@@ -45,18 +45,6 @@
       }
     },
     {
-      "id": "api-app-page-layout",
-      "domain": "application",
-      "kind": "api",
-      "probe": { "method": "GET", "path": "/api/settings" },
-      "allowed": ["root", "app-admin"],
-      "title": { "en": "Arrange the built-in pages", "fr": "Disposer les pages intégrées" },
-      "description": {
-        "en": "The arrangement of the served pages (centered, split, drawer, banner, bare) rides on the application settings, beside the colour scheme: it says where the brand, the picture and the form sit on every page this gateway serves, so it belongs to whoever administers the application rather than the routing.",
-        "fr": "La disposition des pages servies (centrée, split, tiroir, bannière, nue) voyage avec les réglages de l'application, à côté du schéma de couleurs : elle dit où se placent la marque, l'image et le formulaire sur chaque page servie, donc elle revient à qui administre l'application et non le routage."
-      }
-    },
-    {
       "id": "api-app-users",
       "domain": "application",
       "kind": "api",

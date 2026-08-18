@@ -60,7 +60,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [linux/amd64, linux/arm64]
+        # amd64 ONLY while the two-image split settles: an arm64 runner plus a
+        # manifest list doubles the build minutes of every push, and nothing
+        # being stabilised here is architecture-specific. Put linux/arm64 back
+        # when the pipeline is quiet.
+        platform: [linux/amd64]
     steps:
       - uses: actions/checkout@v7
       - name: Prepare platform name
