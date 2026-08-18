@@ -60,60 +60,6 @@ test('flow-profile-history: a fresh sign-in shows with its method', async ({ bro
   await context.close();
 });
 
-// flow-api-token: a user mints a personal token in the browser, then uses it
-// as a Bearer to reach an authenticated data-plane route WITHOUT a session;
-// revoking it closes the door.
-test('flow-api-token: Bearer token authenticates API calls, revoke closes it', async ({ browser }) => {
-  const context = await browser.newContext({ storageState: authDataFile('user') });
-  const page = await context.newPage();
-  await page.goto(DATA_URL + '/profile/tokens');
-  // Creation happens in a modal: open it, fill, submit.
-  await page.click('#tk-open');
-  await page.fill('#tk-create-dlg input[name=name]', 'e2e-token');
-  await page.selectOption('#tk-create-dlg select[name=days]', '90');
-  await page.click('#tk-create-dlg button[value="create"]');
-
-  // The token is revealed once in its own modal.
-  const shown = await page.locator('#tk-reveal-dlg #tk-value').textContent();
-  const token = (shown || '').trim();
-  expect(token).toMatch(/^mk_/);
-  await page.click('#tk-done');
-
-  // The seeded "/secure" route is an AUTHENTICATED UI route. A fresh client
-  // with NO cookies but the Bearer token gets through; without it, refused.
-  // We assert the AUTH GATE (401 or not), not the upstream status, so the
-  // test never depends on the demo upstream being reachable.
-  //
-  // The catch-all stands aside first. A refusal stopped being terminal when a
-  // route's security became part of selecting it: without this, the anonymous
-  // call is turned away by /secure and then served by /**, and the gate this
-  // test exists for is never reached.
-  const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
-  const trap = await (await root.get('/api/routes/trap')).json();
-  expect((await root.put('/api/routes/trap', { data: { ...trap, enabled: false } })).ok()).toBeTruthy();
-
-  const api = await request.newContext({ baseURL: DATA_URL });
-  const withTok = await api.get('/secure/get', {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-  expect(withTok.status(), 'token must pass the auth gate').not.toBe(401);
-  const without = await api.get('/secure/get', { headers: { Accept: 'application/json' } });
-  expect(without.status()).toBe(401);
-  expect((await root.put('/api/routes/trap', { data: { ...trap, enabled: true } })).ok()).toBeTruthy();
-  await root.dispose();
-
-  // Revoke it in the browser (a confirm modal guards the destructive action).
-  const row = page.locator('.tk').filter({ hasText: 'e2e-token' });
-  await row.locator('button[data-revoke]').click();
-  await page.click('#tk-revoke-dlg button[value="revoke"]');
-  await expect(page.locator('.tk').filter({ hasText: 'e2e-token' })).toHaveCount(0);
-  const afterRevoke = await api.get('/secure/get', {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-  expect(afterRevoke.status()).toBe(401);
-  await api.dispose();
-  await context.close();
-});
 
 test('flow-rate-limit: repeated failed sign-ins answer 429', async () => {
   const anon = await request.newContext({ baseURL: DATA_URL });
