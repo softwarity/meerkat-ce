@@ -52,7 +52,9 @@ test('flow-profile-history: a fresh sign-in shows with its method', async ({ bro
   await expect(page).toHaveURL(DATA_URL + '/profile/history');
   // THIS browser's row (badged through its fresh MEERKAT_BROWSER cookie)
   // simplifies to "This browser" + method, no browser/OS/IP.
-  const mine = page.locator('.lh-row').filter({ has: page.locator('.lh-label.here') }).first();
+  // .row, not .lh-row: the history page took the console's shared row style,
+  // and the label keeps the lh- prefix. The locator was left behind.
+  const mine = page.locator('.row').filter({ has: page.locator('.lh-label.here') }).first();
   await expect(mine).toBeVisible();
   await expect(mine.locator('.lh-method')).toHaveText(/password/i);
   await context.close();
@@ -81,6 +83,15 @@ test('flow-api-token: Bearer token authenticates API calls, revoke closes it', a
   // with NO cookies but the Bearer token gets through; without it, refused.
   // We assert the AUTH GATE (401 or not), not the upstream status, so the
   // test never depends on the demo upstream being reachable.
+  //
+  // The catch-all stands aside first. A refusal stopped being terminal when a
+  // route's security became part of selecting it: without this, the anonymous
+  // call is turned away by /secure and then served by /**, and the gate this
+  // test exists for is never reached.
+  const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
+  const trap = await (await root.get('/api/routes/trap')).json();
+  expect((await root.put('/api/routes/trap', { data: { ...trap, enabled: false } })).ok()).toBeTruthy();
+
   const api = await request.newContext({ baseURL: DATA_URL });
   const withTok = await api.get('/secure/get', {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -88,6 +99,8 @@ test('flow-api-token: Bearer token authenticates API calls, revoke closes it', a
   expect(withTok.status(), 'token must pass the auth gate').not.toBe(401);
   const without = await api.get('/secure/get', { headers: { Accept: 'application/json' } });
   expect(without.status()).toBe(401);
+  expect((await root.put('/api/routes/trap', { data: { ...trap, enabled: true } })).ok()).toBeTruthy();
+  await root.dispose();
 
   // Revoke it in the browser (a confirm modal guards the destructive action).
   const row = page.locator('.tk').filter({ hasText: 'e2e-token' });
