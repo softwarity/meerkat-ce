@@ -43,6 +43,17 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
+      // The upstream the demo routes proxy to, run HERE rather than reached on
+      // the internet. Depending on httpbin.org meant three tests failing on
+      // i/o timeouts from a CI runner - a verdict about somebody else's
+      // website, delivered as if it were about this product.
+      // go-httpbin: same API, multi-arch, and it starts in milliseconds.
+      command: 'docker run --rm -p 18099:8080 mccutchen/go-httpbin',
+      url: 'http://localhost:18099/status/200',
+      reuseExistingServer: true,
+      timeout: 120_000,
+    },
+    {
       command: 'node scripts/start-gateway.mjs',
       url: `${ADMIN_URL}/login`,
       reuseExistingServer: false,

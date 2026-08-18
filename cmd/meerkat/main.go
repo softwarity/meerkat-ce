@@ -250,7 +250,7 @@ func seedDemoRoute(ctx context.Context, st *store.Store) error {
 		Order:    100,
 		Enabled:  true,
 		IsUI:     true,
-		Upstream: "https://httpbin.org",
+		Upstream: demoUpstream(),
 		Predicates: []routing.Spec{
 			{Type: "path", Args: map[string]any{"patterns": []any{"/demo/**"}}},
 		},
@@ -273,7 +273,7 @@ func seedDemoRoute(ctx context.Context, st *store.Store) error {
 		Enabled:  true,
 		Access:   store.Access{Level: store.AccessAuth},
 		IsUI:     true,
-		Upstream: "https://httpbin.org",
+		Upstream: demoUpstream(),
 		Predicates: []routing.Spec{
 			{Type: "path", Args: map[string]any{"patterns": []any{"/secure/**"}}},
 		},
@@ -294,11 +294,24 @@ func seedDemoRoute(ctx context.Context, st *store.Store) error {
 		Name:     "trap",
 		Order:    900,
 		Enabled:  true,
-		Upstream: "https://httpbin.org",
+		Upstream: demoUpstream(),
 		Predicates: []routing.Spec{
 			{Type: "path", Args: map[string]any{"patterns": []any{"/**"}}},
 		},
 	})
+}
+
+// demoUpstream is what the seeded demo routes point at. httpbin.org by
+// default, because a first start should show something working without asking
+// anyone to run a container - and an ADDRESS in env, because a test bench must
+// not depend on somebody else's website being up. The e2e suite runs its own
+// httpbin and names it here; without that, three tests failed on i/o timeouts
+// that said nothing about this product.
+func demoUpstream() string {
+	if u := os.Getenv("MEERKAT_DEMO_UPSTREAM"); u != "" {
+		return u
+	}
+	return "https://httpbin.org"
 }
 
 // settleTenancy seeds the mode on a first start and gets out of the way after.

@@ -37,6 +37,9 @@ const child = spawn(
     env: {
       ...process.env,
       MEERKAT_ADMIN_PASSWORD: 'e2e-Root-Password-1',
+      // The demo routes proxy to the httpbin started beside us, never to the
+      // internet: see playwright.config.ts.
+      MEERKAT_DEMO_UPSTREAM: 'http://localhost:18099',
     },
   },
 );
