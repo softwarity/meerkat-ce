@@ -138,8 +138,6 @@ test('flow-api-token: Bearer token authenticates API calls, revoke closes it', a
   expect(withTok.status(), 'token must pass the auth gate').not.toBe(401);
   const without = await api.get('/secure/get', { headers: { Accept: 'application/json' } });
   expect(without.status()).toBe(401);
-  expect((await root.put('/api/routes/trap', { data: { ...trap, enabled: true } })).ok()).toBeTruthy();
-  await root.dispose();
 
   // Revoke it in the browser (a confirm modal guards the destructive action).
   const row = page.locator('.tk').filter({ hasText: 'e2e-token' });
@@ -150,6 +148,11 @@ test('flow-api-token: Bearer token authenticates API calls, revoke closes it', a
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
   expect(afterRevoke.status()).toBe(401);
+
+  // Only now: every assertion above needs the catch-all absent, the last one
+  // included - a revoked token is refused by /secure, and /** would serve it.
+  expect((await root.put('/api/routes/trap', { data: { ...trap, enabled: true } })).ok()).toBeTruthy();
+  await root.dispose();
   await api.dispose();
   await context.close();
 });
