@@ -12,7 +12,10 @@ async function openSelfRegistration(root: APIRequestContext, captcha: boolean) {
   const settings = await (await root.get('/api/settings')).json();
   const put = await root.put('/api/settings', { data: { ...settings, selfRegistration: true } });
   expect(put.ok(), await put.text()).toBeTruthy();
-  const local = await (await root.get('/api/auth-providers/local')).json();
+  // There is no GET for one authority - the list is the read side.
+  const all = await (await root.get('/api/auth-providers')).json();
+  const local = all.find((p: { id: string }) => p.id === 'local');
+  expect(local, 'the local authority must exist').toBeTruthy();
   const authority = await root.put('/api/auth-providers/local', {
     data: { ...local, autoCreate: 'yes', captcha },
   });
