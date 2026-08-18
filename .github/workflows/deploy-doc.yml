@@ -51,7 +51,11 @@ jobs:
 
       - name: Build doc-site for GitHub Pages
         working-directory: docs
-        run: npm run build -- --base-href /meerkat/
+        # The base href follows the REPOSITORY, because this workflow is
+        # mirrored: served from softwarity.github.io/meerkat-ce/ with /meerkat/
+        # baked in, every asset path lands one directory beside itself and the
+        # page renders black.
+        run: npm run build -- --base-href "/${{ github.event.repository.name }}/"
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

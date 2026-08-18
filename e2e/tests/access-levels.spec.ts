@@ -41,6 +41,16 @@ test('flow-access-levels: a pending account passes "signed in" and is sent to th
     expect(res.ok(), await res.text()).toBeTruthy();
   }
 
+  // The seeded catch-all has to stand aside. Since a route's security became
+  // part of SELECTING it (2026-08-16), a refusal is no longer terminal: the
+  // matcher keeps looking, and /** answers whoever the route above turned
+  // away. That is the intended behaviour - two /** routes may differ by
+  // organisation - but it means the refusal below can only be observed when
+  // nothing else is willing to serve the request.
+  const trap = await (await root.get('/api/routes/trap')).json();
+  const parked = await root.put('/api/routes/trap', { data: { ...trap, enabled: false } });
+  expect(parked.ok(), await parked.text()).toBeTruthy();
+
   // Someone confirmed but granted nothing: no membership anywhere. Creation
   // answers a one-time password, and the first sign-in must spend it - a
   // session still pending a password change is not a session.
@@ -76,5 +86,7 @@ test('flow-access-levels: a pending account passes "signed in" and is sent to th
     expect((await root.delete(`/api/routes/${id}`)).ok()).toBeTruthy();
   }
   expect((await root.delete(`/api/users/${body.user.id}`)).ok()).toBeTruthy();
+  const back = await root.put('/api/routes/trap', { data: { ...trap, enabled: true } });
+  expect(back.ok(), await back.text()).toBeTruthy();
   await root.dispose();
 });
