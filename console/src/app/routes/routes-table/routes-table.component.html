@@ -1,0 +1,107 @@
+<div class="table-wrap">
+  <mat-table [dataSource]="routes()" cdkDropList (cdkDropListDropped)="drop($event)">
+    <ng-container matColumnDef="name">
+      <mat-header-cell *matHeaderCellDef i18n="@@Name">Name</mat-header-cell>
+      <mat-cell *matCellDef="let r">
+        <mat-icon
+          cdkDragHandle
+          class="handle"
+          [class.idle]="!reorderable()"
+          (click)="$event.stopPropagation()"
+        >drag_indicator</mat-icon>
+        <span class="name-cell" [class.off]="!r.enabled">
+          <span class="dot" [title]="r.enabled ? 'enabled' : 'disabled'"></span>
+          <span class="name">{{ r.name }}</span>
+          <!-- A route is always a service; UI comes on top (ROUTE-02), and it
+               changes what the route can do - injections, the user button, path
+               locales. Worth seeing without opening it. -->
+          @if (r.isUi) {<mat-icon class="ui-mark" i18n-matTooltip="@@Serves_pages_in_a_browser" matTooltip="UI: serves pages in a browser">web</mat-icon>}
+        </span>
+      </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="access">
+      <mat-header-cell *matHeaderCellDef class="access-col"></mat-header-cell>
+      <mat-cell *matCellDef="let r" class="access-col" [class.off]="!r.enabled">
+        <app-access-badges
+          [access]="accessBadge(r)"
+          [endpoints]="endpointRules(r)"
+          [endpointsLink]="r.api?.openapiUrl ? '/infra/endpoint-security' : null"
+          [endpointsQuery]="{ route: r.id }"
+          [unguarded]="gatesNothing(r)"
+        />
+      </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="matching">
+      <mat-header-cell *matHeaderCellDef i18n="@@Matching">Matching</mat-header-cell>
+      <mat-cell *matCellDef="let r" [class.off]="!r.enabled">
+        <span class="muted mono">{{ summary(r) }}</span>
+      </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="upstream">
+      <mat-header-cell *matHeaderCellDef i18n="@@Upstream">Upstream</mat-header-cell>
+      <mat-cell *matCellDef="let r" [class.off]="!r.enabled">
+        <span class="mono">{{ r.upstream }}</span>
+        <span rowActions="tonal">
+          @if (r.enabled) {
+            <button
+              matIconButton
+              (click)="$event.stopPropagation(); toggleEnabled.emit(r)"
+              i18n-matTooltip="@@Disable_route"
+              matTooltip="Disable route"
+              i18n-aria-label="@@Disable_route"
+              aria-label="Disable route"
+            >
+              <mat-icon>pause_circle</mat-icon>
+            </button>
+          } @else {
+            <button
+              matIconButton
+              (click)="$event.stopPropagation(); toggleEnabled.emit(r)"
+              i18n-matTooltip="@@Enable_route"
+              matTooltip="Enable route"
+              i18n-aria-label="@@Enable_route"
+              aria-label="Enable route"
+            >
+              <mat-icon>play_circle</mat-icon>
+            </button>
+          }
+          <button
+            matIconButton
+            (click)="$event.stopPropagation(); duplicate.emit(r)"
+            i18n-matTooltip="@@Duplicate_route"
+            matTooltip="Duplicate route"
+            i18n-aria-label="@@Duplicate_route"
+            aria-label="Duplicate route"
+          >
+            <mat-icon>content_copy</mat-icon>
+          </button>
+          <button
+            matIconButton
+            (click)="$event.stopPropagation(); remove.emit(r)"
+            i18n-matTooltip="@@Delete_route"
+            matTooltip="Delete route"
+            i18n-aria-label="@@Delete_route"
+            aria-label="Delete route"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        </span>
+      </mat-cell>
+    </ng-container>
+
+    <mat-header-row *matHeaderRowDef="columns; sticky: true"></mat-header-row>
+    <!-- No title on the row: a native tooltip covering the whole width shows
+         up over every badge that has something of its own to say, and the
+         cursor already says the row is clickable. -->
+    <mat-row
+      *matRowDef="let row; columns: columns"
+      cdkDrag
+      [cdkDragDisabled]="!reorderable()"
+      class="clickable"
+      (click)="onRowClick(row)"
+    ></mat-row>
+  </mat-table>
+</div>

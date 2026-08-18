@@ -1,0 +1,478 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px 16px 20px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+mat-selection-list {
+  flex: 0 0 168px;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+  overflow: auto;
+  padding-top: 4px;
+}
+/* Modifiers / UI group headers in the section nav - accent-colored so the
+   groups read at a glance */
+mat-selection-list [matSubheader] {
+  margin: 14px 0 2px;
+  padding: 3px 16px 0;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mat-sys-secondary);
+}
+.panel {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 16px 20px;
+}
+.flags {
+  display: flex;
+  gap: 24px;
+  margin: 4px 0 12px;
+}
+.error {
+  color: var(--mat-sys-error);
+  background: color-mix(in srgb, var(--mat-sys-error) 12%, transparent);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  white-space: pre-wrap;
+}
+footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+mat-form-field,
+app-form-field {
+  width: 100%;
+}
+/* The shared field is inline-block by default (it sits in rows elsewhere);
+   in this drawer it stands on its own line like a mat-form-field does. */
+app-form-field {
+  display: block;
+}
+
+/* route type + UI/API option sections */
+.type-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+/* Sets the UI section apart from the service fields above it. */
+.ui-sep {
+  margin: 28px 0 18px;
+}
+/* No measure cap: the drawer is already 900px wide at most, which puts a line
+   around 80 characters - readable on its own. Capping at 52ch on top of it
+   left a third of every section empty and wrapped hints that fit. */
+.section-hint {
+  margin: 0 0 14px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+.sub {
+  margin: 18px 0 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.sub:first-child {
+  margin-top: 0;
+}
+.btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.height-field {
+  width: 130px;
+}
+app-form-field.height-field {
+  display: inline-block;
+}
+.position-field {
+  width: 240px;
+}
+.show-name {
+  align-self: center;
+}
+.height-field.wide {
+  width: 170px;
+}
+
+/* locales rows: on/off toggle, code, console-locale name, endonym */
+.locale-row {
+  display: grid;
+  grid-template-columns: 40px 110px 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 2px 4px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  max-width: 560px;
+}
+.locale-row .lc {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+.locale-row .ln {
+  color: var(--mat-sys-on-surface-variant);
+}
+.locale-row.off-locale .lc,
+.locale-row.off-locale span {
+  opacity: 0.4;
+}
+.add-locale {
+  align-self: center;
+}
+/* user-info per-field rows: checkbox + its attribute/meta name */
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 3px 0;
+  position: relative;
+}
+.field-row mat-checkbox {
+  width: 130px;
+}
+.field-row mat-form-field,
+.field-row app-form-field {
+  width: 220px;
+  display: inline-block;
+}
+.id-hint {
+  margin-top: 12px;
+}
+
+/* Identity: one row per selected fact - its name, the mapping input, then a
+   live example of what actually travels. */
+.id-attrs {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.id-attr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+}
+.id-attr .id-field {
+  width: 140px;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+/* An unchecked attribute does not travel: its row reads as inactive. */
+.id-attr.off .id-eq,
+.id-attr.off .id-also,
+.id-attr.off .id-sample {
+  opacity: 0.4;
+}
+/* What rides along with this fact, under names of its own. */
+.id-attr .id-also {
+  font-size: 0.74rem;
+  color: var(--mat-sys-on-surface-variant);
+  cursor: help;
+}
+.id-attr .id-map {
+  width: 200px;
+  display: inline-block;
+}
+/* Filled, not a plain icon among the fields: this is where a 9 KB header
+   becomes a 26-byte one, and a flat icon in a row of inputs is not found.
+   Through the button's own tokens rather than its internals. */
+.id-attr .id-shape {
+  --mat-icon-button-icon-color: var(--mat-sys-on-primary-container);
+  --mat-icon-button-state-layer-size: 36px;
+  background: var(--mat-sys-primary-container);
+}
+.id-attr .id-shape:disabled {
+  background: color-mix(in srgb, var(--mat-sys-primary-container) 38%, transparent);
+}
+.id-attr .id-eq {
+  color: var(--mat-sys-outline);
+}
+.id-attr .id-sample {
+  font-family: monospace;
+  font-size: 0.82rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+/* The token lifetime gets its own line, the preview closing it on the right.
+   The field is subscript-less (dynamic), so both really center on each other. */
+.ttl-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  /* No top margin: the row above already reserves its form-field subscript. */
+}
+
+/* The two-state format button lives in every mapping field (an @if would break
+   the matSuffix projection) and only shows on multi-valued attributes. */
+.id-attr .fmt-btn {
+  display: none;
+}
+.id-attr .fmt-btn.shown {
+  display: inline-flex;
+}
+
+/* user-button preview: a mock page; the button anchors per the configured
+   corner and the ghost menu opens away from the anchored edge. */
+.preview {
+  position: relative;
+  margin: 14px 0 6px;
+  height: 230px;
+  border: 1px dashed var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium, 8px);
+  background: var(--mat-sys-surface-container-low);
+  overflow: hidden;
+}
+/* faint page skeleton behind the button, so the corner reads as "a page" */
+.preview::before {
+  content: '';
+  position: absolute;
+  inset: 44px 24px auto;
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--mat-sys-on-surface) 7%, transparent);
+  box-shadow:
+    0 26px 0 color-mix(in srgb, var(--mat-sys-on-surface) 5%, transparent),
+    0 52px 0 color-mix(in srgb, var(--mat-sys-on-surface) 5%, transparent),
+    0 78px 0 color-mix(in srgb, var(--mat-sys-on-surface) 4%, transparent),
+    0 104px 0 color-mix(in srgb, var(--mat-sys-on-surface) 4%, transparent);
+}
+.anchor {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pos-top-left .anchor { top: 14px; left: 14px; align-items: flex-start; }
+.pos-top-right .anchor { top: 14px; right: 14px; align-items: flex-end; }
+.pos-bottom-left .anchor { bottom: 14px; left: 14px; align-items: flex-start; flex-direction: column-reverse; }
+.pos-bottom-right .anchor { bottom: 14px; right: 14px; align-items: flex-end; flex-direction: column-reverse; }
+.fake-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--mat-sys-outline);
+  background: var(--mat-sys-surface);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.fake-avatar {
+  display: grid;
+  place-items: center;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  font-weight: 700;
+}
+.fake-menu {
+  display: grid;
+  gap: 9px;
+  width: 170px;
+  padding: 12px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 10px;
+  background: var(--mat-sys-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+/* ghost menu lines: entries exist, their content does not matter here */
+.gl {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--mat-sys-on-surface) 14%, transparent);
+}
+.gl.strong { background: color-mix(in srgb, var(--mat-sys-on-surface) 30%, transparent); }
+.gl.sep { height: 1px; border-radius: 0; background: var(--mat-sys-outline-variant); }
+.gl.out { background: color-mix(in srgb, var(--mat-sys-error) 45%, transparent); }
+.gl.w40 { width: 40%; }
+.gl.w50 { width: 50%; }
+.gl.w60 { width: 60%; }
+.gl.w70 { width: 70%; }
+.gl.w80 { width: 80%; }
+
+/* the ACTIVE section must read at a glance (same accent as the shell's
+   drawer items) */
+mat-selection-list mat-list-option[aria-selected='true'] {
+  background: var(--mat-sys-secondary-container);
+  border-radius: 0 999px 999px 0;
+  --mdc-list-list-item-label-text-color: var(--mat-sys-on-secondary-container);
+  --mdc-list-list-item-hover-label-text-color: var(--mat-sys-on-secondary-container);
+}
+
+
+// A route that answers here cannot also carry modifiers: the server refuses
+// the combination, so say it where the choice is made.
+.section-hint.warn {
+  color: var(--mat-sys-error);
+}
+
+// The warning about modifiers a terminal mode cannot keep, with its way out.
+.warn-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  .section-hint {
+    margin: 0;
+    flex: 1;
+  }
+
+  button {
+    flex: none;
+  }
+}
+
+/* The header carries the identity of what is being edited: its name, and
+   whether it serves pages. Both stay in view whatever section is open - they
+   are what someone checks they are on the right route with. */
+/* Aligned with the panel's own fields: the section list is 168px and the panel
+   pads 20px, so the name starts where every other input starts. Its width is
+   its own - a route name is short, and a field spanning the drawer reads as an
+   empty one. */
+header .name-field {
+  flex: 0 1 380px;
+  min-width: 0;
+}
+
+/* What kind of drawer this is, before the name it carries. Sized to the
+   section list minus the header's own padding and gap, so what follows lines
+   up with the panel. */
+header .head-kind {
+  flex: 0 0 160px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* The UI switch sits on the group of sections it commands, and IS the group's
+   title: a checkbox carrying the word, in the subheader's own type. */
+mat-selection-list .ui-head {
+  display: flex;
+  align-items: center;
+}
+mat-selection-list .ui-toggle {
+  --mat-checkbox-label-text-size: 0.72rem;
+  --mat-checkbox-label-text-weight: 700;
+  --mat-checkbox-label-text-tracking: 0.08em;
+  --mat-checkbox-label-text-color: var(--mat-sys-secondary);
+  margin-left: -10px;
+}
+
+/* Roles only: which ones travel, and the head to drop from each. */
+.id-tags {
+  flex: 0 0 150px;
+}
+
+.id-trim {
+  flex: 0 0 120px;
+}
+
+/* What the choice above costs on the wire, on this catalogue. */
+.id-weight {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 10px 30px;
+  font-size: 0.76rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* The [Enterprise] cap sits ON the field it explains rather than beside it: in
+   the flow it widened the two frozen rows and broke the column every other row
+   lines up on. Centred over the input, which is inert underneath anyway.
+   The offsets are the columns declared above (checkbox width + the row gap). */
+.id-attr app-ee-lock,
+.field-row app-ee-lock {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  justify-content: center;
+  z-index: 1;
+}
+.id-attr app-ee-lock {
+  left: 150px;
+  width: 200px;
+}
+.field-row app-ee-lock {
+  left: 144px;
+  width: 220px;
+}
+
+// The Locales section owns the panel's height so that ONE thing scrolls: the
+// list of languages. Full or not, it takes the whole area above the forwarding
+// options - a scrolling box that grows and shrinks with its content moves the
+// controls under it every time a language is added.
+.locales-pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.locales-pane .locale-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+.locales-pane .forwarding {
+  flex: none;
+  padding-top: 4px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+// The mechanism names what travels AND what the page does, so the field is
+// wide enough to read it whole, and each option carries its example.
+.mech-field {
+  flex: 0 1 340px;
+}
+
+/* A rule is posed on this route. A dot rather than a number: the other
+   sections count things one adds, this one holds a single rule whose shape
+   the tooltip spells out. */
+mat-list-option .mark {
+  margin-inline-start: 6px;
+  color: var(--mat-sys-primary);
+  font-size: 0.7rem;
+  vertical-align: middle;
+}

@@ -1,0 +1,29 @@
+<div class="duo" #duo>
+  <div class="pane" [class.off]="!darkOffered()" [style.height.px]="paneHeight()" [style.width.px]="paneWidth()">
+    @if (darkUrl(); as url) {
+      <iframe
+        [src]="url"
+        title="Dark preview"
+        (load)="frameReady($event)"
+        [style.transform]="'scale(' + scale() + ')'"
+      ></iframe>
+    }
+  </div>
+  <div class="pane" [class.off]="!lightOffered()" [style.height.px]="paneHeight()" [style.width.px]="paneWidth()">
+    @if (lightUrl(); as url) {
+      <iframe
+        [src]="url"
+        title="Light preview"
+        (load)="frameReady($event)"
+        [style.transform]="'scale(' + scale() + ')'"
+      ></iframe>
+    }
+  </div>
+
+  <!-- The theme picker rail, OVERLAID on the boundary between the two panes so
+       they can sit tight together and the nav block straddles both. Absolute ->
+       never widens .duo, so it can't perturb the measured width (the scale). -->
+  <div class="rail-slot">
+    <ng-content></ng-content>
+  </div>
+</div>

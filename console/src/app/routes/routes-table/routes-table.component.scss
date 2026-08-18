@@ -1,0 +1,103 @@
+@use '../../../styles/table';
+
+:host {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.table-wrap {
+  @include table.frame;
+}
+// The floating FAB sits over the frame's bottom-right corner: the last row
+// clears it from INSIDE, so the page keeps no empty band under the table.
+mat-row:last-of-type {
+  margin-bottom: 56px;
+}
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+.off {
+  opacity: 0.45;
+}
+mat-row.clickable {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+mat-row.clickable:hover {
+  background: var(--mat-sys-surface-container);
+}
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--mat-sys-secondary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--mat-sys-secondary) 60%, transparent);
+  vertical-align: middle;
+}
+.off .dot {
+  background: var(--mat-sys-outline);
+  box-shadow: none;
+}
+.name {
+  font-weight: 500;
+}
+/* A fixed-width column keeps the access badges vertically aligned (no staircase
+   from variable-length names). */
+// Wide enough for the written level plus three counted icons, so the badges
+// never wrap and the column below them stays aligned.
+.access-col {
+  flex: 0 0 190px;
+  justify-content: flex-start;
+}
+// The drag handle rides INSIDE the first cell (like the roles table), so the
+// cell's own padding applies and a thin column never clips it.
+.handle {
+  flex: 0 0 auto;
+  margin-right: 8px;
+  cursor: grab;
+  color: var(--mat-sys-on-surface-variant);
+}
+.handle:active {
+  cursor: grabbing;
+}
+/* Filtered: the order belongs to the whole list, so there is nothing to drag.
+   The handle says it by going dim and losing its grip cursor - no sentence
+   needed for a control that visibly does not respond. */
+.handle.idle {
+  opacity: 0.3;
+  cursor: default;
+}
+.name-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* while a row is dragging, keep it visually intact on top */
+.cdk-drag-preview {
+  display: flex;
+  align-items: center;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.28);
+  background: var(--mat-sys-surface-container-high);
+  border-radius: 8px;
+}
+.cdk-drag-placeholder {
+  opacity: 0.3;
+}
+.cdk-drop-list-dragging .clickable:not(.cdk-drag-placeholder) {
+  transition: transform 0.18s cubic-bezier(0, 0, 0.2, 1);
+}
+
+@include table.banded-rows;
+
+// The UI mark sits with the name, quiet enough not to compete with it.
+.ui-mark {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  color: var(--mat-sys-on-surface-variant);
+  flex: none;
+}

@@ -1,0 +1,74 @@
+<div class="banner">
+  <h1 i18n="@@Built_in_pages">Built-in pages</h1>
+</div>
+
+@if (scope.loading()) {
+  <loading-indicator withContainer />
+} @else {
+  <div class="layout">
+    <div class="left">
+      <nav mat-tab-nav-bar [tabPanel]="panel" mat-stretch-tabs="false">
+        <a
+          mat-tab-link
+          routerLink="theme"
+          routerLinkActive
+          #tTheme="routerLinkActive"
+          [active]="tTheme.isActive"
+          i18n="@@Theme"
+          >Theme</a
+        >
+        <a
+          mat-tab-link
+          routerLink="layout"
+          routerLinkActive
+          #tLayout="routerLinkActive"
+          [active]="tLayout.isActive"
+          i18n="@@Layout"
+          >Layout</a
+        >
+        <a
+          mat-tab-link
+          routerLink="branding"
+          routerLinkActive
+          #tBrand="routerLinkActive"
+          [active]="tBrand.isActive"
+          i18n="@@Branding"
+          >Branding</a
+        >
+      </nav>
+      <mat-tab-nav-panel #panel>
+        <router-outlet />
+      </mat-tab-nav-panel>
+    </div>
+
+    <div class="preview">
+      <!-- One preview for the three tabs, and the theme picker in the gap
+           between its two panes (see theme-carousel). -->
+      <app-theme-preview
+        [themeId]="scope.selectedId()"
+        [version]="scope.version()"
+        [dark]="scope.dark()"
+        [light]="scope.light()"
+        [flat]="scope.flat()"
+        [brandName]="scope.appName()"
+        [brandTagline]="scope.tagline()"
+        [brandLogo]="scope.logo()"
+        [background]="scope.bg()"
+        [highlight]="scope.highlightVar()"
+        [pagesScheme]="scope.pagesScheme()"
+        [layout]="scope.layout()"
+      >
+        <app-theme-carousel
+          [themes]="scope.themes()"
+          [presets]="scope.presets()"
+          [selectedId]="scope.selectedId()"
+          (pick)="scope.select($event)"
+          (activateTheme)="scope.activate($event)"
+          (duplicateTheme)="scope.createFrom()"
+          (removeTheme)="scope.removeTheme($event)"
+          (createPreset)="scope.createFromPreset($event)"
+        />
+      </app-theme-preview>
+    </div>
+  </div>
+}

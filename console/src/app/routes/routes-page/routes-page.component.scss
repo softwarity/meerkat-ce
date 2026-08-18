@@ -1,0 +1,68 @@
+:host {
+  display: block;
+  height: 100%;
+}
+mat-drawer-container {
+  height: 100%;
+  background: transparent;
+}
+// The content column fills the height: the banner stays put, the table area
+// scrolls (its header is sticky), and the FAB floats over the bottom-right.
+mat-drawer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  flex: none;
+}
+.banner h1 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+  /* The search takes over the pushing: title, then search, then the actions
+     against the right edge. */
+  flex: none;
+}
+// The page column: banner fixed, table area takes the rest. The SCROLL is on
+// the table's own frame, so the bar belongs to the table rather than to the
+// page. The bottom padding clears the floating FAB.
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  padding: 0 24px 24px;
+}
+// Floats OVER the frame's bottom-right corner, set in by the page's own 24px
+// plus 16 of air: flush against the hairline it reads as stuck to it.
+.fab-new {
+  position: absolute;
+  right: 40px;
+  bottom: 40px;
+  z-index: 2;
+}
+.empty {
+  padding: 48px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+mat-drawer {
+  width: min(900px, 96vw);
+  border-left: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-high);
+}
+
+/* The search sits next to the title and pushes the actions to the right: it
+   belongs to the list, not to the toolbar. An ordinary field in every other
+   respect - same subscript reserve as everywhere else, so it looks like the
+   fields it is a sibling of - at the width a route name or a path deserves. */
+.banner .search {
+  flex: 0 1 380px;
+  margin-right: auto;
+}
+

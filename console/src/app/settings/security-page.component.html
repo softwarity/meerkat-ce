@@ -1,0 +1,179 @@
+@if (loading()) {
+  <loading-indicator withContainer />
+} @else {
+  <div class="banner">
+    <h1 i18n="@@Security">Security</h1>
+  </div>
+
+  <div class="content">
+    <mat-card appearance="outlined">
+      <h3 i18n="@@Two_factor">Two-factor</h3>
+      <p class="hint text-muted" i18n="@@MFA_global_hint">
+        Require a second factor for every user. Organizations and members can override this.
+      </p>
+      <mat-slide-toggle [checked]="mfaRequired()" (change)="mfaRequired.set($event.checked)">
+        <ng-container i18n="@@Require_two_factor">Require two-factor for everyone</ng-container>
+      </mat-slide-toggle>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <h3 i18n="@@Session_TTL">Session TTL</h3>
+      <p class="hint text-muted" i18n="@@Session_TTL_hint">
+        How long a session lives before the user must sign in again.
+      </p>
+      <mat-form-field class="field">
+        <mat-label i18n="@@Session_TTL">Session TTL</mat-label>
+        <mat-select [value]="sessionTTL()" (selectionChange)="sessionTTL.set($event.value)">
+          @for (c of sessionTtlChoices(); track c) {
+            <mat-option [value]="c">{{ human(c) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <h3 i18n="@@Passwords">Passwords</h3>
+      <p class="hint text-muted" i18n="@@Password_policy_hint">
+        What a new password must contain. Applied wherever one is typed: sign-up, the forced
+        change at first login, the profile, and a reset link. Zero means the rule is not asked
+        for, and a rule that is not asked for is not shown either.
+      </p>
+      <div class="rl-row">
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Length">Length</mat-label>
+          <input matInput type="number" min="0" max="128" [value]="pwLength()" (input)="pwLength.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Lowercase">Lowercase</mat-label>
+          <input matInput type="number" min="0" max="16" [value]="pwLower()" (input)="pwLower.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Uppercase">Uppercase</mat-label>
+          <input matInput type="number" min="0" max="16" [value]="pwUpper()" (input)="pwUpper.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Digits">Digits</mat-label>
+          <input matInput type="number" min="0" max="16" [value]="pwDigits()" (input)="pwDigits.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Special_characters">Special characters</mat-label>
+          <input matInput type="number" min="0" max="16" [value]="pwSpecial()" (input)="pwSpecial.set(+$any($event.target).value)" />
+        </mat-form-field>
+      </div>
+      <div class="rl-row">
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@No_reuse_of_the_last">No reuse of the last</mat-label>
+          <input matInput type="number" min="0" max="24" [value]="pwHistory()" (input)="pwHistory.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Expires_after_days">Expires after (days)</mat-label>
+          <input matInput type="number" min="0" max="3650" [value]="pwExpiry()" (input)="pwExpiry.set(+$any($event.target).value)" />
+        </mat-form-field>
+      </div>
+      <p class="hint text-muted" i18n="@@Password_history_hint">
+        Previous passwords are kept as hashes and compared when a new one is chosen, the one in
+        use included. Expiry is checked at sign-in, not by a clock: an expired password sends the
+        person to the change page instead of ending a session they are working in. A password
+        whose age is unknown never expires.
+      </p>
+      @if (pwLength() < pwSum()) {
+        <p class="hint text-error" i18n="@@Password_length_raised">
+          The length will be raised to {{ pwSum() }} on save: the kinds above already need that many.
+        </p>
+      }
+      @if (pwPreview().length) {
+        <p class="hint text-muted" i18n="@@Password_preview_hint">Users will see:</p>
+        <ul class="pw-preview">
+          @for (r of pwPreview(); track r) {
+            <li>{{ r }}</li>
+          }
+        </ul>
+      } @else {
+        <p class="hint text-muted" i18n="@@Password_no_rule">
+          No rule: any password is accepted, however short.
+        </p>
+      }
+      <div class="force-row" any-role="root">
+        <button matButton="outlined" (click)="forceChangeForAll()" [disabled]="forcing()">
+          <mat-icon>autorenew</mat-icon>
+          <ng-container i18n="@@Force_a_change_for_everyone">Force a change for everyone</ng-container>
+        </button>
+        <span class="hint text-muted" i18n="@@Force_a_change_for_everyone_hint">
+          Every local account changes its password at its next sign-in, yours excepted. One
+          account at a time is in Users.
+        </span>
+      </div>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <h3 i18n="@@Rate_limiting">Rate limiting</h3>
+      <p class="hint text-muted" i18n="@@Rate_limiting_hint">
+        Throttles brute-force attempts: failed sign-ins per address and account within the
+        window, and wrong two-factor codes per account. Zero disables a limiter.
+      </p>
+      <div class="rl-row">
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Failed_sign_ins">Failed sign-ins</mat-label>
+          <input matInput type="number" min="0" max="1000" [value]="rlLogin()" (input)="rlLogin.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Wrong_codes">Wrong 2FA codes</mat-label>
+          <input matInput type="number" min="0" max="100" [value]="rlTotp()" (input)="rlTotp.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="ttl">
+          <mat-label i18n="@@Within">Within</mat-label>
+          <mat-select [value]="rlWindow()" (selectionChange)="rlWindow.set($event.value)">
+            @for (d of rlWindows; track d) {
+              <mat-option [value]="d">{{ human(d) }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <h3 i18n="@@Passkeys">Passkeys</h3>
+      <p class="hint text-muted" i18n="@@Passkeys_global_hint">
+        Let users register passkeys and sign in with them instead of the password and second factor.
+      </p>
+      <mat-slide-toggle [checked]="passkeysAllowed()" (change)="passkeysAllowed.set($event.checked)">
+        <ng-container i18n="@@Allow_passkeys">Allow passkeys</ng-container>
+      </mat-slide-toggle>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <h3 i18n="@@API_tokens">API tokens</h3>
+      <p class="hint text-muted" i18n="@@API_tokens_hint">
+        Let users mint personal access tokens (Profile, Security) to call the API routes behind
+        the gateway without a browser session. A token acts with the user's context at creation.
+      </p>
+      <mat-slide-toggle [checked]="apiTokens()" (change)="apiTokens.set($event.checked)">
+        <ng-container i18n="@@Allow_API_tokens">Allow personal API tokens</ng-container>
+      </mat-slide-toggle>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <h3 i18n="@@Trusted_browsers">Trusted browsers</h3>
+      <p class="hint text-muted" i18n="@@Trusted_browsers_hint">
+        Let users skip the two-factor challenge on a browser they mark as trusted, until it expires.
+      </p>
+      <mat-slide-toggle [checked]="trustAllowed()" (change)="trustAllowed.set($event.checked)">
+        <ng-container i18n="@@Allow_trusted_browsers">Allow trusted browsers</ng-container>
+      </mat-slide-toggle>
+      @if (trustAllowed()) {
+        <mat-form-field class="ttl">
+          <mat-label i18n="@@Trust_duration">Trust duration</mat-label>
+          <mat-select [value]="trustTtl()" (selectionChange)="trustTtl.set($event.value)">
+            @for (d of ttlChoices; track d) {
+              <mat-option [value]="d">{{ human(d) }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+    </mat-card>
+
+    <div class="flex justify-end">
+      <button matButton="filled" (click)="save()" [disabled]="saving()" i18n="@@Save">Save</button>
+    </div>
+  </div>
+}

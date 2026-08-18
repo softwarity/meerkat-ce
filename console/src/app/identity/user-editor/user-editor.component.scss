@@ -1,0 +1,86 @@
+/* A fixed header, then a body that fills the height: the identity/two-factor/
+   account blocks stay put and the sign-in history scrolls on its own, so the
+   drawer itself never scrolls. */
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+header {
+  flex: none;
+}
+/* The history takes the remaining height AND the full width, and owns the
+   scroll: the rest of the panel stays in place. */
+section.history {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+section.history app-login-history {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.identity {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+}
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+section h3 {
+  margin: 0 0 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+/* .danger comes from styles/_utilities.scss - one destructive look. */
+app-mfa-select mat-form-field {
+  width: 240px;
+}
+
+/* The danger zone keeps its frame at the bottom of the drawer, out of the
+   scrolling history above it. */
+section.danger-zone {
+  flex: 0 0 auto;
+  align-self: stretch;
+  gap: 6px;
+}
+section.danger-zone .hint {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}

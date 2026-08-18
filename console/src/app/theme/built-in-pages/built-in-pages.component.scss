@@ -1,0 +1,40 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+
+  h1 {
+    font-size: 1.15rem;
+    font-weight: 500;
+    margin: 0;
+    flex: 1;
+  }
+}
+
+.layout {
+  display: flex;
+  gap: 16px;
+  padding: 0 24px 24px;
+  align-items: flex-start;
+}
+
+/* The tabs live HERE and nowhere else: the preview on the right is the one
+   thing all three tabs are about, and a tab bar spanning it would suggest it
+   changes with them. */
+.left {
+  flex: 0 0 430px;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.left mat-tab-nav-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.preview {
+  flex: 1;
+  min-width: 0;
+}

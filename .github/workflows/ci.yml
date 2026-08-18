@@ -1,0 +1,296 @@
+name: CI
+
+on:
+  push:
+    # Every branch except Dependabot's. Its branches arrive WITH a pull
+    # request, so `push` and `pull_request` both fire and the whole pipeline
+    # runs twice on the same commit - and the push half publishes an image
+    # tagged `dependabot-npm_and_yarn-e2e-e2e-3f52c051c4`, which nobody will
+    # ever deploy. Ignored here, they are still fully tested as pull requests.
+    branches-ignore: ["dependabot/**"]
+  pull_request:
+  workflow_dispatch:
+
+# One pipeline per branch: only the newest commit needs blessing.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - uses: golangci/golangci-lint-action@v9
+
+  # The console, built ONCE and handed to whoever needs it. It was built twice,
+  # in two configurations, for two jobs that both just need the files.
+  console:
+    name: Console
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+      - working-directory: console
+        run: npm ci
+      # Production, not development: it is what ships, and the integration
+      # suite is worth running against the real thing rather than a debug build.
+      - working-directory: console
+        run: npm run build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: console
+          path: console/dist/console/browser
+          retention-days: 1
+
+  # The doc site, built and thrown away. It ships nowhere near the image, so
+  # nothing here needed it - and that was the hole: deploy-doc.yml only runs
+  # AFTER a merge to main, so a change that breaks the site is green all the
+  # way through review and red once it is too late. A Dependabot pull request
+  # raising TypeScript past what Angular accepts passed every check for
+  # exactly that reason.
+  docs:
+    name: Doc site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # gen-version.mjs resolves the latest tag
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - working-directory: docs
+        run: npm ci
+      - working-directory: docs
+        run: npm run build -- --base-href /meerkat/
+
+  # The unit tests, split by the area they cover so a red check names it:
+  # "Routing" rather than "Test (ubuntu-latest)". Ubuntu only - this is about
+  # reading the result, and the same split across three OSes would be fifteen
+  # checks saying one thing.
+  #
+  # The build cache is shared between them (setup-go keys it on go.sum), so the
+  # compilation is paid once across the matrix rather than once per job.
+  unit:
+    name: ${{ matrix.area }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - area: Routing
+            packages: ./internal/routing/... ./internal/filters/... ./internal/gateway/...
+          - area: Authentication
+            packages: ./internal/auth/... ./internal/idp/... ./internal/mfa/... ./internal/session/... ./internal/captcha/...
+          - area: Admin API
+            packages: ./internal/admin/... ./internal/openapi/... ./internal/config/...
+          - area: Storage
+            packages: ./internal/store/... ./internal/features/... ./internal/license/...
+          - area: Secrets and signing
+            packages: ./internal/vault/... ./internal/signing/... ./internal/mail/...
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - run: go vet ${{ matrix.packages }}
+      - run: go test -race ${{ matrix.packages }}
+
+  # Nothing must fall between the areas above: a package nobody listed would
+  # stop being tested on ubuntu and nobody would see it, because the check that
+  # used to cover it is green about something else.
+  coverage-of-the-split:
+    name: Every package is in an area
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - shell: bash
+        run: |
+          listed=$(grep -oE './internal/[a-z]+/\.\.\.' .github/workflows/ci.yml | sort -u | sed 's|/\.\.\.||')
+          # Only packages that HAVE tests: one without any is compiled by the
+          # portability job and has nothing to run here. The day someone adds a
+          # test to it, it appears in this list and the check asks for a home.
+          tested=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./internal/... \
+            | sed 's|github.com/softwarity/meerkat/||' | cut -d/ -f1-2 | sort -u | sed 's|^|./|')
+          missing=$(comm -23 <(echo "$tested") <(echo "$listed"))
+          [ -z "$missing" ] || { echo "these have tests and belong to no area:"; echo "$missing"; exit 1; }
+          echo "every tested package belongs to an area"
+
+  # Everything, in one go: the areas above only cover ./internal, so cmd/,
+  # ee/ and tools/ would otherwise be tested by nobody.
+  #
+  # Linux only, and that is the whole target: Meerkat ships as a Docker image
+  # and nothing else. It used to run here on macOS and Windows too, which cost
+  # two checks and a Windows-specific exemption in the vault tests to answer a
+  # question nobody asks - a gateway is deployed in a cluster, not double-
+  # clicked on a laptop. The portability that does matter is amd64 vs arm64,
+  # and the image job builds both, natively.
+  test:
+    name: Whole tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -race ./...
+
+  # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
+  # Active Directory and Dex; without them these tests SKIP, and a skip is
+  # silent - `ok internal/idp` was being reported for five tests that never
+  # ran.
+  #
+  # One job per directory rather than one for all three. Not for speed - this
+  # is nowhere near the critical path - but because "the directories failed"
+  # sends someone reading logs, while "Active Directory failed" names the
+  # thing. It also stops the slowest server from gating the others: the domain
+  # controller takes about a minute to provision, and OpenLDAP was waiting for
+  # it to test something unrelated.
+  #
+  # Ubuntu only: Docker is not dependable on the macOS and Windows runners, and
+  # interoperability with a directory does not vary by client OS.
+  directories:
+    name: ${{ matrix.directory }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - directory: OpenLDAP
+            service: openldap
+            tests: 'TestLDAPDirectorySignIn|TestLDAPRefusesBadCredentials|TestLDAPNestedGroupsCanBeTurnedOff'
+            expect: 3
+          - directory: Active Directory
+            service: samba
+            tests: 'TestLDAPActiveDirectorySignIn'
+            expect: 1
+          - directory: OIDC (Dex)
+            service: dex
+            tests: 'TestOIDCAgainstDex'
+            expect: 1
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Start ${{ matrix.directory }}
+        working-directory: test/ldap
+        run: docker compose up -d ${{ matrix.service }}
+      # The domain controller provisions itself before it answers, and it is
+      # the only one that needs seeding afterwards.
+      - name: Wait for the domain controller
+        if: matrix.service == 'samba'
+        run: |
+          for _ in $(seq 1 60); do
+            [ "$(docker inspect meerkat-samba-ad --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] && break
+            sleep 5
+          done
+          docker exec meerkat-samba-ad sh /seed.sh
+      # A skipped test PASSES, so counting is the only thing that tells "they
+      # ran" from "nothing answered and nobody noticed".
+      - name: Run against it, and prove they ran
+        run: |
+          go test ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
+          ran=$(grep -c -- '--- PASS' out.txt)
+          echo "$ran of ${{ matrix.expect }} expected tests ran against ${{ matrix.directory }}"
+          [ "$ran" -eq ${{ matrix.expect }} ] || { echo "the server was not reached"; exit 1; }
+      - if: always()
+        working-directory: test/ldap
+        run: docker compose down -v
+
+  # Integration: a real gateway + the built console, driven by Playwright over
+  # the seeded profiles of e2e/scenarios.json (positive AND negative access).
+  e2e:
+    name: Integration (Playwright)
+    runs-on: ubuntu-latest
+    needs: console
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Take the console that was already built
+        uses: actions/download-artifact@v8
+        with:
+          name: console
+          path: console/dist/console/browser
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      # Playwright transpiles the specs without checking them, so a suite can
+      # be green with a tsconfig that no longer compiles - which is exactly
+      # what a TypeScript major did here, and nothing said a word.
+      - name: Type-check the specs
+        working-directory: e2e
+        run: npx tsc --noEmit
+      - name: Run integration suite
+        working-directory: e2e
+        run: npx playwright test
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+
+  # Both architectures of the image must compile, statically, before anything
+  # is published - and on a pull request the image job does not run at all, so
+  # this is the only place that ever asks the arm64 question.
+  #
+  # It used to cross-compile five targets and upload the binaries as an
+  # artifact. Nothing downloaded them: releases publish an image and only an
+  # image. So the binaries are gone and what remains is the check itself: does
+  # it build, with no CGO, for what we ship. The console is not embedded here -
+  # a build without it is exactly what proves the Go side stands alone.
+  build:
+    name: Builds for both architectures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+        run: |
+          for goarch in amd64 arm64; do
+            echo "building linux/$goarch"
+            GOARCH=$goarch go build -trimpath -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+          done
+
+  # Publish only once everything is green. main publishes `latest` (+ `main`);
+  # any other branch publishes only its own `:<branch>` tag - a throwaway image
+  # to test that branch on a real cluster, never latest. Off PRs.
+  image:
+    name: Build & publish image
+    needs: [lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
+    if: success() && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+    # Without this the registry credentials never reach the reusable workflow:
+    # a called workflow gets no repository secret unless the caller passes it,
+    # and the preflight would report "not set" forever.
+    secrets: inherit
+    uses: ./.github/workflows/_docker.yml

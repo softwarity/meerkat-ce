@@ -1,0 +1,81 @@
+// Row banding for the tables that draw a hierarchy (the role catalogue and the
+// groups matrix).
+//
+// A rule every 45px is the usual way to separate rows, and it is the wrong one
+// here: the tree guides are the structure, and a horizontal line crosses every
+// branch. Alternating backgrounds separate just as well without drawing
+// anything, and a full-width hover answers the question these tables exist for
+// (which role is this checkbox on, forty pixels to the right).
+//
+// Both are applied to the ROW and to its CELLS: a sticky column carries its own
+// background, and only a cell-level rule reaches it.
+// The frame every table sits in. It goes on the element that SCROLLS, never on
+// the table: a border on the table itself scrolls away with it, and leaves the
+// scrollbar outside the frame - the table appears to slide behind its own
+// outline. Here the outline is the pane, and the bar belongs to it.
+//
+//   <div class="table-wrap"><mat-table>...</mat-table></div>
+//   .table-wrap { @include table.frame; }
+@mixin frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium, 8px);
+}
+
+@mixin banded-rows($band: 4%, $hover: 9%, $row-height: 48px) {
+  mat-table {
+    --mat-table-row-item-outline-width: 0;
+    background: transparent;
+  }
+  // A sticky header is a header that rows pass UNDER, so it has to stop the
+  // light: transparent, it reads the rows through itself and the labels sit on
+  // top of moving text. On the ROW and on its CELLS, because a sticky COLUMN's
+  // header cell is positioned separately and a row-level rule never reaches it.
+  mat-header-row,
+  mat-header-row mat-header-cell {
+    background: var(--mat-sys-surface-container-high);
+  }
+  // The seam between a sticky column and the rest. Sticky cells slide UNDER
+  // nothing - the columns pass beneath them - so without a rule the numbers
+  // simply appear next to a name that never moved, and one cannot tell which
+  // side is anchored. The last sticky cell of the left block is the one
+  // followed by a non-sticky one; the first of the right block is the one that
+  // follows one.
+  .mat-mdc-table-sticky:has(+ :not(.mat-mdc-table-sticky)) {
+    border-right: 1px solid var(--mat-sys-outline-variant);
+  }
+  :not(.mat-mdc-table-sticky) + .mat-mdc-table-sticky {
+    border-left: 1px solid var(--mat-sys-outline-variant);
+  }
+  // One height for every table of the console. Denser than Material's default
+  // (56px) because these are read by scanning a column, and every pixel is one
+  // less line in view - but not so dense that a two-line cell gets cramped.
+  mat-row,
+  mat-cell {
+    min-height: $row-height;
+  }
+  // A cell holding a label and its identifier underneath: tightened so two
+  // lines fit the same row height as one. Without this, the tables with a
+  // subtitle drift taller than the others and the console looks assembled
+  // from parts.
+  .two-line {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 4px 0;
+    align-self: center;
+    line-height: 1.25;
+  }
+  mat-row:nth-child(even),
+  mat-row:nth-child(even) mat-cell {
+    background: color-mix(in srgb, var(--mat-sys-on-surface) #{$band}, var(--mat-sys-surface));
+  }
+  // After the banding, which it ties on specificity and therefore wins by order.
+  mat-row:hover,
+  mat-row:hover mat-cell {
+    background: color-mix(in srgb, var(--mat-sys-on-surface) #{$hover}, var(--mat-sys-surface));
+  }
+}

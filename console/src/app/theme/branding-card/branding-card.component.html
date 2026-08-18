@@ -1,0 +1,164 @@
+<mat-card appearance="outlined">
+  <mat-form-field class="wide">
+    <mat-label i18n="@@Application_name">Application name</mat-label>
+    <input matInput [value]="appName()" (input)="appName.set($any($event.target).value); changed.emit()" />
+  </mat-form-field>
+  <mat-form-field class="wide">
+    <mat-label i18n="@@Tagline">Tagline</mat-label>
+    <input matInput [value]="tagline()" (input)="tagline.set($any($event.target).value); changed.emit()" />
+  </mat-form-field>
+
+  <div
+    class="dropzone"
+    [class.dragging]="dragging()"
+    (click)="logoInput.click()"
+    (dragover)="$event.preventDefault(); dragging.set(true)"
+    (dragleave)="dragging.set(false)"
+    (drop)="onDrop($event)"
+  >
+    @if (logo()) {
+      <img class="logo-preview" [src]="logo()" alt="" />
+      <span class="dz-hint" i18n="@@Drop_or_click_to_replace">Drop or click to replace</span>
+      <button
+        matIconButton
+        class="clear"
+        (click)="$event.stopPropagation(); logo.set(''); changed.emit()"
+        i18n-matTooltip="@@Reset_to_placeholder"
+        matTooltip="Reset to the placeholder"
+        i18n-aria-label="@@Reset_to_placeholder"
+        aria-label="Reset to the placeholder"
+      >
+        <mat-icon>close</mat-icon>
+      </button>
+    } @else {
+      <svg class="generic" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="3" width="50" height="50" rx="12" stroke="currentColor" stroke-width="2.5" stroke-dasharray="7 6" />
+        <circle cx="21" cy="21" r="5" fill="currentColor" opacity=".85" />
+        <path d="M12 42l11-12 8 9 5-5 8 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span class="dz-hint" i18n="@@Drop_your_logo_here_or_click">Drop your logo here, or click</span>
+    }
+    <input
+      #logoInput
+      type="file"
+      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+      hidden
+      (change)="onLogoFile($event)"
+    />
+  </div>
+
+  <!-- The browser tab. Left alone it follows the logo, which is what almost
+       everyone wants and nobody would think to configure. Same gesture as the
+       logo above - drop or click - because it is the same act. -->
+  <div class="tab-icon">
+    <div
+      class="dropzone small"
+      [class.dragging]="draggingIcon()"
+      (click)="faviconInput.click()"
+      (dragover)="$event.preventDefault(); draggingIcon.set(true)"
+      (dragleave)="draggingIcon.set(false)"
+      (drop)="onIconDrop($event)"
+    >
+      @if (tabIcon(); as icon) {
+        <img class="icon-preview" [src]="icon" alt="" />
+      } @else {
+        <mat-icon>public</mat-icon>
+      }
+    </div>
+    <div class="tab-text">
+      <div class="tab-title">Browser tab icon</div>
+      <div class="tab-hint">
+        @if (favicon()) {
+          Its own image. Drop or click to replace.
+        } @else if (logo()) {
+          Follows the logo above. Drop one here to differ.
+        } @else {
+          Meerkat's mark, until you set a logo.
+        }
+      </div>
+    </div>
+    @if (favicon()) {
+      <button matIconButton (click)="favicon.set(''); changed.emit()" matTooltip="Follow the logo again" aria-label="Follow the logo again">
+        <mat-icon>close</mat-icon>
+      </button>
+    }
+    <input
+      #faviconInput
+      type="file"
+      accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,image/webp"
+      hidden
+      (change)="onFaviconFile($event)"
+    />
+  </div>
+
+  <!-- The picture behind the pages. It is fetched once from the gateway and
+       cached, never inlined, which is why it may be a photograph and not a
+       logo-sized file. Dim is what keeps the card readable over it: without
+       it the fix for a bright corner would be to edit the image. -->
+  <div class="bg-block">
+    <div class="block-title" i18n="@@Page_background">Page background</div>
+    <div
+      class="dropzone wide"
+      [class.dragging]="draggingBg()"
+      (click)="bgInput.click()"
+      (dragover)="$event.preventDefault(); draggingBg.set(true)"
+      (dragleave)="draggingBg.set(false)"
+      (drop)="onBackgroundDrop($event)"
+    >
+      @if (background()) {
+        <img class="bg-preview" [src]="background()" alt="" />
+        <span class="dz-hint" i18n="@@Drop_or_click_to_replace">Drop or click to replace</span>
+        <button
+          matIconButton
+          class="clear"
+          (click)="$event.stopPropagation(); background.set(''); changed.emit()"
+          i18n-matTooltip="@@Remove_the_background"
+          matTooltip="Remove the background"
+          i18n-aria-label="@@Remove_the_background"
+          aria-label="Remove the background"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+      } @else {
+        <mat-icon class="bg-empty">wallpaper</mat-icon>
+        <span class="dz-hint" i18n="@@Drop_a_background_here_or_click">Drop a background here, or click</span>
+      }
+      <input #bgInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden (change)="onBackgroundFile($event)" />
+    </div>
+
+    @if (background()) {
+      <div class="bg-controls">
+        <mat-form-field class="fit-field">
+          <mat-label i18n="@@Fit">Fit</mat-label>
+          <mat-select
+            [value]="backgroundFit()"
+            (selectionChange)="backgroundFit.set($event.value); changed.emit()"
+          >
+            @for (f of fits; track f.value) {
+              <mat-option [value]="f.value">{{ f.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="dim">
+          <span
+            class="dim-label"
+            i18n-matTooltip="@@Dim_hint"
+            matTooltip="How much of the surface colour is laid over the picture. Raise it until the card reads easily in both schemes."
+          ><ng-container i18n="@@Dim">Dim</ng-container></span>
+          <mat-slider min="0" max="90" step="5">
+            <input
+              matSliderThumb
+              [value]="backgroundDim()"
+              (valueChange)="backgroundDim.set($event); changed.emit()"
+              i18n-aria-label="@@Dim"
+              aria-label="Dim"
+            />
+          </mat-slider>
+          <span class="dim-value">{{ backgroundDim() }}%</span>
+        </div>
+      </div>
+    }
+  </div>
+
+</mat-card>

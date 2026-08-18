@@ -1,0 +1,32 @@
+:host {
+  display: block;
+  padding: 16px 20px 24px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  h2 {
+    flex: 1;
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 500;
+  }
+}
+section {
+  margin-top: 16px;
+}
+h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+/* The switch says WHAT it is; the paragraph under it says what follows. */
+.hint {
+  margin: 6px 0 18px;
+  font-size: 0.85rem;
+}
+.policy {
+  width: 280px;
+}

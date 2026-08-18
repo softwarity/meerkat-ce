@@ -1,0 +1,168 @@
+.gallery-card,
+.side-card {
+  padding: 16px 20px;
+}
+
+h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.choice {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mk-radius, 10px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+}
+.choice:hover {
+  border-color: var(--mat-sys-primary);
+}
+/* The chosen one is marked by its frame, not by a tick: the thumbnails are
+   read as a row of shapes, and a tick would be one more shape among them. */
+.choice.on {
+  border-color: var(--mat-sys-primary);
+  box-shadow: inset 0 0 0 1px var(--mat-sys-primary);
+  background: color-mix(in srgb, var(--mat-sys-primary) 10%, transparent);
+}
+.choice .name {
+  font-size: 0.78rem;
+}
+
+/* ── the mock-ups ─────────────────────────────────────────────────────────
+   Three parts, always the same three, moved around: .pic is the background
+   image, .brand the logo and name, .card the form. Absolute inside a fixed
+   ratio so a layout is read as a proportion, which is what it is. */
+.thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 8 / 5;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--mat-sys-surface-container-high);
+}
+.thumb .pic,
+.thumb .brand,
+.thumb .card {
+  position: absolute;
+  display: block;
+}
+.thumb .pic {
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--mat-sys-primary) 22%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+}
+.thumb .brand {
+  border-radius: 2px;
+  background: var(--mat-sys-primary);
+}
+.thumb .card {
+  border-radius: 3px;
+  background: var(--mat-sys-surface);
+  border: 1px solid var(--mat-sys-outline-variant);
+}
+
+/* centered: brand over a card, both in the middle */
+.t-centered .brand {
+  inset: 16% 44% auto 44%;
+  height: 12%;
+}
+.t-centered .card {
+  inset: 34% 24% 20% 24%;
+}
+
+/* split: the picture owns a half, the card the other */
+.t-split .pic {
+  inset: 0 55% 0 0;
+}
+.t-split .brand {
+  inset: 42% 76% auto 10%;
+  height: 12%;
+}
+.t-split .card {
+  inset: 26% 10% 26% 60%;
+}
+.t-split.right .pic {
+  inset: 0 0 0 55%;
+}
+.t-split.right .brand {
+  inset: 42% 10% auto 76%;
+}
+.t-split.right .card {
+  inset: 26% 60% 26% 10%;
+}
+
+/* drawer: the picture keeps the frame, a panel is pulled against one edge */
+.t-drawer .card {
+  inset: 0 62% 0 0;
+  border-radius: 0;
+  border-width: 0 1px 0 0;
+}
+.t-drawer .brand {
+  inset: 22% 72% auto 10%;
+  height: 12%;
+}
+.t-drawer.right .card {
+  inset: 0 0 0 62%;
+  border-width: 0 0 0 1px;
+}
+.t-drawer.right .brand {
+  inset: 22% 10% auto 72%;
+}
+
+/* banner: a band on top, the card under it */
+.t-banner .pic {
+  inset: 22% 0 0 0;
+}
+.t-banner .brand {
+  inset: 0 0 auto 0;
+  height: 18%;
+  border-radius: 0;
+}
+.t-banner .card {
+  inset: 38% 26% 18% 26%;
+}
+
+/* bare: no card at all, two field lines on the picture */
+.t-bare .brand {
+  inset: 18% 44% auto 44%;
+  height: 12%;
+}
+.t-bare .card {
+  inset: 40% 22% auto 22%;
+  height: 8%;
+  background: var(--mat-sys-surface);
+  box-shadow: 0 14px 0 0 var(--mat-sys-surface);
+  border-radius: 2px;
+}
+
+mat-button-toggle-group {
+  width: 100%;
+}
+mat-button-toggle {
+  flex: 1;
+}

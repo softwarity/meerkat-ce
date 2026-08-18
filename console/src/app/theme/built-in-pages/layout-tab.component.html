@@ -1,0 +1,62 @@
+<mat-card appearance="outlined" class="gallery-card" ee-sample="white-label">
+  <h3>
+    <ng-container i18n="@@Arrangement">Arrangement</ng-container>
+    <!-- Marked, not locked: the gallery stays clickable and the preview
+         follows, because seeing an arrangement IS what this screen is for.
+         What the licence buys is keeping it. -->
+    <app-ee-lock
+      feature="white-label"
+      i18n-why="@@Layout_ee_why"
+      why="Try any arrangement here. Keeping one, like removing the Meerkat mark, is Enterprise."
+    />
+  </h3>
+  <p class="hint text-muted" i18n="@@Arrangement_hint">
+    Where the brand, the picture and the form sit on every page this gateway serves. A page opened
+    inside an iframe drops the brand and fills the frame on its own, whichever one is chosen.
+  </p>
+
+  <div class="gallery">
+    @for (c of choices; track c.name) {
+      <button
+        type="button"
+        class="choice"
+        [class.on]="current() === c.name"
+        [attr.aria-pressed]="current() === c.name"
+        [title]="c.what"
+        (click)="pick(c)"
+      >
+        <!-- The mock-up: the same parts every time (picture, brand, card), put
+             where the layout puts them. -->
+        <span class="thumb" [class]="'t-' + c.name" [class.right]="c.sided && side() === 'right'">
+          <span class="pic"></span>
+          <span class="brand"></span>
+          <span class="card"></span>
+        </span>
+        <span class="name">{{ c.label }}</span>
+      </button>
+    }
+  </div>
+</mat-card>
+
+<mat-card appearance="outlined" class="side-card">
+  <h3 i18n="@@Which_side">Which side</h3>
+  <p class="hint text-muted" i18n="@@Which_side_hint">
+    The edge the brand takes. Split and Drawer are the two arrangements made of halves; the others
+    have no side to take.
+  </p>
+  <mat-button-toggle-group
+    [value]="side()"
+    [disabled]="!sided()"
+    (change)="setSide($event.value)"
+    hideSingleSelectionIndicator
+  >
+    <mat-button-toggle value="left">
+      <mat-icon>align_horizontal_left</mat-icon>
+      <ng-container i18n="@@Left">Left</ng-container>
+    </mat-button-toggle>
+    <mat-button-toggle value="right">
+      <mat-icon>align_horizontal_right</mat-icon>
+      <ng-container i18n="@@Right">Right</ng-container>
+    </mat-button-toggle>
+  </mat-button-toggle-group>
+</mat-card>

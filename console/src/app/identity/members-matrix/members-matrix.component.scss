@@ -1,0 +1,157 @@
+@use '../../../styles/table';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  position: relative;
+}
+.empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+.table-wrap {
+  @include table.frame;
+}
+mat-table {
+  min-width: 100%;
+  background: transparent;
+}
+mat-header-cell,
+mat-cell {
+  flex: 0 0 130px;
+  justify-content: center;
+  padding: 0 8px;
+}
+.mat-column-user,
+.mat-column-user-all {
+  flex: 0 0 260px;
+  justify-content: flex-start;
+}
+.mat-column-member,
+.mat-column-member-all {
+  flex: 0 0 100px;
+}
+.mat-column-spacer,
+.mat-column-spacer-all {
+  flex: 1 1 40px;
+  padding: 0;
+}
+mat-row:last-of-type {
+  margin-bottom: 64px;
+}
+mat-header-row {
+  background: var(--mat-sys-surface-container-high);
+}
+mat-header-cell.mat-column-user,
+mat-header-cell.mat-column-user-all {
+  background: var(--mat-sys-surface-container-high);
+}
+mat-cell.mat-column-user {
+  background: var(--mat-sys-surface);
+}
+.user-cell {
+  @extend .two-line;
+}
+.user-cell .name {
+  font-weight: 500;
+}
+.user-cell .desc {
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.grp-head {
+  gap: 2px;
+}
+.grp-head .col-name {
+  font-weight: 500;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.new-fab {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+}
+
+/* membership badges - "member" joins/leaves, "admin" flips the type on
+   click, OWNER read-only. Same activatable pill for all. */
+.type-badge {
+  margin-left: 8px;
+  font: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  padding: 1px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid var(--mat-sys-outline-variant);
+  background: transparent;
+  color: var(--mat-sys-on-surface-variant);
+  opacity: 0.7;
+}
+/* the leading membership badge has nothing to its left */
+.type-badge.member {
+  margin-left: 0;
+}
+.type-badge:hover:not(:disabled) {
+  background: var(--mat-sys-surface-container-high);
+  opacity: 1;
+}
+.type-badge:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+.type-badge.on {
+  border-color: transparent;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  opacity: 1;
+}
+.type-badge.owner {
+  cursor: default;
+}
+.mat-column-member,
+.mat-column-member-all {
+  flex: 0 0 170px;
+  justify-content: flex-start;
+}
+
+/* last connection - sticky at the right edge, above the horizontal scroll */
+.mat-column-lastConn,
+.mat-column-lastConn-all {
+  flex: 0 0 180px;
+  justify-content: flex-start;
+}
+mat-header-cell.mat-column-lastConn,
+mat-header-cell.mat-column-lastConn-all {
+  background: var(--mat-sys-surface-container-high);
+}
+mat-cell.mat-column-lastConn {
+  background: var(--mat-sys-surface);
+}
+.last-seen {
+  font-size: 0.82rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+@include table.banded-rows;
+/* The second header row carries the whole-column boxes, and reads as header
+   rather than as a first data row. */
+.bulk-row {
+  background: var(--mat-sys-surface-container-high);
+  min-height: 34px;
+}
+.bulk-row mat-header-cell {
+  background: var(--mat-sys-surface-container-high);
+}
+.bulk-label {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--mat-sys-on-surface-variant);
+}

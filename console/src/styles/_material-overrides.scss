@@ -1,0 +1,97 @@
+ // MDC quirks + opt-in variants. Wipe entries when Material fixes them upstream.
+
+ // M3 leaves button labels un-cased (Material 2 uppercased them); the product
+ // wants uppercase back. Each variant reads its casing from a token that defaults
+ // to `none` - flip them all. This targets the LABEL only, so mat-icon ligatures
+ // (case-sensitive glyph names) are untouched.
+ .mat-mdc-button-base {
+   --mat-button-filled-label-text-transform: uppercase;
+   --mat-button-tonal-label-text-transform: uppercase;
+   --mat-button-outlined-label-text-transform: uppercase;
+   --mat-button-protected-label-text-transform: uppercase;
+   --mat-button-text-label-text-transform: uppercase;
+ }
+
+
+ // Capability toggles use plain mat-chip with [highlighted] (state is read by
+ // colour, not a selection checkmark - mat-chip-option's checkmark animates the
+ // graphic slot in/out on every toggle and shifts the row). Interactive chips
+ // carry role="button"; give them the matching cursor.
+ .mat-mdc-chip[role='button']:not(.locked) {
+   cursor: pointer;
+ }
+
+ // A "locked" capability (e.g. root on your own account): still shows its actual
+ // state - a locked-on chip stays HIGHLIGHTED/filled, never blanked - but cannot
+ // be toggled. MDC's own `disabled` would strip the highlighted fill, reading as
+ // "not root", so we lock it ourselves: keep the fill, dim slightly, block input.
+ .mat-mdc-chip.locked {
+   cursor: not-allowed;
+   opacity: 0.55;
+ }
+
+ // Inner scroll container needs the .mat-mdc- class (custom element selector misses).
+ .mat-mdc-dialog-content {
+   overflow-x: hidden;
+ }
+
+ // Outlined mat-form-field's floating label sits ~8px above the fieldset ->
+ // clipped by parent's overflow:auto when it's the first child.
+ .mat-mdc-dialog-content > form:first-child,
+ .mat-mdc-dialog-content > .mat-mdc-form-field:first-child {
+   margin-top: 12px;
+ }
+
+ // Opt-in via `panelClass: 'snackbar-error'` (overlay -> must be global).
+ .snackbar-error {
+   --mdc-snackbar-container-color: var(--mat-sys-error-container);
+   --mdc-snackbar-supporting-text-color: var(--mat-sys-on-error-container);
+   --mat-snack-bar-button-color: var(--mat-sys-on-error-container);
+ }
+
+ // Drawer editors own their scrolling: a fixed header, a body that scrolls, a
+ // footer that stays. Material wraps the drawer content in its OWN scroll
+ // container, so the two nest and the body slides under the header instead of
+ // stopping at it. Opt-in, on the drawers that lay themselves out.
+ .editor-drawer .mat-drawer-inner-container {
+   overflow: hidden;
+ }
+
+// A browser fills a remembered field with a background of its own, applied
+// internally and above any author rule: background-color cannot touch it. An
+// inset box-shadow can, because it paints over that background rather than
+// replacing it. Without this, Chrome's pale fill blends into the dark theme
+// and reads as an olive slab. :autofill is the standard name, :-webkit-autofill
+// what most engines still answer to.
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:autofill,
+input:autofill:focus {
+  -webkit-text-fill-color: var(--mat-sys-on-surface);
+  -webkit-box-shadow: 0 0 0 1000px var(--mat-sys-surface-container) inset;
+  box-shadow: 0 0 0 1000px var(--mat-sys-surface-container) inset;
+  caret-color: var(--mat-sys-on-surface);
+}
+
+// The locale mechanism's list: each option names what travels and what the
+// page does, with an example under it. Overlay, so global - opted in via
+// `panelClass: 'mech-panel'`.
+.mech-panel {
+  min-width: 360px !important;
+
+  .mat-mdc-option {
+    height: auto;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .mat-mdc-option .mdc-list-item__primary-text {
+    display: grid;
+    gap: 2px;
+    white-space: normal;
+  }
+  .mech-example {
+    font-size: 0.76rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}

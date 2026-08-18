@@ -1,0 +1,130 @@
+@use '../../../styles/table';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  position: relative;
+}
+.empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* the table fills the remaining height and scrolls (sticky header) vertically,
+   and horizontally when the group columns overflow. */
+.table-wrap {
+  @include table.frame;
+}
+mat-table {
+  min-width: 100%;
+  background: transparent;
+}
+
+/* fixed column widths; the spacer flexes to fill the row. */
+mat-header-cell,
+mat-cell {
+  flex: 0 0 150px;
+  justify-content: center;
+  padding: 0 8px;
+}
+/* Wider: a role reads "Manage the charging report's regulatory indicators"
+   over an identifier of forty characters, and 300px cut both. */
+.mat-column-role,
+.mat-column-role-all {
+  flex: 0 0 420px;
+  justify-content: flex-start;
+}
+.mat-column-spacer,
+.mat-column-spacer-all {
+  flex: 1 1 40px;
+  padding: 0;
+}
+/* leave room under the last row so the FAB never covers a cell */
+mat-row:last-of-type {
+  margin-bottom: 64px;
+}
+@include table.banded-rows;
+
+/* sticky role column + header */
+mat-header-row {
+  background: var(--mat-sys-surface-container-high);
+}
+mat-header-cell.mat-column-role,
+mat-header-cell.mat-column-role-all {
+  background: var(--mat-sys-surface-container-high);
+}
+mat-cell.mat-column-role {
+  background: var(--mat-sys-surface);
+}
+
+/* The guides draw edge to edge, so the row must not pad them apart: the
+   branches of consecutive rows have to meet. The text keeps its own padding. */
+.mat-column-role {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.role-cell {
+  @extend .two-line;
+  padding-left: 4px;
+  min-width: 0;
+}
+/* What does not fit ends in an ellipsis rather than under the next column;
+   the tooltip carries the whole of both lines. */
+.role-cell .label,
+.role-cell .name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The description leads, the name is the identifier underneath it. */
+.role-cell .label {
+  font-weight: 500;
+}
+.role-cell .name {
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+/* Pulled in only to keep the chain readable under a filter: present, legible,
+   and visibly not what was searched for. */
+.role-cell.context .name,
+.role-cell.context .desc {
+  opacity: 0.55;
+}
+/* The second header row carries the whole-column boxes. It reads as part of
+   the header, not as a first data row. */
+.bulk-row {
+  background: var(--mat-sys-surface-container-high);
+  min-height: 34px;
+}
+.bulk-row mat-header-cell {
+  background: var(--mat-sys-surface-container-high);
+}
+.bulk-label {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--mat-sys-on-surface-variant);
+}
+.grp-head {
+  gap: 2px;
+}
+.grp-head .col-name {
+  font-weight: 500;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* icon-only FAB pinned to the bottom-right of the matrix, above the scroll */
+.new-fab {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+}

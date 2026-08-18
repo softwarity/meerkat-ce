@@ -1,0 +1,287 @@
+<header>
+  @if (creating()) {
+    <h2 i18n="@@New_authority">New authority</h2>
+  } @else {
+    <h2>{{ name() }}</h2>
+  }
+  <button matIconButton (click)="closed.emit()" i18n-aria-label="@@Close" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<div class="body">
+  <mat-button-toggle-group
+    class="kinds"
+    [value]="kind()"
+    (change)="pickKind($event.value)"
+    [disabled]="!creating()"
+    hideSingleSelectionIndicator
+  >
+    <mat-button-toggle value="oidc">OpenID Connect</mat-button-toggle>
+    <mat-button-toggle value="ldap" ee-feature="directories" i18n="@@Kind_directory">Directory</mat-button-toggle>
+    <mat-button-toggle value="github">GitHub</mat-button-toggle>
+    <mat-button-toggle value="saml" disabled>SAML</mat-button-toggle>
+  </mat-button-toggle-group>
+  <p class="hint text-muted">
+    @if (kind() === 'oidc') {
+      <ng-container i18n="@@Kind_oidc_hint">
+        An identity provider the browser is sent to. The token it returns is verified against its
+        published keys, so nothing is taken on trust.
+      </ng-container>
+    } @else if (kind() === 'ldap') {
+      <app-ee-lock
+        feature="directories"
+        i18n-why="@@Directories_ee_why"
+        why="Plug an LDAP directory or an Active Directory in straight, instead of going through an identity provider."
+      />
+      <ng-container i18n="@@Kind_ldap_hint">
+        A directory asked directly, with what the person typed in the ordinary sign-in form. No
+        button appears on the login page.
+      </ng-container>
+    } @else if (kind() === 'github') {
+      <ng-container i18n="@@Kind_github_hint">
+        GitHub proves the account, but signs nothing: there is no token to verify, so the trust
+        rests on the exchange and on TLS. Restrict the organisations below unless you mean to open
+        the door to every GitHub account.
+      </ng-container>
+    } @else {
+      <ng-container i18n="@@Kind_saml_hint">Not available yet.</ng-container>
+    }
+  </p>
+
+  <!-- What the admin has to paste into the VENDOR's form, under the vendor's
+       own labels, each with its copy button. Handed over rather than
+       described: a first setup fails here more than anywhere else. -->
+  @if (vendorFields().length) {
+    <div class="callback">
+      <span class="text-muted" i18n="@@Register_these_on_the_authority">Register these on the authority</span>
+      @for (f of vendorFields(); track f.label) {
+        <div class="vendor-row">
+          <span class="vendor-label text-muted">{{ f.label }}</span>
+          <code class="mono truncate">{{ f.value }}</code>
+          <button matIconButton (click)="copy(f.value)" i18n-matTooltip="@@Copy" matTooltip="Copy" i18n-aria-label="@@Copy" aria-label="Copy">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </div>
+      }
+      @if (kind() === 'github') {
+        <p class="hint text-muted" i18n="@@Github_setup_hint">
+          Register an OAuth app on GitHub with these two addresses, then paste back the Client ID
+          and the secret it gives you.
+        </p>
+        <!-- Straight to the form rather than a path through four menus. -->
+        <a matButton href="https://github.com/settings/applications/new" target="_blank" rel="noopener">
+          <mat-icon>open_in_new</mat-icon>
+          <ng-container i18n="@@Create_an_OAuth_app">Create an OAuth app on GitHub</ng-container>
+        </a>
+      }
+      @if (localOrigin()) {
+        <p class="hint text-muted" i18n="@@Local_origin_warning">
+          These addresses come from the one you reached this gateway by. In production, register
+          the public domain name instead: a vendor handed a localhost sends everyone back to a
+          machine that is not yours.
+        </p>
+      }
+    </div>
+  }
+
+  @if (showName()) {
+    <app-form-field i18n-label="@@Name" label="Name" i18n-hint="@@Provider_name_hint" hint="What the login page shows on the button">
+      <textarea
+        matInput
+        rows="1"
+        class="oneline"
+        [value]="name()"
+        (input)="setName($any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()"
+        placeholder="Acme SSO"
+      ></textarea>
+    </app-form-field>
+  }
+
+  <!-- Derived, not asked: it is the URL segment a sign-in travels through, and
+       it is shown only to whoever asks for it. Frozen after creation - changing
+       it would break the callback already registered with the vendor. -->
+  @if (identityShown()) {
+    <app-form-field i18n-label="@@Identifier" label="Identifier" i18n-hint="@@Provider_id_hint" hint="The segment of the sign-in URL, derived from the authority">
+      <textarea
+        matInput
+        rows="1"
+        class="oneline mono"
+        spellcheck="false"
+        autocapitalize="off"
+        autocorrect="off"
+        [value]="id()"
+        [disabled]="!creating()"
+        (input)="id.set($any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()"
+        placeholder="acme-sso"
+      ></textarea>
+    </app-form-field>
+  } @else {
+    <button matButton (click)="showIdentity()">
+      <mat-icon>edit</mat-icon>
+      <ng-container i18n="@@Name_and_identifier">Name and identifier</ng-container>
+    </button>
+  }
+
+  @if (kind() === 'oidc') {
+    <app-form-field i18n-label="@@Issuer" label="Issuer" i18n-hint="@@Issuer_hint" hint="Its discovery document is read from there" allowVault="values" vaultScope="infra">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('issuer')" (input)="setCfg('issuer', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="https://sso.acme.io/realms/main"></textarea>
+    </app-form-field>
+
+    <app-form-field i18n-label="@@Client_ID" label="Client ID" allowVault="secret/values" vaultScope="infra">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('clientId')" (input)="setCfg('clientId', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()"></textarea>
+    </app-form-field>
+
+    <app-secret-field i18n-label="@@Client_secret" label="Client secret" scope="infra"
+      [value]="cfg('clientSecret')" (valueChange)="setCfg('clientSecret', $event)"
+      [held]="secretHeld('clientSecret')" [at]="secretAt('clientSecret')" />
+
+    <app-form-field i18n-label="@@Allowed_domains" label="Allowed e-mail domains" i18n-hint="@@Allowed_domains_hint" hint="Comma separated, empty accepts every address the authority knows">
+      <textarea matInput rows="1" class="oneline" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('allowedDomains')" (input)="setCfgList('allowedDomains', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="acme.io"></textarea>
+    </app-form-field>
+
+  }
+
+  @if (kind() === 'github') {
+    <app-form-field i18n-label="@@Client_ID" label="Client ID" allowVault="secret/values" vaultScope="infra">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('clientId')" (input)="setCfg('clientId', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="Iv1.0123456789abcdef"></textarea>
+    </app-form-field>
+
+    <app-secret-field i18n-label="@@Client_secret" label="Client secret" scope="infra"
+      [value]="cfg('clientSecret')" (valueChange)="setCfg('clientSecret', $event)"
+      [held]="secretHeld('clientSecret')" [at]="secretAt('clientSecret')" />
+
+    <app-form-field
+      i18n-label="@@Allowed_orgs"
+      label="Allowed organisations"
+      i18n-hint="@@Allowed_orgs_hint"
+      hint="Comma separated. Empty lets in ANY GitHub account."
+    >
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('allowedOrgs')" (input)="setCfgList('allowedOrgs', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="softwarity"></textarea>
+    </app-form-field>
+
+    <p class="hint text-muted" i18n="@@Allowed_orgs_groups_hint">
+      These organisations and teams also come back as groups - "org" for an organisation,
+      "org/team" for a team - which a tenant's group rule can turn into roles.
+    </p>
+
+  }
+
+  @if (kind() === 'ldap') {
+    <mat-form-field>
+      <mat-label i18n="@@Dialect">Dialect</mat-label>
+      <mat-select [value]="cfg('dialect') || 'directory'" (selectionChange)="setCfg('dialect', $event.value)">
+        <mat-option value="directory" i18n="@@Dialect_directory">Directory (OpenLDAP and friends)</mat-option>
+        <mat-option value="ad">Active Directory</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label i18n="@@Server_URL">Server URL</mat-label>
+      <!-- Same control as a route's upstream, with the schemes that apply
+           here: the protocol is chosen, never typed, so ldap:// on a port
+           expecting TLS stops being a plausible typo. -->
+      <app-url-input [protocols]="['ldaps', 'ldap']"
+        hostPlaceholder="dc1.acme.io:636" i18n-hostLabel="@@Server_URL" hostLabel="Server URL"
+        [value]="cfg('url')" (valueChange)="setCfg('url', $event)" />
+      <mat-hint align="end" i18n="@@Server_URL_hint">ldaps is the one to use unless the directory is on a private network</mat-hint>
+    </mat-form-field>
+
+    <app-form-field i18n-label="@@Base_DN" label="Search base" allowVault="values" vaultScope="infra">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('baseDn')" (input)="setCfg('baseDn', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="dc=acme,dc=io"></textarea>
+    </app-form-field>
+
+    <app-form-field i18n-label="@@Service_account" label="Service account" i18n-hint="@@Service_account_hint" hint="Used to SEARCH, never to sign anyone in" allowVault="values" vaultScope="infra">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('bindDn')" (input)="setCfg('bindDn', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="cn=meerkat,ou=services,dc=acme,dc=io"></textarea>
+    </app-form-field>
+
+    <app-secret-field i18n-label="@@Service_password" label="Service password" scope="infra"
+      [value]="cfg('bindPassword')" (valueChange)="setCfg('bindPassword', $event)"
+      [held]="secretHeld('bindPassword')" [at]="secretAt('bindPassword')" />
+
+    <app-form-field i18n-label="@@User_filter" label="User filter" i18n-hint="@@User_filter_hint" hint="%s is what the person typed; empty uses the dialect's default">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('userFilter')" (input)="setCfg('userFilter', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()"></textarea>
+    </app-form-field>
+
+    <mat-slide-toggle [checked]="cfgBool('nestedGroups', true)" (change)="setCfgBool('nestedGroups', $event.checked)">
+      <ng-container i18n="@@Nested_groups">Follow nested groups</ng-container>
+    </mat-slide-toggle>
+    <mat-slide-toggle [checked]="cfgBool('insecureSkipVerify')" (change)="setCfgBool('insecureSkipVerify', $event.checked)">
+      <ng-container i18n="@@Skip_certificate_check">Skip the certificate check (self-signed directory)</ng-container>
+    </mat-slide-toggle>
+  }
+
+  <mat-divider />
+
+  <section>
+    <h3 i18n="@@Policies">Policies</h3>
+    <mat-form-field>
+      <mat-label i18n="@@Self_registration">Self-registration</mat-label>
+      <mat-select [value]="autoCreate()" (selectionChange)="autoCreate.set($event.value)">
+        <mat-option value="" i18n="@@Inherited_application">Inherited from the application</mat-option>
+        <mat-option value="yes" i18n="@@Allowed">Allowed</mat-option>
+        <mat-option value="no" i18n="@@Refused">Refused</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <p class="hint text-muted" i18n="@@Auto_create_hint">
+      A first sign-in through this authority creates the account. Refused, only people already
+      linked may come in.
+    </p>
+
+    <mat-form-field>
+      <mat-label i18n="@@Two_factor">Two-factor</mat-label>
+      <mat-select [value]="mfaRequired()" (selectionChange)="mfaRequired.set($event.value)">
+        <mat-option value="" i18n="@@Inherited_application">Inherited from the application</mat-option>
+        <mat-option value="yes" i18n="@@Always_required">Always required</mat-option>
+        <mat-option value="no" i18n="@@Left_to_the_authority">Left to the authority</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </section>
+
+  @if (!creating()) {
+    <mat-divider />
+    <section class="danger-zone">
+      <h3 i18n="@@Danger_zone">Danger zone</h3>
+      <button matButton class="danger" (click)="remove()">
+        <mat-icon>delete</mat-icon>
+        <ng-container i18n="@@Delete">Delete</ng-container>
+      </button>
+    </section>
+  }
+</div>
+
+<footer class="flex items-center gap-2">
+  @if (!creating()) {
+    <button matButton (click)="check()" [disabled]="checking()">
+      @if (checking()) {<mat-icon spin>autorenew</mat-icon>} @else {<mat-icon>network_check</mat-icon>}
+      <ng-container i18n="@@Test_connection">Test the connection</ng-container>
+    </button>
+  }
+  <span class="flex-1"></span>
+  <button matButton (click)="closed.emit()" i18n="@@Cancel">Cancel</button>
+  <button matButton="filled" [disabled]="!canSave()" (click)="save()">
+    @if (creating()) {
+      <ng-container i18n="@@Create">Create</ng-container>
+    } @else {
+      <ng-container i18n="@@Save">Save</ng-container>
+    }
+  </button>
+</footer>

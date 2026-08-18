@@ -1,0 +1,28 @@
+# Build artifacts
+/bin/
+/dist/
+*.test
+coverage.out
+
+# Local environment
+.env
+*.local
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# air dev loop
+/tmp/
+
+# embedded console build, staged by `make ui` (the .gitkeep keeps go:embed
+# compiling when no console has been built)
+/internal/admin/ui/dist/*
+!/internal/admin/ui/dist/.gitkeep
+
+# local db folder
+data
+
+# vault master key (VAULT-01) — never commit, whatever the data dir
+vault.key

@@ -1,0 +1,724 @@
+<header>
+  <span class="head-kind">
+    @if (route()) {
+      <ng-container i18n="@@Edit_route">Edit route</ng-container>
+    } @else {
+      <ng-container i18n="@@New_route">New route</ng-container>
+    }
+  </span>
+  <app-form-field class="name-field" subscriptSizing="dynamic" i18n-label="@@Name" label="Name">
+    <input matInput [formField]="f.name" i18n-placeholder="@@New_route" placeholder="New route" />
+  </app-form-field>
+</header>
+
+<div class="body">
+  <mat-selection-list [multiple]="false" hideSingleSelectionIndicator (selectionChange)="onSectionPick($event.options[0].value)">
+    <mat-list-option value="target" [selected]="section() === 'target'" i18n="@@Section_target">Target</mat-list-option>
+    <mat-list-option value="security" [selected]="section() === 'security'">
+      <span i18n="@@Section_security">Security</span>
+      <!-- Says a rule is POSED, the way the other sections count what they
+           hold. A route whose security is open and one whose security closes
+           it to two roles read the same in this list otherwise, and the rule
+           now decides which route answers at all. -->
+      @if (securityMark(); as m) {
+        <span class="mark" [matTooltip]="m.tip">{{ m.text }}</span>
+      }
+    </mat-list-option>
+    <mat-list-option value="predicates" [selected]="section() === 'predicates'">
+      <span i18n="@@Predicates">Predicates</span>
+      @if (draft().predicates.length) {
+        ({{ draft().predicates.length }})
+      }
+    </mat-list-option>
+    <div matSubheader i18n="@@Modifiers">Modifiers</div>
+    <mat-list-option value="modin" [selected]="section() === 'modin'">
+      <span i18n="@@Incoming">Incoming</span>
+      @if (countPhase('request'); as n) {
+        ({{ n }})
+      }
+    </mat-list-option>
+    <mat-list-option value="modout" [selected]="section() === 'modout'">
+      <span i18n="@@Outgoing">Outgoing</span>
+      @if (countPhase('response'); as n) {
+        ({{ n }})
+      }
+    </mat-list-option>
+    <mat-list-option value="identity" [selected]="section() === 'identity'" i18n="@@Section_identity">Identity</mat-list-option>
+    <mat-list-option value="locales" [selected]="section() === 'locales'" i18n="@@Section_locales">Locales</mat-list-option>
+    <!-- UI extras (ROUTE-02): visible but DISABLED until the toggle turns them
+         on - a route is always a service, UI comes on top. The switch sits on
+         the group it commands: in the header it read as a detail of the name,
+         and nobody found it. -->
+    <div matSubheader class="ui-head">
+      <mat-checkbox
+        class="ui-toggle"
+        [checked]="draft().isUi && uiPossible()"
+        [disabled]="!uiPossible()"
+        [matTooltip]="uiPossible() ? uiTip : uiImpossibleTip()"
+        (change)="setIsUi($event.checked)"
+      >UI</mat-checkbox>
+    </div>
+    <mat-list-option value="button" [selected]="section() === 'button'" [disabled]="!draft().isUi" i18n="@@Section_user_button">User button</mat-list-option>
+    <mat-list-option value="userinfo" [selected]="section() === 'userinfo'" [disabled]="!draft().isUi" i18n="@@Section_user_info">User info</mat-list-option>
+    <mat-list-option value="inject" [selected]="section() === 'inject'" [disabled]="!draft().isUi" i18n="@@Section_injections">Injections</mat-list-option>
+  </mat-selection-list>
+
+  <div class="panel">
+    @switch (section()) {
+            @case ('target') {
+        <p class="section-hint" i18n="@@Target_hint">How this route answers. Proxying fetches from a service and hands
+          back what it says; the other three answer here, without calling anything.</p>
+        <mat-form-field>
+          <mat-label i18n="@@Mode">Mode</mat-label>
+          <mat-select [value]="mode()" (selectionChange)="setMode($event.value)">
+            <mat-option value="proxy" i18n="@@Mode_proxy">Proxy - fetch from a service</mat-option>
+            <mat-option value="redirect" i18n="@@Mode_redirect">Redirect - send the browser elsewhere</mat-option>
+            <mat-option value="maintenance" i18n="@@Mode_maintenance">Maintenance - the built-in unavailable page</mat-option>
+            <mat-option value="respond" i18n="@@Mode_respond">Respond - an answer built from a template</mat-option>
+          </mat-select>
+        </mat-form-field>
+        @if (mode() === 'proxy') {
+        <mat-form-field>
+          <mat-label i18n="@@Upstream">Upstream</mat-label>
+          <app-url-input [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
+            hostPlaceholder="service:8080/base" i18n-hostLabel="@@Upstream" hostLabel="Upstream" />
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label i18n="@@OpenAPI_URL">OpenAPI URL</mat-label>
+          <input
+            matInput
+            placeholder="/v3/api-docs"
+            [value]="draft().openapiUrl"
+            (input)="patch('openapiUrl', $any($event.target).value)"
+          />
+          <button
+            matIconButton
+            matSuffix
+            type="button"
+            [disabled]="saving() || !draft().name.trim() || !draft().upstream.trim() || !draft().openapiUrl.trim()"
+            (click)="goEndpointSecurity()"
+            i18n-matTooltip="@@Edit_endpoint_security"
+            matTooltip="Endpoint security"
+            i18n-aria-label="@@Edit_endpoint_security"
+            aria-label="Endpoint security"
+          >
+            <mat-icon svgIcon="openapi" />
+          </button>
+          <mat-hint align="end" i18n="@@OpenAPI_hint">The OpenAPI spec the service exposes, for endpoint-level security and swagger UI</mat-hint>
+        </mat-form-field>
+        } @else {
+          @if (terminalSpec(); as t) {
+            @switch (mode()) {
+              @case ('redirect') {<app-redirect-filter [spec]="t" (specChange)="patchTerminal($event)" />}
+              @case ('maintenance') {<app-maintenance-filter [spec]="t" (specChange)="patchTerminal($event)" />}
+              @case ('respond') {<app-respond-filter [spec]="t" (specChange)="patchTerminal($event)" />}
+            }
+          }
+        }
+        <!-- Not under User button: it names the application for the apps menu
+             wherever that menu is drawn - the injected button, and the built-in
+             pages, which have one too. Shown even on a service route, DISABLED:
+             a field that vanishes teaches nothing about why it is not there. -->
+        <h3 class="sub" i18n="@@In_the_apps_menu">In the apps menu</h3>
+        <p class="section-hint" i18n="@@Apps_menu_hint">
+          The name this application takes wherever the apps menu is drawn: the injected user button,
+          and the built-in pages.
+        </p>
+        <app-form-field i18n-label="@@Link" label="Link" [hint]="linkHint()">
+          <input
+            matInput
+            [disabled]="!draft().isUi"
+            [value]="draft().uiLink"
+            (input)="patch('uiLink', $any($event.target).value)"
+          />
+        </app-form-field>
+      }
+      @case ('security') {
+        <p class="section-hint" i18n="@@Route_security_hint">
+          The route's base access, applied to the whole route. Leave it empty to delegate security to
+          the upstream; set it to gate at the edge. An API route can refine it per operation in
+          Endpoint security.
+        </p>
+        <app-access-editor
+          [value]="draft().access"
+          [users]="users()"
+          [roles]="roles()"
+          [tenants]="tenants()"
+          (valueChange)="setAccess($event)"
+        />
+      }
+      @case ('predicates') {
+        <app-predicates [formField]="f.predicates" [entries]="predicateEntries()" />
+      }
+      @case ('modin') {
+        <app-filters [formField]="f.filters" [entries]="filterEntries()" phase="request" />
+      }
+      @case ('modout') {
+        <app-filters [formField]="f.filters" [entries]="filterEntries()" phase="response" />
+      }
+      @case ('identity') {
+        <p class="section-hint" i18n="@@Identity_section_hint">
+          Forwards the signed-in caller to the service behind this route. Pick a transport, then
+          choose which facts travel and, optionally, the name each one takes on the way out.
+        </p>
+        <div class="btn-row">
+          <mat-form-field class="position-field">
+            <mat-label i18n="@@Mechanism">Mechanism</mat-label>
+            <mat-select [value]="draft().identityMechanism" (selectionChange)="setMechanism($event.value)">
+              <mat-option value="" i18n="@@None">None</mat-option>
+              <mat-option value="headers" i18n="@@Headers">Headers</mat-option>
+              <mat-option value="jwt" i18n="@@JWT">JWT</mat-option>
+              <mat-option value="signed-jwt" i18n="@@Signed_JWT">Signed JWT</mat-option>
+            </mat-select>
+          </mat-form-field>
+          @if (draft().identityMechanism) {
+            <!-- Shown as soon as a transport is picked, DISABLED when it does
+                 not apply: the reader sees the whole contract, not a form that
+                 grows and shrinks. -->
+            <mat-form-field class="position-field">
+              <mat-label i18n="@@Signature_algorithm">Signature algorithm</mat-label>
+              <mat-select
+                [value]="draft().identityAlgorithm"
+                [disabled]="draft().identityMechanism !== 'signed-jwt'"
+                (selectionChange)="patch('identityAlgorithm', $event.value)"
+              >
+                <mat-option value="ES256">ES256</mat-option>
+                <mat-option value="EdDSA">EdDSA</mat-option>
+                <mat-option value="RS256">RS256</mat-option>
+              </mat-select>
+            </mat-form-field>
+          }
+        </div>
+
+        @if (draft().identityMechanism) {
+          <div class="ttl-row">
+            <mat-form-field class="position-field" subscriptSizing="dynamic">
+              <mat-label i18n="@@Token_TTL">Token TTL</mat-label>
+              <mat-select
+                [value]="draft().identityTtl"
+                [disabled]="draft().identityMechanism === 'headers'"
+                (selectionChange)="patch('identityTtl', $event.value)"
+              >
+                @for (c of ttlChoices(); track c) {
+                  <mat-option [value]="c">{{ humanTtl(c) }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button matButton="tonal" type="button" (click)="openIdentityPreview()">
+              <mat-icon>visibility</mat-icon>
+              <span i18n="@@Preview">Preview</span>
+            </button>
+          </div>
+        }
+        @if (draft().identityMechanism === 'signed-jwt') {
+          <p class="section-hint id-hint" i18n="@@Signed_jwt_hint">
+            The gateway signs each token; backends verify it against the published JWKS. Manage the
+            keys with "Signing keys" on the Routes page.
+          </p>
+        }
+
+        @if (draft().identityMechanism) {
+          <p class="section-hint id-hint" i18n="@@Identity_include_hint">
+            What to include in the payload (everything by default):
+          </p>
+          <div class="id-attrs">
+            @for (field of identityFields; track field) {
+              <!-- A single-organisation instance still SHOWS the two
+                   organisation facts, frozen: hiding them left them ticked,
+                   so they travelled while the screen said nothing. -->
+              <div
+                class="id-attr"
+                [class.off]="frozen(field) || !draft().identityAttrs[field].selected"
+                [attr.ee-feature]="frozen(field) ? 'multi-tenant' : null"
+              >
+                <mat-checkbox
+                  class="id-field"
+                  [checked]="!frozen(field) && draft().identityAttrs[field].selected"
+                  [disabled]="frozen(field)"
+                  [matTooltip]="frozen(field) ? frozenTip() : ''"
+                  (change)="toggleAttr(field, $event.checked)"
+                >{{ field }}</mat-checkbox>
+                @if (frozen(field)) {
+                  <app-ee-lock
+                    feature="multi-tenant"
+                    i18n-why="@@Multi_tenant_ee_why"
+                    why="Isolate tenants, each with its own groups, members and hours."
+                  />
+                }
+                <app-form-field class="id-map" subscriptSizing="dynamic" i18n-label="@@Send_as" label="Send as">
+                  <input
+                    matInput
+                    [placeholder]="field"
+                    [disabled]="frozen(field) || !draft().identityAttrs[field].selected"
+                    [value]="draft().identityAttrs[field].as"
+                    (input)="setAttrAs(field, $any($event.target).value)"
+                  />
+                </app-form-field>
+                @if (field === 'roles') {
+                  <!-- Not a discreet icon among the fields: this is where a 9 KB
+                       header becomes a 26-byte one, and nobody finds it by
+                       accident. -->
+                  <button
+                    matIconButton
+                    type="button"
+                    class="id-shape"
+                    [disabled]="!draft().identityAttrs['roles'].selected"
+                    (click)="openRoleExpr()"
+                    i18n-matTooltip="@@Shape_the_roles"
+                    matTooltip="Which roles travel, under what names, in what shape"
+                  >
+                    <mat-icon>wand_shine</mat-icon>
+                  </button>
+                }
+                <span class="id-eq">=</span>
+                <code class="id-sample">{{ mappedExample(field) }}</code>
+                @if (field === 'username' && draft().identityMechanism === 'headers') {
+                  <!-- Said on the row it depends on: unticking username stops
+                       these two as well. -->
+                  <span
+                    class="id-also"
+                    i18n-matTooltip="@@Remote_user_why"
+                    matTooltip="No header is standardised for the signed-in account (REMOTE_USER is a CGI variable). Meerkat writes both conventions: Spring's, and its dashed form, since an underscore in a header name is dropped by default by nginx. Inbound ones are purged."
+                  >+ REMOTE_USER, X-Remote-User</span>
+                }
+              </div>
+              @if (field === 'roles' && draft().identityAttrs['roles'].selected) {
+                <p class="id-weight">
+                  <code [tpl]="draft().identityAttrs['roles'].expr || defaultRoleExpr" [syntax]="SYNTAX"></code>
+                </p>
+              }
+            }
+          </div>
+        }
+      }
+      @case ('button') {
+        <p class="section-hint" i18n="@@User_button_hint">
+          Injects the meerkat-user-button web component into the pages: profile, tenant switch,
+          languages, color scheme, sign out.
+        </p>
+        <mat-checkbox [checked]="draft().btnEnabled" (change)="setFlag('btnEnabled', $event.checked)">
+          <ng-container i18n="@@Inject_the_user_button">Inject the user button</ng-container>
+        </mat-checkbox>
+        @if (draft().btnEnabled) {
+          <!-- A framed page is a portal, and a portal has its own avatar and
+               its own way out. The button stays out of it unless the frame
+               carries no identity of its own. -->
+          <mat-checkbox
+            [checked]="draft().btnInFrame"
+            (change)="setFlag('btnInFrame', $event.checked)"
+            i18n-matTooltip="@@In_frame_hint"
+            matTooltip="A framed page is usually a portal, with its own user menu: signing out from the frame would end a session the portal still shows as open."
+          >
+            <ng-container i18n="@@Show_it_in_a_framed_page">Show it in a framed page</ng-container>
+          </mat-checkbox>
+        }
+        @if (draft().btnEnabled) {
+          <div class="btn-row">
+            <mat-form-field class="height-field">
+              <mat-label i18n="@@Height_px">Height (px)</mat-label>
+              <input
+                matInput
+                type="number"
+                min="16"
+                max="96"
+                [value]="draft().btnHeight"
+                (change)="setBtnHeight($any($event.target).value)"
+              />
+            </mat-form-field>
+            <mat-form-field class="height-field wide">
+              <mat-label i18n="@@Position">Position</mat-label>
+              <mat-select [value]="draft().btnPosition" (selectionChange)="patch('btnPosition', $event.value)">
+                @for (p of positions; track p) {
+                  <mat-option [value]="p">{{ p }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="height-field">
+              <mat-label i18n="@@Shape">Shape</mat-label>
+              <mat-select [value]="draft().btnShape" (selectionChange)="patch('btnShape', $event.value)">
+                <mat-option value="round" i18n="@@Rounded">Rounded</mat-option>
+                <mat-option value="square" i18n="@@Square">Square</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="height-field">
+              <mat-label i18n="@@Horizontal_gap_px">Horizontal gap (px)</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                max="500"
+                [value]="draft().btnPadX"
+                (change)="setBtnPad('btnPadX', $any($event.target).value)"
+              />
+            </mat-form-field>
+            <mat-form-field class="height-field">
+              <mat-label i18n="@@Vertical_gap_px">Vertical gap (px)</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                max="500"
+                [value]="draft().btnPadY"
+                (change)="setBtnPad('btnPadY', $any($event.target).value)"
+              />
+            </mat-form-field>
+            <mat-form-field class="height-field wide">
+              <mat-label i18n="@@Username">Username</mat-label>
+              <mat-select [value]="draft().btnName" (selectionChange)="patch('btnName', $event.value)">
+                <mat-option value="" i18n="@@Hidden">Hidden</mat-option>
+                <mat-option value="before" i18n="@@Before_the_avatar">Before the avatar</mat-option>
+                <mat-option value="after" i18n="@@After_the_avatar">After the avatar</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <!-- PREVIEW: the button as configured, in a mock page; the ghost
+               menu opens away from the anchored edge and follows the size. -->
+          <div class="preview" [class]="'pos-' + draft().btnPosition">
+            <div class="anchor" [style]="anchorStyle()">
+              <div
+                class="fake-btn"
+                [style.height.px]="draft().btnHeight"
+                [style.font-size.px]="btnFontPx()"
+                [style.border-radius]="btnRadiusPx()"
+                [style.padding-left.px]="draft().btnName === 'before' ? 10 : 3"
+                [style.padding-right.px]="draft().btnName === 'after' ? 10 : 3"
+              >
+                @if (draft().btnName === 'before') {
+                  <span class="fake-name">admin</span>
+                }
+                <span
+                  class="fake-avatar"
+                  [style.width.px]="draft().btnHeight - 6"
+                  [style.height.px]="draft().btnHeight - 6"
+                  [style.border-radius]="avatarRadiusPx()"
+                  [style.font-size.px]="btnFontPx() - 3"
+                >AD</span>
+                @if (draft().btnName === 'after') {
+                  <span class="fake-name">admin</span>
+                }
+              </div>
+              <div class="fake-menu">
+                <span class="gl w70 strong"></span>
+                <span class="gl w50"></span>
+                <span class="gl w80"></span>
+                @if (draft().schemeSelect) {
+                  <span class="gl w60"></span>
+                }
+                <span class="gl sep"></span>
+                <span class="gl w40 out"></span>
+              </div>
+            </div>
+          </div>
+        }
+
+        <h3 class="sub" i18n="@@Color_scheme">Color scheme</h3>
+        <p class="section-hint" i18n="@@Scheme_section_hint">
+          Does the application support a color scheme? The choice is always reflected on the CSS
+          color-scheme and a data-meerkat-scheme attribute; pick the application's own mechanism
+          on top if it has one.
+        </p>
+        <div class="flags">
+          <mat-checkbox
+            [checked]="draft().schemeSelect && !imposedScheme()"
+            [disabled]="!!imposedScheme()"
+            (change)="setFlag('schemeSelect', $event.checked)"
+          >
+            <ng-container i18n="@@Offer_scheme_switch">
+              Offer the color-scheme switch (reflected on the page for the application)
+            </ng-container>
+          </mat-checkbox>
+        </div>
+        @if (imposedScheme(); as imposed) {
+          <p class="section-hint warn" i18n="@@Scheme_switch_unavailable">
+            The built-in pages only offer {{ imposed }}, so there is nothing to switch between.
+            <a routerLink="/application/theme">Change that in Theme</a>.
+          </p>
+        }
+        @if (draft().schemeSelect) {
+          <div class="btn-row">
+            <mat-form-field class="position-field">
+              <mat-label i18n="@@Mechanism">Mechanism</mat-label>
+              <mat-select [value]="draft().schemeMechanism" (selectionChange)="patch('schemeMechanism', $event.value)">
+                <mat-option value="" i18n="@@scheme_none">color-scheme only</mat-option>
+                <mat-option value="attribute" i18n="@@scheme_attribute">attribute</mat-option>
+                <mat-option value="class" i18n="@@scheme_class">class</mat-option>
+              </mat-select>
+            </mat-form-field>
+            @if (draft().schemeMechanism === 'attribute') {
+              <app-form-field class="height-field wide" i18n-label="@@Attribute" label="Attribute">
+                <input matInput placeholder="data-theme" [value]="draft().schemeAttribute" (input)="patch('schemeAttribute', $any($event.target).value)" />
+              </app-form-field>
+            }
+            @if (draft().schemeMechanism) {
+              <app-form-field class="height-field wide" i18n-label="@@Light_value" label="Light value">
+                <input matInput placeholder="light" [value]="draft().schemeLight" (input)="patch('schemeLight', $any($event.target).value)" />
+              </app-form-field>
+              <app-form-field class="height-field wide" i18n-label="@@Dark_value" label="Dark value">
+                <input matInput placeholder="dark" [value]="draft().schemeDark" (input)="patch('schemeDark', $any($event.target).value)" />
+              </app-form-field>
+            }
+          </div>
+        }
+
+      }
+      @case ('locales') {
+        <!-- Two blocks, and only the first one scrolls: with twenty languages
+             the forwarding options used to sit below the fold, so choosing how
+             the language travels meant scrolling past the list of them. The
+             list takes the whole area whether it is full or not, so the
+             options stay where they were put. -->
+        <div class="locales-pane">
+        <div class="locale-list">
+        <h3 class="sub" i18n="@@Locales">Locales</h3>
+        <p class="section-hint" i18n="@@Locales_section_hint">
+          The application's locale offer, managed in Application General. Uncheck the ones this
+          UI does not support: they leave the button's menu and the forwarding.
+        </p>
+        @for (code of appLanguages(); track code) {
+          <div class="locale-row" [class.off-locale]="isLocaleDisabled(code)">
+            <mat-checkbox
+              [checked]="!isLocaleDisabled(code)"
+              (change)="toggleLocale(code, $event.checked)"
+            />
+            <code class="lc">{{ code }}</code>
+            <span>{{ localeName(code) }}</span>
+            <span class="ln">{{ localeNative(code) }}</span>
+          </div>
+        }
+        </div>
+
+        <div class="forwarding">
+        <h3 class="sub" i18n="@@Forwarding">Forwarding</h3>
+        <p class="section-hint" i18n="@@Locales_forwarding_hint">
+          How the language reaches the application, and how a page follows a change.
+        </p>
+        <div class="btn-row">
+          <mat-form-field class="mech-field">
+            <mat-label i18n="@@Mechanism">Mechanism</mat-label>
+            <mat-select
+              [value]="draft().localeMechanism"
+              (selectionChange)="setLocalesMechanisms($event.value)"
+              panelClass="mech-panel"
+            >
+              <!-- The trigger keeps the label alone: the example belongs to the
+                   open list, not to the closed field. -->
+              <mat-select-trigger>{{ mechanismLabel() }}</mat-select-trigger>
+              @for (m of mechanisms(); track m.value) {
+                <mat-option [value]="m.value">
+                  <span class="mech-label">{{ m.label }}</span>
+                  <code class="mech-example">{{ m.example }}</code>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          @if (hasMech('custom')) {
+            <app-form-field class="height-field wide" i18n-label="@@Header_name" label="Header name">
+              <input
+                matInput
+                placeholder="X-Locale"
+                [value]="draft().localesHeader"
+                (input)="patch('localesHeader', $any($event.target).value)"
+              />
+            </app-form-field>
+          }
+          @if (hasMech('query')) {
+            <app-form-field class="height-field wide" i18n-label="@@Parameter_name" label="Parameter name">
+                <input
+                matInput
+                placeholder="lg"
+                [value]="draft().localesParam"
+                (input)="patch('localesParam', $any($event.target).value)"
+              />
+              </app-form-field>
+          }
+        </div>
+
+        @if (hasMech('script')) {
+          <p class="section-hint" i18n="@@On_language_change_hint">
+            Called with the language in <code>locale</code>: on every change, on every page of this
+            browser, and once when a page loads. Apply it in place - no reload.
+          </p>
+          <div class="css-row">
+            <button matButton="tonal" (click)="editCode('onLocaleChange')">
+              <mat-icon>translate</mat-icon>
+              @if (codeLines('onLocaleChange')) {
+                <ng-container i18n="@@Edit_the_script">Edit the script</ng-container>
+              } @else {
+                <ng-container i18n="@@Add_a_script">Add a script</ng-container>
+              }
+            </button>
+            @if (codeLines('onLocaleChange'); as n) {
+              <span class="css-size" i18n="@@N_lines">{{ n }} lines</span>
+            }
+          </div>
+        }
+        </div>
+        </div>
+      }
+      @case ('userinfo') {
+        <h3 class="sub" i18n="@@Roles">Roles</h3>
+        <p class="section-hint" i18n="@@Roles_section_hint">
+          Puts the user's effective roles on the page: classes or a custom attribute on a tag of
+          your choice, or a meta tag, so the application can gate elements on roles with pure CSS.
+        </p>
+        <div class="flags">
+          <mat-checkbox [checked]="draft().rolesEnabled" (change)="setFlag('rolesEnabled', $event.checked)">
+            <ng-container i18n="@@Inject_the_users_roles">Inject the user's roles</ng-container>
+          </mat-checkbox>
+        </div>
+        @if (draft().rolesEnabled) {
+          <div class="btn-row">
+            <mat-form-field class="position-field">
+              <mat-label i18n="@@As">As</mat-label>
+              <mat-select [value]="draft().rolesMode" (selectionChange)="setRolesMode($event.value)">
+                <mat-option value="attribute" i18n="@@an_attribute_on_a_tag">an attribute on a tag</mat-option>
+                <mat-option value="class" i18n="@@classes_on_a_tag">classes on a tag</mat-option>
+                <mat-option value="meta" i18n="@@a_meta_tag">a meta tag</mat-option>
+              </mat-select>
+            </mat-form-field>
+            @if (draft().rolesMode !== 'meta') {
+              <app-form-field class="height-field wide" i18n-label="@@Tag_name" label="Tag name">
+                <input
+                  matInput
+                  placeholder="body"
+                  [value]="draft().rolesTag"
+                  (input)="patch('rolesTag', $any($event.target).value)"
+                />
+              </app-form-field>
+            }
+            @if (draft().rolesMode === 'attribute') {
+              <app-form-field class="height-field wide" i18n-label="@@Attribute_name" label="Attribute name">
+                <input
+                  matInput
+                  placeholder="data-roles"
+                  [value]="draft().rolesAttribute"
+                  (input)="patch('rolesAttribute', $any($event.target).value)"
+                />
+              </app-form-field>
+            }
+            @if (draft().rolesMode === 'meta') {
+              <app-form-field class="height-field wide" i18n-label="@@Meta_name" label="Meta name">
+                <input
+                  matInput
+                  placeholder="meerkat-roles"
+                  [value]="draft().rolesAttribute"
+                  (input)="patch('rolesAttribute', $any($event.target).value)"
+                />
+              </app-form-field>
+            }
+          </div>
+        }
+
+        <h3 class="sub" i18n="@@User_info">User info</h3>
+        <p class="section-hint" i18n="@@User_info_hint">
+          Exposes the selected user facts to the PAGE, as attributes on a tag of your choice or
+          as meta tags. To send the user to the service itself, use the Identity section: both
+          apply at once.
+        </p>
+        <div class="flags">
+          <mat-checkbox [checked]="draft().userInfoEnabled" (change)="setFlag('userInfoEnabled', $event.checked)">
+            <ng-container i18n="@@Inject_user_info">Inject the user info</ng-container>
+          </mat-checkbox>
+        </div>
+        @if (draft().userInfoEnabled) {
+          <div class="btn-row">
+            <mat-form-field class="position-field">
+              <mat-label i18n="@@As">As</mat-label>
+              <mat-select [value]="draft().userInfoMode" (selectionChange)="patch('userInfoMode', $event.value)">
+                <mat-option value="attribute" i18n="@@attributes_on_a_tag">attributes on a tag</mat-option>
+                <mat-option value="meta" i18n="@@meta_tags">meta tags</mat-option>
+              </mat-select>
+            </mat-form-field>
+            @if (draft().userInfoMode === 'attribute') {
+              <app-form-field class="height-field wide" i18n-label="@@Tag_name" label="Tag name">
+                <input
+                  matInput
+                  placeholder="body"
+                  [value]="draft().userInfoTag"
+                  (input)="patch('userInfoTag', $any($event.target).value)"
+                />
+              </app-form-field>
+            }
+          </div>
+          @for (field of pageUserFields; track field) {
+            <div class="field-row" [attr.ee-feature]="frozen(field) ? 'multi-tenant' : null">
+              <mat-checkbox
+                [checked]="!frozen(field) && draft().userInfoFields[field].enabled"
+                [disabled]="frozen(field)"
+                [matTooltip]="frozen(field) ? frozenTip() : ''"
+                (change)="setUserField(field, $event.checked)"
+              >{{ field }}</mat-checkbox>
+              @if (frozen(field)) {
+                <app-ee-lock
+                  feature="multi-tenant"
+                  i18n-why="@@Multi_tenant_ee_why"
+                  why="Isolate tenants, each with its own groups, members and hours."
+                />
+              }
+              <mat-form-field class="height-field wide" subscriptSizing="dynamic">
+                @if (draft().userInfoMode === 'meta') {<mat-label i18n="@@Meta_name">Meta name</mat-label>} @else {<mat-label i18n="@@Attribute_name">Attribute name</mat-label>}
+                <input
+                  matInput
+                  [placeholder]="field"
+                  [disabled]="frozen(field) || !draft().userInfoFields[field].enabled"
+                  [value]="draft().userInfoFields[field].name"
+                  (input)="setUserFieldName(field, $any($event.target).value)"
+                />
+              </mat-form-field>
+            </div>
+          }
+        }
+      }
+      @case ('inject') {
+        <h3 class="sub" i18n="@@Custom_CSS">Custom CSS</h3>
+        <p class="section-hint" i18n="@@Custom_CSS_hint">
+          A style block injected into the pages: tweak the application's look from the gateway.
+        </p>
+        <div class="css-row">
+          <button matButton="tonal" (click)="editCode('css')">
+            <mat-icon>css</mat-icon>
+            @if (codeLines('css')) {
+              <ng-container i18n="@@Edit_CSS">Edit CSS</ng-container>
+            } @else {
+              <ng-container i18n="@@Add_CSS">Add CSS</ng-container>
+            }
+          </button>
+          @if (codeLines('css'); as n) {
+            <span class="css-size" i18n="@@N_lines">{{ n }} lines</span>
+          }
+        </div>
+
+        <h3 class="sub" i18n="@@Custom_JavaScript">Custom JavaScript</h3>
+        <p class="section-hint" i18n="@@Custom_JS_hint">
+          A script injected into the pages, right after the head opens.
+        </p>
+        <div class="css-row">
+          <button matButton="tonal" (click)="editCode('js')">
+            <mat-icon>javascript</mat-icon>
+            @if (codeLines('js')) {
+              <ng-container i18n="@@Edit_JavaScript">Edit JavaScript</ng-container>
+            } @else {
+              <ng-container i18n="@@Add_JavaScript">Add JavaScript</ng-container>
+            }
+          </button>
+          @if (codeLines('js'); as n) {
+            <span class="css-size" i18n="@@N_lines">{{ n }} lines</span>
+          }
+        </div>
+      }
+    }
+
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+  </div>
+</div>
+
+<footer>
+  <button matButton (click)="closed.emit()" i18n="@@Cancel">Cancel</button>
+  <button matButton="filled" (click)="save()" [disabled]="saving() || !f().valid() || !dirty()" i18n="@@Save">
+    Save
+  </button>
+</footer>

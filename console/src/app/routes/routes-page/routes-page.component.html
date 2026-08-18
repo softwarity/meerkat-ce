@@ -1,0 +1,89 @@
+<mat-drawer-container>
+  <mat-drawer-content>
+    <div class="banner">
+      <h1 i18n="@@Routes">Routes</h1>
+      <app-form-field class="search" icon="search" subscriptSizing="dynamic">
+        <input
+          matInput
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
+          i18n-placeholder="@@Search"
+          placeholder="Search"
+        />
+      </app-form-field>
+      <button matIconButton (click)="load()" i18n-matTooltip="@@Refresh" matTooltip="Refresh" i18n-aria-label="@@Refresh" aria-label="Refresh">
+        @if (loading()) {<mat-icon spin>autorenew</mat-icon>} @else {<mat-icon>refresh</mat-icon>}
+      </button>
+      <button
+        matButton="tonal"
+        (click)="openSigningKeys()"
+        i18n-matTooltip="@@JWT_signing_keys"
+        matTooltip="JWT signing keys"
+      >
+        <mat-icon svgIcon="jwt" />
+        <ng-container i18n="@@Signing_keys">Signing keys</ng-container>
+      </button>
+      <button
+        matButton="tonal"
+        (click)="openProbe()"
+        i18n-matTooltip="@@Which_route_takes_a_request"
+        matTooltip="Which route takes a request?"
+      >
+        <mat-icon>play_circle</mat-icon>
+        <ng-container i18n="@@Routing_test">Routing test</ng-container>
+      </button>
+    </div>
+
+    <div class="content">
+      @if (loading()) {
+        <loading-indicator withContainer />
+      } @else if (routes().length === 0) {
+        <div class="empty" i18n="@@No_route_yet_create_the_first_one">No route yet, create the first one.</div>
+      } @else if (shown().length === 0) {
+        <div class="empty" i18n="@@No_route_matches_NAME">No route matches "{{ query() }}".</div>
+      } @else {
+        <app-routes-table
+          [routes]="shown()"
+          [reorderable]="!query().trim()"
+          (edit)="openEdit($event)"
+          (remove)="remove($event)"
+          (duplicate)="duplicate($event)"
+          (toggleEnabled)="toggleEnabled($event)"
+          (reorder)="onReorder($event)"
+        />
+      }
+    </div>
+
+    <button
+      matFab
+      class="fab-new"
+      (click)="openNew()"
+      i18n-matTooltip="@@New_route"
+      matTooltip="New route"
+      i18n-aria-label="@@New_route"
+      aria-label="New route"
+    >
+      <mat-icon>add</mat-icon>
+    </button>
+  </mat-drawer-content>
+
+  <mat-drawer
+    position="end"
+    mode="over"
+    [opened]="editing() !== null"
+    [disableClose]="editorDirty()"
+    (closedStart)="closeEditor()"
+  >
+    @if (editing() !== null) {
+      <app-route-editor
+        [route]="editingRoute()"
+        [catalog]="catalog()"
+        [siblings]="routes()"
+        [initialSection]="section()"
+        (sectionChange)="changeSection($event)"
+        (saved)="onSaved($event)"
+        (closed)="closeEditor()"
+      />
+    }
+  </mat-drawer>
+</mat-drawer-container>

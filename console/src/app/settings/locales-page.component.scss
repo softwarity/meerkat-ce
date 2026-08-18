@@ -1,0 +1,86 @@
+// The page owns the height it was given, so the only thing that can overflow
+// is the list of locales - see .list.
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  flex: none;
+}
+.banner h1 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+.content {
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+mat-card {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  // Grows no further than its content, shrinks when the screen is short:
+  // a card stretched to full height around three locales would be a lot of
+  // empty frame.
+  flex: 0 1 auto;
+  min-height: 0;
+}
+// The one scrolling part. The 4px of end padding keep the scrollbar off the
+// delete buttons rather than over them.
+.list {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.hint {
+  margin: 0 0 12px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+.field {
+  width: 280px;
+}
+.lang-error {
+  margin: 0 0 8px;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}
+.locale-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 2px 4px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.locale-row .lc {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+.locale-row .ln {
+  color: var(--mat-sys-on-surface-variant);
+}
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}

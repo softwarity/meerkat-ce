@@ -1,0 +1,121 @@
+<mat-drawer-container>
+  <mat-drawer-content>
+    <div class="banner">
+      <h1 i18n="@@Users">Users</h1>
+      <app-form-field class="search" icon="search" subscriptSizing="dynamic">
+        <input
+          matInput
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
+          i18n-placeholder="@@Search"
+          placeholder="Search"
+        />
+      </app-form-field>
+      <span class="spacer"></span>
+      <button matIconButton (click)="load()" i18n-matTooltip="@@Refresh" matTooltip="Refresh" i18n-aria-label="@@Refresh" aria-label="Refresh">
+        @if (loading()) {<mat-icon spin>autorenew</mat-icon>} @else {<mat-icon>refresh</mat-icon>}
+      </button>
+    </div>
+
+    <div class="content">
+      @if (loading()) {
+        <loading-indicator withContainer />
+      } @else if (users().length === 0) {
+        <div class="empty" i18n="@@No_user_yet">No user yet.</div>
+      } @else if (shown().length === 0) {
+        <div class="empty" i18n="@@No_user_matches_NAME">No user matches "{{ query() }}".</div>
+      } @else {
+        <div class="table-wrap">
+          <mat-table [dataSource]="shown()">
+            <ng-container matColumnDef="identity">
+              <mat-header-cell *matHeaderCellDef i18n="@@User">User</mat-header-cell>
+              <mat-cell *matCellDef="let u" [class.off]="!u.enabled">
+                <span class="dot" [title]="u.enabled ? 'enabled' : 'disabled'"></span>
+                <span class="id">
+                  <span class="mono">{{ u.username }}</span>
+                  <span class="muted">{{ u.fullname }}{{ u.fullname && u.email ? ' - ' : '' }}{{ u.email }}</span>
+                </span>
+              </mat-cell>
+            </ng-container>
+
+            <!-- Capabilities toggle right here - a badge click flips the power
+                 without opening the drawer (stopPropagation keeps the row click
+                 for the drawer). -->
+            <ng-container matColumnDef="summary">
+              <mat-header-cell *matHeaderCellDef i18n="@@Capabilities">Capabilities</mat-header-cell>
+              <mat-cell *matCellDef="let u" [class.off]="!u.enabled">
+                <span class="badges">
+                  @for (c of capabilities(); track c.key) {
+                    <button
+                      type="button"
+                      class="badge"
+                      [class.on]="u[c.key]"
+                      [disabled]="c.key === 'root' && u.id === meId()"
+                      [matTooltip]="c.tooltip"
+                      (click)="toggleCapability(u, c.key, $event)"
+                    >
+                      {{ c.label }}
+                    </button>
+                  }
+                </span>
+                <span rowActions="tonal">
+                  @if (u.enabled) {
+                    <button
+                      matIconButton
+                      [disabled]="u.id === meId()"
+                      (click)="toggleEnabled(u, $event)"
+                      i18n-matTooltip="@@Disable_user"
+                      matTooltip="Disable user"
+                      i18n-aria-label="@@Disable_user"
+                      aria-label="Disable user"
+                    >
+                      <mat-icon>person_off</mat-icon>
+                    </button>
+                  } @else {
+                    <button
+                      matIconButton
+                      (click)="toggleEnabled(u, $event)"
+                      i18n-matTooltip="@@Enable_user"
+                      matTooltip="Enable user"
+                      i18n-aria-label="@@Enable_user"
+                      aria-label="Enable user"
+                    >
+                      <mat-icon>how_to_reg</mat-icon>
+                    </button>
+                  }
+                </span>
+              </mat-cell>
+            </ng-container>
+
+            <mat-header-row *matHeaderRowDef="columns"></mat-header-row>
+            <mat-row *matRowDef="let row; columns: columns" class="clickable" (click)="openUser(row)"></mat-row>
+          </mat-table>
+        </div>
+      }
+    </div>
+
+    <button
+      matFab
+      class="fab-new"
+      (click)="create()"
+      i18n-matTooltip="@@New_user"
+      matTooltip="New user"
+      i18n-aria-label="@@New_user"
+      aria-label="New user"
+    >
+      <mat-icon>person_add</mat-icon>
+    </button>
+  </mat-drawer-content>
+
+  <mat-drawer position="end" mode="over" [opened]="editing() !== null" (closedStart)="onClose()">
+    @if (editing(); as u) {
+      <app-user-editor
+        [user]="u"
+        [globalMfaLabel]="globalMfaLabel()"
+        [meId]="meId()"
+        (saved)="onUserSaved($event)"
+        (closed)="onClose()"
+      />
+    }
+  </mat-drawer>
+</mat-drawer-container>

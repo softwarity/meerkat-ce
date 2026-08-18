@@ -1,0 +1,48 @@
+.duo {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  // Panes sit tight; the rail overlays their boundary (see .rail-slot).
+  gap: 4px;
+}
+
+// The theme-carousel rail, centred on the boundary between the two panes and
+// overlaid on top of them (out of grid flow, so it doesn't push the panes apart
+// nor widen .duo). z-index above the panes.
+.rail-slot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 5;
+}
+
+.pane {
+  position: relative;
+  justify-self: center;
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  background: var(--mat-sys-surface-container-low);
+}
+
+
+iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1280px;
+  height: 640px;
+  border: 0;
+  transform-origin: 0 0;
+}
+
+/* A scheme nobody will be served: shown, but visibly out of play. Hiding the
+   pane would make the screen jump every time a box is ticked, and the colours
+   still exist - they are simply not going to be used. */
+.pane.off {
+  opacity: 0.4;
+  filter: saturate(0.5);
+}

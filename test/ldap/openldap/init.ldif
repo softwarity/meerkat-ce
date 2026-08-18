@@ -1,0 +1,196 @@
+# The directory the bench signs people in against, mirrored on the Active
+# Directory side (../samba/seed.sh) - one fixture, two dialects, because LDAP
+# and AD only LOOK alike.
+#
+# It is not a list of two people any more. A fixture where everybody is in
+# every group cannot show a decision being taken: whatever rule one writes,
+# everyone gets everything. So each person here answers ONE question a group
+# rule (RBAC-10) has to answer:
+#
+#   johndoe  frontend, backend, operator  the original, unchanged: the tests bind as him
+#   janedoe  devops, frontend, operator   the original
+#   alice    frontend                     one team, nothing else - the simplest rule there is
+#   bob      nothing                      signs in and is granted nothing: does the page still work
+#   carla    backend                      developer ONLY through nesting, nothing direct
+#   dan      no password                  the bind is refused (AD side: really disabled)
+#   evec     frontend                     login is not the mail, and the name carries an accent
+#   frank    Brest Agents                 a group name that is not a role name: space, capitals
+#   gina     operator                     lives in ANOTHER subtree: a narrow search base hides her
+#
+# Passwords are all "password" - except dan, who has none on purpose.
+
+dn: ou=users,dc=example,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: users
+
+# A second subtree of people. The search base decides whether Gina exists at
+# all: based on ou=users she is invisible, based on the root she is not.
+dn: ou=partners,dc=example,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: partners
+
+dn: uid=johndoe,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: John Doe
+sn: Doe
+uid: johndoe
+mail: johndoe@example.com
+userPassword: password
+
+dn: uid=janedoe,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Jane Doe
+sn: Doe
+uid: janedoe
+mail: janedoe@example.com
+userPassword: password
+
+dn: uid=alice,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Alice Martin
+sn: Martin
+uid: alice
+mail: alice@example.com
+userPassword: password
+
+# In no group at all. Signing in must still work and grant nothing - the case
+# an installation meets on its first day, before a single rule is written.
+dn: uid=bob,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Bob Nguyen
+sn: Nguyen
+uid: bob
+mail: bob@example.com
+userPassword: password
+
+# Member of backend and of nothing else, so "developer" can only reach her
+# through the nesting. Turn nesting off and she loses it: John cannot show
+# that, he is in two teams and an extra group.
+dn: uid=carla,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Carla Rossi
+sn: Rossi
+uid: carla
+mail: carla@example.com
+userPassword: password
+
+# No userPassword: the entry exists, the search finds it, the bind fails. That
+# is the shape of a person who left - the directory still knows them and the
+# gateway must still refuse them. On the AD side the account is disabled for
+# real, which is the same story told the way that dialect tells it.
+dn: uid=dan,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Dan Fisher
+sn: Fisher
+uid: dan
+mail: dan@example.com
+
+# The login is not the address, and the name is not ASCII. Both are ordinary
+# in a real directory and both break code that assumed otherwise.
+dn: uid=evec,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Ève Chevalier
+sn: Chevalier
+givenName: Ève
+uid: evec
+mail: eve.chevalier@example.com
+userPassword: password
+
+dn: uid=frank,ou=users,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Frank Weber
+sn: Weber
+uid: frank
+mail: frank@example.com
+userPassword: password
+
+dn: uid=gina,ou=partners,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Gina Lopez
+sn: Lopez
+uid: gina
+mail: gina@partner.example.com
+userPassword: password
+
+dn: ou=groups,dc=example,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: groups
+
+dn: cn=devops,ou=groups,dc=example,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+cn: devops
+uniqueMember: uid=janedoe,ou=users,dc=example,dc=com
+
+dn: cn=frontend,ou=groups,dc=example,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+cn: frontend
+uniqueMember: uid=johndoe,ou=users,dc=example,dc=com
+uniqueMember: uid=janedoe,ou=users,dc=example,dc=com
+uniqueMember: uid=alice,ou=users,dc=example,dc=com
+uniqueMember: uid=evec,ou=users,dc=example,dc=com
+
+dn: cn=backend,ou=groups,dc=example,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+cn: backend
+uniqueMember: uid=johndoe,ou=users,dc=example,dc=com
+uniqueMember: uid=carla,ou=users,dc=example,dc=com
+
+# Nested: developer holds the three TEAM groups, never a person. A client that
+# reads membership flat comes out of here with nobody in it.
+dn: cn=developer,ou=groups,dc=example,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+cn: developer
+uniqueMember: cn=frontend,ou=groups,dc=example,dc=com
+uniqueMember: cn=backend,ou=groups,dc=example,dc=com
+uniqueMember: cn=devops,ou=groups,dc=example,dc=com
+
+dn: cn=operator,ou=groups,dc=example,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+cn: operator
+uniqueMember: uid=johndoe,ou=users,dc=example,dc=com
+uniqueMember: uid=janedoe,ou=users,dc=example,dc=com
+uniqueMember: uid=gina,ou=partners,dc=example,dc=com
+
+# A name no role catalogue would accept as it stands: a space and capitals.
+# What a rule does with it - map it, refuse it, slugify it - is exactly the
+# question a bench with only lowercase one-word groups never asks.
+dn: cn=Brest Agents,ou=groups,dc=example,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+cn: Brest Agents
+uniqueMember: uid=frank,ou=users,dc=example,dc=com

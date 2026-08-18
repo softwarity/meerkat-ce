@@ -1,0 +1,318 @@
+@use '@angular/material' as mat;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+  .title {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    h2 {
+      margin: 0;
+      font: var(--mat-sys-title-medium);
+    }
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.8rem;
+    }
+    .badge {
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: var(--mat-sys-surface-container-high);
+      font-family: var(--mk-mono);
+      font-size: 0.72rem;
+    }
+  }
+  .picker {
+    min-width: 280px;
+    margin-left: auto;
+  }
+  .intro {
+    flex-basis: 100%;
+    margin: 2px 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.82rem;
+  }
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px;
+  padding: 12px 16px;
+  border-radius: var(--mk-radius);
+  background: var(--mat-sys-surface-container);
+  color: var(--mat-sys-on-surface-variant);
+
+  &.error {
+    background: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+  }
+}
+
+.route-default {
+  margin: 14px 20px;
+  flex: 0 0 auto;
+
+  .rd-hint {
+    margin: 10px 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8rem;
+  }
+}
+
+// Tags cell: chips wrap onto several lines within the column width.
+.c-tags {
+  max-width: 240px;
+  white-space: normal;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.rowtag {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.7rem;
+}
+// A compact select in a column header filters the rows (by method or by tag).
+// The density mixin shrinks the Material field so it does not inflate the header.
+.colfilter {
+  width: 130px;
+  @include mat.form-field-density(-5);
+}
+
+.inherits {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+
+  .muted {
+    color: var(--mat-sys-outline);
+  }
+}
+
+// ── The operations table ─────────────────────────────────────────────────────
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+table.ops {
+  width: 100%;
+  background: transparent;
+
+  th {
+    background: var(--mat-sys-surface-container);
+    color: var(--mat-sys-on-surface-variant);
+    font-weight: 600;
+    border-bottom-color: var(--mat-sys-outline-variant);
+  }
+  td {
+    border-bottom-color: var(--mat-sys-outline-variant);
+  }
+  .c-status {
+    width: 116px;
+  }
+  .c-expand {
+    width: 44px;
+    text-align: center;
+    padding-left: 0;
+  }
+}
+
+.op-row {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-low);
+  }
+  &.open {
+    background: var(--mat-sys-surface-container);
+  }
+  // The override accent rides the first CELL (not the row): a cell box-shadow
+  // paints above the row's hover background, so it survives hover.
+  &.secured .c-status {
+    box-shadow: inset 3px 0 0 0 var(--mk-signal);
+  }
+}
+
+.method {
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: var(--mk-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--mat-sys-outline);
+}
+.m-get { background: #22a06b; }
+.m-post { background: #2f6feb; }
+.m-put { background: #d98420; }
+.m-patch { background: #12a4a4; }
+.m-delete { background: #d64545; }
+.m-head,
+.m-options { background: #6e738d; }
+
+.path {
+  font-family: var(--mk-mono);
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+.summary {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.82rem;
+}
+.chev {
+  color: var(--mat-sys-on-surface-variant);
+  transition: transform 0.15s ease;
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+// The inline editor row.
+.detail-cell {
+  padding: 0 !important;
+}
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 18px 56px;
+  background: var(--mat-sys-surface-container-low);
+  border-bottom: 2px solid color-mix(in srgb, var(--mk-signal) 40%, transparent);
+
+  .detail-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    font-size: 0.8rem;
+
+    .k {
+      color: var(--mat-sys-on-surface-variant);
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+    }
+    code {
+      font-family: var(--mk-mono);
+    }
+    .tag-chip {
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: var(--mat-sys-surface-container-high);
+      font-size: 0.72rem;
+    }
+  }
+  .detail-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: start;
+
+    .access {
+      width: 190px;
+    }
+    .roles {
+      min-width: 240px;
+    }
+  }
+}
+
+// ── Footer (global save) ─────────────────────────────────────────────────────
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface);
+
+  .count {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85rem;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .save-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    &.ok {
+      color: #22a06b;
+    }
+    &.err {
+      color: var(--mat-sys-error);
+    }
+  }
+  .spin {
+    animation: es-spin 1s linear infinite;
+  }
+}
+
+@keyframes es-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The whole-route rule, shown and not edited: it takes part in choosing the
+   route, so it lives with the route. */
+.route-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium, 12px);
+}
+.route-rule .rr-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface-variant);
+}
+.route-rule .rr-edit {
+  font-size: 0.82rem;
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+}
+.route-rule .rr-edit:hover {
+  text-decoration: underline;
+}

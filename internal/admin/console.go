@@ -1,0 +1,250 @@
+package admin
+
+import (
+	"bytes"
+	"fmt"
+	"html"
+	"io"
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+
+	"github.com/softwarity/meerkat/internal/admin/ui"
+	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/session"
+	"github.com/softwarity/meerkat/internal/store"
+)
+
+// RegisterConsole mounts the console UI on the admin mux fallback.
+//
+// Priority: an explicit target (--console-url, dev) proxies everything that
+// is not the API or an auth page to the Angular dev server - the gateway is
+// a proxy, so it proxies its own console too, WebSocket/HMR included. With
+// no target, the console embedded at build time (`make ui`) is served. With
+// neither, the fallback answers an explicit status page instead of a naked
+// 404 - the admin port must never look dead.
+//
+// The proxied console's HTML gets the signed-in identity STAMPED on its
+// <body> (same mechanism as UI routes, hard-wired here): capability roles as
+// classes and data-meerkat-* attributes - the console boots without calling
+// /api/me, and the role-CSS visibility applies from the first paint.
+func RegisterConsole(mux *http.ServeMux, target string, st *store.Store, sm *session.Manager) error {
+	if target != "" {
+		u, err := url.Parse(target)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("console-url %q: scheme and host required", target)
+		}
+		proxy := &httputil.ReverseProxy{
+			Rewrite: func(pr *httputil.ProxyRequest) {
+				pr.SetURL(u)
+				// HTML navigations must arrive uncompressed so the identity stamp
+				// can rewrite <body>; assets keep their encoding untouched.
+				if wantsHTML(pr.In) {
+					pr.Out.Header.Del("Accept-Encoding")
+				}
+			},
+			ModifyResponse: func(resp *http.Response) error {
+				return stampConsoleHTML(resp, st, sm)
+			},
+			ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+				slog.Warn("console dev server unreachable", "target", target, "err", err)
+				http.Error(w, "console dev server unreachable - is `npm start` running in console/ ?",
+					http.StatusBadGateway)
+			},
+		}
+		// "/" is the least specific pattern: /api/..., /login, /logout and
+		// /healthz keep winning.
+		mux.Handle("/", proxy)
+		slog.Info("console proxied to dev server", "target", target)
+		return nil
+	}
+	if fsys, ok := ui.Build(); ok {
+		mux.Handle("/", consoleHandler(fsys, st, sm))
+		slog.Info("embedded console mounted")
+		return nil
+	}
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = fmt.Fprintf(w,
+			`{"service":"meerkat control plane","console":"not mounted","hint":"this binary was built without 'make ui'; set --console-url (or MEERKAT_CONSOLE_URL) to a console dev server, e.g. http://localhost:4200","api":"/api","login":"/login","path":%q}`,
+			r.URL.Path)
+	})
+	return nil
+}
+
+// consoleHandler serves the SPA at the root. A path that is not a build file
+// falls back to index.html - deep links are the SPA router's business, exactly
+// what ng serve does in dev.
+//
+// There is no locale segment and no language negotiation: the console speaks
+// English (see the ui package). What used to live here - redirecting "/" into
+// "/fr/", picking a locale from Accept-Language - was the one thing an
+// operator hit before anything else, and it could send them to a language
+// they never asked for when the header listed one we happened to build.
+func consoleHandler(fsys fs.FS, st *store.Store, sm *session.Manager) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if name := strings.TrimPrefix(path.Clean(r.URL.Path), "/"); name != "" {
+			if info, err := fs.Stat(fsys, name); err == nil && !info.IsDir() {
+				// Angular hashes every file name except index.html: safe to
+				// cache forever - a new build means new names.
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				http.ServeFileFS(w, r, fsys, name)
+				return
+			}
+			// A missing FILE is a 404, never the shell. Answering HTML to a
+			// request for main-ABC123.js hands the browser a script that is
+			// not one: it throws a syntax error and the application never
+			// boots - a blank page whose cause is nowhere near it. This is
+			// exactly what a browser holding a previous build's index.html
+			// asks for, and it cost an hour of looking in the wrong place.
+			if path.Ext(name) != "" {
+				http.NotFound(w, r)
+				return
+			}
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		serveStampedIndex(w, r, fsys, "index.html", st, sm)
+	})
+}
+
+// serveStampedIndex writes the SPA shell with the identity and edition stamp
+// on its <body>, the same one the dev proxy applies.
+//
+// It was missing here, which meant the stamp only ever worked in development:
+// the embedded console is what a release runs, and it was booting with a bare
+// <body> and rebuilding the classes from /api/me afterwards. Everything the
+// stamp exists for - role visibility, the multi-tenant screens, the locked
+// Enterprise controls right on the FIRST paint - was therefore true of the
+// dev server and false of production.
+func serveStampedIndex(w http.ResponseWriter, r *http.Request, fsys fs.FS, name string,
+	st *store.Store, sm *session.Manager) {
+	attrs := ""
+	if st != nil && sm != nil {
+		attrs = consoleBodyAttrs(r, st, sm)
+	}
+	if attrs == "" {
+		http.ServeFileFS(w, r, fsys, name)
+		return
+	}
+	body, err := fs.ReadFile(fsys, name)
+	if err != nil {
+		http.ServeFileFS(w, r, fsys, name)
+		return
+	}
+	stamped := bytes.Replace(body, []byte("<body"), []byte("<body "+attrs), 1)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Length", strconv.Itoa(len(stamped)))
+	_, _ = w.Write(stamped)
+}
+
+func wantsHTML(r *http.Request) bool {
+	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
+// stampConsoleHTML rewrites the console index's <body> tag with the session's
+// identity attributes. No session, not HTML, or no <body> tag: untouched.
+func stampConsoleHTML(resp *http.Response, st *store.Store, sm *session.Manager) error {
+	if st == nil || sm == nil || resp.Request == nil || !wantsHTML(resp.Request) {
+		return nil
+	}
+	if resp.StatusCode != http.StatusOK ||
+		!strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		return nil
+	}
+	attrs := consoleBodyAttrs(resp.Request, st, sm)
+	if attrs == "" {
+		return nil
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	closeErr := resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	stamped := bytes.Replace(body, []byte("<body"), []byte("<body "+attrs), 1)
+	resp.Body = io.NopCloser(bytes.NewReader(stamped))
+	resp.ContentLength = int64(len(stamped))
+	resp.Header.Set("Content-Length", strconv.Itoa(len(stamped)))
+	return nil
+}
+
+// consoleBodyAttrs renders the identity stamp for the admin session carried by
+// r, or "" without one: capability roles as classes (the role-CSS mechanism
+// the console already uses) plus data-meerkat-* identity attributes.
+func consoleBodyAttrs(r *http.Request, st *store.Store, sm *session.Manager) string {
+	sess, err := sm.Resolve(r.Context(), r)
+	if err != nil {
+		return ""
+	}
+	user, err := st.GetUserByID(r.Context(), sess.UserID)
+	if err != nil || !user.Enabled {
+		return ""
+	}
+	var roles []string
+	if user.Root {
+		roles = append(roles, "root")
+	}
+	if user.Dev {
+		roles = append(roles, "dev")
+	}
+	if user.Tester {
+		roles = append(roles, "tester")
+	}
+	if user.TenantCreator {
+		roles = append(roles, "tenant-creator")
+	}
+	if user.InfraAdmin {
+		roles = append(roles, "infra-admin")
+	}
+	if user.AppAdmin {
+		roles = append(roles, "app-admin")
+	}
+	// tenant-admin: administers at least one tenant - as its owner (owner_id,
+	// member or not) or an ADMIN member. Ownership is decoupled from membership.
+	if administered, err := st.ListTenantsAdministeredBy(r.Context(), user.ID); err == nil && len(administered) > 0 {
+		roles = append(roles, "tenant-admin")
+	}
+	// What this installation IS travels the same way, and for the same reason
+	// the roles do: the CSS that hides the multi-tenant screens and locks the
+	// Enterprise controls must be right on the FIRST paint. Waiting for
+	// /api/edition would show the multi-organisation console for a frame and
+	// then take it away, which reads as a glitch and, for a locked control,
+	// as a tease.
+	if st.Tenancy(r.Context()) == store.TenancyMulti {
+		roles = append(roles, "multi-tenant")
+	}
+	// ONE class, not one per feature: the product is sold whole, per production
+	// instance, so the only question a stylesheet can ask is which image this is.
+	if edition.Enterprise {
+		roles = append(roles, "ee")
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, `class="%s"`, strings.Join(roles, " "))
+	// The organisation a single installation serves: the console targets it for
+	// Groups, Members and the group rules without ever naming it.
+	primary := ""
+	if p, err := st.PrimaryTenant(r.Context()); err == nil {
+		primary = p.ID
+	}
+	for _, kv := range [][2]string{
+		{"user-id", user.ID},
+		{"username", user.Username},
+		{"fullname", user.Fullname},
+		{"email", user.Email},
+		{"primary-tenant", primary},
+	} {
+		if kv[1] == "" {
+			continue
+		}
+		fmt.Fprintf(&b, ` data-meerkat-%s="%s"`, kv[0], html.EscapeString(kv[1]))
+	}
+	return b.String()
+}

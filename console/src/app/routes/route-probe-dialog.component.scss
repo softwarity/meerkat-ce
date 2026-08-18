@@ -1,0 +1,168 @@
+:host {
+  display: block;
+  max-width: 720px;
+  /* Every row of the request block shares these two columns: the label on the
+     left and the action on the right. Written once, or they drift apart one
+     row at a time. */
+  --probe-col: 130px;
+  --probe-act: 40px;
+}
+/* What scrolls is the LIST, not the dialog. Letting the whole content scroll
+   carried the method and the path off the top: you lose sight of the request
+   you are testing exactly when you read the answer to it. */
+mat-dialog-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 72vh;
+}
+.intro {
+  margin: 0 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.base {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.base .method {
+  width: var(--probe-col);
+  flex: none;
+}
+.base .path {
+  flex: 1;
+  min-width: 0;
+}
+.crit {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+/* The criterion's name reads as a field label, not as a caption: it sits
+   beside a form field and was half its size. */
+.crit .kind {
+  flex: none;
+  width: var(--probe-col);
+  font-size: 0.9rem;
+  color: var(--mat-sys-on-surface);
+}
+.crit app-form-field {
+  flex: 1;
+  min-width: 0;
+}
+.crit .rm {
+  flex: none;
+  width: var(--probe-act);
+}
+/* At the end of the method/path line: adding a criterion is a small act and
+   was taking a whole row to say so. Its width is reserved on the rows below,
+   so every field in this block ends on the same edge. */
+/* The only way to add anything here, so it is not a bare glyph: a tonal disc,
+   the same family as the dialog's own actions. */
+.base .add {
+  flex: none;
+  margin: 0;
+  width: var(--probe-act);
+  height: var(--probe-act);
+  border-radius: 50%;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+.base .add:hover {
+  background: var(--mat-sys-primary-container);
+}
+.err {
+  margin: 12px 0 0;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}
+/* The traversal, in snapshot order: what production would evaluate until the
+   winner; the rows below it are dimmed (the matcher never reaches them). */
+.steps {
+  margin-top: 16px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mk-radius);
+  /* The one scrolling area: it takes the room left and keeps its own bar
+     inside the border, rather than pushing the form out of view. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+.step + .step {
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+.step .mark {
+  flex: none;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--mat-sys-on-surface-variant);
+}
+.step.win {
+  background: color-mix(in srgb, var(--mk-signal) 10%, transparent);
+}
+.step.win .mark {
+  color: var(--mk-signal);
+}
+.step.win .name {
+  font-weight: 600;
+}
+.step.after,
+.step.off {
+  opacity: 0.55;
+}
+.step .name {
+  flex: none;
+}
+.step .why {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.78rem;
+}
+.step .tag {
+  flex: none;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--mk-signal);
+  color: var(--mat-sys-on-secondary, #003);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+/* Below the list, so the traversal never shifts when a verdict lands. */
+.none {
+  margin: 10px 0 0;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Who the probe pretends to be, on the line under the request it describes.
+   The gap plus the [+] above are kept clear on the right so the two rows end
+   on the same edge. */
+.as-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0 4px;
+  padding-inline-end: calc(var(--probe-act) + 12px);
+}
+.as-row .as-f {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.why.rule {
+  color: var(--mat-sys-tertiary);
+}

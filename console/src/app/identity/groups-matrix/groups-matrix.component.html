@@ -1,0 +1,116 @@
+<!-- search and tag filter both live in the layout's right-zone header. -->
+
+@if (loading()) {
+  <loading-indicator withContainer />
+} @else if (roles().length === 0) {
+  <p class="empty" i18n="@@No_roles_catalogue">
+    No roles in the catalogue yet: create them in Application / Roles.
+  </p>
+} @else {
+  <div class="table-wrap">
+    <mat-table [dataSource]="rows()">
+      <ng-container matColumnDef="role" sticky>
+        <mat-header-cell *matHeaderCellDef i18n="@@Roles">Roles</mat-header-cell>
+        <!-- name + description only: tags are a filter concern (header select),
+             their pills live on the Roles page. The indentation carries the
+             hierarchy, which is what explains a checked-and-locked box without
+             a word of extra chrome. -->
+        <!-- The description leads: it is the human-facing label, and the name
+             is the identifier one writes in a template. A role without a
+             description falls back to its name rather than showing a blank. -->
+        <mat-cell *matCellDef="let row">
+          <app-tree-prefix [guides]="row.guides" />
+          <!-- The tooltip carries BOTH lines: what is cut is precisely what
+               someone needs when a name and a description are close cousins. -->
+          <div class="role-cell" [class.context]="row.context" [matTooltip]="roleTip(row.role)">
+            @if (row.role.description) {
+              <span class="label">{{ row.role.description }}</span>
+              <span class="name mono">{{ row.role.name }}</span>
+            } @else {
+              <span class="label mono">{{ row.role.name }}</span>
+            }
+          </div>
+        </mat-cell>
+      </ng-container>
+
+      <!-- Second header row: the columns of the first one, emptied. -->
+      <ng-container matColumnDef="role-all" sticky>
+        <mat-header-cell *matHeaderCellDef class="bulk-label" i18n="@@Whole_column">
+          Whole column
+        </mat-header-cell>
+      </ng-container>
+      <ng-container matColumnDef="spacer-all">
+        <mat-header-cell *matHeaderCellDef></mat-header-cell>
+      </ng-container>
+
+      <!-- flex spacer so the table fills the width; groups sit right after it and
+           only scroll horizontally once they are too many to fit. -->
+      <ng-container matColumnDef="spacer">
+        <mat-header-cell *matHeaderCellDef></mat-header-cell>
+        <mat-cell *matCellDef="let r"></mat-cell>
+      </ng-container>
+
+      @for (g of groups(); track g.id) {
+        <ng-container [matColumnDef]="g.id">
+          <mat-header-cell *matHeaderCellDef class="grp-head">
+            <span class="col-name" [title]="g.description">{{ g.name }}</span>
+            <button
+              matIconButton
+              [matMenuTriggerFor]="groupMenu"
+              [matMenuTriggerData]="{ group: g }"
+              i18n-aria-label="@@Group_menu"
+              aria-label="Group menu"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </mat-header-cell>
+          <mat-cell *matCellDef="let row">
+            <mat-checkbox
+              [checked]="roleChecked(row.role, g.id)"
+              [disabled]="roleImplied(row.role, g.id)"
+              (change)="toggle(row.role, g.id, $event.checked)"
+            />
+          </mat-cell>
+        </ng-container>
+        <!-- Ticks or clears the column, over the rows currently ON SCREEN:
+             what one sees is what one ticks. -->
+        <ng-container [matColumnDef]="g.id + '-all'">
+          <mat-header-cell *matHeaderCellDef>
+            <mat-checkbox
+              [checked]="columnState(g.id).checked"
+              [indeterminate]="columnState(g.id).some"
+              (change)="toggleColumn(g.id, $event.checked)"
+              i18n-aria-label="@@Grant_every_visible_role"
+              aria-label="Grant every visible role"
+            />
+          </mat-header-cell>
+        </ng-container>
+      }
+
+      <mat-header-row *matHeaderRowDef="displayedColumns(); sticky: true"></mat-header-row>
+      <mat-header-row class="bulk-row" *matHeaderRowDef="bulkColumns(); sticky: true"></mat-header-row>
+      <mat-row *matRowDef="let row; columns: displayedColumns()"></mat-row>
+    </mat-table>
+  </div>
+
+  <button mat-fab class="new-fab" (click)="addGroup()" i18n-matTooltip="@@New_group" matTooltip="New group" i18n-aria-label="@@New_group" aria-label="New group">
+    <mat-icon>add</mat-icon>
+  </button>
+}
+
+<!-- One menu at the template root (in scope of every trigger, correctly
+     positioned), receiving its group via context. It opens to the LEFT of its
+     trigger: opening right covered the next group's column, which is the one
+     someone compares against. -->
+<mat-menu #groupMenu xPosition="before">
+  <ng-template matMenuContent let-group="group">
+    <button mat-menu-item (click)="editGroup(group)">
+      <mat-icon>edit</mat-icon>
+      <span i18n="@@Edit">Edit</span>
+    </button>
+    <button mat-menu-item (click)="removeGroup(group)">
+      <mat-icon>delete</mat-icon>
+      <span i18n="@@Delete">Delete</span>
+    </button>
+  </ng-template>
+</mat-menu>
