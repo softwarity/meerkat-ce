@@ -9,7 +9,11 @@ const repo = fileURLToPath(new URL('../..', import.meta.url));
 const tmp = fileURLToPath(new URL('../.tmp', import.meta.url));
 const bin = `${tmp}/meerkat`;
 
-const build = spawnSync('go', ['build', '-o', bin, './cmd/meerkat'], { cwd: repo, stdio: 'inherit' });
+// -tags ee: the suite exercises the WHOLE product - several organisations,
+// directories, hours - so it needs the Enterprise binary. Without the tag the
+// community one is built, and the first thing the setup does (create a tenant)
+// is refused, which is correct behaviour reported as a broken test run.
+const build = spawnSync('go', ['build', '-tags', 'ee', '-o', bin, './cmd/meerkat'], { cwd: repo, stdio: 'inherit' });
 if (build.status !== 0) process.exit(build.status ?? 1);
 
 rmSync(`${tmp}/data`, { recursive: true, force: true });
@@ -33,7 +37,6 @@ const child = spawn(
     env: {
       ...process.env,
       MEERKAT_ADMIN_PASSWORD: 'e2e-Root-Password-1',
-      MEERKAT_FEATURES: 'multi-tenant,directories,business-hours,audit-export,white-label,saml,scim,cluster',
     },
   },
 );
