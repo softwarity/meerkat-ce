@@ -46,6 +46,10 @@ jobs:
     needs: gate
     permissions:
       contents: read
+      # Granted, not used: a called workflow cannot request more than its
+      # caller allows, and the shared definition asks for it so the
+      # Enterprise side can push to GH Packages.
+      packages: write
     # Without this the registry credentials never reach the reusable workflow:
     # a called workflow gets no repository secret unless the caller passes it,
     # and the preflight would report "not set" forever.
