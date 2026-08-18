@@ -64,7 +64,7 @@ le produit indéployable : personne de sérieux ne met ça devant un service.
 | Chargement au démarrage | `internal/edition/edition_ee.go` (`Setup`) | fait, **image EE seulement** |
 | Drapeau et variable | `-license`, `MEERKAT_LICENSE_FILE` | fait |
 | Bac à sable sans licence | `MEERKAT_FEATURES` (avertit bruyamment) | fait |
-| Catalogue des fonctions | `internal/features` | 8 clés |
+| Catalogue des fonctions | **supprimé le 2026-08-18** | une constante, `edition.Enterprise` |
 | Endpoint console | `GET /api/edition` (`internal/admin/edition.go`) | fait |
 | Tests de validation | `internal/license/license_test.go` | 6 tests |
 

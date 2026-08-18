@@ -95,7 +95,7 @@ jobs:
           - area: Admin API
             packages: ./internal/admin/... ./internal/openapi/... ./internal/config/...
           - area: Storage
-            packages: ./internal/store/... ./internal/features/... ./internal/license/...
+            packages: ./internal/store/... ./internal/edition/... ./internal/license/...
           - area: Secrets and signing
             packages: ./internal/vault/... ./internal/signing/... ./internal/mail/...
     steps:
@@ -103,8 +103,13 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
+      # Both editions. A change that only compiles under the tag would break
+      # the community image silently, and the publication would be the first
+      # to know; a change that only works WITHOUT it breaks what is sold.
       - run: go vet ${{ matrix.packages }}
       - run: go test -race ${{ matrix.packages }}
+      - run: go vet -tags ee ${{ matrix.packages }}
+      - run: go test -race -tags ee ${{ matrix.packages }}
 
   # Nothing must fall between the areas above: a package nobody listed would
   # stop being tested on ubuntu and nobody would see it, because the check that
@@ -147,9 +152,11 @@ jobs:
         with:
           go-version: stable
       - name: Vet
-        run: go vet ./...
-      - name: Test
+        run: go vet ./... && go vet -tags ee ./...
+      - name: Test, community
         run: go test -race ./...
+      - name: Test, Enterprise
+        run: go test -race -tags ee ./...
 
   # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
   # Active Directory and Dex; without them these tests SKIP, and a skip is
@@ -206,7 +213,7 @@ jobs:
       # ran" from "nothing answered and nobody noticed".
       - name: Run against it, and prove they ran
         run: |
-          go test ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
+          go test -tags ee ./ee/directories/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
           ran=$(grep -c -- '--- PASS' out.txt)
           echo "$ran of ${{ matrix.expect }} expected tests ran against ${{ matrix.directory }}"
           [ "$ran" -eq ${{ matrix.expect }} ] || { echo "the server was not reached"; exit 1; }
@@ -278,6 +285,7 @@ jobs:
           for goarch in amd64 arm64; do
             echo "building linux/$goarch"
             GOARCH=$goarch go build -trimpath -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+            GOARCH=$goarch go build -trimpath -tags ee -ldflags '-s -w' -o /dev/null ./cmd/meerkat
           done
 
   # Publish only once everything is green. main publishes `latest` (+ `main`);
@@ -294,3 +302,24 @@ jobs:
     # and the preflight would report "not set" forever.
     secrets: inherit
     uses: ./.github/workflows/_docker.yml
+    with:
+      image: docker.io/softwarity/meerkat
+      registry: docker.io
+      go-tags: ""
+
+  # The Enterprise image, same commit, private registry. It is the artifact
+  # that IS the licence: what separates it from the one above is the code the
+  # linker put in it, not a flag it reads.
+  image-ee:
+    name: Build & publish the Enterprise image
+    permissions:
+      contents: read
+      packages: write
+    needs: [lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
+    if: success() && github.event_name != 'pull_request'
+    secrets: inherit
+    uses: ./.github/workflows/_docker.yml
+    with:
+      image: ghcr.io/softwarity/meerkat-ee
+      registry: ghcr.io
+      go-tags: ee

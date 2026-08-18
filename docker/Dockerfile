@@ -21,7 +21,10 @@ COPY --from=console /console/dist/console/browser/ internal/admin/ui/dist/
 ARG VERSION=dev
 ARG GIT_REV=none
 ARG BUILD_DATE=unknown
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w \
+# The edition, and the ONLY thing that separates the two images: empty builds
+# the community one (ee/ is not compiled in at all), "ee" the Enterprise one.
+ARG GO_TAGS=
+RUN CGO_ENABLED=0 go build -trimpath -tags "${GO_TAGS}" -ldflags "-s -w \
       -X github.com/softwarity/meerkat/internal/version.Version=${VERSION} \
       -X github.com/softwarity/meerkat/internal/version.Commit=${GIT_REV} \
       -X github.com/softwarity/meerkat/internal/version.Date=${BUILD_DATE}" \

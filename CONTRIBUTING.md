@@ -11,7 +11,9 @@
 | `requirements.md` | FSL | Product requirements (French, working document) |
 
 One repository, one binary: EE code compiles into every build and stays
-dormant without a valid license file (`internal/license`, `internal/features`).
+absent from the community image entirely: the `ee` build tag decides what
+the linker puts in (`internal/edition`), and the two images are published
+separately.
 Never gate features by build tags or separate artifacts.
 
 ## Conventions

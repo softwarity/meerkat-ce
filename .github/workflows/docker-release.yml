@@ -51,3 +51,23 @@ jobs:
     # and the preflight would report "not set" forever.
     secrets: inherit
     uses: ./.github/workflows/_docker.yml
+    with:
+      image: docker.io/softwarity/meerkat
+      registry: docker.io
+      go-tags: ""
+
+  # The Enterprise image, same commit, private registry. It is the artifact
+  # that IS the licence: what separates it from the one above is the code the
+  # linker put in it, not a flag it reads.
+  image-ee:
+    name: Build & publish the Enterprise image
+    permissions:
+      contents: read
+      packages: write
+    needs: gate
+    secrets: inherit
+    uses: ./.github/workflows/_docker.yml
+    with:
+      image: ghcr.io/softwarity/meerkat-ee
+      registry: ghcr.io
+      go-tags: ee
