@@ -1,8 +1,23 @@
-import { expect, request, test } from '@playwright/test';
+import { expect, request, test, type APIRequestContext } from '@playwright/test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ADMIN_URL, DATA_URL } from '../playwright.config';
 import { authDataFile, authFile, seeded } from '../lib/fixtures';
+
+// The captcha left the global settings on 2026-08-14: it guards a public FORM,
+// so it belongs to the authority that serves one - the local accounts. Opening
+// self-registration is still a global switch; whether a robot has to copy
+// letters is that authority's own answer.
+async function openSelfRegistration(root: APIRequestContext, captcha: boolean) {
+  const settings = await (await root.get('/api/settings')).json();
+  const put = await root.put('/api/settings', { data: { ...settings, selfRegistration: true } });
+  expect(put.ok(), await put.text()).toBeTruthy();
+  const local = await (await root.get('/api/auth-providers/local')).json();
+  const authority = await root.put('/api/auth-providers/local', {
+    data: { ...local, autoCreate: 'yes', captcha },
+  });
+  expect(authority.ok(), await authority.text()).toBeTruthy();
+}
 
 // The gateway's own flow pages (data plane): sign-in hygiene, the profile
 // pages' own guards, and the global passkey policy. Covers the kind=flow
@@ -147,11 +162,7 @@ test('flow-register-captcha: a wrong copy is refused', async ({ page }) => {
     data: { host: '127.0.0.1', port: 12525, security: 'none', username: '', password: '', from: 'no-reply@e2e.test' },
   });
   expect(relay.ok(), await relay.text()).toBeTruthy();
-  const settings = await (await root.get('/api/settings')).json();
-  const put = await root.put('/api/settings', {
-    data: { ...settings, selfRegistration: true, selfRegisterCaptcha: true },
-  });
-  expect(put.ok(), await put.text()).toBeTruthy();
+  await openSelfRegistration(root, true);
   await root.dispose();
 
   await page.goto(DATA_URL + '/register');
@@ -185,15 +196,7 @@ test('flow-self-register: end to end through the mailed confirmation', async ({ 
     data: { host: '127.0.0.1', port: 12525, security: 'none', username: '', password: '', from: 'no-reply@e2e.test' },
   });
   expect(relay.ok(), await relay.text()).toBeTruthy();
-  const settings = await (await root.get('/api/settings')).json();
-  const put = await root.put('/api/settings', {
-    data: {
-      ...settings,
-      selfRegistration: true,
-      selfRegisterCaptcha: false, // the scripted loop skips the visual check
-    },
-  });
-  expect(put.ok(), await put.text()).toBeTruthy();
+  await openSelfRegistration(root, false); // the scripted loop skips the visual check
 
   const findMail = (rcpt: string, needle: string): string | null => {
     if (!existsSync(mailDir)) return null;
