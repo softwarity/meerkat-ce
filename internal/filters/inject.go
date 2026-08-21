@@ -11,6 +11,9 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
+
+	"github.com/andybalholm/brotli"
 )
 
 // maxInjectableBody caps how much of a response we are willing to buffer to
@@ -23,8 +26,8 @@ var headEnd = regexp.MustCompile(`(?i)</head\s*>`)
 
 // InjectAfterHead returns a ReverseProxy ModifyResponse function that inserts
 // fragment right after the opening <head> tag of HTML responses. Non-HTML
-// responses and unsupported encodings pass through untouched. Gzip bodies are
-// decoded and re-encoded; the skeleton does not handle brotli yet.
+// responses and unsupported encodings pass through untouched. Gzip and brotli
+// bodies are decoded and re-encoded in the codec they arrived in.
 func InjectAfterHead(fragment string) func(*http.Response) error {
 	return InjectAfterHeadFunc(func(*http.Response) string { return fragment })
 }
@@ -118,9 +121,13 @@ func RewriteHTMLFunc(gate func(*http.Response) bool, f func(res *http.Response, 
 // by the HTML rewriters. Unsupported encodings, oversized or broken bodies pass
 // through untouched.
 func rewriteHTMLBody(res *http.Response, transform func([]byte) []byte) error {
-	encoding := res.Header.Get("Content-Encoding")
-	if encoding != "" && encoding != "gzip" {
-		return nil // brotli/zstd: pass through for now
+	// The encoding decides whether this response can be rewritten at all. A
+	// codec we cannot read is not an error and not a reason to strip anything:
+	// the bytes go through as they are, and the injection simply does not
+	// happen - a page that arrives unchanged beats a page that arrives broken.
+	encoding := strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Encoding")))
+	if !canRecode(encoding) {
+		return nil
 	}
 	if res.ContentLength > maxInjectableBody {
 		return nil
@@ -138,19 +145,19 @@ func rewriteHTMLBody(res *http.Response, transform func([]byte) []byte) error {
 		res.Body = io.NopCloser(bytes.NewReader(body))
 		return nil
 	}
-	plain := body
-	if encoding == "gzip" {
-		if plain, err = gunzip(body); err != nil {
-			// Broken encoding: hand the original bytes back untouched.
-			res.Body = io.NopCloser(bytes.NewReader(body))
-			return nil
-		}
+	plain, err := decode(encoding, body)
+	if err != nil {
+		// Broken encoding: hand the original bytes back untouched.
+		res.Body = io.NopCloser(bytes.NewReader(body))
+		return nil
 	}
 	out := transform(plain)
-	if encoding == "gzip" {
-		if out, err = gzipBytes(out); err != nil {
-			return fmt.Errorf("rewrite: gzip: %w", err)
-		}
+	// Re-encoded with the SAME codec it arrived in: the response keeps the
+	// Content-Encoding it announced, so nothing downstream has to be told
+	// anything - and a body re-sent as plain text under a gzip header is the
+	// blank page nobody finds by reading the HTML.
+	if out, err = encode(encoding, out); err != nil {
+		return fmt.Errorf("rewrite: %s: %w", encoding, err)
 	}
 	res.Body = io.NopCloser(bytes.NewReader(out))
 	res.ContentLength = int64(len(out))
@@ -192,6 +199,55 @@ var docStart = regexp.MustCompile(`(?is)^\s*(<!doctype\s+html|<html[\s>])`)
 
 func isDocument(body []byte) bool {
 	return docStart.Match(body)
+}
+
+// canRecode reports whether a body in this Content-Encoding can be read AND
+// written back. Identity and gzip have always been here; brotli is what
+// browsers actually negotiate now, and a gateway that cannot read it stops
+// injecting anything the day an upstream turns compression on (ROUTE-14).
+//
+// zstd is deliberately absent: it is negotiated by almost nothing yet, and an
+// unread encoding costs an injection, not a page.
+func canRecode(encoding string) bool {
+	switch encoding {
+	case "", "identity", "gzip", "br":
+		return true
+	}
+	return false
+}
+
+func decode(encoding string, data []byte) ([]byte, error) {
+	switch encoding {
+	case "gzip":
+		return gunzip(data)
+	case "br":
+		return io.ReadAll(brotli.NewReader(bytes.NewReader(data)))
+	}
+	return data, nil
+}
+
+func encode(encoding string, data []byte) ([]byte, error) {
+	switch encoding {
+	case "gzip":
+		return gzipBytes(data)
+	case "br":
+		return brotliBytes(data)
+	}
+	return data, nil
+}
+
+func brotliBytes(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	// Default quality: this runs on a response the visitor is waiting for, and
+	// brotli's top levels cost far more time than they save bytes.
+	bw := brotli.NewWriterLevel(&buf, brotli.DefaultCompression)
+	if _, err := bw.Write(data); err != nil {
+		return nil, err
+	}
+	if err := bw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func gunzip(data []byte) ([]byte, error) {

@@ -127,10 +127,13 @@ func TestJWKSVerifiesES256(t *testing.T) {
 		if k["kid"] != set.Kid(ES256) {
 			t.Fatalf("ES256 JWK kid %q != %q", k["kid"], set.Kid(ES256))
 		}
-		ec = &ecdsa.PublicKey{
-			Curve: elliptic.P256(),
-			X:     new(big.Int).SetBytes(d64(t, k["x"])),
-			Y:     new(big.Int).SetBytes(d64(t, k["y"])),
+		// Through the parser, not by filling in X and Y: those fields are
+		// deprecated as of Go 1.26, and they let a point that is not on the
+		// curve through - which is the one thing a key parser is for.
+		var err error
+		if ec, err = ecdsa.ParseUncompressedPublicKey(elliptic.P256(),
+			uncompressed(d64(t, k["x"]), d64(t, k["y"]))); err != nil {
+			t.Fatalf("ES256 JWK: %v", err)
 		}
 	}
 	if ec == nil {
@@ -233,4 +236,15 @@ func TestMarshalLoadRoundTrip(t *testing.T) {
 	if len(jwksKids(t, loaded)) != 6 {
 		t.Fatal("loaded set lost its retired keys")
 	}
+}
+
+// uncompressed lays x and y out as an uncompressed EC point, left-padded to
+// the field size - JWK strips leading zeros, an EC point is fixed-width.
+func uncompressed(x, y []byte) []byte {
+	const size = 32 // P-256
+	point := make([]byte, 1+2*size)
+	point[0] = 4
+	copy(point[1+size-len(x):], x)
+	copy(point[1+2*size-len(y):], y)
+	return point
 }

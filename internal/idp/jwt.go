@@ -59,19 +59,20 @@ func (k jwk) publicKey() (crypto.PublicKey, error) {
 		}
 		return &rsa.PublicKey{N: n, E: int(e)}, nil
 	case "EC":
-		x, err := b64uint(k.X)
-		if err != nil {
-			return nil, fmt.Errorf("jwks: bad EC x: %w", err)
-		}
-		y, err := b64uint(k.Y)
-		if err != nil {
-			return nil, fmt.Errorf("jwks: bad EC y: %w", err)
-		}
 		curve, err := curveFor(k.Crv)
 		if err != nil {
 			return nil, err
 		}
-		return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}, nil
+		// Built through the curve rather than by filling X and Y in by hand.
+		// Those fields are deprecated as of Go 1.26 for a reason that applies
+		// here exactly: coordinates written straight into the struct are never
+		// checked, so a key off the curve - a malformed JWKS, or a crafted one -
+		// would be accepted and used to verify signatures.
+		key, err := ecPublicKey(curve, k.X, k.Y)
+		if err != nil {
+			return nil, err
+		}
+		return key, nil
 	case "OKP":
 		if k.Crv != "Ed25519" {
 			return nil, fmt.Errorf("jwks: unsupported OKP curve %q", k.Crv)
@@ -216,6 +217,32 @@ func curveFor(crv string) (elliptic.Curve, error) {
 	default:
 		return nil, fmt.Errorf("jwks: unsupported EC curve %q", crv)
 	}
+}
+
+// ecPublicKey turns a JWK's x and y into a public key, through the parser that
+// validates the point.
+//
+// The coordinates are left-padded to the curve's field size: JWK strips
+// leading zero bytes, and an uncompressed point is fixed-width - a key whose x
+// happens to start with a zero would otherwise be rejected as malformed, which
+// is a failure that shows up on one authority out of fifty and looks like a
+// broken gateway.
+func ecPublicKey(curve elliptic.Curve, x, y string) (*ecdsa.PublicKey, error) {
+	size := (curve.Params().BitSize + 7) / 8
+	point := make([]byte, 1+2*size)
+	point[0] = 4 // uncompressed
+	for i, part := range []string{x, y} {
+		raw, err := base64.RawURLEncoding.DecodeString(part)
+		if err != nil || len(raw) == 0 || len(raw) > size {
+			return nil, fmt.Errorf("jwks: bad EC coordinate")
+		}
+		copy(point[1+i*size+size-len(raw):], raw)
+	}
+	key, err := ecdsa.ParseUncompressedPublicKey(curve, point)
+	if err != nil {
+		return nil, fmt.Errorf("jwks: EC key is not on curve %s: %w", curve.Params().Name, err)
+	}
+	return key, nil
 }
 
 func b64uint(s string) (*big.Int, error) {

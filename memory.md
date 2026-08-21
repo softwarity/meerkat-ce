@@ -200,6 +200,44 @@ restore"**, tous du meme endroit - la fusion :
   `rowid DESC` - ca repare aussi l'ecran d'audit, silencieusement faux depuis
   toujours sur les evenements d'une meme seconde.
 
+### 6. Filtres : le lot qui ne coute rien, et brotli
+
+Neuf filtres qui ne touchent AUCUN corps - c'est ce qui les rend gratuits.
+Requete : `set-host`, `rename-request-header`, `add-query-param`,
+`remove-request-cookie`. Reponse : `rename-response-header`, `cache-control`,
+`security-headers`, `cookie-attributes`. Le catalogue etant auto-descriptif,
+l'editeur de route les affiche sans une ligne de console.
+
+Trois pieges qui valent d'etre retenus :
+
+- **`set-host` doit ecrire le champ ET l'en-tete**, et surtout **survivre a
+  `pr.SetURL(target)`**, qui s'execute apres les filtres et emporte le Host avec
+  lui. Le test unitaire du filtre passait pendant que la gateway le defaisait
+  trois lignes plus loin - trouve en le faisant tourner, pas en le relisant ;
+- **`remove-request-cookie`** reecrit l'en-tete Cookie : c'est UNE chaine qui
+  porte tous les cookies, donc le supprimer emporterait la session ;
+- **HSTS seulement sous TLS** : envoye en clair, un navigateur peut le retenir
+  et ne plus joindre du tout une gateway de developpement.
+
+**Brotli lu et reecrit** (ROUTE-14 devient vrai) : `internal/filters/inject.go`
+decode gzip et br et **reencode dans le codec d'arrivee** - un corps renvoye en
+clair sous un en-tete compresse est la page blanche qu'on ne trouve pas en
+lisant le HTML. Un codec inconnu (zstd) n'est pas une erreur : les octets
+passent, l'injection n'a pas lieu. Dependance : `github.com/andybalholm/brotli`
+(Go pur).
+
+**Trois exigences etaient marquees ✔ a tort** : ROUTE-04 et ROUTE-05 promettent
+des choses qui touchent au corps (attributs JSON, cache de reponse) ou jamais
+construites (SetPath, limites de taille) - passees a ◐ avec le manque nomme ;
+ROUTE-06 (images redimensionnees a la volee, heritee d'archway) repasse a ✘.
+
+**Le seul point bloquant restant est le CORPS** : bufferiser tue le streaming
+(SSE, WebSocket, telechargements), invalide ETag et Range, et impose un
+plafond. La regle qui debloque est deja ecrite dans `inject.go` (plafond,
+passthrough au-dela, passthrough sur codec inconnu, restitution intacte en cas
+d'echec, Content-Length recalcule) : il suffira de la sortir de l'injection HTML
+pour en faire le socle commun.
+
 ### 5. L'onglet import/export supprime, et le modele EE change
 
 Decisions de Francois, toutes appliquees :

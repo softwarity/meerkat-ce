@@ -27,6 +27,17 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+# The site lives on the PUBLIC mirror: softwarity.github.io/meerkat-ce/. This
+# workflow is mirrored there verbatim, so it runs in both repositories - and on
+# the private one there are no Pages to publish to, which is why every push
+# touching docs/ was ending in a red "Setup Pages: Not Found".
+#
+# It still BUILDS in both, deliberately: a doc that stopped compiling would
+# otherwise be discovered on the mirror, one push too late. Only the three
+# publishing steps are held back.
+env:
+  PUBLISHES_PAGES: ${{ github.repository == 'softwarity/meerkat-ce' }}
+
 jobs:
   deploy:
     environment:
@@ -58,13 +69,16 @@ jobs:
         run: npm run build -- --base-href "/${{ github.event.repository.name }}/"
 
       - name: Setup Pages
+        if: env.PUBLISHES_PAGES == 'true'
         uses: actions/configure-pages@v6
 
       - name: Upload artifact
+        if: env.PUBLISHES_PAGES == 'true'
         uses: actions/upload-pages-artifact@v5
         with:
           path: './docs/dist/doc-site/browser'
 
       - name: Deploy to GitHub Pages
+        if: env.PUBLISHES_PAGES == 'true'
         id: deployment
         uses: actions/deploy-pages@v5

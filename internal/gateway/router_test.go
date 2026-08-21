@@ -843,14 +843,29 @@ func fetchES256JWK(t *testing.T, url string) (*ecdsa.PublicKey, string) {
 		if k["alg"] != "ES256" {
 			continue
 		}
-		return &ecdsa.PublicKey{
-			Curve: elliptic.P256(),
-			X:     new(big.Int).SetBytes(mustB64(t, k["x"])),
-			Y:     new(big.Int).SetBytes(mustB64(t, k["y"])),
-		}, k["kid"]
+		// Through the parser, not by filling in X and Y: those fields are
+		// deprecated as of Go 1.26, and a test that builds a key the way
+		// nothing else may is a test that stops resembling the code.
+		key, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(),
+			uncompressed(mustB64(t, k["x"]), mustB64(t, k["y"])))
+		if err != nil {
+			t.Fatalf("jwks EC key: %v", err)
+		}
+		return key, k["kid"]
 	}
 	t.Fatal("no ES256 key in JWKS")
 	return nil, ""
+}
+
+// uncompressed lays x and y out as an uncompressed EC point, left-padded to
+// the field size - JWK strips leading zeros, an EC point is fixed-width.
+func uncompressed(x, y []byte) []byte {
+	const size = 32 // P-256
+	point := make([]byte, 1+2*size)
+	point[0] = 4
+	copy(point[1+size-len(x):], x)
+	copy(point[1+2*size-len(y):], y)
+	return point
 }
 
 // Outgoing filters apply to what the route answers ITSELF. An identity endpoint
@@ -1415,5 +1430,49 @@ func TestLocaleMechanismIsOneChoice(t *testing.T) {
 	both := store.LocalesConfig{Mechanism: store.LocaleQuery, Mechanisms: []string{store.LocalePath}}
 	if got := both.Mode(); got != store.LocaleQuery {
 		t.Errorf("the explicit mechanism must win: %q", got)
+	}
+}
+
+// set-host is the one filter whose whole purpose is a header the proxy machine
+// also writes: SetURL points the request at the upstream and takes the Host
+// with it, which is right by default and wrong here - a service answering by
+// virtual host needs a name the upstream URL does not carry. Pinned end to
+// end, because the unit test on the filter passed while the gateway undid it
+// three lines later.
+func TestSetHostSurvivesTheProxyRewrite(t *testing.T) {
+	var seen string
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		seen = r.Host
+	}))
+	t.Cleanup(upstream.Close)
+
+	st, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	route := pathRoute("r-host", "host", 1, "/v/**", upstream.URL)
+	route.Filters = []routing.Spec{
+		{Type: "strip-prefix", Args: map[string]any{"parts": 1}},
+		{Type: "set-host", Args: map[string]any{"host": "app.internal"}},
+	}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/v/x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if seen != "app.internal" {
+		t.Fatalf("the upstream saw Host %q, want app.internal", seen)
 	}
 }

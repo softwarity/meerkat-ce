@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/andybalholm/brotli"
 )
 
 func htmlResponse(body string, header http.Header) *http.Response {
@@ -130,5 +133,60 @@ func TestSkipsUnknownEncoding(t *testing.T) {
 	}
 	if got := readBody(t, res); got != `<html><head></head></html>` {
 		t.Fatalf("brotli body was modified: %q", got)
+	}
+}
+
+// Brotli is what browsers negotiate now (ROUTE-14). A gateway that cannot read
+// it stops injecting the day an upstream turns compression on - silently, and
+// on every page at once. What this pins is the round trip: read it, rewrite
+// it, and hand it back in the SAME codec, because a body re-sent as plain text
+// under a brotli header is a blank page nobody finds by reading the HTML.
+func TestInjectionReadsAndWritesBrotli(t *testing.T) {
+	var buf bytes.Buffer
+	bw := brotli.NewWriter(&buf)
+	if _, err := bw.Write([]byte("<html><head><title>t</title></head><body>x</body></html>")); err != nil {
+		t.Fatal(err)
+	}
+	if err := bw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	res := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": {"text/html"}, "Content-Encoding": {"br"}},
+		Body:       io.NopCloser(bytes.NewReader(buf.Bytes())),
+	}
+	if err := InjectAfterHead("<meta name=mk>")(res); err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Header.Get("Content-Encoding"); got != "br" {
+		t.Fatalf("the response changed codec on the way out: %q", got)
+	}
+	out, err := io.ReadAll(brotli.NewReader(res.Body))
+	if err != nil {
+		t.Fatalf("the body is not brotli any more: %v", err)
+	}
+	if !strings.Contains(string(out), "<meta name=mk>") {
+		t.Fatalf("nothing was injected: %s", out)
+	}
+	if n, _ := strconv.Atoi(res.Header.Get("Content-Length")); n == 0 {
+		t.Fatal("Content-Length was not recomputed")
+	}
+}
+
+// A codec we cannot read is not an error: the bytes go through untouched, and
+// the page arrives whole without the injection.
+func TestAnUnknownCodecPassesThrough(t *testing.T) {
+	original := []byte("whatever zstd looks like")
+	res := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": {"text/html"}, "Content-Encoding": {"zstd"}},
+		Body:       io.NopCloser(bytes.NewReader(original)),
+	}
+	if err := InjectAfterHead("<meta name=mk>")(res); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := io.ReadAll(res.Body)
+	if string(got) != string(original) {
+		t.Fatalf("an unreadable body was touched: %q", got)
 	}
 }

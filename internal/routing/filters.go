@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 // RequestFilter mutates the outgoing (proxied) request.
@@ -274,6 +276,93 @@ func init() {
 		},
 	})
 
+	registerFilter(filterDef{
+		Type: "set-host", Phase: phaseRequest,
+		Doc: "Sets the Host sent upstream, for a service that answers by virtual host.",
+		Params: []Param{
+			{Name: "host", Kind: KindString, Required: true},
+		},
+		compileRequest: func(a decoded) (RequestFilter, error) {
+			host := a.str("host")
+			return func(pr *httputil.ProxyRequest) {
+				// Both, and this is the point of the filter: Go sends
+				// Request.Host on the wire and ignores the header, while
+				// anything reading the request after us reads the header. Set
+				// one and the two disagree - which is the vhost bug that takes
+				// an afternoon.
+				pr.Out.Host = host
+				pr.Out.Header.Set("Host", host)
+			}, nil
+		},
+	})
+
+	registerFilter(filterDef{
+		Type: "rename-request-header", Phase: phaseRequest,
+		Doc: "Moves a request header to another name, values and all - for an application that reads a name of its own.",
+		Params: []Param{
+			{Name: "from", Kind: KindString, Required: true},
+			{Name: "to", Kind: KindString, Required: true},
+		},
+		compileRequest: func(a decoded) (RequestFilter, error) {
+			from, to := a.str("from"), a.str("to")
+			return func(pr *httputil.ProxyRequest) {
+				values := pr.Out.Header.Values(from)
+				if len(values) == 0 {
+					return
+				}
+				pr.Out.Header.Del(from)
+				pr.Out.Header.Del(to)
+				for _, v := range values {
+					pr.Out.Header.Add(to, v)
+				}
+			}, nil
+		},
+	})
+
+	registerFilter(filterDef{
+		Type: "add-query-param", Phase: phaseRequest,
+		Doc: "Adds a query parameter, keeping any the client already sent under that name.",
+		Params: []Param{
+			{Name: "name", Kind: KindString, Required: true},
+			{Name: "value", Kind: KindString, Required: true},
+		},
+		compileRequest: func(a decoded) (RequestFilter, error) {
+			name, value := a.str("name"), a.str("value")
+			return func(pr *httputil.ProxyRequest) {
+				q := pr.Out.URL.Query()
+				q.Add(name, value)
+				pr.Out.URL.RawQuery = q.Encode()
+			}, nil
+		},
+	})
+
+	registerFilter(filterDef{
+		Type: "remove-request-cookie", Phase: phaseRequest,
+		Doc: "Removes one cookie from the request, leaving the others in place.",
+		Params: []Param{
+			{Name: "name", Kind: KindString, Required: true},
+		},
+		compileRequest: func(a decoded) (RequestFilter, error) {
+			name := a.str("name")
+			return func(pr *httputil.ProxyRequest) {
+				kept := pr.Out.Cookies()[:0]
+				for _, c := range pr.Out.Cookies() {
+					if c.Name != name {
+						kept = append(kept, c)
+					}
+				}
+				// Rebuilt rather than edited: the Cookie header is one string
+				// carrying every cookie, so removing one means writing the
+				// header again - and deleting it outright would take the
+				// session with it.
+				pr.Out.Header.Del("Cookie")
+				for _, c := range kept {
+					pr.Out.AddCookie(c)
+				}
+			}, nil
+		},
+	})
+
 	// ---- response ----------------------------------------------------------
 
 	registerFilter(filterDef{
@@ -311,6 +400,132 @@ func init() {
 		compileResponse: func(a decoded) (ResponseFilter, error) {
 			name := a.str("name")
 			return func(res *http.Response) error { res.Header.Del(name); return nil }, nil
+		},
+	})
+
+	registerFilter(filterDef{
+		Type: "rename-response-header", Phase: phaseResponse,
+		Doc: "Moves a response header to another name, values and all.",
+		Params: []Param{
+			{Name: "from", Kind: KindString, Required: true},
+			{Name: "to", Kind: KindString, Required: true},
+		},
+		compileResponse: func(a decoded) (ResponseFilter, error) {
+			from, to := a.str("from"), a.str("to")
+			return func(res *http.Response) error {
+				values := res.Header.Values(from)
+				if len(values) == 0 {
+					return nil
+				}
+				res.Header.Del(from)
+				res.Header.Del(to)
+				for _, v := range values {
+					res.Header.Add(to, v)
+				}
+				return nil
+			}, nil
+		},
+	})
+
+	registerFilter(filterDef{
+		Type: "cache-control", Phase: phaseResponse,
+		Doc: "Sets Cache-Control on the response, and clears the Expires and Pragma an upstream may contradict it with.",
+		Params: []Param{
+			{Name: "value", Kind: KindString, Required: true, Doc: `e.g. "public, max-age=3600" or "no-store"`},
+		},
+		compileResponse: func(a decoded) (ResponseFilter, error) {
+			value := a.str("value")
+			return func(res *http.Response) error {
+				res.Header.Set("Cache-Control", value)
+				// An Expires or a Pragma from the upstream would argue with
+				// what was just decided, and the older header wins in some
+				// caches: saying one thing twice is how a page gets cached
+				// that should not have been.
+				res.Header.Del("Expires")
+				res.Header.Del("Pragma")
+				return nil
+			}, nil
+		},
+	})
+
+	registerFilter(filterDef{
+		Type: "security-headers", Phase: phaseResponse,
+		Doc: "Adds the response headers a browser hardens on: nosniff, a referrer policy, a frame policy, HSTS over TLS, and an optional CSP.",
+		Params: []Param{
+			{Name: "referrerPolicy", Kind: KindString, Default: "strict-origin-when-cross-origin"},
+			{Name: "frameOptions", Kind: KindString, Default: "SAMEORIGIN", Doc: `DENY, SAMEORIGIN, or "" to leave it alone`},
+			{Name: "hstsMaxAge", Kind: KindInt, Default: 0, Doc: "seconds; 0 leaves Strict-Transport-Security alone"},
+			{Name: "contentSecurityPolicy", Kind: KindString, Doc: "sent as-is when set; a CSP is written per application, never guessed"},
+		},
+		compileResponse: func(a decoded) (ResponseFilter, error) {
+			referrer, frame := a.str("referrerPolicy"), a.str("frameOptions")
+			hsts, csp := a.num("hstsMaxAge"), a.str("contentSecurityPolicy")
+			return func(res *http.Response) error {
+				// set, not add: these are decisions, and two of them is none.
+				res.Header.Set("X-Content-Type-Options", "nosniff")
+				if referrer != "" {
+					res.Header.Set("Referrer-Policy", referrer)
+				}
+				if frame != "" {
+					res.Header.Set("X-Frame-Options", frame)
+				}
+				// HSTS only over TLS: sent on a plain request it is either
+				// ignored or, worse, remembered by a browser that then cannot
+				// reach a development gateway at all.
+				if hsts > 0 && res.Request != nil && res.Request.TLS != nil {
+					res.Header.Set("Strict-Transport-Security",
+						"max-age="+strconv.Itoa(hsts)+"; includeSubDomains")
+				}
+				if csp != "" {
+					res.Header.Set("Content-Security-Policy", csp)
+				}
+				return nil
+			}, nil
+		},
+	})
+
+	registerFilter(filterDef{
+		Type: "cookie-attributes", Phase: phaseResponse,
+		Doc: "Forces attributes on the cookies an upstream sets - what an application that does not know it is behind TLS gets wrong.",
+		Params: []Param{
+			{Name: "secure", Kind: KindBool, Default: true},
+			{Name: "httpOnly", Kind: KindBool, Default: false},
+			{Name: "sameSite", Kind: KindString, Doc: `Lax, Strict, None, or "" to leave it alone`},
+		},
+		compileResponse: func(a decoded) (ResponseFilter, error) {
+			secure, httpOnly, sameSite := a.boolean("secure"), a.boolean("httpOnly"), a.str("sameSite")
+			switch strings.ToLower(sameSite) {
+			case "", "lax", "strict", "none":
+			default:
+				return nil, fmt.Errorf("cookie-attributes: sameSite %q is not allowed: use Lax, Strict or None", sameSite)
+			}
+			return func(res *http.Response) error {
+				cookies := res.Cookies()
+				if len(cookies) == 0 {
+					return nil
+				}
+				res.Header.Del("Set-Cookie")
+				for _, c := range cookies {
+					if secure {
+						c.Secure = true
+					}
+					if httpOnly {
+						c.HttpOnly = true
+					}
+					switch strings.ToLower(sameSite) {
+					case "lax":
+						c.SameSite = http.SameSiteLaxMode
+					case "strict":
+						c.SameSite = http.SameSiteStrictMode
+					case "none":
+						// SameSite=None without Secure is dropped by every
+						// current browser: asking for one is asking for both.
+						c.SameSite, c.Secure = http.SameSiteNoneMode, true
+					}
+					res.Header.Add("Set-Cookie", c.String())
+				}
+				return nil
+			}, nil
 		},
 	})
 

@@ -3,6 +3,7 @@ module github.com/softwarity/meerkat
 go 1.26
 
 require (
+	github.com/andybalholm/brotli v1.2.2
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/pb33f/libopenapi v0.38.7

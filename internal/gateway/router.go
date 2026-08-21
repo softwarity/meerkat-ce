@@ -2020,10 +2020,21 @@ func buildProxy(r store.Route, cf routing.CompiledFilters) (http.Handler, error)
 			// Request filters transform the request path/headers first, THEN
 			// the upstream base path is prepended by SetURL - so strip-prefix
 			// and friends reason on the request path, never on the upstream's.
+			was := pr.Out.Host
 			for _, f := range cf.Request {
 				f(pr)
 			}
+			asked := pr.Out.Host
 			pr.SetURL(target)
+			// SetURL points the request at the upstream AND takes the Host with
+			// it, which is right by default and wrong for the one filter whose
+			// whole purpose is that header: a service answering by virtual host
+			// needs a name the upstream URL does not carry. So a filter that
+			// changed it wins - it was asked for, the upstream's host is only
+			// the default.
+			if asked != was {
+				pr.Out.Host = asked
+			}
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			slog.Warn("upstream error", "route", r.Name, "upstream", r.Upstream, "err", err)
