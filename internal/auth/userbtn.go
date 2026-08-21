@@ -194,7 +194,9 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 	payload.Email = u.Email
 	payload.Initials = initials(u)
 	payload.Issues = h.issuesEnabled(r)
-	payload.DevDocs = u.Dev
+	// Both halves: the installation offers the developer surface, and this
+	// account holds the capability (DEV-01).
+	payload.DevDocs = h.st.DevAllowed(r.Context(), u)
 	if avatar, err := h.st.GetUserAvatar(r.Context(), sess.UserID); err == nil {
 		payload.Avatar = avatar
 	}

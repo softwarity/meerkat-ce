@@ -3,19 +3,14 @@
 // directive, no runtime, and it holds on markup Angular never rendered.
 //
 // The gateway stamps <body> when it serves the console: `multi-tenant` when
-// the mode says so, one `ee-<feature>` class per unlocked feature. Everything
-// below reads those.
+// the mode says so, `ee` when it is the Enterprise image. Everything below
+// reads those two.
 //
 // Simpler than the role mechanism, and worth saying why: roles HIDE by default
 // and reveal what is granted, which forces a `display` to be restated per
 // Material family (revert would give back `inline`). Here the default is
 // visible, so nothing is ever revealed - only hidden or locked - and the
 // display is left alone.
-
-// Every Enterprise feature, in the order the offer reads. Must match
-// internal/features (the `All` list): a key that exists there and not here
-// simply never locks anything, and nothing would catch it.
-$ee-features: (multi-tenant, directories, saml, scim, business-hours, cluster, audit-export, white-label);
 
 // ── What has no meaning in this mode ─────────────────────────────────────────
 //
@@ -43,28 +38,39 @@ html body.multi-tenant [single-tenant-only] {
   display: none !important;
 }
 
-// ── What the licence has not unlocked ────────────────────────────────────────
+// ── What this IMAGE does not carry ───────────────────────────────────────────
 //
 // The opposite call: an Enterprise control stays VISIBLE and goes inert. Hidden
 // it would never be discovered; a modal would be resented. Met at the moment
 // someone would have used it, it explains itself - which is the whole point of
 // the [Enterprise] cap that `app-ee-lock` puts next to it.
 //
+// ONE class, `ee`, stamped by the gateway when the Enterprise image serves the
+// console. There is no feature registry any more: the product is sold whole,
+// per production instance, so the only question a stylesheet can ask is which
+// image this is. The `ee-feature="..."` values that remain in the templates are
+// documentation - they say WHICH feature a block is, and nothing keys on them.
+//
+// (They used to key on `body.ee-<feature>`. When the registry collapsed into
+// one constant, nobody wrote those classes any more and every rule below
+// matched forever: on the Enterprise image, the multi-organisation switch and
+// the working hours were dimmed and refused the click. A selector that depends
+// on a class no code writes cannot fail loudly - it just always wins.)
+//
 // pointer-events is what actually disables it, so a click cannot slip through
 // on a control the server would refuse anyway; the server refuses regardless,
 // this is politeness, not security.
-@each $feature in $ee-features {
-  body:not(.ee-#{$feature}) [ee-feature='#{$feature}'] {
-    pointer-events: none;
-    opacity: 0.55;
-  }
-  // A locked block dims as a whole: its own label included, and its lock badge
-  // excluded - the one thing that must stay readable and clickable is the
-  // explanation of why the rest is not.
-  body:not(.ee-#{$feature}) [ee-feature='#{$feature}'] app-ee-lock {
-    pointer-events: auto;
-    opacity: 1;
-  }
+body:not(.ee) [ee-feature] {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+// A locked block dims as a whole: its own label included, and its lock badge
+// excluded - the one thing that must stay readable and clickable is the
+// explanation of why the rest is not.
+body:not(.ee) [ee-feature] app-ee-lock {
+  pointer-events: auto;
+  opacity: 1;
 }
 
 // ── What can be TRIED but not kept ───────────────────────────────────────────
@@ -72,7 +78,7 @@ html body.multi-tenant [single-tenant-only] {
 // A second presentation, and it is a different promise. `ee-feature` locks:
 // acting would be pointless or misleading, so the control refuses the click.
 // `ee-sample` invites: the control works, the screen answers, and only KEEPING
-// the result needs the licence.
+// the result needs the other image.
 //
 // It earns its place exactly where acting has no consequence - the layout
 // gallery beside a live preview, where trying IS the demonstration. It would
@@ -81,16 +87,9 @@ html body.multi-tenant [single-tenant-only] {
 //
 // So: no pointer-events rule here, and no dimming either. Only the badge,
 // which says what the save will say.
-@each $feature in $ee-features {
-  body.ee-#{$feature} [ee-sample='#{$feature}'] app-ee-lock {
-    display: none;
-  }
-}
 
-// The badge itself is only shown while the feature is locked: once bought, the
+// The badge is only shown while this image cannot do it: once it can, the
 // control is just a control.
-@each $feature in $ee-features {
-  body.ee-#{$feature} app-ee-lock[feature='#{$feature}'] {
-    display: none;
-  }
+body.ee app-ee-lock {
+  display: none;
 }

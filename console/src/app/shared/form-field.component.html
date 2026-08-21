@@ -1,4 +1,4 @@
-<mat-form-field [subscriptSizing]="subscriptSizing()">
+<mat-form-field [subscriptSizing]="subscriptSizing()" [floatLabel]="floatLabel()">
   @if (label()) {<mat-label>{{ label() }}</mat-label>}
   @if (icon()) {<mat-icon matPrefix>{{ icon() }}</mat-icon>}
   <ng-content />

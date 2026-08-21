@@ -238,9 +238,17 @@ const flowTop = `<!doctype html>
        written next to the markup it dresses is a rule every page gets. */
     /* Why a page refused, above the choice it offers. Not an error - nothing
        went wrong - so it wears the muted note, not the red one. */
+    /* Why the chooser reappeared. A WARNING, not an error: nothing broke, the
+       page asked for an organisation this session is not in. So it is made to
+       be read - a marked callout rather than grey small print under a list -
+       without the red of a failure. The bar takes the accent so it stays
+       coherent whatever preset is active; no theme carries a warning colour. */
     .why {
-      margin: -6px 0 2px; font-size: .82rem; text-align: start;
-      color: var(--mk-on-surface-variant);
+      margin: 0 0 2px; padding: 9px 12px; text-align: start; font-size: .82rem;
+      color: var(--mk-on-surface);
+      background: var(--mk-surface-container-high);
+      border-inline-start: 3px solid var(--mk-primary);
+      border-radius: var(--mk-radius-small);
     }
     .back { margin: 6px 0 0; text-align: center; font-size: .8rem; }
     .back a { color: var(--mk-primary); text-decoration: none; }
@@ -2389,7 +2397,7 @@ func (h *Handler) doProfileDevCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.st.GetUserByID(r.Context(), sess.UserID)
-	if err != nil || !u.Dev {
+	if err != nil || !h.st.DevAllowed(r.Context(), u) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}
@@ -2443,7 +2451,7 @@ func (h *Handler) renderProfile(w http.ResponseWriter, r *http.Request, sess sto
 		// services authenticate, the UI test mode, the substitution plug uses.
 		// None of it means anything from the console, and its pages are not
 		// served there - so the entry would be a link to a 404.
-		data.IsDev = !h.adminPlane && u.Dev
+		data.IsDev = !h.adminPlane && h.st.DevAllowed(r.Context(), u)
 	}
 	// The organisation, only where there is a choice to speak of. A
 	// single-organisation instance never names it anywhere else - the console
@@ -2524,7 +2532,7 @@ func (h *Handler) showProfileDev(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.st.GetUserByID(r.Context(), sess.UserID)
-	if err != nil || !u.Dev {
+	if err != nil || !h.st.DevAllowed(r.Context(), u) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}
@@ -2547,7 +2555,7 @@ func (h *Handler) showProfileDevCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.st.GetUserByID(r.Context(), sess.UserID)
-	if err != nil || !u.Dev {
+	if err != nil || !h.st.DevAllowed(r.Context(), u) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}

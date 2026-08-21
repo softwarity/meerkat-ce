@@ -232,14 +232,33 @@ export class LicensePageComponent {
     },
   };
 
+  // The offer, in the order it reads. It is a LIST OF WHAT THE EDITION
+  // INCLUDES, not a list of keys the server unlocks one by one: the product is
+  // sold whole, per production instance, so every line is on or every line is
+  // off, and which it is depends on nothing but the image that answered.
+  //
+  // The catalogue is written here rather than served because it is marketing
+  // copy in the console's language, and because a server that has no feature
+  // registry has nothing to enumerate.
+  private readonly offer = [
+    'multi-tenant',
+    'directories',
+    'saml',
+    'scim',
+    'business-hours',
+    'cluster',
+    'audit-export',
+    'white-label',
+  ];
+
   protected readonly rows = computed<FeatureRow[]>(() => {
     const e = this.edition();
     if (!e) return [];
-    return e.known.map((key) => ({
+    return this.offer.map((key) => ({
       key,
       label: this.copy[key]?.label ?? key,
       what: this.copy[key]?.what ?? '',
-      on: e.features.includes(key),
+      on: e.enterprise,
     }));
   });
 

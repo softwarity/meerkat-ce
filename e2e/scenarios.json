@@ -213,6 +213,21 @@
       }
     },
     {
+      "id": "api-config-collection",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/configurations" },
+      "allowed": ["root"],
+      "title": {
+        "en": "List the saved configurations",
+        "fr": "Lister les configurations enregistrées"
+      },
+      "description": {
+        "en": "Several configurations coexist and one is active (CFG-02). Root only, like export and import and for the same reason: a configuration crosses both planes at once, so whoever handles one administers both. Reading stays open on the community image - what the Enterprise one adds is KEEPING several - so an installation coming down from it still sees what it saved.",
+        "fr": "Plusieurs configurations coexistent, une seule est active (CFG-02). Root uniquement, comme l'export et l'import et pour la même raison : une configuration traverse les deux plans à la fois, donc qui en manipule une administre les deux. La lecture reste ouverte sur l'image communautaire - c'est d'en GARDER plusieurs que l'édition Enterprise ajoute - donc une installation qui en redescend voit toujours ce qu'elle a enregistré."
+      }
+    },
+    {
       "id": "api-infra-mail-relay-test",
       "domain": "gateway",
       "kind": "api",

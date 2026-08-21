@@ -45,15 +45,47 @@ export class GeneralPageComponent {
   private readonly settings = signal<Settings | null>(null);
 
   protected readonly businessAccess = signal<BusinessAccess>({ inherited: false });
+  protected readonly devMode = signal(false);
+  protected readonly switchingDev = signal(false);
 
   constructor() {
     this.api.settings().subscribe({
       next: (s) => {
         this.settings.set(s);
         this.businessAccess.set(s.businessAccess ?? { inherited: false });
+        this.devMode.set(s.devMode ?? true);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  // Written on the click, like the mode above it and unlike the hours below:
+  // a switch whose effect is immediate everywhere else (the served pages stop
+  // offering the tooling on the very next request) must not wait behind a Save
+  // button two cards away. The hours in the form are NOT sent - the payload is
+  // the last saved snapshot - so a half-typed window cannot ride along.
+  protected setDevMode(on: boolean): void {
+    const s = this.settings();
+    if (!s) return;
+    this.switchingDev.set(true);
+    this.devMode.set(on);
+    this.api.saveSettings({ ...s, devMode: on }).subscribe({
+      next: (saved) => {
+        this.settings.set(saved);
+        this.switchingDev.set(false);
+        this.snack.open($localize`:@@Saved:Saved`, undefined, { duration: 2000 });
+      },
+      error: (err: unknown) => {
+        this.devMode.set(!on);
+        this.switchingDev.set(false);
+        const e = err as { error?: { error?: string } };
+        this.snack.open(
+          typeof e?.error?.error === 'string' ? e.error.error : $localize`:@@Save_failed:Save failed`,
+          undefined,
+          { duration: 4000 },
+        );
+      },
     });
   }
 

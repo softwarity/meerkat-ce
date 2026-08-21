@@ -24,6 +24,7 @@ const maxConfigBytes = 8 << 20
 func (a *API) registerConfig(mux *http.ServeMux) {
 	mux.Handle("GET /api/config/export", a.rootOnly(a.exportConfig))
 	mux.Handle("GET /api/config/report", a.rootOnly(a.exportReport))
+	mux.Handle("GET /api/config/document", a.rootOnly(a.currentDocument))
 	mux.Handle("POST /api/config/preview", a.rootOnly(a.previewConfig))
 	mux.Handle("POST /api/config/import", a.rootOnly(a.importConfig))
 }
@@ -31,10 +32,14 @@ func (a *API) registerConfig(mux *http.ServeMux) {
 // exportConfig serves the configuration, as plain YAML or as a package.
 //
 // Plain bytes rather than a JSON envelope, so `curl -o meerkat.yaml` is the
-// whole story for anyone versioning their exports. Asking for ?format=zip gets
-// the YAML with its images beside it instead of inline - both forms are
-// self-contained, which is what stops either from ever naming a picture it does
-// not carry.
+// whole story for anyone versioning their exports.
+//
+// The two forms differ by ONE thing, and it is the rule that runs through this
+// whole feature: a YAML never carries a picture, a package does. So a plain
+// export is text a person can read, diff and paste in a ticket, and it says
+// what it leaves behind; a package is what to take when the pictures have to
+// travel. Neither can name an image it does not carry, and an import that
+// carries none leaves the ones in place alone.
 func (a *API) exportConfig(w http.ResponseWriter, r *http.Request, actor store.User) {
 	doc, literals, err := config.Export(r.Context(), a.st)
 	if err != nil {
@@ -54,15 +59,38 @@ func (a *API) exportConfig(w http.ResponseWriter, r *http.Request, actor store.U
 			return
 		}
 		name, mime = "meerkat-config.zip", "application/zip"
-	} else if file, err = config.Marshal(doc); err != nil {
-		a.internal(w, err)
-		return
+	} else {
+		stripped, sErr := config.WithoutImages(doc)
+		if sErr != nil {
+			a.internal(w, sErr)
+			return
+		}
+		if file, err = config.Marshal(stripped); err != nil {
+			a.internal(w, err)
+			return
+		}
 	}
 	a.auditEvent(r.Context(), actor, "config.export", "config", "", name, "",
 		fmt.Sprintf("%d bytes, %d secrets left behind", len(file), len(literals)))
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	_, _ = w.Write(file)
+}
+
+// currentDocument serves the RUNNING configuration as text to read and edit -
+// the export's twin, with the pictures taken out (see readConfigurationDocument).
+func (a *API) currentDocument(w http.ResponseWriter, r *http.Request, _ store.User) {
+	doc, _, err := config.Export(r.Context(), a.st)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	file, err := config.Marshal(doc)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	writeDocumentText(w, a, file)
 }
 
 // exportReport says what an export will NOT contain, before it is downloaded:

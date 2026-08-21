@@ -51,8 +51,8 @@ func (rt *Router) uiSimGate(w http.ResponseWriter, r *http.Request) (sessionKey,
 		return "", "", false
 	}
 	u, err := rt.st.GetUserByID(r.Context(), sess.UserID)
-	if err != nil || !u.Enabled || !u.Dev {
-		uiSimErr(w, http.StatusUnauthorized, "the UI test mode requires the dev capability")
+	if err != nil || !rt.st.DevAllowed(r.Context(), u) {
+		uiSimErr(w, http.StatusUnauthorized, "the UI test mode requires the dev capability, on an installation where developer mode is on")
 		return "", "", false
 	}
 	return sess.TokenHash, u.Username, true

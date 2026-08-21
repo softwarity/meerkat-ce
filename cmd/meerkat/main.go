@@ -99,6 +99,17 @@ func run(addr, adminAddr, consoleURL, dataDir, configFile, vaultFile, tenancy st
 	if err := auth.SeedAdmin(ctx, st); err != nil {
 		return err
 	}
+	// The tape's first point (CFG-06), taken before anyone can change anything.
+	// Without it the earliest state a gateway can go back to is the one AFTER
+	// its first change - and "put it back the way it was" would be the one
+	// thing the history cannot do. Written only when the configuration differs
+	// from the last point, so an ordinary restart adds nothing; a restart that
+	// seeded from a file, or one whose database was touched meanwhile, does.
+	if written, err := config.Record(ctx, st, "", "gateway started"); err != nil {
+		slog.Error("startup restore point not written", "err", err)
+	} else if written {
+		slog.Info("restore point taken", "reason", "startup")
+	}
 
 	// One session manager PER PLANE: distinct cookie names and a plane stamp
 	// on every stored session - the two ports never share a browser session.

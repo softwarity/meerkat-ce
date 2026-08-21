@@ -64,6 +64,11 @@ import { VaultService } from './vault.service';
 })
 export class FormFieldComponent {
   readonly label = input('');
+  // Kept floating when a field has something to SHOW while holding no value:
+  // Material hides a placeholder behind a resting label, so a field whose
+  // whole message is its placeholder (a stored secret's mask) reads as empty
+  // until someone clicks into it.
+  readonly floatLabel = input<'auto' | 'always'>('auto');
   // Optional leading icon (a Material symbol name, e.g. "search").
   readonly icon = input('');
   // Hint under the field. An input, not projected content: a <mat-hint align="end"> passed

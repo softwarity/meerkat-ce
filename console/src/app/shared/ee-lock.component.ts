@@ -54,10 +54,12 @@ import { RouterLink } from '@angular/router';
   ],
 })
 export class EeLockComponent {
-  // The feature key, matching internal/features. It is what the CSS keys the
-  // badge's own visibility on, so it must be set even though the component
-  // itself never reads it.
-  readonly feature = input.required<string>();
+  // Which feature this is - documentation now, not a key. Nothing reads it:
+  // the badge appears whenever the running image is not the Enterprise one
+  // (styles/_modes.scss), because the product is sold whole. Kept as an input
+  // so the templates that name their feature keep compiling, and because the
+  // name is the first thing anyone reading the markup wants to know.
+  readonly feature = input('');
   // What this would do, in one sentence. Shown on hover, because a badge that
   // only says "Enterprise" tells someone they cannot have something without
   // ever saying what.

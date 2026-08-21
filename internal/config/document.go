@@ -96,6 +96,7 @@ var ExportedSettings = []string{
 	store.SettingIssuesEnabled,
 	store.SettingPagesScheme,
 	store.SettingPageLayout,
+	store.SettingDevMode,
 }
 
 // stampedKeys are written by the store on every save. They say WHEN an object

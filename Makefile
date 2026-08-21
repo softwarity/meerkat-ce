@@ -8,36 +8,26 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build build-ee ui dev dev-locked dev-ce test test-ee lint fmt vet clean ldap-up ldap-down ldap-test
+.PHONY: build build-ee ui dev dev-ce test test-ee lint fmt vet clean ldap-up ldap-down ldap-test
 
 # Hot-reload dev loop: rebuilds and restarts the gateway on every .go save.
 # Requires air (once): go install github.com/air-verse/air@latest
 # Resolved from PATH or GOPATH/bin, so it works even when ~/go/bin is not in PATH.
 AIR := $(shell command -v air 2>/dev/null || echo "$$(go env GOPATH)/bin/air")
 
-# The dev loop is the WHOLE product, unlocked: what is being built lives in
-# ee/ too, and a feature nobody can see is a feature nobody tests. The `ee` tag
-# links that code in; MEERKAT_FEATURES opens it without a licence file (no
-# signing key ships with a source build).
+# Two shapes, because there are two images and nothing in between:
 #
-#   make dev         everything, unlocked - the normal loop
-#   make dev-locked  the same binary with nothing enabled: what a customer who
-#                    has not bought sees, locks and refusals included
-#   make dev-ce      the community binary, where ee/ is not compiled in at all
+#   make dev     the Enterprise product - what .air.toml builds (`-tags ee`)
+#   make dev-ce  the community one, where ee/ is not compiled in at all
 #
-# The locked and community shapes are ALSO pinned by tests (`make test` fails
-# if the trunk needs ee/, and the community fallback has its own test), which
-# is what the dev default must no longer be relied on for: unlocking
-# everything here is how the Meerkat mark once vanished for every developer
-# while it was shipping visible.
+# The tag lives in .air.toml, so typing `air` by hand (the way DEV.md passes
+# -addr/-console-url) builds the same binary as `make dev`. Anything after `--`
+# goes to MEERKAT, never to the build.
 dev:
-	MEERKAT_FEATURES=all $(AIR) -- -build.tags ee
-
-dev-locked:
-	$(AIR) -- -build.tags ee
+	$(AIR)
 
 dev-ce:
-	$(AIR)
+	$(AIR) --build.cmd "go build -o ./tmp/meerkat ./cmd/meerkat"
 
 # Two artifacts from one commit. The community one carries no Enterprise code
 # at all: ee/ is only linked by internal/edition's `ee`-tagged file.

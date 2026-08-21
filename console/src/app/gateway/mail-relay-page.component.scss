@@ -11,6 +11,11 @@
 .fields {
   column-gap: 16px;
   row-gap: 16px;
+  // Each field keeps its OWN height. A grid stretches its cells to the tallest
+  // of the row, so the moment one field explained itself in its subscript, its
+  // neighbour grew a matching amount of empty box - the account looked like a
+  // text area because the password had something to say.
+  align-items: start;
 }
 .sub {
   margin: 20px 0 8px;

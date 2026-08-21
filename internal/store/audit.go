@@ -162,7 +162,11 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 	if len(where) > 0 {
 		q += " WHERE " + strings.Join(where, " AND ")
 	}
-	q += " ORDER BY e.at DESC, e.id DESC LIMIT ?"
+	// Newest first, and within one second the LAST written wins: ids are random
+	// hex, so ordering by them shuffled events that happened in a known order.
+	// It reads wrong on the audit screen, and it made the restore point borrow
+	// the words of the change it was undoing rather than its own.
+	q += " ORDER BY e.at DESC, e.rowid DESC LIMIT ?"
 	args = append(args, limit)
 
 	rows, err := s.db.QueryContext(ctx, q, args...)

@@ -58,12 +58,12 @@ MEERKAT_ADMIN_PASSWORD=test1234 \
 make dev               # requires air: go install github.com/air-verse/air@latest
 ```
 
-`make dev` runs the **Enterprise shape** - every feature on, from
-`MEERKAT_FEATURES=all`, with no license file and no signing key involved. That is
-what is being built, and a feature nobody can see is a feature nobody tests; the
-log says on every start that nothing licenses it. Use **`make dev-ce`** for the
-same loop as a community install sees it: no multi-organisation, directories and
-business hours locked.
+`make dev` builds the **Enterprise image** (the `ee` build tag, set in
+`.air.toml`): what is being built lives under `ee/` too, and a feature nobody can
+see is a feature nobody tests. The startup line says which edition came up. Use
+**`make dev-ce`** for the same loop as a community install sees it: no
+multi-organisation, no directories, no page arrangements - that code is not in
+the binary at all.
 
 Then browse **http://localhost:9092** (the admin port): the gateway serves its API and
 login there and proxies everything else to the console dev server, HMR included. Pick

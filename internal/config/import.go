@@ -72,7 +72,61 @@ func (p *Plan) Touches() bool {
 
 // Preview reports what importing doc would do, changing nothing.
 func Preview(ctx context.Context, st *store.Store, doc *Document, prune bool) (*Plan, error) {
-	return run(ctx, st, doc, prune, false)
+	return run(ctx, st, doc, prune, false, false)
+}
+
+// Switch applies doc as the WHOLE configuration - what activating a saved one
+// does (CFG-02) - and PreviewSwitch says what that would change.
+//
+// The difference with Apply is one sentence and it is the whole feature: an
+// imported FILE may legitimately be a fragment, so what it does not mention is
+// left alone; an activated CONFIGURATION is a promise about the resulting
+// gateway, so what it does not mention goes.
+//
+// The mechanism is the section headers. Apply skips a section the document
+// does not carry at all (nil), which is exactly right for a fragment and
+// exactly wrong here: a configuration captured from a gateway with no routes
+// would leave the previous configuration's routes running, and the two
+// configurations an operator switches between would quietly merge. Completing
+// the document says "yes, this covers routes, and it has none of them".
+//
+// Organisations stay out of it, here as in Apply: they hold accounts,
+// memberships and audit that no document knows about (CFG-01).
+func Switch(ctx context.Context, st *store.Store, doc *Document) (*Plan, error) {
+	return run(ctx, st, complete(doc), true, true, true)
+}
+
+// PreviewSwitch reports what Switch would do, changing nothing.
+func PreviewSwitch(ctx context.Context, st *store.Store, doc *Document) (*Plan, error) {
+	return run(ctx, st, complete(doc), true, false, true)
+}
+
+// complete materialises the sections a full configuration covers, so an
+// EMPTY one is read as "none" rather than "not my business". A copy, never the
+// caller's document: the same *Document is handed to the preview and then to
+// the switch, and a preview that mutated it would be answering about something
+// else by the time it is applied.
+func complete(doc *Document) *Document {
+	out := *doc
+	if out.Routes == nil {
+		out.Routes = []store.Route{}
+	}
+	if out.Roles == nil {
+		out.Roles = []store.Role{}
+	}
+	if out.Groups == nil {
+		out.Groups = []store.Group{}
+	}
+	if out.AuthProviders == nil {
+		out.AuthProviders = []store.AuthProvider{}
+	}
+	// Themes are NOT completed, and a switch does not prune them (see run):
+	// an export carries the ACTIVE theme alone - the others are colour trials
+	// kept on the side - so a document can never be read as the full list of
+	// themes an installation has. Reading it that way would make switching
+	// between two customers' configurations delete the palettes somebody spent
+	// an afternoon on.
+	return &out
 }
 
 // Apply imports doc and returns what it did.
@@ -89,13 +143,14 @@ func Preview(ctx context.Context, st *store.Store, doc *Document, prune bool) (*
 //     credential on the way back in - the most expensive way imaginable to
 //     learn how the format works.
 func Apply(ctx context.Context, st *store.Store, doc *Document, prune bool) (*Plan, error) {
-	return run(ctx, st, doc, prune, true)
+	return run(ctx, st, doc, prune, true, false)
 }
 
 // run walks the document once, deciding for every object, and writes only when
 // commit is set. One traversal for both so the preview cannot drift from the
-// import it describes.
-func run(ctx context.Context, st *store.Store, doc *Document, prune, commit bool) (*Plan, error) {
+// import it describes. `whole` marks a SWITCH - the document is the whole
+// configuration rather than a fragment (see Switch).
+func run(ctx context.Context, st *store.Store, doc *Document, prune, commit, whole bool) (*Plan, error) {
 	if doc.Empty() {
 		return nil, fmt.Errorf("config: this file configures nothing " +
 			"(no routes, roles, authorities, mail relay, themes or settings)")
@@ -142,7 +197,10 @@ func run(ctx context.Context, st *store.Store, doc *Document, prune, commit bool
 	if err := importProviders(ctx, st, doc, plan, prune, commit); err != nil {
 		return nil, err
 	}
-	if err := importThemes(ctx, st, doc, plan, prune, commit); err != nil {
+	// Themes are never pruned by a SWITCH, whatever else it removes - see
+	// complete(): the export carries the active one alone, so the section is a
+	// statement about which theme to wear, never about which ones exist.
+	if err := importThemes(ctx, st, doc, plan, prune && !whole, commit); err != nil {
 		return nil, err
 	}
 	if err := importRelay(ctx, st, doc, plan, commit); err != nil {
@@ -605,6 +663,22 @@ func importSettings(ctx context.Context, st *store.Store, doc *Document, plan *P
 		value := doc.Settings[key]
 		var before json.RawMessage
 		had := st.GetSetting(ctx, key, &before) == nil
+		// The branding's PICTURES are not defined by a document that does not
+		// carry them. A package puts them back on the way in; a plain YAML -
+		// one unzipped by hand, or one edited in the console, where images are
+		// deliberately not shown - carries none, and taking that for "remove
+		// the logo" would erase an integrator's identity with no way back and
+		// nothing on screen that ever mentioned it.
+		//
+		// Same rule as an empty secret field, for the same reason: what a file
+		// does not carry, it does not destroy.
+		if key == store.SettingBranding && had {
+			merged, err := mergeBrandingImages(value, before)
+			if err != nil {
+				return err
+			}
+			value = merged
+		}
 		action := ActionAdd
 		switch {
 		case had && sameJSON(before, value):
@@ -626,6 +700,26 @@ func importSettings(ctx context.Context, st *store.Store, doc *Document, plan *P
 		}
 	}
 	return nil
+}
+
+// mergeBrandingImages fills the incoming branding's empty picture fields from
+// the stored one. Both sides stay opaque JSON: this package knows which FIELDS
+// are pictures (imageFields) and nothing else about branding.
+func mergeBrandingImages(incoming, stored json.RawMessage) (json.RawMessage, error) {
+	var in, was map[string]any
+	if err := json.Unmarshal(incoming, &in); err != nil {
+		return nil, fmt.Errorf("config: branding: %w", err)
+	}
+	if err := json.Unmarshal(stored, &was); err != nil {
+		// A stored value this package cannot read is not a reason to refuse an
+		// import: it simply has no picture to carry over.
+		return incoming, nil //nolint:nilerr // see above
+	}
+	out, err := json.Marshal(keepImages(in, was))
+	if err != nil {
+		return nil, fmt.Errorf("config: branding: %w", err)
+	}
+	return out, nil
 }
 
 // missingRefs lists the $names the document expects and the vault does not
@@ -721,6 +815,15 @@ func decide(had bool, before, after any) string {
 	return ActionSame
 }
 
+// canonical renders an object the way the COMPARISON should see it: without
+// the stamps, and without the difference between "absent" and "empty".
+//
+// That second half is not cosmetic. The export drops blank values, so a route
+// stored with `filters: []` comes back from its own document with no filters
+// key at all - and comparing the two raw made every such route report as
+// "update" on re-import. On the screen that lists what a switch would change,
+// that is worse than noise: it turns "activating this changes nothing" into a
+// page of updates, and the changes that matter stop standing out.
 func canonical(v any) (string, error) {
 	raw, err := json.Marshal(v)
 	if err != nil {
@@ -730,7 +833,7 @@ func canonical(v any) (string, error) {
 	if err := json.Unmarshal(raw, &tree); err != nil {
 		return "", err
 	}
-	out, err := json.Marshal(strip(tree, stampedKeys))
+	out, err := json.Marshal(drop(strip(tree, stampedKeys)))
 	if err != nil {
 		return "", err
 	}

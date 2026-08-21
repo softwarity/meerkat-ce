@@ -48,9 +48,30 @@ func (a *API) authed(next userHandler) http.Handler {
 			writeErr(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
-		next(w, r, actor)
+		// Every write goes through here, which is the only reason the tape can
+		// be complete: an endpoint added next month is recorded without anyone
+		// remembering to record it.
+		rec := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next(rec, r, actor)
+		a.markConfigPoint(r, actor, rec.status)
 	})
 }
+
+// statusWriter remembers what was answered, so a point is only taken after a
+// change that succeeded.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+// Unwrap keeps http.ResponseController working (flush, hijack) for the handlers
+// that stream - the console's log tail among them.
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 // rootOnly restricts a handler to root users.
 func (a *API) rootOnly(next userHandler) http.Handler {
@@ -911,6 +932,17 @@ type settingsPayload struct {
 	// built-in layout plus, for the two made of halves, which side the brand
 	// takes.
 	PageLayout store.PageLayout `json:"pageLayout"`
+	// DevMode is the installation-wide developer switch (DEV-01): off, the
+	// served applications carry no developer surface at all, whoever holds the
+	// capability. Free in both editions - developing against a gateway is how
+	// one adopts it.
+	//
+	// A POINTER because this PUT carries the whole payload: an older console,
+	// a script, or a screen that never heard of this field would send no
+	// `devMode` at all, and a plain bool would read that silence as "off" -
+	// saving a locale would close the developer tooling of an installation
+	// nobody asked about. Absent means UNCHANGED.
+	DevMode *bool `json:"devMode,omitempty"`
 }
 
 // smtpPayload is READ-ONLY context about outbound e-mail: who the recipient
@@ -958,6 +990,8 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	_ = a.st.GetSetting(ctx, store.SettingPagesScheme, &p.PagesScheme)
 	p.PageLayout = store.DefaultPageLayout()
 	_ = a.st.GetSetting(ctx, store.SettingPageLayout, &p.PageLayout)
+	devMode := a.st.DevMode(ctx)
+	p.DevMode = &devMode
 	smtp := a.st.GetSMTP(ctx)
 	p.SMTP = smtpPayload{
 		FromName: smtp.FromName, RelayHost: smtp.Host, RelayFrom: smtp.Address(),
@@ -1143,6 +1177,13 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		}
 	}
 	if err := a.st.SetSetting(r.Context(), store.SettingPageLayout, layout); err != nil {
+		a.internal(w, err)
+		return
+	}
+	if p.DevMode == nil {
+		current := a.st.DevMode(r.Context())
+		p.DevMode = &current
+	} else if err := a.st.SetDevMode(r.Context(), *p.DevMode); err != nil {
 		a.internal(w, err)
 		return
 	}

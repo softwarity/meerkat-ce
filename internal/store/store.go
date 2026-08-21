@@ -521,9 +521,54 @@ CREATE TABLE IF NOT EXISTS issues (
 );
 CREATE INDEX IF NOT EXISTS issues_at ON issues(created_at);
 CREATE INDEX IF NOT EXISTS issues_tenant ON issues(tenant_id, created_at);
-CREATE INDEX IF NOT EXISTS issues_status ON issues(status, created_at);`
+CREATE INDEX IF NOT EXISTS issues_status ON issues(status, created_at);
 
-const schemaVersion = 38
+-- Named configurations (CFG-01/02). The document is opaque here on purpose:
+-- its shape belongs to internal/config, which imports this package - holding
+-- the bytes rather than the structure is what keeps the dependency one-way.
+--
+-- The partial unique index is the "one active" rule, written where it cannot
+-- be forgotten: two rows claiming to be the running configuration would make
+-- every later question (what is running? what does a rollback go back to?)
+-- unanswerable, and no amount of care in the handlers proves they never do.
+CREATE TABLE IF NOT EXISTS configurations (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL DEFAULT '',
+  document    TEXT NOT NULL DEFAULT '',
+  -- The document's fingerprint, so "is what is running still this one?" is a
+  -- comparison rather than a claim. Stored rather than computed on read: the
+  -- list deliberately leaves the documents behind, and loading ten of them to
+  -- hash them would undo exactly what that saves.
+  digest      TEXT NOT NULL DEFAULT '',
+  active      INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL DEFAULT 0,
+  updated_at  INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS configurations_active ON configurations(active) WHERE active = 1;
+
+-- Restore points (CFG-06): the gateway's own tape, written whenever a change
+-- moves the configuration's fingerprint - never on purpose, never named.
+--
+-- A different object from a saved configuration, and keeping them apart is what
+-- makes both simple: the shelf is intentional and named ("the Acme setup"), the
+-- tape is automatic and timestamped ("what it looked like at 14:32"). One is
+-- for switching, the other for going back.
+--
+-- The document is stored WITHOUT its pictures (see config.WithoutImages), which
+-- is what makes a tape affordable: a few kilobytes a point instead of a
+-- megabyte of base64 repeated two hundred times.
+CREATE TABLE IF NOT EXISTS config_points (
+  id         TEXT PRIMARY KEY,
+  at         INTEGER NOT NULL,
+  actor_id   TEXT NOT NULL DEFAULT '',
+  label      TEXT NOT NULL DEFAULT '',
+  digest     TEXT NOT NULL DEFAULT '',
+  document   TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS config_points_at ON config_points(at);`
+
+const schemaVersion = 41
 
 func (s *Store) migrate() error {
 	var v int

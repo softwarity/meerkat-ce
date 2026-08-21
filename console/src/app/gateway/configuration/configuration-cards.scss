@@ -1,0 +1,65 @@
+// The card grammar shared by the three tabs of the Configuration screen. One
+// file rather than three copies: the tabs are one screen, and a hint that
+// looks different from one tab to the next reads as a different product.
+:host {
+  display: block;
+  padding: 8px 0 24px;
+  max-width: 900px;
+}
+mat-card {
+  padding: 20px 24px;
+}
+mat-card + mat-card {
+  margin-top: 16px;
+}
+h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hint {
+  margin: 0 0 16px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.hint:last-child {
+  margin-bottom: 0;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.note {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container);
+  margin-bottom: 16px;
+}
+.note mat-icon {
+  flex-shrink: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+.note.warn mat-icon {
+  color: var(--mat-sys-error);
+}
+.note p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.note ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+}
+.mono {
+  font-family: var(--mk-mono);
+  font-size: 0.85rem;
+}

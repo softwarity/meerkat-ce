@@ -395,6 +395,21 @@ const (
 	// PageLayout. Colours answer "what does it look like", this one answers
 	// "where is everything", and they are set on two tabs of one screen.
 	SettingPageLayout = "page_layout"
+	// SettingDevMode is the installation-wide developer switch (DEV-01): the
+	// master the per-account `dev` capability hangs from. Off, the developer
+	// surface of the SERVED applications is not there at all - no Developer
+	// entry in the user button, no UI test mode, no route API docs, no
+	// developer profile page - however many accounts carry the capability.
+	//
+	// Two levels rather than one because they answer two questions. The
+	// capability says WHO may develop against this gateway; this setting says
+	// whether this INSTALLATION is one you develop against. A production
+	// gateway turns it off once and stops caring which accounts kept the flag,
+	// and a demo stops showing an amber bar to whoever is watching.
+	//
+	// Ships ON: the capability was the whole gate until now, and an upgrade
+	// must not take a developer's tools away without anyone asking for it.
+	SettingDevMode = "dev_mode"
 	// SettingIssuesEnabled turns on the embedded issue tracker (ISSUE-04):
 	// the user-button of proxied apps gains a "Report an issue" panel and the
 	// data plane accepts reports. Ships OFF; the switch lives on the Issues
@@ -495,6 +510,10 @@ func (s *Store) seedDefaultSettings() error {
 		SettingPageLayout: string(layout),
 		// Single until someone says otherwise at startup, with a license.
 		SettingTenancy: `"` + TenancySingle + `"`,
+		// On, because the dev CAPABILITY was the only gate until this setting
+		// existed: an installation that upgrades must not silently lose the
+		// developer tooling its people already had.
+		SettingDevMode: `true`,
 	}
 	for key, value := range defaults {
 		if _, err := s.db.Exec(

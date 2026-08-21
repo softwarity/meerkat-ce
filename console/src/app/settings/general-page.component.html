@@ -35,6 +35,30 @@
       </div>
     </mat-card>
 
+    <!-- The developer switch (DEV-01). It sits here, under the mode, because
+         it is the same kind of statement: what this installation IS. The
+         capability on an account says who may develop; this says whether one
+         develops here at all. Free in both editions - developing against a
+         gateway is how one adopts it. -->
+    <mat-card appearance="outlined">
+      <div class="tenancy">
+        <mat-icon>code</mat-icon>
+        <div class="grow">
+          <div class="title"><ng-container i18n="@@Developer_mode">Developer mode</ng-container></div>
+          <p class="hint text-muted" i18n="@@Developer_mode_hint">
+            On, accounts holding the developer capability get their tooling on the applications this
+            gateway serves: the Developer menu in the user button, the UI test mode and the routes'
+            API docs. Off, none of it is there at all - however many accounts carry the capability.
+          </p>
+        </div>
+        <mat-slide-toggle
+          [checked]="devMode()"
+          [disabled]="switchingDev()"
+          (change)="setDevMode($event.checked)"
+        />
+      </div>
+    </mat-card>
+
     <mat-card appearance="outlined" ee-feature="business-hours">
       <h3 i18n="@@Working_hours">
         Working hours

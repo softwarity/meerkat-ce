@@ -80,3 +80,47 @@ func TestDeveloperHub(t *testing.T) {
 		}
 	}
 }
+
+// The same switch, seen from the pages: with developer mode off the profile
+// stops offering the hub, the hub refuses, and the user button never mentions
+// a Developer submenu. The account keeps its capability throughout - that is
+// the point: the installation answers, not the flag.
+func TestDeveloperModeHidesTheDeveloperSurface(t *testing.T) {
+	st, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("s3cret"), bcrypt.MinCost)
+	if err := st.CreateUser(ctx, store.User{ID: "d", Username: "devon", PasswordHash: string(hash), Enabled: true, Dev: true}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	New(st, session.NewManager(st)).Register(mux)
+	devC := postLogin(t, mux, url.Values{"username": {"devon"}, "password": {"s3cret"}}).Result().Cookies()[0]
+
+	if err := st.SetDevMode(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if body := bodyString(do(t, mux, "GET", "/profile", nil, devC)); strings.Contains(body, `href="/profile/dev"`) {
+		t.Fatal("the profile offered the Developer entry with developer mode off")
+	}
+	for _, p := range []string{"/profile/dev", "/profile/dev/cert"} {
+		if res := do(t, mux, "GET", p, nil, devC); res.Code != http.StatusForbidden {
+			t.Fatalf("%s with developer mode off: code=%d, want 403", p, res.Code)
+		}
+	}
+	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC)); strings.Contains(body, `"devDocs"`) {
+		t.Fatalf("the user button advertised the Developer submenu with developer mode off: %s", body)
+	}
+
+	// Back on, everything the developer had returns - no re-flagging, no
+	// re-login.
+	if err := st.SetDevMode(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC)); !strings.Contains(body, `"devDocs":true`) {
+		t.Fatalf("the Developer submenu did not come back: %s", body)
+	}
+}

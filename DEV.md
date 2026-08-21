@@ -18,14 +18,20 @@ npm start     # ng serve
 ## Terminal 2 - gateway hot-reload (air), flags en direct
 
 ```bash
-MEERKAT_ADMIN_PASSWORD=test1234 air -- -build.tags ee -addr :8082 -admin-addr :9092 -console-url http://localhost:4200
+MEERKAT_ADMIN_PASSWORD=test1234 air -- -addr :8082 -admin-addr :9092 -console-url http://localhost:4200
 ```
 
-> **La balise `ee` compte depuis le 2026-08-17.** Sans elle on construit
-> l'image communautaire : ni pilote d'annuaire, ni dispositions de page - le
-> code n'est pas dans le binaire. La ligne ci-dessus la pose, comme `make dev`.
-> `make dev-locked` construit le même binaire sans rien activer (ce que voit un
-> client qui n'a pas acheté) et `make dev-ce` construit la communautaire.
+> **La balise `ee` est dans `.air.toml`**, pas sur la ligne de commande. Elle
+> compte : sans elle on construit l'image communautaire (ni pilote d'annuaire,
+> ni dispositions de page, ni configurations multiples - le code n'est pas dans
+> le binaire). Comme `air` la prend de son fichier de config, `air` tapé à la
+> main et `make dev` construisent le même binaire. `make dev-ce` construit la
+> communautaire.
+>
+> **Piège corrigé le 2026-08-18** : la ligne portait `air -- -build.tags ee`.
+> Or tout ce qui suit `--` va au **binaire**, pas au build : meerkat recevait un
+> flag inconnu et sortait aussitôt, pendant qu'air construisait la communautaire.
+> C'est ainsi qu'une installation multi-organisations a tourné en mode CE.
 
 > `~/go/bin` est dans le PATH via `~/.bash_profile` (ajouté le 2026-07-28 -
 > terminal ouvert avant cette date : `source ~/.bash_profile`).
@@ -35,10 +41,12 @@ MEERKAT_ADMIN_PASSWORD=test1234 air -- -build.tags ee -addr :8082 -admin-addr :9
   que les valeurs par défaut - le flag gagne.
 - Le **mot de passe admin n'a pas de flag, exprès** : un mot de passe en argv est
   visible dans `ps`/l'historique -> il reste en env (`MEERKAT_ADMIN_PASSWORD`).
-- Tout ce qui suit `--` est transmis par air au binaire (vérifié). `air` vient de
-  `go install github.com/air-verse/air@latest` (résolu aussi par `make dev`, mais
-  `make dev` ne transmet pas d'arguments -> utiliser `air --` directement pour les
-  flags, ou l'équivalent env : `MEERKAT_ADDR=:8082 MEERKAT_ADMIN_ADDR=:9092
+- Tout ce qui suit `--` est transmis par air **au binaire** (vérifié), jamais au
+  build : une option de compilation posée là ne compile rien et fait sortir
+  meerkat. `air` vient de `go install github.com/air-verse/air@latest` (résolu
+  aussi par `make dev`, mais `make dev` ne transmet pas d'arguments -> utiliser
+  `air --` directement pour les flags, ou l'équivalent env :
+  `MEERKAT_ADDR=:8082 MEERKAT_ADMIN_ADDR=:9092
   MEERKAT_CONSOLE_URL=http://localhost:4200 MEERKAT_ADMIN_PASSWORD=test1234 make dev`).
 - Sans hot-reload : `go run ./cmd/meerkat -addr :8082 -admin-addr :9092
   -console-url http://localhost:4200` (mêmes flags).

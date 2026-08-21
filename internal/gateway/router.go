@@ -1442,6 +1442,15 @@ func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Acces
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
+	// Someone who IS signed in and is turned away anyway: a WARN, once, for
+	// both outcomes below. Not an error - the gateway did its job - but the
+	// operator has to be able to see that people are hitting a rule, which no
+	// redirection to the organisation chooser will ever tell them. The cause is
+	// the same word the page shows, so a support call and a log line say the
+	// same thing.
+	slog.Warn("access refused", "path", req.URL.Path, "method", req.Method,
+		"user", who.Username, "tenant", who.TenantID, "why", refusalCode(a, who))
+
 	// A refused SIMULATED identity during a UI test must not lock the
 	// developer out (a bare 403 has no developer bar): explain and offer the
 	// exit instead.

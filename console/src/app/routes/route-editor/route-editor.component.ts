@@ -382,7 +382,7 @@ export class RouteEditorComponent {
   // licensed instance the mode is simply set to single, and blaming Enterprise
   // would be a lie; on a community one, the mode is what the licence covers.
   protected readonly frozenTip = computed(() =>
-    this.me.has('multi-tenant')
+    this.me.enterprise()
       ? $localize`:@@Frozen_single_mode:This instance runs in single-organisation mode: the value would be the same on every request. The mode is in Application, General.`
       : $localize`:@@Frozen_single_mode_ce:This instance serves one organisation, so the value would be the same on every request. Several organisations is an Enterprise feature - see Application, General.`,
   );

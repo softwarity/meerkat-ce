@@ -61,6 +61,25 @@ function rolesMatcher(segments: UrlSegment[]): UrlMatchResult | null {
   return { consumed: segments, posParams };
 }
 
+// management, and management/<id> when a configuration's file is open in the
+// drawer - "current" being the id of what the gateway serves.
+function managementMatcher(segments: UrlSegment[]): UrlMatchResult | null {
+  if (!segments.length || segments[0].path !== 'management') return null;
+  if (segments.length > 2) return null;
+  const posParams: Record<string, UrlSegment> = {};
+  if (segments.length === 2) posParams['id'] = segments[1];
+  return { consumed: segments, posParams };
+}
+
+// history, and history/<id> when a point's document is open in the drawer.
+function historyMatcher(segments: UrlSegment[]): UrlMatchResult | null {
+  if (!segments.length || segments[0].path !== 'history') return null;
+  if (segments.length > 2) return null;
+  const posParams: Record<string, UrlSegment> = {};
+  if (segments.length === 2) posParams['id'] = segments[1];
+  return { consumed: segments, posParams };
+}
+
 export const routes: Routes = [
   // "/" resolves to the first section the user may use (infra admin ->
   // routes, app admin -> general, others -> tenants).
@@ -117,12 +136,49 @@ export const routes: Routes = [
           import('./gateway/access-tokens-page.component').then((m) => m.AccessTokensPageComponent),
       },
       {
-        // Import and export of the whole configuration (CFG-03/05). Root only:
-        // a document crosses both planes at once.
+        // The configuration screen (CFG-02/03/05). Root only: a document
+        // crosses both planes at once. Three tabs, and they are child ROUTES so
+        // a bookmark on one comes back to it.
         path: 'configuration',
         canActivate: [rootOnly],
         loadComponent: () =>
-          import('./gateway/configuration-page.component').then((m) => m.ConfigurationPageComponent),
+          import('./gateway/configuration/configuration-page.component').then(
+            (m) => m.ConfigurationPageComponent,
+          ),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'management' },
+          // The Import/export tab is gone: its export report, its plan and its
+          // vault entries live in the dialogs of Management now. The path stays
+          // as a redirect - the bookmarks people already have must land
+          // somewhere that makes sense, not on a 404.
+          { path: 'import-export', redirectTo: 'management' },
+          {
+            path: 'snapshot',
+            loadComponent: () =>
+              import('./gateway/configuration/snapshot-tab.component').then(
+                (m) => m.ConfigurationSnapshotComponent,
+              ),
+          },
+          {
+            // The tape, and one point open in its drawer: same shape as
+            // management, same reason.
+            matcher: historyMatcher,
+            loadComponent: () =>
+              import('./gateway/configuration/history-tab.component').then(
+                (m) => m.ConfigurationHistoryComponent,
+              ),
+          },
+          {
+            // management and management/:id share ONE component instance (the
+            // same trick as routes and roles): opening the drawer changes a
+            // param, it does not re-create the screen nor re-fetch the list.
+            matcher: managementMatcher,
+            loadComponent: () =>
+              import('./gateway/configuration/management-tab.component').then(
+                (m) => m.ConfigurationManagementComponent,
+              ),
+          },
+        ],
       },
     ],
   },

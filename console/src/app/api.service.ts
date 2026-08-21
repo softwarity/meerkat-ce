@@ -562,12 +562,67 @@ export interface Me {
   primaryTenant?: string;
 }
 
-// What the edition screen reads, and what the fallback path uses to put the
-// feature classes on <body> when no stamp did.
+// One saved configuration (CFG-01/02). `document` is the portable file itself
+// and only travels on the detail call - the console shows it and downloads it,
+// it never parses it.
+export interface SavedConfiguration {
+  id: string;
+  name: string;
+  description?: string;
+  document?: string;
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+  // What is inside, counted: three configurations named after customers say
+  // nothing about what separates them.
+  contents?: ConfigSection[];
+}
+
+// One moment of the gateway's configuration (CFG-06). Nobody asks for a point
+// and nobody names one - it has an hour, an author, and the words the audit
+// trail used for the change that produced it.
+export interface RestorePoint {
+  id: string;
+  at: number;
+  actorId?: string;
+  actorName?: string;
+  label?: string;
+  digest: string;
+  // The saved configuration whose document is byte for byte this one: how the
+  // tape shows where a name was taken.
+  savedAs?: string;
+  // The LATEST point holding what the gateway serves: where it is now.
+  current?: boolean;
+  // ANY point holding it - a state the gateway is already in, so going back to
+  // it would change nothing.
+  live?: boolean;
+  // When this exact state was FIRST recorded, if this is not the first time.
+  // Going back produces one by definition, and two identical lines with
+  // nothing to tell them apart is what makes a tape look broken.
+  sameAs?: number;
+}
+
+// The state of the running configuration (CFG-02): its fingerprint, the saved
+// configuration it MATCHES (none when what runs exists nowhere else), and the
+// one holding the current mark - which stays put when the gateway drifts away
+// from it, so the screen can say what it drifted from.
+export interface CurrentConfiguration {
+  digest: string;
+  savedAs?: { id: string; name: string };
+  active?: { id: string; name: string };
+}
+
+// What the edition screen reads, and what the fallback path uses to stamp
+// <body> when no server stamp did.
+//
+// ONE boolean, not a feature list: Meerkat is sold per production instance, so
+// the only question is which image is running. The `features`/`known` arrays
+// that used to be here outlived the registry they came from - the server
+// stopped sending them, `applyEdition` kept iterating `e.known`, and every
+// Enterprise control stayed dimmed on the Enterprise image because the class
+// it waited for (`ee-multi-tenant`) had no one left to write it.
 export interface Edition {
   enterprise: boolean;
-  features: string[];
-  known: string[];
   tenancy: 'single' | 'multi';
   primaryTenant: string;
   hiddenTenants: number;
@@ -849,6 +904,11 @@ export interface Settings {
   // How those pages are ARRANGED (PAGE-02). Colours answer what it looks
   // like, this one answers where everything is.
   pageLayout?: PageLayout;
+  // The installation-wide developer switch (DEV-01). Optional on purpose: the
+  // server reads its ABSENCE as "leave it alone", so a screen that saves the
+  // settings without knowing about this field cannot close the developer
+  // tooling of a whole installation by accident.
+  devMode?: boolean;
 }
 
 // One of the built-in arrangements. `side` is which edge the brand takes and
@@ -1085,6 +1145,123 @@ export class ApiService {
 
   importConfig(file: Blob, prune: boolean): Observable<ConfigPlan> {
     return this.http.post<ConfigPlan>(`/api/config/import?prune=${prune}`, file);
+  }
+
+  // ── several configurations, one active (CFG-01/02) ─────────────────────────
+  //
+  // Every one of these is a COPY. Only activate() touches what the gateway
+  // serves - which is why it is the only one that returns a plan.
+
+  // ── the tape: a restore point per change (CFG-06) ──────────────────────────
+
+  configHistory(): Observable<RestorePoint[]> {
+    return this.http.get<RestorePoint[]>('/api/config/history');
+  }
+
+  // A point as the text it is - it never carried a picture.
+  restorePointDocument(id: string): Observable<string> {
+    return this.http.get(`/api/config/history/${id}`, { responseType: 'text' });
+  }
+
+  restorePointPlan(id: string): Observable<ConfigPlan> {
+    return this.http.get<ConfigPlan>(`/api/config/history/${id}/plan`);
+  }
+
+  restoreConfigPoint(id: string): Observable<ConfigPlan> {
+    return this.http.post<ConfigPlan>(`/api/config/history/${id}/restore`, {});
+  }
+
+  // The one crossing from the tape to the shelf: a moment gets a name.
+  saveRestorePoint(id: string, name: string): Observable<SavedConfiguration> {
+    return this.http.post<SavedConfiguration>(
+      `/api/config/history/${id}/save?name=${encodeURIComponent(name)}`,
+      {},
+    );
+  }
+
+  // What is running, and whether it is still what was saved. A COMPARISON of
+  // fingerprints, computed server-side: "saved" recorded once would go on
+  // saying so after the next route was added.
+  currentConfiguration(): Observable<CurrentConfiguration> {
+    return this.http.get<CurrentConfiguration>('/api/configurations/current');
+  }
+
+  configurations(): Observable<SavedConfiguration[]> {
+    return this.http.get<SavedConfiguration[]>('/api/configurations');
+  }
+
+  configuration(id: string): Observable<SavedConfiguration> {
+    return this.http.get<SavedConfiguration>(`/api/configurations/${id}`);
+  }
+
+  // Saves the state the gateway is running RIGHT NOW under a name.
+  captureConfiguration(name: string, description = ''): Observable<SavedConfiguration> {
+    return this.http.post<SavedConfiguration>('/api/configurations', { name, description });
+  }
+
+  // Refreshes an existing one from the running gateway: activate, change
+  // things, save them back into it.
+  recaptureConfiguration(id: string): Observable<SavedConfiguration> {
+    return this.http.post<SavedConfiguration>(`/api/configurations/${id}/capture`, {});
+  }
+
+  renameConfiguration(id: string, name: string, description = ''): Observable<SavedConfiguration> {
+    return this.http.put<SavedConfiguration>(`/api/configurations/${id}`, { name, description });
+  }
+
+  duplicateConfiguration(id: string, name: string): Observable<SavedConfiguration> {
+    return this.http.post<SavedConfiguration>(`/api/configurations/${id}/duplicate`, { name });
+  }
+
+  deleteConfiguration(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/configurations/${id}`);
+  }
+
+  // What switching to it would change, writing nothing.
+  configurationPlan(id: string): Observable<ConfigPlan> {
+    return this.http.get<ConfigPlan>(`/api/configurations/${id}/plan`);
+  }
+
+  // The switch itself. Unlike an import, it PRUNES: afterwards the gateway is
+  // that configuration, so what it does not carry goes.
+  activateConfiguration(id: string): Observable<ConfigPlan> {
+    return this.http.post<ConfigPlan>(`/api/configurations/${id}/activate`, {});
+  }
+
+  // Takes a file into the collection without applying it - the difference with
+  // importConfig, which applies.
+  storeConfigurationFile(name: string, file: Blob): Observable<SavedConfiguration> {
+    return this.http.post<SavedConfiguration>(
+      `/api/configurations/import?name=${encodeURIComponent(name)}`,
+      file,
+    );
+  }
+
+  // Replaces one configuration's document with an uploaded file, applying
+  // nothing. This is what importing under a name that already exists means -
+  // the console asks first, because the name is all anyone sees in the list.
+  replaceConfigurationDocument(id: string, file: Blob): Observable<SavedConfiguration> {
+    return this.http.put<SavedConfiguration>(`/api/configurations/${id}/document`, file);
+  }
+
+  // A configuration as TEXT to read and edit: the same file, with the pictures
+  // taken out. Not the export - that one has to stand on its own elsewhere, so
+  // it carries everything.
+  configurationDocument(id: string): Observable<string> {
+    return this.http.get(`/api/configurations/${id}/document`, { responseType: 'text' });
+  }
+
+  currentDocument(): Observable<string> {
+    return this.http.get('/api/config/document', { responseType: 'text' });
+  }
+
+  // The same configuration as a package: the YAML with its images beside it.
+  exportConfigurationBundle(id: string): Observable<Blob> {
+    return this.http.get(`/api/configurations/${id}/export?format=zip`, { responseType: 'blob' });
+  }
+
+  exportConfiguration(id: string): Observable<string> {
+    return this.http.get(`/api/configurations/${id}/export`, { responseType: 'text' });
   }
 
   // ── snapshots (STORE-05) ───────────────────────────────────────────────────

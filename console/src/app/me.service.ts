@@ -30,16 +30,14 @@ export class MeService {
   // the screens that target the served organisation without naming it).
   readonly multiTenant = signal(document.body.classList.contains('multi-tenant'));
   readonly primaryTenant = signal(document.body.getAttribute('data-meerkat-primary-tenant') ?? '');
-  private readonly eeFeatures = signal<string[]>(
-    [...document.body.classList].filter((c) => c.startsWith('ee-')).map((c) => c.slice(3)),
-  );
+  // Which IMAGE is running, read from the same stamp the CSS reads. One class,
+  // one signal: there is no feature registry any more, so a control is either
+  // in this binary or it is not.
+  readonly enterprise = signal(document.body.classList.contains('ee'));
   // The organisation the tenant-scoped endpoints are called with: whichever is
   // being administered in multi, the served one in single - where no screen
   // ever names it.
   readonly scopeTenant = computed(() => this.primaryTenant());
-  has(feature: string): boolean {
-    return this.eeFeatures().includes(feature);
-  }
 
   // The fallback path: no stamp means the console was not served by the
   // gateway, so what it is has to be asked for and put on <body> by hand -
@@ -48,11 +46,9 @@ export class MeService {
   private applyEdition(e: Edition): void {
     this.multiTenant.set(e.tenancy === 'multi');
     this.primaryTenant.set(e.primaryTenant);
-    this.eeFeatures.set(e.features);
+    this.enterprise.set(e.enterprise);
     document.body.classList.toggle('multi-tenant', e.tenancy === 'multi');
-    for (const known of e.known) {
-      document.body.classList.toggle('ee-' + known, e.features.includes(known));
-    }
+    document.body.classList.toggle('ee', e.enterprise);
   }
 
   // Called after switching the mode: the stamp is a page-load thing, and the

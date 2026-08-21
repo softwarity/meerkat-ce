@@ -71,6 +71,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	a.registerIssues(mux)
 	a.registerEdition(mux)
 	a.registerConfig(mux)
+	a.registerConfigurations(mux)
+	a.registerConfigPoints(mux)
 	a.registerBackup(mux)
 	a.auditRegisterViewer(mux)
 }

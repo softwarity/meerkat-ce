@@ -115,6 +115,57 @@ func MarshalBundle(doc *Document) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// WithoutImages returns doc with its pictures taken OUT of the branding - what
+// the console shows when a configuration is read or edited as text.
+//
+// A logo is a megabyte of base64 on one line, in the middle of a document
+// someone is trying to read. Worse, it invites editing: a stray keystroke in
+// that line is an image nobody can recover from a diff. So the rule the console
+// states out loud is that MEDIA ARE NOT DEFINED BY EDITING - they are set on
+// the Branding screen and travel in a package - and this is what makes the rule
+// true rather than a sentence.
+//
+// The counterpart lives in the import: a document that carries no picture keeps
+// the one in place (see importSettings). Without it, saving an edited document
+// would silently erase the logo it never showed.
+func WithoutImages(doc *Document) (*Document, error) {
+	branding, err := brandingMap(doc)
+	if err != nil {
+		return nil, err
+	}
+	if branding == nil {
+		return doc, nil
+	}
+	dropped := false
+	for _, f := range imageFields {
+		if uri, _ := getPath(branding, f.path).(string); strings.HasPrefix(uri, "data:") {
+			setPath(branding, f.path, "")
+			dropped = true
+		}
+	}
+	if !dropped {
+		return doc, nil
+	}
+	return withBranding(doc, branding)
+}
+
+// keepImages fills the picture fields of `in` from `stored` wherever `in` has
+// none - the import-side half of WithoutImages.
+func keepImages(in, stored map[string]any) map[string]any {
+	if in == nil || stored == nil {
+		return in
+	}
+	for _, f := range imageFields {
+		if uri, _ := getPath(in, f.path).(string); uri != "" {
+			continue
+		}
+		if was, _ := getPath(stored, f.path).(string); was != "" {
+			setPath(in, f.path, was)
+		}
+	}
+	return in
+}
+
 // IsBundle reports whether body is a ZIP, by its magic number rather than by
 // its name: what an admin uploads has been through a browser, a chat and a
 // download folder, and the extension is the first thing to be lost.

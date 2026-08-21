@@ -4,7 +4,16 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/meerkat ./cmd/meerkat"
+# The dev loop builds the WHOLE product: `ee` links in what is sold (the
+# directory drivers, the page arrangements, several configurations), and a
+# feature nobody can see is a feature nobody tests.
+#
+# The tag belongs HERE, in the build command, and not on air's own line: air
+# passes everything after `--` to the BINARY, so `air -- -build.tags ee` handed
+# meerkat a flag it does not have (it exited at once) while quietly building the
+# community binary. That is how a multi-organisation installation came up in
+# community mode. `make dev-ce` overrides this command to get the other one.
+cmd = "go build -tags ee -o ./tmp/meerkat ./cmd/meerkat"
 bin = "./tmp/meerkat"
 include_ext = ["go"]
 exclude_dir = ["bin", "data", "dist", "docs", "tmp"]

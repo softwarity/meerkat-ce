@@ -7,6 +7,26 @@
 >
 > Dernière revue : 2026-08-09.
 
+> ⚠ **Ce document est en retard sur le produit depuis le 2026-08-18.** Ce qui
+> reste vrai : deux images depuis un commit (§1), la balise `ee`, le repli
+> perpétuel comme principe commercial. Ce qui est **mort dans le code** et
+> qu'aucune section ci-dessous n'a encore rattrapé :
+>
+> - **il n'y a plus de fichier de licence** : ni flag `-license`, ni
+>   `MEERKAT_LICENSE_FILE`, ni chargement au démarrage. L'image EST la licence,
+>   et le registre privé est ce qui la remet. `internal/license` survit sans
+>   aucun appelant - à supprimer ou à ressusciter, mais pas à croire sur parole ;
+> - **il n'y a plus de clés de fonctions** : plus de `MEERKAT_FEATURES`, plus de
+>   catalogue, plus de `features.Require`. Une constante, `edition.Enterprise`,
+>   et `edition.Require("ce que ça fait")` là où le code est nécessairement
+>   commun ; le reste est **absent** du binaire communautaire ;
+> - **la boucle de dev** : `make dev` (Enterprise, balise dans `.air.toml`) et
+>   `make dev-ce`. Rien d'autre - `dev-locked` n'existe plus ;
+> - `GET /api/edition` ne renvoie plus ni `features` ni `known`, et la console
+>   ne pose plus qu'une classe `ee` sur `<body>`.
+>
+> À reprendre en entier lors du prochain passage sur le sujet commercial.
+
 ## 1. Le modèle, et pourquoi
 
 **Deux images, un commit** (décidé le 2026-08-17, revient sur « un seul

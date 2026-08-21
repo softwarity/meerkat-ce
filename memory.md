@@ -5,7 +5,13 @@
 > quand l'état change. Le contrat produit reste `requirements.md` ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-08-09 : **pages integrees** - vingt langues (RTL compris),
+_Derniere mise a jour : 2026-08-19 : **la boucle de dev construisait la
+communautaire** (balise `ee` passee au binaire au lieu du build - corrige dans
+`.air.toml`), la console **verrouillait tout l'Enterprise sur les deux images**
+(le CSS attendait des classes `ee-<fonction>` que plus personne n'ecrit depuis
+la collapse du registre), **commutateur d'installation du mode dev** (DEV-01) et
+**configurations multiples** (CFG-01/02/04/05, Enterprise) - voir la section
+dediee. Avant : 2026-08-09 : **pages integrees** - vingt langues (RTL compris),
 **fuseau horaire dans le profil**, **fond de page** et **separation Theme / Marque**
 en deux sections de console - voir la section dediee. Avant : 2026-08-08 : **editions CE/EE tranchees** (8 cles, licence
 perpetuelle, gating sur les ecritures seules) et **mode mono-organisation par
@@ -23,6 +29,219 @@ developpeur escamotable + lisere, identite simulee session+route pour VOIR ce qu
 role voit. Avant cela : testeur de routage (ROUTE-15). Rappel 2026-07-30 : auth externe (AUTH-19) livree ; tout est sur
 `main`, la branche `feat/endpoint-security-openapi` avait ete repliee et supprimee
 (Francois : "je t'ai jamais demande de creer des branches")._
+
+## Session 2026-08-19 - la boucle de dev, le mode dev global, les configurations
+
+### 1. `make dev` construisait l'image communautaire (et la console le montrait)
+
+Francois : "mon meerkat air est en multitenant, pourtant il semble en mode CE".
+Deux causes, independantes, qui donnaient la meme impression.
+
+**Cote build** : la ligne etait `air -- -build.tags ee`. Tout ce qui suit `--`
+va au **binaire**, pas au build - meerkat sortait aussitot sur un flag inconnu
+pendant qu'air construisait la communautaire. La balise est maintenant dans
+`.air.toml` (`cmd = "go build -tags ee ..."`), donc `air` tape a la main (ce que
+DEV.md fait pour passer `-addr`/`-console-url`) et `make dev` construisent le
+meme binaire. `make dev-ce` surcharge la commande de build. `dev-locked` et
+`MEERKAT_FEATURES` (registre disparu) sont retires du Makefile, de DEV.md et du
+README.
+
+**Cote console** : le serveur ne pose plus qu'**une** classe, `ee`, depuis que
+le registre de fonctions a ete reduit a une constante - mais `styles/_modes.scss`
+attendait toujours `body.ee-multi-tenant`, `body.ee-directories`... Selecteur
+qui depend d'une classe que plus personne n'ecrit : il gagne **toujours**. Donc
+sur l'image Enterprise, le bouton multi-organisations et les horaires etaient
+grises et refusaient le clic. Pire : `applyEdition()` iterait `e.known`, que le
+serveur n'envoie plus - basculer le mode levait une exception. Corrige : une
+classe, un booleen (`MeService.enterprise`), `[ee-feature]` sans valeur, l'ecran
+License liste l'offre completee par `e.enterprise`.
+
+### 2. Mode dev : un commutateur d'installation (DEV-01)
+
+Reglage `dev_mode` (Application, General), **livre a ON** : la capacite par
+compte etait le seul verrou jusqu'ici, une montee de version ne doit pas retirer
+ses outils a un dev. Eteint, il n'y a plus **aucune** surface dev sur les
+applications servies : sous-menu Developer du user-button, mode test UI,
+`/meerkat/apidocs/`, page profil dev et son certificat, simulation d'identite
+cote data plane. `store.DevAllowed(ctx, user)` est le seul endroit qui repond -
+c'est ce qui empeche la prochaine porte dev de ne verifier que le compte.
+
+Le champ est un **pointeur** dans la charge utile des reglages : un PUT porte
+tout le payload, et une console qui ne connait pas le champ aurait ferme le mode
+dev en enregistrant une locale. Absent = inchange.
+
+La simulation **cote console** (Try it out du swagger) n'est pas concernee :
+c'est un outil du plan de controle, garde par les capacites d'admin.
+
+### 3. Configurations multiples (CFG-01/02/04/05) - Enterprise
+
+Table `configurations` (schema v39) + index unique **partiel** sur `active = 1` :
+deux configurations actives rendraient toute question suivante sans reponse.
+Le document est stocke **opaque** (le YAML tel quel) - `internal/config` importe
+`internal/store`, l'inverse fermerait le cercle - et c'est ce qui fait de
+"exporter celle-ci" une lecture, donc un fichier octet pour octet identique a ce
+qui serait applique.
+
+Onze routes sous `/api/configurations` (root, comme l'import/export : une
+configuration traverse les deux plans). Ecritures gardees par
+`edition.Require("keeping several configurations")` ; **lecture et export
+restent ouverts** dans les deux images - une installation qui redescend
+d'Enterprise doit continuer a voir et sortir ce qu'elle a enregistre.
+
+Le geste central : `config.Switch` / `PreviewSwitch`, a cote de `Apply`/`Preview`.
+Un **fichier** importe peut etre un fragment, donc on fusionne ; une
+**configuration** activee est une promesse sur la gateway resultante, donc on
+elague. Le mecanisme est l'en-tete de section : `Apply` ignore une section
+absente (nil), ce qui est juste pour un fragment et faux ici - une configuration
+capturee sur une gateway sans routes aurait laisse tourner les routes de la
+precedente. `complete()` materialise les sections vides.
+
+Deux pieges trouves en la faisant tourner, tous deux corriges :
+
+- **Les themes ne s'elaguent jamais sur une bascule.** L'export ne porte que le
+  theme ACTIF (decision assumee : les autres sont des essais de couleurs), donc
+  un document ne dit jamais quels themes existent. Sans exemption, basculer d'un
+  client a l'autre supprimait les palettes.
+- **`canonical()` compare desormais sans la difference absent/vide.** L'export
+  laisse tomber les valeurs blanches : une route stockee avec `filters: []`
+  revenait de son propre document sans la cle, et se declarait "update" a chaque
+  fois. Sur l'ecran qui liste ce qu'une bascule changerait, c'est pire que du
+  bruit - "activer ne change rien" devenait une page de modifications.
+
+Console (deuxieme forme, apres retour de Francois : la premiere - une carte de
+liste - ne lui plaisait pas) : **l'ecran Configuration a trois onglets routes**,
+`import-export` / `snapshot` / `management`. Management est **une seule table**
+dont la **premiere ligne est la configuration courante**, sticky sous l'en-tete :
+ses actions sont enregistrer-sous-un-nom et exporter ; les autres lignes portent
+definir-comme-courante, dupliquer, exporter, supprimer. Un clic sur une ligne
+ouvre un **tiroir** (URL-driven, `management/<id>` ou `management/current`) avec
+le **YAML** dans CodeMirror : lecture, bouton Edit, puis Save - sur une copie ca
+remplace le document et n'applique rien, sur la courante ca passe par le plan
+puis applique.
+
+Trois pieges de cet ecran, tous rencontres en le regardant tourner :
+
+- un tiroir dans une colonne de texte de 900 px n'a nulle part ou s'ouvrir :
+  l'ecran prend la hauteur, la largeur de lecture descend sur chaque onglet ;
+- la hauteur de CodeMirror ne peut pas etre posee en CSS de composant
+  (l'encapsulation Angular n'atteint pas son DOM) : elle passe par
+  `EditorView.theme({'&': {height: '100%'}})` ;
+- les boutons de `rowActions` ne sont **pas** dans la ligne : la directive les
+  projette dans une overlay CDK au survol - un selecteur `mat-row button` ne les
+  trouve jamais.
+
+**Enregistrer l'etat courant sous un nom pose la marque `active`** : nommer ce
+qui tourne, c'est dire que ce qui tourne s'appelle Acme. Sans ca la carte
+courante affichait "not saved under any name" juste apres qu'on l'ait
+enregistree.
+
+**"Enregistre" est une COMPARAISON, pas un drapeau** (remarque de Francois, et
+c'est le point important de l'ecran) : on enregistre, on ajoute une route, et
+ce qui tourne n'est plus ce qui a ete enregistre. Colonne `digest` (sha256 du
+document, ecrite a la sauvegarde, schema v40) + `GET /api/configurations/current`
+qui empreinte l'etat vivant et le compare. Trois etats sur une seule icone de
+la premiere ligne, le nom dans l'infobulle :
+
+- `cloud_done` vert : ce qui tourne EST une configuration enregistree ;
+- `cloud_alert` rouge : a derive de celle dont il porte la marque - c'est le cas
+  a signaler, et l'avertissement avant une bascule s'appuie dessus ;
+- `cloud_off` gris : jamais enregistre.
+
+Le digest est stocke et non calcule a la lecture parce que la liste laisse
+volontairement les documents en base ; les charger pour les hacher annulerait
+exactement ce que ca economise.
+
+### 4. Les points de reprise (CFG-06) - la bande
+
+Demande de Francois apres coup, et son modele est meilleur que celui que je
+proposais (des versions attachees a une sauvegarde) : **l'historisation ne
+depend d'aucun save**. Deux objets distincts, et c'est ce qui les rend simples :
+
+- **l'etagere** : des configurations nommees, intentionnelles, une par client ;
+- **la bande** : un point a chaque changement, horodate, que personne ne nomme.
+
+**La condition est l'empreinte, pas l'endpoint.** Le point se pose dans
+`authed` (par ou passent toutes les ecritures d'admin), apres coup, si
+`config.Record` voit l'empreinte bouger. Deux proprietes en decoulent : un
+endpoint ajoute plus tard est couvert sans qu'on y pense, et ce qui n'est pas
+de la configuration (compte cree, coffre rempli, session ouverte) ne laisse
+rien - par construction, pas par une liste d'exceptions.
+
+`config.Record` est dans internal/config et pas dans l'API parce que **deux
+appelants ont besoin de la meme reponse** : chaque ecriture, et le **demarrage**
+(sans ce point de base, l'etat le plus ancien atteignable serait celui d'apres
+le premier changement - le test l'a trouve avant moi).
+
+Reglages valides par Francois : **200 points**, elagage a l'ecriture ;
+**fusion des changements d'un meme acteur sur 2 minutes** (le dernier gagne).
+Piege corrige au passage : la fusion exigeait seulement "moins de 2 minutes
+d'ecart", donc un point date d'une heure plus tot (une bande mise en scene, une
+horloge qui recule) ecrasait le present ; il faut aussi qu'il soit **plus
+recent**.
+
+Console : quatrieme onglet **History**, chronologie groupee par jour, le
+document d'un point dans le meme tiroir, **diff avec l'etat courant**
+(`@codemirror/merge`, vue unifiee), restauration avec le plan d'abord, et
+"enregistrer sous un nom" - seul passage de la bande vers l'etagere.
+
+**Trois defauts trouves par Francois en jouant la sequence "demarrage, modif,
+restore"**, tous du meme endroit - la fusion :
+
+- le restore arrivait moins de 2 minutes apres la modif, meme acteur, donc il
+  **remplacait le point qu'il defaisait** : la ligne de modif disparaissait et
+  il restait deux lignes identiques. Regle ajoutee : **un etat que la bande
+  connait deja n'est jamais fusionne** - y atterrir, c'est ce qu'est un retour ;
+- **"Current" s'affichait sur deux lignes** (le point restaure et le point du
+  restore portent le meme etat) : la marque va sur le **plus recent** qui porte
+  l'etat servi, un seul ;
+- le libelle du point de restore reprenait les mots du changement **defait**,
+  parce que `ListAuditEvents` triait `at DESC, id DESC` et que les ids sont du
+  hex aleatoire : a la meme seconde, l'ordre etait tire au sort. Tri par
+  `rowid DESC` - ca repare aussi l'ecran d'audit, silencieusement faux depuis
+  toujours sur les evenements d'une meme seconde.
+
+### 5. L'onglet import/export supprime, et le modele EE change
+
+Decisions de Francois, toutes appliquees :
+
+**Trois onglets, Management en premier** (puis History, puis Snapshot).
+L'onglet Import/export n'existe plus : son rapport d'export est **une phrase
+avant un telechargement** (modale), le plan et les entrees de coffre a remplir
+appartiennent a l'import qui les produit (modale), et la case "elaguer" est
+devenue **la troisieme destination** d'un import - sous un nom / remplacer la
+courante / **ajouter** a la courante. Cette troisieme est le piege a ne pas
+oublier : un fichier peut etre un fragment, et sans elle la fusion disparaissait
+avec l'onglet. `/infra/configuration/import-export` redirige vers management.
+
+**Deux formes d'export, une regle** : un YAML est du texte et ne porte **jamais**
+d'image, un ZIP les emporte a cote. C'est le prolongement de la regle des
+medias : l'import qui n'en porte pas laisse en place celles qui y sont.
+
+**Les gardes EE deviennent un plafond.** Plus de `requireCollection` : tout
+marche sur les deux images, la communautaire garde **trois configurations a la
+fois** (`FreeConfigurations`), le compte est affiche avant d'etre atteint et le
+refus dit combien tiennent. Plafonner le nombre ET verrouiller la bascule aurait
+rendu les trois inutiles.
+
+**La bande reste illimitee et identique dans les deux editions** (mon
+desaccord, accepte par Francois) : defaire est une fonction de securite, et
+comme l'elagage se fait a l'ecriture, un plafond par edition **detruirait**
+l'historique le jour d'une redescente d'Enterprise.
+
+**Git local ecarte** pour l'historique : on n'utiliserait ni branches ni fusion
+ni remotes, donc un journal lineaire = une table ; le binaire est distroless et
+sans CGO (embarquer git ou go-git pour ca) ; ca ferait deux sources de verite
+(l'instantane STORE-05 n'emporterait pas un `.git`) ; et surtout **le cluster
+le disqualifie** - plusieurs instances derriere une meme base donneraient N
+histoires divergentes, et un git partage serait un serveur de plus. Git reste
+la bonne reponse **dehors** : l'export est stable a l'octet, dix lignes de cron.
+
+**Reste a faire** : comparer deux configurations enregistrees entre elles ;
+CFG-03 (le fichier au demarrage devient une configuration disponible) n'est
+toujours pas branche sur la collection ; et la question ouverte de Francois -
+l'onglet import/export pourrait disparaitre une fois que le tiroir porte le
+rapport d'export (secrets laisses derriere) et les entrees de coffre a remplir,
+qui sont les seules choses qu'il a en propre.
 
 ## Session 2026-08-09 - les pages integrees : langues, fuseau, fond, marque
 

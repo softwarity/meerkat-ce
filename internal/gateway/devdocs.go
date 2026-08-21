@@ -55,7 +55,7 @@ func (rt *Router) devDocsSession(r *http.Request) (store.User, string, bool) {
 		return store.User{}, "", false
 	}
 	u, err := rt.st.GetUserByID(r.Context(), sess.UserID)
-	if err != nil || !u.Enabled || !u.Dev {
+	if err != nil || !rt.st.DevAllowed(r.Context(), u) {
 		return store.User{}, "", false
 	}
 	return u, sess.TenantID, true

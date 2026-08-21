@@ -20,11 +20,19 @@ services:
       - "3389:389"
     volumes:
       - ./openldap/init.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/init.ldif:ro
+    # Two rhythms, and the second one is the one that matters on a laptop: a
+    # probe every few seconds is right while `make ldap-up` is waiting for the
+    # thing to come up, and wrong for the rest of the day. `interval` never
+    # stops - a bench left running was probing more often than every other
+    # container on this machine put together, and each probe is a process spawn
+    # through the VM, which is what actually costs.
     healthcheck:
       test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost", "-b", "dc=example,dc=com", "-D", "cn=admin,dc=example,dc=com", "-w", "adminpassword"]
-      interval: 3s
+      start_period: 60s
+      start_interval: 2s
+      interval: 60s
       timeout: 5s
-      retries: 20
+      retries: 3
 
   # A real OIDC provider: Dex, static Go, no database, no JVM. Meerkat exists
   # so that an installation does NOT have to run an identity server; the test
@@ -39,9 +47,11 @@ services:
       - ./dex/config.yaml:/etc/dex/config.yaml:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:5556/dex/.well-known/openid-configuration"]
-      interval: 3s
+      start_period: 30s
+      start_interval: 2s
+      interval: 60s
       timeout: 5s
-      retries: 20
+      retries: 3
 
   # A real Active Directory domain controller (Samba 4 in AD DC mode). It
   # provisions on first start, which takes about a minute; the seed script
@@ -67,8 +77,14 @@ services:
       - "3636:636"
     volumes:
       - ./samba/seed.sh:/seed.sh:ro
+    # The provisioning takes about a minute on a cold start, hence the long
+    # start_period; samba-tool is a Python program, so the steady-state probe is
+    # the most expensive one of the three and the one that most deserves to be
+    # rare.
     healthcheck:
       test: ["CMD-SHELL", "samba-tool domain info 127.0.0.1 >/dev/null 2>&1"]
-      interval: 5s
+      start_period: 240s
+      start_interval: 5s
+      interval: 120s
       timeout: 10s
-      retries: 40
+      retries: 3
