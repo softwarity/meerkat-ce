@@ -609,6 +609,12 @@ func (rt *Router) compile(r store.Route, appLangs []string) (compiledRoute, erro
 		}
 		handler = redirectToLocale(handler, localeCodes, routing.PathPrefixes(r.Predicates), inPath, param)
 	}
+	// Gates (ROUTE-04) go on LAST, so they sit outermost: what a route refuses
+	// to carry is decided before the access rule reads a session, before a
+	// modifier touches a header, and before a redirect sends the caller round
+	// again. Refusing early is the whole point - an oversized body must not be
+	// read to be turned away.
+	handler = gateChain(filters.Gates, handler)
 	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler,
 		access: selectAccess, isUI: r.IsUI}, nil
 }
@@ -2017,26 +2023,51 @@ func buildProxy(r store.Route, cf routing.CompiledFilters) (http.Handler, error)
 		Transport: cookieStrippingTransport{upstreamTransport},
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetXForwarded()
+			// Whatever the caller sent under this name goes: it tells the
+			// service where it is published, so a caller who poses their own
+			// makes the service write its links wherever they asked. Purged
+			// unconditionally, even on a route that never sets it - a route
+			// without strip-prefix must not carry a stranger's idea of its
+			// own prefix either. Same reasoning as the identity headers.
+			pr.Out.Header.Del(routing.ForwardedPrefixHeader)
 			// Request filters transform the request path/headers first, THEN
 			// the upstream base path is prepended by SetURL - so strip-prefix
 			// and friends reason on the request path, never on the upstream's.
-			was := pr.Out.Host
 			for _, f := range cf.Request {
 				f(pr)
 			}
-			asked := pr.Out.Host
+			// SetURL points the request at the upstream AND takes the Host
+			// with it, which is right by default and wrong for the filters
+			// whose whole purpose is that header: a service answering by
+			// virtual host needs a name the upstream URL does not carry, and
+			// one building its own links needs the name the CALLER used.
+			//
+			// The signal is the Host HEADER, not a changed value. Comparing
+			// values before and after made preserve-host a no-op nobody could
+			// explain: it writes the caller's Host, which is what Out already
+			// carried, so "nothing changed" and the upstream's name went out.
+			// A header, on the other hand, says a filter asked - the client
+			// never sends one (Go moves it to Request.Host), so its presence
+			// is unambiguous.
+			asked := pr.Out.Header.Get("Host")
 			pr.SetURL(target)
-			// SetURL points the request at the upstream AND takes the Host with
-			// it, which is right by default and wrong for the one filter whose
-			// whole purpose is that header: a service answering by virtual host
-			// needs a name the upstream URL does not carry. So a filter that
-			// changed it wins - it was asked for, the upstream's host is only
-			// the default.
-			if asked != was {
+			if asked != "" {
 				pr.Out.Host = asked
 			}
 		},
-		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+		ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
+			// A body that blew through the route's cap while it was being
+			// copied upstream (no declared length, so the guard could only
+			// find out on the way through). It is the CALLER who is at fault,
+			// not the service - and the service, in this case, was never
+			// even asked.
+			if mbe, ok := filtering.OversizeBody(err); ok {
+				slog.Info("request refused: body over the route limit",
+					"route", r.Name, "limit", mbe.Limit)
+				filtering.RefuseSize(w, req, http.StatusRequestEntityTooLarge,
+					"request body too large", -1, mbe.Limit)
+				return
+			}
 			slog.Warn("upstream error", "route", r.Name, "upstream", r.Upstream, "err", err)
 			http.Error(w, "upstream unavailable", http.StatusBadGateway)
 		},

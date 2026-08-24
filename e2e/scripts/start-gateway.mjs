@@ -2,18 +2,23 @@
 // a DISPOSABLE database: every run starts from a clean slate, the setup
 // project re-seeds the profiles through the real HTTP flows.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('../..', import.meta.url));
 const tmp = fileURLToPath(new URL('../.tmp', import.meta.url));
 const bin = `${tmp}/meerkat`;
 
-// -tags ee: the suite exercises the WHOLE product - several organisations,
-// directories, hours - so it needs the Enterprise binary. Without the tag the
-// community one is built, and the first thing the setup does (create a tenant)
-// is refused, which is correct behaviour reported as a broken test run.
-const build = spawnSync('go', ['build', '-tags', 'ee', '-o', bin, './cmd/meerkat'], { cwd: repo, stdio: 'inherit' });
+// Which product this tree carries, asked of the tree: the community mirror is
+// this commit with ee/ removed, and the suite has to run there too. With ee/
+// the Enterprise binary is built and the gateway comes up multi-organisation,
+// which is what the whole matrix expects; without it the community binary
+// comes up single, and the scenarios that need several organisations are the
+// ones marked `edition: "ee"` and left out (see lib/fixtures).
+const enterprise = existsSync(`${repo}/ee`);
+const tags = enterprise ? ['-tags', 'ee'] : [];
+console.log(enterprise ? 'ee/ is here: Enterprise binary, multi-organisation' : 'no ee/: community binary, single organisation');
+const build = spawnSync('go', ['build', ...tags, '-o', bin, './cmd/meerkat'], { cwd: repo, stdio: 'inherit' });
 if (build.status !== 0) process.exit(build.status ?? 1);
 
 rmSync(`${tmp}/data`, { recursive: true, force: true });
@@ -26,11 +31,11 @@ const child = spawn(
     '-admin-addr', ':19092',
     '-console-url', 'http://localhost:14200',
     '-data', `${tmp}/data`,
-    // The suite exercises the whole product, so the gateway runs the
-    // Enterprise shape: several organisations, directories, hours. The
-    // community refusals are covered by Go tests, and the single-tenant
-    // console by a scenario that switches this one over and back.
-    '-tenancy', 'multi',
+    // The shape the binary can serve. The community one starts single
+    // whatever this says - it warns and carries on - but asking for a mode a
+    // build cannot serve puts a warning in every run's log, and a log nobody
+    // can read is a log nobody reads.
+    '-tenancy', enterprise ? 'multi' : 'single',
   ],
   {
     stdio: 'inherit',

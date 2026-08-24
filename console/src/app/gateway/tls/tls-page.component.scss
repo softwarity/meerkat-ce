@@ -1,0 +1,306 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+}
+.banner h1 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+.content {
+  padding: 0 24px 24px;
+  display: grid;
+  gap: 20px;
+  max-width: 900px;
+}
+.card {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: grid;
+  gap: 12px;
+}
+.card h2 {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 0;
+}
+.plane-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.plane-head h2 {
+  flex: 1;
+}
+.plane-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+/* The two addresses, read together. A screen that shows one and leaves the
+   other to a stack file makes an operator go and look it up. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-family: var(--mk-mono);
+  font-size: 0.82rem;
+}
+.links a,
+.links .off {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.links a {
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+}
+.links a:hover {
+  text-decoration: underline;
+}
+.links .off {
+  color: var(--mat-sys-on-surface-variant);
+  opacity: 0.65;
+}
+.links mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+}
+/* One declared name and whether anything answers for it - the only question
+   an operator actually has about TLS. */
+.cover {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.cover code {
+  font-family: var(--mk-mono);
+  color: var(--mat-sys-on-surface);
+}
+.cover mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+  flex-shrink: 0;
+}
+/* The status classes carry an s- prefix. Without it, a status called "acme"
+   collided with the .acme layout block below and silently turned the row into
+   a grid - three lines where one was meant. A status is data, a layout class
+   is structure, and they must not share a namespace. */
+.cover.s-covered mat-icon {
+  color: var(--mat-sys-primary);
+}
+.cover.s-expiring mat-icon,
+.cover.s-acme mat-icon {
+  color: var(--mat-sys-tertiary);
+}
+.cover.s-uncovered mat-icon,
+.cover.s-expired mat-icon {
+  color: var(--mat-sys-error);
+}
+.automatic {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0;
+}
+.automatic h3 {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 0 4px;
+}
+.automatic code {
+  font-family: var(--mk-mono);
+  font-size: 0.82rem;
+}
+.certs h2 {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 0;
+}
+.lamp {
+  margin-left: auto;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.lamp.on {
+  color: var(--mat-sys-primary);
+  font-weight: 500;
+}
+.note {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.82rem;
+  margin: 0;
+}
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}
+.problem mat-icon {
+  flex-shrink: 0;
+  overflow: visible;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+.certs {
+  display: grid;
+  gap: 12px;
+}
+.cert {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 12px 16px 12px 18px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.cert::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--mat-sys-primary);
+  opacity: 0.7;
+}
+.cert.pending::before {
+  background: var(--mat-sys-outline);
+}
+.cert .name {
+  font-weight: 500;
+}
+.badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+}
+.badge.warn {
+  background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
+  color: var(--mat-sys-error);
+}
+.is-default mat-icon {
+  color: var(--mat-sys-primary);
+}
+.cert .hosts,
+.cert .meta {
+  grid-column: 1 / -1;
+}
+.cert .hosts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.cert .hosts code {
+  font-family: var(--mk-mono);
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.cert .meta {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.78rem;
+}
+.validity.soon,
+.soon {
+  color: var(--mat-sys-tertiary);
+  font-weight: 500;
+}
+.validity.gone {
+  color: var(--mat-sys-error);
+  font-weight: 500;
+}
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+  padding: 8px 0;
+}
+.acme {
+  display: grid;
+  gap: 4px;
+}
+.private {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+.private summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+/* The fields inside the fold stack. app-form-field is display:contents, so
+   its mat-form-field is what this grid actually lays out - left to flow, the
+   three of them sat side by side and squeezed the PEM box into a column four
+   characters wide. */
+.fold {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-top: 12px;
+}
+textarea.pem {
+  font-family: var(--mk-mono);
+  font-size: 0.75rem;
+}
+.issued {
+  margin-top: 8px;
+}
+.issued h3 {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 0 4px;
+}
+.issued p {
+  margin: 2px 0;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.offer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--mat-sys-primary) 45%, transparent);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.offer mat-icon {
+  color: var(--mat-sys-primary);
+  flex-shrink: 0;
+  overflow: visible;
+}
+.offer span {
+  flex: 1;
+}
+.offer button {
+  flex-shrink: 0;
+}

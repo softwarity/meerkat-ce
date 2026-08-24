@@ -20,7 +20,32 @@ export function emptyAccess(): AccessState {
 // Empty means Meerkat poses no condition of its own; the upstream still
 // applies whatever it applies.
 export function isEmpty(a: AccessState): boolean {
-  return a.level === '' && a.roles.length === 0 && a.users.length === 0;
+  // Users are an EXCEPTION and an exception needs a condition: delegated with
+  // no role asked poses none, so a name listed there excepts nobody from
+  // anything and the rule is empty (the gateway reads it the same way - see
+  // store.Access.Empty). Such a list is a leftover: the editor clears it when
+  // the level goes back to delegated, so it only survives on rules written
+  // before that, or through the API.
+  return a.level === '' && a.roles.length === 0;
+}
+
+// The level in a few characters - AUTH, ORG, ORG-2, DENY - shared by the
+// routes table's badges and the route editor's section mark, so the same rule
+// does not read as two different things one click apart. An em dash for
+// delegated: there IS no level, and a blank would read as "not loaded yet".
+export function levelShort(a: AccessState): string {
+  switch (a.level) {
+    case 'auth':
+      return $localize`:@@Level_short_auth:AUTH`;
+    case 'tenant':
+      return $localize`:@@Level_short_tenant:ORG`;
+    case 'tenants':
+      return $localize`:@@Level_short_tenants:ORG` + '\u00b7' + a.tenants.length;
+    case 'deny':
+      return $localize`:@@Level_short_deny:DENY`;
+    default:
+      return '\u2014';
+  }
 }
 
 // The belonging axis, in order. Each entry says what it REQUIRES - and none of

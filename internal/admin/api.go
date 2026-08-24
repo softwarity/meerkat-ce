@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -35,6 +36,10 @@ type API struct {
 	// admin features that must name the sibling plane (e.g. OIDC callbacks).
 	DataAddr string
 
+	// TLS is the live HTTPS state (SSL-01/02). Wired by main; nil in the tests
+	// that have no listener to open, where saving material still has to work.
+	TLS *certs.Supervisor
+
 	st     *store.Store
 	sm     *session.Manager
 	router *gateway.Router
@@ -53,6 +58,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/routes", a.gw(a.listRoutes))
 	mux.Handle("POST /api/routes/reorder", a.infraAdmin(a.reorderRoutes))
 	mux.Handle("POST /api/routes/respond-preview", a.infraAdmin(a.previewRespond))
+	mux.Handle("POST /api/routes/version-preview", a.infraAdmin(a.previewVersion))
 	mux.Handle("GET /api/routes/{id}", a.gw(a.getRoute))
 	mux.Handle("PUT /api/routes/{id}", a.infraAdmin(a.putRoute))
 	mux.Handle("DELETE /api/routes/{id}", a.infraAdmin(a.deleteRoute))
@@ -74,6 +80,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	a.registerConfigurations(mux)
 	a.registerConfigPoints(mux)
 	a.registerBackup(mux)
+	a.registerCertificates(mux)
 	a.auditRegisterViewer(mux)
 }
 
@@ -134,6 +141,35 @@ func (a *API) previewRespond(w http.ResponseWriter, r *http.Request, _ store.Use
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"output": out, "caller": routing.PreviewCaller()})
+}
+
+// previewVersion runs a version predicate's arguments against a sample, so the
+// editor can show what will be extracted and whether it falls in the range
+// while someone is still typing the pattern.
+//
+// The ENGINE answers, not the browser: Go's regexps are RE2, which refuses the
+// lookarounds JavaScript allows, so a preview computed in the console would
+// report a match on a pattern the gateway turns down at save.
+func (a *API) previewVersion(w http.ResponseWriter, r *http.Request, _ store.User) {
+	var in struct {
+		Args   map[string]any `json:"args"`
+		Sample string         `json:"sample"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed body: expected {\"args\": {...}, \"sample\": \"...\"}")
+		return
+	}
+	extracted, matches, err := routing.PreviewVersion(in.Args, in.Sample)
+	if err != nil {
+		// 200 with the error inside, like the respond preview: half of what
+		// someone types is not valid yet, and a 4xx per keystroke would light
+		// up the console's error handling for nothing.
+		writeJSON(w, http.StatusOK, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"extracted": extracted, "matches": matches})
 }
 
 // reorderRoutes persists a new route order (first-match-wins, so order matters)

@@ -1,0 +1,47 @@
+.body {
+  display: grid;
+  gap: 4px;
+  min-width: 520px;
+}
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+}
+.note {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+.or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 8px 0;
+}
+.or::before,
+.or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--mat-sys-outline-variant);
+}
+.file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.file .picked {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+textarea.pem {
+  font-family: var(--mk-mono);
+  font-size: 0.75rem;
+  min-height: 96px;
+}

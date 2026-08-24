@@ -14,6 +14,11 @@
 <div class="body">
   <mat-selection-list [multiple]="false" hideSingleSelectionIndicator (selectionChange)="onSectionPick($event.options[0].value)">
     <mat-list-option value="target" [selected]="section() === 'target'" i18n="@@Section_target">Target</mat-list-option>
+    <!-- The three that decide a request's FATE, before anything transforms it.
+         They do not decide it the same way, and each panel says so: a predicate
+         that does not match and an access rule that does not grant both let the
+         NEXT route try, a gate refuses outright. -->
+    <div matSubheader i18n="@@Filters">Filters</div>
     <mat-list-option value="security" [selected]="section() === 'security'">
       <span i18n="@@Section_security">Security</span>
       <!-- Says a rule is POSED, the way the other sections count what they
@@ -30,6 +35,12 @@
         ({{ draft().predicates.length }})
       }
     </mat-list-option>
+    <mat-list-option value="gates" [selected]="section() === 'gates'">
+      <span i18n="@@Gates">Gates</span>
+      @if (countPhase('gate'); as n) {
+        ({{ n }})
+      }
+    </mat-list-option>
     <div matSubheader i18n="@@Modifiers">Modifiers</div>
     <mat-list-option value="modin" [selected]="section() === 'modin'">
       <span i18n="@@Incoming">Incoming</span>
@@ -43,6 +54,12 @@
         ({{ n }})
       }
     </mat-list-option>
+    <!-- A forwarder carries upstream what only the GATEWAY knows: who the
+         caller is, which language they asked for. A modifier retouches what
+         passes; these two add something the service could not have found on
+         its own. Both compile down to request filters, which is why they sat
+         under Modifiers - the mechanism, not the subject. -->
+    <div matSubheader i18n="@@Forwarders">Forwarders</div>
     <mat-list-option value="identity" [selected]="section() === 'identity'" i18n="@@Section_identity">Identity</mat-list-option>
     <mat-list-option value="locales" [selected]="section() === 'locales'" i18n="@@Section_locales">Locales</mat-list-option>
     <!-- UI extras (ROUTE-02): visible but DISABLED until the toggle turns them
@@ -63,7 +80,10 @@
     <mat-list-option value="inject" [selected]="section() === 'inject'" [disabled]="!draft().isUi" i18n="@@Section_injections">Injections</mat-list-option>
   </mat-selection-list>
 
-  <div class="panel">
+  <!-- Flush for the sections whose content is a palette drawer: the drawer
+       slides over its container, so a padded container leaves an unpainted
+       band along the edge. Those panels pad their own content instead. -->
+  <div class="panel" [class.flush]="hasPalette()">
     @switch (section()) {
             @case ('target') {
         <p class="section-hint" i18n="@@Target_hint">How this route answers. Proxying fetches from a service and hands
@@ -151,6 +171,12 @@
       @case ('predicates') {
         <app-predicates [formField]="f.predicates" [entries]="predicateEntries()" />
       }
+      @case ('gates') {
+        <!-- No section hint here: the palette component already carries the
+             one sentence this section needs, and a second paragraph outside
+             its padded content would have hung off the flush panel's edge. -->
+        <app-filters [formField]="f.filters" [entries]="filterEntries()" phase="gate" />
+      }
       @case ('modin') {
         <app-filters [formField]="f.filters" [entries]="filterEntries()" phase="request" />
       }
@@ -170,6 +196,13 @@
               <mat-option value="headers" i18n="@@Headers">Headers</mat-option>
               <mat-option value="jwt" i18n="@@JWT">JWT</mat-option>
               <mat-option value="signed-jwt" i18n="@@Signed_JWT">Signed JWT</mat-option>
+              <!-- Announced where it will live, disabled until it exists: the
+                   palette's "planned" block only covers bricks, so a mechanism
+                   that is coming had nowhere to be seen. -->
+              <mat-option value="relay" disabled>
+                <span i18n="@@Relay_the_callers_token">Relay the caller's token</span>
+                <span class="soon" i18n="@@not_available_yet">(not available yet)</span>
+              </mat-option>
             </mat-select>
           </mat-form-field>
           @if (draft().identityMechanism) {

@@ -89,19 +89,18 @@ func Synthesize(specs []Spec) Synthesis {
 				break
 			}
 			s.Headers = put(s.Headers, "X-Forwarded-For", addr)
-		case "after":
-			if t, err := parseDatetime(str(args, "datetime")); err == nil {
-				s.At = later(s.At, t.Add(time.Second))
-			}
-		case "before":
-			if t, err := parseDatetime(str(args, "datetime")); err == nil {
-				s.At = earlier(s.At, t.Add(-time.Second))
-			}
-		case "between":
-			t1, err1 := parseDatetime(str(args, "datetime1"))
-			t2, err2 := parseDatetime(str(args, "datetime2"))
-			if err1 == nil && err2 == nil && t2.After(t1) {
-				s.At = t1.Add(t2.Sub(t1) / 2)
+		case "time-window":
+			// A moment the window accepts: just inside an open end, or the
+			// middle when both ends are given.
+			from, fromErr := parseDatetime(str(args, "from"))
+			to, toErr := parseDatetime(str(args, "to"))
+			switch {
+			case fromErr == nil && toErr == nil && to.After(from):
+				s.At = from.Add(to.Sub(from) / 2)
+			case fromErr == nil:
+				s.At = later(s.At, from.Add(time.Second))
+			case toErr == nil:
+				s.At = earlier(s.At, to.Add(-time.Second))
 			}
 		case "weight":
 			// The share depends on the whole group, which only the compiled

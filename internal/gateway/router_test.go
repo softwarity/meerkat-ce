@@ -1476,3 +1476,156 @@ func TestSetHostSurvivesTheProxyRewrite(t *testing.T) {
 		t.Fatalf("the upstream saw Host %q, want app.internal", seen)
 	}
 }
+
+// preserve-host is the filter that changes nothing and must still win: it
+// writes the Host the caller used, which is what the outbound request already
+// carried, so a rewrite that compared values before and after would see no
+// change and let SetURL hand the upstream's name over instead.
+func TestPreserveHostSurvivesTheProxyRewrite(t *testing.T) {
+	var seen string
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		seen = r.Host
+	}))
+	t.Cleanup(upstream.Close)
+
+	st, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	route := pathRoute("r-keep", "keep-host", 1, "/v/**", upstream.URL)
+	route.Filters = []routing.Spec{
+		{Type: "strip-prefix", Args: map[string]any{"parts": 1}},
+		{Type: "preserve-host"},
+	}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/v/x", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = "shop.example"
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if seen != "shop.example" {
+		t.Fatalf("the upstream saw Host %q, want the caller's shop.example", seen)
+	}
+}
+
+// And a route with no host filter still reaches the upstream under the
+// upstream's own name - the default must not have moved.
+func TestWithoutAHostFilterTheUpstreamKeepsItsName(t *testing.T) {
+	var seen string
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		seen = r.Host
+	}))
+	t.Cleanup(upstream.Close)
+
+	rt := newRouter(t, pathRoute("r-def", "default-host", 1, "/v/**", upstream.URL))
+	if err := rt.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/v/x", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = "shop.example"
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if seen != strings.TrimPrefix(upstream.URL, "http://") {
+		t.Fatalf("the upstream saw Host %q, want its own name", seen)
+	}
+}
+
+// A service behind a stripped prefix sees /orders and would write /orders in
+// any link it builds - which lands outside the route. X-Forwarded-Prefix is
+// how it learns where it is published, and it must never be the caller's word
+// for it.
+func TestForwardedPrefixIsAnnouncedAndNeverTrusted(t *testing.T) {
+	var seen string
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		seen = r.Header.Get("X-Forwarded-Prefix")
+	}))
+	t.Cleanup(upstream.Close)
+
+	call := func(t *testing.T, filters []routing.Spec, path, sent string) string {
+		t.Helper()
+		seen = ""
+		route := pathRoute("r-fp", "prefixed", 1, "/**", upstream.URL)
+		route.Filters = filters
+		rt := newRouter(t, route)
+		if err := rt.Reload(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		srv := httptest.NewServer(rt)
+		t.Cleanup(srv.Close)
+		req, err := http.NewRequest(http.MethodGet, srv.URL+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sent != "" {
+			req.Header.Set("X-Forwarded-Prefix", sent)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		return seen
+	}
+
+	strip := func(parts int, args ...any) routing.Spec {
+		a := map[string]any{"parts": parts}
+		for i := 0; i+1 < len(args); i += 2 {
+			a[args[i].(string)] = args[i+1]
+		}
+		return routing.Spec{Type: "strip-prefix", Args: a}
+	}
+
+	if got := call(t, []routing.Spec{strip(1)}, "/demo/orders", ""); got != "/demo" {
+		t.Fatalf("prefix %q, want /demo", got)
+	}
+	if got := call(t, []routing.Spec{strip(2)}, "/api/v1/orders", ""); got != "/api/v1" {
+		t.Fatalf("prefix %q, want /api/v1", got)
+	}
+	// Two strips in a row widen the announced prefix instead of the second one
+	// overwriting it with its own share.
+	if got := call(t, []routing.Spec{strip(1), strip(1)}, "/api/v1/orders", ""); got != "/api/v1" {
+		t.Fatalf("two strips announced %q, want /api/v1", got)
+	}
+	// Off by choice: an application already configured to live under its prefix
+	// would otherwise write it twice.
+	if got := call(t, []routing.Spec{strip(1, "announcePrefix", false)}, "/demo/orders", ""); got != "" {
+		t.Fatalf("announcement was posed while turned off: %q", got)
+	}
+	// The caller's own value never survives - with a strip that replaces it...
+	if got := call(t, []routing.Spec{strip(1)}, "/demo/orders", "/evil"); got != "/demo" {
+		t.Fatalf("prefix %q, want /demo - the caller's value won", got)
+	}
+	// ...and on a route that strips nothing, where nothing replaces it.
+	if got := call(t, nil, "/orders", "/evil"); got != "" {
+		t.Fatalf("a route with no strip-prefix carried the caller's %q", got)
+	}
+	// Off, the caller's value must not survive either.
+	if got := call(t, []routing.Spec{strip(1, "announcePrefix", false)}, "/demo/orders", "/evil"); got != "" {
+		t.Fatalf("turned off, the caller's %q went through", got)
+	}
+}

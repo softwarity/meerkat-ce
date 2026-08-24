@@ -93,6 +93,25 @@ func (a *API) secretHolders() map[string]secretHolder {
 				return a.st.SetSetting(ctx, store.SettingSMTP, cfg)
 			},
 		},
+		"tls": {
+			scope: vault.ScopeInfra,
+			load: func(ctx context.Context, _ string) (string, map[string]string, error) {
+				cfg := a.st.RawTLS(ctx)
+				// The external-account HMAC key is what a corporate ACME
+				// authority hands out to say which account this gateway
+				// registers under. It arrives by e-mail, gets pasted, and would
+				// otherwise sit in the settings row in clear.
+				return "TLS", map[string]string{"eabHmacKey": cfg.ACME.EABHMACKey}, nil
+			},
+			stash: func(ctx context.Context, _, field, value string) error {
+				cfg := a.st.RawTLS(ctx)
+				if field != "eabHmacKey" {
+					return fmt.Errorf("the TLS settings hold no secret named %q", field)
+				}
+				cfg.ACME.EABHMACKey = value
+				return a.st.SetSetting(ctx, store.SettingTLS, cfg)
+			},
+		},
 	}
 }
 

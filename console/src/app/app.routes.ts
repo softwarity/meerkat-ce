@@ -130,6 +130,14 @@ export const routes: Routes = [
           import('./gateway/mail-relay-page.component').then((m) => m.MailRelayPageComponent),
       },
       {
+        // TLS (SSL-01/02/03/05): the certificates and the two HTTPS doors. It
+        // sits in the infra plane for the same reason the relay does - it is a
+        // property of the installation, not of the application it serves.
+        path: 'tls',
+        canActivate: [infraOnly],
+        loadComponent: () => import('./gateway/tls/tls-page.component').then((m) => m.TlsPageComponent),
+      },
+      {
         path: 'access-tokens',
         canActivate: [rootOnly],
         loadComponent: () =>

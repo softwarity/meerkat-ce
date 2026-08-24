@@ -1,0 +1,108 @@
+<h2 mat-dialog-title>{{ title() }}</h2>
+
+<mat-dialog-content class="body">
+  @if (door === 'import') {
+    <p class="note" i18n="@@Import_note">
+      Paste what the authority sent back, or pick the keystore a Java or Windows tool exported.
+      The private key stays here: it is sealed in the store and never travels back to this screen.
+    </p>
+    <div class="file">
+      <button matButton="outlined" type="button" (click)="picker.click()">
+        <mat-icon>folder_open</mat-icon>
+        <ng-container i18n="@@Choose_a_keystore">Choose a keystore</ng-container>
+      </button>
+      <input #picker type="file" accept=".p12,.pfx" hidden (change)="pickKeystore($event)" />
+      @if (keystoreName()) {
+        <span class="picked">{{ keystoreName() }}</span>
+      }
+    </div>
+    @if (keystore()) {
+      <app-form-field
+        i18n-label="@@Keystore_password"
+        label="Keystore password"
+        revealable
+        [subscriptSizing]="'fixed'"
+      >
+        <input matInput type="password" [value]="password()" (input)="password.set($any($event.target).value)" />
+      </app-form-field>
+    } @else {
+      <div class="or" i18n="@@or">or</div>
+      <app-form-field i18n-label="@@Certificate_PEM" label="Certificate (PEM)"
+        i18n-hint="@@Leaf_then_intermediates" hint="The certificate first, then any intermediates">
+        <textarea matInput class="pem" rows="5" [value]="certPem()"
+          (input)="certPem.set($any($event.target).value)"
+          placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+      </app-form-field>
+      <app-form-field i18n-label="@@Private_key_PEM" label="Private key (PEM)">
+        <textarea matInput class="pem" rows="4" [value]="keyPem()"
+          (input)="keyPem.set($any($event.target).value)"
+          placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+      </app-form-field>
+    }
+  } @else {
+    @if (door === 'self-signed') {
+      <p class="note" i18n="@@Self_signed_note">
+        Nobody vouches for this one but itself, so browsers will warn. What it buys is a real
+        handshake today: secure cookies that can be marked secure, and passkeys that work.
+      </p>
+    } @else {
+      <p class="note" i18n="@@Signing_request_note">
+        The request leaves, the private key does not. Carry it to whoever runs your authority,
+        then paste their answer back here - no network, no authority Meerkat has to reach.
+      </p>
+    }
+    <app-form-field
+      i18n-label="@@Hosts"
+      label="Hosts"
+      i18n-hint="@@Hosts_hint"
+      hint="Separated by spaces or commas. An IP address works too."
+    >
+      <input matInput [value]="hosts()" (input)="hosts.set($any($event.target).value)"
+        placeholder="gateway.example.com *.apps.example.com" />
+    </app-form-field>
+    <div class="split">
+      <app-form-field i18n-label="@@Organization" label="Organization">
+        <input matInput [value]="organization()" (input)="organization.set($any($event.target).value)" />
+      </app-form-field>
+      <mat-form-field>
+        <mat-label i18n="@@Key_type">Key type</mat-label>
+        <mat-select [value]="keyType()" (valueChange)="keyType.set($event)">
+          @for (k of keyTypes; track k.value) {
+            <mat-option [value]="k.value">{{ k.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+    @if (door === 'self-signed') {
+      <app-form-field
+        i18n-label="@@Valid_for_days"
+        label="Valid for (days)"
+        i18n-hint="@@Apple_398_hint"
+        hint="Apple refuses anything over 398 days, self-signed included."
+      >
+        <input matInput type="number" min="1" max="398" [value]="days()"
+          (input)="days.set(+$any($event.target).value)" />
+      </app-form-field>
+    }
+  }
+
+  <app-form-field
+    i18n-label="@@Name"
+    label="Name"
+    i18n-hint="@@Certificate_name_hint"
+    hint="What to call it in this list. Left empty, it takes the first host."
+  >
+    <input matInput [value]="name()" (input)="name.set($any($event.target).value)" />
+  </app-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton mat-dialog-close i18n="@@Cancel">Cancel</button>
+  <button matButton="filled" [disabled]="invalid()" (click)="submit()">
+    @if (door === 'import') {
+      <ng-container i18n="@@Import">Import</ng-container>
+    } @else {
+      <ng-container i18n="@@Generate">Generate</ng-container>
+    }
+  </button>
+</mat-dialog-actions>

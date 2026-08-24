@@ -10,6 +10,18 @@
         </span>
       </button>
     }
+    @if (planned().length) {
+      <div class="planned-title" i18n="@@Planned_not_available_yet">Planned (not available yet)</div>
+      @for (b of planned(); track b.type) {
+        <div class="cat-entry planned">
+          <mat-icon>schedule</mat-icon>
+          <span class="b-lines">
+            <span>{{ label(b.type) }}</span>
+            <span class="b-doc">{{ b.doc }}</span>
+          </span>
+        </div>
+      }
+    }
   </mat-drawer>
   <mat-drawer-content>
     <div class="bar">
@@ -25,7 +37,7 @@
     }
 
     @for (p of value(); track $index; let i = $index) {
-      <app-predicate-item [spec]="p" (specChange)="updateAt(i, $event)" (removed)="removeAt(i)" />
+      <app-predicate-item [spec]="p" [doc]="details(p.type)" [params]="paramsOf(p.type)" [ref]="refOf(p.type)" (specChange)="updateAt(i, $event)" (removed)="removeAt(i)" />
     } @empty {
       <p class="empty" i18n="@@No_predicates_yet_the_route_matches_nothing">
         No predicates yet: the route matches nothing.

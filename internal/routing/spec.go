@@ -7,6 +7,7 @@ package routing
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -36,6 +37,18 @@ type Param struct {
 	Required bool      `json:"required,omitempty"`
 	Default  any       `json:"default,omitempty"`
 	Doc      string    `json:"doc,omitempty"`
+	// Initial is what the console writes into the field when the brick is
+	// ADDED - a starting point, not a default: the server never applies it, so
+	// a required argument stays required. It exists for the arguments where a
+	// good starting value is obvious but applying it silently would be wrong,
+	// like the pattern that reads a version out of a path (the permissive one
+	// takes an order id for a version, which has to be seen to be corrected).
+	Initial any `json:"initial,omitempty"`
+	// Options is the closed set of values this argument accepts. Declared here
+	// rather than checked in the brick alone, so the console can offer a list
+	// instead of a text field someone has to guess the spelling for - and so
+	// the two never disagree about what is allowed.
+	Options []string `json:"options,omitempty"`
 	// Literal marks an argument taken VERBATIM: the vault's $name expansion
 	// must leave it alone. A Go template writes $i and $r for its own loop
 	// variables, and the gateway read those as vault references - the route was
@@ -69,6 +82,15 @@ func decodeArgs(brick string, params []Param, in map[string]any) (decoded, error
 		v, err := coerce(p.Kind, raw)
 		if err != nil {
 			return nil, fmt.Errorf("%s: arg %q: %w", brick, key, err)
+		}
+		// A closed set is checked HERE, once, rather than in each brick: two
+		// places deciding what is allowed is two places to disagree, and the
+		// console reads this same list to offer it.
+		if len(p.Options) > 0 {
+			if str, ok := v.(string); ok && !slices.Contains(p.Options, str) {
+				return nil, fmt.Errorf("%s: arg %q: %q is not allowed (allowed: %s)",
+					brick, key, str, strings.Join(named(p.Options), ", "))
+			}
 		}
 		out[key] = v
 	}
@@ -155,4 +177,18 @@ func (d decoded) num(name string) int {
 func (d decoded) boolean(name string) bool {
 	b, _ := d[name].(bool)
 	return b
+}
+
+// named renders a set of options for an error message, giving the empty one a
+// name: "" in a list of allowed values reads as a typo, not as a choice.
+func named(options []string) []string {
+	out := make([]string, 0, len(options))
+	for _, o := range options {
+		if o == "" {
+			out = append(out, "empty")
+			continue
+		}
+		out = append(out, o)
+	}
+	return out
 }

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/netip"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -18,6 +20,8 @@ type Predicate func(*http.Request) bool
 type predicateDef struct {
 	Type    string
 	Doc     string
+	Details string
+	Ref     *Reference
 	Params  []Param
 	compile func(a decoded) (Predicate, error)
 }
@@ -183,8 +187,9 @@ func knownPredicates() string {
 
 func init() {
 	registerPredicate(predicateDef{
-		Type: "path",
-		Doc:  "Matches the request path against one or more patterns (segments, {var}, trailing **).",
+		Type:    "path",
+		Doc:     "Matches the request path against one or more patterns.",
+		Details: "Patterns match path segments: /orders/* is one segment, /orders/** is everything below, {id} captures one segment. Several patterns act as OR.",
 		Params: []Param{
 			{Name: "patterns", Kind: KindStringList, Required: true, Doc: "e.g. /api/users/{id}, /static/**"},
 		},
@@ -210,8 +215,9 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "host",
-		Doc:  "Matches the request Host against exact names or *.suffix wildcards.",
+		Type:    "host",
+		Doc:     "Matches the request Host against exact names or *.suffix wildcards.",
+		Details: "Matches the Host sent by the caller, port ignored. A wildcard covers subdomains only: *.example.com matches app.example.com but not example.com.",
 		Params: []Param{
 			{Name: "hosts", Kind: KindStringList, Required: true, Doc: "e.g. app.example.com, *.example.com"},
 		},
@@ -234,8 +240,9 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "method",
-		Doc:  "Matches the HTTP method.",
+		Type:    "method",
+		Doc:     "Matches the HTTP method.",
+		Details: "Matches the HTTP verb. Several verbs act as OR.",
 		Params: []Param{
 			{Name: "methods", Kind: KindStringList, Required: true, Doc: "e.g. GET, POST"},
 		},
@@ -249,11 +256,13 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "header",
-		Doc:  "Matches when a header is present, optionally against a regexp.",
+		Type:    "header",
+		Doc:     "Matches when a header is present, against a list of values or a regexp.",
+		Details: "Matches when the header is present. Give values to accept a short list, or a regexp when the value has a shape rather than a list. Header names are case-insensitive, values are not.",
 		Params: []Param{
 			{Name: "name", Kind: KindString, Required: true},
-			{Name: "regexp", Kind: KindString, Doc: "full-match regexp on the value; empty = presence only"},
+			{Name: "values", Kind: KindStringList, Doc: "e.g. prod, staging - the value must be one of them"},
+			{Name: "regexp", Kind: KindString, Doc: "full-match regexp on the value; use it for a shape, not for a list"},
 		},
 		compile: compileNamedValue(func(r *http.Request, name string) (string, bool) {
 			v := r.Header.Get(name)
@@ -262,11 +271,13 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "cookie",
-		Doc:  "Matches when a cookie is present, optionally against a regexp.",
+		Type:    "cookie",
+		Doc:     "Matches when a cookie is present, against a list of values or a regexp.",
+		Details: "Matches when the cookie is present. Give values to accept a short list, or a regexp for a shape. Useful to pin a caller to one side of a canary, since a cookie lasts the whole session.",
 		Params: []Param{
 			{Name: "name", Kind: KindString, Required: true},
-			{Name: "regexp", Kind: KindString, Doc: "full-match regexp on the value; empty = presence only"},
+			{Name: "values", Kind: KindStringList, Doc: "the cookie value must be one of them"},
+			{Name: "regexp", Kind: KindString, Doc: "full-match regexp on the value; use it for a shape, not for a list"},
 		},
 		compile: compileNamedValue(func(r *http.Request, name string) (string, bool) {
 			c, err := r.Cookie(name)
@@ -278,11 +289,13 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "query",
-		Doc:  "Matches when a query parameter is present, optionally against a regexp.",
+		Type:    "query",
+		Doc:     "Matches when a query parameter is present, against a list of values or a regexp.",
+		Details: "Matches when the query parameter is present, even with an empty value. Give values to accept a short list, or a regexp for a shape.",
 		Params: []Param{
 			{Name: "name", Kind: KindString, Required: true},
-			{Name: "regexp", Kind: KindString, Doc: "full-match regexp on the value; empty = presence only"},
+			{Name: "values", Kind: KindStringList, Doc: "the parameter value must be one of them"},
+			{Name: "regexp", Kind: KindString, Doc: "full-match regexp on the value; use it for a shape, not for a list"},
 		},
 		compile: compileNamedValue(func(r *http.Request, name string) (string, bool) {
 			if !r.URL.Query().Has(name) {
@@ -293,8 +306,9 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "remote-addr",
-		Doc:  "Matches the client address against CIDR ranges. One predicate for both direct and proxied traffic (the V1 had two).",
+		Type:    "remote-addr",
+		Doc:     "Matches the client address against CIDR ranges.",
+		Details: "Matches the client IP against CIDR ranges, for example 10.0.0.0/8 or 192.168.1.10/32. Behind another proxy this is the proxy's IP: use x-forwarded-remote-addr instead.",
 		Params: []Param{
 			{Name: "cidrs", Kind: KindStringList, Required: true, Doc: "e.g. 10.0.0.0/8, 192.168.1.10/32"},
 			{Name: "useForwarded", Kind: KindBool, Default: false, Doc: "trust the first X-Forwarded-For entry (only behind a trusted proxy)"},
@@ -325,64 +339,9 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "after",
-		Doc:  "Matches requests made after the given datetime.",
-		Params: []Param{
-			{Name: "datetime", Kind: KindString, Required: true, Doc: "RFC 3339, e.g. 2026-01-20T17:42:47+01:00"},
-		},
-		compile: func(a decoded) (Predicate, error) {
-			t, err := parseDatetime(a.str("datetime"))
-			if err != nil {
-				return nil, err
-			}
-			return func(r *http.Request) bool { return nowFrom(r).After(t) }, nil
-		},
-	})
-
-	registerPredicate(predicateDef{
-		Type: "before",
-		Doc:  "Matches requests made before the given datetime.",
-		Params: []Param{
-			{Name: "datetime", Kind: KindString, Required: true, Doc: "RFC 3339, e.g. 2026-01-20T17:42:47+01:00"},
-		},
-		compile: func(a decoded) (Predicate, error) {
-			t, err := parseDatetime(a.str("datetime"))
-			if err != nil {
-				return nil, err
-			}
-			return func(r *http.Request) bool { return nowFrom(r).Before(t) }, nil
-		},
-	})
-
-	registerPredicate(predicateDef{
-		Type: "between",
-		Doc:  "Matches requests made between the two datetimes.",
-		Params: []Param{
-			{Name: "datetime1", Kind: KindString, Required: true, Doc: "RFC 3339 start"},
-			{Name: "datetime2", Kind: KindString, Required: true, Doc: "RFC 3339 end"},
-		},
-		compile: func(a decoded) (Predicate, error) {
-			t1, err := parseDatetime(a.str("datetime1"))
-			if err != nil {
-				return nil, err
-			}
-			t2, err := parseDatetime(a.str("datetime2"))
-			if err != nil {
-				return nil, err
-			}
-			if !t2.After(t1) {
-				return nil, fmt.Errorf("between: datetime2 %s must be after datetime1 %s", t2, t1)
-			}
-			return func(r *http.Request) bool {
-				now := nowFrom(r)
-				return now.After(t1) && now.Before(t2)
-			}, nil
-		},
-	})
-
-	registerPredicate(predicateDef{
-		Type: "x-forwarded-remote-addr",
-		Doc:  "Matches the rightmost X-Forwarded-For address against CIDR ranges - the address the LAST proxy reports; use behind a trusted front proxy.",
+		Type:    "x-forwarded-remote-addr",
+		Doc:     "Matches the rightmost X-Forwarded-For address against CIDR ranges - the address the LAST proxy reports; use behind a trusted front proxy.",
+		Details: "Matches the last address of X-Forwarded-For against CIDR ranges. Use it only when a trusted proxy writes that header, since a client can send any value.",
 		Params: []Param{
 			{Name: "cidrs", Kind: KindStringList, Required: true, Doc: "e.g. 10.0.0.0/8, 192.168.1.10/32"},
 		},
@@ -416,8 +375,76 @@ func init() {
 	})
 
 	registerPredicate(predicateDef{
-		Type: "weight",
-		Doc:  "Splits traffic between the routes of a group (canary): a route takes weight/total of the requests.",
+		Type:    "time-window",
+		Doc:     "Matches requests made inside a time window.",
+		Details: "Opens or closes a route at a date: a migration that starts Monday, an offer that ends at midnight. Outside the window the route does not match, so the next matching route answers - or nobody, and that is a 404.",
+		Ref:     &Reference{Label: "RFC 3339", URL: "https://www.rfc-editor.org/rfc/rfc3339"},
+		Params: []Param{
+			{Name: "from", Kind: KindString, Doc: "RFC 3339, e.g. 2026-01-20T17:42:47+01:00 - the offset travels with it"},
+			{Name: "to", Kind: KindString, Doc: "RFC 3339; must be after from"},
+		},
+		compile: func(a decoded) (Predicate, error) {
+			from, to := a.str("from"), a.str("to")
+			if from == "" && to == "" {
+				return nil, fmt.Errorf("time-window: give from, to, or both - a window open at both ends matches every moment, which is what having no time predicate already does")
+			}
+			var start, end time.Time
+			var err error
+			if from != "" {
+				if start, err = parseDatetime(from); err != nil {
+					return nil, fmt.Errorf("time-window: from: %w", err)
+				}
+			}
+			if to != "" {
+				if end, err = parseDatetime(to); err != nil {
+					return nil, fmt.Errorf("time-window: to: %w", err)
+				}
+			}
+			if from != "" && to != "" && !end.After(start) {
+				return nil, fmt.Errorf("time-window: to %s is not after from %s, so the window accepts nothing", to, from)
+			}
+			return func(r *http.Request) bool {
+				now := nowFrom(r)
+				if from != "" && !now.After(start) {
+					return false
+				}
+				if to != "" && !now.Before(end) {
+					return false
+				}
+				return true
+			}, nil
+		},
+	})
+
+	registerPredicate(predicateDef{
+		Type:    "version",
+		Doc:     "Matches an API version range read from a header, a query parameter or the path.",
+		Details: "Two routes on the same path, one per API version: v2 to the new service, the rest to the old one. Versions compare as numbers, so 1.10 comes after 1.9 - a regexp reads it as before. A request with no version does not match, so put the unversioned route underneath.",
+		Params: []Param{
+			{Name: "source", Kind: KindString, Default: "header", Options: []string{"header", "query", "path"},
+				Doc: "where the version is read from"},
+			{Name: "name", Kind: KindString, Default: "X-API-Version", Doc: "the header or parameter carrying the version; unused on path"},
+			{Name: "pattern", Kind: KindString, Required: true, Literal: true, Initial: `v?(\d+(?:\.\d+)*)`,
+				Doc: `extracts the version, e.g. /v?(\\d+(?:\\.\\d+)*)`},
+			{Name: "from", Kind: KindString, Doc: "lowest version accepted, inclusive - e.g. 2.0"},
+			{Name: "to", Kind: KindString, Doc: "first version REFUSED, exclusive - e.g. 3.0"},
+		},
+		compile: func(a decoded) (Predicate, error) {
+			m, err := compileVersionMatcher(a)
+			if err != nil {
+				return nil, err
+			}
+			return func(r *http.Request) bool {
+				_, ok := m.read(m.rawFrom(r))
+				return ok
+			}, nil
+		},
+	})
+
+	registerPredicate(predicateDef{
+		Type:    "weight",
+		Doc:     "Splits traffic between the routes of a group (canary): a route takes weight/total of the requests.",
+		Details: "Sends part of the traffic to a new version: 8 and 2 on two routes gives one request in five to the second. The draw happens per request, so one person sees both versions; a cookie predicate keeps them on one side.",
 		Params: []Param{
 			{Name: "group", Kind: KindString, Required: true},
 			{Name: "weight", Kind: KindInt, Required: true},
@@ -432,6 +459,13 @@ func compileNamedValue(get func(*http.Request, string) (string, bool)) func(deco
 	return func(a decoded) (Predicate, error) {
 		name := a.str("name")
 		expr := a.str("regexp")
+		values := a.strs("values")
+		// One way or the other, not both: a list and a pattern on the same
+		// value are two answers to the same question, and nobody would know
+		// which one decides.
+		if expr != "" && len(values) > 0 {
+			return nil, fmt.Errorf("give values or regexp, not both: a list matches whole values, a regexp matches a shape")
+		}
 		var re *regexp.Regexp
 		if expr != "" {
 			var err error
@@ -443,6 +477,9 @@ func compileNamedValue(get func(*http.Request, string) (string, bool)) func(deco
 			v, ok := get(r, name)
 			if !ok {
 				return false
+			}
+			if len(values) > 0 {
+				return slices.Contains(values, v)
 			}
 			return re == nil || re.MatchString(v)
 		}, nil
@@ -477,4 +514,153 @@ func clientAddr(r *http.Request, useForwarded bool) (netip.Addr, bool) {
 	}
 	a, err := netip.ParseAddr(hostname(r.RemoteAddr))
 	return a, err == nil
+}
+
+// version is a dotted numeric version, compared segment by segment as NUMBERS.
+// Three segments are enough for what this matches on, and a shorter one is
+// padded: 2 is 2.0.0, so "from 2" takes 2.1 as well.
+type version [3]int
+
+// parseVersion reads 2, 2.1, v2.1.3. Anything else is refused HERE, at save
+// time, rather than silently never matching at request time - except for what
+// a caller sends, which cannot be validated in advance and simply does not
+// match.
+func parseVersion(s string) (version, error) {
+	raw := strings.TrimSpace(s)
+	raw = strings.TrimPrefix(strings.TrimPrefix(raw, "v"), "V")
+	if raw == "" {
+		return version{}, fmt.Errorf("%q is not a version", s)
+	}
+	parts := strings.Split(raw, ".")
+	if len(parts) > 3 {
+		return version{}, fmt.Errorf("%q has more than three segments", s)
+	}
+	var out version
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 {
+			return version{}, fmt.Errorf("%q is not a version: segment %q is not a number", s, p)
+		}
+		out[i] = n
+	}
+	return out, nil
+}
+
+func compareVersions(a, b version) int {
+	for i := range a {
+		switch {
+		case a[i] < b[i]:
+			return -1
+		case a[i] > b[i]:
+			return 1
+		}
+	}
+	return 0
+}
+
+// versionMatcher is the version predicate's whole behaviour, in one place: the
+// preview endpoint the console calls while someone types runs THIS, so what an
+// editor shows and what the gateway will do cannot diverge. A preview computed
+// in the browser would be a second implementation, and JavaScript regexps have
+// lookarounds that Go's RE2 refuses - it would report a match on a pattern the
+// gateway rejects at save.
+type versionMatcher struct {
+	source, name string
+	re           *regexp.Regexp
+	group        int // capture group holding the version, 0 when the whole match is it
+	from, to     string
+	lo, hi       version
+}
+
+func compileVersionMatcher(a decoded) (*versionMatcher, error) {
+	m := &versionMatcher{source: a.str("source"), name: a.str("name"), from: a.str("from"), to: a.str("to")}
+	if m.from == "" && m.to == "" {
+		return nil, fmt.Errorf("version: give from, to, or both - a range open on both sides matches every version, which is what having no version predicate already does")
+	}
+	var err error
+	if m.from != "" {
+		if m.lo, err = parseVersion(m.from); err != nil {
+			return nil, fmt.Errorf("version: from: %w", err)
+		}
+	}
+	if m.to != "" {
+		if m.hi, err = parseVersion(m.to); err != nil {
+			return nil, fmt.Errorf("version: to: %w", err)
+		}
+	}
+	if m.from != "" && m.to != "" && compareVersions(m.lo, m.hi) >= 0 {
+		return nil, fmt.Errorf("version: from %s is not below to %s, so the range accepts nothing (to is exclusive)", m.from, m.to)
+	}
+	if pattern := a.str("pattern"); pattern != "" {
+		if m.re, err = regexp.Compile(pattern); err != nil {
+			return nil, fmt.Errorf("version: pattern: %w", err)
+		}
+		// The named group wins, the first capturing group does otherwise, and
+		// with no group at all the whole match IS the version.
+		for i, n := range m.re.SubexpNames() {
+			if n == "version" {
+				m.group = i
+			}
+		}
+		if m.group == 0 && m.re.NumSubexp() > 0 {
+			m.group = 1
+		}
+	}
+	return m, nil
+}
+
+// rawFrom is the text the version is looked for in.
+func (m *versionMatcher) rawFrom(r *http.Request) string {
+	switch m.source {
+	case "query":
+		return r.URL.Query().Get(m.name)
+	case "path":
+		return r.URL.Path
+	default:
+		return r.Header.Get(m.name)
+	}
+}
+
+// read extracts the version from raw and says whether it falls in the range.
+// It returns what it extracted either way, because that is what a preview has
+// to show: "extracted 1.2, outside [2.0 3.0[" is a different problem from
+// "extracted nothing".
+func (m *versionMatcher) read(raw string) (string, bool) {
+	if raw == "" {
+		return "", false
+	}
+	if m.re != nil {
+		hit := m.re.FindStringSubmatch(raw)
+		if hit == nil || m.group >= len(hit) {
+			return "", false
+		}
+		raw = hit[m.group]
+	}
+	got, err := parseVersion(raw)
+	if err != nil {
+		return raw, false // a caller sending nonsense is not "any version"
+	}
+	if m.from != "" && compareVersions(got, m.lo) < 0 {
+		return raw, false
+	}
+	if m.to != "" && compareVersions(got, m.hi) >= 0 {
+		return raw, false
+	}
+	return raw, true
+}
+
+// PreviewVersion runs a version predicate's args against a sample, for the
+// editor: what was extracted, whether it matches, and the engine's own error
+// when the args do not compile.
+func PreviewVersion(args map[string]any, sample string) (extracted string, matches bool, err error) {
+	decodedArgs, err := decodeArgs("predicate version", predicateRegistry["version"].Params, args)
+	if err != nil {
+		return "", false, err
+	}
+	m, err := compileVersionMatcher(decodedArgs)
+	if err != nil {
+		return "", false, err
+	}
+	extracted, matches = m.read(sample)
+	return extracted, matches, nil
 }

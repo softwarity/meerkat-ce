@@ -20,6 +20,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/admin"
 	"github.com/softwarity/meerkat/internal/auth"
+	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/config"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
@@ -42,6 +43,13 @@ func main() {
 		"single (one implicit organisation) or multi (Enterprise); chosen once, at the first start")
 	vaultFile := flag.String("vault", envOr("MEERKAT_VAULT_FILE", ""),
 		"encrypted vault file to ingest once (passphrase in MEERKAT_VAULT_PASSPHRASE or _FILE)")
+	// Two ports per plane, and they have different jobs: one serves, the other
+	// tells the caller where to go (SSL-02). A port whose protocol cannot be
+	// named is a port nobody can write a firewall rule or a runbook against.
+	tlsAddr := flag.String("tls-addr", envOr("MEERKAT_TLS_ADDR", ":8443"),
+		"application (data plane) HTTPS listen address, opened when TLS is switched on")
+	adminTLSAddr := flag.String("admin-tls-addr", envOr("MEERKAT_ADMIN_TLS_ADDR", ":9443"),
+		"administration (control plane) HTTPS listen address, opened when TLS is switched on")
 	flag.Parse()
 
 	if *showVersion {
@@ -49,13 +57,30 @@ func main() {
 		return
 	}
 
-	if err := run(*addr, *adminAddr, *consoleURL, *dataDir, *configFile, *vaultFile, *tenancy); err != nil {
+	if err := run(options{
+		addr: *addr, adminAddr: *adminAddr, tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
+		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
+		vaultFile: *vaultFile, tenancy: *tenancy,
+	}); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(addr, adminAddr, consoleURL, dataDir, configFile, vaultFile, tenancy string) error {
+// options is what the command line and the environment settled on. A struct
+// rather than nine positional strings: the two HTTPS addresses were the ones
+// that made the argument list unreadable.
+type options struct {
+	addr, adminAddr       string
+	tlsAddr, adminTLSAddr string
+	consoleURL, dataDir   string
+	configFile, vaultFile string
+	tenancy               string
+}
+
+func run(o options) error {
+	addr, adminAddr, consoleURL := o.addr, o.adminAddr, o.consoleURL
+	dataDir, configFile, vaultFile, tenancy := o.dataDir, o.configFile, o.vaultFile, o.tenancy
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
@@ -200,6 +225,30 @@ func run(addr, adminAddr, consoleURL, dataDir, configFile, vaultFile, tenancy st
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	// TLS (SSL-01/02): one HTTPS door per plane, opened and closed while the
+	// gateway runs. The certificate a handshake receives comes from a
+	// callback, so replacing one never moves a port and never drops a
+	// connection - which is what the previous generation had to do.
+	//
+	// Only the APPLICATION plane's plain port redirects. The console's stays a
+	// plain port for good: it is what a broken certificate gets repaired from.
+	dataRedirect := certs.NewRedirect()
+	srv.Handler = dataRedirect.Wrap(srv.Handler)
+	tlsSup := certs.NewSupervisor(st,
+		func(err error) bool { return errors.Is(err, store.ErrNoRows) },
+		certs.NewListener("data", o.tlsAddr, srv.Handler, nil),
+		certs.NewListener("admin", o.adminTLSAddr, adminSrv.Handler, nil),
+		dataRedirect,
+	)
+	tlsSup.Ports(addr, adminAddr)
+	adminAPI.TLS = tlsSup
+	if err := tlsSup.Reload(ctx); err != nil {
+		// Not fatal: a taken HTTPS port must not keep the gateway from serving
+		// the plain one, or a typo in an address would take the whole
+		// installation down instead of one door.
+		slog.Error("tls", "err", err)
+	}
+
 	// SIGHUP -> hot reload of the routes; SIGINT/SIGTERM -> graceful stop.
 	reload := make(chan os.Signal, 1)
 	signal.Notify(reload, syscall.SIGHUP)
@@ -233,6 +282,9 @@ func run(addr, adminAddr, consoleURL, dataDir, configFile, vaultFile, tenancy st
 		err := srv.Shutdown(shutdownCtx)
 		if aerr := adminSrv.Shutdown(shutdownCtx); err == nil {
 			err = aerr
+		}
+		if terr := tlsSup.Stop(shutdownCtx); err == nil {
+			err = terr
 		}
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			return err

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ADMIN_URL } from '../playwright.config';
-import { authFile, profiles, scenarios, seeded } from '../lib/fixtures';
+import { authFile, ENTERPRISE, profiles, scenarios, seeded } from '../lib/fixtures';
 
 // Console navigation: the rail entries only show for the profiles that may
 // use them (kind=ui scenarios), and "/" lands each profile on its own first
@@ -29,12 +29,19 @@ for (const sc of scenarios.filter((s) => s.kind === 'ui')) {
 }
 
 // ui-landing (kind=flow, spec=console-nav): each profile's landing screen.
+//
+// The last two depend on the SHAPE of the installation, and that is the
+// product's own rule rather than a quirk of the test: someone who administers
+// no gateway and no application lands on the organisations they administer -
+// and an installation serving ONE has no such screen, so they land on License,
+// the single page no guard can bounce anyone off. See landing() in the
+// console's access guards.
 const LANDING: Record<string, RegExp> = {
   root: /\/routes$/,
   'infra-admin': /\/routes$/,
   'app-admin': /\/general$/,
-  'tenant-admin': /\/tenants\/[^/]+/,
-  user: /\/tenants(\/[^/]+)?/,
+  'tenant-admin': ENTERPRISE ? /\/tenants\/[^/]+/ : /\/license$/,
+  user: ENTERPRISE ? /\/tenants(\/[^/]+)?/ : /\/license$/,
 };
 
 test.describe('ui-landing', () => {

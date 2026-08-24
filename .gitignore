@@ -7,6 +7,8 @@ coverage.out
 # Local environment
 .env
 *.local
+# personal notes: keep the .md extension for the editor, out of the repo
+*.local.md
 
 # Editors / OS
 .DS_Store

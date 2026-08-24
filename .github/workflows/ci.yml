@@ -17,6 +17,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # This pipeline runs on TWO trees: the Enterprise one, and the community
+  # mirror, which is the same commit with ee/ removed. Everything below that
+  # says `-tags ee` needs code the mirror does not have, so it has to ask
+  # first - and it asks the tree, not the repository name: a rename must not
+  # silently turn the Enterprise half off.
+  edition:
+    name: What this tree carries
+    runs-on: ubuntu-latest
+    outputs:
+      enterprise: ${{ steps.look.outputs.enterprise }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: look
+        run: |
+          if [ -d ee ]; then
+            echo "enterprise=true" >> "$GITHUB_OUTPUT"
+            echo "ee/ is here: both editions are tested"
+          else
+            echo "enterprise=false" >> "$GITHUB_OUTPUT"
+            echo "no ee/: this is the community tree, the Enterprise half is skipped"
+          fi
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -84,6 +106,7 @@ jobs:
   unit:
     name: ${{ matrix.area }}
     runs-on: ubuntu-latest
+    needs: edition
     strategy:
       fail-fast: false
       matrix:
@@ -108,8 +131,10 @@ jobs:
       # to know; a change that only works WITHOUT it breaks what is sold.
       - run: go vet ${{ matrix.packages }}
       - run: go test -race ${{ matrix.packages }}
-      - run: go vet -tags ee ${{ matrix.packages }}
-      - run: go test -race -tags ee ${{ matrix.packages }}
+      - if: needs.edition.outputs.enterprise == 'true'
+        run: go vet -tags ee ${{ matrix.packages }}
+      - if: needs.edition.outputs.enterprise == 'true'
+        run: go test -race -tags ee ${{ matrix.packages }}
 
   # Nothing must fall between the areas above: a package nobody listed would
   # stop being tested on ubuntu and nobody would see it, because the check that
@@ -146,16 +171,21 @@ jobs:
   test:
     name: Whole tree
     runs-on: ubuntu-latest
+    needs: edition
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      - name: Vet
-        run: go vet ./... && go vet -tags ee ./...
+      - name: Vet, community
+        run: go vet ./...
+      - name: Vet, Enterprise
+        if: needs.edition.outputs.enterprise == 'true'
+        run: go vet -tags ee ./...
       - name: Test, community
         run: go test -race ./...
       - name: Test, Enterprise
+        if: needs.edition.outputs.enterprise == 'true'
         run: go test -race -tags ee ./...
 
   # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
@@ -175,6 +205,7 @@ jobs:
   directories:
     name: ${{ matrix.directory }}
     runs-on: ubuntu-latest
+    needs: edition
     strategy:
       fail-fast: false
       matrix:
@@ -197,6 +228,7 @@ jobs:
         with:
           go-version: stable
       - name: Start ${{ matrix.directory }}
+        if: needs.edition.outputs.enterprise == 'true' || matrix.service == 'dex'
         working-directory: test/ldap
         run: docker compose up -d ${{ matrix.service }}
       # The domain controller provisions itself before it answers, and it is
@@ -212,6 +244,10 @@ jobs:
       # A skipped test PASSES, so counting is the only thing that tells "they
       # ran" from "nothing answered and nobody noticed".
       - name: Run against it, and prove they ran
+        # OIDC is community; the LDAP driver is not. On the mirror there is no
+        # driver to exercise, so the row that needs one has nothing to say -
+        # and saying nothing loudly beats a green tick over an empty run.
+        if: needs.edition.outputs.enterprise == 'true' || matrix.service == 'dex'
         run: |
           go test -tags ee ./ee/directories/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
           ran=$(grep -c -- '--- PASS' out.txt)
@@ -227,6 +263,14 @@ jobs:
     name: Integration (Playwright)
     runs-on: ubuntu-latest
     needs: console
+    # Runs on BOTH trees. The suite asks the tree what it can build: with ee/ it
+    # drives the Enterprise product multi-organisation, without it the
+    # community one on the single organisation every installation serves. The
+    # handful of scenarios that need several organisations carry
+    # `edition: "ee"` in scenarios.json and are left out there - the difference
+    # is declared in the matrix, where it can be read, rather than hidden in a
+    # workflow condition. A pull request on the mirror is worth nothing if the
+    # integration suite does not run on it.
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -285,16 +329,22 @@ jobs:
           for goarch in amd64 arm64; do
             echo "building linux/$goarch"
             GOARCH=$goarch go build -trimpath -ldflags '-s -w' -o /dev/null ./cmd/meerkat
-            GOARCH=$goarch go build -trimpath -tags ee -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+            if [ -d ee ]; then
+              GOARCH=$goarch go build -trimpath -tags ee -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+            fi
           done
 
   # Publish only once everything is green. main publishes `latest` (+ `main`);
   # any other branch publishes only its own `:<branch>` tag - a throwaway image
   # to test that branch on a real cluster, never latest. Off PRs.
+  # Publishing happens from the ENTERPRISE tree, the one releases are cut from.
+  # The mirror carries the same sources and would push the same bytes under the
+  # same tag - two publishers for one `latest` is a race nobody can read
+  # afterwards.
   image:
     name: Build & publish image
-    needs: [lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
-    if: success() && github.event_name != 'pull_request'
+    needs: [edition, lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
+    if: success() && github.event_name != 'pull_request' && needs.edition.outputs.enterprise == 'true'
     permissions:
       contents: read
       # Granted, not used: a called workflow cannot request more than its
@@ -319,8 +369,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-    needs: [lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
-    if: success() && github.event_name != 'pull_request'
+    needs: [edition, lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
+    # And this one could not build at all without ee/: it IS the code the
+    # linker puts in.
+    if: success() && github.event_name != 'pull_request' && needs.edition.outputs.enterprise == 'true'
     secrets: inherit
     uses: ./.github/workflows/_docker.yml
     with:

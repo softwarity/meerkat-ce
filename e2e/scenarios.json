@@ -21,6 +21,22 @@
       }
     },
     {
+      "id": "api-gw-version-preview",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/routes/version-preview",
+        "body": { "args": { "source": "path", "pattern": "/v(?<version>[0-9.]+)/", "from": "2.0" }, "sample": "/api/v2.1/orders" }
+      },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Preview a version predicate", "fr": "Aperçu d'un prédicat de version" },
+      "description": {
+        "en": "The editor asks the ENGINE what a version pattern extracts while it is being typed, rather than guessing in the browser: Go uses RE2, which refuses lookarounds JavaScript allows, so a preview computed there would promise a match the gateway turns down at save. It reads and writes nothing, but it belongs to the routing plane and follows the route table's scope.",
+        "fr": "L'éditeur demande au MOTEUR ce qu'un motif de version extrait pendant la frappe, plutôt que de deviner dans le navigateur : Go utilise RE2, qui refuse des lookarounds que JavaScript accepte, donc un aperçu calculé là promettrait une correspondance que la gateway refuse à l'enregistrement. Il ne lit ni n'écrit rien, mais il appartient au plan de routage et suit le périmètre de la table des routes."
+      }
+    },
+    {
       "id": "api-gw-catalog",
       "domain": "gateway",
       "kind": "api",
@@ -363,6 +379,7 @@
       "id": "ui-rail-tenants",
       "domain": "console",
       "kind": "ui",
+      "edition": "ee",
       "check": { "railItem": "Tenants" },
       "allowed": ["root", "tenant-admin"],
       "title": { "en": "The Tenants rail entry shows for tenant admins", "fr": "L'entrée Tenants du rail apparaît pour les admins de tenant" },
@@ -559,6 +576,7 @@
       "domain": "console",
       "kind": "flow",
       "spec": "tenancy",
+      "edition": "ee",
       "allowed": ["root"],
       "title": {
         "en": "Single-organisation mode is switched live, and gives the others back",
@@ -567,6 +585,64 @@
       "description": {
         "en": "The shape of an installation is a setting read per request, not a value frozen at boot: switching it takes effect at once. Going down to one organisation holds the others back without deleting anything - the console is served knowing it, on the first paint - and switching up gives them and their people's access straight back.",
         "fr": "La forme d'une installation est un reglage lu par requete, pas une valeur figee au demarrage : la bascule prend effet immediatement. Redescendre a une organisation met les autres de cote sans rien supprimer - la console est servie en le sachant, des la premiere peinture - et rebasculer les rend, elles et l'acces des personnes concernees."
+      }
+    },
+    {
+      "id": "api-infra-certificates",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/certificates" },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "List the TLS certificates", "fr": "Lister les certificats TLS" },
+      "description": {
+        "en": "What the gateway presents at a handshake is infrastructure, like the upstream of a route: only infra admins may read the certificates. Key material never appears in the payload, whoever asks.",
+        "fr": "Ce que la gateway présente à la poignée de main est de l'infrastructure, comme l'amont d'une route : seuls les admins infra lisent les certificats. Le matériel de clé n'apparaît dans la charge utile, pour personne."
+      }
+    },
+    {
+      "id": "api-infra-certificate-self-signed",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/certificates/self-signed",
+        "body": { "name": "e2e", "dnsNames": ["e2e.test"] },
+        "allowedStatus": [201]
+      },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Generate a self-signed certificate", "fr": "Générer un certificat auto-signé" },
+      "description": {
+        "en": "HTTPS in one click, for a laboratory or a first integration: the gateway is its own authority, and the certificate says so.",
+        "fr": "HTTPS en un clic, pour un labo ou une première intégration : la gateway est sa propre autorité, et le certificat le dit."
+      }
+    },
+    {
+      "id": "api-infra-certificate-signing-request",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/certificates/signing-request",
+        "body": { "name": "e2e-csr", "dnsNames": ["csr.e2e.test"] },
+        "allowedStatus": [201]
+      },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Create a certificate signing request", "fr": "Créer une demande de signature" },
+      "description": {
+        "en": "The offline door: the request leaves for whoever runs the authority, the private key stays. Nothing here needs a route to the internet.",
+        "fr": "La porte hors ligne : la demande part vers qui tient l'autorité, la clé privée reste. Rien ici n'a besoin d'un accès internet."
+      }
+    },
+    {
+      "id": "api-infra-tls-settings",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/settings/tls" },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Read the TLS settings", "fr": "Lire les réglages TLS" },
+      "description": {
+        "en": "Which HTTPS doors are open, and whether an ACME authority issues on its own. The external-account HMAC key follows the vault rule: a literal never travels back.",
+        "fr": "Quelles portes HTTPS sont ouvertes, et si une autorité ACME émet toute seule. La clé HMAC de compte externe suit la règle du coffre : un littéral ne revient jamais."
       }
     }
   ]

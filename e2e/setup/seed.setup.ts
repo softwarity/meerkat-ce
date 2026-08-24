@@ -1,7 +1,7 @@
 import { expect, request, test as setup, type APIRequestContext } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { ADMIN_URL, DATA_URL, ROOT_PASSWORD } from '../playwright.config';
-import { AUTH_DIR, authDataFile, authFile, type Seeded } from '../lib/fixtures';
+import { AUTH_DIR, authDataFile, authFile, ENTERPRISE, type Seeded } from '../lib/fixtures';
 
 // Seeds the five profiles THROUGH THE REAL FLOWS (no store shortcut): root
 // creates the users over the admin API, each user signs in with its one-time
@@ -31,6 +31,19 @@ async function loginFirstTime(ctx: APIRequestContext, username: string, oneTime:
   expect(me.ok(), `session incomplete for ${username}`).toBeTruthy();
 }
 
+async function organisation(root: APIRequestContext): Promise<string> {
+  if (ENTERPRISE) {
+    const res = await root.post('/api/tenants', { data: { name: 'acme' } });
+    expect(res.status(), await res.text()).toBe(201);
+    return ((await res.json()) as { id: string }).id;
+  }
+  const res = await root.get('/api/edition');
+  expect(res.ok(), await res.text()).toBeTruthy();
+  const primary = ((await res.json()) as { primaryTenant: string }).primaryTenant;
+  expect(primary, 'a single installation still serves one organisation').toBeTruthy();
+  return primary;
+}
+
 setup('seed profiles and tenant', async () => {
   mkdirSync(AUTH_DIR, { recursive: true });
 
@@ -54,10 +67,13 @@ setup('seed profiles and tenant', async () => {
   const tadmin = await create({ username: 'tadmin', enabled: true });
   const alice = await create({ username: 'alice', enabled: true, fullname: 'Alice Martin' });
 
-  // The acme tenant: tadmin administers it, alice is a plain member.
-  const tenantRes = await root.post('/api/tenants', { data: { name: 'acme' } });
-  expect(tenantRes.status(), await tenantRes.text()).toBe(201);
-  const tenantId = ((await tenantRes.json()) as { id: string }).id;
+  // The organisation tadmin administers and alice belongs to.
+  //
+  // On the Enterprise build it is created for the occasion. On the community
+  // one a second organisation is refused BY DESIGN, so the profiles are seeded
+  // into the one every installation already serves - the same memberships, the
+  // same matrix, on the shape that build can serve.
+  const tenantId = await organisation(root);
   for (const [userId, type] of [
     [tadmin.id, 'ADMIN'],
     [alice.id, 'USER'],

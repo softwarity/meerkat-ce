@@ -30,6 +30,84 @@ role voit. Avant cela : testeur de routage (ROUTE-15). Rappel 2026-07-30 : auth 
 `main`, la branche `feat/endpoint-security-openapi` avait ete repliee et supprimee
 (Francois : "je t'ai jamais demande de creer des branches")._
 
+## Session 2026-08-23 - le catalogue de briques : formes, ecrans, explications
+
+### 1. Le modele de briques a QUATRE formes (et une cinquieme en reserve)
+
+`gate` (refuser avant), `request` (transformer ce qui part), `response`
+(transformer ce qui revient), `terminal` (repondre a la place). Une brique qui
+doit encadrer l'appel AVEC un etat entre l'aller et le retour - cache,
+disjoncteur, mesure de latence - demande une cinquieme forme, `around`. Elle
+sera ajoutee le jour ou une de ces briques se fait, sans toucher aux autres.
+
+**Ce modele vient de `httputil.ReverseProxy`** (Rewrite / ModifyResponse), pas
+d'une decision produit. Ce qu'il gagne : une brique ne peut pas casser la chaine
+en oubliant d'appeler la suite, l'ordre se lit par phase a l'ecran, et le
+streaming reste au proxy standard. Ce qu'il coute : une forme de plus a chaque
+besoin non prevu. Le modele de SCG (un middleware unique) coute la reecriture de
+tout le sortant au-dessus d'une interception de ResponseWriter, donc le
+streaming - arbitrage tranche : on garde, on ajoutera `around` au besoin.
+
+### 2. Console : le catalogue rend les ecrans, pas l'inverse
+
+- **`app-brick-fields`** rend N'IMPORTE quelle brique depuis ses `Params`.
+  Avant, un type absent d'une table codee en dur rendait une carte SANS AUCUN
+  champ (filtres) ou le mauvais formulaire (predicats, qui retombaient sur
+  matcher). Seize briques etaient inconfigurables.
+- **Trois notions sur un `Param`** : `Default` (le serveur l'applique),
+  `Options` (ensemble ferme, verifie UNE fois dans decodeArgs, offert en liste
+  par la console), `Initial` (ce que la console ecrit A L'AJOUT et que le
+  serveur n'applique JAMAIS - c'est ce qui permet a un argument d'etre a la fois
+  obligatoire et pre-rempli).
+- **`Details`** (texte long, sur la carte posee) et **`Ref`** (un lien vers la
+  norme, en fin d'explication) a cote du `Doc` court de la palette.
+
+### 3. Briques ajoutees
+
+`version` (plage [from, to[ lue dans un header, un parametre ou LE CHEMIN via un
+motif d'extraction, comparee en NOMBRES ; zone d'essai repondue par le MOTEUR
+via `/api/routes/version-preview`, parce que RE2 refuse des lookarounds que
+JavaScript accepte), `time-window` (fusion de after/before/between : personne
+n'en pose deux), `values` sur header/cookie/query (liste en OR, exclusive avec
+la regexp), `X-Forwarded-Prefix` sur strip-prefix (case "Tell the service",
+active par defaut, en-tete entrant PURGE sans condition).
+
+### 4. Les explications : deux echecs de style
+
+Ecrites d'abord bavardes (incises, ironie, commentaire de mon propre
+raisonnement), puis factuelles mais mecaniques. La bonne forme : **la situation
+d'abord, le mecanisme ensuite** - "Two routes on the same path, one per API
+version" avant "compares segment by segment". Francois a rejete les deux
+premieres versions ; la troisieme tient.
+
+### 5. Pieges vecus
+
+- **`@if` autour d'un `<mat-hint>` casse la projection** : Material projette par
+  selecteur et la projection ne traverse pas un bloc de controle. Le hint tombe
+  DANS le champ, sous le label. Le repo documentait deja ce piege sur un
+  matSuffix.
+- **Ecrire dans un `model.required()` depuis le constructeur** : l'input n'existe
+  pas encore, le template ne rend plus rien. C'est ce qui a fait naitre `Initial`.
+- **Le subscript d'un form-field ne se touche pas** : il est la pour les hints et
+  les erreurs. Retire, il enleve l'espace sous le champ - reproche deux fois.
+- **`linkedSignal` reseede sur la VERSION d'un producteur lu**, pas sur la valeur
+  de sa computation : lire le spec dedans le remet a zero a chaque frappe
+  voisine. Lire un `computed` intermediaire.
+- **Une coupe scriptee peut emporter le voisin** : `x-forwarded-remote-addr` a
+  disparu du registre en fusionnant les predicats de temps. Verifier le catalogue
+  apres une suppression.
+
+### 6. Reste a faire (detaille dans `briques-restantes.local.md`, gitignore)
+
+Rate limiter, circuit breaker, retry, trust-forwarded-for, response-cache (mis
+de cote : une reponse personnalisee mise en cache est servie au visiteur
+suivant). Plus le chantier "authentification vers une UI qui a la sienne"
+(RabbitMQ, Portainer) : Basic ne suffit pas pour l'INTERFACE, le formulaire
+rejoue est le gros morceau, l'injection de jeton en localStorage s'appuie sur
+l'injection JS existante, et le mode record est ecarte. Arbitrage non technique
+a trancher : compte partage (l'appli ne trace plus personne) ou password
+vaulting par personne (le coffre change de nature).
+
 ## Session 2026-08-19 - la boucle de dev, le mode dev global, les configurations
 
 ### 1. `make dev` construisait l'image communautaire (et la console le montrait)
@@ -231,7 +309,54 @@ des choses qui touchent au corps (attributs JSON, cache de reponse) ou jamais
 construites (SetPath, limites de taille) - passees a ◐ avec le manque nomme ;
 ROUTE-06 (images redimensionnees a la volee, heritee d'archway) repasse a ✘.
 
-**Le seul point bloquant restant est le CORPS** : bufferiser tue le streaming
+**Le socle de corps est sorti** dans `internal/filters/rewrite.go`
+(`RewriteBody`, `Rewritable`, `MaxRewritableBody`) : l'injection HTML n'en est
+plus qu'un appelant. Il refuse, et chaque refus laisse passer les octets
+INTACTS - un flux (SSE, Upgrade, `no-transform`), un 206 (une tranche dont
+reecrire deplace les offsets), un codec illisible, un corps au-dessus du
+plafond. Apres reecriture il recalcule `Content-Length` et **retire l'ETag** :
+celui de l'amont decrit les octets de l'amont, garde sur des octets modifies il
+fait servir l'un sous le nom de l'autre.
+
+Dessus : **`remove-json-fields`** (ROUTE-05) - par nom ou chemin pointe, et
+**dans les tableaux**, sinon une liste d'utilisateurs garde tous les mots de
+passe qu'on lui a demande de retirer. Et **`set-path`** (ROUTE-04), qui efface
+aussi `RawPath` : laisse derriere, c'est la forme echappee que le proxy envoie,
+donc l'ANCIEN chemin.
+
+**Les limites de taille sont des GATES** (ROUTE-04 ✔), et depuis le 2026-08-23
+ce sont deux BRIQUES - `max-request-body` et `max-request-headers` - dans la
+section Filters, plus une option de route. Une phase du moteur a
+part, `phaseGate` dans `internal/routing/filters.go`, et un groupe dans la
+console : **Filters** = Security + Predicates + Gates, les trois qui decident du
+sort d'une requete avant qu'on la transforme. Ils ne le decident pas pareil, et
+c'est ecrit dans chaque panneau : un predicat qui ne matche pas et une regle
+d'acces qui n'accorde pas laissent la route SUIVANTE essayer (la premiere
+refusee est gardee comme candidate et porte le refus final ; seul `deny` refuse
+tout de suite), une gate qui refuse repond et s'arrete la.
+
+Deux briques, pas une a deux champs : `max-request-body` (413) et
+`max-request-headers` (431). Une brique, un refus, un statut ; on RETIRE la
+brique pour lever la limite, il n'y a pas de champ vide a interpreter. La taille
+s'ecrit `2MB`/`512KB` (`filters.ParseSize`), parce que c'est ce qui se relit dans
+un export. Mecanique commune dans `internal/filters/size.go`.
+
+Details qui ont couté : l'ErrorHandler du proxy reconnait `*http.MaxBytesError`
+pour rendre 413 et non le 502 d'un amont jamais appele ; **un Upgrade n'est
+jamais plafonne** (un WebSocket n'a pas un corps mais une conversation, dans le
+meme reader) ; les gates ne sont PAS videes sur une route terminale, contrairement
+aux modificateurs entrants - elles ne transforment rien.
+
+**preserve-host a force une regle** : il ecrit le Host que l'appelant a utilise,
+donc celui que la requete sortante portait deja. Le routeur comparait les valeurs
+avant/apres pour savoir si un filtre avait demande un Host : ce filtre-la etait
+donc un non-evenement. Le signal est maintenant l'en-tete `Host`, qu'un client
+n'envoie jamais (Go le deplace dans `Request.Host`).
+
+**Ce qui reste et n'est pas un filtre** : le cache de reponse local, qui est un
+etat entre les requetes comme les quotas (ROUTE-08).
+
+**L'ancien point bloquant etait le CORPS** : bufferiser tue le streaming
 (SSE, WebSocket, telechargements), invalide ETag et Range, et impose un
 plafond. La regle qui debloque est deja ecrite dans `inject.go` (plafond,
 passthrough au-dela, passthrough sur codec inconnu, restitution intacte en cas
@@ -2092,6 +2217,40 @@ Le partagé, c'est le **parse serveur** ; la console ne voit jamais l'OpenAPI br
 
 ## Pièges connus (vécus)
 
+### Vecu le 2026-08-23 (les exceptions qui excluaient)
+
+- **Un user nomme est une EXCEPTION, et une exception a besoin d'une
+  condition.** Niveau `delegated` sans role = aucune condition, donc une liste
+  d'users n'y excepte personne de rien : la regle est VIDE. `Access.Empty()`
+  disait le contraire (il regardait `len(Users)`), et le prix n'etait pas
+  cosmetique : la route exigeait une session pour etre SELECTIONNEE, donc un
+  appel anonyme etait ecarte et servi par la route suivante - le catch-all en
+  pratique, sans un mot a l'ecran. Vu en trafic reel (200 par le trap).
+  « Seulement ces gens » s'ecrit **`deny` + les noms**, et c'est teste :
+  anonyme 401, l'exception 200.
+- Un test d'endpoint ecrivait `Users` seuls pour dire « reserve a neo » et
+  passait pour la MAUVAISE raison (la regle comptait comme posee, donc la gate
+  reclamait une session, ce qui refusait l'anonyme du cas). Fixture corrigee.
+- La console nettoyait deja au changement de niveau ; le residu venait de
+  regles ecrites avant, ou par l'API. `toAccessState` normalise a la lecture.
+
+### Vécu le 2026-08-22 (le bouton Add mort)
+
+- **`linkedSignal` est reseede par la VERSION d'un producteur, pas par la valeur
+  de sa computation.** `linkedSignal(() => list().length === 0)` fait de `list`
+  un producteur : le formulaire reemet le tableau (nouvelle reference) a chaque
+  cycle, donc la version bouge, donc la computation rejoue et **ecrase la valeur
+  ecrite avec `.set()` dans le meme tick**, meme si le booleen ne change pas. La
+  palette des modificateurs s'ouvrait au clic et se refermait avant d'etre
+  rendue ; seule une section vide (ou le recalcul redonne `true`) marchait.
+  Correctif : lire un `computed()` intermediaire - un computed n'incremente sa
+  version que si sa valeur change vraiment. La forme objet `{source, computation}`
+  n'y change RIEN : la source est appelee inline, sans nœud d'egalite.
+- **Une liste de « bientot disponible » ecrite a la main se perime en silence** :
+  trois briques y trainaient alors que la gateway les servait, deux sous un autre
+  nom. `FiltersComponent.planned` filtre desormais contre le catalogue vivant, et
+  ce qui sort doit quand meme etre retire de `PLANNED_MODIFIERS`.
+
 ### Vécus le 2026-07-30 (session auth externe)
 
 - **Samba AD en conteneur, sous Docker Desktop** : l'image détecte la mauvaise interface
@@ -2256,6 +2415,153 @@ push et l'annonce plutot que de rougir la CI. GHCR n'est plus une cible.
 - **Rendu visuel du flux TOTP** (login -> `/totp` challenge, `/totp-enroll` QR +
   scratch codes, `/profile/mfa` renew/disable) dans son instance dev - validé par
   httptest, pas encore vu en navigateur.
+
+## Session 2026-08-23 - TLS : quatre portes, un echange de pointeur
+
+**Livré** : SSL-01/02/03/05. Paquet `internal/certs`, table `certificates` +
+`acme_cache` (store **v43**), API `/api/certificates` + `/api/settings/tls`,
+écran console `/infra/tls`. Vert : `make lint`, `go vet`, tests CE et EE,
+`npm run build`. Vérifié en le faisant tourner (h2 négocié, SNI, CSR signée
+par un vrai openssl, PKCS#12 importé, cookie `Secure`).
+
+**Le point de bascule, à ne pas re-litiger** : `tls.Config.GetCertificate` est
+un callback appelé à chaque poignée de main. Remplacer un certificat est donc
+un échange de pointeur sous un verrou - pas d'arrêt/redémarrage, pas de fenêtre
+sans HTTPS, le port ne bouge pas, et le SNI vient gratuitement. Archway devait
+détruire l'écoute avant de reconstruire : un port pris et l'opérateur se
+retrouvait sans l'ancien certificat ni le nouveau. Tout le reste du dossier
+découle de cette lecture.
+
+**Les quatre portes** (aucune n'est EE, voir plus bas) : import PEM ou PKCS#12,
+auto-signé, demande de signature + adoption, ACME. Elles existent parce que les
+lieux ne se ressemblent pas - site public, salle sans internet, labo, entreprise
+qui a déjà acheté son certificat.
+
+**ACME sans Let's Encrypt** : le répertoire est une URL, plus le certificat
+racine qui signe le serveur ACME et le rattachement de compte externe (EAB).
+Défi **TLS-ALPN-01** (le port 80 reste fermé). L'état ACME est **scellé dans le
+stockage**, pas sur disque : il devra être partagé au multi-instance, sinon deux
+instances enregistrent deux comptes et se prennent les quotas.
+
+**Rien n'est réservé à l'EE, et c'est une décision.** La ligne EE de ce produit
+passe par l'échelle et l'organisation (multi-organisation, layouts, annuaires,
+taille de l'étagère), jamais par une primitive de sécurité : vendre le TLS
+serait vendre la sûreté. Ce qui tombera naturellement en EE le jour venu est le
+**partage du cache ACME entre instances**, parce que le multi-instance est déjà
+EE - aucune règle nouvelle à inventer.
+
+**Pièges vécus, tous trouvés en exécutant :**
+- `tls.X509KeyPair` a **deux** formulations pour un couple dépareillé : « does
+  not match public key » (même type de clé) et « type does not match » (RSA
+  contre ECDSA). Ne détecter que la première laisse passer le cas le plus
+  courant avec la phrase brute de la stdlib.
+- go-pkcs12 dit « private key missing » pour un **trust store**, pas
+  « expected exactly one key ». Le trust store est l'erreur qui mérite un nom :
+  ça ressemble à un fichier de certificat et ça n'importe nulle part.
+- Un certificat **sans SAN** (common name seul) est refusé à l'import : Go et
+  les navigateurs ne lisent plus le CN, il échouerait à chaque poignée de main.
+- **Apple refuse plus de 398 jours**, auto-signé compris. Le défaut est 397.
+- `display: grid` sur un `<details>` ne traverse pas : Chrome met tout ce qui
+  suit le `summary` dans une boîte à lui, donc il faut un `<div>` intérieur.
+- **Ne jamais réécrire `e2e/scenarios.json` avec `json.dumps`** : le fichier est
+  formaté à la main (tableaux courts en ligne), un dump reformate 466 lignes.
+  Insérer en texte. Même leçon que prettier sans config.
+
+**DEUX ports par plan - et c'est l'état final (2026-08-24, après un
+aller-retour).** Le sujet a été tranché deux fois dans la même journée ; ne pas
+le rouvrir sans lire les deux arguments.
+
+*Aller* : j'avais livré deux ports HTTPS séparés, François a objecté que publier
+un port de plus dans une stack c'est un redéploiement - exactement ce que
+l'interrupteur à chaud devait éviter. J'ai donc fait un port unique par plan,
+aiguillé par le premier octet (`0x16` = TLS, majuscule ASCII = HTTP ; aucun
+recouvrement, exact et pas heuristique). Ça marchait, tests à l'appui.
+
+*Retour* : en s'en servant, François a trouvé la forme déroutante, et il avait
+raison. **L'argument qui tranche : on allume le TLS une fois, à l'installation ;
+le port ambigu, lui, reste ambigu pour toujours.** Un scan de sécurité qui voit
+du clair sur le port signale, une doc doit expliquer un mécanisme au lieu
+d'annoncer un port, et personne n'écrit de règle de pare-feu contre un port dont
+le protocole dépend de l'appelant. C'est aussi ce que font Caddy, Traefik et
+nginx : deux ports, celui du clair ne servant qu'à rediriger.
+
+Ce qui SURVIT du détour, et qui est réutilisable si le sujet revient : le
+reniflage marche, et deux points l'avaient rendu viable - **HTTP/2** exige
+`srv.TLSConfig.NextProtos` contenant `h2` pour que `Serve` installe h2 (pas
+seulement `srv.Protocols`), et **`r.TLS`** exige que le `*tls.Conn` soit le type
+EXTERNE rendu par `Accept`, sinon tout cookie `Secure` retombe. Le code est dans
+l'historique (`sniff.go`, commit 6c75721).
+
+**Un seul port par plan, pas deux (état intermédiaire, abandonné).** J'avais livré
+deux ports HTTPS séparés ; François a fait remarquer que publier un port de plus
+dans une stack, c'est un redéploiement - exactement ce que l'interrupteur à
+chaud devait éviter. Donc : le port du plan **bascule**, chaque connexion étant
+aiguillée par son premier octet (`0x16` = TLS, majuscule ASCII = HTTP ; aucun
+recouvrement, c'est exact et pas heuristique). Effet de bord heureux : plus
+aucun `bind` ne peut échouer, tout le cas d'erreur « port déjà pris » disparaît.
+Deux choses devaient survivre au reniflage et ont été prouvées avant d'écrire
+quoi que ce soit : **HTTP/2** (il faut `srv.TLSConfig.NextProtos` contenant `h2`
+pour que `Serve` installe h2, pas seulement `srv.Protocols`) et **`r.TLS`** (le
+`*tls.Conn` doit être le type EXTERNE rendu par `Accept`, sinon tout cookie
+`Secure` retombe).
+
+**La console répond toujours en clair - c'est une propriété, pas un réglage.**
+Avec deux ports elle est structurelle : le port en clair de la console n'est
+simplement jamais câblé pour rediriger. Il n'y a plus de règle à défendre.
+Le plan de données peut être bloqué, c'est l'application. Le plan de contrôle,
+jamais : c'est depuis lui qu'on répare un certificat cassé. J'avais d'abord mis
+une garde conditionnelle (« ne pas rediriger si tout est périmé ») ; elle laisse
+un trou - ACME armé mais jamais émis compte comme vivant. Un chemin de secours
+qui dépend de la détection correcte de la panne n'est pas un chemin de secours.
+Donc le plan admin ne redirige jamais, point.
+
+**La redirection suit la méthode** : 301 pour GET/HEAD (tout client comprend),
+308 pour le reste (un 301 sur un POST le rejoue en GET et perd le corps sans
+bruit). `/healthz` est exempté.
+
+**Il y a toujours un certificat de repli** quand quelque chose est installé (le
+plus longtemps valide, à défaut d'un défaut explicite). Sans repli, une poignée
+de main pour un nom inconnu est **avortée**, ce que le navigateur rapporte en
+« réponse vide » - l'événement le moins diagnosticable qui soit, et exactement
+le `NS_ERROR_NET_EMPTY_RESPONSE` que François a vu. Avec repli, ça devient un
+avertissement de nom qui nomme les deux côtés.
+
+**L'écran part des NOMS (SSL-08, 2026-08-24).** Idée de François, et elle est
+juste : la question d'un exploitant n'est jamais « quels certificats ai-je »
+mais « ma console répondra-t-elle ». Donc deux zones, une par plan, chacune
+déclarant ses noms - **la console en a UN, le plan de données en a PLUSIEURS**,
+et c'est cette asymétrie qui rendait une liste plate inconfortable. Pour chaque
+nom, la couverture est calculée **en continu** (pas au moment de l'ajout : un
+contrôle unique ne dit rien le jour où quelqu'un supprime la mauvaise ligne), et
+avec **la même règle de choix que le moteur** au handshake, sinon l'écran
+promettrait ce que la poignée de main refuse. Chaque zone a son menu d'ajout,
+pré-rempli des noms non couverts.
+
+**ACME : une autorité, une case par nom.** François proposait un ACME par plan ;
+c'est le mauvais découpage - ACME est un COMPTE chez une autorité, deux configs
+enregistreraient deux comptes pour la même machine. Ce qui varie est le nom, pas
+le plan. La liste `domains` se déduit donc des cases, et un domaine posé par
+l'API est **adopté** dans les noms déclarés plutôt que jeté en silence (première
+version : je le filtrais, ce qui effaçait sans le dire ce qu'un appelant avait
+demandé).
+
+**Piège CSS vécu** : `class="cover {{status}}"` avec un statut `acme` percutait
+la classe de mise en page `.acme` (un `display:grid`) et transformait la ligne
+en trois lignes. **Un statut est une donnée, une classe de layout est une
+structure : jamais le même espace de noms.** Les statuts portent maintenant un
+préfixe `s-`. Trouvé en mesurant le DOM, invisible à la lecture du code.
+
+**Reste** : SSL-04 (notification d'expiration - la console montre déjà le compte
+à rebours), SSL-06 (redirection HTTP->HTTPS ; `security-headers` pose déjà HSTS
+sous TLS), SSL-07 (HTTP/3, dépendance quic-go + écoute UDP + `Alt-Svc`).
+
+**Sur HTTP/2** : livré avec le TLS, déclaré explicitement (`srv.Protocols`)
+parce que cette écoute porte aussi le protocole du défi ACME. Le CONNECT étendu
+(RFC 8441, WebSocket sur h2) est **désactivé par défaut dans Go** derrière
+`GODEBUG=http2xconnect=1` : on garde le défaut, les WebSockets passent en
+HTTP/1.1 comme avant. Côté amont, `Request.requiresHTTP1()` force déjà HTTP/1
+pour `Upgrade: websocket` malgré `ForceAttemptHTTP2` - vérifié par un test réel,
+pas supposé.
 
 ## Prochains chantiers (ordre suggéré)
 

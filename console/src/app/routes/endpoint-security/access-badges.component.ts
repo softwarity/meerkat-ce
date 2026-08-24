@@ -2,7 +2,7 @@ import { Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ACCESS_LEVELS, AccessState, isEmpty } from './access-editor.component';
+import { ACCESS_LEVELS, AccessState, isEmpty, levelShort } from './access-editor.component';
 
 // The rule at a glance. The LEVEL is written, not drawn: a lit padlock said
 // "some rule" and left "signed in", "in an organisation" and "in one of these
@@ -161,21 +161,7 @@ export class AccessBadgesComponent {
   // The written form. Kept to a few characters because it sits in a table
   // column: the full sentence is one hover away, and the organisations it
   // names come with it rather than needing a second badge.
-  protected readonly levelShort = computed(() => {
-    const a = this.access();
-    switch (a.level) {
-      case 'auth':
-        return $localize`:@@Level_short_auth:AUTH`;
-      case 'tenant':
-        return $localize`:@@Level_short_tenant:ORG`;
-      case 'tenants':
-        return $localize`:@@Level_short_tenants:ORG` + '\u00b7' + a.tenants.length;
-      case 'deny':
-        return $localize`:@@Level_short_deny:DENY`;
-      default:
-        return '\u2014';
-    }
-  });
+  protected readonly levelShort = computed(() => levelShort(this.access()));
   // The full sentence on hover, carried by the level chip alone - the set used
   // to hold one too, and every icon then answered twice. The organisations
   // themselves are not listed: the rule carries ids, which say nothing to a

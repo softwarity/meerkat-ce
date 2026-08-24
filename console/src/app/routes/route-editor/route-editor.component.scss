@@ -28,23 +28,39 @@ mat-selection-list {
   overflow: auto;
   padding-top: 4px;
 }
-/* Modifiers / UI group headers in the section nav - accent-colored so the
-   groups read at a glance */
+/* Filters / Modifiers / UI group headers in the section nav. The label sits ON
+   the separator - the rule runs out of the word and off to the edge - rather
+   than under a full-width border: three groups means three separators, and a
+   line of its own for each cost enough height to push the last section out of
+   view. Drawn with a flexed pseudo-element rather than a background behind the
+   text, which would need to match the drawer's surface and would come apart on
+   a theme that changes it. */
 mat-selection-list [matSubheader] {
-  margin: 14px 0 2px;
-  padding: 3px 16px 0;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0 16px;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--mat-sys-secondary);
 }
+mat-selection-list [matSubheader]::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
 .panel {
   flex: 1;
   min-width: 0;
   overflow: auto;
   padding: 16px 20px;
+}
+/* See hasPalette(): a drawer must reach the panel's own edges. */
+.panel.flush {
+  padding: 0;
 }
 .flags {
   display: flex;
@@ -127,6 +143,7 @@ app-form-field.height-field {
 .height-field.wide {
   width: 170px;
 }
+
 
 /* locales rows: on/off toggle, code, console-locale name, endonym */
 .locale-row {
@@ -475,4 +492,12 @@ mat-list-option .mark {
   color: var(--mat-sys-primary);
   font-size: 0.7rem;
   vertical-align: middle;
+}
+
+/* An option announced but not built: the same grey the palette uses for its
+   planned bricks. */
+.soon {
+  margin-left: 6px;
+  font-size: 0.78rem;
+  color: var(--mat-sys-secondary);
 }

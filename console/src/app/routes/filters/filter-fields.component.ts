@@ -3,6 +3,7 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { StatusCodeFieldComponent } from '../../shared/status-code-field.component';
 import { RespondEditorComponent } from './respond-editor.component';
 import { Spec } from '../../api.service';
@@ -117,25 +118,52 @@ export class RemoveQueryParamFilterComponent {
   }
 }
 
-// integer count - strip N leading path segments.
+// integer count - strip N leading path segments, plus whether to tell the
+// service about it. The checkbox sits HERE and not in a section of its own:
+// the prefix exists because this brick removed it, and a setting reads best
+// next to the decision that created the need for it.
 @Component({
   selector: 'app-strip-prefix-filter',
-  imports: [MatFormFieldModule, MatInputModule],
+  imports: [MatCheckboxModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
   styles: [FIELDS_STYLE],
   template: `
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Segments_to_strip">Segments to strip</mat-label>
-        <input matInput type="number" min="0" [value]="parts()" (input)="set($any($event.target).value)" />
+        <input matInput type="number" min="1" [value]="parts()" (input)="set($any($event.target).value)" />
       </mat-form-field>
+      <mat-checkbox
+        [checked]="announce()"
+        (change)="setAnnounce($event.checked)"
+        [matTooltip]="announceTip"
+      >
+        X-Forwarded-Prefix
+      </mat-checkbox>
     </div>
   `,
 })
 export class StripPrefixFilterComponent {
   readonly spec = model.required<Spec>();
-  protected readonly parts = computed(() => argStr(this.spec(), 'parts'));
+  // Never blank: one segment is the server's default and the only value that
+  // makes the brick mean anything. An empty field read as "strips nothing",
+  // which is not a setting - it is a brick to remove.
+  protected readonly parts = computed(() => argStr(this.spec(), 'parts') || '1');
+  // Absent means on: the server's default, and the right answer nearly always -
+  // a service that builds a link has no other way to know where it is
+  // published. Turn it off for an application already configured to live under
+  // the prefix, which would otherwise write it twice.
+  protected readonly announce = computed(() => this.spec().args?.['announcePrefix'] !== false);
+  protected readonly announceTip = $localize`:@@Announce_prefix_tip:Tells the service the public prefix these segments came from, so it builds its links, redirects and cookie paths under it instead of under its own root. Turn it off for an application already configured to live under that prefix - it would write it twice.`;
+
   protected set(v: string): void {
-    this.spec.update((s) => patchSpec(s, 'parts', v === '' ? '' : Number(v)));
+    const n = Math.max(1, Math.trunc(Number(v)) || 1);
+    this.spec.update((s) => patchSpec(s, 'parts', n));
+  }
+
+  // Written only when it is FALSE: true is the default, and an argument that
+  // repeats the default is noise in an exported file.
+  protected setAnnounce(on: boolean): void {
+    this.spec.update((s) => patchSpec(s, 'announcePrefix', on ? '' : false));
   }
 }
 

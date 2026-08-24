@@ -351,11 +351,30 @@ export interface Param {
   required?: boolean;
   default?: unknown;
   doc?: string;
+  // What the field starts on when the brick is ADDED. A starting point, not a
+  // default: the server applies none of them, so a required argument stays
+  // required and the value is visible rather than assumed.
+  initial?: unknown;
+  // A closed set of accepted values: the console offers the list, the server
+  // checks against the same one.
+  options?: string[];
+}
+
+// The norm or the page a brick's explanation ends on - a link rather than a
+// paragraph paraphrasing a specification.
+export interface BrickRef {
+  label: string;
+  url: string;
 }
 
 export interface CatalogEntry {
   kind: 'predicate' | 'filter';
   type: string;
+  // The long form, shown on the brick once it is POSED (the short doc is what
+  // one reads to pick it from the palette). Absent when the short line says
+  // everything there is to say.
+  details?: string;
+  ref?: BrickRef;
   phase?: 'request' | 'response' | 'terminal';
   doc: string;
   params: Param[];
@@ -727,6 +746,123 @@ export interface AdminTokenCreated {
   expiresAt: number;
 }
 
+// TLS (SSL-01 to SSL-03, SSL-05). A certificate reaches Meerkat through one of
+// four doors, and none of them is optional: a public site renews itself from an
+// authority, an air-gapped room signs offline, a laboratory wants one click,
+// and a company hands over what it already bought.
+export interface CertInfo {
+  subject: string;
+  issuer: string;
+  serial: string;
+  algo: string;
+  keyType: string;
+  dnsNames: string[];
+  ipAddresses: string[];
+  notBefore: number;
+  notAfter: number;
+  selfSigned: boolean;
+  chain: number;
+}
+
+export interface CsrInfo {
+  subject: string;
+  dnsNames: string[];
+  ipAddresses: string[];
+  keyType: string;
+}
+
+export interface Certificate {
+  id: string;
+  name: string;
+  // 'import' | 'self-signed' | 'csr'
+  source: string;
+  info: CertInfo;
+  // The one that answers a handshake carrying no server name: a client that
+  // came by IP address sends none.
+  default: boolean;
+  createdAt: number;
+  updatedAt: number;
+  // A signing request with no answer yet: it holds a key and serves nothing.
+  pending: boolean;
+  csr?: CsrInfo;
+}
+
+// What a generation form asks for. Days only applies to a self-signed one.
+export interface CertRequest {
+  name?: string;
+  commonName?: string;
+  organization?: string;
+  organizationalUnit?: string;
+  country?: string;
+  province?: string;
+  locality?: string;
+  dnsNames: string[];
+  ipAddresses?: string[];
+  keyType?: string;
+  days?: number;
+  default?: boolean;
+}
+
+export interface AcmeSettings {
+  enabled: boolean;
+  // The directory is a URL and not a vendor list on purpose: half the rooms
+  // Meerkat runs in have no route to the internet, and an internal step-ca or
+  // an enterprise authority answers here just as well.
+  directoryUrl: string;
+  email: string;
+  domains: string[];
+  // The root that signs the ACME SERVER's own certificate, for a private one.
+  rootCa: string;
+  eabKeyId: string;
+  eabHmacKey: string;
+  acceptTos: boolean;
+}
+
+// What the supervisor last managed to do, which is not always what was asked.
+export interface TlsState {
+  data: boolean;
+  admin: boolean;
+  acme: boolean;
+  problems: string[];
+  dataAddr: string;
+  adminAddr: string;
+  dataPlainAddr: string;
+  adminPlainAddr: string;
+  // The redirect can be off while the setting is on: nothing valid to present
+  // stands it down.
+  redirecting: boolean;
+}
+
+// One declared name, and whether anything actually answers for it.
+export interface Coverage {
+  name: string;
+  plane: 'console' | 'app';
+  // covered | expiring | expired | acme | uncovered
+  status: string;
+  certId?: string;
+  certName?: string;
+  notAfter?: number;
+  automatic: boolean;
+}
+
+export interface TlsSettings {
+  data: boolean;
+  admin: boolean;
+  // The APPLICATION plane's plain port sends callers to its HTTPS one. The
+  // console's plain port is never redirected: it is what a broken certificate
+  // gets repaired from.
+  redirect: boolean;
+  acme: AcmeSettings;
+  // The names each plane answers to. Two lists because the two planes are not
+  // alike: a console has one name, an application gateway fronts many.
+  consoleNames: string[];
+  appNames: string[];
+  eabSecretSet: boolean;
+  state: TlsState;
+  issued?: Record<string, CertInfo>;
+  coverage: Coverage[];
+}
+
 // Trusted-browser policy (MFA-03): whether a user may skip the TOTP challenge
 // on a remembered browser, and for how long (ISO-8601 duration).
 export interface TrustedBrowserPolicy {
@@ -806,7 +942,7 @@ export interface ExternalIdentity {
 // itself. The console sends a NAME, never a value: this is the one path that
 // works for a literal it never received (bootstrap file, earlier save).
 export interface SecretLocation {
-  holder: 'authprovider' | 'mailrelay';
+  holder: 'authprovider' | 'mailrelay' | 'tls';
   id: string;
   field: string;
 }
@@ -927,6 +1063,12 @@ export const PAGE_LAYOUTS = ['centered', 'split', 'drawer', 'banner', 'bare'] as
 // gateway, whatever theme is active. Logo is a data URI ('' = built-in mark).
 // What the respond editor gets back while someone types (one of the two
 // fields is set).
+export interface VersionPreview {
+  extracted?: string;
+  matches?: boolean;
+  error?: string;
+}
+
 export interface RespondPreview {
   output?: string;
   error?: string;
@@ -997,6 +1139,14 @@ export class ApiService {
 
   // Renders a respond template against the gateway's witness caller: either the
   // bytes an application would receive, or the error the save would raise.
+  // What a version pattern extracts from a sample, and whether it falls in the
+  // range - answered by the ENGINE. Go's regexps are RE2 and refuse the
+  // lookarounds JavaScript allows, so working it out here would promise a match
+  // the gateway turns down at save.
+  versionPreview(args: Record<string, unknown>, sample: string): Observable<VersionPreview> {
+    return this.http.post<VersionPreview>('/api/routes/version-preview', { args, sample });
+  }
+
   respondPreview(body: string): Observable<RespondPreview> {
     return this.http.post<RespondPreview>('/api/routes/respond-preview', { body });
   }
@@ -1610,6 +1760,76 @@ export class ApiService {
 
   toggleAdminToken(id: string, enabled: boolean): Observable<void> {
     return this.http.post<void>(`/api/admin-tokens/${encodeURIComponent(id)}/toggle`, { enabled });
+  }
+
+  // ── TLS (SSL-01/02/03/05) ──────────────────────────────────────────────────
+
+  listCertificates(): Observable<Certificate[]> {
+    return this.http.get<Certificate[]>('/api/certificates');
+  }
+
+  // Import: a PEM pair, or a PKCS#12 keystore as base64. One endpoint, because
+  // to an operator it is one gesture - "here is what I already have".
+  importCertificate(body: {
+    name: string;
+    certPem?: string;
+    keyPem?: string;
+    keystore?: string;
+    password?: string;
+    default?: boolean;
+  }): Observable<Certificate> {
+    return this.http.post<Certificate>('/api/certificates/import', body);
+  }
+
+  createSelfSigned(req: CertRequest): Observable<Certificate> {
+    return this.http.post<Certificate>('/api/certificates/self-signed', req);
+  }
+
+  createSigningRequest(req: CertRequest): Observable<Certificate> {
+    return this.http.post<Certificate>('/api/certificates/signing-request', req);
+  }
+
+  adoptCertificate(id: string, certPem: string): Observable<Certificate> {
+    return this.http.post<Certificate>(`/api/certificates/${encodeURIComponent(id)}/adopt`, {
+      certPem,
+    });
+  }
+
+  updateCertificate(id: string, body: { name: string; default: boolean }): Observable<Certificate> {
+    return this.http.put<Certificate>(`/api/certificates/${encodeURIComponent(id)}`, body);
+  }
+
+  deleteCertificate(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/certificates/${encodeURIComponent(id)}`);
+  }
+
+  // The two downloads are PEM text, not JSON: they are carried to an authority
+  // or into a trust store, so they must arrive as files.
+  downloadSigningRequest(id: string): Observable<string> {
+    return this.http.get(`/api/certificates/${encodeURIComponent(id)}/signing-request`, {
+      responseType: 'text',
+    });
+  }
+
+  downloadCertificate(id: string): Observable<string> {
+    return this.http.get(`/api/certificates/${encodeURIComponent(id)}/pem`, {
+      responseType: 'text',
+    });
+  }
+
+  getTls(): Observable<TlsSettings> {
+    return this.http.get<TlsSettings>('/api/settings/tls');
+  }
+
+  saveTls(body: {
+    data: boolean;
+    admin: boolean;
+    redirect: boolean;
+    consoleNames: string[];
+    appNames: string[];
+    acme: AcmeSettings;
+  }): Observable<TlsSettings> {
+    return this.http.put<TlsSettings>('/api/settings/tls', body);
   }
 
   revokeAdminToken(id: string): Observable<void> {

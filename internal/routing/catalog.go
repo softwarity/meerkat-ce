@@ -2,15 +2,30 @@ package routing
 
 import "sort"
 
+// Reference is the norm or the page a brick's explanation ends on. A link,
+// rather than a paragraph paraphrasing a specification: the example in a field
+// covers the everyday case, and whoever needs the edges wants the text itself.
+type Reference struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
+}
+
 // CatalogEntry is the self-description of one brick - what the admin API
 // serves so the console can generate the route editor forms, and what the
 // documentation is derived from. One source of truth for four layers.
 type CatalogEntry struct {
-	Kind   string  `json:"kind"`            // "predicate" | "filter"
-	Type   string  `json:"type"`            // e.g. "path", "strip-prefix"
-	Phase  string  `json:"phase,omitempty"` // filters: request | response | terminal
-	Doc    string  `json:"doc"`
-	Params []Param `json:"params"`
+	Kind  string `json:"kind"`            // "predicate" | "filter"
+	Type  string `json:"type"`            // e.g. "path", "strip-prefix"
+	Phase string `json:"phase,omitempty"` // filters: request | response | terminal
+	Doc   string `json:"doc"`
+	// Details is what the console shows on the brick ONCE IT IS POSED: the
+	// short Doc is what one reads to pick a brick from a list, this is what one
+	// reads with the thing in front of them, wondering what its fields do and
+	// what it will break. Optional - a brick whose one line says everything
+	// leaves it empty rather than repeating itself at greater length.
+	Details string     `json:"details,omitempty"`
+	Params  []Param    `json:"params"`
+	Ref     *Reference `json:"ref,omitempty"`
 }
 
 // Catalog returns every registered predicate and filter, sorted by kind then
@@ -18,10 +33,10 @@ type CatalogEntry struct {
 func Catalog() []CatalogEntry {
 	out := make([]CatalogEntry, 0, len(predicateRegistry)+len(filterRegistry))
 	for _, d := range predicateRegistry {
-		out = append(out, CatalogEntry{Kind: "predicate", Type: d.Type, Doc: d.Doc, Params: d.Params})
+		out = append(out, CatalogEntry{Kind: "predicate", Type: d.Type, Doc: d.Doc, Details: d.Details, Params: d.Params, Ref: d.Ref})
 	}
 	for _, d := range filterRegistry {
-		out = append(out, CatalogEntry{Kind: "filter", Type: d.Type, Phase: string(d.Phase), Doc: d.Doc, Params: d.Params})
+		out = append(out, CatalogEntry{Kind: "filter", Type: d.Type, Phase: string(d.Phase), Doc: d.Doc, Details: d.Details, Params: d.Params, Ref: d.Ref})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Kind != out[j].Kind {

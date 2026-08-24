@@ -6,6 +6,14 @@
   height: 100%;
   background: transparent;
 }
+/* The padding belongs to the CONTENT, not to the container around it. The
+   palette is a drawer sliding over this container: padded, the container left
+   an unpainted band along its edge and the drawer stopped short of the panel.
+   Flush container, self-padding content. */
+mat-drawer-content {
+  padding: 16px 20px;
+  box-sizing: border-box;
+}
 .pal {
   width: 380px;
   padding: 16px 14px;
@@ -79,4 +87,21 @@
   font-size: 0.74rem;
   color: var(--mat-sys-on-surface-variant);
   white-space: normal;
+}
+
+/* Same block as the filter palette: what exists and what is coming, in one
+   place, the coming ones dimmed and not clickable. */
+.planned-title {
+  margin: 14px 0 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mat-sys-secondary);
+}
+.cat-entry.planned {
+  opacity: 0.45;
+  cursor: default;
 }

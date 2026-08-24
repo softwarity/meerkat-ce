@@ -1,7 +1,7 @@
 import { Component, computed, input, model, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { Spec } from '../../api.service';
+import { BrickRef, Param, Spec } from '../../api.service';
 import { humanize } from '../predicates/args';
 import {
   HeaderFilterComponent,
@@ -16,6 +16,7 @@ import {
   SetStatusFilterComponent,
   StripPrefixFilterComponent,
 } from './filter-fields.component';
+import { BrickFieldsComponent } from '../brick-fields.component';
 
 // type -> which dedicated editor renders it. Several types share an editor
 // (a header value is a header value, whichever verb/phase), so the map collapses
@@ -56,6 +57,7 @@ const KIND: Record<string, string> = {
     RedirectFilterComponent,
     MaintenanceFilterComponent,
     RespondFilterComponent,
+    BrickFieldsComponent,
   ],
   styles: [
     `
@@ -72,6 +74,19 @@ const KIND: Record<string, string> = {
         align-items: center;
         gap: 8px;
         margin-bottom: 4px;
+      }
+      .doc a {
+        color: var(--mat-sys-primary);
+        text-decoration: none;
+      }
+      .doc a:hover {
+        text-decoration: underline;
+      }
+      .doc {
+        margin: 0 0 8px;
+        font-size: 0.78rem;
+        line-height: 1.35;
+        color: var(--mat-sys-on-surface-variant);
       }
       .type {
         font-size: 0.9rem;
@@ -111,6 +126,19 @@ const KIND: Record<string, string> = {
         <mat-icon>close</mat-icon>
       </button>
     </div>
+    <!-- The same line the palette showed when this brick was picked. It
+         disappeared the moment it was posed, exactly when a reader has the
+         thing in front of them and wants to know what its fields do. -->
+    @if (doc()) {
+      <p class="doc">
+        {{ doc() }}
+        <!-- The reference closes the explanation, inline, because that is where
+             someone finishes reading and wonders about the edge cases. -->
+        @if (ref(); as r) {
+          <a [href]="r.url" target="_blank" rel="noopener noreferrer">{{ r.label }}</a>
+        }
+      </p>
+    }
 
     @switch (kind()) {
       @case ('header') {
@@ -146,11 +174,23 @@ const KIND: Record<string, string> = {
       @case ('respond') {
         <app-respond-filter [spec]="spec()" (specChange)="spec.set($event)" />
       }
+      @default {
+        <!-- Everything without a dedicated editor, rendered from the catalog's
+             own description of the brick. Without this case the card showed a
+             title and no field at all. -->
+        <app-brick-fields [spec]="spec()" (specChange)="spec.set($event)" [params]="params()" />
+      }
     }
   `,
 })
 export class FilterItemComponent {
   readonly spec = model.required<Spec>();
+  // What this brick does, in one line, from the catalog (see brick-docs).
+  readonly doc = input('');
+  // The norm this brick's explanation points at, when it has one.
+  readonly ref = input<BrickRef | undefined>(undefined);
+  // The catalog's description of THIS brick's arguments, for the generic editor.
+  readonly params = input<Param[]>([]);
   readonly phase = input('');
   readonly first = input(false);
   readonly last = input(false);

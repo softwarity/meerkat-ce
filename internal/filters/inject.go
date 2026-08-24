@@ -6,19 +6,12 @@ package filters
 import (
 	"bytes"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strconv"
-	"strings"
 
 	"github.com/andybalholm/brotli"
 )
-
-// maxInjectableBody caps how much of a response we are willing to buffer to
-// rewrite it. Bigger HTML responses pass through untouched.
-const maxInjectableBody = 20 << 20 // 20 MiB, the V1 ceiling
 
 var headTag = regexp.MustCompile(`(?i)<head[^>]*>`)
 var bodyTag = regexp.MustCompile(`(?i)<body[^>]*>`)
@@ -117,52 +110,11 @@ func RewriteHTMLFunc(gate func(*http.Response) bool, f func(res *http.Response, 
 	}
 }
 
-// rewriteHTMLBody handles the read/decode/transform/re-encode plumbing shared
-// by the HTML rewriters. Unsupported encodings, oversized or broken bodies pass
-// through untouched.
+// rewriteHTMLBody is the HTML injection's use of the shared rewriter (see
+// rewrite.go): the guards, the codecs and the recomputed headers are the same
+// for every filter that touches a body.
 func rewriteHTMLBody(res *http.Response, transform func([]byte) []byte) error {
-	// The encoding decides whether this response can be rewritten at all. A
-	// codec we cannot read is not an error and not a reason to strip anything:
-	// the bytes go through as they are, and the injection simply does not
-	// happen - a page that arrives unchanged beats a page that arrives broken.
-	encoding := strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Encoding")))
-	if !canRecode(encoding) {
-		return nil
-	}
-	if res.ContentLength > maxInjectableBody {
-		return nil
-	}
-	body, err := io.ReadAll(io.LimitReader(res.Body, maxInjectableBody+1))
-	closeErr := res.Body.Close()
-	if err != nil {
-		return fmt.Errorf("rewrite: read body: %w", err)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("rewrite: close body: %w", closeErr)
-	}
-	if len(body) > maxInjectableBody {
-		// Too big to rewrite: restore what we read, untouched.
-		res.Body = io.NopCloser(bytes.NewReader(body))
-		return nil
-	}
-	plain, err := decode(encoding, body)
-	if err != nil {
-		// Broken encoding: hand the original bytes back untouched.
-		res.Body = io.NopCloser(bytes.NewReader(body))
-		return nil
-	}
-	out := transform(plain)
-	// Re-encoded with the SAME codec it arrived in: the response keeps the
-	// Content-Encoding it announced, so nothing downstream has to be told
-	// anything - and a body re-sent as plain text under a gzip header is the
-	// blank page nobody finds by reading the HTML.
-	if out, err = encode(encoding, out); err != nil {
-		return fmt.Errorf("rewrite: %s: %w", encoding, err)
-	}
-	res.Body = io.NopCloser(bytes.NewReader(out))
-	res.ContentLength = int64(len(out))
-	res.Header.Set("Content-Length", strconv.Itoa(len(out)))
-	return nil
+	return RewriteBody(res, transform)
 }
 
 func isHTML(res *http.Response) bool {

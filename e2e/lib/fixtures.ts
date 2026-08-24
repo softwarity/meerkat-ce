@@ -15,6 +15,9 @@ export interface Scenario {
   probe?: { method: string; path: string; body?: unknown; allowedStatus?: number[] };
   check?: { railItem: string };
   spec?: string;
+  // "ee" when the scenario needs the Enterprise product (several
+  // organisations). Absent means it runs on both.
+  edition?: 'ee';
   allowed: string[];
   title: Record<string, string>;
   description: Record<string, string>;
@@ -25,8 +28,20 @@ export interface Profile {
   username: string;
 }
 
+// Which product this tree can build, asked of the TREE rather than of a
+// repository name: the community mirror is this commit with ee/ removed, and
+// it has to run the suite too - a pull request there proves nothing if the
+// integration matrix does not run at all.
+export const ENTERPRISE = existsSync(join(__dirname, '..', '..', 'ee'));
+
 export const profiles: Profile[] = scenariosFile.profiles;
-export const scenarios: Scenario[] = scenariosFile.scenarios as Scenario[];
+
+// Scenarios this tree can run. An `edition: "ee"` row needs several
+// organisations, which a community binary refuses BY DESIGN - running it there
+// would report a correct refusal as a broken suite.
+export const scenarios: Scenario[] = (scenariosFile.scenarios as Scenario[]).filter(
+  (s) => ENTERPRISE || s.edition !== 'ee',
+);
 
 export const AUTH_DIR = join(__dirname, '..', '.auth');
 // The two planes ISOLATE their sessions (MEERKAT_ADMIN_SESSION vs

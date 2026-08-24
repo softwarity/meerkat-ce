@@ -58,7 +58,13 @@ func TestEndpointSecurityEnforcement(t *testing.T) {
 		Endpoints: []store.EndpointPolicy{
 			{Method: "GET", Path: "/get", Access: store.Access{}},                              // reopened to anonymous
 			{Method: "GET", Path: "/admin/{id}", Access: store.Access{Roles: []string{"ops"}}}, // ops role
-			{Method: "POST", Path: "/user-only", Access: store.Access{Users: []string{"neo"}}}, // named user
+			// "Only neo" is deny plus the name: users are an EXCEPTION, and with
+			// no condition to except them from, naming one says nothing (see
+			// Access.Empty). This fixture used to write it as users alone and
+			// pass for the wrong reason - the rule was counted as posed, so the
+			// gate demanded a session, which happened to refuse the anonymous
+			// caller the case is about.
+			{Method: "POST", Path: "/user-only", Access: store.Access{Level: store.AccessDeny, Users: []string{"neo"}}},
 		},
 	}}
 	must(st.SaveRoute(ctx, route))

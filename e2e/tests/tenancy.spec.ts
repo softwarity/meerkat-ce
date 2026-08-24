@@ -1,6 +1,6 @@
 import { expect, request, test } from '@playwright/test';
 import { ADMIN_URL } from '../playwright.config';
-import { authFile } from '../lib/fixtures';
+import { authFile, ENTERPRISE } from '../lib/fixtures';
 
 // The two shapes of an installation, switched live on a running gateway.
 //
@@ -9,6 +9,11 @@ import { authFile } from '../lib/fixtures';
 // thing a restart used to be needed for: the mode is read per request, so
 // switching it takes effect at once - and going back down is allowed and
 // deletes nothing, which is what makes the risk acceptable.
+// A community build serves one organisation and cannot be switched to several:
+// the refusal is the correct behaviour and the Go suite asserts it. Skipped
+// here rather than inverted - this spec is about the SWITCH.
+test.skip(!ENTERPRISE, 'this build serves one organisation: there is no mode to switch');
+
 test('flow-tenancy-switch: single mode serves one organisation and gives the others back', async () => {
   const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
 

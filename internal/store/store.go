@@ -566,9 +566,56 @@ CREATE TABLE IF NOT EXISTS config_points (
   digest     TEXT NOT NULL DEFAULT '',
   document   TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS config_points_at ON config_points(at);`
+CREATE INDEX IF NOT EXISTS config_points_at ON config_points(at);
 
-const schemaVersion = 41
+-- TLS material (SSL-01), v43. One row per certificate, whichever of the four
+-- doors it came through: imported, generated self-signed, or generated as a
+-- signing request and adopted once an authority signed it. The material an
+-- ACME authority fetches is NOT here - it lives in acme_cache, because
+-- autocert owns its lifecycle and a second copy would be a second truth.
+--
+-- key_sealed is the private key under the vault's master key (VAULT-01). It is
+-- the one field in this database that must never be readable from a stolen
+-- file, and the one Archway left in clear beside its keystore.
+--
+-- csr_pem holds a request waiting for its answer: the row exists, serves
+-- nothing, and shows in the console as pending - which is the state an offline
+-- signing procedure spends its days in.
+CREATE TABLE IF NOT EXISTS certificates (
+  id           TEXT PRIMARY KEY,
+  name         TEXT NOT NULL DEFAULT '',
+  source       TEXT NOT NULL DEFAULT 'import',
+  cert_pem     TEXT NOT NULL DEFAULT '',
+  key_sealed   TEXT NOT NULL DEFAULT '',
+  csr_pem      TEXT NOT NULL DEFAULT '',
+  subject      TEXT NOT NULL DEFAULT '',
+  issuer       TEXT NOT NULL DEFAULT '',
+  serial       TEXT NOT NULL DEFAULT '',
+  algo         TEXT NOT NULL DEFAULT '',
+  key_type     TEXT NOT NULL DEFAULT '',
+  dns_names    TEXT NOT NULL DEFAULT '[]',
+  ip_addresses TEXT NOT NULL DEFAULT '[]',
+  chain        INTEGER NOT NULL DEFAULT 0,
+  self_signed  INTEGER NOT NULL DEFAULT 0,
+  not_before   INTEGER NOT NULL DEFAULT 0,
+  not_after    INTEGER NOT NULL DEFAULT 0,
+  is_default   INTEGER NOT NULL DEFAULT 0,
+  created_at   INTEGER NOT NULL DEFAULT 0,
+  updated_at   INTEGER NOT NULL DEFAULT 0
+);
+
+-- The ACME account key and the certificates an authority issued (SSL-05).
+-- This is autocert's own cache, kept in the store rather than on disk for one
+-- reason: it MUST be shared. Two instances with two caches register twice and
+-- request twice, and the second one meets the authority's rate limit on behalf
+-- of the first. Sealed, because the account key signs on this gateway's behalf.
+CREATE TABLE IF NOT EXISTS acme_cache (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL DEFAULT 0
+);`
+
+const schemaVersion = 43
 
 func (s *Store) migrate() error {
 	var v int
@@ -698,7 +745,16 @@ type Caller struct {
 // Empty reports whether NO gateway rule is set (the request is then delegated
 // to the upstream, not made public).
 func (a Access) Empty() bool {
-	return a.Level == AccessDelegated && len(a.Roles) == 0 && len(a.Users) == 0
+	// Named users are an EXCEPTION, and an exception needs a condition to be an
+	// exception to. Delegated with no role asked poses no condition, so the
+	// list has nothing to let anyone past and the rule conditions nothing -
+	// which is what empty means. "Only these people" is deny plus the names.
+	//
+	// Counting such a rule as posed cost more than a mark in the console: the
+	// route required a session to be SELECTED, so an anonymous caller was
+	// passed over and served by whatever matched next - the catch-all, in
+	// practice, silently and with nothing on screen to say so.
+	return a.Level == AccessDelegated && len(a.Roles) == 0
 }
 
 // Grants reports whether the gateway lets a caller through.
@@ -713,13 +769,6 @@ func (a Access) Grants(c Caller) bool {
 	}
 	if a.Level == AccessDeny {
 		return false
-	}
-	// Named users are an exception TO a condition. With no condition to fail -
-	// delegated, no role asked - there is nothing to except them from, and
-	// naming one must not quietly turn the route into "signed in required" for
-	// everyone else. Closing a route is what deny is for.
-	if a.Level == AccessDelegated && len(a.Roles) == 0 {
-		return true
 	}
 	if !c.Authenticated {
 		return false
@@ -1125,7 +1174,8 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 		   name = excluded.name, ord = excluded.ord, enabled = excluded.enabled,
 		   is_ui = excluded.is_ui, upstream = excluded.upstream,
 		   predicates = excluded.predicates, filters = excluded.filters,
-		   api = excluded.api, ui = excluded.ui, identity = excluded.identity, locales = excluded.locales, access = excluded.access`,
+		   api = excluded.api, ui = excluded.ui, identity = excluded.identity, locales = excluded.locales,
+		   access = excluded.access`,
 		r.ID, r.Name, r.Order, r.Enabled, r.IsUI, r.Upstream,
 		string(preds), string(filts), api, ui, identity, locales, string(access))
 	if err != nil {

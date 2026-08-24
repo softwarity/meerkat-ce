@@ -395,6 +395,11 @@ const (
 	// PageLayout. Colours answer "what does it look like", this one answers
 	// "where is everything", and they are set on two tabs of one screen.
 	SettingPageLayout = "page_layout"
+	// SettingTLS is which HTTPS doors are open and whether an authority issues
+	// certificates on its own (certs.Settings). The MATERIAL lives in its own
+	// table - this holds only the switches, so turning HTTPS off never risks
+	// touching a private key.
+	SettingTLS = "tls"
 	// SettingDevMode is the installation-wide developer switch (DEV-01): the
 	// master the per-account `dev` capability hangs from. Off, the developer
 	// surface of the SERVED applications is not there at all - no Developer

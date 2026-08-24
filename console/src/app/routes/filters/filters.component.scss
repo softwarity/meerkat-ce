@@ -6,6 +6,14 @@
   height: 100%;
   background: transparent;
 }
+/* The padding belongs to the CONTENT, not to the container around it. The
+   palette is a drawer sliding over this container: padded, the container left
+   an unpainted band along its edge and the drawer stopped short of the panel.
+   Flush container, self-padding content. */
+mat-drawer-content {
+  padding: 16px 20px;
+  box-sizing: border-box;
+}
 .pal {
   width: 380px;
   padding: 16px 14px;

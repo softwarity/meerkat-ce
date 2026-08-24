@@ -24,7 +24,7 @@ import { humanDuration } from '../../shared/duration';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { UrlInputComponent } from '../../shared/url-input.component';
-import { AccessEditorComponent, AccessState, emptyAccess } from '../endpoint-security/access-editor.component';
+import { ACCESS_LEVELS, AccessEditorComponent, AccessState, emptyAccess, levelShort } from '../endpoint-security/access-editor.component';
 import { FiltersComponent } from '../filters/filters.component';
 import { IdentityPreviewData, IdentityPreviewDialogComponent } from '../identity-preview-dialog.component';
 import { argStr, cleanSpecs } from '../predicates/args';
@@ -85,6 +85,7 @@ const CODE_FIELD: Record<CodeKind, 'customCss' | 'customJs' | 'localesOnChange'>
 type Section =
   | 'security'
   | 'predicates'
+  | 'gates'
   | 'target'
   | 'modin'
   | 'modout'
@@ -98,7 +99,7 @@ type Section =
 // bookmark on the General section that no longer exists - lands on Target
 // rather than on an empty panel.
 const SECTIONS: Section[] = [
-  'security', 'predicates', 'target', 'modin', 'modout',
+  'security', 'predicates', 'gates', 'target', 'modin', 'modout',
   'identity', 'button', 'locales', 'userinfo', 'inject',
 ];
 
@@ -136,9 +137,14 @@ const IDENTITY_TTL_CHOICES = ['PT1M', 'PT2M', 'PT5M', 'PT10M', 'PT15M', 'PT30M',
 
 // The route's base Access as the editor's non-optional shape.
 function toAccessState(a: Access | undefined): AccessState {
-  return a
-    ? { level: a.level ?? '', tenants: a.tenants ?? [], roles: a.roles ?? [], users: a.users ?? [] }
-    : emptyAccess();
+  if (!a) return emptyAccess();
+  const level = a.level ?? '';
+  const roles = a.roles ?? [];
+  // Normalised on the way IN: exceptions with nothing to except them from are
+  // dropped, so a leftover list stops showing a rule that conditions nothing -
+  // and stops being saved back the next time the route is touched.
+  const users = level === '' && roles.length === 0 ? [] : (a.users ?? []);
+  return { level, tenants: a.tenants ?? [], roles, users };
 }
 
 // The editable shape of one route: every field the drawer can change, with the
@@ -278,20 +284,33 @@ export class RouteEditorComponent {
   // What the Security entry shows beside its name: the level in short, plus
   // the count of what narrows it. Empty when nothing is posed - an unguarded
   // route says so by saying nothing, like every other section here.
+  // The rule at a glance, in the LIST's own words - AUTH, ORG, DENY - rather
+  // than the dot that stood here: a dot says "something is posed" and leaves
+  // "signed in", "in an organisation" and "closed to everyone" looking
+  // identical, one click away from a table that tells them apart. The two
+  // lists stay in the tooltip, where a count belongs when there is no room to
+  // draw its icon.
   protected securityMark(): { text: string; tip: string } | null {
-    const a = this.draft().access ?? {};
+    const a = this.draft().access ?? emptyAccess();
     const bits: string[] = [];
-    if (a.level === 'deny') bits.push($localize`:@@Closed:closed`);
-    else if (a.level === 'tenants') bits.push($localize`:@@N_organisations:${a.tenants?.length ?? 0}:COUNT: org`);
-    else if (a.level === 'tenant') bits.push($localize`:@@An_organisation:org`);
-    else if (a.level === 'auth') bits.push($localize`:@@Signed_in:signed in`);
+    // isEmpty is the same judgement the gateway makes, so the mark cannot
+    // claim a rule the engine ignores.
     if (a.roles?.length) bits.push($localize`:@@N_roles:${a.roles.length}:COUNT: roles`);
     if (a.users?.length) bits.push($localize`:@@N_users:${a.users.length}:COUNT: users`);
     const endpoints = this.route()?.api?.security?.endpoints?.length ?? 0;
     if (endpoints) bits.push($localize`:@@N_endpoints:${endpoints}:COUNT: endpoints`);
-    if (!bits.length) return null;
-    return { text: '●', tip: bits.join(' · ') };
+    const level = levelShort(a);
+    const delegated = level === '\u2014';
+    if (delegated && !bits.length) return null;
+    const label = ACCESS_LEVELS.find((l) => l.value === (a.level ?? ''))?.label ?? '';
+    return { text: delegated ? '\u25cf' : level, tip: bits.length ? label + ' - ' + bits.join(' \u00b7 ') : label };
   }
+
+  // Sections whose whole panel is a palette drawer (see the template): they
+  // take the padding off the panel and put it on their own content.
+  protected readonly hasPalette = computed(() =>
+    ['predicates', 'gates', 'modin', 'modout'].includes(this.section()),
+  );
 
   protected countPhase(phase: string): number {
     const phaseOf = (t: string) => this.catalog().find((e) => e.type === t)?.phase ?? 'request';

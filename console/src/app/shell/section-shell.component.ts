@@ -31,6 +31,7 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
         icon: 'passkey',
       },
       { path: 'mail-relay', label: $localize`:@@Mail_relay:Mail relay`, icon: 'outgoing_mail' },
+      { path: 'tls', label: $localize`:@@TLS:TLS`, icon: 'lock' },
       {
         path: 'access-tokens',
         label: $localize`:@@Access_tokens:Access tokens`,

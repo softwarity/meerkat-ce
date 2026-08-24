@@ -46,23 +46,41 @@ export interface PlannedBrick {
   doc: string;
 }
 
+// What is NOT here matters as much as what is: an entry that ships must leave
+// this list, and the palette filters it against the live catalog on top of
+// that (see FiltersComponent.planned). A hand-kept list of promises goes stale
+// silently - three of these were sitting greyed out as "coming" while the
+// server had been serving them for weeks, under a name of their own.
+// Predicates have their own list. What is announced here is the RANGE, not
+// version routing as such: the header predicate already matches a named
+// version exactly, and what it cannot do is compare - a regexp compares
+// characters, so 1.10 reads as smaller than 1.9. Naming every version instead
+// is a list that rots at each release.
+// Empty: version shipped. The palette filters this against the live catalog
+// anyway, but an entry that shipped leaves the list - a promise kept twice is
+// how the list rotted the first time.
+export const PLANNED_PREDICATES: PlannedBrick[] = [];
+
 export const PLANNED_MODIFIERS: Record<string, PlannedBrick[]> = {
-  request: [
-    { type: 'map-request-header', doc: $localize`:@@planned_map_request_header:Copy a request header into another name` },
-    { type: 'rewrite-request-param', doc: $localize`:@@planned_rewrite_request_param:Rewrite a query parameter with a regexp` },
-    { type: 'set-request-host', doc: $localize`:@@planned_set_request_host:Force the Host header sent to the service` },
-    { type: 'preserve-host', doc: $localize`:@@planned_preserve_host:Send the client Host header instead of the upstream one` },
-    { type: 'request-size', doc: $localize`:@@planned_request_size:Refuse requests bigger than a limit` },
+  // Gates - the bricks that accept or refuse. All three of these REFUSE, which
+  // is why they sit here and not among the modifiers, and all three wait on the
+  // same thing: state that survives between requests (ROUTE-08/09).
+  gate: [
+    { type: 'rate-limiter', doc: $localize`:@@planned_rate_limiter:Throttle callers by key` },
     { type: 'circuit-breaker', doc: $localize`:@@planned_circuit_breaker:Stop calling a failing service, with a fallback` },
     { type: 'retry', doc: $localize`:@@planned_retry:Retry idempotent requests on upstream errors` },
-    { type: 'rate-limiter', doc: $localize`:@@planned_rate_limiter:Throttle callers by key` },
+  ],
+  request: [
+    {
+      type: 'trust-forwarded-for',
+      doc: $localize`:@@planned_trust_forwarded_for:Keep the X-Forwarded-For chain written by a trusted proxy in front - today it is dropped, so a service sees the load balancer`,
+    },
   ],
   response: [
-    { type: 'dedupe-response-header', doc: $localize`:@@planned_dedupe_response_header:Drop duplicate response header values` },
-    { type: 'rewrite-response-header', doc: $localize`:@@planned_rewrite_response_header:Rewrite a response header with a regexp` },
-    { type: 'rewrite-location', doc: $localize`:@@planned_rewrite_location:Fix the Location header of upstream redirects` },
-    { type: 'secure-headers', doc: $localize`:@@planned_secure_headers:Add the classic security headers` },
-    { type: 'response-cache', doc: $localize`:@@planned_response_cache:Cache upstream responses locally` },
+    {
+      type: 'response-cache',
+      doc: $localize`:@@planned_response_cache:Cache responses locally - held back: caching a personalised page serves it to the next visitor`,
+    },
   ],
   // Nothing planned here: respond shipped, and it does more than the fixed
   // status and body this list once promised.
