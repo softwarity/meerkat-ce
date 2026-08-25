@@ -1,8 +1,9 @@
 import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-deploy',
-  imports: [],
+  imports: [RouterLink],
   preserveWhitespaces: true,
   styles: [
     `
@@ -86,7 +87,9 @@ volumes:
     </p>
     <p>
       The Enterprise file is the one above plus three things: the Enterprise image, a port, and
-      the socket that lets the agent give a name to a machine.
+      the socket that lets the agent give a name to a machine. The image lives in a private
+      registry, and a commercial agreement is what opens it - see
+      <a routerLink="/">the editions</a>.
     </p>
     <pre><code>services:
   meerkat:

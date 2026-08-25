@@ -65,8 +65,8 @@ import { RouterLink } from '@angular/router';
       <li>
         <strong>Dev mode</strong> — with <a href="https://github.com/softwarity/plug"
         target="_blank" rel="noopener">plug</a>, a developer's workstation joins the cluster and
-        substitutes a deployed service for their own traffic; testers opt in to try a dev's
-        variant. See <a routerLink="/dev-mode">Dev mode</a>.
+        substitutes a deployed service, and everyone looking at the application is told which
+        one, and by whom. See <a routerLink="/dev-mode">Dev mode</a>.
       </li>
     </ul>
 
@@ -77,8 +77,47 @@ import { RouterLink } from '@angular/router';
       external database only when you want a HA cluster.
     </p>
 
-    <h3>Try it (once it exists)</h3>
-    <pre><code>docker run -p 8080:8080 softwarity/meerkat</code></pre>
+    <h3>Try it</h3>
+    <pre><code>docker run -p 8080:8080 -p 9090:9090 \
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat</code></pre>
+    <p>
+      8080 is what your users reach, 9090 is the admin console. See
+      <a routerLink="/deploy">Deploy</a> for a compose file, a Helm chart, and what each
+      variable decides.
+    </p>
+
+    <h3>Two editions, two licences</h3>
+    <p>
+      One commit, two images. The <strong>community</strong> one is on Docker Hub and public;
+      the <strong>Enterprise</strong> one is on GitHub Packages and private. What separates them
+      is not a flag read at startup, it is what the linker put in the binary - so a feature that
+      is not sold is not in the image at all, and there is no licence file to check at runtime.
+    </p>
+    <ul>
+      <li>
+        <strong>The core is
+        <a href="https://fsl.software/" target="_blank" rel="noopener">FSL-1.1-Apache-2.0</a></strong>
+        - the Functional Source License. Read it, change it, run it, ship it inside your own
+        product: the only thing you may not do is sell a competing gateway with it. Two years
+        after each release, that version becomes plain <strong>Apache 2.0</strong>, with no
+        conditions left at all. The published sources are
+        <a href="https://github.com/softwarity/meerkat-ce" target="_blank" rel="noopener">softwarity/meerkat-ce</a>.
+      </li>
+      <li>
+        <strong>The Enterprise code (<code>ee/</code>) is under a Softwarity commercial
+        licence.</strong> It may be read, modified and contributed to; it may be USED - built
+        into a running gateway, or carried into another work - only under a commercial
+        agreement. It is not in the community sources, which is why the mirror is the whole
+        community product rather than a crippled copy of another one.
+      </li>
+    </ul>
+    <p>
+      What falls on each side is a rule rather than a price list:
+      <strong>never a security primitive</strong>. TLS, the vault, MFA, passkeys, the audit
+      trail and endpoint security are in both images - selling those would be selling safety.
+      Enterprise is scale and organisation: several organisations, external directories, the
+      arrangements of the built-in pages, the developer tunnel embedded in the gateway.
+    </p>
 
     <h3>Why “Meerkat”?</h3>
     <p>

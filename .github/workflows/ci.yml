@@ -233,8 +233,14 @@ jobs:
         run: docker compose up -d ${{ matrix.service }}
       # The domain controller provisions itself before it answers, and it is
       # the only one that needs seeding afterwards.
+      #
+      # Same condition as the step that STARTS it, which this one was missing:
+      # on the mirror nothing is started, so this waited five minutes for a
+      # container that was never coming and then failed on `docker exec`. A
+      # community pull request went red for an Enterprise driver it does not
+      # carry.
       - name: Wait for the domain controller
-        if: matrix.service == 'samba'
+        if: matrix.service == 'samba' && needs.edition.outputs.enterprise == 'true'
         run: |
           for _ in $(seq 1 60); do
             [ "$(docker inspect meerkat-samba-ad --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] && break
