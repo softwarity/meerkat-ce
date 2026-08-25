@@ -1,0 +1,27 @@
+# Meerkat, community edition - one gateway, one command.
+#
+#   MEERKAT_ADMIN_PASSWORD='choose-one' docker compose up -d
+#
+# Two ports, and they are two different jobs: 8080 is the APPLICATION plane
+# (what your users reach), 9090 is the CONTROL plane (the admin console). Only
+# the application plane belongs on the internet.
+#
+# For the Enterprise image and the developer tunnel, see docker-compose.ee.yml.
+services:
+  meerkat:
+    image: docker.io/softwarity/meerkat:latest
+    ports:
+      - "8080:8080" # application plane
+      - "9090:9090" # control plane (admin console) - keep this one internal
+    environment:
+      # Read once, on the FIRST start, to create the admin account. Leave it
+      # set afterwards or remove it; it is never used again.
+      MEERKAT_ADMIN_PASSWORD: ${MEERKAT_ADMIN_PASSWORD:?set a password for the first admin}
+    volumes:
+      # Everything the gateway knows: routes, accounts, the sealed vault, the
+      # certificates. Back this up and you have backed up the gateway.
+      - meerkat-data:/data
+    restart: unless-stopped
+
+volumes:
+  meerkat-data:

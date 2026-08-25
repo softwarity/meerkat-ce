@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meerkat.fullname" . }}
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    # The store is a file on a ReadWriteOnce volume, so two gateways cannot
+    # hold it at once: the old pod goes before the new one arrives.
+    type: Recreate
+  selector:
+    matchLabels: {{- include "meerkat.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "meerkat.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "meerkat.fullname" . }}
+      containers:
+        - name: meerkat
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-data", "/data"]
+          ports:
+            - name: app
+              containerPort: 8080
+            - name: admin
+              containerPort: 9090
+            {{- if .Values.plug.enabled }}
+            - name: plug
+              containerPort: {{ .Values.plug.port }}
+            {{- end }}
+          env:
+            {{- if or .Values.admin.password .Values.admin.existingSecret }}
+            - name: MEERKAT_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meerkat.adminSecretName" . }}
+                  key: {{ .Values.admin.existingSecretKey }}
+            {{- end }}
+            {{- if .Values.production }}
+            - name: MEERKAT_PRODUCTION
+              value: "1"
+            {{- end }}
+            {{- if .Values.plug.enabled }}
+            - name: MEERKAT_PLUG_ADDR
+              value: ":{{ .Values.plug.port }}"
+            {{- end }}
+          livenessProbe:
+            httpGet: { path: /healthz, port: app }
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet: { path: /healthz, port: app }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- with .Values.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "meerkat.fullname" .)) }}
+          {{- else }}
+          # No volume asked for: everything the gateway learns dies with the
+          # pod. Fine for a demo, never for anything else.
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

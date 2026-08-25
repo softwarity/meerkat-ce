@@ -25,6 +25,7 @@ export class AppComponent {
     { path: '/', label: 'About', icon: 'visibility' },
     { path: '/requirements', label: 'Requirements', icon: 'checklist' },
     { path: '/dev-mode', label: 'Dev mode', icon: 'terminal' },
+    { path: '/deploy', label: 'Deploy', icon: 'rocket_launch' },
     { path: '/roadmap', label: 'Roadmap', icon: 'map' },
     { path: '/tests', label: 'Test coverage', icon: 'verified' },
   ];

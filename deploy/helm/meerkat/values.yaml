@@ -1,0 +1,55 @@
+image:
+  # Two images, two products, built from the same commit: the community one on
+  # Docker Hub, the Enterprise one on GitHub Packages (private - the pull
+  # secret below is how a cluster reaches it).
+  repository: docker.io/softwarity/meerkat
+  tag: "" # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# The FIRST admin account, created on the first start and never read again.
+# Either give a password here (the chart makes a Secret) or name a Secret you
+# manage yourself - never both.
+admin:
+  password: ""
+  existingSecret: ""
+  existingSecretKey: password
+
+# Declare this gateway a PRODUCTION one: the whole developer surface stays
+# closed here whatever the database says. Worth setting even when nobody
+# expects a developer tunnel - the stored switch travels in a backup or a
+# configuration export, and this does not.
+production: false
+
+# The developer tunnel (Enterprise only): plug, compiled into the gateway.
+#
+# It needs one right - manage Services in this namespace - and that grant is
+# the whole contract. On, the chart grants it; off, it grants nothing.
+plug:
+  enabled: false
+  port: 22222
+  service:
+    # ClusterIP, NodePort or LoadBalancer. How your developers reach the
+    # tunnel is a network decision, so the chart asks rather than assumes.
+    type: ClusterIP
+    nodePort: ""
+
+service:
+  type: ClusterIP
+  appPort: 8080   # application plane: what your users reach
+  adminPort: 9090 # control plane: the admin console, keep it internal
+
+persistence:
+  # Everything the gateway knows lives here: routes, accounts, the sealed
+  # vault, the certificates. Without a volume, a restarted pod is a new
+  # installation.
+  enabled: true
+  size: 2Gi
+  storageClass: ""
+  existingClaim: ""
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

@@ -1,0 +1,47 @@
+# Two planes, two Services, on purpose: an Ingress put in front of the
+# application plane must not be able to reach the console by accident.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meerkat.fullname" . }}
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector: {{- include "meerkat.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: app
+      port: {{ .Values.service.appPort }}
+      targetPort: app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meerkat.fullname" . }}-admin
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "meerkat.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: admin
+      port: {{ .Values.service.adminPort }}
+      targetPort: admin
+{{- if .Values.plug.enabled }}
+---
+# The developer tunnel. How your developers reach it is a network decision, so
+# the chart asks for the Service type rather than assuming one.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meerkat.fullname" . }}-plug
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.plug.service.type }}
+  selector: {{- include "meerkat.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: plug
+      port: {{ .Values.plug.port }}
+      targetPort: plug
+      {{- with .Values.plug.service.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,51 @@
+# Meerkat, Enterprise edition, with the DEVELOPER TUNNEL open.
+#
+#   docker compose -f docker-compose.ee.yml up -d
+#
+# The tunnel (DEV-11) plugs a developer's machine into this stack: a service
+# they run on their laptop answers, for them, under its cluster name, and the
+# other services keep talking to it as if it were still deployed. It is the
+# plug agent (https://github.com/softwarity/plug) compiled INTO the gateway.
+#
+# Two things have to be true for it to open, and neither is a setting to
+# remember:
+#
+#   1. developer mode is on (Application > General in the console - it is on by
+#      default, and MEERKAT_PRODUCTION below closes it for good);
+#   2. the gateway can reach an orchestrator AND is a container that
+#      orchestrator knows - which is what the socket below grants.
+#
+# Where it cannot work, it does not open a port: it writes one line saying
+# which resource it lacks, and the gateway serves as usual.
+services:
+  meerkat:
+    image: ghcr.io/softwarity/meerkat-ee:latest
+    ports:
+      - "8080:8080" # application plane
+      - "9090:9090" # control plane (admin console) - keep this one internal
+      # The developer tunnel. Which port you publish is yours to choose; the
+      # gateway listens on 22222 inside. Publish it where your developers can
+      # reach it, and nowhere else.
+      - "22222:22222"
+    environment:
+      MEERKAT_ADMIN_PASSWORD: ${MEERKAT_ADMIN_PASSWORD:?set a password for the first admin}
+      # Uncomment on a PRODUCTION gateway. It closes the whole developer
+      # surface - tooling, API docs, UI test mode, tunnel - whatever the
+      # database says. Worth setting even here: the stored switch travels in a
+      # backup or a configuration export, and this one does not.
+      # MEERKAT_PRODUCTION: "1"
+    volumes:
+      - meerkat-data:/data
+      # What lets the agent give a name to a developer's machine: it creates a
+      # small signpost container carrying the DNS alias, for the length of the
+      # session. Without this mount the gateway runs exactly as before and the
+      # tunnel simply says it cannot start.
+      #
+      # It is a real grant: whoever can act as this container can act on this
+      # Docker daemon. Mount it on the clusters your developers already trust,
+      # not in front of customers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  meerkat-data:

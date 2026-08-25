@@ -1,0 +1,26 @@
+Meerkat is starting.
+
+  Application plane (your users):  {{ include "meerkat.fullname" . }}:{{ .Values.service.appPort }}
+  Control plane (admin console):   {{ include "meerkat.fullname" . }}-admin:{{ .Values.service.adminPort }}
+
+Reach the console without exposing it:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "meerkat.fullname" . }}-admin {{ .Values.service.adminPort }}:{{ .Values.service.adminPort }}
+
+{{- if .Values.production }}
+
+This gateway is declared PRODUCTION: the developer surface stays closed here
+whatever the settings say.
+{{- end }}
+{{- if .Values.plug.enabled }}
+
+The developer tunnel listens on {{ .Values.plug.port }} ({{ .Values.plug.service.type }} service
+{{ include "meerkat.fullname" . }}-plug). It opens only where developer mode is on AND the
+gateway can reach the cluster - if it cannot, it says so in one line and the
+gateway serves as usual:
+
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "meerkat.fullname" . }} | grep tunnel
+
+Each developer deposits their own public key in their profile (Developer > key)
+before it will let them in.
+{{- end }}

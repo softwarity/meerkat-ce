@@ -1,0 +1,28 @@
+{{- if .Values.plug.enabled }}
+# The developer tunnel needs one right: manage Services in this namespace, so a
+# session can point a cluster name at somebody's machine and put it back. That
+# grant IS the switch - without it the tunnel does not run, the gateway says so
+# once and serves as usual.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "meerkat.fullname" . }}-serve-names
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "create", "delete", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "meerkat.fullname" . }}-serve-names
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "meerkat.fullname" . }}-serve-names
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" . }}
+{{- end }}

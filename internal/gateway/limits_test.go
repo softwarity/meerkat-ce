@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/softwarity/meerkat/internal/routing"
@@ -17,12 +18,17 @@ import (
 // whether it was called at all. The second fact is the one that matters for a
 // refusal: a limit that lets the request reach the service has cost the very
 // transfer it was posed to prevent.
-func countingUpstream(t *testing.T, called *bool, got *int64) *httptest.Server {
+// Atomic, because the two facts are written by the upstream's goroutine and
+// read by the test's. A refused body is cut mid-transfer, so the handler is
+// often still copying when the client already has its 413 - the reader and the
+// writer genuinely overlap, and the race detector said so on a CI machine
+// slow enough to lose the coin toss.
+func countingUpstream(t *testing.T, called *atomic.Bool, got *atomic.Int64) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		*called = true
+		called.Store(true)
 		n, _ := io.Copy(io.Discard, r.Body)
-		*got = n
+		got.Store(n)
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	t.Cleanup(srv.Close)
@@ -52,8 +58,8 @@ func headers(size string) routing.Spec {
 }
 
 func TestBodyLimitRefusesADeclaredOversizeBody(t *testing.T) {
-	var called bool
-	var got int64
+	var called atomic.Bool
+	var got atomic.Int64
 	up := countingUpstream(t, &called, &got)
 	srv := limitedRouter(t, up.URL, body("1KB"))
 
@@ -68,7 +74,7 @@ func TestBodyLimitRefusesADeclaredOversizeBody(t *testing.T) {
 	if res.StatusCode != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status %d, want 413", res.StatusCode)
 	}
-	if called {
+	if called.Load() {
 		t.Fatal("the upstream was called: the refusal happened too late to save the transfer")
 	}
 	// The arithmetic is the message: a bare "too large" is what costs an
@@ -81,8 +87,8 @@ func TestBodyLimitRefusesADeclaredOversizeBody(t *testing.T) {
 }
 
 func TestBodyLimitRefusesAnUndeclaredOversizeBody(t *testing.T) {
-	var called bool
-	var got int64
+	var called atomic.Bool
+	var got atomic.Int64
 	up := countingUpstream(t, &called, &got)
 	srv := limitedRouter(t, up.URL, body("1KB"))
 
@@ -105,8 +111,8 @@ func TestBodyLimitRefusesAnUndeclaredOversizeBody(t *testing.T) {
 	if res.StatusCode != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status %d (%s), want 413", res.StatusCode, body)
 	}
-	if got > 1<<10 {
-		t.Fatalf("the upstream read %d bytes, more than the %d it was capped at", got, 1<<10)
+	if got.Load() > 1<<10 {
+		t.Fatalf("the upstream read %d bytes, more than the %d it was capped at", got.Load(), 1<<10)
 	}
 	// Proves the answer came from the proxy's error path recognising the cap,
 	// not from the declared-length shortcut: there was no length to report,
@@ -120,8 +126,8 @@ func TestBodyLimitRefusesAnUndeclaredOversizeBody(t *testing.T) {
 }
 
 func TestBodyUnderTheLimitGoesThrough(t *testing.T) {
-	var called bool
-	var got int64
+	var called atomic.Bool
+	var got atomic.Int64
 	up := countingUpstream(t, &called, &got)
 	srv := limitedRouter(t, up.URL, body("1KB"))
 
@@ -133,14 +139,14 @@ func TestBodyUnderTheLimitGoesThrough(t *testing.T) {
 	if res.StatusCode != http.StatusNoContent {
 		t.Fatalf("status %d, want 204", res.StatusCode)
 	}
-	if got != 900 {
-		t.Fatalf("the upstream received %d bytes, want 900", got)
+	if got.Load() != 900 {
+		t.Fatalf("the upstream received %d bytes, want 900", got.Load())
 	}
 }
 
 func TestHeaderLimitRefusesWith431(t *testing.T) {
-	var called bool
-	var got int64
+	var called atomic.Bool
+	var got atomic.Int64
 	up := countingUpstream(t, &called, &got)
 	srv := limitedRouter(t, up.URL, headers("1KB"))
 
@@ -160,14 +166,14 @@ func TestHeaderLimitRefusesWith431(t *testing.T) {
 	if res.StatusCode != http.StatusRequestHeaderFieldsTooLarge {
 		t.Fatalf("status %d, want 431", res.StatusCode)
 	}
-	if called {
+	if called.Load() {
 		t.Fatal("the upstream was called with headers the route refuses")
 	}
 }
 
 func TestNoLimitCarriesAnythingTheServiceAccepts(t *testing.T) {
-	var called bool
-	var got int64
+	var called atomic.Bool
+	var got atomic.Int64
 	up := countingUpstream(t, &called, &got)
 	srv := limitedRouter(t, up.URL)
 
@@ -180,8 +186,8 @@ func TestNoLimitCarriesAnythingTheServiceAccepts(t *testing.T) {
 	if res.StatusCode != http.StatusNoContent {
 		t.Fatalf("status %d, want 204", res.StatusCode)
 	}
-	if got != 2<<20 {
-		t.Fatalf("the upstream received %d bytes, want %d", got, 2<<20)
+	if got.Load() != 2<<20 {
+		t.Fatalf("the upstream received %d bytes, want %d", got.Load(), 2<<20)
 	}
 }
 

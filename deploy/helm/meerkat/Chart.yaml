@@ -1,0 +1,12 @@
+apiVersion: v2
+name: meerkat
+description: Meerkat, the app gateway - routing, identity and the built-in pages in front of your services
+type: application
+version: 0.1.0
+# The image tag the chart defaults to. Override image.tag to pin a release.
+appVersion: "latest"
+home: https://softwarity.github.io/meerkat/
+sources:
+  - https://github.com/softwarity/meerkat
+maintainers:
+  - name: Softwarity

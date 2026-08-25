@@ -606,7 +606,7 @@
       "probe": {
         "method": "POST",
         "path": "/api/certificates/self-signed",
-        "body": { "name": "e2e", "dnsNames": ["e2e.test"] },
+        "body": { "plane": "app", "host": "e2e.test" },
         "allowedStatus": [201]
       },
       "allowed": ["root", "infra-admin"],
@@ -623,7 +623,7 @@
       "probe": {
         "method": "POST",
         "path": "/api/certificates/signing-request",
-        "body": { "name": "e2e-csr", "dnsNames": ["csr.e2e.test"] },
+        "body": { "plane": "app", "host": "csr.e2e.test" },
         "allowedStatus": [201]
       },
       "allowed": ["root", "infra-admin"],

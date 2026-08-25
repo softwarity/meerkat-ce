@@ -16,6 +16,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/dev-mode.component').then((m) => m.DevModeComponent),
   },
   {
+    path: 'deploy',
+    loadComponent: () => import('./pages/deploy.component').then((m) => m.DeployComponent),
+  },
+  {
     path: 'roadmap',
     loadComponent: () => import('./pages/roadmap.component').then((m) => m.RoadmapComponent),
   },
