@@ -28,12 +28,21 @@ import (
 //	resolvedLanguage()  the language this page was served in
 //	signedOut()         tell the other pages the session just ended
 //	data()              the shared /meerkat/user-button.json read
+//	onEvent(type, fn)   what the GATEWAY has to say, live
 //
-// Two channels between the pages of one browser, both BroadcastChannel:
-// meerkat-locale carries a language someone picked, meerkat-session carries
-// "alive" and "ended". Deliberately not a socket to the gateway - this is one
-// message between tabs, and a connection per open page would buy reaching a
-// second machine that nobody needs.
+// Three channels, and the split between them is by WHO knows the thing.
+//
+// Two are BroadcastChannel, between the pages of one browser: meerkat-locale
+// carries a language someone picked, meerkat-session carries "alive" and
+// "ended". Deliberately not sockets - one message between tabs, and a
+// connection per open page would buy reaching a second machine that nobody
+// needs for a setting touched twice a year.
+//
+// The third IS a socket (/meerkat/events), because what it carries only the
+// gateway knows: a service served from a developer's machine, a configuration
+// reloaded. It opens on the first onEvent listener, so a page that asks for
+// nothing pays nothing, and it is never required - every listener already has
+// its state from the fetch at load.
 func (h *Handler) pageJS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")
@@ -287,8 +296,65 @@ const pageJS = `(() => {
     };
   };
 
+  // ---- the live channel -----------------------------------------------
+  // What the GATEWAY knows and the page cannot: a service being served from a
+  // developer's machine right now, a configuration reloaded, a message an
+  // operator put on every screen. Not the same need as the BroadcastChannels
+  // above - those carry one message between the tabs of one browser, this one
+  // carries what only the server has.
+  //
+  // Opened LAZILY, on the first subscriber: a page nobody listens on pays
+  // nothing, which is what let this be added to pages that were already
+  // working. And never required - every listener already has its state from
+  // the fetch at load, so a proxy that eats WebSockets costs the freshness,
+  // not the feature.
+  const handlers = new Map();
+  let socket = null, attempt = 0, retryAt = 0;
+
+  const openEvents = () => {
+    if (socket || typeof WebSocket !== 'function') return;
+    const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/meerkat/events';
+    try { socket = new WebSocket(url); } catch { socket = null; return; }
+    socket.onopen = () => { attempt = 0; };
+    socket.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      for (const fn of handlers.get(msg && msg.type) || []) {
+        try { fn(msg.data); } catch (err) { console.error('meerkat: an event listener threw', err); }
+      }
+    };
+    // One handler for both ways out: a refusal never fires onclose without
+    // onerror, and a reconnection scheduled twice is a reconnection storm.
+    socket.onclose = socket.onerror = () => {
+      if (!socket) return;
+      socket = null;
+      if (!handlers.size) return;
+      // Backoff with jitter, capped: a gateway that just restarted has every
+      // page of every browser waiting on it, and they must not come back in
+      // step. The state a page shows meanwhile is the one it fetched, which
+      // is exactly what makes waiting affordable.
+      const wait = Math.min(30000, 1000 * Math.pow(2, attempt++)) * (0.75 + Math.random() / 2);
+      clearTimeout(retryAt);
+      retryAt = setTimeout(openEvents, wait);
+    };
+  };
+
+  const onEvent = (type, fn) => {
+    if (!type || typeof fn !== 'function') return;
+    const list = handlers.get(type) || [];
+    list.push(fn);
+    handlers.set(type, list);
+    openEvents();
+  };
+
+  // A tab brought back after a sleep finds its socket dead and nothing
+  // pending: the timer did not fire while it was away.
+  addEventListener('visibilitychange', () => {
+    if (!document.hidden && !socket && handlers.size) { attempt = 0; openEvents(); }
+  });
+
   window.meerkatPage = {
-    data, applyScheme, applyLanguage, pickLanguage, resolvedLanguage,
+    data, applyScheme, applyLanguage, pickLanguage, resolvedLanguage, onEvent,
     onLanguage: (fn) => { if (typeof fn === 'function') listeners.push(fn); },
     // Called by the button after /logout: the cookie is already gone here, so
     // the other tabs learn it from the message rather than from a failure.

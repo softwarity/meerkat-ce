@@ -8,6 +8,7 @@ package main
 // so that code is not in the binary at all, and the compiler proves the trunk
 // never depended on it.
 import (
+	_ "github.com/softwarity/meerkat/ee/devplug"
 	_ "github.com/softwarity/meerkat/ee/directories"
 	_ "github.com/softwarity/meerkat/ee/layouts"
 )

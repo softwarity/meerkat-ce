@@ -45,7 +45,7 @@ func TestDeveloperHub(t *testing.T) {
 	// testing nothing at all.
 	hub := do(t, mux, "GET", "/profile/dev", nil, devC)
 	hubBody := bodyString(hub)
-	if hub.Code != http.StatusOK || !strings.Contains(hubBody, `href="/profile/dev/cert"`) {
+	if hub.Code != http.StatusOK || !strings.Contains(hubBody, `href="/profile/dev/key"`) {
 		t.Fatalf("hub: code=%d, cert link missing", hub.Code)
 	}
 
@@ -63,18 +63,19 @@ func TestDeveloperHub(t *testing.T) {
 		t.Fatalf("user-button payload advertises devDocs to a non-dev: %s", body)
 	}
 
-	// The cert sub-page renders its form, and a bad PEM is refused there.
-	cert := do(t, mux, "GET", "/profile/dev/cert", nil, devC)
-	if cert.Code != http.StatusOK || !strings.Contains(bodyString(cert), "BEGIN CERTIFICATE") {
-		t.Fatalf("cert page: code=%d", cert.Code)
+	// The key sub-page renders its form, and something that is not a public
+	// key is refused there.
+	key := do(t, mux, "GET", "/profile/dev/key", nil, devC)
+	if key.Code != http.StatusOK || !strings.Contains(bodyString(key), "ssh-ed25519") {
+		t.Fatalf("key page: code=%d", key.Code)
 	}
-	bad := do(t, mux, "POST", "/profile/dev-cert", url.Values{"cert": {"not a pem"}}, devC)
+	bad := do(t, mux, "POST", "/profile/dev-key", url.Values{"key": {"not a key"}}, devC)
 	if bad.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("bad cert: code=%d, want 422", bad.Code)
+		t.Fatalf("bad key: code=%d, want 422", bad.Code)
 	}
 
 	// A non-dev is refused at the hub and the sub-page.
-	for _, p := range []string{"/profile/dev", "/profile/dev/cert"} {
+	for _, p := range []string{"/profile/dev", "/profile/dev/key"} {
 		if res := do(t, mux, "GET", p, nil, bobC); res.Code != http.StatusForbidden {
 			t.Fatalf("non-dev on %s: code=%d, want 403", p, res.Code)
 		}
@@ -106,7 +107,7 @@ func TestDeveloperModeHidesTheDeveloperSurface(t *testing.T) {
 	if body := bodyString(do(t, mux, "GET", "/profile", nil, devC)); strings.Contains(body, `href="/profile/dev"`) {
 		t.Fatal("the profile offered the Developer entry with developer mode off")
 	}
-	for _, p := range []string{"/profile/dev", "/profile/dev/cert"} {
+	for _, p := range []string{"/profile/dev", "/profile/dev/key"} {
 		if res := do(t, mux, "GET", p, nil, devC); res.Code != http.StatusForbidden {
 			t.Fatalf("%s with developer mode off: code=%d, want 403", p, res.Code)
 		}

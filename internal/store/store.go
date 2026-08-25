@@ -6,10 +6,8 @@ package store
 
 import (
 	"context"
-	"crypto/x509"
 	"database/sql"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -171,9 +169,11 @@ CREATE TABLE IF NOT EXISTS users (
   -- tenant selection (unlike a per-tenant override).
   mfa_required         TEXT NOT NULL DEFAULT '',
   avatar               TEXT NOT NULL DEFAULT '',
-  -- A DEVELOPER's public certificate (PEM): the credential their plugged
-  -- service authenticates with (dev plug matching). Self-service, /profile.
-  dev_cert             TEXT NOT NULL DEFAULT '',
+  -- A DEVELOPER's public SSH key (one authorized_keys line): the credential
+  -- their plugged service authenticates with (DEV-11). Self-service, /profile.
+  -- A key rather than a signed certificate, so that removing it takes effect
+  -- at the next connection instead of at an expiry date.
+  dev_key              TEXT NOT NULL DEFAULT '',
   -- Self-registration (AUTH-20). email_verified defaults to 1: admin-created
   -- accounts answer for their address; only the /register flow creates
   -- unverified ones (and confirms them by e-mail).
@@ -583,7 +583,13 @@ CREATE INDEX IF NOT EXISTS config_points_at ON config_points(at);
 -- signing procedure spends its days in.
 CREATE TABLE IF NOT EXISTS certificates (
   id           TEXT PRIMARY KEY,
-  name         TEXT NOT NULL DEFAULT '',
+  -- The HOST this certificate answers for, and the plane it belongs to. A
+  -- certificate is not floating material to be matched against a list of
+  -- names: it IS the name's certificate. The console has one, the application
+  -- has one per host it serves, and the same material used by both is simply
+  -- added twice - two entries, two keys, no shared object to reason about.
+  plane        TEXT NOT NULL DEFAULT 'app',
+  host         TEXT NOT NULL DEFAULT '',
   source       TEXT NOT NULL DEFAULT 'import',
   cert_pem     TEXT NOT NULL DEFAULT '',
   key_sealed   TEXT NOT NULL DEFAULT '',
@@ -599,7 +605,6 @@ CREATE TABLE IF NOT EXISTS certificates (
   self_signed  INTEGER NOT NULL DEFAULT 0,
   not_before   INTEGER NOT NULL DEFAULT 0,
   not_after    INTEGER NOT NULL DEFAULT 0,
-  is_default   INTEGER NOT NULL DEFAULT 0,
   created_at   INTEGER NOT NULL DEFAULT 0,
   updated_at   INTEGER NOT NULL DEFAULT 0
 );
@@ -615,7 +620,7 @@ CREATE TABLE IF NOT EXISTS acme_cache (
   updated_at INTEGER NOT NULL DEFAULT 0
 );`
 
-const schemaVersion = 43
+const schemaVersion = 46
 
 func (s *Store) migrate() error {
 	var v int
@@ -632,6 +637,22 @@ func (s *Store) migrate() error {
 	if err := s.addMissingColumns(); err != nil {
 		return err
 	}
+	// A certificate now belongs to a host (v44). Rows written before that have
+	// an empty one and cannot be expressed in the model at all - they belong to
+	// no name, so no screen can show them and no handshake can pick them. They
+	// are dropped rather than left to render as a nameless ghost, and the count
+	// is logged: silent deletion and silent nonsense are both worse than a line
+	// saying what happened.
+	if res, err := s.db.Exec(`DELETE FROM certificates WHERE host = ''`); err == nil {
+		if n, _ := res.RowsAffected(); n > 0 {
+			slog.Info("dropped certificates that predate the host they answer for", "count", n)
+		}
+	}
+	// The developer credential became a KEY rather than a certificate (v46).
+	// Best effort: on a database that predates it the old column is dead
+	// weight, and leaving a dev_cert nobody reads is how a schema starts
+	// describing something the product no longer does.
+	_, _ = s.db.Exec(`ALTER TABLE users DROP COLUMN dev_cert`)
 	if err := s.seedDefaultSettings(); err != nil {
 		return err
 	}
@@ -1574,54 +1595,6 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (User, e
 		return User{}, fmt.Errorf("store: get user %q: %w", username, err)
 	}
 	return u, nil
-}
-
-// SanitizeDevCert validates a developer's PUBLIC certificate: one PEM
-// CERTIFICATE block, parseable X.509, 16 KiB max. "" clears it.
-func SanitizeDevCert(pemText string) error {
-	if pemText == "" {
-		return nil
-	}
-	if len(pemText) > 16<<10 {
-		return fmt.Errorf("certificate is too large (%d bytes): the limit is 16 KiB", len(pemText))
-	}
-	block, rest := pem.Decode([]byte(pemText))
-	if block == nil || block.Type != "CERTIFICATE" {
-		return fmt.Errorf("certificate must be a PEM CERTIFICATE block")
-	}
-	if len(strings.TrimSpace(string(rest))) > 0 {
-		return fmt.Errorf("certificate must be a SINGLE PEM block")
-	}
-	if _, err := x509.ParseCertificate(block.Bytes); err != nil {
-		return fmt.Errorf("certificate does not parse: %w", err)
-	}
-	return nil
-}
-
-// SetUserDevCert stores (or clears, with "") a developer's public
-// certificate. Like the avatar, it never rides the User struct: read it
-// through GetUserDevCert only.
-func (s *Store) SetUserDevCert(ctx context.Context, id, cert string) error {
-	if err := SanitizeDevCert(cert); err != nil {
-		return fmt.Errorf("store: user %q: %w", id, err)
-	}
-	res, err := s.db.ExecContext(ctx, `UPDATE users SET dev_cert = ? WHERE id = ?`, cert, id)
-	if err != nil {
-		return fmt.Errorf("store: set dev cert for %q: %w", id, err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("store: user %q not found", id)
-	}
-	return nil
-}
-
-// GetUserDevCert returns the stored PEM certificate ("" when none).
-func (s *Store) GetUserDevCert(ctx context.Context, id string) (string, error) {
-	var cert string
-	if err := s.db.QueryRowContext(ctx, `SELECT dev_cert FROM users WHERE id = ?`, id).Scan(&cert); err != nil {
-		return "", fmt.Errorf("store: get dev cert for %q: %w", id, err)
-	}
-	return cert, nil
 }
 
 // SanitizeAvatar validates a profile photo: an image data URI (png, jpeg or

@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/softwarity/meerkat/internal/certs"
 
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -490,5 +493,65 @@ func TestATouchedThemeCarriesItsColours(t *testing.T) {
 	}
 	if len(doc.Themes) != 1 || doc.Themes[0].Dark["primary"] != "#ff0000" {
 		t.Fatalf("an edited theme must carry its colours: %+v", doc.Themes)
+	}
+}
+
+// TestACertificateNeverTravels is the line CFG-01 draws, made testable: a
+// configuration is public by construction, and a private key is the one thing
+// that must never be in one.
+//
+// The contrast with branding is the point. A logo IS exported - it is a data
+// URI inside a setting, and decoration is meant to travel. A certificate is
+// not decoration: it is material, obtained where it is used. What travels
+// instead is the INTENT - which names this gateway answers to, and which
+// authority may issue for them.
+func TestACertificateNeverTravels(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+
+	// A real certificate, installed the way an operator installs one.
+	m, err := certs.SelfSigned(certs.Request{DNSNames: []string{"shop.example.com"}}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveCertificate(ctx, store.Certificate{
+		ID: "c1", Plane: store.PlaneApp, Host: "shop.example.com",
+		Source: store.CertSourceSelfSigned, CertPEM: m.CertPEM, KeyPEM: m.KeyPEM, Info: m.Info,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSetting(ctx, store.SettingTLS, certs.Settings{
+		ConsoleName: "admin.example.com",
+		AppNames:    []string{"shop.example.com"},
+		ACME:        certs.ACMESettings{Enabled: true, Domains: []string{"shop.example.com"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	doc, _, err := Export(ctx, st)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	raw, err := Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(raw)
+
+	// The intent travels.
+	for _, want := range []string{"shop.example.com", "admin.example.com"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("the names a gateway answers to are configuration and must travel: %q missing", want)
+		}
+	}
+	// The material does not, in any shape.
+	for _, forbidden := range []string{"PRIVATE KEY", "BEGIN CERTIFICATE", "certPem", "keyPem"} {
+		if strings.Contains(out, forbidden) {
+			t.Fatalf("an export carried %q - a document that calls itself public must never hold key material", forbidden)
+		}
+	}
+	// And neither does the marker that only means something here.
+	if strings.Contains(out, store.SettingTLSSeeded) {
+		t.Fatal("the seed marker belongs to the install that wrote it")
 	}
 }

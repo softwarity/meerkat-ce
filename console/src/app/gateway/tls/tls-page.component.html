@@ -6,285 +6,105 @@
   <loading-indicator withContainer />
 } @else {
   <div class="content">
-    <!-- The console. One name, one door, and a plain port that never moves. -->
+    <!-- The console: one name, one certificate. -->
     <section class="card">
-      <div class="plane-head">
-        <h2 i18n="@@Console_control_plane">Console (control plane)</h2>
-        <mat-slide-toggle
-          [checked]="tls()!.admin"
-          [disabled]="saving()"
-          (change)="toggle('admin', $event.checked)"
-        >
-          <span i18n="@@HTTPS">HTTPS</span>
-        </mat-slide-toggle>
-      </div>
-
-      <div class="links">
-        <a [href]="link('console', 'http')" target="_blank" rel="noopener">
-          <mat-icon>lock_open_right</mat-icon>{{ link('console', 'http') }}
-        </a>
-        @if (state()?.admin) {
-          <a [href]="link('console', 'https')" target="_blank" rel="noopener">
-            <mat-icon>lock</mat-icon>{{ link('console', 'https') }}
-          </a>
-        } @else {
-          <span class="off">
-            {{ link('console', 'https') }} <ng-container i18n="@@Closed">Closed</ng-container>
-          </span>
-        }
-      </div>
+      <h2 i18n="@@Console">Console</h2>
 
       <app-form-field
-        i18n-label="@@Console_name"
+        i18n-label="@@Name"
         label="Name"
         i18n-hint="@@Console_name_hint"
-        hint="The name this console is reached by. Usually one."
+        hint="The name this console is reached by."
       >
-        <textarea
+        <input
           matInput
-          rows="1"
-          [value]="consoleNames()"
-          (input)="consoleNames.set($any($event.target).value)"
-          (blur)="saveNames()"
-          placeholder="admin.acme.com"
-        ></textarea>
+          [value]="consoleName()"
+          (input)="renameConsole($any($event.target).value)"
+          (blur)="save()"
+          placeholder="localhost"
+        />
       </app-form-field>
 
-      @for (c of consoleCoverage(); track c.name) {
-        <p class="cover s-{{ c.status }}">
-          <mat-icon>{{ coverIcon(c) }}</mat-icon>
-          <code>{{ c.name }}</code>
-          <span>{{ coverText(c) }}</span>
+      <ng-container
+        *ngTemplateOutlet="entryBlock; context: { $implicit: consoleEntry() }"
+      ></ng-container>
+
+
+    </section>
+
+    <!-- The application: one name per host it serves, each with its own. -->
+    <section class="card">
+      <div class="plane-head">
+        <h2 i18n="@@Application">Application</h2>
+        <button matButton="tonal" (click)="addName()">
+          <mat-icon>add</mat-icon>
+          <ng-container i18n="@@Add_a_name">Add a name</ng-container>
+        </button>
+      </div>
+
+      @for (e of appEntries(); track e.host) {
+        <ng-container *ngTemplateOutlet="entryBlock; context: { $implicit: e }"></ng-container>
+      } @empty {
+        <p class="empty" i18n="@@No_name_yet">
+          No name yet. Add the host this gateway answers to, then give it a certificate.
         </p>
       }
 
-      <div class="plane-actions">
-        <button matButton="tonal" [matMenuTriggerFor]="consoleDoors">
-          <mat-icon>add</mat-icon>
-          <ng-container i18n="@@Add_certificate">Add certificate</ng-container>
-        </button>
-        <mat-menu #consoleDoors>
-          <button mat-menu-item (click)="add('import', 'console')">
-            <mat-icon>upload</mat-icon>
-            <span i18n="@@Import_PEM_or_keystore">Import a PEM or a keystore</span>
-          </button>
-          <button mat-menu-item (click)="add('self-signed', 'console')">
-            <mat-icon>bolt</mat-icon>
-            <span i18n="@@Generate_self_signed">Generate a self-signed one</span>
-          </button>
-          <button mat-menu-item (click)="add('signing-request', 'console')">
-            <mat-icon>draft</mat-icon>
-            <span i18n="@@Create_signing_request">Create a signing request</span>
-          </button>
-        </mat-menu>
-      </div>
 
-      @if (offerHTTPS()) {
-        <div class="offer">
-          <mat-icon>lock_open_right</mat-icon>
-          <span>
-            <ng-container i18n="@@Console_still_over_http"
-              >You are reading this console over its plain port. The control plane never forces the
-              move - that is what keeps it reachable when a certificate goes wrong.</ng-container
-            >
-            @if (warnOnMove()) {
-              <ng-container i18n="@@Console_move_warns">
-                Your certificate vouches for itself, so the browser will warn once.</ng-container
-              >
-            }
-          </span>
-          <button matButton="tonal" (click)="openOverHTTPS()">
-            <mat-icon>lock</mat-icon>
-            <ng-container i18n="@@Open_over_https">Open over HTTPS</ng-container>
-          </button>
-        </div>
-      }
-    </section>
-
-    <!-- The application. Many names, and a plain port that redirects. -->
-    <section class="card">
-      <div class="plane-head">
-        <h2 i18n="@@Application_data_plane">Application (data plane)</h2>
-        <mat-slide-toggle
-          [checked]="tls()!.data"
-          [disabled]="saving()"
-          (change)="toggle('data', $event.checked)"
-        >
-          <span i18n="@@HTTPS">HTTPS</span>
-        </mat-slide-toggle>
-      </div>
-
-      <div class="links">
-        <a [href]="link('app', 'http')" target="_blank" rel="noopener">
-          <mat-icon>lock_open_right</mat-icon>{{ link('app', 'http') }}
-        </a>
-        @if (state()?.data) {
-          <a [href]="link('app', 'https')" target="_blank" rel="noopener">
-            <mat-icon>lock</mat-icon>{{ link('app', 'https') }}
-          </a>
-        } @else {
-          <span class="off">
-            {{ link('app', 'https') }} <ng-container i18n="@@Closed">Closed</ng-container>
-          </span>
-        }
-      </div>
-
-      @if (state()?.data) {
+      @if (state()?.app) {
         <div class="plane-head">
           <mat-slide-toggle
             [checked]="tls()!.redirect"
             [disabled]="saving()"
             (change)="toggleRedirect($event.checked)"
           >
-            <span i18n="@@Redirect_plaintext">Send the plain port to HTTPS</span>
+            <span i18n="@@Force_https">Force HTTPS</span>
           </mat-slide-toggle>
           @if (tls()!.redirect && !state()?.redirecting) {
             <span class="lamp" i18n="@@Standing_down">Standing down</span>
           }
         </div>
-        <p class="note" i18n="@@Redirect_note">
-          The application plane only. The console's plain port is never redirected - it is what a
-          broken certificate gets repaired from. The liveness probe stays in the clear too, and if
-          every certificate expires the redirect stands itself down rather than sending callers to
-          a door none of them will open.
+        <p class="note" i18n="@@Force_https_note">
+          Callers arriving on the plain port are sent to HTTPS. The console is never forced, and
+          neither is the liveness probe - and if every certificate expires this stands itself down
+          rather than sending callers to a door none of them will open.
         </p>
       }
-
-      <app-form-field
-        i18n-label="@@Application_names"
-        label="Names"
-        i18n-hint="@@Application_names_hint"
-        hint="Every host this gateway answers to. One per line. *.example.com works."
-      >
-        <textarea
-          matInput
-          rows="3"
-          [value]="appNames()"
-          (input)="appNames.set($any($event.target).value)"
-          (blur)="saveNames()"
-          placeholder="shop.acme.com"
-        ></textarea>
-      </app-form-field>
-
-      @for (c of appCoverage(); track c.name) {
-        <p class="cover s-{{ c.status }}">
-          <mat-icon>{{ coverIcon(c) }}</mat-icon>
-          <code>{{ c.name }}</code>
-          <span>{{ coverText(c) }}</span>
-        </p>
-      }
-
-      <div class="plane-actions">
-        <button matButton="tonal" [matMenuTriggerFor]="appDoors">
-          <mat-icon>add</mat-icon>
-          <ng-container i18n="@@Add_certificate">Add certificate</ng-container>
-        </button>
-        <mat-menu #appDoors>
-          <button mat-menu-item (click)="add('import', 'app')">
-            <mat-icon>upload</mat-icon>
-            <span i18n="@@Import_PEM_or_keystore">Import a PEM or a keystore</span>
-          </button>
-          <button mat-menu-item (click)="add('self-signed', 'app')">
-            <mat-icon>bolt</mat-icon>
-            <span i18n="@@Generate_self_signed">Generate a self-signed one</span>
-          </button>
-          <button mat-menu-item (click)="add('signing-request', 'app')">
-            <mat-icon>draft</mat-icon>
-            <span i18n="@@Create_signing_request">Create a signing request</span>
-          </button>
-        </mat-menu>
-      </div>
     </section>
 
     @for (p of problems(); track p) {
       <p class="problem"><mat-icon>error</mat-icon><span>{{ p }}</span></p>
     }
 
-    <!-- One list: a certificate is material, and a wildcard often serves both
-         planes at once. What is per-plane is the NAMES, not the material. -->
-    <section class="certs">
-      <h2 i18n="@@Installed_certificates">Installed certificates</h2>
-      @for (c of certificates(); track c.id) {
-        <div class="cert" [class.pending]="c.pending">
-          <span class="name">{{ c.name }}</span>
-          <span
-            class="badge"
-            [class.warn]="c.info.selfSigned && !c.pending"
-            [matTooltip]="c.info.selfSigned && !c.pending ? selfSignedWarning : ''"
-            >{{ sourceLabel(c) }}</span
-          >
-          <button
-            matIconButton
-            [class.is-default]="c.default"
-            [disabled]="c.pending"
-            (click)="setDefault(c)"
-            i18n-matTooltip="@@Default_certificate_tooltip"
-            matTooltip="Answers a client that sends no server name - one arriving by IP address."
-          >
-            <mat-icon>{{ c.default ? 'star' : 'star_border' }}</mat-icon>
-          </button>
-          @if (c.pending) {
-            <button matButton="tonal" (click)="adopt(c)">
-              <mat-icon>how_to_reg</mat-icon>
-              <ng-container i18n="@@Adopt">Adopt</ng-container>
-            </button>
-          }
-          <button matIconButton (click)="download(c)" i18n-matTooltip="@@Download" matTooltip="Download">
-            <mat-icon>download</mat-icon>
-          </button>
-          <button matIconButton (click)="rename(c)" i18n-matTooltip="@@Rename" matTooltip="Rename">
-            <mat-icon>edit</mat-icon>
-          </button>
-          <button matIconButton (click)="remove(c)" i18n-matTooltip="@@Delete" matTooltip="Delete">
-            <mat-icon>delete</mat-icon>
-          </button>
-          <span class="hosts">
-            @for (h of hosts(c); track h) {
-              <code>{{ h }}</code>
-            }
-          </span>
-          <span class="meta">
-            <span class="validity {{ validity(c).level }}">{{ validity(c).text }}</span>
-            @if (!c.pending) {
-              &nbsp;-&nbsp;<ng-container i18n="@@Issued_by">Issued by</ng-container>
-              {{ c.info.issuer }}
-              &nbsp;-&nbsp;{{ c.info.keyType }}
-              @if (c.info.chain === 0 && !c.info.selfSigned) {
-                &nbsp;-&nbsp;<span class="soon" i18n-matTooltip="@@No_chain_tooltip"
-                  matTooltip="Without the intermediates, this works in curl and fails in a browser that has never met them."
-                  i18n="@@No_intermediate">No intermediate</span>
-              }
-            }
-          </span>
-        </div>
-      } @empty {
-        <p class="empty" i18n="@@No_certificate_yet">
-          No certificate yet. Generate a self-signed one to have HTTPS in a click, or import what
-          your authority already issued.
-        </p>
-      }
-    </section>
-
-    <!-- The authority. ONE account, and a tick box per declared name: what
-         varies is never the plane, it is the name. -->
+    <!-- The authority. ONE account, and a tick box per name: what varies is
+         never the plane, it is the name. -->
     <section class="card">
       <h2 i18n="@@Automatic_certificates">Automatic certificates (ACME)</h2>
       <p class="note" i18n="@@ACME_note">
-        An ACME authority issues and renews on its own, and nobody touches a file again. The
-        directory is a URL rather than a vendor list on purpose: an internal step-ca or a company
-        authority answers here as well as a public one, so an air-gapped installation is not left
-        out. The challenge is served on the HTTPS port this gateway already holds - port 80 stays
-        closed.
+        A certificate has to be signed by someone browsers trust, and it expires - ninety days with
+        Let's Encrypt. ACME is the gateway asking an authority for one directly: it proves it
+        controls the name, receives the certificate, and renews weeks before the expiry. Nobody
+        touches a file, and nobody has to remember.
+      </p>
+      <p class="note" i18n="@@ACME_requires">
+        The proof is what sets the condition: the authority connects to the name itself, so a
+        public one only works for a name that resolves on the internet and reaches this gateway.
+        The exchange runs on the HTTPS port already held here - port 80 stays closed.
       </p>
       <mat-slide-toggle
         [checked]="acme().enabled"
-        (change)="acme.set({ ...acme(), enabled: $event.checked }); saveAcme()"
+        (change)="acme.set({ ...acme(), enabled: $event.checked }); save()"
       >
         <span i18n="@@Let_an_authority_issue">Let an authority issue certificates</span>
       </mat-slide-toggle>
 
       @if (acme().enabled) {
         <div class="acme">
+          <p class="note" i18n="@@Authority_note">
+            A URL rather than a vendor list, so an internal step-ca or a company authority answers
+            here as well as a public one: a closed network gets automatic certificates for its own
+            names too.
+          </p>
           <mat-form-field>
             <mat-label i18n="@@Authority">Authority</mat-label>
             <mat-select [value]="directoryChoice()" (valueChange)="directoryChoice.set($event)">
@@ -323,17 +143,25 @@
 
           <div class="automatic">
             <h3 i18n="@@Which_names_are_automatic">Which names the authority may issue</h3>
-            @for (c of allCoverage(); track c.plane + c.name) {
-              <mat-checkbox
-                [checked]="c.automatic"
-                (change)="toggleAutomatic(c.name, $event.checked)"
-              >
-                <code>{{ c.name }}</code>
-              </mat-checkbox>
-            } @empty {
-              <p class="empty" i18n="@@Declare_a_name_first">
-                Declare a name above first: an authority is only ever asked for names you listed.
-              </p>
+            @for (e of allEntries(); track e.plane + e.host) {
+              @if (e.host) {
+                <span class="auto-row">
+                  <mat-checkbox
+                    [checked]="e.automatic"
+                    (change)="toggleAutomatic(e.host, $event.checked)"
+                  >
+                    <code>{{ e.host }}</code>
+                  </mat-checkbox>
+                  <!-- The trap worth catching before it is sprung: a public
+                       authority has to REACH the name to prove it, so it can
+                       never issue for one that exists only on this machine. -->
+                  @if (privateName(e.host) && !customAuthority()) {
+                    <span class="soon" i18n="@@Not_reachable_from_the_internet"
+                      >a public authority cannot reach this name</span
+                    >
+                  }
+                </span>
+              }
             }
           </div>
 
@@ -375,7 +203,7 @@
                 [held]="eabSecretSet()"
                 [at]="{ holder: 'tls', id: '', field: 'eabHmacKey' }"
                 scope="infra"
-                (moved)="saveAcme()"
+                (moved)="save()"
               />
             </div>
           </details>
@@ -395,7 +223,6 @@
                   <code>{{ row[0] }}</code>
                   &nbsp;-&nbsp;<ng-container i18n="@@Valid_until">Valid until</ng-container>
                   {{ day(row[1].notAfter) }}
-                  &nbsp;-&nbsp;{{ row[1].issuer }}
                 </p>
               }
             </div>
@@ -403,9 +230,122 @@
         </div>
 
         <div class="actions">
-          <button matButton="filled" [disabled]="saving()" (click)="saveAcme()" i18n="@@Save">Save</button>
+          <button matButton="filled" [disabled]="saving()" (click)="save()" i18n="@@Save">Save</button>
         </div>
       }
     </section>
   </div>
 }
+
+<!-- One name and its certificate, in the same block: they are one thing. -->
+<ng-template #entryBlock let-e>
+  <div class="entry {{ level(e) }}">
+    <span class="host">
+      <mat-icon>{{ icon(e) }}</mat-icon>
+      <code>{{ e.host }}</code>
+    </span>
+
+    @if (e.cert) {
+      <span class="badge" [class.warn]="e.cert.info.selfSigned && !e.cert.pending"
+        [matTooltip]="e.cert.info.selfSigned && !e.cert.pending ? selfSignedWarning : ''"
+        >{{ sourceLabel(e.cert) }}</span
+      >
+      @if (e.cert.pending) {
+        <button matButton="tonal" (click)="adopt(e.cert)">
+          <mat-icon>how_to_reg</mat-icon>
+          <ng-container i18n="@@Adopt">Adopt</ng-container>
+        </button>
+      }
+      <button matIconButton (click)="download(e.cert)" i18n-matTooltip="@@Download" matTooltip="Download">
+        <mat-icon>download</mat-icon>
+      </button>
+      <!-- Replace, not delete. Nobody wants a host left with no certificate:
+           what they want is a different one, and the old is dropped only once
+           the new one is in. -->
+      <button matButton [matMenuTriggerFor]="swap">
+        <mat-icon>swap_horiz</mat-icon>
+        <ng-container i18n="@@Replace">Replace</ng-container>
+      </button>
+      <mat-menu #swap>
+        <button mat-menu-item (click)="replace('import', e)">
+          <mat-icon>upload</mat-icon>
+          <span i18n="@@Import_PEM_or_keystore">Import a PEM or a keystore</span>
+        </button>
+        <button mat-menu-item (click)="replace('self-signed', e)">
+          <mat-icon>bolt</mat-icon>
+          <span i18n="@@Generate_self_signed">Generate a self-signed one</span>
+        </button>
+        <button mat-menu-item (click)="replace('signing-request', e)">
+          <mat-icon>draft</mat-icon>
+          <span i18n="@@Create_signing_request">Create a signing request</span>
+        </button>
+        <button mat-menu-item (click)="dropCertificate(e)">
+          <mat-icon>lock_open_right</mat-icon>
+          <span i18n="@@Serve_this_name_in_the_clear">Remove it, serve this name in the clear</span>
+        </button>
+      </mat-menu>
+    } @else {
+      <button matButton="tonal" [matMenuTriggerFor]="doors">
+        <mat-icon>add</mat-icon>
+        <ng-container i18n="@@Add_certificate">Add certificate</ng-container>
+      </button>
+      <mat-menu #doors>
+        <button mat-menu-item (click)="add('import', e)">
+          <mat-icon>upload</mat-icon>
+          <span i18n="@@Import_PEM_or_keystore">Import a PEM or a keystore</span>
+        </button>
+        <button mat-menu-item (click)="add('self-signed', e)">
+          <mat-icon>bolt</mat-icon>
+          <span i18n="@@Generate_self_signed">Generate a self-signed one</span>
+        </button>
+        <button mat-menu-item (click)="add('signing-request', e)">
+          <mat-icon>draft</mat-icon>
+          <span i18n="@@Create_signing_request">Create a signing request</span>
+        </button>
+      </mat-menu>
+    }
+
+    <!-- The only other destructive action, and it is about the NAME: this host
+         is no longer served at all. On the console there is none - its name is
+         a field, not a row. -->
+    @if (e.plane === 'app') {
+      <button
+        matIconButton
+        (click)="removeName(e)"
+        i18n-matTooltip="@@Remove_this_name"
+        matTooltip="Remove this name"
+      >
+        <mat-icon>close</mat-icon>
+      </button>
+    }
+
+    @if (linkable(e)) {
+      <span class="links">
+        <a [href]="link(e, 'http')" target="_blank" rel="noopener">
+          <mat-icon>lock_open_right</mat-icon><span>{{ link(e, 'http') }}</span>
+        </a>
+        @if (secure(e) && e.cert && !e.cert.pending) {
+          <a [href]="link(e, 'https')" target="_blank" rel="noopener">
+            <mat-icon>lock</mat-icon><span>{{ link(e, 'https') }}</span>
+          </a>
+        }
+      </span>
+    }
+
+    <span class="says">
+      {{ says(e) }}
+      @if (e.cert && !e.cert.pending) {
+        &nbsp;-&nbsp;{{ e.cert.info.keyType }}
+        @if (e.cert.info.chain === 0 && !e.cert.info.selfSigned) {
+          &nbsp;-&nbsp;<span
+            class="soon"
+            i18n-matTooltip="@@No_chain_tooltip"
+            matTooltip="Without the intermediates, this works in curl and fails in a browser that has never met them."
+            i18n="@@No_intermediate"
+            >No intermediate</span
+          >
+        }
+      }
+    </span>
+  </div>
+</ng-template>

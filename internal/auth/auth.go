@@ -6,11 +6,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/hex"
-	"encoding/pem"
 	"fmt"
 	"hash/crc32"
 	"html/template"
@@ -26,8 +22,10 @@ import (
 	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -51,7 +49,7 @@ var (
 	profilePasswordPage = flowPage("profile-password", profilePasswordBody)
 	profileSecurityPage = flowPage("profile-security", profileSecurityBody)
 	profileDevPage      = flowPage("profile-dev", profileDevBody)
-	profileDevCertPage  = flowPage("profile-dev-cert", profileDevCertBody)
+	profileDevKeyPage   = flowPage("profile-dev-key", profileDevKeyBody)
 	specimenPage        = flowPage("specimen", specimenBody)
 )
 
@@ -1199,12 +1197,12 @@ const profileDevBody = `    <style>
     </style>
     <p class="lead">{{.T.developer}}</p>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-    <a class="dev-link" href="/profile/dev/cert">
+    <a class="dev-link" href="/profile/dev/key">
       <span class="dl-row">
-        <span class="dl-label">{{.T.devCert}}</span>
-        <span class="dl-state{{if .DevCertFingerprint}} on{{end}}">{{if .DevCertFingerprint}}{{.T.devCertSet}}{{else}}&rsaquo;{{end}}</span>
+        <span class="dl-label">{{.T.devKey}}</span>
+        <span class="dl-state{{if .DevKeyFingerprint}} on{{end}}">{{if .DevKeyFingerprint}}{{.T.devKeySet}}{{else}}&rsaquo;{{end}}</span>
       </span>
-      <p class="dl-desc">{{.T.devCertDesc}}</p>
+      <p class="dl-desc">{{.T.devKeyDesc}}</p>
     </a>
     <a class="dev-link" href="/meerkat/apidocs/">
       <span class="dl-row">
@@ -1216,9 +1214,14 @@ const profileDevBody = `    <style>
     <p class="back"><a href="/profile">{{.T.backToProfile}}</a></p>
 `
 
-// profileDevCertBody is the certificate sub-page: paste a PUBLIC PEM so plugged
-// services authenticate with it. (The install command will join it here.)
-const profileDevCertBody = `    <style>
+// profileDevKeyBody is the key sub-page: paste a PUBLIC SSH key so plugged
+// services authenticate AS YOU. (The install command will join it here.)
+//
+// A key rather than a signed certificate, and the page says why in one line:
+// removing it takes effect at once. A certificate would carry its own validity
+// and go on being accepted until it expired, which is the whole reason the
+// certificate authority was examined and dropped.
+const profileDevKeyBody = `    <style>
       .facts { gap: 10px; }
       .facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
       .facts dt {
@@ -1241,24 +1244,23 @@ const profileDevCertBody = `    <style>
       }
       .dc-clear:hover { color: var(--mk-error); filter: none; box-shadow: none; transform: none; }
     </style>
-    <p class="lead">{{.T.devCert}}</p>
+    <p class="lead">{{.T.devKey}}</p>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-    {{if .DevCertFingerprint}}
+    {{if .DevKeyFingerprint}}
     <dl class="facts">
-      {{if .DevCertSubject}}<div><dt>{{.T.devCertSubject}}</dt><dd>{{.DevCertSubject}}</dd></div>{{end}}
-      <div><dt>{{.T.devCertFingerprint}}</dt><dd class="dc-mono">{{.DevCertFingerprint}}</dd></div>
-      <div><dt>{{.T.devCertExpires}}</dt><dd>{{.DevCertExpires}}</dd></div>
+      <div><dt>{{.T.devKeyFingerprint}}</dt><dd class="dc-mono">{{.DevKeyFingerprint}}</dd></div>
+      {{if .DevKeyComment}}<div><dt>&nbsp;</dt><dd class="dc-mono">{{.DevKeyComment}}</dd></div>{{end}}
     </dl>
-    <form method="post" action="/profile/dev-cert">
+    <form method="post" action="/profile/dev-key">
       <input type="hidden" name="action" value="clear">
-      <button class="dc-clear" type="submit">{{.T.devCertRemove}}</button>
+      <button class="dc-clear" type="submit">{{.T.devKeyRemove}}</button>
     </form>
     {{else}}
-    <form method="post" action="/profile/dev-cert" class="dc-form">
-      <textarea name="cert" rows="5" placeholder="-----BEGIN CERTIFICATE-----" required></textarea>
-      <button type="submit">{{.T.devCertSave}}</button>
+    <form method="post" action="/profile/dev-key" class="dc-form">
+      <textarea name="key" rows="4" placeholder="ssh-ed25519 AAAA... you@laptop" required></textarea>
+      <button type="submit">{{.T.devKeySave}}</button>
     </form>
-    <p class="dc-hint">{{.T.devCertHint}}</p>
+    <p class="dc-hint">{{.T.devKeyHint}}</p>
     {{end}}
     <p class="back"><a href="/profile/dev">{{.T.backToDeveloper}}</a></p>
 `
@@ -1418,16 +1420,21 @@ type Handler struct {
 	pwCache    store.PasswordPolicy
 	pwReadAt   time.Time
 	pwCacheSet bool
+
+	// hub is the live channel to the served pages (/meerkat/events). Built
+	// here even on the admin plane, where nothing mounts it: a nil hub would
+	// buy a nil check on every publisher for the sake of one allocation.
+	hub *events.Hub
 }
 
 // New builds the data-plane auth handler (full flow).
 func New(st *store.Store, sm *session.Manager) *Handler {
-	return &Handler{st: st, sm: sm, regLimit: newRateLimiter()}
+	return &Handler{st: st, sm: sm, regLimit: newRateLimiter(), hub: events.NewHub()}
 }
 
 // NewAdmin builds the admin-plane auth handler (credentials only).
 func NewAdmin(st *store.Store, sm *session.Manager) *Handler {
-	return &Handler{st: st, sm: sm, adminPlane: true, regLimit: newRateLimiter()}
+	return &Handler{st: st, sm: sm, adminPlane: true, regLimit: newRateLimiter(), hub: events.NewHub()}
 }
 
 // brandView is the branding as the templates consume it (THEME-02). LogoURL
@@ -1577,8 +1584,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		mux.HandleFunc("GET /profile/tokens", h.showTokens)
 		mux.HandleFunc("POST /profile/tokens", h.doTokens)
 		mux.HandleFunc("GET /profile/dev", h.showProfileDev)
-		mux.HandleFunc("GET /profile/dev/cert", h.showProfileDevCert)
-		mux.HandleFunc("POST /profile/dev-cert", h.doProfileDevCert)
+		mux.HandleFunc("GET /profile/dev/key", h.showProfileDevKey)
+		mux.HandleFunc("POST /profile/dev-key", h.doProfileDevKey)
 		// Self-registration (AUTH-20) - the pages 404 while the policy is off.
 		mux.HandleFunc("GET /register", h.showRegister)
 		mux.HandleFunc("POST /register", h.doRegister)
@@ -1587,6 +1594,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		mux.HandleFunc("GET /account-pending", h.showAccountPending)
 		// The injected <meerkat-user-button> web component (UI routes).
 		h.registerUserButton(mux)
+		// The live channel the served pages listen on (generic, not tied to
+		// any one feature).
+		h.registerEvents(mux)
 		// Issue reports filed from the component's panel (ISSUE-01).
 		h.registerIssues(mux)
 	}
@@ -2147,10 +2157,9 @@ type authorityLink struct {
 // users only).
 type profileDevData struct {
 	flowChrome
-	Error              string
-	DevCertSubject     string
-	DevCertFingerprint string
-	DevCertExpires     string
+	Error             string
+	DevKeyFingerprint string
+	DevKeyComment     string
 }
 
 // passkeyView is one profile row: name it, date it, revoke it.
@@ -2383,10 +2392,10 @@ func (h *Handler) doProfileAvatar(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/profile", http.StatusSeeOther)
 }
 
-// doProfileDevCert stores or clears a DEVELOPER's public certificate - the
-// credential their plugged service will authenticate with (dev plug
-// matching). Devs only; the store validates the PEM.
-func (h *Handler) doProfileDevCert(w http.ResponseWriter, r *http.Request) {
+// doProfileDevKey stores or clears a DEVELOPER's public SSH key - the
+// credential their plugged service will authenticate with (DEV-11). Devs only;
+// the store validates the line.
+func (h *Handler) doProfileDevKey(w http.ResponseWriter, r *http.Request) {
 	sess, err := h.sm.Resolve(r.Context(), r)
 	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -2405,35 +2414,29 @@ func (h *Handler) doProfileDevCert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	cert := ""
+	key := ""
 	if r.PostFormValue("action") != "clear" {
-		cert = strings.TrimSpace(r.PostFormValue("cert"))
+		key = strings.TrimSpace(r.PostFormValue("key"))
 	}
-	if err := h.st.SetUserDevCert(r.Context(), sess.UserID, cert); err != nil {
-		h.renderProfileDevCert(w, r, sess, h.tr(r, "errBadCert"), http.StatusUnprocessableEntity)
+	if err := h.st.SetUserDevKey(r.Context(), sess.UserID, key); err != nil {
+		h.renderProfileDevKey(w, r, sess, h.tr(r, "errBadKey"), http.StatusUnprocessableEntity)
 		return
 	}
-	http.Redirect(w, r, "/profile/dev/cert", http.StatusSeeOther)
+	http.Redirect(w, r, "/profile/dev/key", http.StatusSeeOther)
 }
 
-// devCertView summarizes a stored PEM certificate for the profile page.
-func devCertView(pemText string) (subject, fingerprint, expires string) {
-	block, _ := pem.Decode([]byte(pemText))
-	if block == nil {
-		return
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
+// devKeyView summarizes a stored key for the profile page: the fingerprint
+// OpenSSH itself prints, so someone can compare it with `ssh-keygen -lf` and
+// recognize their own, plus the comment that names the machine it came from.
+//
+// No expiry, and that absence is the design: a key is valid until it is
+// removed, which is what makes removing it mean something.
+func devKeyView(line string) (fingerprint, comment string) {
+	key, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
 	if err != nil {
-		return
+		return "", ""
 	}
-	sum := sha256.Sum256(cert.Raw)
-	fingerprint = hex.EncodeToString(sum[:8]) // enough to recognize it
-	subject = cert.Subject.CommonName
-	if subject == "" {
-		subject = cert.Subject.String()
-	}
-	expires = cert.NotAfter.Format("2006-01-02")
-	return
+	return ssh.FingerprintSHA256(key), comment
 }
 
 func (h *Handler) renderProfile(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
@@ -2537,14 +2540,14 @@ func (h *Handler) showProfileDev(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := profileDevData{flowChrome: h.flowData(r, "titleDeveloper")}
-	if cert, err := h.st.GetUserDevCert(r.Context(), sess.UserID); err == nil && cert != "" {
-		data.DevCertSubject, data.DevCertFingerprint, data.DevCertExpires = devCertView(cert)
+	if key, err := h.st.GetUserDevKey(r.Context(), sess.UserID); err == nil && key != "" {
+		data.DevKeyFingerprint, data.DevKeyComment = devKeyView(key)
 	}
 	writeFlow(w, profileDevPage, data, http.StatusOK)
 }
 
-// showProfileDevCert renders the certificate sub-page.
-func (h *Handler) showProfileDevCert(w http.ResponseWriter, r *http.Request) {
+// showProfileDevKey renders the key sub-page.
+func (h *Handler) showProfileDevKey(w http.ResponseWriter, r *http.Request) {
 	sess, err := h.sm.Resolve(r.Context(), r)
 	if err != nil {
 		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
@@ -2559,15 +2562,15 @@ func (h *Handler) showProfileDevCert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}
-	h.renderProfileDevCert(w, r, sess, "", http.StatusOK)
+	h.renderProfileDevKey(w, r, sess, "", http.StatusOK)
 }
 
-func (h *Handler) renderProfileDevCert(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
+func (h *Handler) renderProfileDevKey(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
 	data := profileDevData{flowChrome: h.flowData(r, "titleDeveloper"), Error: errMsg}
-	if cert, err := h.st.GetUserDevCert(r.Context(), sess.UserID); err == nil && cert != "" {
-		data.DevCertSubject, data.DevCertFingerprint, data.DevCertExpires = devCertView(cert)
+	if key, err := h.st.GetUserDevKey(r.Context(), sess.UserID); err == nil && key != "" {
+		data.DevKeyFingerprint, data.DevKeyComment = devKeyView(key)
 	}
-	writeFlow(w, profileDevCertPage, data, status)
+	writeFlow(w, profileDevKeyPage, data, status)
 }
 
 // initials builds a 1-2 letter avatar seed from the user's name (offline - no

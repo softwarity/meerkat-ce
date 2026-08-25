@@ -2419,7 +2419,7 @@ push et l'annonce plutot que de rougir la CI. GHCR n'est plus une cible.
 ## Session 2026-08-23 - TLS : quatre portes, un echange de pointeur
 
 **Livré** : SSL-01/02/03/05. Paquet `internal/certs`, table `certificates` +
-`acme_cache` (store **v43**), API `/api/certificates` + `/api/settings/tls`,
+`acme_cache` (store **v45**), API `/api/certificates` + `/api/settings/tls`,
 écran console `/infra/tls`. Vert : `make lint`, `go vet`, tests CE et EE,
 `npm run build`. Vérifié en le faisant tourner (h2 négocié, SNI, CSR signée
 par un vrai openssl, PKCS#12 importé, cookie `Secure`).
@@ -2449,6 +2449,43 @@ taille de l'étagère), jamais par une primitive de sécurité : vendre le TLS
 serait vendre la sûreté. Ce qui tombera naturellement en EE le jour venu est le
 **partage du cache ACME entre instances**, parce que le multi-instance est déjà
 EE - aucune règle nouvelle à inventer.
+
+**L'écran est fait des NOMS, pas des certificats (2026-08-24, sa demande, et
+c'est la forme finale).** Premier jet : un interrupteur HTTPS par plan, une liste
+globale de certificats, un certificat rattaché après coup. Verdict de François :
+« tu compliques comme toujours les choses, penses user ». La refonte tient en une
+phrase : **une entrée = un nom DNS**, et son certificat vit dans son bloc.
+
+- **Pas d'interrupteur HTTPS.** Avoir un certificat EST l'activation. Un
+  interrupteur pouvait dire « activé » sans que rien ne serve, c'est-à-dire
+  mentir. Ce qui n'existe pas ne ment pas.
+- **Pas de liste globale.** Un certificat par nom, même s'il faut déposer deux
+  fois le même pour la console et pour l'application : deux plans, deux
+  écoutes, et la duplication coûte moins cher que l'aiguillage mental.
+- **`localhost` est là avant tout le monde**, sur les DEUX plans, semé par
+  `seedTLSNames()` (`internal/store/identity.go:551`). Sa demande : « pourquoi
+  ai-je besoin d'ajouter un name sur application pour ajouter localhost, il
+  devrait être par défaut ».
+- **« Console » et « Application »**, jamais « control plane » / « data plane »
+  dans l'écran : les deux mots se comprennent seuls.
+- **Les liens en clair et en TLS sont sous chaque nom**, pour ouvrir et voir.
+- **L'export emporte les noms, jamais la matière** (`SettingTLS` est dans
+  `ExportedSettings`, les certificats non) : une configuration se transporte,
+  une clé privée reste où elle est scellée.
+
+**Pièges du même jour, tous trouvés en exécutant :**
+- **`INSERT ... ON CONFLICT DO NOTHING` sur une clé déjà présente ne sème rien.**
+  Le réglage `tls` existait, donc le semis n'a jamais atteint sa base. Corrigé
+  par un **marqueur dédié** (`SettingTLSSeeded`) : « ai-je déjà semé » est une
+  question distincte de « la valeur est-elle là ».
+- **Une colonne `NOT NULL DEFAULT ''` fabrique des lignes fantômes** : l'ajout
+  de `host` a donné une ligne à nom vide dans son écran. La migration les
+  supprime en journalisant le compte.
+- **Collision de classes CSS** : un statut nommé `acme` a rencontré une classe
+  de mise en page `.acme` (`display: grid`) et une ligne est devenue trois. Les
+  classes d'état portent maintenant un préfixe `s-`. Trouvé en mesurant le DOM.
+- **Le soulignement au survol vivait sur l'ancre**, donc le cadenas se
+  soulignait aussi : envelopper le texte dans un `<span>`.
 
 **Pièges vécus, tous trouvés en exécutant :**
 - `tls.X509KeyPair` a **deux** formulations pour un couple dépareillé : « does
@@ -2492,19 +2529,6 @@ seulement `srv.Protocols`), et **`r.TLS`** exige que le `*tls.Conn` soit le type
 EXTERNE rendu par `Accept`, sinon tout cookie `Secure` retombe. Le code est dans
 l'historique (`sniff.go`, commit 6c75721).
 
-**Un seul port par plan, pas deux (état intermédiaire, abandonné).** J'avais livré
-deux ports HTTPS séparés ; François a fait remarquer que publier un port de plus
-dans une stack, c'est un redéploiement - exactement ce que l'interrupteur à
-chaud devait éviter. Donc : le port du plan **bascule**, chaque connexion étant
-aiguillée par son premier octet (`0x16` = TLS, majuscule ASCII = HTTP ; aucun
-recouvrement, c'est exact et pas heuristique). Effet de bord heureux : plus
-aucun `bind` ne peut échouer, tout le cas d'erreur « port déjà pris » disparaît.
-Deux choses devaient survivre au reniflage et ont été prouvées avant d'écrire
-quoi que ce soit : **HTTP/2** (il faut `srv.TLSConfig.NextProtos` contenant `h2`
-pour que `Serve` installe h2, pas seulement `srv.Protocols`) et **`r.TLS`** (le
-`*tls.Conn` doit être le type EXTERNE rendu par `Accept`, sinon tout cookie
-`Secure` retombe).
-
 **La console répond toujours en clair - c'est une propriété, pas un réglage.**
 Avec deux ports elle est structurelle : le port en clair de la console n'est
 simplement jamais câblé pour rediriger. Il n'y a plus de règle à défendre.
@@ -2526,7 +2550,73 @@ de main pour un nom inconnu est **avortée**, ce que le navigateur rapporte en
 le `NS_ERROR_NET_EMPTY_RESPONSE` que François a vu. Avec repli, ça devient un
 avertissement de nom qui nomme les deux côtés.
 
-**L'écran part des NOMS (SSL-08, 2026-08-24).** Idée de François, et elle est
+**UN CERTIFICAT APPARTIENT A UN NOM (SSL-08, état final).** François a
+recadré : « penses user ». Ce qui a sauté, et pourquoi :
+
+- **L'interrupteur HTTPS.** Il pouvait être allumé sans certificat, donc il
+  mentait. Avoir un certificat EST l'activation ; le supprimer est l'extinction.
+  Disparaissent avec lui : le message « allumé mais rien à présenter », et tout
+  l'état incohérent qu'il fallait expliquer.
+- **La liste globale de certificats**, et avec elle l'appariement nom/matériel,
+  la couverture calculée, et l'étoile de repli. Le repli est simplement la
+  première entrée du plan.
+- **Le même certificat pour les deux plans s'ajoute deux fois.** Duplication
+  assumée : deux entrées et deux clés se comprennent mieux qu'un objet partagé
+  plus sa règle de couverture.
+
+Le modèle : une ligne = un hôte + son certificat, dans le même bloc. **Et rien
+d'autre** : pas de libellé sur un certificat (l'hôte EST son nom ; le champ
+existait, était stocké, et n'était affiché nulle part), pas de bouton
+« ouvrir en HTTPS » (le lien https est déjà cliquable au-dessus, le bouton le
+dupliquait sous un paragraphe expliquant un choix que personne n'a besoin de
+lire). Règle qui se dégage : **un champ qu'aucun écran ne relit est du poids
+mort, un bouton qui double un lien aussi.**
+
+**Deux icônes destructrices côte à côte ne se distinguent pas.** François :
+« c'est quoi la diff entre remove et delete ? ». La corbeille supprimait le
+certificat, la croix supprimait le nom - invisible. Le correctif n'est pas un
+meilleur libellé : **personne ne veut supprimer un certificat**, on veut le
+REMPLACER (il expire, ou c'est le mauvais fichier). Donc « Replace » avec les
+trois portes, et le retrait sec relégué au bas du menu (« serve this name in
+the clear »). Le remplacement crée AVANT de supprimer : un import raté laisse
+l'hôte servi.
+
+**Piège de schéma** : ajouter une colonne `host NOT NULL DEFAULT ''` laisse les
+anciennes lignes avec un hôte vide - inexprimables dans le nouveau modèle, elles
+s'affichaient en ligne fantôme (« does not answer for » suivi de rien). En phase
+de conception les bases sont jetables, donc la migration les **supprime en le
+journalisant**. Le silence et l'absurde sont pires qu'une ligne de log.
+
+**Semer un défaut, ne pas le rejouer à la lecture - et lui donner SON marqueur.**
+Les deux plans démarrent avec `localhost`. Un `if vide alors localhost` dans le
+lecteur aurait ressuscité le nom à chaque suppression du dernier (écran
+désobéissant). Mais un `INSERT ... DO NOTHING` sur la clé du réglage ne suffit
+pas non plus : François avait déjà des réglages TLS écrits avant que les noms
+existent, donc la clé existait et le semis ne l'a jamais atteint. Il faut un
+marqueur propre (`tls_seeded`), comme `theme_presets_seeded` le fait déjà.
+**« Le réglage existe » n'est pas « déjà semé ».**
+
+**Export (CFG-01) : l'intention voyage, la matière non.** `SettingTLS` (noms +
+autorité ACME) est dans `ExportedSettings` ; les certificats ne peuvent pas y
+être, ils vivent dans leur table et portent une clé privée. Le marqueur
+`tls_seeded` est exclu comme les autres gardes internes. Le contraste avec le
+branding est volontaire et vaut d'être dit : un logo EST exporté (data URI dans
+un réglage) parce que c'est une décoration. Test : `TestACertificateNeverTravels`
+installe un vrai certificat et vérifie qu'aucun `PRIVATE KEY` ni `BEGIN
+CERTIFICATE` n'apparaît dans l'export, pendant que les noms, eux, y sont.
+
+**Le soulignement d'un lien appartient au TEXTE, pas à l'ancre.** Posé sur
+`a:hover`, il traverse l'icône qui précède et se lit comme un défaut de rendu.
+Un `<span>` autour du texte, et la décoration se pose dessus. Le
+formulaire ne redemande pas l'hôte (déclaré une fois). Un import qui ne couvre
+pas son hôte est refusé À L'IMPORT. `localhost` reçoit `127.0.0.1` et `::1` en
+plus, parce qu'on l'atteint par l'un ou par l'autre selon qui tape.
+
+Vocabulaire : « Console » et « Application », **jamais** control plane / data
+plane sur un écran. Et « Force HTTPS », pas « Send the plain port to HTTPS ».
+
+**Version antérieure, abandonnée (l'écran part des noms mais garde une liste
+globale)** : Idée de François, et elle est
 juste : la question d'un exploitant n'est jamais « quels certificats ai-je »
 mais « ma console répondra-t-elle ». Donc deux zones, une par plan, chacune
 déclarant ses noms - **la console en a UN, le plan de données en a PLUSIEURS**,
@@ -2564,6 +2654,33 @@ pour `Upgrade: websocket` malgré `ForceAttemptHTTP2` - vérifié par un test r�
 pas supposé.
 
 ## Prochains chantiers (ordre suggéré)
+
+**Le chantier décidé, prêt à démarrer : plug embarqué dans Meerkat (2026-08-24).**
+Le plan complet est dans **`plug-integration.local.md`** (non versionné, règle
+`*.local.md`) : le contrat tel qu'il est écrit dans `plug/agent/host.go`, ce qui
+existe déjà côté Meerkat avec les `fichier:ligne`, la séquence en cinq étapes et
+les pièges. À lire AVANT de toucher au sujet, il évite de re-litiger.
+
+Ce qu'il faut en retenir sans l'ouvrir :
+- **Ordre convenu : le canal WebSocket d'abord**, transverse et hors plug. Il
+  doit rester **générique** (il portera d'autres messages), donc pas de canal
+  « plug ».
+- **EE par conséquence, pas par une porte fermée.** Restent CE : le canal, la
+  barre dev, son ancre déplaçable (position en `localStorage`, façon TeamViewer).
+  Sont EE : l'agent embarqué et le dépôt de clé par développeur (`edition.Require`
+  refuse). Le bandeau d'override et la page d'après-login sont **EE de fait** :
+  `standaloneHost` ignore `Served`/`Unserved`, donc en CE il n'y a rien à
+  afficher, sans rien avoir à interdire. En une phrase : **CE prouve qu'on a
+  plug, EE prouve qui on est** - d'où l'attribution « pluggé par X », la
+  révocation d'un partant, et l'écran d'état.
+- **Vérification de build à ne pas oublier** : sans le tag `ee`,
+  `go list -deps ./cmd/meerkat` ne doit PAS montrer `github.com/softwarity/plug/agent`.
+- **Non tranché, à lui demander** : le port d'écoute de l'agent embarqué
+  (`MEERKAT_PLUG_ADDR`, défaut `:2222` proposé - `:22` demanderait root ou
+  `CAP_NET_BIND_SERVICE`) ; où vit l'écran d'état dans la console ; et la
+  licence (plug est en FSL-1.1, `ee/` est commercial - les deux sont Softwarity,
+  donc c'est une décision d'édition, pas un blocage, mais mieux vaut l'écrire).
+
 
 0. **Séparer les rôles d'admin gateway / appli / tenant** (question François
    2026-07-26, avis donné : OUI via le catalogue de rôles système -

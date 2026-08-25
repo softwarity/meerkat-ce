@@ -32,17 +32,33 @@ func ValidCertSource(s string) bool {
 	return s == CertSourceImport || s == CertSourceSelfSigned || s == CertSourceCSR
 }
 
-// Certificate is one row: what it is, what it serves, and the material.
+// Planes a certificate can belong to.
+const (
+	PlaneConsole = "console"
+	PlaneApp     = "app"
+)
+
+// ValidCertPlane reports whether p is one of the two.
+func ValidCertPlane(p string) bool { return p == PlaneConsole || p == PlaneApp }
+
+// Certificate is ONE host's certificate.
+//
+// It is not floating material to be matched against a list of names later: the
+// host is part of the row. The console has one, the application has one per
+// host it serves, and material used by both is added twice. Two entries and
+// two keys are cheaper to understand than one shared object plus the rule that
+// works out which name it covers.
 type Certificate struct {
-	ID     string     `json:"id"`
-	Name   string     `json:"name"`
-	Source string     `json:"source"`
-	Info   certs.Info `json:"info"`
-	// Default says this one answers a handshake that names no host - a client
-	// arriving by IP address sends no SNI, and something has to be presented.
-	Default   bool  `json:"default"`
-	CreatedAt int64 `json:"createdAt"`
-	UpdatedAt int64 `json:"updatedAt"`
+	ID string `json:"id"`
+	// Plane and Host are what this certificate is FOR. There is no separate
+	// label: the host IS the name of the thing, and a second one to type would
+	// only be a second one to keep in step.
+	Plane     string     `json:"plane"`
+	Host      string     `json:"host"`
+	Source    string     `json:"source"`
+	Info      certs.Info `json:"info"`
+	CreatedAt int64      `json:"createdAt"`
+	UpdatedAt int64      `json:"updatedAt"`
 
 	// CertPEM is public material by construction: it is what the gateway hands
 	// to every visitor. It is excluded from the list payload only because a
@@ -63,81 +79,73 @@ func (c Certificate) Pending() bool { return c.CertPEM == "" && c.CSRPEM != "" }
 // SaveCertificate inserts or updates one row. The key is sealed here, once,
 // so no caller has to remember to.
 func (s *Store) SaveCertificate(ctx context.Context, c Certificate) error {
-	c.Name = strings.TrimSpace(c.Name)
-	if c.ID == "" || c.Name == "" {
-		return fmt.Errorf("store: a certificate needs an id and a name")
+	c.Host = strings.ToLower(strings.TrimSpace(c.Host))
+	if c.ID == "" {
+		return fmt.Errorf("store: a certificate needs an id")
+	}
+	if c.Host == "" {
+		return fmt.Errorf("store: a certificate needs a host - it belongs to the name it answers for")
+	}
+	if !ValidCertPlane(c.Plane) {
+		return fmt.Errorf("store: certificate %q: unknown plane %q (allowed: %s, %s)",
+			c.Host, c.Plane, PlaneConsole, PlaneApp)
 	}
 	if !ValidCertSource(c.Source) {
 		return fmt.Errorf("store: certificate %q: unknown source %q (allowed: %s, %s, %s)",
-			c.Name, c.Source, CertSourceImport, CertSourceSelfSigned, CertSourceCSR)
+			c.Host, c.Source, CertSourceImport, CertSourceSelfSigned, CertSourceCSR)
 	}
 	if c.KeyPEM == "" {
-		return fmt.Errorf("store: certificate %q: no private key", c.Name)
+		return fmt.Errorf("store: certificate %q: no private key", c.Host)
 	}
 	sealed, err := s.vaultCipher.Seal(c.KeyPEM)
 	if err != nil {
-		return fmt.Errorf("store: certificate %q: sealing the private key: %w", c.Name, err)
+		return fmt.Errorf("store: certificate %q: sealing the private key: %w", c.Host, err)
 	}
 	dns, err := json.Marshal(nonNil(c.Info.DNSNames))
 	if err != nil {
-		return fmt.Errorf("store: certificate %q: %w", c.Name, err)
+		return fmt.Errorf("store: certificate %q: %w", c.Host, err)
 	}
 	ips, err := json.Marshal(nonNil(c.Info.IPAddresses))
 	if err != nil {
-		return fmt.Errorf("store: certificate %q: %w", c.Name, err)
+		return fmt.Errorf("store: certificate %q: %w", c.Host, err)
 	}
 	now := time.Now().Unix()
 	if c.CreatedAt == 0 {
 		c.CreatedAt = now
 	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO certificates (id, name, source, cert_pem, key_sealed, csr_pem, subject, issuer,
-		   serial, algo, key_type, dns_names, ip_addresses, chain, self_signed, not_before, not_after,
-		   is_default, created_at, updated_at)
+		`INSERT INTO certificates (id, plane, host, source, cert_pem, key_sealed, csr_pem,
+		   subject, issuer, serial, algo, key_type, dns_names, ip_addresses, chain, self_signed,
+		   not_before, not_after, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
-		   name = excluded.name, source = excluded.source, cert_pem = excluded.cert_pem,
+		   plane = excluded.plane, host = excluded.host,
+		   source = excluded.source, cert_pem = excluded.cert_pem,
 		   key_sealed = excluded.key_sealed, csr_pem = excluded.csr_pem, subject = excluded.subject,
 		   issuer = excluded.issuer, serial = excluded.serial, algo = excluded.algo,
 		   key_type = excluded.key_type, dns_names = excluded.dns_names,
 		   ip_addresses = excluded.ip_addresses, chain = excluded.chain,
 		   self_signed = excluded.self_signed, not_before = excluded.not_before,
-		   not_after = excluded.not_after, is_default = excluded.is_default,
-		   updated_at = excluded.updated_at`,
-		c.ID, c.Name, c.Source, c.CertPEM, sealed, c.CSRPEM, c.Info.Subject, c.Info.Issuer,
-		c.Info.Serial, c.Info.Algo, c.Info.KeyType, string(dns), string(ips), c.Info.Chain,
-		c.Info.SelfSigned, c.Info.NotBefore, c.Info.NotAfter, c.Default, c.CreatedAt, now)
+		   not_after = excluded.not_after, updated_at = excluded.updated_at`,
+		c.ID, c.Plane, c.Host, c.Source, c.CertPEM, sealed, c.CSRPEM, c.Info.Subject,
+		c.Info.Issuer, c.Info.Serial, c.Info.Algo, c.Info.KeyType, string(dns), string(ips),
+		c.Info.Chain, c.Info.SelfSigned, c.Info.NotBefore, c.Info.NotAfter, c.CreatedAt, now)
 	if err != nil {
-		return fmt.Errorf("store: save certificate %q: %w", c.Name, err)
-	}
-	if c.Default {
-		return s.clearOtherDefaults(ctx, c.ID)
+		return fmt.Errorf("store: save certificate %q: %w", c.Host, err)
 	}
 	return nil
 }
 
-// clearOtherDefaults keeps "at most one default" true. Enforced in code rather
-// than by a partial unique index: the same schema has to run on the external
-// SQL backend one day, and partial indexes are the first thing dialects
-// disagree about.
-func (s *Store) clearOtherDefaults(ctx context.Context, keep string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE certificates SET is_default = 0 WHERE id <> ?`, keep)
-	if err != nil {
-		return fmt.Errorf("store: clearing the previous default certificate: %w", err)
-	}
-	return nil
-}
-
-const certCols = `id, name, source, cert_pem, key_sealed, csr_pem, subject, issuer, serial, algo,
-	key_type, dns_names, ip_addresses, chain, self_signed, not_before, not_after, is_default,
+const certCols = `id, plane, host, source, cert_pem, key_sealed, csr_pem, subject, issuer,
+	serial, algo, key_type, dns_names, ip_addresses, chain, self_signed, not_before, not_after,
 	created_at, updated_at`
 
 func (s *Store) scanCertificate(sc scanner) (Certificate, error) {
 	var c Certificate
 	var sealed, dns, ips string
-	if err := sc.Scan(&c.ID, &c.Name, &c.Source, &c.CertPEM, &sealed, &c.CSRPEM, &c.Info.Subject,
-		&c.Info.Issuer, &c.Info.Serial, &c.Info.Algo, &c.Info.KeyType, &dns, &ips, &c.Info.Chain,
-		&c.Info.SelfSigned, &c.Info.NotBefore, &c.Info.NotAfter, &c.Default,
+	if err := sc.Scan(&c.ID, &c.Plane, &c.Host, &c.Source, &c.CertPEM, &sealed, &c.CSRPEM,
+		&c.Info.Subject, &c.Info.Issuer, &c.Info.Serial, &c.Info.Algo, &c.Info.KeyType, &dns, &ips,
+		&c.Info.Chain, &c.Info.SelfSigned, &c.Info.NotBefore, &c.Info.NotAfter,
 		&c.CreatedAt, &c.UpdatedAt); err != nil {
 		return c, err
 	}
@@ -159,7 +167,7 @@ func (s *Store) scanCertificate(sc scanner) (Certificate, error) {
 // looking at this screen has just added something.
 func (s *Store) ListCertificates(ctx context.Context) ([]Certificate, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+certCols+` FROM certificates ORDER BY is_default DESC, name COLLATE NOCASE, created_at DESC`)
+		`SELECT `+certCols+` FROM certificates ORDER BY plane, host COLLATE NOCASE`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list certificates: %w", err)
 	}
@@ -197,63 +205,33 @@ func (s *Store) DeleteCertificate(ctx context.Context, id string) error {
 	return nil
 }
 
-// SetDefaultCertificate points the no-SNI fallback at one row, or at none.
-func (s *Store) SetDefaultCertificate(ctx context.Context, id string) error {
-	if id == "" {
-		_, err := s.db.ExecContext(ctx, `UPDATE certificates SET is_default = 0`)
-		return err
-	}
-	c, err := s.FindCertificate(ctx, id)
-	if err != nil {
-		return err
-	}
-	if c.Pending() {
-		return fmt.Errorf("store: %q is a signing request waiting for an answer: it has no certificate to present", c.Name)
-	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE certificates SET is_default = 1 WHERE id = ?`, id); err != nil {
-		return fmt.Errorf("store: set default certificate: %w", err)
-	}
-	return s.clearOtherDefaults(ctx, id)
-}
-
-// CertificateMaterials parses every servable row into what the TLS manager
+// CertificateMaterials parses one plane's rows into what its TLS manager
 // holds. A row that cannot be parsed does not sink the others: it is named in
 // the returned problems and left out, because one corrupt certificate must not
-// take the whole HTTPS listener down with it.
-func (s *Store) CertificateMaterials(ctx context.Context) (list []*certs.Material, fallback *certs.Material, problems []string, err error) {
+// take a whole HTTPS door down with it.
+//
+// The fallback - what answers a handshake carrying no server name, from a
+// client that came by IP address - is simply the FIRST entry of the plane.
+// There is no star to tick: with one certificate per host, asking an operator
+// to also nominate a default would be asking about a mechanism they were never
+// shown.
+func (s *Store) CertificateMaterials(ctx context.Context, plane string) (list []*certs.Material, fallback *certs.Material, problems []string, err error) {
 	rows, err := s.ListCertificates(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	for _, c := range rows {
-		if c.Pending() {
+		if c.Plane != plane || c.Pending() {
 			continue
 		}
 		m, perr := certs.ParsePEM(c.CertPEM, c.KeyPEM)
 		if perr != nil {
-			problems = append(problems, fmt.Sprintf("%s: %v", c.Name, perr))
+			problems = append(problems, fmt.Sprintf("%s: %v", c.Host, perr))
 			continue
 		}
 		list = append(list, m)
-		if c.Default {
+		if fallback == nil {
 			fallback = m
-		}
-	}
-	// There is ALWAYS a fallback when anything is installed, and that is a
-	// deliberate choice about which failure an operator gets.
-	//
-	// With one, the answer is obvious and asking would be asking a question
-	// with a single answer. With several and none marked, the temptation is to
-	// present nothing - but a handshake that finds no certificate is aborted,
-	// and a browser reports that as an empty response, which is the least
-	// diagnosable event of anyone's day. Presenting the longest-lived one
-	// instead turns it into a plain name-mismatch warning that names both
-	// sides. It is what a web server's default virtual host has always done.
-	if fallback == nil {
-		for _, m := range list {
-			if fallback == nil || m.Info.NotAfter > fallback.Info.NotAfter {
-				fallback = m
-			}
 		}
 	}
 	return list, fallback, problems, nil
@@ -336,8 +314,19 @@ func (s *Store) RawTLS(ctx context.Context) certs.Settings {
 // TLSSettings reads them RESOLVED, which is what the supervisor runs on. The
 // external-account HMAC key is the one secret here, and it follows the rule
 // every secret follows: stored as a $name, expanded only when used.
+//
+// The console defaults to localhost: a first start has to have a name to offer,
+// and localhost is the one every installation is reachable by before anyone has
+// decided anything.
 func (s *Store) TLSSettings(ctx context.Context) certs.Settings {
 	cfg := s.RawTLS(ctx)
 	cfg.ACME.EABHMACKey = s.ExpandInfra(ctx, cfg.ACME.EABHMACKey)
+	if cfg.ConsoleName == "" {
+		cfg.ConsoleName = DefaultConsoleName
+	}
 	return cfg
 }
+
+// DefaultConsoleName is what the console answers to before anyone says
+// otherwise. Every installation is reachable by it on the first day.
+const DefaultConsoleName = "localhost"

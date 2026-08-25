@@ -59,7 +59,9 @@
   color: var(--mat-sys-primary);
   text-decoration: none;
 }
-.links a:hover {
+/* The underline belongs to the TEXT, not to the whole anchor: run across the
+   padlock it reads as a rendering fault rather than as a link. */
+.links a:hover span {
   text-decoration: underline;
 }
 .links .off {
@@ -72,40 +74,74 @@
   height: 16px;
   overflow: visible;
 }
-/* One declared name and whether anything answers for it - the only question
-   an operator actually has about TLS. */
-.cover {
+/* One name and its certificate, in one block: they are one thing, and reading
+   them apart was what made the old flat list hard to work with. */
+.entry {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.entry::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--mat-sys-outline);
+}
+.entry.ok::before {
+  background: var(--mat-sys-primary);
+}
+.entry.soon::before,
+.entry.wait::before {
+  background: var(--mat-sys-tertiary);
+}
+.entry.bad::before {
+  background: var(--mat-sys-error);
+}
+.entry .host {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--mat-sys-on-surface-variant);
+  min-width: 0;
 }
-.cover code {
+.entry .host code {
   font-family: var(--mk-mono);
-  color: var(--mat-sys-on-surface);
+  font-weight: 500;
 }
-.cover mat-icon {
+.entry .host mat-icon {
   font-size: 18px;
   width: 18px;
   height: 18px;
   overflow: visible;
   flex-shrink: 0;
+  color: var(--mat-sys-on-surface-variant);
 }
-/* The status classes carry an s- prefix. Without it, a status called "acme"
-   collided with the .acme layout block below and silently turned the row into
-   a grid - three lines where one was meant. A status is data, a layout class
-   is structure, and they must not share a namespace. */
-.cover.s-covered mat-icon {
+.entry.ok .host mat-icon {
   color: var(--mat-sys-primary);
 }
-.cover.s-expiring mat-icon,
-.cover.s-acme mat-icon {
+.entry.soon .host mat-icon,
+.entry.wait .host mat-icon {
   color: var(--mat-sys-tertiary);
 }
-.cover.s-uncovered mat-icon,
-.cover.s-expired mat-icon {
+.entry.bad .host mat-icon {
+  color: var(--mat-sys-error);
+}
+.entry .links {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+}
+.entry .says {
+  grid-column: 1 / -1;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+}
+.entry.bad .says {
   color: var(--mat-sys-error);
 }
 .automatic {
@@ -117,6 +153,265 @@
   font-size: 0.85rem;
   font-weight: 500;
   margin: 0 0 4px;
+}
+.auto-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auto-row .soon {
+  font-size: 0.78rem;
+}
+.automatic code {
+  font-family: var(--mk-mono);
+  font-size: 0.82rem;
+}
+.certs h2 {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 0;
+}
+.lamp {
+  margin-left: auto;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.lamp.on {
+  color: var(--mat-sys-primary);
+  font-weight: 500;
+}
+.note {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.82rem;
+  margin: 0;
+}
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}
+.problem mat-icon {
+  flex-shrink: 0;
+  overflow: visible;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+.certs {
+  display: grid;
+  gap: 12px;
+}
+.cert {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 12px 16px 12px 18px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.cert::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--mat-sys-primary);
+  opacity: 0.7;
+}
+.cert.pending::before {
+  background: var(--mat-sys-outline);
+}
+.cert .name {
+  font-weight: 500;
+}
+.badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+}
+.badge.warn {
+  background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
+  color: var(--mat-sys-error);
+}
+.is-default mat-icon {
+  color: var(--mat-sys-primary);
+}
+.cert .hosts,
+.cert .meta {
+  grid-column: 1 / -1;
+}
+.cert .hosts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.cert .hosts code {
+  font-family: var(--mk-mono);
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.cert .meta {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.78rem;
+}
+.validity.soon,
+.soon {
+  color: var(--mat-sys-tertiary);
+  font-weight: 500;
+}
+.validity.gone {
+  color: var(--mat-sys-error);
+  font-weight: 500;
+}
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+  padding: 8px 0;
+}
+.acme {
+  display: grid;
+  gap: 4px;
+}
+.private {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+.private summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+/* The fields inside the fold stack. app-form-field is display:contents, so
+   its mat-form-field is what this grid actually lays out - left to flow, the
+   three of them sat side by side and squeezed the PEM box into a column four
+   characters wide. */
+.fold {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-top: 12px;
+}
+textarea.pem {
+  font-family: var(--mk-mono);
+  font-size: 0.75rem;
+}
+.issued {
+  margin-top: 8px;
+}
+.issued h3 {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 0 4px;
+}
+.issued p {
+  margin: 2px 0;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.entry::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--mat-sys-outline);
+}
+.entry.ok::before {
+  background: var(--mat-sys-primary);
+}
+.entry.soon::before,
+.entry.wait::before {
+  background: var(--mat-sys-tertiary);
+}
+.entry.bad::before {
+  background: var(--mat-sys-error);
+}
+.entry .host {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.entry .host code {
+  font-family: var(--mk-mono);
+  font-weight: 500;
+}
+.entry .host mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+  flex-shrink: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+.entry.ok .host mat-icon {
+  color: var(--mat-sys-primary);
+}
+.entry.soon .host mat-icon,
+.entry.wait .host mat-icon {
+  color: var(--mat-sys-tertiary);
+}
+.entry.bad .host mat-icon {
+  color: var(--mat-sys-error);
+}
+.entry .links {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+}
+.entry .says {
+  grid-column: 1 / -1;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+}
+.entry.bad .says {
+  color: var(--mat-sys-error);
+}
+.automatic {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0;
+}
+.automatic h3 {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 0 4px;
+}
+.auto-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auto-row .soon {
+  font-size: 0.78rem;
 }
 .automatic code {
   font-family: var(--mk-mono);

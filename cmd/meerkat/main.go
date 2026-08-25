@@ -22,6 +22,7 @@ import (
 	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/config"
+	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
@@ -32,6 +33,17 @@ import (
 )
 
 func main() {
+	// Before anything else: a process the developer tunnel started to answer
+	// ONE verb. It is not a gateway - no store, no ports, no flags - and it
+	// exits when the answer is out. The gateway re-execs itself rather than
+	// running a verb in a goroutine because the verbs call os.Exit, which is
+	// right for a process whose whole job is one answer and would take the
+	// gateway down with it. The community image has no verbs to answer.
+	if len(os.Args) > 1 && os.Args[1] == devtunnel.VerbArg {
+		devtunnel.RunVerb()
+		return
+	}
+
 	showVersion := flag.Bool("version", false, "print version and exit")
 	addr := flag.String("addr", envOr("MEERKAT_ADDR", ":8080"), "application (data plane) listen address")
 	adminAddr := flag.String("admin-addr", envOr("MEERKAT_ADMIN_ADDR", ":9090"), "administration (control plane) listen address")
@@ -50,6 +62,21 @@ func main() {
 		"application (data plane) HTTPS listen address, opened when TLS is switched on")
 	adminTLSAddr := flag.String("admin-tls-addr", envOr("MEERKAT_ADMIN_TLS_ADDR", ":9443"),
 		"administration (control plane) HTTPS listen address, opened when TLS is switched on")
+	// This gateway is a PRODUCTION one: the whole developer surface is closed
+	// here, whatever the database says. An environment decision rather than a
+	// stored one, because the stored switch travels - a configuration export,
+	// a restored backup, a database copied from staging can each carry it ON
+	// into production, and nobody notices until there is a tunnel port in
+	// front of customers.
+	production := flag.Bool("production", envOr("MEERKAT_PRODUCTION", "") != "",
+		"declare this gateway production: the developer surface (tooling, API docs, tunnel) stays closed whatever the settings say")
+	// The developer tunnel's SSH port (DEV-11). Always has one - turning the
+	// tunnel off is done by closing the developer surface, not by withholding
+	// a port. Above 1024 because binding a privileged port would want root or
+	// CAP_NET_BIND_SERVICE, against the grain of the rest of the image; which
+	// port is PUBLISHED outside the cluster is a deployment decision anyway.
+	plugAddr := flag.String("plug-addr", envOr("MEERKAT_PLUG_ADDR", devtunnel.DefaultAddr),
+		"developer tunnel (plug) listen address, Enterprise only; it opens only where developer mode is on and a cluster is reachable")
 	flag.Parse()
 
 	if *showVersion {
@@ -60,7 +87,8 @@ func main() {
 	if err := run(options{
 		addr: *addr, adminAddr: *adminAddr, tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
-		vaultFile: *vaultFile, tenancy: *tenancy,
+		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr,
+		production: *production,
 	}); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
@@ -76,11 +104,21 @@ type options struct {
 	consoleURL, dataDir   string
 	configFile, vaultFile string
 	tenancy               string
+	plugAddr              string
+	production            bool
 }
 
 func run(o options) error {
 	addr, adminAddr, consoleURL := o.addr, o.adminAddr, o.consoleURL
 	dataDir, configFile, vaultFile, tenancy := o.dataDir, o.configFile, o.vaultFile, o.tenancy
+	// Before the store opens, so the very first read of the developer switch
+	// already has the environment's answer. Said out loud once: an operator
+	// looking for tooling that is not there deserves to find the reason in the
+	// startup lines rather than in the source.
+	store.SetProduction(o.production)
+	if o.production {
+		slog.Info("production gateway: the developer surface is closed here", "why", "MEERKAT_PRODUCTION")
+	}
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
@@ -158,6 +196,11 @@ func run(o options) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
 	authHandler := auth.New(st, sessions)
+	// What a developer's machine is serving right now, and who by. The
+	// registry lives in the trunk because trunk code READS it; only the
+	// Enterprise agent ever writes to it, so in the community image it stays
+	// empty and every screen built on it shows nothing, without a guard.
+	served := devtunnel.NewRegistry(authHandler.Events())
 	authHandler.Mailer = mailer
 	authHandler.Register(mux)
 	router.RegisterDevDocs(mux) // /meerkat/apidocs - developer docs (dev capability)
@@ -259,6 +302,13 @@ func run(o options) error {
 			}
 		}
 	}()
+
+	// The developer tunnel follows the developer-mode switch: mode off, no
+	// agent, no port, nothing listening. The community image linked no agent
+	// in, so this returns at once and says nothing.
+	tunnelCtx, stopTunnel := context.WithCancel(context.Background())
+	defer stopTunnel()
+	go devtunnel.Supervise(tunnelCtx, devtunnel.Deps{Store: st, Registry: served, Addr: o.plugAddr})
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)

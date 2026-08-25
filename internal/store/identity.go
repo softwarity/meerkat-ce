@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/softwarity/meerkat/internal/certs"
 )
 
 // DayRange is one allowed window on one weekday. Hours are WALL-CLOCK in the
@@ -400,6 +402,10 @@ const (
 	// table - this holds only the switches, so turning HTTPS off never risks
 	// touching a private key.
 	SettingTLS = "tls"
+	// SettingTLSSeeded records that both planes were given their first name
+	// (localhost). Its own marker, so the names can be seeded ONCE on an
+	// installation that already had TLS settings - and so removing them sticks.
+	SettingTLSSeeded = "tls_seeded"
 	// SettingDevMode is the installation-wide developer switch (DEV-01): the
 	// master the per-account `dev` capability hangs from. Off, the developer
 	// surface of the SERVED applications is not there at all - no Developer
@@ -527,7 +533,39 @@ func (s *Store) seedDefaultSettings() error {
 			return fmt.Errorf("store: seed setting %q: %w", key, err)
 		}
 	}
-	return nil
+	return s.seedTLSNames()
+}
+
+// seedTLSNames gives both planes the name every installation answers to on its
+// first day.
+//
+// It carries its OWN marker rather than riding on "is the setting absent",
+// because the two are not the same question: an installation that saved TLS
+// settings before names existed has the key and no names, and would open on an
+// Application block with nothing in it and no obvious first move.
+//
+// And it is a marker rather than a default applied on read, because a name an
+// operator removes must stay removed - "empty means localhost" would put it
+// back every time they cleared the last one, which is how a screen starts
+// feeling disobedient.
+func (s *Store) seedTLSNames() error {
+	ctx := context.Background()
+	var seeded bool
+	if err := s.GetSetting(ctx, SettingTLSSeeded, &seeded); err == nil && seeded {
+		return nil
+	}
+	var cfg certs.Settings
+	_ = s.GetSetting(ctx, SettingTLS, &cfg)
+	if cfg.ConsoleName == "" {
+		cfg.ConsoleName = DefaultConsoleName
+	}
+	if len(cfg.AppNames) == 0 {
+		cfg.AppNames = []string{DefaultConsoleName}
+	}
+	if err := s.SetSetting(ctx, SettingTLS, cfg); err != nil {
+		return err
+	}
+	return s.SetSetting(ctx, SettingTLSSeeded, true)
 }
 
 // Tenancy reports the mode this installation runs in, defaulting to single

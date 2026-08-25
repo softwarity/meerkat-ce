@@ -7,6 +7,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/pb33f/libopenapi v0.38.7
+	github.com/softwarity/plug/agent v0.0.0-20260823202101-500a77de3b48
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.54.0
 	golang.org/x/text v0.40.0

@@ -79,8 +79,8 @@ func (d *Document) Empty() bool {
 //   - the signing keys, which are private key material - like a certificate,
 //     it is generated where it is used and never travels in a document that
 //     calls itself public;
-//   - the internal guards (theme presets seeded...), which only mean something
-//     for the install that wrote them.
+//   - the internal guards (theme presets seeded, tls names seeded...), which
+//     only mean something for the install that wrote them.
 var ExportedSettings = []string{
 	store.SettingBusinessAccess,
 	store.SettingSessionTTL,
@@ -97,6 +97,20 @@ var ExportedSettings = []string{
 	store.SettingPagesScheme,
 	store.SettingPageLayout,
 	store.SettingDevMode,
+	// The TLS names and the authority that issues for them. WHICH names this
+	// gateway answers to is configuration in the same sense a route's host
+	// predicate is, and it travels for the same reason: a configuration landing
+	// in a fresh environment should know what it serves rather than waiting for
+	// someone to remember.
+	//
+	// The CERTIFICATES do not travel, and cannot. They hold private keys, and a
+	// document that calls itself public is the last place for one - which is
+	// also why they live in their own table rather than in a setting. What
+	// lands with this is the intent; the material is obtained where it is used,
+	// by an authority that fetches it or by a hand that imports it. The
+	// external-account secret rides as a $name (VAULT-05), so even the
+	// authority's credentials stay behind.
+	store.SettingTLS,
 }
 
 // stampedKeys are written by the store on every save. They say WHEN an object

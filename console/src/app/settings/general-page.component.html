@@ -50,10 +50,17 @@
             gateway serves: the Developer menu in the user button, the UI test mode and the routes'
             API docs. Off, none of it is there at all - however many accounts carry the capability.
           </p>
+          @if (devLocked()) {
+            <p class="hint text-muted" i18n="@@Developer_mode_locked">
+              This gateway is declared production, so the developer surface stays closed here
+              whatever this switch says. It is set where the gateway runs, not here - a database
+              restored from staging cannot carry it back open.
+            </p>
+          }
         </div>
         <mat-slide-toggle
           [checked]="devMode()"
-          [disabled]="switchingDev()"
+          [disabled]="switchingDev() || devLocked()"
           (change)="setDevMode($event.checked)"
         />
       </div>

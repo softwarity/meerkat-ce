@@ -575,8 +575,8 @@ func TestAnExpiredCertificateStandsTheRedirectDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := &fakeSource{
-		materials: []*Material{expired}, fallback: expired,
-		settings: Settings{Data: true, Redirect: true},
+		app: []*Material{expired}, appFallback: expired,
+		settings: Settings{Redirect: true, AppNames: []string{"app.example.com"}},
 	}
 	d := NewRedirect()
 	sup := NewSupervisor(src, func(error) bool { return true },
@@ -587,7 +587,9 @@ func TestAnExpiredCertificateStandsTheRedirectDown(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sup.Stop(context.Background()) })
 
-	if !sup.State().Data {
+	// Having a certificate IS the activation: no switch was set, and the door
+	// opened because there is something to present.
+	if !sup.State().App {
 		t.Fatal("an expired certificate is still something to present: the door opens")
 	}
 	if sup.State().Redirecting {
@@ -607,13 +609,18 @@ func TestAnExpiredCertificateStandsTheRedirectDown(t *testing.T) {
 
 // fakeSource stands in for the store.
 type fakeSource struct {
-	materials []*Material
-	fallback  *Material
-	settings  Settings
+	console     []*Material
+	consoleFall *Material
+	app         []*Material
+	appFallback *Material
+	settings    Settings
 }
 
-func (f *fakeSource) CertificateMaterials(context.Context) ([]*Material, *Material, []string, error) {
-	return f.materials, f.fallback, nil, nil
+func (f *fakeSource) CertificateMaterials(_ context.Context, plane string) ([]*Material, *Material, []string, error) {
+	if plane == PlaneConsole {
+		return f.console, f.consoleFall, nil, nil
+	}
+	return f.app, f.appFallback, nil, nil
 }
 func (f *fakeSource) TLSSettings(context.Context) Settings                 { return f.settings }
 func (f *fakeSource) ACMECacheGet(context.Context, string) (string, error) { return "", errNoRow }
@@ -645,5 +652,76 @@ func TestCoversFollowsTheRuleX509Applies(t *testing.T) {
 	}
 	if err := m.Leaf().VerifyHostname("apps.example.com"); err == nil {
 		t.Fatal("x509 disagrees with Covers on the bare domain")
+	}
+}
+
+// TestHavingACertificateIsTheActivation: there is no switch to disagree with.
+// A plane with material serves TLS; a plane without does not, and no state
+// exists in which one says "on" while nothing can be presented.
+func TestHavingACertificateIsTheActivation(t *testing.T) {
+	console := mustSelfSigned(t, Request{DNSNames: []string{"localhost"}})
+	src := &fakeSource{
+		console: []*Material{console}, consoleFall: console,
+		settings: Settings{ConsoleName: "localhost"},
+	}
+	sup := NewSupervisor(src, func(error) bool { return true },
+		NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
+		NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil), NewRedirect())
+	t.Cleanup(func() { _ = sup.Stop(context.Background()) })
+
+	if err := sup.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	st := sup.State()
+	if !st.Console {
+		t.Fatal("the console has a certificate: its door is open")
+	}
+	if st.App {
+		t.Fatal("the application has none: its door stays shut")
+	}
+	// And nothing is reported as a problem - an empty plane is not a fault,
+	// it is an installation that has not got there yet.
+	if len(st.Problems) != 0 {
+		t.Fatalf("no certificate is not a problem to report: %v", st.Problems)
+	}
+
+	// Remove it, and the door closes on its own.
+	src.console, src.consoleFall = nil, nil
+	if err := sup.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sup.State().Console {
+		t.Fatal("deleting the certificate is what closes the door")
+	}
+}
+
+// TestEachPlaneOnlyEverPresentsItsOwn: the console door must never hand out an
+// application certificate, whatever names it carries.
+func TestEachPlaneOnlyEverPresentsItsOwn(t *testing.T) {
+	console := mustSelfSigned(t, Request{DNSNames: []string{"admin.example.com"}})
+	app := mustSelfSigned(t, Request{DNSNames: []string{"shop.example.com"}})
+	src := &fakeSource{
+		console: []*Material{console}, consoleFall: console,
+		app: []*Material{app}, appFallback: app,
+	}
+	sup := NewSupervisor(src, func(error) bool { return true },
+		NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
+		NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil), NewRedirect())
+	t.Cleanup(func() { _ = sup.Stop(context.Background()) })
+	if err := sup.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := sup.Console.GetCertificate(hello("shop.example.com")); err == nil {
+		// It falls back rather than erroring, but it must never be the
+		// application's certificate that comes out.
+		got, _ := sup.Console.GetCertificate(hello("shop.example.com"))
+		if got == app.TLS() {
+			t.Fatal("the console door presented an application certificate")
+		}
+	}
+	got, err := sup.App.GetCertificate(hello("shop.example.com"))
+	if err != nil || got != app.TLS() {
+		t.Fatalf("the application door must present its own: %v", err)
 	}
 }

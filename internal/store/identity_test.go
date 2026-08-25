@@ -2,18 +2,15 @@ package store
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
+	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"database/sql"
-	"encoding/pem"
 	"errors"
-	"math/big"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 func TestUserLifecycle(t *testing.T) {
@@ -364,44 +361,63 @@ func ranges(from, to string, days ...int) []DayRange {
 	return out
 }
 
-// A developer's public certificate: valid PEM in, same PEM out, garbage
-// refused, empty clears.
-func TestDevCertRoundtrip(t *testing.T) {
+// A developer's public key: an authorized_keys line in, the same line out,
+// garbage refused, empty clears. And the admission list only holds accounts
+// that could actually use it.
+func TestDevKeyRoundtrip(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()
 	if err := s.CreateUser(ctx, User{ID: "d1", Username: "neo", PasswordHash: "x", Dev: true, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmpl := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "dev-neo"},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(24 * time.Hour),
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	signer, err := ssh.NewPublicKey(pub)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pemText := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer))) + " neo@laptop"
 
-	if err := s.SetUserDevCert(ctx, "d1", pemText); err != nil {
-		t.Fatalf("SetUserDevCert: %v", err)
+	if err := s.SetUserDevKey(ctx, "d1", line); err != nil {
+		t.Fatalf("SetUserDevKey: %v", err)
 	}
-	got, err := s.GetUserDevCert(ctx, "d1")
-	if err != nil || got != pemText {
+	got, err := s.GetUserDevKey(ctx, "d1")
+	if err != nil || got != line {
 		t.Fatalf("roundtrip failed: %v %q", err, got)
 	}
-	if err := s.SetUserDevCert(ctx, "d1", "not a cert"); err == nil {
-		t.Fatal("garbage certificate accepted")
+	// A PRIVATE key is the mistake worth catching: it is the file next to the
+	// one they meant, and pasting it here would publish it.
+	if err := s.SetUserDevKey(ctx, "d1", "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----"); err == nil {
+		t.Fatal("a private key was accepted")
 	}
-	if err := s.SetUserDevCert(ctx, "d1", ""); err != nil {
+	if err := s.SetUserDevKey(ctx, "d1", "not a key"); err == nil {
+		t.Fatal("garbage key accepted")
+	}
+
+	// The admission list: only an enabled dev who deposited something.
+	owners, err := s.DevKeyOwners(ctx)
+	if err != nil || len(owners) != 1 || owners[0].Username != "neo" {
+		t.Fatalf("owners = %+v (%v)", owners, err)
+	}
+	if err := s.CreateUser(ctx, User{ID: "d2", Username: "trinity", PasswordHash: "x", Dev: true, Enabled: false}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetUserDevKey(ctx, "d2", line); err != nil {
+		t.Fatal(err)
+	}
+	if owners, _ := s.DevKeyOwners(ctx); len(owners) != 1 {
+		t.Fatalf("a disabled account is still admitted: %+v", owners)
+	}
+
+	if err := s.SetUserDevKey(ctx, "d1", ""); err != nil {
 		t.Fatalf("clear: %v", err)
 	}
-	if got, _ := s.GetUserDevCert(ctx, "d1"); got != "" {
+	if got, _ := s.GetUserDevKey(ctx, "d1"); got != "" {
 		t.Fatalf("not cleared: %q", got)
+	}
+	if owners, _ := s.DevKeyOwners(ctx); len(owners) != 0 {
+		t.Fatalf("a cleared key still admits: %+v", owners)
 	}
 }

@@ -42,7 +42,8 @@ func TestTheFourDoors(t *testing.T) {
 
 	// 1. Import: what a CA e-mailed back, what certbot wrote.
 	certPEM, keyPEM := pemPair(t, "imported.example.com")
-	body := `{"name":"imported","certPem":` + jsonString(certPEM) + `,"keyPem":` + jsonString(keyPEM) + `}`
+	body := `{"plane":"app","host":"imported.example.com","certPem":` +
+		jsonString(certPEM) + `,"keyPem":` + jsonString(keyPEM) + `}`
 	code, out := f.call(t, "POST", "/api/certificates/import", body, f.rootC)
 	if code != http.StatusCreated {
 		t.Fatalf("import: %d %s", code, out)
@@ -53,7 +54,7 @@ func TestTheFourDoors(t *testing.T) {
 
 	// 2. Self-signed: HTTPS in one click, honestly labelled.
 	code, out = f.call(t, "POST", "/api/certificates/self-signed",
-		`{"name":"lab","dnsNames":["lab.example.com"],"keyType":"ecdsa-p256"}`, f.rootC)
+		`{"plane":"console","host":"localhost","keyType":"ecdsa-p256"}`, f.rootC)
 	if code != http.StatusCreated {
 		t.Fatalf("self-signed: %d %s", code, out)
 	}
@@ -67,7 +68,7 @@ func TestTheFourDoors(t *testing.T) {
 
 	// 3. The offline door: a request leaves, the key stays.
 	code, out = f.call(t, "POST", "/api/certificates/signing-request",
-		`{"name":"intranet","dnsNames":["intranet.acme.test"],"organization":"Acme"}`, f.rootC)
+		`{"plane":"app","host":"intranet.acme.test","organization":"Acme"}`, f.rootC)
 	if code != http.StatusCreated {
 		t.Fatalf("signing request: %d %s", code, out)
 	}
@@ -105,7 +106,8 @@ func TestTheFourDoors(t *testing.T) {
 	// 4. The automatic door, pointed at a PRIVATE authority: nothing about it
 	// may depend on Let's Encrypt existing.
 	code, out = f.call(t, "PUT", "/api/settings/tls",
-		`{"data":false,"admin":false,"acme":{"enabled":true,"directoryUrl":"https://step-ca.internal/acme/directory",`+
+		`{"consoleName":"localhost","appNames":["app.example.com"],"acme":{"enabled":true,`+
+			`"directoryUrl":"https://step-ca.internal/acme/directory",`+
 			`"domains":["app.example.com"],"acceptTos":true,"email":"ops@example.com"}}`, f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("acme settings: %d %s", code, out)
@@ -174,7 +176,7 @@ func signCSR(t *testing.T, csrPEM string) string {
 func TestAdoptRefusesTheCertificateOfAnotherOrder(t *testing.T) {
 	f := setup(t)
 	code, out := f.call(t, "POST", "/api/certificates/signing-request",
-		`{"name":"mine","dnsNames":["mine.example.com"]}`, f.rootC)
+		`{"plane":"app","host":"mine.example.com"}`, f.rootC)
 	if code != http.StatusCreated {
 		t.Fatalf("signing request: %d %s", code, out)
 	}
@@ -199,14 +201,16 @@ func TestImportNamesWhatItRefuses(t *testing.T) {
 	certPEM, _ := pemPair(t, "a.example.com")
 	_, keyPEM := pemPair(t, "b.example.com")
 	code, out := f.call(t, "POST", "/api/certificates/import",
-		`{"name":"mixed","certPem":`+jsonString(certPEM)+`,"keyPem":`+jsonString(keyPEM)+`}`, f.rootC)
+		`{"plane":"app","host":"a.example.com","certPem":`+jsonString(certPEM)+
+			`,"keyPem":`+jsonString(keyPEM)+`}`, f.rootC)
 	if code != http.StatusUnprocessableEntity {
 		t.Fatalf("mismatched pair: %d %s", code, out)
 	}
 	if !strings.Contains(out, "two different pairs") {
 		t.Fatalf("the error must say what happened: %s", out)
 	}
-	if code, out := f.call(t, "POST", "/api/certificates/import", `{"name":"empty"}`, f.rootC); code != http.StatusUnprocessableEntity {
+	if code, out := f.call(t, "POST", "/api/certificates/import",
+		`{"plane":"app","host":"a.example.com"}`, f.rootC); code != http.StatusUnprocessableEntity {
 		t.Fatalf("importing nothing: %d %s", code, out)
 	}
 }
@@ -218,8 +222,9 @@ func TestTheExternalAccountKeyFollowsTheVaultRule(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 
-	body := `{"data":false,"admin":false,"acme":{"enabled":true,"domains":["app.example.com"],` +
-		`"acceptTos":true,"eabKeyId":"kid-1","eabHmacKey":"c2VjcmV0LWhtYWMta2V5"}}`
+	body := `{"consoleName":"localhost","appNames":["app.example.com"],"acme":{"enabled":true,` +
+		`"domains":["app.example.com"],"acceptTos":true,"eabKeyId":"kid-1",` +
+		`"eabHmacKey":"c2VjcmV0LWhtYWMta2V5"}}`
 	code, out := f.call(t, "PUT", "/api/settings/tls", body, f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("save: %d %s", code, out)
@@ -238,8 +243,8 @@ func TestTheExternalAccountKeyFollowsTheVaultRule(t *testing.T) {
 	// Saving again with a blank secret keeps the stored one: the console never
 	// received it, so it cannot resend it.
 	code, out = f.call(t, "PUT", "/api/settings/tls",
-		`{"data":false,"admin":false,"acme":{"enabled":true,"domains":["app.example.com"],`+
-			`"acceptTos":true,"eabKeyId":"kid-2","eabHmacKey":""}}`, f.rootC)
+		`{"consoleName":"localhost","appNames":["app.example.com"],"acme":{"enabled":true,`+
+			`"domains":["app.example.com"],"acceptTos":true,"eabKeyId":"kid-2","eabHmacKey":""}}`, f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("second save: %d %s", code, out)
 	}
@@ -259,7 +264,8 @@ func TestChangingAuthorityForgetsTheOldAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, out := f.call(t, "PUT", "/api/settings/tls",
-		`{"data":false,"admin":false,"acme":{"enabled":true,"directoryUrl":"https://other.authority/directory",`+
+		`{"consoleName":"localhost","appNames":["app.example.com"],"acme":{"enabled":true,`+
+			`"directoryUrl":"https://other.authority/directory",`+
 			`"domains":["app.example.com"],"acceptTos":true}}`, f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("save: %d %s", code, out)
@@ -276,23 +282,24 @@ func TestACMEIsRefusedAtSaveTimeRatherThanAtRenewalTime(t *testing.T) {
 	// No domains: an open host policy lets anyone reach the gateway with a
 	// made-up name and burn the authority's rate limit.
 	code, out := f.call(t, "PUT", "/api/settings/tls",
-		`{"data":false,"admin":false,"acme":{"enabled":true,"acceptTos":true}}`, f.rootC)
+		`{"consoleName":"localhost","acme":{"enabled":true,"acceptTos":true}}`, f.rootC)
 	if code != http.StatusUnprocessableEntity {
 		t.Fatalf("acme with no domain: %d %s", code, out)
 	}
 	// Accepting terms is a legal act: it is never assumed on an operator's
 	// behalf, so the tick box is what carries it.
 	code, out = f.call(t, "PUT", "/api/settings/tls",
-		`{"data":false,"admin":false,"acme":{"enabled":true,"domains":["app.example.com"]}}`, f.rootC)
+		`{"consoleName":"localhost","appNames":["app.example.com"],"acme":{"enabled":true,`+
+			`"domains":["app.example.com"]}}`, f.rootC)
 	if code != http.StatusUnprocessableEntity || !strings.Contains(out, "terms of service") {
 		t.Fatalf("acme without accepted terms: %d %s", code, out)
 	}
 }
 
-// TestSwitchingHTTPSOnWithNothingToPresentSaysSo runs the supervisor for real:
-// a port that binds and then refuses every visitor is worse than a door that
-// stayed shut and said why.
-func TestSwitchingHTTPSOnWithNothingToPresentSaysSo(t *testing.T) {
+// TestTheDoorFollowsTheCertificate replaces the old "switched on but nothing
+// installed" case, which cannot happen any more: there is no switch. Adding a
+// certificate opens the plane's door, deleting it closes it.
+func TestTheDoorFollowsTheCertificate(t *testing.T) {
 	f := setup(t)
 	f.api.TLS = certs.NewSupervisor(f.api.st, isNoRows,
 		certs.NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
@@ -300,41 +307,80 @@ func TestSwitchingHTTPSOnWithNothingToPresentSaysSo(t *testing.T) {
 		certs.NewRedirect(),
 	)
 	t.Cleanup(func() { _ = f.api.TLS.Stop(context.Background()) })
+	if err := f.api.TLS.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
-	code, out := f.call(t, "PUT", "/api/settings/tls", `{"data":true,"admin":false,"redirect":true,"acme":{}}`, f.rootC)
+	code, out := f.call(t, "GET", "/api/settings/tls", "", f.rootC)
 	if code != http.StatusOK {
-		t.Fatalf("save: %d %s", code, out)
+		t.Fatalf("read: %d %s", code, out)
 	}
 	var view tlsPayload
 	if err := json.Unmarshal([]byte(out), &view); err != nil {
 		t.Fatal(err)
 	}
-	if view.State.Data {
-		t.Fatal("no certificate is installed: the HTTPS door must stay shut")
+	if view.State.Console {
+		t.Fatal("nothing installed: the console door is shut")
 	}
-	if len(view.State.Problems) == 0 || !strings.Contains(strings.Join(view.State.Problems, " "), "no certificate is installed") {
-		t.Fatalf("the reason must be on screen, not only in a log: %+v", view.State)
+	// And the console has a name to offer before anyone types one.
+	if view.ConsoleName != "localhost" {
+		t.Fatalf("console name = %q, want the default", view.ConsoleName)
 	}
 
-	// Install one, and the same setting now opens the door.
-	certPEM, keyPEM := pemPair(t, "app.example.com")
-	code, out = f.call(t, "POST", "/api/certificates/import",
-		`{"name":"app","certPem":`+jsonString(certPEM)+`,"keyPem":`+jsonString(keyPEM)+`,"default":true}`, f.rootC)
+	code, out = f.call(t, "POST", "/api/certificates/self-signed",
+		`{"plane":"console","host":"localhost"}`, f.rootC)
 	if code != http.StatusCreated {
-		t.Fatalf("import: %d %s", code, out)
+		t.Fatalf("generate: %d %s", code, out)
 	}
-	code, out = f.call(t, "GET", "/api/settings/tls", "", f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("read back: %d %s", code, out)
+	var made certView
+	if err := json.Unmarshal([]byte(out), &made); err != nil {
+		t.Fatal(err)
 	}
+	// The host alone drives the generation - the name was declared once, and
+	// asking for it again in the form is where the two drift apart.
+	if made.Mismatch {
+		t.Fatal("a certificate generated for this host must cover it")
+	}
+	// localhost is reached by name AND by address depending on who types it.
+	if len(made.Info.IPAddresses) == 0 {
+		t.Fatalf("localhost must carry 127.0.0.1 too: %+v", made.Info)
+	}
+
+	_, out = f.call(t, "GET", "/api/settings/tls", "", f.rootC)
 	if err := json.Unmarshal([]byte(out), &view); err != nil {
 		t.Fatal(err)
 	}
-	if !view.State.Data {
-		t.Fatalf("with a certificate installed the door must open: %+v", view.State)
+	if !view.State.Console {
+		t.Fatalf("having a certificate IS the activation: %+v", view.State)
 	}
-	if len(view.State.Problems) != 0 {
-		t.Fatalf("nothing should be wrong now: %v", view.State.Problems)
+
+	if code, out := f.call(t, "DELETE", "/api/certificates/"+made.ID, "", f.rootC); code != http.StatusNoContent {
+		t.Fatalf("delete: %d %s", code, out)
+	}
+	_, out = f.call(t, "GET", "/api/settings/tls", "", f.rootC)
+	if err := json.Unmarshal([]byte(out), &view); err != nil {
+		t.Fatal(err)
+	}
+	if view.State.Console {
+		t.Fatal("deleting the certificate is what closes the door")
+	}
+}
+
+// TestAnImportMustAnswerForItsHost is the check that earns its keep: a
+// certificate filed under a name it does not cover would fail at the first
+// handshake, where nobody connects it back to this screen.
+func TestAnImportMustAnswerForItsHost(t *testing.T) {
+	f := setup(t)
+	certPEM, keyPEM := pemPair(t, "elsewhere.example.com")
+	code, out := f.call(t, "POST", "/api/certificates/import",
+		`{"plane":"app","host":"shop.example.com","certPem":`+jsonString(certPEM)+
+			`,"keyPem":`+jsonString(keyPEM)+`}`, f.rootC)
+	if code != http.StatusUnprocessableEntity {
+		t.Fatalf("import under the wrong host: %d %s", code, out)
+	}
+	if !strings.Contains(out, "does not answer for shop.example.com") ||
+		!strings.Contains(out, "elsewhere.example.com") {
+		t.Fatalf("the refusal must name both sides: %s", out)
 	}
 }
 

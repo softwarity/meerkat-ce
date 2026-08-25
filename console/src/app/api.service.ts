@@ -771,36 +771,40 @@ export interface CsrInfo {
   keyType: string;
 }
 
+// A certificate belongs to a NAME. The console has one, the application has
+// one per host it serves, and material used by both is added twice: two
+// entries are cheaper to understand than one shared object plus the rule that
+// works out which name it covers.
 export interface Certificate {
   id: string;
-  name: string;
+  plane: 'console' | 'app';
+  host: string;
   // 'import' | 'self-signed' | 'csr'
   source: string;
   info: CertInfo;
-  // The one that answers a handshake carrying no server name: a client that
-  // came by IP address sends none.
-  default: boolean;
   createdAt: number;
   updatedAt: number;
   // A signing request with no answer yet: it holds a key and serves nothing.
   pending: boolean;
+  // The material does not answer for the host it is filed under.
+  mismatch: boolean;
   csr?: CsrInfo;
 }
 
-// What a generation form asks for. Days only applies to a self-signed one.
-export interface CertRequest {
-  name?: string;
+// Where a new certificate is filed: which plane, and for which host. It
+// carries no host LIST - the host is the entry it is created for, declared
+// once on the screen.
+export interface CertEntry {
+  plane: 'console' | 'app';
+  host: string;
+}
+
+// A generation form. Days only applies to a self-signed one.
+export interface CertRequest extends CertEntry {
   commonName?: string;
   organization?: string;
-  organizationalUnit?: string;
-  country?: string;
-  province?: string;
-  locality?: string;
-  dnsNames: string[];
-  ipAddresses?: string[];
   keyType?: string;
   days?: number;
-  default?: boolean;
 }
 
 export interface AcmeSettings {
@@ -820,47 +824,35 @@ export interface AcmeSettings {
 
 // What the supervisor last managed to do, which is not always what was asked.
 export interface TlsState {
-  data: boolean;
-  admin: boolean;
+  // The doors that are actually open. They follow from the certificates.
+  console: boolean;
+  app: boolean;
   acme: boolean;
   problems: string[];
-  dataAddr: string;
-  adminAddr: string;
-  dataPlainAddr: string;
-  adminPlainAddr: string;
+  consoleAddr: string;
+  consolePlainAddr: string;
+  appAddr: string;
+  appPlainAddr: string;
   // The redirect can be off while the setting is on: nothing valid to present
   // stands it down.
   redirecting: boolean;
 }
 
-// One declared name, and whether anything actually answers for it.
-export interface Coverage {
-  name: string;
-  plane: 'console' | 'app';
-  // covered | expiring | expired | acme | uncovered
-  status: string;
-  certId?: string;
-  certName?: string;
-  notAfter?: number;
-  automatic: boolean;
-}
-
+// There is no "switch HTTPS on" here, and the absence is the design: having a
+// certificate for a name is what opens that plane's door, and deleting it is
+// what closes it.
 export interface TlsSettings {
-  data: boolean;
-  admin: boolean;
-  // The APPLICATION plane's plain port sends callers to its HTTPS one. The
-  // console's plain port is never redirected: it is what a broken certificate
-  // gets repaired from.
+  // The console answers to ONE name. The application fronts as many hosts as
+  // it serves - that asymmetry is why they are two fields.
+  consoleName: string;
+  appNames: string[];
+  // Force the application's plain port over to HTTPS. The console's plain port
+  // is never redirected: it is what a broken certificate gets repaired from.
   redirect: boolean;
   acme: AcmeSettings;
-  // The names each plane answers to. Two lists because the two planes are not
-  // alike: a console has one name, an application gateway fronts many.
-  consoleNames: string[];
-  appNames: string[];
   eabSecretSet: boolean;
   state: TlsState;
   issued?: Record<string, CertInfo>;
-  coverage: Coverage[];
 }
 
 // Trusted-browser policy (MFA-03): whether a user may skip the TOTP challenge
@@ -1045,6 +1037,8 @@ export interface Settings {
   // settings without knowing about this field cannot close the developer
   // tooling of a whole installation by accident.
   devMode?: boolean;
+  /** The ENVIRONMENT closed the developer surface (MEERKAT_PRODUCTION), not an operator. Read-only. */
+  devModeLocked?: boolean;
 }
 
 // One of the built-in arrangements. `side` is which edge the brand takes and
@@ -1770,14 +1764,14 @@ export class ApiService {
 
   // Import: a PEM pair, or a PKCS#12 keystore as base64. One endpoint, because
   // to an operator it is one gesture - "here is what I already have".
-  importCertificate(body: {
-    name: string;
-    certPem?: string;
-    keyPem?: string;
-    keystore?: string;
-    password?: string;
-    default?: boolean;
-  }): Observable<Certificate> {
+  importCertificate(
+    body: CertEntry & {
+      certPem?: string;
+      keyPem?: string;
+      keystore?: string;
+      password?: string;
+    },
+  ): Observable<Certificate> {
     return this.http.post<Certificate>('/api/certificates/import', body);
   }
 
@@ -1793,10 +1787,6 @@ export class ApiService {
     return this.http.post<Certificate>(`/api/certificates/${encodeURIComponent(id)}/adopt`, {
       certPem,
     });
-  }
-
-  updateCertificate(id: string, body: { name: string; default: boolean }): Observable<Certificate> {
-    return this.http.put<Certificate>(`/api/certificates/${encodeURIComponent(id)}`, body);
   }
 
   deleteCertificate(id: string): Observable<void> {
@@ -1822,11 +1812,9 @@ export class ApiService {
   }
 
   saveTls(body: {
-    data: boolean;
-    admin: boolean;
-    redirect: boolean;
-    consoleNames: string[];
+    consoleName: string;
     appNames: string[];
+    redirect: boolean;
     acme: AcmeSettings;
   }): Observable<TlsSettings> {
     return this.http.put<TlsSettings>('/api/settings/tls', body);
