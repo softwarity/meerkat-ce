@@ -6,8 +6,9 @@ require (
 	github.com/andybalholm/brotli v1.2.2
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/go-webauthn/webauthn v0.17.4
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pb33f/libopenapi v0.38.7
-	github.com/softwarity/plug/agent v0.0.0-20260823202101-500a77de3b48
+	github.com/softwarity/plug/agent v0.0.0-20260825155054-153b113452d8
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.54.0
 	golang.org/x/text v0.40.0
@@ -30,7 +31,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.10.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
