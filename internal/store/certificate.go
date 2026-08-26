@@ -167,7 +167,7 @@ func (s *Store) scanCertificate(sc scanner) (Certificate, error) {
 // looking at this screen has just added something.
 func (s *Store) ListCertificates(ctx context.Context) ([]Certificate, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+certCols+` FROM certificates ORDER BY plane, host COLLATE NOCASE`)
+		`SELECT `+certCols+` FROM certificates ORDER BY plane, LOWER(host)`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list certificates: %w", err)
 	}

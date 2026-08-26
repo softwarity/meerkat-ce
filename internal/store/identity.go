@@ -193,8 +193,8 @@ func (s *Store) ListTenantsAdministeredBy(ctx context.Context, userID string) ([
 		`SELECT t.id, t.name, t.description, t.enabled, t.business_access, t.session_ttl, t.group_mode, t.created_by, t.owner_id, t.created_at, t.updated_at
 		 FROM tenants t
 		 LEFT JOIN memberships m ON m.tenant_id = t.id AND m.user_id = ?
-		 WHERE t.owner_id = ? OR (m.type = 'ADMIN' AND m.enabled = 1)
-		 ORDER BY t.name ASC`, userID, userID)
+		 WHERE t.owner_id = ? OR (m.type = 'ADMIN' AND m.enabled = ?)
+		 ORDER BY t.name ASC`, userID, userID, true)
 }
 
 func (s *Store) listTenants(ctx context.Context, query string, args ...any) ([]Tenant, error) {
@@ -608,14 +608,21 @@ func (s *Store) SetTenancy(ctx context.Context, mode string) error {
 // FIRST one, not a hard-coded id - an installation that created its own
 // organisations has no "default", and picking by id would serve none of them.
 //
-// Ordered by insertion (rowid), not by created_at: that column has a second's
-// resolution, so a seeded install that writes its organisations in the same
-// second as the boot would fall back to sorting by id, which is alphabetical
-// and means nothing.
+// Oldest first, and the SEEDED one wins a tie. Insertion order used to answer
+// this, through SQLite's rowid - which PostgreSQL does not have, and which was
+// standing in for the tie-break rather than for the age: created_at has a
+// second's resolution, so an installation that writes its organisations in the
+// same second as its boot has several rows claiming to be the oldest.
+//
+// The seeded organisation is what a fresh install must keep serving, so it
+// takes the tie explicitly. Past that it is alphabetical, which means nothing -
+// but by then every candidate was created in the same second and nothing else
+// would mean more.
 func (s *Store) PrimaryTenant(ctx context.Context) (Tenant, error) {
 	list, err := s.listTenants(ctx,
 		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at
-		 FROM tenants ORDER BY rowid ASC LIMIT 1`)
+		 FROM tenants
+		 ORDER BY created_at ASC, CASE WHEN id = ? THEN 0 ELSE 1 END, id ASC LIMIT 1`, DefaultTenantID)
 	if err != nil {
 		return Tenant{}, err
 	}
@@ -655,8 +662,8 @@ func (s *Store) seedDefaultTenant() error {
 	now := time.Now().Unix()
 	if _, err := s.db.Exec(
 		`INSERT INTO tenants (id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at)
-		 VALUES (?, ?, '', 1, ?, '', '', '', '', ?, ?)`,
-		DefaultTenantID, defaultTenantName, string(ba), now, now); err != nil {
+		 VALUES (?, ?, '', ?, ?, '', '', '', '', ?, ?)`,
+		DefaultTenantID, defaultTenantName, true, string(ba), now, now); err != nil {
 		return fmt.Errorf("store: seed default tenant: %w", err)
 	}
 	return nil

@@ -25,7 +25,7 @@ import (
 
 // Store wraps the embedded database.
 type Store struct {
-	db *sql.DB
+	db *database
 	// vaultCipher seals the vault's secret entries at rest (VAULT-01). The
 	// master key comes from MEERKAT_VAULT_KEY, or a 0600 key file in dataDir.
 	vaultCipher *vault.Cipher
@@ -36,7 +36,29 @@ type Store struct {
 
 // Open opens (creating if needed) the embedded database inside dataDir and
 // applies migrations.
+//
+// The embedded one is the default and the promise: a `docker run` with nothing
+// else must keep working exactly as it does. OpenAt is the other door.
 func Open(dataDir string) (*Store, error) {
+	return OpenAt(dataDir, "")
+}
+
+// OpenAt opens the database a URL names, falling back to the embedded one when
+// the URL is empty.
+//
+// An external database is what several gateways serving one installation need,
+// and PostgreSQL is the one option - chosen for a reason that is not storage.
+// It carries LISTEN/NOTIFY, which is how one instance tells the others to
+// re-read what changed, and advisory locks, which is the one exclusion the
+// product needs. No Redis, no message bus.
+func OpenAt(dataDir, url string) (*Store, error) {
+	if strings.TrimSpace(url) != "" {
+		return openPostgres(dataDir, url)
+	}
+	return openEmbedded(dataDir)
+}
+
+func openEmbedded(dataDir string) (*Store, error) {
 	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)",
 		filepath.Join(dataDir, "meerkat.db"))
 	db, err := sql.Open("sqlite", dsn)
@@ -46,7 +68,7 @@ func Open(dataDir string) (*Store, error) {
 	// SQLite serializes writers; a single connection avoids SQLITE_BUSY storms
 	// while the skeleton has no connection-pool needs.
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db, dataDir: dataDir}
+	s := &Store{db: &database{DB: db, dialect: dialectSQLite}, dataDir: dataDir}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -116,8 +138,8 @@ CREATE TABLE IF NOT EXISTS routes (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL UNIQUE,
   ord           INTEGER NOT NULL DEFAULT 0,
-  enabled       INTEGER NOT NULL DEFAULT 1,
-  is_ui         INTEGER NOT NULL DEFAULT 0,
+  enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+  is_ui         BOOLEAN NOT NULL DEFAULT FALSE,
   upstream      TEXT NOT NULL,
   predicates    TEXT NOT NULL DEFAULT '[]',
   filters       TEXT NOT NULL DEFAULT '[]',
@@ -134,24 +156,24 @@ CREATE TABLE IF NOT EXISTS users (
   id                   TEXT PRIMARY KEY,
   username             TEXT NOT NULL UNIQUE,
   password_hash        TEXT NOT NULL,
-  root                 INTEGER NOT NULL DEFAULT 0,
+  root                 BOOLEAN NOT NULL DEFAULT FALSE,
   fullname             TEXT NOT NULL DEFAULT '',
   email                TEXT NOT NULL DEFAULT '',
-  enabled              INTEGER NOT NULL DEFAULT 1,
-  dev                  INTEGER NOT NULL DEFAULT 0,
-  tester               INTEGER NOT NULL DEFAULT 0,
-  tenant_creator       INTEGER NOT NULL DEFAULT 0,
+  enabled              BOOLEAN NOT NULL DEFAULT TRUE,
+  dev                  BOOLEAN NOT NULL DEFAULT FALSE,
+  tester               BOOLEAN NOT NULL DEFAULT FALSE,
+  tenant_creator       BOOLEAN NOT NULL DEFAULT FALSE,
   -- Split administration (RBAC-05): the routing plane and the application's
   -- identity are separate concerns with separate admins. Tenant
   -- administration is NOT a flag here - it lives in memberships (TENANT-02).
-  infra_admin          INTEGER NOT NULL DEFAULT 0,
-  app_admin            INTEGER NOT NULL DEFAULT 0,
+  infra_admin          BOOLEAN NOT NULL DEFAULT FALSE,
+  app_admin            BOOLEAN NOT NULL DEFAULT FALSE,
   locale               TEXT NOT NULL DEFAULT '',
   timezone             TEXT NOT NULL DEFAULT 'UTC',
   created_at           INTEGER NOT NULL DEFAULT 0,
   updated_at           INTEGER NOT NULL DEFAULT 0,
   last_connection_at   INTEGER NOT NULL DEFAULT 0,
-  must_change_password INTEGER NOT NULL DEFAULT 0,
+  must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
   -- When the password was last set, for the expiry rule (AUTH-10). Checked at
   -- SIGN-IN, never by a clock: expiring at three in the morning would sign
   -- nobody out, it would only refuse the next login.
@@ -177,8 +199,8 @@ CREATE TABLE IF NOT EXISTS users (
   -- Self-registration (AUTH-20). email_verified defaults to 1: admin-created
   -- accounts answer for their address; only the /register flow creates
   -- unverified ones (and confirms them by e-mail).
-  email_verified       INTEGER NOT NULL DEFAULT 1,
-  self_registered      INTEGER NOT NULL DEFAULT 0
+  email_verified       BOOLEAN NOT NULL DEFAULT TRUE,
+  self_registered      BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- v27 the vault (VAULT-01): named entries the configuration references by
@@ -235,7 +257,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL UNIQUE,
   description     TEXT NOT NULL DEFAULT '',
-  enabled         INTEGER NOT NULL DEFAULT 1,
+  enabled         BOOLEAN NOT NULL DEFAULT TRUE,
   business_access TEXT NOT NULL DEFAULT '{"inherited":true}',
   session_ttl     TEXT NOT NULL DEFAULT '',
   -- '' = inherit the gateway-wide group mode; MULTIPLE/SINGLE = forced here.
@@ -257,7 +279,7 @@ CREATE TABLE IF NOT EXISTS memberships (
   -- Who placed this person here (v32): '' an administrator, 'rule' a group
   -- rule. A synchronisation only removes what it added itself.
   source          TEXT NOT NULL DEFAULT '',
-  enabled         INTEGER NOT NULL DEFAULT 1,
+  enabled         BOOLEAN NOT NULL DEFAULT TRUE,
   business_access TEXT NOT NULL DEFAULT '{"inherited":true}',
   session_ttl     TEXT NOT NULL DEFAULT '',
   created_at      INTEGER NOT NULL DEFAULT 0,
@@ -274,8 +296,8 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS themes (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL UNIQUE,
-  active     INTEGER NOT NULL DEFAULT 0,
-  flat       INTEGER NOT NULL DEFAULT 0,
+  active     BOOLEAN NOT NULL DEFAULT FALSE,
+  flat       BOOLEAN NOT NULL DEFAULT FALSE,
   dark       TEXT NOT NULL DEFAULT '{}',
   light      TEXT NOT NULL DEFAULT '{}',
   created_at INTEGER NOT NULL DEFAULT 0,
@@ -290,7 +312,7 @@ CREATE TABLE IF NOT EXISTS roles (
   description TEXT NOT NULL DEFAULT '',
   parent_id   TEXT REFERENCES roles(id) ON DELETE SET NULL,
   tags        TEXT NOT NULL DEFAULT '[]',
-  system      INTEGER NOT NULL DEFAULT 0,
+  system      BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  INTEGER NOT NULL DEFAULT 0,
   updated_at  INTEGER NOT NULL DEFAULT 0
 );
@@ -415,7 +437,7 @@ CREATE TABLE IF NOT EXISTS auth_providers (
   id            TEXT PRIMARY KEY,
   kind          TEXT NOT NULL,                    -- oidc | ldap | saml
   name          TEXT NOT NULL,                    -- what the login page shows
-  enabled       INTEGER NOT NULL DEFAULT 0,
+  enabled       BOOLEAN NOT NULL DEFAULT FALSE,
   ord           INTEGER NOT NULL DEFAULT 0,
   config        TEXT NOT NULL DEFAULT '{}',
   -- Per-provider policies: '' inherits the application setting. An authority
@@ -430,7 +452,7 @@ CREATE TABLE IF NOT EXISTS auth_providers (
   -- The anti-robot check, LOCAL authority only: it guards a public form. An
   -- arrival through a directory or an identity provider already proved itself
   -- over there.
-  captcha       INTEGER NOT NULL DEFAULT 1,
+  captcha       BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    INTEGER NOT NULL DEFAULT 0,
   updated_at    INTEGER NOT NULL DEFAULT 0
 );
@@ -466,7 +488,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   tenant_id    TEXT NOT NULL DEFAULT '',
   group_id     TEXT NOT NULL DEFAULT '',
   plane        TEXT NOT NULL DEFAULT 'data',
-  enabled      INTEGER NOT NULL DEFAULT 1,
+  enabled      BOOLEAN NOT NULL DEFAULT TRUE,
   created_at   INTEGER NOT NULL DEFAULT 0,
   expires_at   INTEGER NOT NULL DEFAULT 0,
   last_used_at INTEGER NOT NULL DEFAULT 0
@@ -541,11 +563,13 @@ CREATE TABLE IF NOT EXISTS configurations (
   -- list deliberately leaves the documents behind, and loading ten of them to
   -- hash them would undo exactly what that saves.
   digest      TEXT NOT NULL DEFAULT '',
-  active      INTEGER NOT NULL DEFAULT 0,
+  active      BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  INTEGER NOT NULL DEFAULT 0,
   updated_at  INTEGER NOT NULL DEFAULT 0
 );
-CREATE UNIQUE INDEX IF NOT EXISTS configurations_active ON configurations(active) WHERE active = 1;
+-- One active configuration at a time, enforced by the index rather than by a
+-- transaction everyone has to remember.
+CREATE UNIQUE INDEX IF NOT EXISTS configurations_active ON configurations(active) WHERE active = TRUE;
 
 -- Restore points (CFG-06): the gateway's own tape, written whenever a change
 -- moves the configuration's fingerprint - never on purpose, never named.
@@ -602,7 +626,7 @@ CREATE TABLE IF NOT EXISTS certificates (
   dns_names    TEXT NOT NULL DEFAULT '[]',
   ip_addresses TEXT NOT NULL DEFAULT '[]',
   chain        INTEGER NOT NULL DEFAULT 0,
-  self_signed  INTEGER NOT NULL DEFAULT 0,
+  self_signed  BOOLEAN NOT NULL DEFAULT FALSE,
   not_before   INTEGER NOT NULL DEFAULT 0,
   not_after    INTEGER NOT NULL DEFAULT 0,
   created_at   INTEGER NOT NULL DEFAULT 0,
@@ -623,13 +647,12 @@ CREATE TABLE IF NOT EXISTS acme_cache (
 const schemaVersion = 46
 
 func (s *Store) migrate() error {
-	var v int
-	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&v); err != nil {
-		return fmt.Errorf("store: read schema version: %w", err)
+	v, err := s.db.schemaVersion()
+	if err != nil {
+		return err
 	}
 	_ = v // design phase: no data migrations, the columns catch up on their own.
-	_, err := s.db.Exec(schemaSQL)
-	if err != nil {
+	if _, err := s.db.Exec(schemaSQL); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
 	// The columns a build added since this database was created: CREATE TABLE
@@ -665,10 +688,7 @@ func (s *Store) migrate() error {
 	if err := s.seedLocalProvider(); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion)); err != nil {
-		return fmt.Errorf("store: set schema version: %w", err)
-	}
-	return nil
+	return s.db.setSchemaVersion(schemaVersion)
 }
 
 // The token planes (must match session.DataPlane/AdminPlane, same string
@@ -1467,9 +1487,15 @@ func (s *Store) SetUserPassword(ctx context.Context, id, passwordHash string, mu
 		// about the RECENT past, and rows nobody will ever compare against are
 		// hashes kept for no reason.
 		if _, err := tx.ExecContext(ctx,
-			`DELETE FROM password_history WHERE user_id = ? AND rowid NOT IN (
-			   SELECT rowid FROM password_history WHERE user_id = ?
-			   ORDER BY changed_at DESC, rowid DESC LIMIT ?)`,
+			// By the hash, because this table has no id of its own and rowid
+			// is SQLite's alone. Not by changed_at: it has a second's
+			// resolution, and several passwords changed within one second
+			// would share a value - the subquery would then keep every row of
+			// that second instead of the count asked for, and a password long
+			// out of the window would go on being refused.
+			`DELETE FROM password_history WHERE user_id = ? AND password_hash NOT IN (
+			   SELECT password_hash FROM password_history WHERE user_id = ?
+			   ORDER BY changed_at DESC, password_hash DESC LIMIT ?)`,
 			id, id, maxPasswordHistory); err != nil {
 			return fmt.Errorf("store: set password for user %q: %w", id, err)
 		}
@@ -1498,8 +1524,8 @@ const maxPasswordHistory = 24
 // password with a temporary one somebody then has to carry to its owner.
 func (s *Store) SetMustChangePassword(ctx context.Context, id string) error {
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE users SET must_change_password = 1, updated_at = ? WHERE id = ? AND password_hash != ''`,
-		time.Now().Unix(), id)
+		`UPDATE users SET must_change_password = ?, updated_at = ? WHERE id = ? AND password_hash != ''`,
+		true, time.Now().Unix(), id)
 	if err != nil {
 		return fmt.Errorf("store: flag password change for user %q: %w", id, err)
 	}
@@ -1517,8 +1543,8 @@ func (s *Store) SetMustChangePassword(ctx context.Context, id string) error {
 // a form that cannot help them.
 func (s *Store) SetMustChangePasswordForAll(ctx context.Context, except string) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE users SET must_change_password = 1, updated_at = ? WHERE password_hash != '' AND id != ?`,
-		time.Now().Unix(), except)
+		`UPDATE users SET must_change_password = ?, updated_at = ? WHERE password_hash != '' AND id != ?`,
+		true, time.Now().Unix(), except)
 	if err != nil {
 		return 0, fmt.Errorf("store: flag password change for every account: %w", err)
 	}
@@ -1539,7 +1565,7 @@ func (s *Store) RecentPasswordHashes(ctx context.Context, userID string, n int) 
 	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT password_hash FROM password_history WHERE user_id = ?
-		 ORDER BY changed_at DESC, rowid DESC LIMIT ?`, userID, n)
+		 ORDER BY changed_at DESC, password_hash DESC LIMIT ?`, userID, n)
 	if err != nil {
 		return nil, fmt.Errorf("store: password history for user %q: %w", userID, err)
 	}
@@ -1861,24 +1887,28 @@ func (s *Store) PurgeExpiredSessions(ctx context.Context, now int64) (int64, err
 // the schema simply stays behind, unused, which costs nothing and loses no
 // data.
 func (s *Store) addMissingColumns() error {
-	ref, err := sql.Open("sqlite", ":memory:")
+	// The reference is the schema THIS BUILD carries, read from a throwaway
+	// SQLite: we are only parsing our own DDL, so it stays SQLite whatever the
+	// live database is. What has to be dialectal is reading the LIVE one.
+	raw, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return fmt.Errorf("store: reference schema: %w", err)
 	}
-	defer func() { _ = ref.Close() }()
-	if _, err := ref.Exec(schemaSQL); err != nil {
+	defer func() { _ = raw.Close() }()
+	if _, err := raw.Exec(schemaSQL); err != nil {
 		return fmt.Errorf("store: reference schema: %w", err)
 	}
-	tables, err := tableNames(ref)
+	ref := &database{DB: raw, dialect: dialectSQLite}
+	tables, err := ref.tableNames()
 	if err != nil {
 		return err
 	}
 	for _, table := range tables {
-		want, err := columnsOf(ref, table)
+		want, err := ref.columnsOf(table)
 		if err != nil {
 			return err
 		}
-		got, err := columnsOf(s.db, table)
+		got, err := s.db.columnsOf(table)
 		if err != nil {
 			return err
 		}
@@ -1921,38 +1951,4 @@ func (c column) definition() string {
 		def += " DEFAULT " + c.dflt.String
 	}
 	return def
-}
-
-func tableNames(db *sql.DB) ([]string, error) {
-	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
-	if err != nil {
-		return nil, fmt.Errorf("store: list tables: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		out = append(out, name)
-	}
-	return out, rows.Err()
-}
-
-func columnsOf(db *sql.DB, table string) ([]column, error) {
-	rows, err := db.Query(`SELECT name, type, "notnull", dflt_value FROM pragma_table_info(?)`, table)
-	if err != nil {
-		return nil, fmt.Errorf("store: columns of %s: %w", table, err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []column
-	for rows.Next() {
-		var c column
-		if err := rows.Scan(&c.name, &c.dataType, &c.notNull, &c.dflt); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
 }

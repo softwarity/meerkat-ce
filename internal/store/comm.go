@@ -187,7 +187,7 @@ func (s *Store) TakeEmailToken(ctx context.Context, tokenHash, purpose string, n
 // MarkEmailVerified flips the user's address to verified.
 func (s *Store) MarkEmailVerified(ctx context.Context, userID string) error {
 	return s.execUser(ctx, userID,
-		`UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?`,
+		`UPDATE users SET email_verified = ?, updated_at = ? WHERE id = ?`, true,
 		time.Now().Unix(), userID)
 }
 
@@ -195,7 +195,7 @@ func (s *Store) MarkEmailVerified(ctx context.Context, userID string) error {
 func (s *Store) UserIDByEmail(ctx context.Context, email string) (string, error) {
 	var id string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id FROM users WHERE email = ? COLLATE NOCASE`, email).Scan(&id)
+		`SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, email).Scan(&id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", err
@@ -211,8 +211,8 @@ func (s *Store) UserIDByEmail(ctx context.Context, email string) (string, error)
 func (s *Store) ListNotifiableAdmins(ctx context.Context) ([]User, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+userCols+` FROM users
-		 WHERE enabled = 1 AND email != '' AND (root = 1 OR app_admin = 1)
-		 ORDER BY username`)
+		 WHERE enabled = ? AND email != '' AND (root = ? OR app_admin = ?)
+		 ORDER BY username`, true, true, true)
 	if err != nil {
 		return nil, fmt.Errorf("store: list notifiable admins: %w", err)
 	}
@@ -242,7 +242,7 @@ func (s *Store) PurgeExpiredEmailTokens(ctx context.Context, now int64) (int64, 
 // confirmed their address before the cutoff (abandoned sign-ups).
 func (s *Store) PurgeUnconfirmedSelfRegistrations(ctx context.Context, cutoff int64) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`DELETE FROM users WHERE self_registered = 1 AND email_verified = 0 AND created_at < ?`, cutoff)
+		`DELETE FROM users WHERE self_registered = ? AND email_verified = ? AND created_at < ?`, true, false, cutoff)
 	if err != nil {
 		return 0, fmt.Errorf("store: purge unconfirmed sign-ups: %w", err)
 	}
@@ -256,6 +256,6 @@ func (s *Store) PurgeUnconfirmedSelfRegistrations(ctx context.Context, cutoff in
 // writes.
 func (s *Store) SetUserEmail(ctx context.Context, userID, email string) error {
 	return s.execUser(ctx, userID,
-		`UPDATE users SET email = ?, email_verified = 0, updated_at = ? WHERE id = ?`,
-		strings.TrimSpace(email), time.Now().Unix(), userID)
+		`UPDATE users SET email = ?, email_verified = ?, updated_at = ? WHERE id = ?`,
+		strings.TrimSpace(email), false, time.Now().Unix(), userID)
 }

@@ -37,7 +37,7 @@ func TestAnOlderDatabaseCatchesUp(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	cols, err := columnsOf(st.db, "user_identities")
+	cols, err := st.db.columnsOf("user_identities")
 	if err != nil {
 		t.Fatal(err)
 	}

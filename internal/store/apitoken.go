@@ -57,8 +57,8 @@ func (s *Store) AddAPIToken(ctx context.Context, id, userID, name, tokenHash, pr
 	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO api_tokens (id, user_id, name, token_hash, prefix, plane, tenant_id, group_id, enabled, created_at, expires_at, last_used_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)`,
-		id, userID, name, tokenHash, prefix, plane, tenantID, groupID, time.Now().Unix(), expiresAt)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+		id, userID, name, tokenHash, prefix, plane, tenantID, groupID, true, time.Now().Unix(), expiresAt)
 	if err != nil {
 		return fmt.Errorf("store: add api token for %q: %w", userID, err)
 	}

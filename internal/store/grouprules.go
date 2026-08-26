@@ -213,9 +213,9 @@ func (s *Store) SyncMappedGroups(ctx context.Context, userID, providerID string,
 	for tenantID := range tenants {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO memberships (user_id, tenant_id, type, enabled, source, created_at, updated_at)
-			 VALUES (?, ?, 'USER', 1, ?, ?, ?)
+			 VALUES (?, ?, 'USER', ?, ?, ?, ?)
 			 ON CONFLICT(user_id, tenant_id) DO NOTHING`,
-			userID, tenantID, SourceRule, now, now); err != nil {
+			userID, tenantID, true, SourceRule, now, now); err != nil {
 			return nil, fmt.Errorf("store: grant membership of %q: %w", tenantID, err)
 		}
 	}

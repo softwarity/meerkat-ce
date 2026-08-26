@@ -49,6 +49,16 @@ func main() {
 	adminAddr := flag.String("admin-addr", envOr("MEERKAT_ADMIN_ADDR", ":9090"), "administration (control plane) listen address")
 	consoleURL := flag.String("console-url", envOr("MEERKAT_CONSOLE_URL", ""), "dev only: proxy the console UI to a front dev server (e.g. http://localhost:4200)")
 	dataDir := flag.String("data", envOr("MEERKAT_DATA", "data"), "data directory (embedded storage)")
+	// An external database, for several gateways serving one installation.
+	// Empty is the embedded one, which is the default and the promise: a
+	// `docker run` with nothing else keeps working exactly as it does.
+	//
+	// PostgreSQL is the one option, and it was chosen for a reason that is not
+	// storage: it carries LISTEN/NOTIFY, which is how one instance tells the
+	// others to re-read what changed, and advisory locks. No second moving
+	// part to run.
+	databaseURL := flag.String("database-url", envOr("MEERKAT_DATABASE_URL", ""),
+		"PostgreSQL URL for a multi-instance deployment; empty uses the embedded storage in -data")
 	configFile := flag.String("config", envOr("MEERKAT_CONFIG_FILE", ""),
 		"configuration file (YAML or JSON) seeding an EMPTY gateway on first start; never overwrites a configured one")
 	tenancy := flag.String("tenancy", envOr("MEERKAT_TENANCY", store.TenancySingle),
@@ -87,7 +97,7 @@ func main() {
 	if err := run(options{
 		addr: *addr, adminAddr: *adminAddr, tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
-		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr,
+		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr, databaseURL: *databaseURL,
 		production: *production,
 	}); err != nil {
 		slog.Error("fatal", "err", err)
@@ -105,6 +115,7 @@ type options struct {
 	configFile, vaultFile string
 	tenancy               string
 	plugAddr              string
+	databaseURL           string
 	production            bool
 }
 
@@ -122,9 +133,15 @@ func run(o options) error {
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
-	st, err := store.Open(dataDir)
+	st, err := store.OpenAt(dataDir, o.databaseURL)
 	if err != nil {
 		return err
+	}
+	if o.databaseURL != "" {
+		// Said out loud, because it changes where everything this gateway
+		// knows actually lives - and because a URL in an environment is easy
+		// to set by accident and hard to notice.
+		slog.Info("storage: external database", "kind", "postgres")
 	}
 	defer func() { _ = st.Close() }()
 

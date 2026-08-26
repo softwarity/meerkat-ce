@@ -85,12 +85,12 @@ func (s *Store) SaveConfiguration(ctx context.Context, c *Configuration) error {
 	digest := DigestOf(c.Document)
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO configurations (id, name, description, document, digest, active, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, description = excluded.description,
 		   document = excluded.document, digest = excluded.digest,
 		   updated_at = excluded.updated_at`,
-		c.ID, name, c.Description, c.Document, digest, created, now)
+		c.ID, name, c.Description, c.Document, digest, false, created, now)
 	if err != nil {
 		return fmt.Errorf("store: save configuration %q: %w", name, err)
 	}
@@ -132,7 +132,7 @@ func (s *Store) GetConfiguration(ctx context.Context, id string) (Configuration,
 func (s *Store) ActiveConfiguration(ctx context.Context) (Configuration, error) {
 	return s.configurationRow(ctx,
 		`SELECT id, name, description, document, digest, active, created_at, updated_at
-		   FROM configurations WHERE active = 1`)
+		   FROM configurations WHERE active = ?`, true)
 }
 
 func (s *Store) configurationRow(ctx context.Context, query string, args ...any) (Configuration, error) {
@@ -160,11 +160,11 @@ func (s *Store) MarkConfigurationActive(ctx context.Context, id string) error {
 		return fmt.Errorf("store: activate configuration: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `UPDATE configurations SET active = 0 WHERE active = 1`); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE configurations SET active = ? WHERE active = ?`, false, true); err != nil {
 		return fmt.Errorf("store: activate configuration: %w", err)
 	}
 	res, err := tx.ExecContext(ctx,
-		`UPDATE configurations SET active = 1, updated_at = ? WHERE id = ?`, time.Now().Unix(), id)
+		`UPDATE configurations SET active = ?, updated_at = ? WHERE id = ?`, true, time.Now().Unix(), id)
 	if err != nil {
 		return fmt.Errorf("store: activate configuration: %w", err)
 	}

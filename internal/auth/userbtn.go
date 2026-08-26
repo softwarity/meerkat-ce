@@ -211,8 +211,13 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 			payload.Tenants = append(payload.Tenants, userButtonTenant{ID: m.TenantID, Name: m.TenantName})
 		}
 	}
-	for _, l := range h.reachableLinks(r.Context(), sess) {
-		payload.Apps = append(payload.Apps, userButtonLink(l))
+	// Same rule as the organisations above: a submenu offering ONE destination
+	// is a click that leads where one already is. It appears when there is a
+	// choice to make, and not before.
+	if links := h.reachableLinks(r.Context(), sess); len(links) > 1 {
+		for _, l := range links {
+			payload.Apps = append(payload.Apps, userButtonLink(l))
+		}
 	}
 	if names, err := h.st.SessionRoleNames(r.Context(), sess.UserID, sess.TenantID, sess.GroupID); err == nil {
 		for _, n := range names {

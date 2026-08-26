@@ -88,7 +88,7 @@ import { MatIconModule } from '@angular/material/icon';
         </tr>
         <tr>
           <td>Dev mode</td>
-          <td>plug integration: per-dev keys, service substitution, tester variants</td>
+          <td>plug integration: per-dev keys, service substitution, and everyone told who is serving what</td>
           <td><mat-icon class="status-icon soon">pending</mat-icon> planned</td>
         </tr>
       </tbody>

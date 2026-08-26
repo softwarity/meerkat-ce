@@ -69,3 +69,39 @@ func TestProfileHubAndUserButtonListReachableApps(t *testing.T) {
 		t.Fatalf("user-button labels must carry the Applications entry")
 	}
 }
+
+// TestOneAppMeansNoApplicationsMenu: a submenu that offers a single
+// destination is a click leading where one already is. The organisations
+// submenu has always worked that way (more than one membership, or nothing);
+// the applications one now matches.
+func TestOneAppMeansNoApplicationsMenu(t *testing.T) {
+	mux, _, st := mfaSetup(t)
+	ctx := context.Background()
+	// Two routes, ONE of them reachable: the role-gated one does not count,
+	// which is the case that makes "how many are there" a live question.
+	for _, rt := range []store.Route{
+		uiRoute("shop", 1, false, ""),
+		uiRoute("ops", 2, true, "operations"),
+	} {
+		if err := st.SaveRoute(ctx, rt); err != nil {
+			t.Fatalf("SaveRoute %s: %v", rt.ID, err)
+		}
+	}
+	login := do(t, mux, "POST", "/login", url.Values{"username": {"admin"}, "password": {"s3cret"}}, nil)
+	sc := sessionCookieOf(login)
+
+	payload := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, sc))
+	if strings.Contains(payload, `"apps"`) {
+		t.Fatalf("one reachable app must not produce an applications submenu: %s", payload)
+	}
+
+	// A second one appears: the choice is real, the submenu comes back.
+	if err := st.SaveRoute(ctx, uiRoute("intranet", 3, true, "")); err != nil {
+		t.Fatalf("SaveRoute: %v", err)
+	}
+	payload = bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, sc))
+	if !strings.Contains(payload, `"apps"`) ||
+		!strings.Contains(payload, `"/shop"`) || !strings.Contains(payload, `"/intranet"`) {
+		t.Fatalf("two reachable apps must be offered: %s", payload)
+	}
+}

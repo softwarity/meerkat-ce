@@ -126,7 +126,7 @@ type DevKeyOwner struct {
 // itself and caches: SQL cannot compare keys, and the table is small.
 func (s *Store) DevKeyOwners(ctx context.Context) ([]DevKeyOwner, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT username, dev_key FROM users WHERE dev = 1 AND enabled = 1 AND dev_key != '' ORDER BY username`)
+		`SELECT username, dev_key FROM users WHERE dev = ? AND enabled = ? AND dev_key != '' ORDER BY username`, true, true)
 	if err != nil {
 		return nil, fmt.Errorf("store: dev key owners: %w", err)
 	}

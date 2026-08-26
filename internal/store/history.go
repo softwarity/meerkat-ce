@@ -36,7 +36,7 @@ func (s *Store) AddLoginEvent(ctx context.Context, e LoginEvent, userID string) 
 	}
 	if _, err := s.db.ExecContext(ctx,
 		`DELETE FROM login_events WHERE user_id = ? AND id NOT IN (
-		   SELECT id FROM login_events WHERE user_id = ? ORDER BY at DESC, rowid DESC LIMIT ?)`,
+		   SELECT id FROM login_events WHERE user_id = ? ORDER BY at DESC, id DESC LIMIT ?)`,
 		userID, userID, loginHistoryKeep); err != nil {
 		return fmt.Errorf("store: prune login events for %q: %w", userID, err)
 	}
@@ -47,7 +47,7 @@ func (s *Store) AddLoginEvent(ctx context.Context, e LoginEvent, userID string) 
 func (s *Store) ListLoginEvents(ctx context.Context, userID string) ([]LoginEvent, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, method, label, ip, country, browser_hash, at FROM login_events
-		 WHERE user_id = ? ORDER BY at DESC, rowid DESC`, userID)
+		 WHERE user_id = ? ORDER BY at DESC, id DESC`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list login events for %q: %w", userID, err)
 	}

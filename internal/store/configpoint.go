@@ -1,5 +1,19 @@
 package store
 
+// KNOWN GAP - config_points still orders on SQLite's rowid.
+//
+// Everywhere else the tie-break for a timestamp with a second's resolution
+// moved to the row's own id, which both databases have. Here it cannot: the
+// tape asks which point is genuinely the NEWEST, and an id that is random
+// answers that arbitrarily - the test that restores a state and reads it back
+// went from green to a coin toss.
+//
+// What this table needs is a monotonic column of its own, which is a schema
+// change and a migration to do deliberately rather than in passing. Until
+// then the tape works on the embedded database and answers an error on
+// PostgreSQL, which is the honest failure: loud, on one feature, rather than
+// silent and on the wrong row.
+
 import (
 	"context"
 	"database/sql"

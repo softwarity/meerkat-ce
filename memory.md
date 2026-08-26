@@ -2653,6 +2653,174 @@ HTTP/1.1 comme avant. Côté amont, `Request.requiresHTTP1()` force déjà HTTP/
 pour `Upgrade: websocket` malgré `ForceAttemptHTTP2` - vérifié par un test réel,
 pas supposé.
 
+## Session 2026-08-25 - plug embarqué, et le cadrage scalabilité
+
+**Livré** (tout poussé) : le canal live `/meerkat/events`, la clé SSH à la place
+du certificat dev, le tunnel plug embarqué en EE, `MEERKAT_PRODUCTION`, les
+fichiers de déploiement, deux pages de doc, et trois correctifs CI. Le détail
+vit dans **`plug-integration.local.md`** (non versionné) ; ne pas le dupliquer
+ici, mais savoir qu'il existe.
+
+**Les décisions qui n'ont pas d'autre trace :**
+
+- **Le canal est générique, jamais requis.** `{type, data}`, l'audience est un
+  **topic accordé par le serveur** depuis la session (`all`, `dev`,
+  `user:<id>`). Un producteur publie sur un topic et **n'a aucune question de
+  permission à se poser**. Ajouter une règle (par organisation, par rôle) est
+  une ligne à **un seul endroit**, `internal/auth/events.go`.
+- **Une page en retard est LARGUÉE**, pas mise en tampon : le remède à un
+  message manqué est de se reconnecter et refaire son fetch. Cette règle-là se
+  répète, voir la scalabilité plus bas.
+- **RFC 6455 écrit à la main** (le navigateur est le seul client et n'envoie que
+  des trames de contrôle). Deux pièges : le **contrôle d'origine** est à nous
+  (un WebSocket échappe au CORS, et un sous-domaine voisin est same-site pour le
+  cookie) et **HTTP/1.1** obligatoire (Go laisse le CONNECT étendu désactivé).
+- **Une clé SSH, pas un certificat** : un certificat porte sa propre validité et
+  reste accepté jusqu'à expiration. Une passerelle est debout par définition,
+  donc elle peut répondre « cette clé est-elle encore permise » à chaque
+  connexion. **Révoquer = supprimer la ligne.** La page n'affiche AUCUNE date
+  d'expiration : l'absence est le propos.
+- **`MEERKAT_PRODUCTION`** (son idée) : la surface dev est fermée quoi que dise
+  la base. Le bon niveau parce que **le réglage stocké voyage** (export,
+  sauvegarde restaurée, base copiée d'une préprod) et l'environnement non. Il ne
+  va que dans un sens, la console montre l'interrupteur **désactivé avec la
+  raison** (`devModeLocked`), et une écriture qui le rouvrirait part en 422.
+- **Le tunnel s'ouvre là où il peut travailler.** `MEERKAT_PLUG_ADDR` vaut
+  `:22222` et ne sert qu'à DÉPLACER le port - on n'éteint pas une
+  fonctionnalité en lui retirant son port. Deux conditions vérifiées AVANT toute
+  annonce : `agent.Preflight()` ET `inContainer()` (la première ne suffit pas :
+  Docker Desktop tourne sur un poste et plug ne peut toujours rien provisionner,
+  il identifie l'agent en inspectant **son propre conteneur**).
+- **La passerelle n'annonce pas le port** : « port configured est différent de
+  port listening » (lui). La seule ligne qui vaille est celle de l'agent.
+- **Le droit EST l'interrupteur** (lui, sur le chart) : plug a besoin d'un droit,
+  on l'accorde ou non. J'avais ajouté un garde-fou `production` contre
+  `plug.enabled` - retiré.
+
+**Le site public est celui du MIROIR.** `softwarity/meerkat` est privé et n'a
+aucun site Pages (404) ; le seul publié est `softwarity.github.io/meerkat-ce/`.
+Donc tout ce qu'on écrit dans `docs/` atterrit sur le site communautaire - à
+avoir en tête avant d'y documenter de l'EE.
+
+**Les deux licences sont maintenant dites** sur la page d'accueil : cœur en
+FSL-1.1-Apache-2.0 (Apache 2.0 pur deux ans après chaque version), `ee/` en
+licence commerciale Softwarity. Et la règle de partage, parce qu'un lecteur la
+demande : **jamais une primitive de sécurité** (TLS, coffre, MFA, passkeys,
+audit, sécurité par endpoint sont dans les deux). L'EE = échelle et
+organisation.
+
+## Cadrage SCALABILITÉ (2026-08-25, à ne pas re-dériver)
+
+**C'est de l'EE** (le multi-instance l'était déjà).
+
+**Ce qui bloque n'est PAS d'abord la base, c'est que rien ne se propage** :
+chaque écriture admin appelle `router.Reload()` **dans son propre processus**
+(`internal/admin/config.go:159`, `configurations.go:452`, `signing.go:152`,
+`openapi.go:126`). À N nœuds, une route publiée vit sur un nœud et nulle part
+ailleurs. Il n'y a que SIGHUP, manuel.
+
+L'état qui diverge, par gravité : le **snapshot du routeur** ; les **limiteurs
+de débit** (`internal/auth/register.go:98`) - N nœuds = N fois l'autorisation,
+un contrôle de sécurité qui s'affaiblit en grandissant ; le **hub d'événements**
+(la moitié de NOTIF-03) ; le **mode test UI et les jetons swagger** (par
+processus, assumé) ; **ACME** (deux nœuds peuvent renouveler ensemble) ; le
+**cache de session** (obsolescence bornée, acceptable).
+
+**PostgreSQL, une seule option externe, pas un choix libre.** La raison
+décisive : `LISTEN/NOTIFY` donne le transport inter-nœuds qui manque au hub et
+les *advisory locks* la mutuelle exclusion - **sans Redis ni NATS**. Postgres
+n'est donc pas que du stockage ici. Le coût du multi-dialecte serait réel : 169
+appels SQL, une vingtaine de points spécifiquement SQLite (`PRAGMA
+user_version`, `ALTER TABLE DROP COLUMN`, placeholders `?`). Une deuxième base
+= une conversation commerciale, pas un défaut à porter.
+
+**PAS de leader** (il m'a corrigé, il a raison) : pour RÉPLIQUER un état, une
+instance écrit, elle NOTIFY, les autres relisent. Le seul endroit qui demande de
+la coordination est **ACME**, et c'est un **verrou**, pas un leader : le premier
+arrivé fait le travail, et Postgres relâche si le processus meurt. Les purges
+sont des DELETE idempotents, elles n'ont même pas besoin de ça.
+
+**Deux pièges du modèle NOTIFY**, à prévoir dès le départ :
+1. **C'est du fire-and-forget** : une instance déconnectée au mauvais moment ne
+   rattrape jamais et reste périmée POUR TOUJOURS. Il faut un **numéro de
+   version en base** plus une réconciliation périodique. C'est exactement la
+   règle du canal WebSocket : **le canal n'est jamais requis, il accélère une
+   vérité qu'on sait relire**.
+2. **Le message est un pointeur, pas la donnée** (plafond 8000 octets, livré au
+   commit) : « les routes ont changé, version 42 ».
+
+**Ce qui ne rentre pas dans le modèle** : les limiteurs de débit sont un
+**compteur à partager**, pas un état à répliquer. Soit diviser le quota, soit le
+mettre en base. À trancher séparément.
+
+**plug en multi-nœud - ce qui casse, et où** (vérifié dans son code) :
+
+| Contexte | Cible du nom | À N instances |
+|---|---|---|
+| Docker / Compose | le **nom du conteneur** | **déjà correct** |
+| Swarm | le **VIP du service** | cassé (`relayTarget` dit lui-même « assumes the usual single replica ») |
+| k8s | le selector `app: plug` (`agent/main.go:2368` et `:2272`) | cassé : l'étiquette matche les N pods, la session vit dans un |
+
+Le chemin Docker montre la bonne forme : **viser l'instance, pas le service**.
+Second problème, celui-là identique dans les trois contextes : **un workload
+garé n'est restauré que par l'instance qui l'a garé** (le reçu voyage dans les
+labels du signpost, le gc de démarrage de CET agent restaure). Si ce pod ne
+revient jamais, le service reste à zéro.
+
+**L'asymétrie qui en fait un argument EE** : embarqué, on a une base partagée,
+donc le bail peut y vivre et **n'importe quel nœud restaure ce qu'un nœud mort
+avait garé**. plug autonome ne peut pas. Le prompt complet a été passé à plug le
+2026-08-25 (travail en cours de leur côté).
+
+## Multi-instance - CE QUI SE SYNCHRONISE, ET COMMENT (2026-08-25)
+
+Plan de chantier complet : **`multi-instance.local.md`** (non versionné, comme
+celui de plug). Le POURQUOI est dans « Cadrage SCALABILITÉ » plus haut. Ce qui
+suit est la partie qu'il a demandé de bien noter : **les objets en mémoire à
+resynchroniser, et la discipline**.
+
+**La règle, une fois pour toutes** : `NOTIFY` **accélère une vérité qu'on sait
+relire, il n'en est jamais la source**. Trois conséquences non négociables :
+1. **Le message est un POINTEUR, pas la donnée** (plafond 8000 octets, livré au
+   commit) : « les routes ont changé, version 42 ».
+2. **Chaque objet porte un NUMÉRO DE VERSION en base**, et chaque instance
+   réconcilie périodiquement en comparant. Sans ça, une instance déconnectée au
+   mauvais moment (coupure, bascule du primaire, redémarrage) **reste périmée
+   pour toujours** - `NOTIFY` est du fire-and-forget.
+3. C'est **exactement** la règle du canal navigateur (`internal/events`) : l'état
+   vient du fetch, le canal ne fait que le rafraîchir. La même discipline deux
+   fois, ce qui est plutôt bon signe.
+
+**Les objets en mémoire qui divergent**, avec leur couture existante :
+
+| Objet | Où | Aujourd'hui | À N nœuds |
+|---|---|---|---|
+| **Snapshot du routeur** (routes, prédicats, filtres, sécurité endpoint, specs OpenAPI) | `internal/gateway/router.go:104` `Reload(ctx)` | appelé **dans le processus** qui a servi la console (`admin/config.go:159`, `configurations.go:452`, `signing.go:152`, `openapi.go:126`) | une route publiée vit sur **un** nœud |
+| **Certificats + réglages TLS** | `internal/certs/supervisor.go:154` `Reload(ctx)` | `admin/certificates.go:489` | un certificat importé sur A, et B sert encore l'ancien - **facile à oublier, très visible** |
+| **Clés de signature JWT** | via le routeur | rotation appelée sur un nœud | les autres signent avec l'ancienne |
+| **Fournisseurs d'auth** (`internal/idp`) | registre en mémoire | idem | un OIDC reconfiguré n'existe que sur un nœud |
+| **Registre plug** (`internal/devtunnel`) | en mémoire, par design | rien | se synchronise très bien par NOTIFY |
+| **Hub d'événements** (`internal/events`) | en mémoire | rien | doit **relayer** : un message publié sur A doit atteindre les pages de B |
+| Caches réglages/thème (5 s) | `internal/auth` | TTL | obsolescence bornée, **pas besoin de NOTIFY** |
+| Cache de session (TTL) | `internal/session` | TTL | déconnexion honorée après le TTL, acceptable, **à écrire dans la doc** |
+
+**Les deux `Reload(ctx)` existants sont les points d'accroche** : c'est déjà la
+bonne granularité, il ne manque que « qui le déclenche ». Aujourd'hui l'écriture
+appelle son propre Reload ; demain elle **incrémente une version, écrit, et
+NOTIFY** - et chaque instance, y compris celle qui a écrit, recharge en voyant
+la version bouger. Un seul chemin, pas deux.
+
+**Ce qui ne rentre PAS dans le modèle** : les **limiteurs de débit**
+(`internal/auth/register.go:98`) sont un compteur à PARTAGER, pas un état à
+répliquer. À N nœuds, N fois l'autorisation - un contrôle de sécurité qui
+s'affaiblit en grandissant. Soit diviser le quota, soit le compteur en base
+(une écriture par tentative refusée, c'est déjà le chemin lent). À trancher
+séparément.
+
+**Le mode test UI et les jetons swagger** restent par processus, assumé : à N
+nœuds une simulation saute d'une requête à l'autre. À **dire dans la doc**
+plutôt qu'à corriger.
+
 ## Prochains chantiers (ordre suggéré)
 
 **Le chantier décidé, prêt à démarrer : plug embarqué dans Meerkat (2026-08-24).**

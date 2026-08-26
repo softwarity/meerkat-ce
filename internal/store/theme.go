@@ -432,7 +432,7 @@ func (s *Store) ActivateTheme(ctx context.Context, id string) error {
 		return fmt.Errorf("store: activate theme %q: %w", id, ErrNoRows)
 	}
 	var active int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM themes WHERE active = 1`).Scan(&active); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM themes WHERE active = ?`, true).Scan(&active); err != nil {
 		return fmt.Errorf("store: activate theme %q: %w", id, err)
 	}
 	if active != 1 {
@@ -450,7 +450,7 @@ func (s *Store) GetTheme(ctx context.Context, id string) (Theme, error) {
 // GetActiveTheme returns the active theme (there is always exactly one).
 func (s *Store) GetActiveTheme(ctx context.Context) (Theme, error) {
 	return s.themeRow(ctx, `SELECT id, name, active, flat, dark, light, created_at, updated_at
-		 FROM themes WHERE active = 1`)
+		 FROM themes WHERE active = ?`, true)
 }
 
 // completePalettes materializes the default value of every missing token so a
