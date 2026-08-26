@@ -16,6 +16,7 @@ package devtunnel
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -168,6 +169,27 @@ func Linked() bool { return hooks.Run != nil }
 // VerbArg is the hidden first argument that turns a gateway process into one
 // verb answer. Hidden because nobody types it: the agent builds the command.
 const VerbArg = "__plug-verb"
+
+// DownloadArg answers the ANONYMOUS `get` account, the one a developer reaches
+// with `ssh get@gateway install | sh` before they have a client at all.
+//
+// Standalone plug hands back its own binaries from a script in its image. A
+// gateway has none to hand back - it embeds the agent, not the client - and
+// left to the default it fork/execs a path that does not exist and says
+// "no such file or directory", which tells nobody anything.
+//
+// So it answers a script instead. It is piped straight into a shell, so what
+// it prints IS the answer: a line naming where the client lives, and a
+// non-zero exit so nothing downstream believes an install happened.
+const DownloadArg = "__plug-download"
+
+// PrintDownloadNotice writes that script. Kept in the trunk rather than beside
+// the agent because the sentence is about this PRODUCT, not about the tunnel.
+func PrintDownloadNotice() {
+	fmt.Println(`echo "This gateway runs the plug agent, but it does not distribute the plug client." >&2`)
+	fmt.Println(`echo "Install it from https://github.com/softwarity/plug (releases), then point it here." >&2`)
+	fmt.Println(`exit 1`)
+}
 
 // RunVerb answers a verb and never returns. Called before anything else in
 // main, from a process the agent started.

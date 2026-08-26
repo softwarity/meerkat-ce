@@ -43,6 +43,13 @@ func main() {
 		devtunnel.RunVerb()
 		return
 	}
+	// The anonymous account a developer reaches before they have a client:
+	// `ssh get@gateway install | sh`. This gateway has no client to hand out,
+	// and says so in the one place the person is looking.
+	if len(os.Args) > 1 && os.Args[1] == devtunnel.DownloadArg {
+		devtunnel.PrintDownloadNotice()
+		return
+	}
 
 	showVersion := flag.Bool("version", false, "print version and exit")
 	addr := flag.String("addr", envOr("MEERKAT_ADDR", ":8080"), "application (data plane) listen address")
