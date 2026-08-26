@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestAuditTrail(t *testing.T) {
@@ -71,5 +72,43 @@ func TestAuditTrail(t *testing.T) {
 	left, _ := s.ListAuditEvents(ctx, AuditFilter{})
 	if len(left) != 1 || left[0].At != 200 {
 		t.Fatalf("after purge: %+v", left)
+	}
+}
+
+// An identifier that sorts by time is the whole reason the tape and the audit
+// trail can order themselves without SQLite's rowid: two rows stamped in the
+// same SECOND are ordered by it, which is what a second cannot do.
+//
+// Inside one MILLISECOND the order is the random half's, and that is the
+// design rather than a gap - two writes that close are concurrent, and any
+// order between them is as true as another. So what is asserted is what is
+// promised: across milliseconds, chronological.
+func TestEventIDsSortByTime(t *testing.T) {
+	var ids []string
+	for range 20 {
+		ids = append(ids, newEventID())
+		time.Sleep(2 * time.Millisecond)
+	}
+	for i := 1; i < len(ids); i++ {
+		if ids[i] <= ids[i-1] {
+			t.Fatalf("id %d does not sort after its predecessor:\n  %s\n  %s", i, ids[i-1], ids[i])
+		}
+	}
+	// Fixed width, or the comparison stops being chronological the day the
+	// millisecond count gains a digit.
+	for _, id := range ids {
+		if len(id) != len(ids[0]) {
+			t.Fatalf("ids are not a fixed width: %d and %d", len(ids[0]), len(id))
+		}
+	}
+	// And unique on the random half: minted inside one millisecond, still
+	// distinct - a primary key does not get to collide.
+	seen := map[string]bool{}
+	for range 500 {
+		id := newEventID()
+		if seen[id] {
+			t.Fatal("two identical ids")
+		}
+		seen[id] = true
 	}
 }

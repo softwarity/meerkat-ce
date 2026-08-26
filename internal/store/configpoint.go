@@ -1,19 +1,5 @@
 package store
 
-// KNOWN GAP - config_points still orders on SQLite's rowid.
-//
-// Everywhere else the tie-break for a timestamp with a second's resolution
-// moved to the row's own id, which both databases have. Here it cannot: the
-// tape asks which point is genuinely the NEWEST, and an id that is random
-// answers that arbitrarily - the test that restores a state and reads it back
-// went from green to a coin toss.
-//
-// What this table needs is a monotonic column of its own, which is a schema
-// change and a migration to do deliberately rather than in passing. Until
-// then the tape works on the embedded database and answers an error on
-// PostgreSQL, which is the honest failure: loud, on one feature, rather than
-// silent and on the wrong row.
-
 import (
 	"context"
 	"database/sql"
@@ -75,7 +61,7 @@ func (s *Store) LastConfigPoint(ctx context.Context) (ConfigPoint, error) {
 	var p ConfigPoint
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id, at, actor_id, label, digest, document
-		   FROM config_points ORDER BY at DESC, rowid DESC LIMIT 1`).
+		   FROM config_points ORDER BY at DESC, id DESC LIMIT 1`).
 		Scan(&p.ID, &p.At, &p.ActorID, &p.Label, &p.Digest, &p.Document)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ConfigPoint{}, ErrNoConfigPoint
@@ -123,7 +109,7 @@ func (s *Store) AddConfigPoint(ctx context.Context, p ConfigPoint) error {
 		return err
 	}
 	if p.ID == "" {
-		p.ID = newAuditID()
+		p.ID = newEventID()
 	}
 	if _, err := s.db.ExecContext(ctx,
 		`INSERT INTO config_points (id, at, actor_id, label, digest, document)
@@ -149,7 +135,7 @@ func (s *Store) ListConfigPoints(ctx context.Context) ([]ConfigPoint, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT p.id, p.at, p.actor_id, COALESCE(u.username, ''), p.label, p.digest
 		   FROM config_points p LEFT JOIN users u ON u.id = p.actor_id
-		  ORDER BY p.at DESC, p.rowid DESC`)
+		  ORDER BY p.at DESC, p.id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list restore points: %w", err)
 	}

@@ -12,10 +12,29 @@ import (
 
 // newAuditID mints a random id for an event whose caller did not supply one
 // (tests, or the emit helper leaving it to the store).
-func newAuditID() string {
-	var b [16]byte
+// newEventID mints an identifier that SORTS BY TIME: twelve hex digits of unix
+// milliseconds, then ten random bytes.
+//
+// The randomness alone was enough to be unique and useless for anything else.
+// Both tables that use this stamp their rows with a timestamp in SECONDS, and
+// ask "which is the newest" - a question a second cannot answer when two rows
+// share one. SQLite's rowid was answering it, silently, and PostgreSQL has no
+// such thing.
+//
+// So the id answers it instead. Lexicographic order is now chronological to
+// the millisecond, ties inside one millisecond fall to the random half, and
+// two instances writing in the same millisecond are genuinely concurrent -
+// any order between them is as true as another.
+//
+// A prefix rather than a sequence, deliberately: a sequence would need a
+// number handed out by somebody, and with several gateways that somebody is a
+// round trip and a retry on every write. A clock needs nobody.
+func newEventID() string {
+	var b [10]byte
 	_, _ = rand.Read(b[:])
-	return hex.EncodeToString(b[:])
+	// Twelve hex digits hold milliseconds until the year 10889, and keep the
+	// width fixed - which is what makes the comparison lexicographic.
+	return fmt.Sprintf("%012x%s", time.Now().UnixMilli(), hex.EncodeToString(b[:]))
 }
 
 // AuditEvent is one recorded administrative mutation (the audit trail). It
@@ -80,7 +99,7 @@ type AuditFilter struct {
 // callers may pass a bare event.
 func (s *Store) AddAuditEvent(ctx context.Context, ev AuditEvent) error {
 	if ev.ID == "" {
-		ev.ID = newAuditID()
+		ev.ID = newEventID()
 	}
 	if ev.At == 0 {
 		ev.At = time.Now().Unix()
