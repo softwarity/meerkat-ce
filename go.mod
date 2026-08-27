@@ -8,7 +8,7 @@ require (
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pb33f/libopenapi v0.38.7
-	github.com/softwarity/plug/agent v0.0.0-20260827082429-004dbb45768d
+	github.com/softwarity/plug/agent v0.0.0-20260827090335-e9ad3d1206f4
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.54.0
 	golang.org/x/text v0.40.0
