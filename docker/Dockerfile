@@ -4,7 +4,12 @@ ARG GO_VERSION=1.26
 ARG NODE_VERSION=24
 # The plug client this image hands out, and which edition carries it. Declared
 # here because a FROM can only read an ARG from the global scope.
-ARG PLUG_VERSION=latest
+# The client flavour this image serves. `hosted` carries the verbs that make
+# sense against an embedded agent and leaves out the ones the gateway decides -
+# update and versions - because a gateway serves its own client and its own
+# version. The flavour rides in the version string, so nothing here has to
+# repeat it.
+ARG PLUG_VERSION=hosted
 ARG EDITION=ce
 
 # The console first: its production build is embedded in the Go binary, so the
