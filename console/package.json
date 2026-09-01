@@ -38,7 +38,7 @@
     "@angular/build": "^22.0.0",
     "@angular/cli": "^22.0.0",
     "@angular/compiler-cli": "^22.0.0",
-    "@types/luxon": "^3.7.2",
+    "@types/luxon": "^3.7.5",
     "typescript": "~6.0.0"
   },
   "overrides": {
