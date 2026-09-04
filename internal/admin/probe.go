@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/softwarity/meerkat/internal/gateway"
@@ -20,7 +22,7 @@ import (
 // admin adjusts a header, and re-runs.
 //
 // It matches, it never proxies: no upstream is contacted, nothing is written.
-func (a *API) registerProbe(mux *http.ServeMux) {
+func (a *API) registerProbe(mux Mux) {
 	mux.Handle("POST /api/routes/probe", a.infraAdmin(a.probeRoutes))
 }
 
@@ -47,25 +49,33 @@ func (a *API) probeRoutes(w http.ResponseWriter, r *http.Request, _ store.User) 
 			"nothing to probe: pass targetRouteId, a request, or both")
 		return
 	}
+	out, err := a.probe(r.Context(), p)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
 
+// probe is the probing itself, shared by the endpoint and by the agent's
+// test_routing tool: two ways in, one answer, and no second implementation to
+// drift.
+func (a *API) probe(ctx context.Context, p probePayload) (any, error) {
 	var synth routing.Synthesis
 	if p.TargetRouteID != "" {
-		route, err := a.st.GetRoute(r.Context(), p.TargetRouteID)
+		route, err := a.st.GetRoute(ctx, p.TargetRouteID)
 		if err != nil {
-			writeErr(w, http.StatusNotFound, "unknown route "+p.TargetRouteID)
-			return
+			return nil, fmt.Errorf("unknown route %s", p.TargetRouteID)
 		}
 		// Probe the route the ENGINE runs, references resolved: a predicate on
 		// "${tenant-host}" must be tried with the host, not with the reference.
-		values, err := a.st.VaultValues(r.Context(), vault.ScopeInfra)
+		values, err := a.st.VaultValues(ctx, vault.ScopeInfra)
 		if err != nil {
-			a.internal(w, err)
-			return
+			return nil, err
 		}
 		expanded, _, err := gateway.ExpandRoute(route, values)
 		if err != nil {
-			a.internal(w, err)
-			return
+			return nil, err
 		}
 		synth = routing.Synthesize(expanded.Predicates)
 		if !route.Enabled {
@@ -78,7 +88,7 @@ func (a *API) probeRoutes(w http.ResponseWriter, r *http.Request, _ store.User) 
 	if p.Request != nil {
 		synth = mergeSynthesis(synth, *p.Request)
 	}
-	writeJSON(w, http.StatusOK, a.router.Probe(p.TargetRouteID, synth, p.As))
+	return a.router.Probe(p.TargetRouteID, synth, p.As), nil
 }
 
 // mergeSynthesis lets the caller override what the synthesis proposed, field

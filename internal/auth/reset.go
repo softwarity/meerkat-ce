@@ -115,7 +115,7 @@ func (h *Handler) doForgot(w http.ResponseWriter, r *http.Request) {
 		}, http.StatusUnprocessableEntity)
 		return
 	}
-	if !h.registerAllow(clientIP(r)) {
+	if !h.registerAllow(r.Context(), clientIP(r)) {
 		writeFlow(w, forgotPage, forgotData{
 			flowChrome: h.flowData(r, "titleForgot"), Error: h.tr(r, "errTooManyAttempts"),
 		}, http.StatusTooManyRequests)
@@ -228,9 +228,14 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	}
 	// The new password KILLS every live session of the account: whoever held
 	// one (including a possible intruder) signs in again or is out.
+	//
+	// The rows go, and then the caches: Resolve answers from memory for a few
+	// seconds, so without this the intruder keeps their page for that long -
+	// on every gateway, including the ones that heard nothing.
 	if _, err := h.st.DeleteSessionsForUser(r.Context(), userID); err != nil {
 		slog.Warn("session revocation after reset failed", "err", err)
 	}
+	h.sm.Revoked(userID)
 	// Tell the owner (best-effort): an unexpected reset is worth an alarm.
 	if u, err := h.st.GetUserByID(r.Context(), userID); err == nil && u.Email != "" {
 		t := messagesFor(u.Locale)

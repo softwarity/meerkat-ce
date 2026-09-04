@@ -13,6 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // fakeMailbox records outbound mail instead of sending it.
@@ -46,7 +47,7 @@ func (f *fakeMailbox) forRecipient(to string) []mail.Message {
 // recording mailbox.
 func registerSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store, *fakeMailbox) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -20,9 +21,11 @@ var specClient = &http.Client{Timeout: 20 * time.Second}
 // registerOpenAPI mounts the endpoint-security surface (RBAC-07): read the
 // route's OpenAPI operations, and pose per-endpoint access rules. Routing plane
 // (GATEWAY scope): root or infra-admin.
-func (a *API) registerOpenAPI(mux *http.ServeMux) {
+func (a *API) registerOpenAPI(mux Mux) {
 	mux.Handle("GET /api/routes/{id}/operations", a.gw(a.getRouteOperations))
 	mux.Handle("PUT /api/routes/{id}/security", a.infraAdmin(a.putRouteSecurity))
+	mux.Handle("PUT /api/routes/{id}/spec", a.infraAdmin(a.putRouteSpec))
+	mux.Handle("DELETE /api/routes/{id}/spec", a.infraAdmin(a.deleteRouteSpec))
 }
 
 // routeOperations is what the console consumes to draw the swagger-like editor:
@@ -58,17 +61,9 @@ func (a *API) getRouteOperations(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "route not found")
 		return
 	}
-	specURL, err := resolveSpecURL(route)
+	spec, err := a.readSpec(r.Context(), route)
 	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-	defer cancel()
-	spec, _, err := openapi.Fetch(ctx, specClient, specURL)
-	if err != nil {
-		// The upstream or its spec is the problem, not this request: 502.
-		writeErr(w, http.StatusBadGateway, err.Error())
+		writeErr(w, specReadStatus(err), err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, routeOperations{
@@ -123,7 +118,7 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 		a.internal(w, err)
 		return
 	}
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
 		return
 	}
@@ -148,8 +143,209 @@ func endpointsOf(route store.Route) []store.EndpointPolicy {
 	return route.API.Security.Endpoints
 }
 
+// errNoSpec is what a route with no spec declaration answers, and what tells a
+// missing declaration (422: nothing to read) from an upstream that will not
+// answer (502: the other end is the problem).
+var errNoSpec = errors.New("this route declares no OpenAPI spec")
+
+// errNoFile is a route declaring a deposited spec whose file is not there -
+// the state an import leaves behind when it carried the configuration without
+// the package that holds the media. It is a 422 for the same reason: the
+// request is fine, the declaration is what is incomplete.
+var errNoFile = errors.New("this route declares a deposited spec, but no file was deposited")
+
+func specReadStatus(err error) int {
+	if errors.Is(err, errNoSpec) || errors.Is(err, errNoFile) {
+		return http.StatusUnprocessableEntity
+	}
+	return http.StatusBadGateway
+}
+
+// readSpec parses the route's spec, from wherever it comes: fetched from the
+// service, or read from what was deposited. One projection either way - which
+// source it was is the console's business, not this screen's.
+func (a *API) readSpec(ctx context.Context, route store.Route) (*openapi.Spec, error) {
+	decl := route.Spec()
+	if decl.Empty() {
+		return nil, errNoSpec
+	}
+	if decl.Type == store.SpecFile {
+		raw, ok, err := a.st.RouteSpecContent(ctx, route.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, errNoFile
+		}
+		return openapi.Parse(raw)
+	}
+	specURL, err := resolveSpecURL(route)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	spec, _, err := openapi.Fetch(ctx, specClient, specURL)
+	return spec, err
+}
+
+// specDeposit is what the console gets back after depositing a file: what the
+// spec turned out to be, where it is now served, and whether the upstream
+// already answers there - the shadowing is announced at deposit time rather
+// than discovered later. Replacing an incomplete spec IS the reason to deposit
+// one, so this is a fact to state, never a refusal.
+type specDeposit struct {
+	Title    string `json:"title,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Format   string `json:"format"`
+	Count    int    `json:"operations"`
+	Path     string `json:"path"`
+	URL      string `json:"url"`
+	Filename string `json:"filename"`
+	Shadows  int    `json:"shadows,omitempty"`
+}
+
+// putRouteSpec deposits a spec file on a route: the bytes are stored, and the
+// route's declaration is switched to that file in the same move - a deposit
+// that left the route pointing upstream would be a file nobody reads.
+//
+// The body is the file itself (JSON or YAML, the two forms the specification
+// admits). It is PARSED before anything is written: what is not a spec is
+// refused here, with the parser's own words, rather than discovered months
+// later in an empty swagger.
+func (a *API) putRouteSpec(w http.ResponseWriter, r *http.Request, actor store.User) {
+	route, err := a.st.GetRoute(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "route not found")
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxSpecUpload+1))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "could not read the file: "+err.Error())
+		return
+	}
+	if len(body) > maxSpecUpload {
+		writeErr(w, http.StatusRequestEntityTooLarge,
+			fmt.Sprintf("this file is over %d bytes: a specification that big does not belong in a configuration package", maxSpecUpload))
+		return
+	}
+	parsed, err := openapi.Parse(body)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	decl := store.RouteSpec{
+		Type:     store.SpecFile,
+		Path:     r.URL.Query().Get("path"),
+		Filename: r.URL.Query().Get("filename"),
+	}
+	if decl.Filename == "" {
+		decl.Filename = "openapi.json"
+	}
+	if err := store.SanitizeRouteSpec(&decl); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if err := a.st.SetRouteSpec(r.Context(), route.ID, body); err != nil {
+		a.internal(w, err)
+		return
+	}
+	before := route.Spec()
+	api := store.RouteAPI{}
+	if route.API != nil {
+		api = *route.API // the endpoint policies stay where they are
+	}
+	api.Spec = &decl
+	route.API = &api
+	if err := a.st.SaveRoute(r.Context(), route); err != nil {
+		a.internal(w, err)
+		return
+	}
+	if err := a.reloadRouting(r.Context()); err != nil {
+		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
+		return
+	}
+	a.auditUpdate(r.Context(), actor, "route.spec", "route", route.ID, route.Name, "", before, decl)
+	out := specDeposit{
+		Title: parsed.Title, Version: parsed.Version, Format: parsed.Format,
+		Count: len(parsed.Operations), Path: decl.Path, Filename: decl.Filename,
+		URL: routeSpecURL(route), Shadows: a.shadowedStatus(r.Context(), route),
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// deleteRouteSpec drops the deposited file AND the declaration that names it:
+// a route left declaring a file that is gone is the dangling reference this
+// whole feature is built to avoid.
+func (a *API) deleteRouteSpec(w http.ResponseWriter, r *http.Request, actor store.User) {
+	route, err := a.st.GetRoute(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "route not found")
+		return
+	}
+	before := route.Spec()
+	if err := a.st.DeleteRouteSpec(r.Context(), route.ID); err != nil {
+		a.internal(w, err)
+		return
+	}
+	if route.API != nil && route.API.Spec != nil && route.API.Spec.Type == store.SpecFile {
+		route.API.Spec = nil
+		if err := a.st.SaveRoute(r.Context(), route); err != nil {
+			a.internal(w, err)
+			return
+		}
+		if err := a.reloadRouting(r.Context()); err != nil {
+			a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
+			return
+		}
+	}
+	a.auditUpdate(r.Context(), actor, "route.spec", "route", route.ID, route.Name, "", before, store.RouteSpec{})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// maxSpecUpload is the ceiling on a deposited file. It comes from the EXPORT,
+// not from the parser: this file travels inside a configuration package.
+const maxSpecUpload = 4 << 20
+
+// routeSpecURL is where a deposited spec answers: inside the route's own
+// prefix, so the document sits at the base it documents.
+func routeSpecURL(route store.Route) string {
+	decl := route.Spec()
+	if decl.Type != store.SpecFile {
+		return ""
+	}
+	return routing.MatchPrefix(route.Predicates) + "/" + decl.Path
+}
+
+// shadowedStatus asks the upstream whether it already answers where the
+// deposited file now does, and returns its status code (0 when it does not
+// answer at all). Best effort by design: an upstream that is down is not a
+// reason to refuse a deposit.
+func (a *API) shadowedStatus(ctx context.Context, route store.Route) int {
+	decl := route.Spec()
+	if decl.Type != store.SpecFile || route.Upstream == "" {
+		return 0
+	}
+	target := strings.TrimRight(route.Upstream, "/") + routeUpstreamPrefix(route) + "/" + decl.Path
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return 0
+	}
+	res, err := specClient.Do(req)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode >= 400 {
+		return 0
+	}
+	return res.StatusCode
+}
+
 // resolveSpecURL yields the absolute URL of a route's OpenAPI spec: an absolute
-// openapiUrl is used as is; a relative one is resolved THE WAY THE ROUTE'S OWN
+// path is used as is; a relative one is resolved THE WAY THE ROUTE'S OWN
 // TRAFFIC IS.
 //
 // That last part is the whole point. A route matching /fpl-svc/** with no
@@ -159,10 +355,11 @@ func endpointsOf(route store.Route) []store.EndpointPolicy {
 // left wondering which of the two ends was wrong. With a strip-prefix, the
 // prefix is gone from what the service sees, and so it is from here.
 func resolveSpecURL(route store.Route) (string, error) {
-	if route.API == nil || strings.TrimSpace(route.API.OpenapiURL) == "" {
-		return "", errors.New("this route declares no OpenAPI spec url")
+	decl := route.Spec()
+	if decl.Type != store.SpecUpstream || decl.Path == "" {
+		return "", errNoSpec
 	}
-	s := strings.TrimSpace(route.API.OpenapiURL)
+	s := decl.Path
 	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
 		return s, nil
 	}

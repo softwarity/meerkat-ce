@@ -1,0 +1,124 @@
+<div class="head">
+  <h2 i18n="@@JWT_signing_keys">JWT signing keys</h2>
+  <span class="grow"></span>
+  <button matIconButton (click)="closed.emit()" i18n-matTooltip="@@Close" matTooltip="Close" i18n-aria-label="@@Close" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+<div class="panel-body">
+  <p class="workflow" i18n="@@Signing_keys_workflow">
+    Three distinct key pairs, one per algorithm - not one key in three formats. A route picks the
+    one its service can verify, and the private halves never leave this server.
+  </p>
+  @if (data(); as d) {
+    <!-- Both labels sit ON the border, the way an outlined field carries its
+         own: they name the box without taking a line inside it. And it is
+         "JWKS", not "JWKS (data plane)" - a plane is a word from this
+         product's own vocabulary, and it was answering a question nobody had
+         asked. -->
+    <div class="jwks">
+      <span class="lbl" i18n="@@JWKS_endpoint">JWKS</span>
+      <span class="badge" i18n="@@Recommended">Recommended</span>
+      <code class="path">{{ d.jwksPath }}</code>
+      <span class="spacer"></span>
+      <button matIconButton (click)="copy(d.jwksPath)" i18n-matTooltip="@@Copy" matTooltip="Copy">
+        <mat-icon>content_copy</mat-icon>
+      </button>
+    </div>
+    <!-- Said ONCE, here: it is about the JWKS above and about all three rows
+         at the same time. Inside each row it was the same paragraph three
+         times over. -->
+    <!-- The choice and its consequence, rather than the mechanism: what a
+         reader has to leave with is that one path costs nothing forever and
+         the other is theirs to maintain forever. -->
+    <p class="fallback" i18n="@@Static_fallback">
+      The recommended path, and the only one where rotating costs nothing: a service reads this
+      once, caches it, and reads it again the day a token names a key it does not know. Rotate, and
+      it finds the new one on its own. A service that cannot fetch a JWKS takes the PEM from its
+      row below instead - and then every rotation means going back to every service holding one,
+      which is why that is the fallback and not the plan.
+    </p>
+
+    @for (k of d.keys; track k.algorithm) {
+      <mat-expansion-panel class="key">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <span class="alg">{{ k.algorithm }}</span>
+          </mat-panel-title>
+          <!-- Collapsed, the row answers one question: does this one concern
+               me? The count does that; the kid it used to show answered
+               nothing anybody acts on. -->
+          <mat-panel-description>
+            @if (usersOf(k.algorithm).length; as n) {
+              <span class="used">{{ n }}</span>
+              @if (n === 1) {
+                <ng-container i18n="@@One_route">route</ng-container>
+              } @else {
+                <ng-container i18n="@@N_routes">routes</ng-container>
+              }
+            } @else {
+              <span class="idle" i18n="@@No_route_signs_with_it">no route signs with it</span>
+            }
+            <span class="spacer"></span>
+            <!-- Right of the row, muted: it names the key without competing
+                 with the name that means something. -->
+            <span
+              class="kid"
+              i18n-matTooltip="@@Key_id_tooltip"
+              matTooltip="The gateway puts this in each token's header. The backend reads it, finds the matching key in the JWKS, and verifies with that one - which is what makes a rotation invisible to it."
+            >{{ k.kid }}</span>
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        @if (usersOf(k.algorithm).length) {
+          <!-- What the gateway KNOWS: which routes it signs with this key,
+               which is its own setting. How the service behind one of them
+               verifies - fetching the JWKS or holding a pasted PEM - it has no
+               way of knowing, so the list must not sit over the PEM as though
+               it named its users. -->
+          <p class="routes-lbl" i18n="@@Signed_with_this_key">Signed with this key</p>
+          <ul class="routes">
+            @for (r of usersOf(k.algorithm); track r.id) {
+              <li>
+                <button matButton (click)="routePicked.emit(r.id)">
+                  <mat-icon>alt_route</mat-icon>
+                  <span>{{ r.name }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+
+        <div class="pem-wrap">
+          <pre class="pem">{{ k.publicPem }}</pre>
+          <button
+            matIconButton
+            class="pem-copy"
+            (click)="copy(k.publicPem)"
+            i18n-matTooltip="@@Copy_PEM"
+            matTooltip="Copy PEM"
+            i18n-aria-label="@@Copy_PEM"
+            aria-label="Copy PEM"
+          >
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </div>
+      </mat-expansion-panel>
+    }
+  }
+</div>
+<div class="panel-actions">
+  @if (confirming()) {
+    <span class="warn" i18n="@@Rotate_confirm">Rotate now? The old keys keep verifying for a short grace window, so tokens signed a second ago still pass while services pick up the new ones.</span>
+    <button matButton (click)="confirming.set(false)" i18n="@@Cancel">Cancel</button>
+    <button matButton="filled" [disabled]="renewing()" (click)="renew()" i18n="@@Rotate">Rotate</button>
+  } @else {
+    <button matButton (click)="confirming.set(true)" [disabled]="renewing() || loading()">
+      <mat-icon>autorenew</mat-icon>
+      <span i18n="@@Renew_keys">Renew keys</span>
+    </button>
+  }
+</div>

@@ -16,6 +16,7 @@ import (
 	netmail "net/mail"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/mail"
@@ -44,6 +46,7 @@ func flowPage(name, body string) *template.Template {
 var (
 	loginPage           = flowPage("login", loginBody)
 	selectTenantPage    = flowPage("select-tenant", selectTenantBody)
+	pluggedPage         = flowPage("plugged", pluggedBody)
 	updatePasswordPage  = flowPage("update-password", updatePasswordBody)
 	profilePage         = flowPage("profile", profileBody)
 	profilePasswordPage = flowPage("profile-password", profilePasswordBody)
@@ -169,6 +172,10 @@ const specimenBody = `    <form onsubmit="return false">
           /^data:image\/(png|jpeg|webp|svg\+xml);base64,[a-zA-Z0-9+/=]+$/.test(brand.logo);
         if (mark && okLogo) {
           if (!img) { img = document.createElement('img'); img.className = 'applogo'; mark.prepend(img); }
+          // The size travels as a class, and only the two known ones do: an
+          // arbitrary string from a message is not a class name here.
+          const big = brand.logoSize === 'large' || brand.logoSize === 'xlarge';
+          img.className = big ? 'applogo ' + brand.logoSize : 'applogo';
           img.src = brand.logo; img.style.display = '';
           if (svg) svg.style.display = 'none';
         } else {
@@ -248,6 +255,81 @@ const flowTop = `<!doctype html>
       border-inline-start: 3px solid var(--mk-primary);
       border-radius: var(--mk-radius-small);
     }
+    /* The way OUT of a step. The organisation chooser and the group chooser
+       are the two pages with no exit: somebody who signed in as the wrong
+       person, or into an account that reaches nothing, had a cookie to clear
+       by hand and nothing else. Styled as the way back rather than as an
+       action, because leaving is not what the page is for. In the SHARED
+       chrome, since both pages need it - the lesson the mark and the back
+       link each paid for once. */
+    /* The way OUT at the foot of a flow page - six pages offer it - is a
+       button and nothing else. It was wearing THE CARD: surface, border, the
+       hairline accent along the top and twenty-six pixels of padding, because
+       the rule above grants all of that to any form element and .leave only
+       reset the button inside it. So a text link sat in a panel of its own,
+       taller than the choice it followed. */
+    form.leave {
+      margin: 10px 0 0; padding: 0; width: auto; text-align: center;
+      display: block; background: none; border: 0; box-shadow: none;
+      backdrop-filter: none; animation: none;
+    }
+    form.leave::before { display: none; }
+    form.leave button {
+      margin: 0; padding: 0; width: auto; font-size: .8rem; font-weight: 400;
+      font-family: inherit; background: none; color: var(--mk-on-surface-variant);
+      box-shadow: none;
+    }
+    form.leave button:hover {
+      color: var(--mk-primary); text-decoration: underline;
+      filter: none; box-shadow: none; transform: none;
+    }
+    /* The unavailable page (LIFE-05). Its statement is the whole page, so it
+       carries the weight - a lead sized as a caption under a message sized as
+       a paragraph put the operator's sentence above the announcement, which
+       is the wrong way round on the one page a visitor reads to learn one
+       thing. The message is what it is: their own words, subordinate, and
+       measured so a long one does not run the width of a layout. */
+    /* Centred EXPLICITLY, like every other centred thing in this chrome. The
+       card is start-aligned in the layouts built around a form - split and
+       drawer say so outright - so nothing here inherits a centre, and every
+       block that wants one asks for it. Leaning on inheritance is what left a
+       heading and a message hanging on the left of a page whose dot, footnote,
+       link and controls were all centred. */
+    .maint-lead {
+      margin: 0; text-align: center;
+      font-family: var(--mk-mono); font-size: .95rem; font-weight: 600;
+      letter-spacing: .14em; text-transform: uppercase; color: var(--mk-on-surface);
+    }
+    .maint-when {
+      margin: 8px auto 0; max-width: 44ch; text-align: center;
+      font-size: .82rem; color: var(--mk-on-surface-variant);
+    }
+    .maint-msg {
+      margin: 14px auto 0; max-width: 44ch; text-align: center;
+      font-size: .9rem; line-height: 1.55; color: var(--mk-on-surface-variant);
+    }
+    /* The one thing worth keeping from the page this replaced: something that
+       moves. An outage page with nothing alive on it reads as a page that is
+       itself broken. */
+    .maint-dot {
+      width: 8px; height: 8px; margin: 26px auto 0; border-radius: 50%;
+      background: var(--mk-primary); animation: maint-pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes maint-pulse {
+      0%, 100% { opacity: .35; box-shadow: 0 0 0 0 transparent; }
+      50% { opacity: 1; box-shadow: 0 0 14px 2px var(--mk-primary); }
+    }
+    @media (prefers-reduced-motion: reduce) { .maint-dot { animation: none; opacity: .8; } }
+    /* The footnote, only ever shown to whoever administers here. pre-line,
+       because the catalogue carries the break: a sentence about them and a
+       sentence about everybody else are two lines, and a translator should not
+       have to know any markup to keep them so. */
+    .maint-note {
+      margin: 30px 0 0; text-align: center; font-size: .8rem; line-height: 1.5;
+      white-space: pre-line; color: var(--mk-on-surface-variant);
+    }
+    .maint-go { margin: 8px 0 0; text-align: center; font-size: .8rem; }
+    .maint-go a { color: var(--mk-primary); }
     .back { margin: 6px 0 0; text-align: center; font-size: .8rem; }
     .back a { color: var(--mk-primary); text-decoration: none; }
     .back a:hover { text-decoration: underline; }
@@ -267,10 +349,19 @@ const flowTop = `<!doctype html>
       --meerkat-eye: var(--mk-surface);
       filter: drop-shadow(0 0 calc(14px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary) calc(55% * var(--mk-glow, 1)), transparent));
     }
+    /* The BOX the logo is drawn in, square and object-fit: contain, so any
+       picture arrives whole. Its side is the branding's choice (LogoSize),
+       carried as a class - a wide wordmark laid in the 56px box comes out
+       14px tall, which is the one thing a logo must never be. A layout that
+       needs its own size still wins: it names the element under a body class,
+       which outranks these two. */
     .applogo {
-      position: relative; z-index: 1; width: 56px; height: 56px; object-fit: contain;
+      position: relative; z-index: 1; object-fit: contain;
+      width: var(--mk-logo, 56px); height: var(--mk-logo, 56px);
       filter: drop-shadow(0 0 calc(14px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary) calc(45% * var(--mk-glow, 1)), transparent));
     }
+    .applogo.large { --mk-logo: 88px; }
+    .applogo.xlarge { --mk-logo: 128px; }
     .generic {
       position: relative; z-index: 1; width: 52px; height: 52px;
       color: var(--mk-primary); opacity: .9;
@@ -457,6 +548,40 @@ const flowTop = `<!doctype html>
     }
     button.choice:hover, a.choice:hover { border-color: var(--mk-primary); filter: none; box-shadow: none; }
     a.choice { justify-content: center; text-decoration: none; border-radius: 10px; }
+    /* Connecting an agent (MCP-07): the page where somebody decides what an
+       agent may do. Written HERE and not in the page's own body, for the
+       reason the two comments above already paid for once. */
+    .consent { gap: 18px; }
+    .consent fieldset {
+      margin: 0; padding: 0; border: 0; width: 100%;
+      display: grid; gap: 8px;
+    }
+    .consent legend {
+      padding: 0 0 8px; font-family: var(--mk-mono); font-size: .68rem;
+      letter-spacing: .18em; text-transform: uppercase; color: var(--mk-on-surface-variant);
+    }
+    label.choice {
+      display: flex; align-items: flex-start; gap: 12px; text-align: start;
+      padding: 12px 14px; cursor: pointer;
+      background: var(--mk-surface-container-high); color: var(--mk-on-surface);
+      border: 1px solid var(--mk-outline); border-radius: 10px;
+      transition: border-color .15s;
+    }
+    label.choice:hover { border-color: var(--mk-primary); }
+    label.choice:has(input:checked) {
+      border-color: var(--mk-primary);
+      background: color-mix(in srgb, var(--mk-primary) 10%, var(--mk-surface-container-high));
+    }
+    label.choice input { margin-top: 3px; accent-color: var(--mk-primary); }
+    label.choice small { display: block; margin-top: 3px; color: var(--mk-on-surface-variant); }
+    .consent .actions { display: flex; gap: 10px; width: 100%; }
+    .consent .actions button { flex: 1; margin: 0; }
+    button.ghost {
+      background: transparent; color: var(--mk-on-surface-variant);
+      border: 1px solid var(--mk-outline); box-shadow: none;
+    }
+    button.ghost:hover { filter: none; box-shadow: none; border-color: var(--mk-outline); color: var(--mk-on-surface); }
+    .consent .note { margin: 0; font-size: .78rem; color: var(--mk-on-surface-variant); }
     /* "or sign in with", set apart from the form above it */
     .sep {
       margin: 18px 0 10px; text-align: center; font-size: .85rem;
@@ -483,9 +608,16 @@ const flowTop = `<!doctype html>
     button.pk-btn { margin-top: 22px; width: 100%; justify-content: center; }
     /* language / color-scheme switchers - persisted in cookies, applied
        server-side on the next render (no flash) */
+    /* Centred like everything else in the card. It is the one thing here that
+       did not follow: .watch centres its children and the text inherits it,
+       but a flex row ignores text-align, so the language and scheme controls
+       sat at the pane's left edge while the page above them was centred - a
+       few pixels off on a narrow card, and half a screen off on a wide
+       layout. It is a footer of the page, so it is centred on the page, and
+       there is one behaviour rather than one per page. */
     .prefs {
-      margin-top: 18px; display: flex; align-items: center; gap: 4px;
-      animation: rise .7s .4s both;
+      margin-top: 18px; display: flex; align-items: center; justify-content: center;
+      gap: 4px; animation: rise .7s .4s both;
     }
     .prefs button {
       margin: 0; padding: 4px 9px; font-family: var(--mk-mono); font-size: .62rem;
@@ -499,9 +631,16 @@ const flowTop = `<!doctype html>
     /* language icon-menu + the single 3-state scheme button */
     .langbox { position: relative; display: inline-flex; }
     .lang-toggle svg { display: block; }
+    /* Twenty languages is a tall menu, and it opens UPWARDS from a control at
+       the foot of the page: on a short window it ran off the top and the first
+       half of the alphabet was unreachable. It is bounded and it scrolls -
+       never taller than the window minus a margin - and the script below
+       lowers its anchor when even that would not fit, because a menu detached
+       from its button beats a menu with its head off the screen. */
     .lang-menu {
       position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
       display: grid; gap: 2px; min-width: 150px; padding: 6px;
+      max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain;
       background: var(--mk-surface-container); border: 1px solid var(--mk-outline);
       border-radius: var(--mk-radius-small); z-index: 5;
       box-shadow: 0 8px 24px rgb(0 0 0 / .25);
@@ -529,7 +668,7 @@ const flowTop = `<!doctype html>
   <main class="watch">
     <div class="brand">
     <div class="mark{{if .Brand.Meerkat}} pulse{{end}}" aria-hidden="true">
-      {{if .Brand.LogoURL}}<img class="applogo" src="{{.Brand.LogoURL}}" alt="">{{end}}
+      {{if .Brand.LogoURL}}<img class="applogo{{with .Brand.LogoSize}} {{.}}{{end}}" src="{{.Brand.LogoURL}}" alt="">{{end}}
       {{if not .Brand.Meerkat}}<svg class="generic"{{if or .Brand.LogoURL .Brand.HasBackground}} style="display:none"{{end}} viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect x="3" y="3" width="50" height="50" rx="12" stroke="currentColor" stroke-width="2.5" stroke-dasharray="7 6"/>
         <circle cx="21" cy="21" r="5" fill="currentColor" opacity=".85"/>
@@ -619,9 +758,42 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
     document.cookie = k + '=' + v + ';path=/;max-age=31536000;SameSite=Lax';
     location.reload();
   };
+  // The scheme is a preference of the PERSON, like the language just below:
+  // the cookie renders the next page, the account remembers it for the next
+  // browser. Signed out - which most of these pages are - the endpoint answers
+  // 204 and only the cookie remains. The reload waits for the call, so the
+  // page that comes back is the one the account already agrees with.
+  const setScheme = (v) => {
+    document.cookie = 'MEERKAT_SCHEME=' + v + ';path=/;max-age=31536000;SameSite=Lax';
+    fetch('/meerkat/scheme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scheme: v }),
+      credentials: 'same-origin',
+    }).catch(() => {}).finally(() => location.reload());
+  };
   const lt = document.getElementById('lang-toggle'), lm = document.getElementById('lang-menu');
   if (lt) {
-    lt.addEventListener('click', (e) => { e.stopPropagation(); lm.hidden = !lm.hidden; });
+    // Opened upwards from the foot of the page. If its head would leave the
+    // window, the menu is pinned to the top instead and the anchor slides
+    // down below the button - the whole list stays reachable, which is what
+    // the control is for. The max-height above then makes it scroll.
+    const place = () => {
+      lm.style.bottom = '';
+      const r = lm.getBoundingClientRect();
+      if (r.top >= 12) return;
+      // Slide it DOWN by exactly what is sticking out, from the offset the
+      // stylesheet actually applied - so the correction is the overflow and
+      // nothing else, whatever the rule above says today.
+      const applied = parseFloat(getComputedStyle(lm).bottom) || 0;
+      lm.style.bottom = (applied - (12 - r.top)) + 'px';
+    };
+    lt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      lm.hidden = !lm.hidden;
+      if (!lm.hidden) place();
+    });
+    window.addEventListener('resize', () => { if (!lm.hidden) place(); });
     document.addEventListener('click', () => { lm.hidden = true; });
   }
   // The language is a preference of the PERSON, not of the browser: the cookie
@@ -638,7 +810,7 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
     }).catch(() => {}).finally(() => location.reload());
   });
   const sc = document.querySelector('[data-scheme-next]');
-  if (sc) sc.addEventListener('click', () => setPref('MEERKAT_SCHEME', sc.dataset.schemeNext));
+  if (sc) sc.addEventListener('click', () => setScheme(sc.dataset.schemeNext));
 
   // The password checklist ticks as you type (AUTH-10). It counts exactly what
   // the server counts, and it decides nothing: the form still submits, and the
@@ -790,6 +962,49 @@ const updatePasswordBody = `    <form method="post" action="update-password">
       </label>
       <button type="submit">{{.T.changePassword}}</button>
     </form>
+    <form method="post" action="logout" class="leave">
+      <button type="submit">{{.T.signOut}}</button>
+    </form>
+`
+
+// pluggedBody is the halt after signing in (DEV-11): what a developer's
+// machine is answering for, read once, deliberately, before starting.
+//
+// It INFORMS, it does not gate. Typing the destination straight into the
+// address bar walks past it, and that is right - nobody can be made to read,
+// and the strip at the bottom of every page goes on saying the same thing for
+// as long as it stays true. What this page buys is the one moment where it is
+// the only thing on screen.
+const pluggedBody = `    <style>
+      /* One row per developer: who, then what they are serving under it.
+         Side by side, the names pushed the name of the person off the line as
+         soon as there were four of them. */
+      .pg-row {
+        display: grid; gap: 4px; padding: 12px 14px;
+        background: var(--mk-surface-container-high); color: var(--mk-on-surface);
+        border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
+      }
+      .pg-who {
+        font-family: var(--mk-mono); font-size: .66rem; letter-spacing: .16em;
+        text-transform: uppercase; color: var(--mk-on-surface-variant);
+      }
+      /* A service name is an identifier, not prose: it wraps BETWEEN names and
+         never inside one. flight-folder-frontend split across two lines reads
+         as two services that do not exist. */
+      .pg-names { font-family: var(--mk-mono); font-size: .82rem; }
+      .pg-names > span { white-space: nowrap; }
+    </style>
+    <form method="post" action="/plugged">
+      <p class="lead">{{.T.pluggedTitle}}</p>
+      {{range .Served}}
+      <div class="pg-row">
+        {{if .Who}}<span class="pg-who">{{.Who}}</span>{{end}}
+        <span class="pg-names">{{range $i, $n := .Names}}{{if $i}}, {{end}}<span>{{$n}}</span>{{end}}</span>
+      </div>
+      {{end}}
+      <input type="hidden" name="next" value="{{.Next}}">
+      <button type="submit">{{.T.pluggedContinue}}</button>
+    </form>
 `
 
 const selectTenantBody = `    <form method="post" action="select-tenant">
@@ -804,6 +1019,9 @@ const selectTenantBody = `    <form method="post" action="select-tenant">
         <span class="choice-name">{{.TenantName}}</span>
       </button>
       {{end}}
+    </form>
+    <form method="post" action="logout" class="leave">
+      <button type="submit">{{.T.signOut}}</button>
     </form>
 `
 
@@ -1222,45 +1440,77 @@ const profileDevBody = `    <style>
 // and go on being accepted until it expired, which is the whole reason the
 // certificate authority was examined and dropped.
 const profileDevKeyBody = `    <style>
-      .facts { gap: 10px; }
-      .facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
-      .facts dt {
+      /* The fingerprint is the whole point of this page: it is what someone
+         compares against what plug pubkey printed, before believing the deposit
+         Its own line, whole, in mono - beside a label it wrapped mid-hash and
+         two halves of one hash compare as neither. */
+      .dk-fact { display: grid; gap: 3px; }
+      .dk-label {
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
         text-transform: uppercase; color: var(--mk-on-surface-variant);
       }
-      .facts dd { margin: 0; text-align: end; overflow-wrap: anywhere; font-size: .92rem; }
-      .dc-form { display: grid; gap: 8px; width: 100%; }
-      .dc-form textarea {
+      .dk-value { font-family: var(--mk-mono); font-size: .78rem; overflow-wrap: anywhere; }
+      .dk-comment { font-size: .78rem; color: var(--mk-on-surface-variant); }
+      .dk-form textarea {
         width: 100%; resize: vertical; padding: 8px 10px;
         font-family: var(--mk-mono); font-size: .68rem;
         background: var(--mk-surface-container); color: var(--mk-on-surface);
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
       }
-      .dc-mono { font-family: var(--mk-mono); font-size: .72rem; }
-      .dc-hint { margin: 0; font-size: .74rem; color: var(--mk-on-surface-variant); }
-      .dc-clear {
-        margin: 0; padding: 2px 10px; border: 0; background: none; box-shadow: none;
-        color: var(--mk-on-surface-variant); font-size: .72rem; cursor: pointer; justify-self: start;
+      .dk-hint { margin: 0; font-size: .74rem; color: var(--mk-on-surface-variant); }
+      /* Removing is not the action of the page, so it keeps no weight - no
+         fill, no border. But it IS destructive, and it wears the error colour
+         from the start rather than only under the cursor: a hand should learn
+         what a control does before it is over it, not from the reaction.
+         Right-aligned, away from the reading edge, where a destructive control
+         is not the next thing a finger lands on. */
+      .dk-clear {
+        margin: 0; padding: 2px 0; border: 0; background: none; box-shadow: none;
+        color: var(--mk-error); font-size: .78rem; cursor: pointer; justify-self: end;
       }
-      .dc-clear:hover { color: var(--mk-error); filter: none; box-shadow: none; transform: none; }
+      .dk-clear:hover { filter: none; box-shadow: none; transform: none; text-decoration: underline; }
+      .dk-steps { display: grid; gap: 6px; margin-top: 18px; }
+      .dk-steps pre {
+        margin: 0; padding: 10px 12px; overflow-x: auto;
+        font-family: var(--mk-mono); font-size: .7rem; line-height: 1.7;
+        text-align: start; user-select: all;
+        background: var(--mk-surface-container); color: var(--mk-on-surface);
+        border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
+      }
     </style>
-    <p class="lead">{{.T.devKey}}</p>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
     {{if .DevKeyFingerprint}}
-    <dl class="facts">
-      <div><dt>{{.T.devKeyFingerprint}}</dt><dd class="dc-mono">{{.DevKeyFingerprint}}</dd></div>
-      {{if .DevKeyComment}}<div><dt>&nbsp;</dt><dd class="dc-mono">{{.DevKeyComment}}</dd></div>{{end}}
-    </dl>
-    <form method="post" action="/profile/dev-key">
+    <form method="post" action="/profile/dev-key" class="dk-form">
+      <p class="lead">{{.T.devKey}}</p>
+      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <div class="dk-fact">
+        <span class="dk-label">{{.T.devKeyFingerprint}}</span>
+        <span class="dk-value">{{.DevKeyFingerprint}}</span>
+        {{if .DevKeyComment}}<span class="dk-comment">{{.DevKeyComment}}</span>{{end}}
+      </div>
+      <p class="dk-hint">{{.T.devKeyHint}}</p>
       <input type="hidden" name="action" value="clear">
-      <button class="dc-clear" type="submit">{{.T.devKeyRemove}}</button>
+      <button class="dk-clear" type="submit">{{.T.devKeyRemove}}</button>
     </form>
     {{else}}
-    <form method="post" action="/profile/dev-key" class="dc-form">
+    <form method="post" action="/profile/dev-key" class="dk-form">
+      <p class="lead">{{.T.devKey}}</p>
+      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
       <textarea name="key" rows="4" placeholder="ssh-ed25519 AAAA... you@laptop" required></textarea>
       <button type="submit">{{.T.devKeySave}}</button>
+      <p class="dk-hint">{{.T.devKeyHint}}</p>
     </form>
-    <p class="dc-hint">{{.T.devKeyHint}}</p>
+    {{/* The three commands, in the order somebody runs them the first time.
+         plug is not installed from a package manager: it comes FROM the
+         cluster it plugs you into, which is also why the host is a blank
+         nobody here can fill - this gateway does not know which cluster you
+         develop against. Telling someone to run "plug pubkey" without saying
+         where plug comes from is the gap this page had. */}}
+    <div class="dk-steps">
+      <p class="dk-hint">{{.T.devKeyInstall}}</p>
+      <pre>ssh -p 2222 get@&lt;your-cluster&gt; install | sh
+plug keygen
+plug pubkey</pre>
+    </div>
     {{end}}
     <p class="back"><a href="/profile/dev">{{.T.backToDeveloper}}</a></p>
 `
@@ -1425,16 +1675,26 @@ type Handler struct {
 	// here even on the admin plane, where nothing mounts it: a nil hub would
 	// buy a nil check on every publisher for the sake of one allocation.
 	hub *events.Hub
+
+	// served is what a developer's machine is answering for (DEV-11), read for
+	// the pages that have to say so. Nil when nothing can write to it - the
+	// community image, or a test - and every reader treats that as "nothing".
+	served *devtunnel.Registry
 }
+
+// WatchServed hands the handler the registry the developer tunnel fills. Set
+// once, at startup; nil is a perfectly good answer and means the pages show
+// nothing, which is the community image's whole behaviour here.
+func (h *Handler) WatchServed(r *devtunnel.Registry) { h.served = r }
 
 // New builds the data-plane auth handler (full flow).
 func New(st *store.Store, sm *session.Manager) *Handler {
-	return &Handler{st: st, sm: sm, regLimit: newRateLimiter(), hub: events.NewHub()}
+	return &Handler{st: st, sm: sm, regLimit: newRateLimiter(st), hub: events.NewHub()}
 }
 
 // NewAdmin builds the admin-plane auth handler (credentials only).
 func NewAdmin(st *store.Store, sm *session.Manager) *Handler {
-	return &Handler{st: st, sm: sm, adminPlane: true, regLimit: newRateLimiter(), hub: events.NewHub()}
+	return &Handler{st: st, sm: sm, adminPlane: true, regLimit: newRateLimiter(st), hub: events.NewHub()}
 }
 
 // brandView is the branding as the templates consume it (THEME-02). LogoURL
@@ -1444,6 +1704,10 @@ type brandView struct {
 	AppName string
 	Tagline string
 	LogoURL template.URL
+	// LogoSize is the class the mark wears - "" (normal), "large", "xlarge".
+	// The store sanitizes it to one of the three, which is what lets it be
+	// written straight into a class attribute.
+	LogoSize string
 	// Meerkat marks the ADMIN plane's built-in identity: the sentinel mark and
 	// its pulse are Meerkat lore - an integrator's app gets a neutral
 	// placeholder and no animation.
@@ -1474,7 +1738,8 @@ func toBrandView(b store.Branding) brandView {
 	return brandView{
 		AppName:       b.AppName,
 		Tagline:       b.Tagline,
-		LogoURL:       template.URL(b.Logo),                           //nolint:gosec // sanitized data URI
+		LogoURL:       template.URL(b.Logo), //nolint:gosec // sanitized data URI
+		LogoSize:      b.LogoSize,
 		BackgroundCSS: template.CSS(b.Background.CSS(backgroundPath)), //nolint:gosec // store-sanitized enum + fixed URL
 		HasBackground: b.Background.Image != "",
 		icon:          b.TabIcon(),
@@ -1583,6 +1848,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		// Personal API tokens (AUTH-16) - the pages 404 while the policy is off.
 		mux.HandleFunc("GET /profile/tokens", h.showTokens)
 		mux.HandleFunc("POST /profile/tokens", h.doTokens)
+		mux.HandleFunc("GET /plugged", h.showPlugged)
+		mux.HandleFunc("POST /plugged", h.doPlugged)
 		mux.HandleFunc("GET /profile/dev", h.showProfileDev)
 		mux.HandleFunc("GET /profile/dev/key", h.showProfileDevKey)
 		mux.HandleFunc("POST /profile/dev-key", h.doProfileDevKey)
@@ -1599,6 +1866,11 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		h.registerEvents(mux)
 		// Issue reports filed from the component's panel (ISSUE-01).
 		h.registerIssues(mux)
+	}
+	if h.adminPlane {
+		// Connecting an agent without a copied secret (MCP-07): the control
+		// plane is its own authorisation server.
+		h.registerOAuth(mux)
 	}
 	// The PROFILE lives on both planes. Whoever administers the gateway is a
 	// user too: they need a passkey, a photo, a second factor and an address,
@@ -1717,12 +1989,12 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		window = d
 	}
 	loginKey := "login|" + clientIP(r) + "|" + strings.ToLower(username)
-	if pol.LoginAttempts > 0 && h.regLimit.count(loginKey, window) >= pol.LoginAttempts {
+	if pol.LoginAttempts > 0 && h.regLimit.count(r.Context(), loginKey, window) >= pol.LoginAttempts {
 		h.render(w, r, next, h.tr(r, "errTooManyAttempts"), http.StatusTooManyRequests)
 		return
 	}
 	fail := func() {
-		h.regLimit.hit(loginKey, window)
+		h.regLimit.hit(r.Context(), loginKey)
 		h.render(w, r, next, h.tr(r, "errInvalidCreds"), http.StatusUnauthorized)
 	}
 
@@ -1735,7 +2007,7 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password)) // equalize timing
 		if h.tryCredentialProviders(w, r, username, password, next) {
-			h.regLimit.reset(loginKey)
+			h.regLimit.reset(r.Context(), loginKey)
 			return
 		}
 		fail()
@@ -1749,7 +2021,7 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil ||
 		!h.localPasswordAllowed(r.Context()) {
 		if h.tryCredentialProviders(w, r, username, password, next) {
-			h.regLimit.reset(loginKey)
+			h.regLimit.reset(r.Context(), loginKey)
 			return
 		}
 		fail()
@@ -1761,12 +2033,12 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	h.regLimit.reset(loginKey)
+	h.regLimit.reset(r.Context(), loginKey)
 	// A self-registered account stays unusable until its address is confirmed
 	// (AUTH-20). Only revealed to someone holding the CORRECT password, and
 	// the confirmation is re-sent (rate-limited) - the usual lost-mail rescue.
 	if user.SelfRegistered && !user.EmailVerified {
-		if h.registerAllow(clientIP(r)) {
+		if h.registerAllow(r.Context(), clientIP(r)) {
 			if err := h.sendConfirmation(r, user); err != nil {
 				slog.Warn("confirmation re-send failed", "user", user.Username, "err", err)
 			}
@@ -1868,20 +2140,42 @@ func (h *Handler) issueAndGo(w http.ResponseWriter, r *http.Request, user store.
 	if err := h.st.TouchLastConnection(r.Context(), user.ID); err != nil {
 		slog.Warn("last connection stamp failed", "user", user.Username, "err", err)
 	}
-	// The language follows the PERSON to a browser that never knew them. The
-	// cookie is what every page reads, and until this sign-in it held whatever
-	// this machine happened to say - now it holds what they chose, wherever
-	// they chose it. Signing in is the moment we learn who is asking, and the
-	// only moment the account may speak louder than the browser.
+	// The language and the colour scheme follow the PERSON to a browser that
+	// never knew them. The cookies are what every page reads, and until this
+	// sign-in they held whatever this machine happened to say - now they hold
+	// what they chose, wherever they chose it. Signing in is the moment we
+	// learn who is asking, and the only moment the account may speak louder
+	// than the browser.
+	//
+	// An account that chose NOTHING says nothing: the cookie of this machine
+	// stays as it is, and a scheme left at "follow the system" does not travel
+	// as a decision to un-choose.
 	if user.Locale != "" {
 		http.SetCookie(w, &http.Cookie{
 			Name: langCookie, Value: user.Locale, Path: "/",
 			MaxAge: int((365 * 24 * time.Hour).Seconds()), SameSite: http.SameSiteLaxMode,
 		})
 	}
+	if user.Scheme != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name: schemeCookie, Value: user.Scheme, Path: "/",
+			MaxAge: int((365 * 24 * time.Hour).Seconds()), SameSite: http.SameSiteLaxMode,
+		})
+	}
 	// The session is issued: THIS is a completed sign-in (a refused window or
 	// a failed issue above never lands in the history).
 	h.recordLogin(w, r, user.ID, method)
+	// The halt (DEV-11). There are two terminals for a sign-in - this one for a
+	// session with no step to answer, finishFlow for one that answered some -
+	// and both go through it, or half the logins would never see it.
+	//
+	// It carries `next`, not `dest`: continuing re-resolves the organisation
+	// and the group the same way this did, so the halt cannot get between a
+	// person and a choice they still owe.
+	if len(h.servedNames()) > 0 {
+		http.Redirect(w, r, "/plugged?next="+url.QueryEscape(safeNext(next)), http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
@@ -2086,6 +2380,14 @@ func (h *Handler) finishFlow(w http.ResponseWriter, r *http.Request, sess store.
 		method = withSecondFactor(method)
 	}
 	h.recordLogin(w, r, sess.UserID, method)
+	// The halt (DEV-11), when a developer's machine is answering for something:
+	// one screen, read once, before starting. AFTER the login is recorded, so
+	// walking past it cannot lose the record - and it is walkable past on
+	// purpose, being a notice and not a gate.
+	if len(h.servedNames()) > 0 {
+		http.Redirect(w, r, "/plugged?next="+url.QueryEscape(safeNext(sess.Next)), http.StatusSeeOther)
+		return
+	}
 	h.continueAfterStep(w, r, sess.UserID, safeNext(sess.Next))
 }
 
@@ -2441,6 +2743,10 @@ func devKeyView(line string) (fingerprint, comment string) {
 
 func (h *Handler) renderProfile(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
 	data := profileData{flowChrome: h.flowData(r, "titleProfile"), Error: errMsg}
+	// Through safeNext, which is the same guard every post-login destination
+	// goes through: a relative path of this site, never an absolute URL. The
+	// value arrives in a query string, so it is a stranger until it passes.
+	back := safeNext(r.URL.Query().Get("from"))
 	if avatar, err := h.st.GetUserAvatar(r.Context(), sess.UserID); err == nil {
 		data.Avatar = template.URL(avatar) //nolint:gosec // SanitizeAvatar gates writes
 	}
@@ -2469,6 +2775,24 @@ func (h *Handler) renderProfile(w http.ResponseWriter, r *http.Request, sess sto
 	// plane that serves them. The console has its own navigation.
 	if !h.adminPlane {
 		data.Apps = h.reachableLinks(r.Context(), sess)
+		// The application someone CAME FROM points back where they were, not
+		// at its front door. "Go to NEO" and "go back to NEO" are one intent
+		// when you just left it, and the entry path - a route pattern cut at
+		// its first wildcard - could only ever offer the root.
+		//
+		// Only that one entry moves; the others stay what they are, a way in.
+		//
+		// And a return that matches NO application is dropped rather than
+		// offered, which is the whole guard: safeNext proves an address
+		// belongs to this site, not that it is a place anyone wants to go
+		// back to. A profile offering "back to /login" to somebody who is
+		// signed in is the shape that mistake takes.
+		for i, app := range data.Apps {
+			if back != "" && underEntry(back, app.Href) {
+				data.Apps[i].Href = back
+				break
+			}
+		}
 	}
 	data.Console = h.adminPlane
 	writeFlow(w, profilePage, data, status)
@@ -2848,6 +3172,14 @@ func (h *Handler) reachableLinks(ctx context.Context, sess store.Session) []publ
 		caller.Roles = names
 	}
 	var links []publicLink
+	// Two routes that lead to the SAME address are one application to whoever
+	// clicks: an installation commonly fronts one product with several routes -
+	// one per organisation, one per version - and they differ in what they
+	// proxy, never in where you go. Listing them twice offered a choice that
+	// is not one, and TICKED BOTH, since the tick is matched on the entry path
+	// and both carried it. The first wins, which is also the one the router
+	// would pick: the menu walks the routes in the same order the engine does.
+	seen := map[string]bool{}
 	for _, rt := range routes {
 		// Only UI routes that opted into the apps menu with a Link, and only
 		// when the caller's access grants them (an empty Access is public). The
@@ -2858,9 +3190,12 @@ func (h *Handler) reachableLinks(ctx context.Context, sess store.Session) []publ
 		if !rt.Access.Grants(caller) {
 			continue
 		}
-		if href := routeEntryPath(rt); href != "" {
-			links = append(links, publicLink{Name: rt.UI.Link, Href: href})
+		href := routeEntryPath(rt)
+		if href == "" || seen[href] {
+			continue
 		}
+		seen[href] = true
+		links = append(links, publicLink{Name: rt.UI.Link, Href: href})
 	}
 	return links
 }
@@ -2954,4 +3289,97 @@ func SeedAdmin(ctx context.Context, st *store.Store) error {
 		slog.Info("first start: admin account created from MEERKAT_ADMIN_PASSWORD", "username", "admin")
 	}
 	return nil
+}
+
+// pluggedData is the halt's model: what is served, and where the person was
+// going.
+type pluggedData struct {
+	flowChrome
+	Served []pluggedGroup
+	Next   string
+}
+
+// pluggedGroup is one developer and everything they are serving. Grouped
+// because that is how it reads: with four services plugged by one person, a
+// flat list repeated their name four times and buried the only thing that
+// varied.
+type pluggedGroup struct {
+	Who   string
+	Names []string
+}
+
+// groupServed folds the served names by whoever is serving them, sorted on
+// both levels so the same state renders the same way twice.
+func groupServed(list []servedName) []pluggedGroup {
+	byWho := map[string][]servedName{}
+	for _, s := range list {
+		byWho[s.Who] = append(byWho[s.Who], s)
+	}
+	out := make([]pluggedGroup, 0, len(byWho))
+	for who, names := range byWho {
+		sort.Slice(names, func(i, j int) bool { return names[i].Name < names[j].Name })
+		g := pluggedGroup{Who: who}
+		for _, n := range names {
+			g.Names = append(g.Names, n.Name)
+		}
+		out = append(out, g)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Who < out[j].Who })
+	return out
+}
+
+// showPlugged renders the halt. A session is required - this is the end of a
+// sign-in - and an empty list sends the person straight on, because a page
+// announcing nothing is worse than no page.
+func (h *Handler) showPlugged(w http.ResponseWriter, r *http.Request) {
+	sess, err := h.sm.Resolve(r.Context(), r)
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if sess.Pending != "" {
+		http.Redirect(w, r, "/"+sess.Pending, http.StatusSeeOther)
+		return
+	}
+	served := h.servedNames()
+	next := safeNext(r.URL.Query().Get("next"))
+	if len(served) == 0 {
+		http.Redirect(w, r, next, http.StatusSeeOther)
+		return
+	}
+	writeFlow(w, pluggedPage, pluggedData{
+		flowChrome: h.flowData(r, "titlePlugged"),
+		Served:     groupServed(served),
+		Next:       next,
+	}, http.StatusOK)
+}
+
+// doPlugged resumes the sign-in the halt interrupted. It goes through
+// continueAfterStep rather than redirecting on its own: the organisation still
+// has to be resolved, and a group may still have to be picked.
+func (h *Handler) doPlugged(w http.ResponseWriter, r *http.Request) {
+	sess, err := h.sm.Resolve(r.Context(), r)
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	h.continueAfterStep(w, r, sess.UserID, safeNext(r.PostFormValue("next")))
+}
+
+// underEntry says whether a path lies inside a route's entry path - the test
+// for "this is where they came from" among the applications on offer.
+//
+// A prefix, but a prefix on SEGMENTS: /embedded is not inside /embed, and a
+// plain strings.HasPrefix would have said it was.
+func underEntry(path, entry string) bool {
+	if entry == "" || entry == "/" {
+		return false
+	}
+	entry = strings.TrimSuffix(entry, "/")
+	return path == entry || strings.HasPrefix(path, entry+"/") ||
+		strings.HasPrefix(path, entry+"?") || strings.HasPrefix(path, entry+"#")
 }

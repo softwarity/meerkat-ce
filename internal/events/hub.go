@@ -67,6 +67,11 @@ const outBuffer = 16
 type Hub struct {
 	mu   sync.Mutex
 	subs map[*Subscription]struct{}
+	// relay carries a message to the OTHER gateways (STORE-03). A page is held
+	// open by whichever node the load balancer gave it, so a message published
+	// on one reaches a fraction of the audience unless it travels; with one
+	// gateway there is nobody to tell and this stays nil.
+	relay func(topic string, payload []byte)
 }
 
 // NewHub builds an empty hub.
@@ -133,6 +138,27 @@ func (h *Hub) Publish(topic string, msg Message) {
 		slog.Error("event could not be encoded", "type", msg.Type, "err", err)
 		return
 	}
+	h.Deliver(topic, payload)
+	h.mu.Lock()
+	relay := h.relay
+	h.mu.Unlock()
+	if relay != nil {
+		relay(topic, payload)
+	}
+}
+
+// Relay installs the carrier to the other gateways. Wired by main; called once
+// at wiring time.
+func (h *Hub) Relay(fn func(topic string, payload []byte)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.relay = fn
+}
+
+// Deliver publishes an already-encoded message to THIS node's pages and tells
+// nobody. It is what the carrier calls on the receiving side - relaying a
+// relayed message is how one event becomes an infinite number.
+func (h *Hub) Deliver(topic string, payload []byte) {
 	var behind []*Subscription
 	h.mu.Lock()
 	for sub := range h.subs {

@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/softwarity/meerkat/internal/certs"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 func certStore(t *testing.T) *Store {
 	t.Helper()
-	st, err := Open(t.TempDir())
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

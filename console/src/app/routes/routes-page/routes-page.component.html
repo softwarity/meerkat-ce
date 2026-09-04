@@ -16,21 +16,42 @@
       </button>
       <button
         matButton="tonal"
-        (click)="openSigningKeys()"
-        i18n-matTooltip="@@JWT_signing_keys"
-        matTooltip="JWT signing keys"
-      >
-        <mat-icon svgIcon="jwt" />
-        <ng-container i18n="@@Signing_keys">Signing keys</ng-container>
-      </button>
-      <button
-        matButton="tonal"
         (click)="openProbe()"
         i18n-matTooltip="@@Which_route_takes_a_request"
         matTooltip="Which route takes a request?"
       >
         <mat-icon>play_circle</mat-icon>
         <ng-container i18n="@@Routing_test">Routing test</ng-container>
+      </button>
+      <!-- What is true of every route at once. It carries the closed state on
+           its face: a switch you have to open a drawer to see is a switch
+           somebody leaves on. -->
+      <button
+        matButton="tonal"
+        [class.maintaining]="maintenance()?.enabled"
+        (click)="openGlobal()"
+        i18n-matTooltip="@@What_applies_to_every_route"
+        matTooltip="What applies to every route"
+      >
+        <mat-icon>{{ maintenance()?.enabled ? 'public_off' : 'public' }}</mat-icon>
+        @if (maintenance()?.enabled) {
+          <ng-container i18n="@@Unavailable">Unavailable</ng-container>
+        } @else {
+          <ng-container i18n="@@Global">Global</ng-container>
+        }
+      </button>
+      <!-- Its own button, beside Global rather than inside it. Global holds
+           settings, one line each; these are keys, with a rotation, a JWKS to
+           hand to a backend and three PEMs to copy - they filled more of that
+           drawer than everything else in it. -->
+      <button
+        matButton="tonal"
+        (click)="openKeys()"
+        i18n-matTooltip="@@What_signs_the_identity_jwt"
+        matTooltip="What signs the identity JWT services verify"
+      >
+        <mat-icon svgIcon="jwt" />
+        <ng-container i18n="@@JWT">JWT</ng-container>
       </button>
     </div>
 
@@ -44,6 +65,7 @@
       } @else {
         <app-routes-table
           [routes]="shown()"
+          [health]="health()"
           [reorderable]="!query().trim()"
           (edit)="openEdit($event)"
           (remove)="remove($event)"
@@ -67,14 +89,28 @@
     </button>
   </mat-drawer-content>
 
+  <!-- ONE drawer, two contents. Editing a route and looking at what applies
+       to all of them are mutually exclusive acts, and two drawers on the same
+       edge is a position Material refuses anyway. -->
   <mat-drawer
     position="end"
     mode="over"
-    [opened]="editing() !== null"
+    [opened]="editing() !== null || globalOpen() || keysOpen()"
     [disableClose]="editorDirty()"
-    (closedStart)="closeEditor()"
+    (closedStart)="closeDrawer()"
   >
-    @if (editing() !== null) {
+    @if (globalOpen()) {
+      <app-global-panel
+        (closed)="globalOpen.set(false)"
+        (maintenanceChanged)="maintenance.set($event)"
+      />
+    } @else if (keysOpen()) {
+      <app-signing-keys-panel
+        [routes]="routes()"
+        (closed)="keysOpen.set(false)"
+        (routePicked)="openIdentity($event)"
+      />
+    } @else if (editing() !== null) {
       <app-route-editor
         [route]="editingRoute()"
         [catalog]="catalog()"

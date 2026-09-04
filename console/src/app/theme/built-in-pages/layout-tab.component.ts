@@ -3,6 +3,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { EeLockComponent } from '../../shared/ee-lock.component';
+import { LogoSize } from '../../api.service';
 import { BuiltInPagesScope } from './built-in-pages.scope';
 
 // One entry of the gallery: the name the server knows, what to call it, and
@@ -12,6 +13,10 @@ interface LayoutChoice {
   label: string;
   what: string;
   sided: boolean;
+  // The arrangement draws the mark at its own size, so the size control means
+  // nothing under it. Banner is the case: a brand band across the top holds a
+  // 32px mark, and an "extra large" chosen here would simply not happen.
+  ownLogoSize?: boolean;
 }
 
 // The Layout tab (PAGE-02): pick an arrangement for the pages this gateway
@@ -54,6 +59,7 @@ export class LayoutTabComponent {
       label: $localize`:@@Layout_banner:Banner`,
       what: $localize`:@@Layout_banner_what:A brand band across the top, the card under it. Holds up without a picture.`,
       sided: false,
+      ownLogoSize: true,
     },
     {
       name: 'bare',
@@ -71,6 +77,24 @@ export class LayoutTabComponent {
   protected readonly sided = computed(
     () => this.choices.find((c) => c.name === this.current())?.sided ?? false,
   );
+
+  // The size can be chosen when the arrangement leaves it open AND there is a
+  // mark to size: growing the dashed placeholder is not a decision anyone is
+  // making. Disabled with the reason in the hint, on the model of the side -
+  // a control that vanishes is a control nobody finds again.
+  protected readonly sizes: { value: LogoSize; label: string }[] = [
+    { value: '', label: $localize`:@@Logo_size_normal:Normal` },
+    { value: 'large', label: $localize`:@@Logo_size_large:Large` },
+    { value: 'xlarge', label: $localize`:@@Logo_size_xlarge:Extra large` },
+  ];
+  protected readonly sizable = computed(
+    () => !this.choices.find((c) => c.name === this.current())?.ownLogoSize && !!this.scope.logo(),
+  );
+
+  protected setLogoSize(size: LogoSize): void {
+    if (!this.sizable()) return;
+    this.scope.setLogoSize(size);
+  }
 
   protected pick(c: LayoutChoice): void {
     this.scope.setLayout(c.sided ? { name: c.name, side: this.side() } : { name: c.name });

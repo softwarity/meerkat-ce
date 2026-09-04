@@ -62,7 +62,7 @@ import { StringListComponent } from './predicates/string-list.component';
                server checks against, so the two cannot drift. -->
           <mat-form-field>
             <mat-label>{{ label(p) }}</mat-label>
-            <mat-select [value]="str(p.name)" (selectionChange)="set(p.name, $event.value)">
+            <mat-select [required]="!!p.required" [value]="str(p.name)" (selectionChange)="set(p.name, $event.value)">
               @for (o of p.options; track o) {
                 <mat-option [value]="o">{{ o || none }}</mat-option>
               }
@@ -85,14 +85,14 @@ import { StringListComponent } from './predicates/string-list.component';
           @case ('int') {
             <mat-form-field>
               <mat-label>{{ label(p) }}</mat-label>
-              <input matInput type="number" [value]="str(p.name)" (input)="setNumber(p.name, $any($event.target).value)" />
+              <input matInput type="number" [required]="!!p.required" [value]="str(p.name)" (input)="setNumber(p.name, $any($event.target).value)" />
               <mat-hint>{{ p.doc }}</mat-hint>
             </mat-form-field>
           }
           @default {
             <mat-form-field>
               <mat-label>{{ label(p) }}</mat-label>
-              <input matInput [value]="str(p.name)" [placeholder]="placeholder(p)" (input)="set(p.name, $any($event.target).value)" />
+              <input matInput [required]="!!p.required" [value]="str(p.name)" [placeholder]="placeholder(p)" (input)="set(p.name, $any($event.target).value)" />
               <mat-hint>{{ p.doc }}</mat-hint>
             </mat-form-field>
           }
@@ -138,8 +138,11 @@ export class BrickFieldsComponent {
     this.spec.update((s) => patchSpec(s, name, value.trim() === '' || !Number.isFinite(n) ? '' : n));
   }
 
+  // The star is Material's now, drawn from the control's own required flag -
+  // which is also what paints the field when it is required and empty, and
+  // what a screen reader announces. Two stars would be one too many.
   protected label(p: Param): string {
-    return humanize(p.name) + (p.required ? ' *' : '');
+    return humanize(p.name);
   }
 
   // The default is shown as the placeholder, so "what happens if I leave this

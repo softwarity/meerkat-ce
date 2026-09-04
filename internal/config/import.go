@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -55,6 +56,14 @@ type MissingRef struct {
 type Plan struct {
 	Changes []Change     `json:"changes"`
 	Missing []MissingRef `json:"missing"`
+	// MissingFiles are the media the document NAMES and the import did not
+	// receive - a package unzipped by hand, or a plain YAML, which never
+	// carries a media. Listed rather than refused, and rather than silently
+	// clearing the declaration: same rule as the branding's pictures, what a
+	// file does not carry it does not destroy. The route stays valid and its
+	// per-endpoint policies stay posed; only the document that draws them is
+	// missing, and depositing the file again puts it back.
+	MissingFiles []MissingFile `json:"missingFiles"`
 	// Prune says whether objects absent from the file were (or would be)
 	// removed. Only sections the file actually carries are ever pruned.
 	Prune bool `json:"prune"`
@@ -68,6 +77,14 @@ func (p *Plan) Touches() bool {
 		}
 	}
 	return false
+}
+
+// MissingFile names a media the document points at without carrying it.
+type MissingFile struct {
+	// Kind is what the file is: "openapi" today, the only media a route holds.
+	Kind  string `json:"kind"`
+	Route string `json:"route"`
+	Name  string `json:"name"`
 }
 
 // Preview reports what importing doc would do, changing nothing.
@@ -403,6 +420,12 @@ func importRoutes(ctx context.Context, st *store.Store, doc *Document, plan *Pla
 	for _, r := range existing {
 		known[r.ID] = r
 	}
+	// The specs already deposited here, read once: a route's file is not part
+	// of the route, so a document may change one without changing the other.
+	stored, err := st.RouteSpecContents(ctx)
+	if err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	for _, r := range doc.Routes {
 		seen[r.ID] = true
@@ -413,6 +436,31 @@ func importRoutes(ctx context.Context, st *store.Store, doc *Document, plan *Pla
 		})
 		if commit && action != ActionSame {
 			if err := st.SaveRoute(ctx, r); err != nil {
+				return fmt.Errorf("config: route %q: %w", r.Name, err)
+			}
+		}
+		decl := r.Spec()
+		if decl.Type != store.SpecFile {
+			continue
+		}
+		content, carried := doc.Specs[r.ID]
+		if !carried || len(content) == 0 {
+			plan.MissingFiles = append(plan.MissingFiles,
+				MissingFile{Kind: store.SpecKindOpenAPI, Route: r.Name, Name: decl.Filename})
+			continue
+		}
+		specAction := ActionAdd
+		if was, ok := stored[r.ID]; ok {
+			specAction = ActionUpdate
+			if bytes.Equal(was, content) {
+				specAction = ActionSame
+			}
+		}
+		plan.Changes = append(plan.Changes, Change{
+			Kind: "route.spec", ID: r.ID, Label: r.Name + "/" + decl.Filename, Action: specAction,
+		})
+		if commit && specAction != ActionSame {
+			if err := st.SetRouteSpec(ctx, r.ID, content); err != nil {
 				return fmt.Errorf("config: route %q: %w", r.Name, err)
 			}
 		}

@@ -4,11 +4,13 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 func rbacStore(t *testing.T) (*Store, context.Context) {
 	t.Helper()
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}

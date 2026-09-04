@@ -4,20 +4,25 @@ import (
 	"context"
 	"os"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
-// The same suite, against a real PostgreSQL. Skipped unless one is named, so
-// `go test ./...` on a laptop stays what it was.
+// The dialect, spelled out. Every other test in this package now runs on
+// PostgreSQL too when one is named (see internal/store/dbtest), which is the
+// real coverage; what stays here is the handful of things that WOULD pass on
+// the embedded database while being wrong on the other one, kept together so
+// a dialect regression names itself instead of surfacing as a random failure
+// three packages away.
 //
 // It is deliberately not a mock: what this proves is that the SCHEMA applies
 // and that the values come back as themselves - and a fake that speaks our own
 // dialect proves neither.
 func TestAgainstARealPostgres(t *testing.T) {
-	url := os.Getenv("MEERKAT_TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("set MEERKAT_TEST_DATABASE_URL to run against a real PostgreSQL")
+	if os.Getenv(dbtest.Env) == "" {
+		t.Skip("set " + dbtest.Env + " to run against a real PostgreSQL")
 	}
-	st, err := OpenAt(t.TempDir(), url)
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

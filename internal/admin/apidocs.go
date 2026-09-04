@@ -19,7 +19,7 @@ import (
 // control plane: the data plane never exposes Meerkat's contract. The routes'
 // specs are a DEVELOPER matter and live there instead
 // (gateway.RegisterDevDocs), where the dev capability is the whole gate.
-func (a *API) registerAPIDocs(mux *http.ServeMux) {
+func (a *API) registerAPIDocs(mux Mux) {
 	mux.Handle("GET /apidocs", http.RedirectHandler("/apidocs/", http.StatusMovedPermanently))
 	mux.HandleFunc("GET /apidocs/{$}", a.apidocsPage)
 	mux.HandleFunc("GET /apidocs/assets/{file}", apidocsAsset)

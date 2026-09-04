@@ -1,128 +1,107 @@
 package store
 
 import (
-	"slices"
+	"context"
+	"strings"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
-// The access rule's two axes (RBAC-06), and the hole they were written to
-// close: a confirmed account that belongs to NO organisation used to reach
-// anything gated on "authenticated" while the console showed it the waiting
-// room - and it arrived upstream with no tenant and no role, so every
-// role-based decision inside the application read as "this person has nothing".
-func TestAccessLevels(t *testing.T) {
-	pending := Caller{Authenticated: true, Username: "newcomer"}
-	member := Caller{Authenticated: true, Username: "jane", TenantID: "acme", Roles: []string{"reader"}}
-	admin := Caller{Authenticated: true, Username: "boss", TenantID: "globex", Roles: []string{"admin"}}
-	anon := Caller{}
-
-	for _, tc := range []struct {
-		name  string
-		rule  Access
-		grant map[string]bool // caller name -> expected
+// A rule must say on disk exactly what the engine reads. The case that bit:
+// a name left in the users list of a rule that poses no condition - ignored by
+// the gateway, drawn as a restriction by the console, and a way in the day
+// somebody raises the level.
+func TestSanitizeAccess(t *testing.T) {
+	cases := []struct {
+		name string
+		in   Access
+		want Access
 	}{
 		{
-			// No rule at all: the gateway poses no condition, anonymous
-			// included. The upstream still applies its own - which is true at
-			// every level, and is why this one is called delegated rather than
-			// public.
-			name:  "delegated lets everything through",
-			rule:  Access{},
-			grant: map[string]bool{"anon": true, "pending": true, "member": true},
+			name: "a name on a rule that conditions nothing is dropped",
+			in:   Access{Level: AccessDelegated, Users: []string{"alice"}},
+			want: Access{Level: AccessDelegated},
 		},
 		{
-			// Deliberate: this is how one serves the page that explains how to
-			// ask for access. "auth" says who it is, and nothing more.
-			name:  "auth takes anyone signed in, waiting room included",
-			rule:  Access{Level: AccessAuth},
-			grant: map[string]bool{"anon": false, "pending": true, "member": true},
+			// With a role asked, the rule DOES pose a condition, and a named
+			// user is a real exception to it.
+			name: "a name beside a role is an exception and stays",
+			in:   Access{Level: AccessDelegated, Roles: []string{"ops"}, Users: []string{"alice"}},
+			want: Access{Level: AccessDelegated, Roles: []string{"ops"}, Users: []string{"alice"}},
 		},
 		{
-			name:  "tenant turns away the account that belongs nowhere",
-			rule:  Access{Level: AccessTenant},
-			grant: map[string]bool{"anon": false, "pending": false, "member": true, "admin": true},
+			name: "a name on a closed rule is what makes the rule mean something",
+			in:   Access{Level: AccessDeny, Users: []string{"alice"}},
+			want: Access{Level: AccessDeny, Users: []string{"alice"}},
 		},
 		{
-			name:  "tenants names which organisations",
-			rule:  Access{Level: AccessTenants, Tenants: []string{"acme"}},
-			grant: map[string]bool{"pending": false, "member": true, "admin": false},
+			name: "a tenant list belongs to the level that reads it",
+			in:   Access{Level: AccessAuth, Tenants: []string{"acme"}},
+			want: Access{Level: AccessAuth},
 		},
 		{
-			// The role catalogue is GLOBAL while groups are per-organisation,
-			// so a bare role gate means "an admin of ANY organisation" - a
-			// cross-org administration UI.
-			name:  "roles alone accept the holder from any organisation",
-			rule:  Access{Level: AccessAuth, Roles: []string{"admin"}},
-			grant: map[string]bool{"pending": false, "member": false, "admin": true},
+			name: "and stays where it is read",
+			in:   Access{Level: AccessTenants, Tenants: []string{"acme"}},
+			want: Access{Level: AccessTenants, Tenants: []string{"acme"}},
 		},
 		{
-			// The two axes ANDed: admin OF acme. Neither axis alone says it.
-			name:  "tenants and roles cross",
-			rule:  Access{Level: AccessTenants, Tenants: []string{"acme"}, Roles: []string{"admin"}},
-			grant: map[string]bool{"member": false, "admin": false},
+			name: "blanks are not entries",
+			in:   Access{Level: AccessDeny, Users: []string{"alice", "  ", ""}},
+			want: Access{Level: AccessDeny, Users: []string{"alice"}},
 		},
-		{
-			// The exception: named users pass whatever the level asks. A UI
-			// dedicated to one person, a service account, a support login.
-			name:  "a named user passes a level they do not satisfy",
-			rule:  Access{Level: AccessTenants, Tenants: []string{"acme"}, Users: []string{"newcomer"}},
-			grant: map[string]bool{"anon": false, "pending": true, "admin": false},
-		},
-		{
-			// An exception needs something to be an exception TO. Naming a user
-			// under a delegated route used to close it to anonymous callers -
-			// neither what the level says nor what anyone asked for. Closing a
-			// route is what deny is for.
-			name:  "a named user under a delegated route closes nothing",
-			rule:  Access{Users: []string{"newcomer"}},
-			grant: map[string]bool{"anon": true, "pending": true, "member": true},
-		},
-		{
-			name:  "deny closes the route to everyone",
-			rule:  Access{Level: AccessDeny},
-			grant: map[string]bool{"anon": false, "pending": false, "member": false, "admin": false},
-		},
-		{
-			// Where the exception finally means something: nobody, except them.
-			// A route being taken down, a beta, a support-only console.
-			name:  "deny keeps the named users, and only them",
-			rule:  Access{Level: AccessDeny, Users: []string{"boss"}},
-			grant: map[string]bool{"anon": false, "pending": false, "member": false, "admin": true},
-		},
-	} {
+	}
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for who, want := range tc.grant {
-				c := map[string]Caller{"anon": anon, "pending": pending, "member": member, "admin": admin}[who]
-				if got := tc.rule.Grants(c); got != want {
-					t.Errorf("Grants(%s) = %v, want %v", who, got, want)
-				}
+			got := tc.in
+			if err := SanitizeAccess(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got.Level != tc.want.Level ||
+				strings.Join(got.Users, ",") != strings.Join(tc.want.Users, ",") ||
+				strings.Join(got.Roles, ",") != strings.Join(tc.want.Roles, ",") ||
+				strings.Join(got.Tenants, ",") != strings.Join(tc.want.Tenants, ",") {
+				t.Errorf("got %+v, want %+v", got, tc.want)
 			}
 		})
 	}
+
+	// An invented level used to behave like "signed in", silently. It is
+	// refused, naming what is allowed.
+	err := SanitizeAccess(&Access{Level: "authenticated"})
+	if err == nil || !strings.Contains(err.Error(), "auth") {
+		t.Errorf("an invented level answered %v, want a refusal naming the allowed ones", err)
+	}
 }
 
-// Switchable is what keeps a refusal from being a dead end: someone who
-// belongs to an accepted organisation but is active in another one is offered
-// the choice rather than a 403 they cannot act on.
-func TestAccessSwitchable(t *testing.T) {
-	both := Caller{Authenticated: true, TenantID: "globex", Memberships: []string{"acme", "globex"}}
-	if offer := (Access{Level: AccessTenants, Tenants: []string{"acme"}}).Switchable(both); !slices.Equal(offer, []string{"acme"}) {
-		t.Fatalf("offer = %v, want [acme]", offer)
+// The cleaning happens where every writer goes through, so an import or an
+// agent cannot put back what the console cannot show.
+func TestSavingARouteCleansItsRule(t *testing.T) {
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Nothing to switch TO: the refusal is final and the caller must be told so.
-	outsider := Caller{Authenticated: true, TenantID: "globex", Memberships: []string{"globex"}}
-	if offer := (Access{Level: AccessTenants, Tenants: []string{"acme"}}).Switchable(outsider); len(offer) != 0 {
-		t.Fatalf("offer = %v, want none", offer)
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+
+	route := Route{
+		ID: "ops-app", Name: "ops-app", Enabled: true, Upstream: "http://ops.invalid",
+		Access: Access{Level: AccessDelegated, Users: []string{"alice"}},
+		API: &RouteAPI{Security: &EndpointSecurity{Endpoints: []EndpointPolicy{
+			{Method: "GET", Path: "/x", Access: Access{Level: AccessDelegated, Users: []string{"bob"}}},
+		}}},
 	}
-	// A member who has not chosen yet, on a rule that just wants AN
-	// organisation: every membership is a valid answer.
-	unchosen := Caller{Authenticated: true, Memberships: []string{"acme", "globex"}}
-	if offer := (Access{Level: AccessTenant}).Switchable(unchosen); len(offer) != 2 {
-		t.Fatalf("offer = %v, want both", offer)
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
 	}
-	// The waiting room has nowhere to go: this is the /account-pending case,
-	// not the chooser.
-	if offer := (Access{Level: AccessTenant}).Switchable(Caller{Authenticated: true}); len(offer) != 0 {
-		t.Fatalf("offer = %v, want none", offer)
+	saved, err := st.GetRoute(ctx, "ops-app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(saved.Access.Users) != 0 {
+		t.Errorf("the route kept %v on a rule that conditions nothing", saved.Access.Users)
+	}
+	if u := saved.API.Security.Endpoints[0].Users; len(u) != 0 {
+		t.Errorf("the endpoint override kept %v", u)
 	}
 }

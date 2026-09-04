@@ -131,6 +131,14 @@ func NewSupervisor(src Source, missing func(error) bool, appLn, adminLn *Listene
 	return s
 }
 
+// SerialiseIssuance makes certificate ordering one-at-a-time across the
+// gateways sharing one database. Wired by main to the store's advisory lock;
+// left alone on a single node, where there is nobody to race.
+func (s *Supervisor) SerialiseIssuance(fn Serialiser) {
+	s.Console.SerialiseIssuance(fn)
+	s.App.SerialiseIssuance(fn)
+}
+
 // Ports records where the two PLAIN doors listen. They are not the
 // supervisor's to manage - main owns them - but they belong on the same screen
 // as the HTTPS ones.

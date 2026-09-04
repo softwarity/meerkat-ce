@@ -3,10 +3,15 @@
     <ng-container matColumnDef="name">
       <mat-header-cell *matHeaderCellDef i18n="@@Name">Name</mat-header-cell>
       <mat-cell *matCellDef="let r">
+        <!-- Dimmed while the list is filtered, because order can only be
+             changed on the WHOLE list - and it now SAYS so. A handle that goes
+             quiet and does nothing is the shape of every "it stopped working"
+             this product has had to explain afterwards. -->
         <mat-icon
           cdkDragHandle
           class="handle"
           [class.idle]="!reorderable()"
+          [matTooltip]="handleTip()"
           (click)="$event.stopPropagation()"
         >drag_indicator</mat-icon>
         <span class="name-cell" [class.off]="!r.enabled">
@@ -16,6 +21,14 @@
                changes what the route can do - injections, the user button, path
                locales. Worth seeing without opening it. -->
           @if (r.isUi) {<mat-icon class="ui-mark" i18n-matTooltip="@@Serves_pages_in_a_browser" matTooltip="UI: serves pages in a browser">web</mat-icon>}
+          <!-- Whether it is ANSWERING (SVC-04), which is the other half of the
+               dot beside it: that one says somebody enabled this route, this
+               one says the service behind it replied. Shown only when there is
+               something to say - a route nobody has called has nothing, and a
+               green tick over an unknown would be the worst of the three. -->
+          @if (trouble(r); as t) {
+            <mat-icon class="trouble" [class.open]="t.open" [matTooltip]="t.tip">{{ t.icon }}</mat-icon>
+          }
         </span>
       </mat-cell>
     </ng-container>
@@ -26,7 +39,7 @@
         <app-access-badges
           [access]="accessBadge(r)"
           [endpoints]="endpointRules(r)"
-          [endpointsLink]="r.api?.openapiUrl ? '/infra/endpoint-security' : null"
+          [endpointsLink]="r.api?.spec ? '/infra/endpoint-security' : null"
           [endpointsQuery]="{ route: r.id }"
           [unguarded]="gatesNothing(r)"
         />

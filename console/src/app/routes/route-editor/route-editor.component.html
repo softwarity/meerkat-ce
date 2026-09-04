@@ -7,13 +7,21 @@
     }
   </span>
   <app-form-field class="name-field" subscriptSizing="dynamic" i18n-label="@@Name" label="Name">
-    <input matInput [formField]="f.name" i18n-placeholder="@@New_route" placeholder="New route" />
+    <input #nameInput matInput [formField]="f.name" i18n-placeholder="@@New_route" placeholder="New route" />
   </app-form-field>
 </header>
 
 <div class="body">
   <mat-selection-list [multiple]="false" hideSingleSelectionIndicator (selectionChange)="onSectionPick($event.options[0].value)">
-    <mat-list-option value="target" [selected]="section() === 'target'" i18n="@@Section_target">Target</mat-list-option>
+    <!-- A section that is always required wears a star, and any section with
+         something missing wears the error colour until it has not. The star
+         is a fact about the route, the colour a fact about right now, and
+         reading them together is the question "what is left to do". -->
+    <mat-list-option value="target" [selected]="section() === 'target'"
+      [class.wants]="hasGap('target')" [matTooltip]="gapTip('target')">
+      <span i18n="@@Section_target">Target</span>
+      <span class="req">*</span>
+    </mat-list-option>
     <!-- The three that decide a request's FATE, before anything transforms it.
          They do not decide it the same way, and each panel says so: a predicate
          that does not match and an access rule that does not grant both let the
@@ -29,26 +37,37 @@
         <span class="mark" [matTooltip]="m.tip">{{ m.text }}</span>
       }
     </mat-list-option>
-    <mat-list-option value="predicates" [selected]="section() === 'predicates'">
+    <mat-list-option value="predicates" [selected]="section() === 'predicates'"
+      [class.wants]="hasGap('predicates')" [matTooltip]="gapTip('predicates')">
       <span i18n="@@Predicates">Predicates</span>
+      <span class="req">*</span>
       @if (draft().predicates.length) {
         ({{ draft().predicates.length }})
       }
     </mat-list-option>
-    <mat-list-option value="gates" [selected]="section() === 'gates'">
+    <mat-list-option value="gates" [selected]="section() === 'gates'"
+      [class.wants]="hasGap('gates')" [matTooltip]="gapTip('gates')">
       <span i18n="@@Gates">Gates</span>
       @if (countPhase('gate'); as n) {
         ({{ n }})
       }
     </mat-list-option>
     <div matSubheader i18n="@@Modifiers">Modifiers</div>
-    <mat-list-option value="modin" [selected]="section() === 'modin'">
+    <!-- Disabled off proxy: CompileFilters drops every request filter when a
+         route carries a terminal one, so editing these wrote settings the
+         gateway throws away with nothing but a line in its log. -->
+    <mat-list-option value="modin" [selected]="section() === 'modin'"
+      [disabled]="!proxies()" [class.wants]="hasGap('modin')"
+      [matTooltip]="proxies() ? gapTip('modin') : notProxiedTip">
       <span i18n="@@Incoming">Incoming</span>
       @if (countPhase('request'); as n) {
         ({{ n }})
       }
     </mat-list-option>
-    <mat-list-option value="modout" [selected]="section() === 'modout'">
+    <!-- Outgoing stays live on every mode: the gateway applies response
+         filters to what a route answers itself exactly as to a proxied one. -->
+    <mat-list-option value="modout" [selected]="section() === 'modout'"
+      [class.wants]="hasGap('modout')" [matTooltip]="gapTip('modout')">
       <span i18n="@@Outgoing">Outgoing</span>
       @if (countPhase('response'); as n) {
         ({{ n }})
@@ -60,7 +79,10 @@
          its own. Both compile down to request filters, which is why they sat
          under Modifiers - the mechanism, not the subject. -->
     <div matSubheader i18n="@@Forwarders">Forwarders</div>
-    <mat-list-option value="identity" [selected]="section() === 'identity'" i18n="@@Section_identity">Identity</mat-list-option>
+    <mat-list-option value="identity" [selected]="section() === 'identity'"
+      [disabled]="!proxies()" [matTooltip]="proxies() ? '' : notProxiedTip">
+      <span i18n="@@Section_identity">Identity</span>
+    </mat-list-option>
     <mat-list-option value="locales" [selected]="section() === 'locales'" i18n="@@Section_locales">Locales</mat-list-option>
     <!-- UI extras (ROUTE-02): visible but DISABLED until the toggle turns them
          on - a route is always a service, UI comes on top. The switch sits on
@@ -86,8 +108,12 @@
   <div class="panel" [class.flush]="hasPalette()">
     @switch (section()) {
             @case ('target') {
-        <p class="section-hint" i18n="@@Target_hint">How this route answers. Proxying fetches from a service and hands
-          back what it says; the other three answer here, without calling anything.</p>
+        <!-- One heading per subject: the controls under this tab answer four
+             different questions, and a run of eleven fields with nothing
+             between them makes the reader work out which is which. -->
+        <h3 class="sub" i18n="@@How_it_answers">How it answers</h3>
+        <p class="section-hint" i18n="@@Target_hint">Proxying fetches from a service and hands back
+          what it says; the other three answer here, without calling anything.</p>
         <mat-form-field>
           <mat-label i18n="@@Mode">Mode</mat-label>
           <mat-select [value]="mode()" (selectionChange)="setMode($event.value)">
@@ -98,25 +124,113 @@
           </mat-select>
         </mat-form-field>
         @if (mode() === 'proxy') {
+        <!-- No heading of its own: the mode says "fetch from a service" and
+             this says which one. Two headings would split one question, and
+             the other three modes put their own answer in the same place. -->
+        <!-- http first: inside a cluster TLS ends at this gateway, and the hop
+             to the service is plain. https stays one click away for the
+             third-party upstream that needs it.
+             The runtime's own services (SVC-02) are offered IN the field:
+             focus it and they drop, type and they filter. Beside it they were
+             a second control for one value, and an empty box does not announce
+             it holds a list. Free text stays free - an upstream outside the
+             cluster is typed, and always will be. -->
+        <app-url-input i18n-label="@@Upstream" label="Upstream" required
+          [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
+          [protocols]="['http', 'https']" [suggestions]="upstreamChoices()"
+          [hint]="upstreamHint()" hintAlign="end" hostPlaceholder="service:8080/base" />
+
+        <!-- How long this one may take (ROUTE-07), and when to stop asking
+             (ROUTE-09): one subject, because both answer what happens when the
+             service misbehaves. Bounding the wait stops one slow upstream
+             holding a connection; it does not stop the gateway sending a
+             thousand more that each wait their own bound. -->
+        <h3 class="sub" i18n="@@When_slow_or_down">When the service is slow or down</h3>
+        <div class="pair">
+          <mat-form-field>
+            <mat-label i18n="@@Connect_timeout">Connect within</mat-label>
+            <mat-select [value]="timeout('connect')" (valueChange)="setTimeout('connect', $event)">
+              @for (d of connectOffered(); track d.key) {
+                <mat-option [value]="d.key">{{ d.label || inheritedConnect() }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label i18n="@@Response_timeout">First answer within</mat-label>
+            <mat-select [value]="timeout('response')" (valueChange)="setTimeout('response', $event)">
+              @for (d of responseOffered(); track d.key) {
+                <mat-option [value]="d.key">{{ d.label || inheritedResponse() }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <p class="field-hint" i18n="@@Timeouts_hint">
+          Past either, the caller gets a 502 instead of waiting. Only the wait for the first answer
+          is bounded - a download or a websocket that has started runs as long as it needs.
+        </p>
+
+        <mat-checkbox
+          class="standalone"
+          [checked]="draft().breakerOn"
+          (change)="setBreaker($event.checked)"
+          i18n="@@Stop_calling_when_down"
+        >Stop calling this service when it stops answering</mat-checkbox>
+        @if (draft().breakerOn) {
+          <div class="pair">
+            <mat-form-field>
+              <mat-label i18n="@@After_failures">After (failures in a row)</mat-label>
+              <mat-select [value]="draft().breakerTrip" (valueChange)="patch('breakerTrip', $event)">
+                @for (n of tripChoices; track n.key) {
+                  <mat-option [value]="n.key">{{ n.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label i18n="@@Try_again_after">Try again after</mat-label>
+              <mat-select [value]="draft().breakerCool" (valueChange)="patch('breakerCool', $event)">
+                @for (c of coolChoices; track c.key) {
+                  <mat-option [value]="c.key">{{ c.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <p class="field-hint" i18n="@@Breaker_hint">
+            While it is down, callers get the unavailable page at once instead of waiting - and the
+            service is met by ONE request after the delay rather than by everything that piled up. A
+            500 does not count: a service answering 500 is up and has a bug, and taking it out of
+            rotation would close a whole route over one endpoint.
+          </p>
+        }
+
+        <!-- Where the contract comes from (SVC-06). The two sources differ by
+             one thing worth saying out loud: the service's spec follows the
+             service, a deposited file is a snapshot. Whichever it is, the spec
+             ends up with a url ON THIS ROUTE. -->
+        <h3 class="sub" i18n="@@The_API_contract">The API contract</h3>
         <mat-form-field>
-          <mat-label i18n="@@Upstream">Upstream</mat-label>
-          <app-url-input [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
-            hostPlaceholder="service:8080/base" i18n-hostLabel="@@Upstream" hostLabel="Upstream" />
+          <mat-label i18n="@@OpenAPI_spec">OpenAPI spec</mat-label>
+          <mat-select [value]="draft().specSource" (selectionChange)="setSpecSource($event.value)">
+            <mat-option value="" i18n="@@Spec_none">None</mat-option>
+            <mat-option value="upstream" i18n="@@Spec_from_service">Published by the service</mat-option>
+            <mat-option value="file" i18n="@@Spec_deposited">Deposited here</mat-option>
+          </mat-select>
+          <mat-hint align="end" i18n="@@Spec_hint">Feeds endpoint-level security and the developer swagger</mat-hint>
         </mat-form-field>
 
+        @if (draft().specSource === 'upstream') {
         <mat-form-field>
           <mat-label i18n="@@OpenAPI_URL">OpenAPI URL</mat-label>
           <input
             matInput
             placeholder="/v3/api-docs"
-            [value]="draft().openapiUrl"
-            (input)="patch('openapiUrl', $any($event.target).value)"
+            [value]="draft().specPath"
+            (input)="patch('specPath', $any($event.target).value)"
           />
           <button
             matIconButton
             matSuffix
             type="button"
-            [disabled]="saving() || !draft().name.trim() || !draft().upstream.trim() || !draft().openapiUrl.trim()"
+            [disabled]="saving() || !draft().name.trim() || !draft().upstream.trim() || !draft().specPath.trim()"
             (click)="goEndpointSecurity()"
             i18n-matTooltip="@@Edit_endpoint_security"
             matTooltip="Endpoint security"
@@ -125,8 +239,61 @@
           >
             <mat-icon svgIcon="openapi" />
           </button>
-          <mat-hint align="end" i18n="@@OpenAPI_hint">The OpenAPI spec the service exposes, for endpoint-level security and swagger UI</mat-hint>
+          <mat-hint align="end" i18n="@@OpenAPI_url_hint">Relative to the upstream, or an absolute url for a third-party service</mat-hint>
         </mat-form-field>
+        } @else if (draft().specSource === 'file') {
+        <div class="spec-file">
+          <input
+            type="file"
+            hidden
+            #specInput
+            accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
+            (change)="depositSpec(specInput.files)"
+          />
+          <button matButton="tonal" type="button" [disabled]="saving()" (click)="specInput.click()">
+            <mat-icon>upload_file</mat-icon>
+            <span i18n="@@Deposit_a_file">Deposit a file</span>
+          </button>
+          @if (draft().specFilename) {
+          <span class="spec-name">{{ draft().specFilename }}</span>
+          <button
+            matIconButton
+            type="button"
+            [disabled]="saving()"
+            (click)="removeSpec()"
+            i18n-matTooltip="@@Remove_the_file"
+            matTooltip="Remove the file"
+            i18n-aria-label="@@Remove_the_file"
+            aria-label="Remove the file"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+          <button
+            matIconButton
+            type="button"
+            [disabled]="saving() || !draft().name.trim()"
+            (click)="goEndpointSecurity()"
+            i18n-matTooltip="@@Edit_endpoint_security"
+            matTooltip="Endpoint security"
+            i18n-aria-label="@@Edit_endpoint_security"
+            aria-label="Endpoint security"
+          >
+            <mat-icon svgIcon="openapi" />
+          </button>
+          }
+        </div>
+        <!-- The url the file answers on, computed here so nobody has to guess
+             where their upload landed. JSON is what is served, whatever was
+             deposited. -->
+        @if (draft().specFilename) {
+        <p class="spec-note" i18n="@@Spec_served_at">Served at {{ specUrl() }}</p>
+        }
+        @if (specShadow()) {
+        <p class="spec-note warn" i18n="@@Spec_shadows">
+          The service already answers on that path: the deposited file takes its place. Rename it to serve both.
+        </p>
+        }
+        }
         } @else {
           @if (terminalSpec(); as t) {
             @switch (mode()) {
@@ -750,6 +917,25 @@
 </div>
 
 <footer>
+  <!-- What is missing, next to the button it disables. A greyed Save that says
+       nothing sends the reader through eleven sections looking for the field
+       it wants; each line here names the section and jumps to it. -->
+  @if (gaps().length) {
+    <button matButton class="gaps" type="button" [matMenuTriggerFor]="gapMenu">
+      <mat-icon>error_outline</mat-icon>
+      <span i18n="@@N_to_fix">{{ gaps().length }} to fix</span>
+    </button>
+    <mat-menu #gapMenu class="mk-gap-menu">
+      @for (g of gaps(); track $index) {
+        <!-- Every row goes somewhere: a section, or the name field in the
+             header. A row that only states a fact is one more place to look. -->
+        <button mat-menu-item type="button" (click)="goToGap(g)">
+          <span class="gap-where">{{ gapWhere(g) }}</span>
+          <span class="gap-what">{{ g.message }}</span>
+        </button>
+      }
+    </mat-menu>
+  }
   <button matButton (click)="closed.emit()" i18n="@@Cancel">Cancel</button>
   <button matButton="filled" (click)="save()" [disabled]="saving() || !f().valid() || !dirty()" i18n="@@Save">
     Save

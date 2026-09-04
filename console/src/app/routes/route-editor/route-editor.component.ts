@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, input, linkedSignal, output, signal, viewChild } from '@angular/core';
+import { humanIso, withCurrent } from '../../shared/iso-duration';
 import { FormField, type ValidationError, form, required, validate } from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -7,6 +8,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatSelectModule } from '@angular/material/select';
@@ -14,7 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { LOCALE_ID } from '@angular/core';
-import { Access, ApiService, CatalogEntry, Spec, IDENTITY_FIELDS, IdentityAttr, IdentityForward, LocaleMechanism, PAGE_USER_FIELDS, Role, Route, Tenant, User, USER_BUTTON_POSITIONS } from '../../api.service';
+import { Access, ApiService, CatalogEntry, DiscoveredService, Spec, IDENTITY_FIELDS, IdentityAttr, IdentityForward, LocaleMechanism, PAGE_USER_FIELDS, Role, Route, Tenant, User, USER_BUTTON_POSITIONS } from '../../api.service';
 import { MaintenanceFilterComponent, RedirectFilterComponent, RespondFilterComponent } from '../filters/filter-fields.component';
 import { runRoleExpr } from '../role-expr-dialog.component';
 import { ROLE_SYNTAX } from '../template-highlight';
@@ -23,11 +25,12 @@ import { MeService } from '../../me.service';
 import { humanDuration } from '../../shared/duration';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
-import { UrlInputComponent } from '../../shared/url-input.component';
+import { UrlInputComponent, UrlSuggestion } from '../../shared/url-input.component';
 import { ACCESS_LEVELS, AccessEditorComponent, AccessState, emptyAccess, levelShort } from '../endpoint-security/access-editor.component';
 import { FiltersComponent } from '../filters/filters.component';
 import { IdentityPreviewData, IdentityPreviewDialogComponent } from '../identity-preview-dialog.component';
-import { argStr, cleanSpecs } from '../predicates/args';
+import { argStr, cleanPredicates, cleanSpecs, humanize } from '../predicates/args';
+import { missingArgs, upstreamProblem } from './gaps';
 import { PredicatesComponent } from '../predicates/predicates.component';
 
 // What an empty language script opens on. A sentence describing an argument
@@ -107,9 +110,82 @@ const SECTIONS: Section[] = [
 // hidden) when the other type is selected.
 const UI_SECTIONS: Section[] = ['button', 'userinfo', 'inject'];
 
+// Sections a route that answers BY ITSELF has no use for. This is not a
+// tidying preference: CompileFilters drops every request filter when the route
+// carries a terminal one ("incoming filters ignored: this route answers by
+// itself, nothing is proxied") and identity forwarding compiles down to one.
+// Editing them on a redirect wrote settings the gateway throws away without
+// telling anyone but its log.
+const PROXY_SECTIONS: Section[] = ['modin', 'identity'];
+
+// What the drawer calls each section, for the list of what is missing: a gap
+// has to say WHERE, and "predicates" is not what the reader sees on the left.
+const SECTION_LABEL: Record<Section, string> = {
+  security: $localize`:@@Section_security:Security`,
+  predicates: $localize`:@@Predicates:Predicates`,
+  gates: $localize`:@@Gates:Gates`,
+  target: $localize`:@@Section_target:Target`,
+  modin: $localize`:@@Incoming:Incoming`,
+  modout: $localize`:@@Outgoing:Outgoing`,
+  identity: $localize`:@@Section_identity:Identity`,
+  button: $localize`:@@Section_user_button:User button`,
+  locales: $localize`:@@Section_locales:Locales`,
+  userinfo: $localize`:@@Section_user_info:User info`,
+  inject: $localize`:@@Section_injections:Injections`,
+};
+
+// Where a brick's gap is edited, from the phase the catalogue gives it.
+function sectionOfPhase(phase: string | undefined): Section {
+  switch (phase) {
+    case 'gate':
+      return 'gates';
+    case 'response':
+      return 'modout';
+    case 'terminal':
+      return 'target';
+    default:
+      return 'modin';
+  }
+}
+
+// One thing standing between this route and Save.
+//
+// The section travels in the error KIND rather than beside the message: a
+// Signal Forms error carries a kind and a message and nothing else, and a
+// filter's section is not known until its phase is read. Parsed back out in
+// `gaps` below.
+interface Gap {
+  section: Section | '';
+  message: string;
+}
+
+function gapError(section: Section | '', message: string): ValidationError {
+  return { kind: section ? `gap:${section}` : 'gap', message };
+}
+
 // The blank lines a respond template carries for comfort in the editor are
 // not content: trailing whitespace would ride into the answer an application
 // receives, so it is cut on the way out.
+// The static head a caller's path must carry to enter the route ("/api/**" ->
+// "/api"), which is where the route's own documents live. The SERVER is the
+// authority (routing.MatchPrefix); this mirrors it so the screen can say where
+// a deposited file will answer before it is deposited.
+function matchPrefix(predicates: Spec[]): string {
+  for (const p of predicates) {
+    if (p.type !== 'path') continue;
+    const patterns = p.args?.['patterns'];
+    const first = Array.isArray(patterns) ? String(patterns[0] ?? '') : '';
+    const kept: string[] = [];
+    for (const segment of first.split('/')) {
+      if (!segment) continue;
+      if (segment.includes('*') || segment.includes('{')) break;
+      kept.push(segment);
+    }
+    return kept.length ? '/' + kept.join('/') : '';
+  }
+  return '';
+}
+
 function trimTemplates(specs: Spec[]): Spec[] {
   return specs.map((s) =>
     s.type === 'respond' && typeof s.args?.['body'] === 'string'
@@ -160,8 +236,21 @@ function draftOf(r: Route | null) {
     isUi: r?.isUi ?? false,
     predicates: r?.predicates ?? [],
     filters: r?.filters ?? [],
-    // API section
-    openapiUrl: r?.api?.openapiUrl ?? '',
+    // How long this upstream may take (ROUTE-07). Undefined is the
+    // installation's defaults, and stays undefined rather than becoming a pair
+    // of empty strings - a route back on the defaults stores nothing.
+    timeouts: r?.timeouts as { connect?: string; response?: string } | undefined,
+    // ROUTE-09. Off unless somebody turned it on: a breaker turns one kind of
+    // failure into another, so it is met because it was chosen.
+    breakerOn: r?.breaker?.enabled ?? false,
+    breakerTrip: String(r?.breaker?.trip ?? ''),
+    breakerCool: r?.breaker?.cool ?? '',
+    // API section (SVC-06): the source, then what it needs. specPath is the
+    // upstream url for one, the served file name for the other - the field
+    // means "where the spec is, relative to this route" in both cases.
+    specSource: r?.api?.spec?.type ?? '',
+    specPath: r?.api?.spec?.path ?? '',
+    specFilename: r?.api?.spec?.filename ?? '',
     // UI section
     schemeSelect: r?.ui?.scheme?.select ?? false,
     schemeMechanism: r?.ui?.scheme?.mechanism ?? '',
@@ -243,6 +332,7 @@ function draftOf(r: Route | null) {
     MatIconModule,
     MatInputModule,
     MatListModule,
+    MatMenuModule,
     MatSelectModule,
     MatTooltipModule,
     RouterLink,
@@ -257,6 +347,10 @@ function draftOf(r: Route | null) {
     AccessEditorComponent,
     TplCodeComponent,
   ],
+  // Opts this drawer into showing a required-and-empty field in the error
+  // colour without waiting to be touched: creating a route is precisely the
+  // moment "what is still missing" has to be readable at a glance.
+  host: { class: 'mk-show-missing' },
   templateUrl: './route-editor.component.html',
   styleUrl: './route-editor.component.scss',
 })
@@ -357,15 +451,23 @@ export class RouteEditorComponent {
 
   // The active section: a NEW url value wins, the UI toggle kicks disabled
   // sections back to Target, local picks flow through onSectionPick.
-  protected readonly section = linkedSignal<{ ui: boolean; ini: string }, Section>({
-    source: () => ({ ui: this.draft().isUi, ini: this.initialSection() }),
+  protected readonly section = linkedSignal<{ ui: boolean; proxy: boolean; ini: string }, Section>({
+    source: () => ({ ui: this.draft().isUi, proxy: this.mode() === 'proxy', ini: this.initialSection() }),
     computation: (src, previous) => {
       let s = (previous && previous.source.ini === src.ini ? previous.value : src.ini) as Section;
       if (!SECTIONS.includes(s)) s = 'target';
       if (!src.ui && UI_SECTIONS.includes(s)) s = 'target';
+      // Same reason as the UI ones: switching to a mode that answers by itself
+      // must not leave the reader editing a section the gateway will ignore.
+      if (!src.proxy && PROXY_SECTIONS.includes(s)) s = 'target';
       return s;
     },
   });
+
+  // Said on the sections a terminal route silences, so the reason is where the
+  // question is rather than in a log nobody reads.
+  protected readonly proxies = computed(() => this.mode() === 'proxy');
+  protected readonly notProxiedTip = $localize`:@@Not_proxied_tip:This route answers by itself, so nothing is sent upstream: the gateway drops incoming filters and forwards no identity.`;
 
   protected onSectionPick(s: Section): void {
     this.section.set(s);
@@ -420,6 +522,22 @@ export class RouteEditorComponent {
   private readonly consoleNames = new Intl.DisplayNames([inject(LOCALE_ID)], { type: 'language' });
 
   constructor() {
+    // What the runtime can route to. Silent on failure: an installation with
+    // no runtime to ask still types an upstream by hand, and a red box in
+    // front of a working field would be the wrong trade.
+    this.api.services().subscribe({
+      next: (d) => {
+        this.discovered.set(d.services ?? []);
+        this.reach.set(d.reach ?? []);
+      },
+      error: () => {},
+    });
+    // What the installation waits, for the "inherited" entries. Read once and
+    // failing silently: a label is not worth an error box in front of a route.
+    this.api.proxyLimits().subscribe({
+      next: (l) => this.houseTimeouts.set(l.timeouts ?? {}),
+      error: () => {},
+    });
     this.api.settings().subscribe({
       next: (s) => {
         this.appLanguages.set(s.languages ?? []);
@@ -570,25 +688,127 @@ export class RouteEditorComponent {
     }
     return '';
   }
+  // Everything that has to be true before the gateway will take this route.
+  //
+  // One schema, and the drawer reads it three ways: Save is disabled, the left
+  // list marks the sections at fault, and the footer lists them. The rules
+  // themselves mirror the server's - a required argument the catalogue names,
+  // an upstream gateway.Validate would parse - so the console refuses what the
+  // gateway refuses instead of discovering it in a 422.
   protected readonly f = form(this.draft, (p) => {
-    required(p.name);
-    validate(p.predicates, ({ value }) => {
-      const errors: ValidationError[] = [];
-      if (value().some((s) => MATCHER_TYPES.includes(s.type) && !argStr(s, 'name') && argStr(s, 'regexp'))) {
-        errors.push({
-          kind: 'matcherName',
-          message: $localize`:@@A_header_cookie_or_query_matcher_needs_a_name:A header, cookie or query matcher needs a name`,
-        });
-      }
-      if (value().some((s) => s.type === 'weight' && !argStr(s, 'group') !== !argStr(s, 'weight'))) {
-        errors.push({
-          kind: 'weightArgs',
-          message: $localize`:@@Weight_needs_both_a_group_and_a_weight:Weight needs both a group and a weight`,
-        });
-      }
-      return errors;
+    required(p.name, {
+      error: gapError('', $localize`:@@Gap_name:a name`),
     });
+    validate(p.upstream, ({ value }) => {
+      if (this.mode() !== 'proxy') return [];
+      const problem = upstreamProblem(value());
+      return problem ? [gapError('target', problem)] : [];
+    });
+    validate(p.predicates, ({ value }) => {
+      // On what will be SENT, not on the draft. A predicate row someone has
+      // just added and not typed into yet is dropped on the way out
+      // (cleanPredicates), so flagging it would accuse the form of a fault the
+      // payload does not have - and it would do it the instant "add" is
+      // clicked, before anyone could have filled anything.
+      const specs = cleanPredicates(value());
+      const errors: ValidationError[] = [];
+      // A route with no predicate accepts every request - which is a real
+      // thing to want, and is written "/**": the two match identically, down
+      // to "/" and "//". Written down it shows in the routes table and reads
+      // as a decision; left empty it is indistinguishable from an oversight,
+      // and it silences every route below it.
+      if (!specs.length) {
+        errors.push(
+          gapError(
+            'predicates',
+            $localize`:@@Gap_no_predicate:at least one - a path of "/**" if this route is meant to catch everything`,
+          ),
+        );
+      }
+      if (specs.some((s) => MATCHER_TYPES.includes(s.type) && !argStr(s, 'name') && argStr(s, 'regexp'))) {
+        errors.push(
+          gapError(
+            'predicates',
+            $localize`:@@A_header_cookie_or_query_matcher_needs_a_name:a header, cookie or query matcher needs a name`,
+          ),
+        );
+      }
+      if (specs.some((s) => s.type === 'weight' && !argStr(s, 'group') !== !argStr(s, 'weight'))) {
+        errors.push(
+          gapError(
+            'predicates',
+            $localize`:@@Weight_needs_both_a_group_and_a_weight:weight needs both a group and a weight`,
+          ),
+        );
+      }
+      return [...errors, ...this.brickGaps(specs, () => 'predicates')];
+    });
+    // Gates, incoming, outgoing AND the terminal live in one list, so one rule
+    // covers four sections: the phase says which one to send the reader to.
+    // A filter is kept whatever it holds - cleanSpecs only empties it - so one
+    // added and left blank IS what gets sent, and IS what the gateway will
+    // refuse. Flagged from the moment it is posed, therefore.
+    validate(p.filters, ({ value }) =>
+      this.brickGaps(cleanSpecs(value()), (e) => sectionOfPhase(e?.phase)),
+    );
   });
+
+  // A brick missing a required argument, named the way the palette names it.
+  private brickGaps(
+    specs: Spec[],
+    where: (entry: CatalogEntry | undefined) => Section,
+  ): ValidationError[] {
+    const out: ValidationError[] = [];
+    for (const s of specs) {
+      const entry = this.catalog().find((e) => e.type === s.type);
+      const missing = missingArgs(s, entry);
+      if (missing.length) {
+        out.push(gapError(where(entry), `${humanize(s.type)}: ${missing.join(', ')}`));
+      }
+    }
+    return out;
+  }
+
+  // What is missing, in the order the schema declares it. Read by the footer
+  // list and, grouped, by the marks in the section list.
+  protected readonly gaps = computed<Gap[]>(() =>
+    this.f()
+      .errorSummary()
+      .map((e) => ({
+        section: (e.kind.startsWith('gap:') ? e.kind.slice(4) : '') as Section | '',
+        message: e.message ?? '',
+      })),
+  );
+  private readonly gapsBySection = computed(() => {
+    const by = new Map<string, string[]>();
+    for (const g of this.gaps()) {
+      by.set(g.section, [...(by.get(g.section) ?? []), g.message]);
+    }
+    return by;
+  });
+  // A tooltip rather than a count: one mark says a section needs attention,
+  // and hovering says what - which is the whole question.
+  protected gapTip(s: Section): string {
+    return (this.gapsBySection().get(s) ?? []).join('\n');
+  }
+  protected hasGap(s: Section): boolean {
+    return this.gapsBySection().has(s);
+  }
+  protected sectionLabel(s: Section | ''): string {
+    return s ? SECTION_LABEL[s] : '';
+  }
+  // The name is not a section: it lives in the header, above the list.
+  private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
+  protected gapWhere(g: Gap): string {
+    return g.section ? SECTION_LABEL[g.section] : $localize`:@@Name:Name`;
+  }
+  protected goToGap(g: Gap): void {
+    if (g.section) {
+      this.onSectionPick(g.section);
+      return;
+    }
+    this.nameInput()?.nativeElement.focus();
+  }
 
   protected readonly error = signal('');
   protected readonly saving = signal(false);
@@ -697,9 +917,139 @@ export class RouteEditorComponent {
     });
   }
 
+  // How long this upstream may take (ROUTE-07). Offered rather than typed, for
+  // the reason every other duration in this product is: a list is read at a
+  // glance and cannot be spelled wrong. The empty entry is the installation's
+  // default, which is what every route ran with when the bounds were global.
+  // What the runtime says exists beside this gateway (SVC-02). One entry per
+  // service AND PORT: a service exposing three is three choices, and offering
+  // it once would mean guessing which - the guess being exactly the mistake
+  // this list exists to remove.
+  private readonly discovered = signal<DiscoveredService[]>([]);
+  // Said under the field, because a list that only appears on focus needs to
+  // announce itself once. Short and right-aligned, so it clears the floating
+  // label of the row underneath. Empty when there is no runtime to ask: the
+  // hint row is reserved either way, so the silence costs nothing.
+  //
+  // It says WHICH list when that matters. A gateway that could not find its
+  // own networks is offering the cluster's inventory rather than what it can
+  // reach - true of every developer instance running outside the cluster, and
+  // exactly the moment somebody would trust a name that resolves nowhere.
+  protected readonly upstreamHint = computed(() => {
+    const n = this.upstreamChoices().length;
+    if (!n) return '';
+    if (!this.reach().length) return $localize`:@@Upstream_all:${n}:COUNT: in the cluster`;
+    const out = this.discovered().filter((s) => s.reachable === false).length;
+    return out
+      ? $localize`:@@Upstream_some_out:${n}:COUNT: offered, ${out}:OUT: off your network`
+      : $localize`:@@Upstream_known:${n}:COUNT: services offered`;
+  });
+  // Reachable first: an upstream this gateway shares no network with is still
+  // shown - it may be one network away from working - but it does not sit
+  // above the ones that answer today.
+  protected readonly upstreamChoices = computed<UrlSuggestion[]>(() =>
+    [...this.discovered()]
+      .sort((a, b) => Number(b.reachable !== false) - Number(a.reachable !== false))
+      .flatMap((s) => {
+      // The name that RESOLVES, not the identity: a stack service answers to
+      // its short alias, and that is what an operator writes. The full name
+      // rides along in the hint, so the identity is never hidden.
+      const host = s.names?.[0] || s.name;
+      // The declared state, beside the name, ALWAYS - zero of zero is a
+      // service somebody stopped, and hiding it would make a deliberate
+      // decision look like a missing answer. Pointing a route at one is a
+      // choice; pointing at one by accident is not.
+      const state = `${s.ready}/${s.wanted}`;
+      // Out of reach: the network is named, because that is the answer to
+      // "why can I not use this one" - and the answer is never the stack.
+      const out = s.reachable === false;
+      const parts = [host === s.name ? '' : s.name, out ? (s.networks ?? []).join(' ') : '', state];
+      return (s.ports ?? [])
+        .filter((p) => p.target > 0)
+        .map((p) => ({
+          // The HOST only: the scheme is the field's own select, so picking a
+          // service keeps the scheme already chosen instead of imposing one.
+          value: `${host}:${p.target}`,
+          hint: parts.filter(Boolean).join('  '),
+          muted: out,
+        }));
+      }),
+  );
+
+  private readonly reach = signal<string[]>([]);
+
+  // What the installation waits, so the "inherited" entry names the real
+  // number rather than a constant that may not be in force. A label that says
+  // "Default (5 s)" on an installation running 30 is worse than no label.
+  private readonly houseTimeouts = signal<{ connect?: string; response?: string }>({});
+  protected readonly inheritedConnect = computed(() =>
+    labelFor(this.houseTimeouts().connect, '5 s'),
+  );
+  protected readonly inheritedResponse = computed(() =>
+    labelFor(this.houseTimeouts().response, '15 s'),
+  );
+
+  protected readonly connectOffered = computed(() =>
+    withCurrent(this.connectChoices, this.timeout('connect')),
+  );
+  protected readonly responseOffered = computed(() =>
+    withCurrent(this.responseChoices, this.timeout('response')),
+  );
+  private readonly connectChoices = [
+    { key: '', label: '' },
+    { key: 'PT2S', label: '2 s' },
+    { key: 'PT5S', label: '5 s' },
+    { key: 'PT10S', label: '10 s' },
+    { key: 'PT30S', label: '30 s' },
+  ];
+  private readonly responseChoices = [
+    { key: '', label: '' },
+    { key: 'PT5S', label: '5 s' },
+    { key: 'PT15S', label: '15 s' },
+    { key: 'PT30S', label: '30 s' },
+    { key: 'PT1M', label: '1 min' },
+    { key: 'PT5M', label: '5 min' },
+    { key: 'PT10M', label: '10 min' },
+  ];
+
+  // An empty first entry, as the cool-down has: a route that never chose one
+  // carries no number, and a select with nothing in it reads as a field the
+  // screen forgot to fill rather than as the default it is.
+  protected readonly tripChoices = [
+    { key: '', label: $localize`:@@Default_5_trip:Default (5)` },
+    { key: '3', label: '3' },
+    { key: '5', label: '5' },
+    { key: '10', label: '10' },
+    { key: '20', label: '20' },
+  ];
+  protected readonly coolChoices = [
+    { key: '', label: $localize`:@@Default_15s_cool:Default (15 s)` },
+    { key: 'PT5S', label: '5 s' },
+    { key: 'PT15S', label: '15 s' },
+    { key: 'PT30S', label: '30 s' },
+    { key: 'PT1M', label: '1 min' },
+    { key: 'PT5M', label: '5 min' },
+  ];
+
+  protected timeout(which: 'connect' | 'response'): string {
+    return this.draft().timeouts?.[which] ?? '';
+  }
+
+  // Both bounds live in one object, and an object with nothing in it is no
+  // object at all: a route back on the defaults stores nothing rather than a
+  // pair of empty strings.
+  protected setTimeout(which: 'connect' | 'response', value: string): void {
+    const next: { connect?: string; response?: string } = {
+      ...(this.draft().timeouts ?? {}),
+      [which]: value || undefined,
+    };
+    const empty = !next.connect && !next.response;
+    this.draft.update((d) => ({ ...d, timeouts: empty ? undefined : next }));
+  }
+
   protected patch(
     key:
-      | 'openapiUrl'
+      | 'specPath'
       | 'uiLink'
       | 'upstream'
       | 'identityTtl'
@@ -716,10 +1066,18 @@ export class RouteEditorComponent {
       | 'userInfoMode'
       | 'userInfoTag'
       | 'localesHeader'
-      | 'localesParam',
+      | 'localesParam'
+      | 'breakerTrip'
+      | 'breakerCool',
     value: string,
   ): void {
     this.draft.update((d) => ({ ...d, [key]: value }));
+  }
+
+  // Its own setter because the flag is a boolean and patch takes strings -
+  // the shape the rest of this editor already uses for a checkbox.
+  protected setBreaker(on: boolean): void {
+    this.draft.update((d) => ({ ...d, breakerOn: on }));
   }
 
   protected setBtnHeight(value: string): void {
@@ -816,11 +1174,33 @@ export class RouteEditorComponent {
       // shows that, and what is saved has to agree with what is shown.
       isUi: d.isUi && this.uiPossible(),
       upstream: d.upstream.trim(),
-      predicates: cleanSpecs(d.predicates),
+      // Two cleaners, because the two answer different questions: a predicate
+      // with nothing in it is a row somebody started and left, a filter with
+      // nothing in it is a brick that needs nothing.
+      predicates: cleanPredicates(d.predicates),
       filters: trimTemplates(cleanSpecs(d.filters)),
+      timeouts: d.timeouts,
+      breaker: d.breakerOn
+        ? {
+            enabled: true,
+            trip: Number(d.breakerTrip) || undefined,
+            cool: d.breakerCool || undefined,
+          }
+        : undefined,
     };
-    if (d.openapiUrl.trim()) {
-      route.api = { openapiUrl: d.openapiUrl.trim() };
+    // The endpoint policies are NOT edited here - they have their own screen -
+    // so they are carried over rather than dropped: a screen that saves what it
+    // only meant to display is how a rule disappears without anyone deciding.
+    const security = this.route()?.api?.security;
+    if (d.specSource === 'upstream' && d.specPath.trim()) {
+      route.api = { spec: { type: 'upstream', path: d.specPath.trim() } };
+    } else if (d.specSource === 'file' && d.specFilename) {
+      // A file is only declared once one has been deposited: declaring one
+      // that is not there is the dangling reference this feature avoids.
+      route.api = { spec: { type: 'file', path: d.specPath.trim() || 'openapi.json', filename: d.specFilename } };
+    }
+    if (security) {
+      route.api = { ...(route.api ?? {}), security };
     }
     if (d.isUi && this.uiPossible()) {
       route.ui = {
@@ -926,9 +1306,94 @@ export class RouteEditorComponent {
     });
   }
 
+  // Switching source clears what belonged to the other one: an upstream url
+  // left behind under "deposited" would be read by nobody and understood by
+  // everybody as still in force.
+  protected setSpecSource(value: '' | 'upstream' | 'file'): void {
+    this.draft.update((d) => ({ ...d, specSource: value, specPath: '', specFilename: value === 'file' ? d.specFilename : '' }));
+    if (value !== 'file') {
+      this.specShadow.set(false);
+    }
+  }
+
+  // Deposit: the route has to exist first (the file is stored against it), so
+  // this saves it the same way the endpoint-security button does.
+  protected depositSpec(files: FileList | null): void {
+    const file = files?.[0];
+    if (!file) return;
+    this.error.set('');
+    this.save((out) => {
+      this.saving.set(true);
+      this.api.depositRouteSpec(out.id, file, this.draft().specPath.trim()).subscribe({
+        next: (deposit) => {
+          this.saving.set(false);
+          this.specShadow.set(!!deposit.shadows);
+          this.draft.update((d) => ({
+            ...d,
+            specSource: 'file',
+            specPath: deposit.path,
+            specFilename: deposit.filename,
+          }));
+          this.saved.emit({
+            ...out,
+            api: { ...(out.api ?? {}), spec: { type: 'file', path: deposit.path, filename: deposit.filename } },
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.error.set(err.error?.error ?? 'the file could not be read as an OpenAPI specification');
+        },
+      });
+    });
+  }
+
+  // Removing drops the file AND the declaration: the server refuses to leave
+  // one without the other, and so does this screen.
+  protected removeSpec(): void {
+    const id = this.route()?.id;
+    if (!id) return;
+    this.saving.set(true);
+    this.api.deleteRouteSpec(id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.specShadow.set(false);
+        this.draft.update((d) => ({ ...d, specSource: '', specPath: '', specFilename: '' }));
+        const current = this.route();
+        if (current) {
+          this.saved.emit({ ...current, api: { ...(current.api ?? {}), spec: undefined } });
+        }
+      },
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.error.set(err.error?.error ?? 'the file could not be removed');
+      },
+    });
+  }
+
+  // Whether the upstream already answers where the deposited file now does.
+  // Set by the deposit itself: that is the moment it can be checked, and the
+  // moment it matters.
+  protected readonly specShadow = signal(false);
+
+  // Where the deposited file answers. The server is the authority
+  // (routing.MatchPrefix); this mirrors it so nobody has to deposit a file to
+  // find out where it landed.
+  protected specUrl(): string {
+    const d = this.draft();
+    return matchPrefix(d.predicates) + '/' + (d.specPath.trim() || 'openapi.json');
+  }
+
   // Save the route, then jump to its endpoint-security screen (which needs the
-  // route persisted, with its OpenAPI url, to fetch the operations).
+  // route persisted, with its spec, to fetch the operations).
   protected goEndpointSecurity(): void {
     this.save((out) => void this.router.navigate(['/infra/endpoint-security'], { queryParams: { route: out.id } }));
   }
+}
+
+// The inherited entry's wording. It names what the INSTALLATION is running, so
+// somebody choosing "inherit" knows what they are inheriting - a label reading
+// "Default (5 s)" on an installation set to 30 is worse than no label at all.
+function labelFor(iso: string | undefined, builtIn: string): string {
+  if (!iso) return $localize`:@@Inherited_builtin:Inherited (${builtIn}:VALUE:)`;
+  return $localize`:@@Inherited_house:Inherited (${humanIso(iso)}:VALUE:)`;
 }

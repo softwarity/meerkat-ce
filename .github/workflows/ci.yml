@@ -22,6 +22,21 @@ jobs:
   # says `-tags ee` needs code the mirror does not have, so it has to ask
   # first - and it asks the tree, not the repository name: a rename must not
   # silently turn the Enterprise half off.
+  #
+  # The two trees also SHARE THE WORK, and that is what most of the conditions
+  # below are about. The mirror is a public repository, where GitHub bills no
+  # minutes; this one is private, where it bills every one of them. So anything
+  # whose answer does not depend on ee/ - the doc site, the split guard, the
+  # community half of the tests, the OIDC directory - is left to the mirror,
+  # which runs it for free minutes later on the very same sources. What stays
+  # here is what the mirror CANNOT answer: everything built with the tag, the
+  # two directories only the Enterprise driver talks to, the integration suite
+  # driving the multi-organisation product, and the publications, which need
+  # credentials a public repository must never hold.
+  #
+  # The community tree is not left unwatched here: mirror-ce.yml builds and
+  # tests it before publishing a single byte, so a community regression is
+  # still caught on this side.
   edition:
     name: What this tree carries
     runs-on: ubuntu-latest
@@ -82,6 +97,13 @@ jobs:
   docs:
     name: Doc site
     runs-on: ubuntu-latest
+    needs: edition
+    # The site has no Enterprise half - it is the same sources either way - so
+    # the mirror answers this one, for free. The hole the job was opened for
+    # (deploy-doc.yml only running after a merge) stays plugged: the mirror
+    # runs minutes after the push, which is when this project's merges happen
+    # anyway, since work lands on main.
+    if: needs.edition.outputs.enterprise == 'false'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -116,9 +138,9 @@ jobs:
           - area: Authentication
             packages: ./internal/auth/... ./internal/idp/... ./internal/mfa/... ./internal/session/... ./internal/captcha/... ./internal/events/... ./internal/devtunnel/...
           - area: Admin API
-            packages: ./internal/admin/... ./internal/openapi/... ./internal/config/...
+            packages: ./internal/admin/... ./internal/mcp/... ./internal/openapi/... ./internal/config/...
           - area: Storage
-            packages: ./internal/store/... ./internal/edition/... ./internal/license/...
+            packages: ./internal/store/... ./internal/cluster/... ./internal/edition/... ./internal/license/...
           - area: Secrets and signing
             packages: ./internal/vault/... ./internal/signing/... ./internal/mail/... ./internal/certs/...
     steps:
@@ -129,10 +151,17 @@ jobs:
       # Both editions. A change that only compiles under the tag would break
       # the community image silently, and the publication would be the first
       # to know; a change that only works WITHOUT it breaks what is sold.
-      - run: go vet ${{ matrix.packages }}
-      - run: go test -race ${{ matrix.packages }}
-      - if: needs.edition.outputs.enterprise == 'true'
-        run: go vet -tags ee ${{ matrix.packages }}
+      #
+      # Tests only: `go vet` runs once over the whole tree below, in both
+      # editions, and running it again per area paid a second compilation of
+      # the same packages five times over. What it costs is attribution - a
+      # vet finding now names "Whole tree" rather than "Routing" - and that is
+      # the cheaper half of the trade, since vet reports a file and a line.
+      # The community run is the mirror's half of the deal: same packages, same
+      # command, no tag - and free over there. Here we run what only this tree
+      # can run.
+      - if: needs.edition.outputs.enterprise == 'false'
+        run: go test -race ${{ matrix.packages }}
       - if: needs.edition.outputs.enterprise == 'true'
         run: go test -race -tags ee ${{ matrix.packages }}
 
@@ -142,6 +171,10 @@ jobs:
   coverage-of-the-split:
     name: Every package is in an area
     runs-on: ubuntu-latest
+    needs: edition
+    # Reads this file and `go list`; ./internal is the same on both trees, so
+    # the answer is too. Left to the mirror.
+    if: needs.edition.outputs.enterprise == 'false'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -159,8 +192,9 @@ jobs:
           [ -z "$missing" ] || { echo "these have tests and belong to no area:"; echo "$missing"; exit 1; }
           echo "every tested package belongs to an area"
 
-  # Everything, in one go: the areas above only cover ./internal, so cmd/,
-  # ee/ and tools/ would otherwise be tested by nobody.
+  # What the areas leave: they cover ./internal, so cmd/, ee/ and tools/ would
+  # otherwise be tested by nobody. Plus `go vet` over the WHOLE tree, in both
+  # editions, which is the one pass no other job makes.
   #
   # Linux only, and that is the whole target: Meerkat ships as a Docker image
   # and nothing else. It used to run here on macOS and Windows too, which cost
@@ -178,15 +212,85 @@ jobs:
         with:
           go-version: stable
       - name: Vet, community
+        if: needs.edition.outputs.enterprise == 'false'
         run: go vet ./...
       - name: Vet, Enterprise
         if: needs.edition.outputs.enterprise == 'true'
         run: go vet -tags ee ./...
+      # What the areas do NOT cover. It used to be ./... - which re-ran every
+      # test the five area jobs had just run, twice over with the tag, for
+      # about eight minutes a run and no answer the areas had not already
+      # given. The guard below proves nothing internal falls through the
+      # split, so this is the rest of the tree and only the rest.
+      #
+      # The VETS above stay on ./..., because vet is the one thing no area
+      # runs any more and it is cheap: it compiles, it does not execute.
       - name: Test, community
-        run: go test -race ./...
+        if: needs.edition.outputs.enterprise == 'false'
+        run: go test -race ./cmd/... ./ee/... ./tools/...
       - name: Test, Enterprise
         if: needs.edition.outputs.enterprise == 'true'
-        run: go test -race -tags ee ./...
+        run: go test -race -tags ee ./cmd/... ./ee/... ./tools/...
+
+  # The SAME suite, on the other database (QUAL-01).
+  #
+  # PostgreSQL is what a cluster runs on (STORE-03), and until this job existed
+  # the evidence that the product works on it was ONE smoke test: a user row, a
+  # setting, and the schema version. The other hundred and sixty-odd queries
+  # were taken on faith - and the first run of this job found two of them
+  # broken, one silently waiting for 2038.
+  #
+  # No second suite was written: internal/store/dbtest gives every test a
+  # private schema when MEERKAT_TEST_DATABASE_URL names a server, and returns
+  # nothing when it does not, so `go test ./...` on a laptop is untouched.
+  #
+  # Runs on BOTH trees, like the integration suite: the mirror answers for the
+  # community half on free minutes, and the Enterprise tree answers for the
+  # code only it can link.
+  postgres:
+    name: The suite on PostgreSQL
+    runs-on: ubuntu-latest
+    needs: edition
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: meerkat
+          POSTGRES_PASSWORD: meerkat
+          POSTGRES_DB: meerkat
+        ports:
+          - 5432:5432
+        # Without this the first connection races the server's own startup,
+        # and the failure reads as a broken query rather than a missing server.
+        options: >-
+          --health-cmd "pg_isready -U meerkat"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MEERKAT_TEST_DATABASE_URL: postgres://meerkat:meerkat@localhost:5432/meerkat?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      # A suite that quietly fell back to the embedded database would be green
+      # about nothing, which is the failure this whole job exists to prevent.
+      # The smoke test SKIPS when the variable is unset, and a skip passes - so
+      # it is run alone, verbosely, and counted.
+      - name: Prove the server is actually reached
+        run: |
+          go test ./internal/store/ -run TestAgainstARealPostgres -count=1 -v 2>&1 | tee out.txt
+          grep -q -- '--- PASS: TestAgainstARealPostgres' out.txt \
+            || { echo "the suite did not reach PostgreSQL"; exit 1; }
+      # No -race here: the point is the dialect, not the concurrency, and the
+      # areas above already run the whole tree under the detector.
+      - name: Community
+        if: needs.edition.outputs.enterprise == 'false'
+        run: go test ./... -count=1
+      - name: Enterprise
+        if: needs.edition.outputs.enterprise == 'true'
+        run: go test -tags ee ./... -count=1
 
   # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
   # Active Directory and Dex; without them these tests SKIP, and a skip is
@@ -206,6 +310,12 @@ jobs:
     name: ${{ matrix.directory }}
     runs-on: ubuntu-latest
     needs: edition
+    # Dex exercises the OIDC driver, which is community code, so the mirror
+    # runs that row for free too - and it is left here as well, deliberately.
+    # A job's own `if` cannot read `matrix` (only a step's can), so skipping
+    # that one row would mean building the matrix in the edition job above, in
+    # JSON: it would cost the readable table below to save about a minute.
+    # The two LDAP rows need the Enterprise driver and can only run here.
     strategy:
       fail-fast: false
       matrix:
@@ -334,9 +444,13 @@ jobs:
         run: |
           for goarch in amd64 arm64; do
             echo "building linux/$goarch"
-            GOARCH=$goarch go build -trimpath -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+            # With ee/ here, the community build is the mirror's to make: it
+            # compiles the very same files from the very same commit. What
+            # only this tree can compile is the linked Enterprise binary.
             if [ -d ee ]; then
               GOARCH=$goarch go build -trimpath -tags ee -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+            else
+              GOARCH=$goarch go build -trimpath -ldflags '-s -w' -o /dev/null ./cmd/meerkat
             fi
           done
 
@@ -349,7 +463,10 @@ jobs:
   # afterwards.
   image:
     name: Build & publish image
-    needs: [edition, lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
+    # coverage-of-the-split is deliberately absent: it runs on the mirror only,
+    # and a skipped dependency skips its dependants - the publication would
+    # never fire.
+    needs: [edition, lint, unit, test, postgres, directories, e2e, build, console]
     if: success() && github.event_name != 'pull_request' && needs.edition.outputs.enterprise == 'true'
     permissions:
       contents: read
@@ -375,7 +492,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-    needs: [edition, lint, unit, coverage-of-the-split, test, directories, e2e, build, console]
+    # coverage-of-the-split is deliberately absent: it runs on the mirror only,
+    # and a skipped dependency skips its dependants - the publication would
+    # never fire.
+    needs: [edition, lint, unit, test, postgres, directories, e2e, build, console]
     # And this one could not build at all without ee/: it IS the code the
     # linker puts in.
     if: success() && github.event_name != 'pull_request' && needs.edition.outputs.enterprise == 'true'

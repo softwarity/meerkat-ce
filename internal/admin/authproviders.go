@@ -23,7 +23,7 @@ import (
 // password sign-in so a broken authority stays repairable. Disabling every
 // authority is allowed: it means nobody signs in to the DATA plane, which is a
 // legitimate state for a gateway serving public routes only.
-func (a *API) registerAuthProviders(mux *http.ServeMux) {
+func (a *API) registerAuthProviders(mux Mux) {
 	mux.Handle("GET /api/auth-providers", a.infraAdmin(a.listAuthProviders))
 	mux.Handle("GET /api/auth-providers/callback-base", a.infraAdmin(a.getCallbackBase))
 	mux.Handle("PUT /api/auth-providers/{id}", a.infraAdmin(a.putAuthProvider))

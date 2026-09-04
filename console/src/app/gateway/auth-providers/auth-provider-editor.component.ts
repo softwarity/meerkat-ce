@@ -88,6 +88,8 @@ function freeId(wanted: string, taken: string[]): string {
   styleUrl: './auth-provider-editor.component.scss',
 })
 export class AuthProviderEditorComponent {
+  // A hint the field renders itself, so it is a string rather than markup.
+  protected readonly ldapHint = $localize`:@@Server_URL_hint:ldaps is the one to use unless the directory is on a private network`;
   // null creates one.
   readonly provider = input<AuthProvider | null>(null);
   // The identifiers already in use, so a derived one never collides.

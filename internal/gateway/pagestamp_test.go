@@ -11,6 +11,7 @@ import (
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The server-side page stamp edits the served HTML directly. These cover the
@@ -79,7 +80,7 @@ func TestPageStampServerSide(t *testing.T) {
 		UserInfo: &store.UserInfoConfig{Enabled: true, Fields: map[string]string{"username": ""}},
 	}
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

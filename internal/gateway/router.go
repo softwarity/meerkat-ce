@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"context"
 	cryptorand "crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -27,6 +29,7 @@ import (
 	"time"
 
 	filtering "github.com/softwarity/meerkat/internal/filters"
+	"github.com/softwarity/meerkat/internal/openapi"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/signing"
@@ -51,7 +54,21 @@ type Router struct {
 	// AdminSessions resolves admin-plane sessions, ONLY to authorize identity
 	// simulation (simulate.go). Nil disables simulation entirely.
 	AdminSessions *session.Manager
-	// simTokenKey signs the ephemeral test tokens (simulate.go); per boot.
+	// Pages renders the built-in pages this router has to serve itself - the
+	// unavailable page today (LIFE-05). Wired by main to the flow chrome, so
+	// the page wears the installation's theme, layout, mark and the visitor's
+	// language like every other page it serves; nil falls back to a
+	// self-contained block, which is what the tests run on.
+	Pages func(w http.ResponseWriter, r *http.Request, reason string, until int64, continueURL string)
+	// Stripe is the reminder injected into every page seen through the
+	// maintenance door, translated like the page it lands on. Wired by main;
+	// nil falls back to the English block below it.
+	Stripe func(r *http.Request) string
+	// simTokenKey signs the ephemeral test tokens (simulate.go). Read from the
+	// store at Reload, so every gateway on one database signs with the same
+	// key: per boot, a token minted on one node was gibberish on the next, and
+	// a restart invalidated one an operator had just copied. The random value
+	// New puts here is only what a router with no usable store falls back on.
 	simTokenKey []byte
 
 	mu       sync.RWMutex
@@ -65,6 +82,22 @@ type Router struct {
 	// signing holds the gateway's identity signing keys (signed-jwt). Loaded
 	// at Reload; nil until a route uses signed-jwt or the admin generates them.
 	signing *signing.Set
+	// maintenance is the global switch (LIFE-05) and the page it answers,
+	// rendered once here rather than per request. Both under rt.mu, swapped by
+	// Reload like everything else this router holds.
+	maintenance     store.Maintenance
+	maintenancePage []byte
+
+	// defaultTimeouts is what the INSTALLATION asks of every route that does
+	// not say otherwise (ROUTE-07), read at every reload. Only written there,
+	// only read while compiling, both under the same call - so it needs no
+	// lock of its own.
+	defaultTimeouts store.RouteTimeouts
+
+	// breakers holds one circuit per route (ROUTE-09), and with it the state
+	// the console reads to say whether a route is answering (SVC-04). Per
+	// node, deliberately - see internal/gateway/breaker.go.
+	breakers *breakers
 
 	// tagsMu guards the catalogue's tag -> role names table, read by routes
 	// that narrow what they forward. Cached: the catalogue changes far less
@@ -85,16 +118,24 @@ type compiledRoute struct {
 	// meant the first one always won and the second was unreachable.
 	access store.Access
 	isUI   bool
+	// breaker is the route's circuit configuration, kept on the compiled route
+	// so the health view can report against the same numbers the guard uses.
+	breaker store.CircuitBreaker
 }
 
 // New builds a Router over the store. sm may be nil when no route requires
 // authentication (tests). Call Reload to load the routes.
+//
+// The simulation key it starts with is random and private to this process.
+// Reload replaces it with the one in the database, which is what makes a test
+// token minted on one gateway readable by the next; this is only what stands
+// in until then, and what a router whose store cannot answer keeps.
 func New(st *store.Store, sm *session.Manager) *Router {
 	key := make([]byte, 32)
 	if _, err := cryptorand.Read(key); err != nil {
 		panic(err) // the OS entropy source is gone; nothing sensible remains
 	}
-	return &Router{st: st, sm: sm, lottery: rand.Float64, simTokenKey: key}
+	return &Router{st: st, sm: sm, lottery: rand.Float64, simTokenKey: key, breakers: newBreakers()}
 }
 
 // Reload compiles the enabled routes from the store and swaps them in
@@ -119,6 +160,22 @@ func (rt *Router) Reload(ctx context.Context) error {
 		slog.Warn("vault unavailable, route references will not resolve", "err", err)
 		values = map[string]string{}
 	}
+	// The specs deposited on routes (SVC-06), in one query rather than route by
+	// route: they are served from memory, so the conversion to JSON and the
+	// retargeting are paid once here instead of on every read.
+	specs, err := rt.st.RouteSpecContents(ctx)
+	if err != nil {
+		slog.Warn("deposited openapi specs unavailable", "err", err)
+		specs = map[string][]byte{}
+	}
+	// What the installation asks of every route unless a route says otherwise
+	// (PERF-02 for the memory ceiling, ROUTE-07 for the waits). Read BEFORE
+	// compiling, because the compilation is what bakes the waits into a
+	// transport.
+	limits := rt.st.GetProxyLimits(ctx)
+	filtering.SetMaxRewritableBody(int64(limits.BodyRewriteMiB) << 20)
+	rt.defaultTimeouts = limits.Timeouts
+
 	compiled := make([]compiledRoute, 0, len(stored))
 	var allPreds []*routing.CompiledPredicates
 	needDraw := false
@@ -141,7 +198,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 				"route", raw.Name, "names", missing)
 			continue
 		}
-		cr, err := rt.compile(r, appLangs)
+		cr, err := rt.compile(r, appLangs, specs[raw.ID])
 		if err != nil {
 			return fmt.Errorf("gateway: route %q: %w", r.Name, err)
 		}
@@ -170,10 +227,45 @@ func (rt *Router) Reload(ctx context.Context) error {
 	} else if loaded, ok, e := rt.st.GetSigningSet(ctx); e == nil && ok {
 		sset = loaded
 	}
+	// The simulation key, shared between the nodes. A failure is not fatal:
+	// the router keeps the one it has and the simulator keeps working on this
+	// node - refusing to serve routes because a developer tool cannot sign
+	// would be the wrong trade by a wide margin.
+	simKey, err := rt.st.EnsureSimulationKey(ctx)
+	if err != nil {
+		slog.Warn("simulation key unavailable, keeping this node's own", "err", err)
+	}
+
+	// The global maintenance switch. Read here so it applies at once and, via
+	// the reload the control plane announces, on every node.
+	maint := rt.st.GetMaintenance(ctx)
+	// And the mark the unavailable page wears: it is the one page every
+	// visitor meets during an outage, so it carries the installation's name
+	// rather than looking like some gateway they never heard of.
+	brand := store.DefaultBranding()
+	if err := rt.st.GetSetting(ctx, store.SettingBranding, &brand); err != nil {
+		brand = store.DefaultBranding()
+	}
+	routing.SetMaintenanceBrand(routing.MaintenanceBrand{
+		LogoURL: brand.Logo, LogoSize: brand.LogoSize, AppName: brand.AppName,
+	})
+
+	// A deleted route's circuit has nobody to be about, and an id that comes
+	// back is a new route deserving a clean slate.
+	alive := make(map[string]bool, len(compiled))
+	for _, c := range compiled {
+		alive[c.id] = true
+	}
+	rt.breakers.forget(alive)
+
 	rt.mu.Lock()
 	rt.routes = compiled
 	rt.needDraw = needDraw
 	rt.signing = sset
+	rt.maintenance, rt.maintenancePage = maint, renderMaintenance(maint)
+	if simKey != nil {
+		rt.simTokenKey = simKey
+	}
 	rt.mu.Unlock()
 	slog.Info("routes reloaded", "count", len(compiled))
 	return nil
@@ -221,6 +313,15 @@ func stripGatewayCookies(r *http.Request) {
 		}
 		r.AddCookie(c)
 	}
+}
+
+// simKey returns the key the test tokens are signed with. Read under the lock
+// for the same reason as the signing set: Reload swaps it while requests are
+// being served.
+func (rt *Router) simKey() []byte {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	return rt.simTokenKey
 }
 
 // currentSigning returns the active signing set (nil when none). Read under the
@@ -389,6 +490,18 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
+	// Maintenance (LIFE-05), before any route is looked at: what it answers
+	// for is EVERY route, which is the point of a switch that needs no route
+	// edited. Below the JWKS above it on purpose - a backend still holding a
+	// token has to be able to finish verifying it - and above everything else.
+	if rt.takeBypass(w, req) {
+		return
+	}
+	req, answer, down := rt.underMaintenance(w, req)
+	if down {
+		rt.serveMaintenance(w, req, answer)
+		return
+	}
 	// Identity simulation (Try it out): validated headers replace the session
 	// for this request; unauthorized simulation is an explicit 403, not a
 	// silent fallback to the caller's real identity.
@@ -413,10 +526,11 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// refusal would arrive as a bare 404, which is the one answer nobody can
 	// act on, and the whole point of naming what is missing would be lost.
 	var (
-		cand    *compiledRoute
-		candReq *http.Request
-		candOK  bool
-		candWho store.Caller
+		cand       *compiledRoute
+		candReq    *http.Request
+		candOK     bool
+		candWho    store.Caller
+		candUserID string
 	)
 	for i := range routes {
 		if !routes[i].preds.Match(req) {
@@ -441,21 +555,21 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// matches next would turn the one rule written to shut a path into a
 		// rule that merely redirects it.
 		if r.access.Level == store.AccessDeny {
-			rt.refuse(w, hit, r.access, r.isUI, ok, who)
+			rt.refuse(w, hit, r.access, r.isUI, ok, who, d.UserID)
 			return
 		}
 		if cand == nil {
-			cand, candReq, candOK, candWho = r, hit, ok, who
+			cand, candReq, candOK, candWho, candUserID = r, hit, ok, who, d.UserID
 		}
 	}
 	if cand != nil {
-		rt.refuse(w, candReq, cand.access, cand.isUI, candOK, candWho)
+		rt.refuse(w, candReq, cand.access, cand.isUI, candOK, candWho, candUserID)
 		return
 	}
 	http.NotFound(w, req)
 }
 
-func (rt *Router) compile(r store.Route, appLangs []string) (compiledRoute, error) {
+func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte) (compiledRoute, error) {
 	preds, err := routing.CompilePredicates(r.Predicates)
 	if err != nil {
 		return compiledRoute{}, err
@@ -540,6 +654,23 @@ func (rt *Router) compile(r store.Route, appLangs []string) (compiledRoute, erro
 			"<script>\nwindow."+store.LocaleHookName+" = function (locale) {\n"+localeCfg.OnChange+"\n};\n</script>"))
 	}
 
+	// The maintenance stripe (LIFE-05), on EVERY route: an administrator who
+	// took the door browses an application that is down for everyone else, and
+	// nothing said so - which is the same silence the door was opened to fix,
+	// moved one step along. Costs a Content-Type check on HTML answers and
+	// nothing at all otherwise: the fragment is empty unless this very request
+	// went through the door.
+	filters.Response = append(filters.Response,
+		filtering.InjectAfterHeadFunc(func(res *http.Response) string {
+			if res.Request == nil || !bypassing(res.Request.Context()) {
+				return ""
+			}
+			if rt.Stripe != nil {
+				return rt.Stripe(res.Request)
+			}
+			return maintenanceStripe
+		}))
+
 	var handler http.Handler
 	if filters.Terminal != nil {
 		handler = filters.Terminal
@@ -556,10 +687,14 @@ func (rt *Router) compile(r store.Route, appLangs []string) (compiledRoute, erro
 			handler = rt.withIdentity(handler)
 		}
 	} else {
-		handler, err = buildProxy(r, filters)
+		handler, err = buildProxy(r, filters, rt.defaultTimeouts)
 		if err != nil {
 			return compiledRoute{}, err
 		}
+		// The circuit sits around the PROXY and nothing else: a route that
+		// answers by itself - a redirect, the unavailable page, a template -
+		// has no upstream to stop calling.
+		handler = rt.guarded(r, handler)
 	}
 	// Per-endpoint security (RBAC-07): when an API route poses operation
 	// policies, wrap the handler with the endpoint guard INSIDE the route-level
@@ -609,13 +744,41 @@ func (rt *Router) compile(r store.Route, appLangs []string) (compiledRoute, erro
 		}
 		handler = redirectToLocale(handler, localeCodes, routing.PathPrefixes(r.Predicates), inPath, param)
 	}
+	// A deposited spec (SVC-06) answers on the route's own prefix, ahead of the
+	// upstream. OUTSIDE the endpoint guard on purpose: the file inherits the
+	// route's access rule, not its per-operation policies - a deny-by-default
+	// posed on the operations would otherwise refuse the very document that
+	// lists them, and the contract would become unreadable exactly where it is
+	// most needed. When overrides exist the route's own rule no longer takes
+	// part in selection (it lives inside the guard), so it is applied here.
+	if spec := r.Spec(); spec.Type == store.SpecFile && len(deposited) > 0 {
+		body, err := openapi.Normalize(deposited)
+		if err != nil {
+			return compiledRoute{}, fmt.Errorf("deposited openapi spec: %w", err)
+		}
+		// Served from the route, so the operations it declares are reachable at
+		// the very prefix it was fetched from - no reader has to guess which
+		// base the gateway exposes.
+		if rewritten, rErr := openapi.Rewrite(body, routeMatchPrefix(r)); rErr == nil {
+			body = rewritten
+		}
+		served := specFileHandler(body)
+		if hasOverrides {
+			served = rt.accessGate(r.Access, r.IsUI, served)
+		}
+		handler = serveSpecFile(routeMatchPrefix(r)+"/"+spec.Path, served, handler)
+	}
 	// Gates (ROUTE-04) go on LAST, so they sit outermost: what a route refuses
 	// to carry is decided before the access rule reads a session, before a
 	// modifier touches a header, and before a redirect sends the caller round
 	// again. Refusing early is the whole point - an oversized body must not be
 	// read to be turned away.
 	handler = gateChain(filters.Gates, handler)
-	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler,
+	cfg := store.CircuitBreaker{}
+	if r.Breaker != nil {
+		cfg = *r.Breaker
+	}
+	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler, breaker: cfg,
 		access: selectAccess, isUI: r.IsUI}, nil
 }
 
@@ -1413,7 +1576,7 @@ func (rt *Router) accessGate(a store.Access, isUI bool, next http.Handler) http.
 		// The SAME refusal as the one the selection produces (refuse): one
 		// decision, in one place, or the day they diverge a person is told two
 		// different things about the same rule.
-		rt.refuse(w, req, a, isUI, ok, caller)
+		rt.refuse(w, req, a, isUI, ok, caller, d.UserID)
 	}))
 }
 
@@ -1425,7 +1588,7 @@ func (rt *Router) accessGate(a store.Access, isUI bool, next http.Handler) http.
 // The order is the order of what a person can do about it: sign in, finish the
 // login flow, choose another organisation, wait to be granted something, and
 // only then a plain refusal that names what was missing.
-func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Access, isUI, ok bool, who store.Caller) {
+func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Access, isUI, ok bool, who store.Caller, userID string) {
 	if !ok {
 		// No usable session. A browser going TO a page is sent to sign in with
 		// a way back; anything else gets a plain 401 - there is nobody to read
@@ -1465,7 +1628,7 @@ func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Acces
 		return
 	}
 	if isUI {
-		if offer := a.Switchable(who); len(offer) > 0 {
+		if offer := rt.switchWouldHelp(req.Context(), a, userID, a.Switchable(who)); len(offer) > 0 {
 			// WHY, carried to the page: an organisation chooser that reappears
 			// saying nothing is the reason someone switches back and forth
 			// wondering what they did wrong.
@@ -1481,6 +1644,35 @@ func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Acces
 		}
 	}
 	http.Error(w, refusalReason(a, who), http.StatusForbidden)
+}
+
+// switchWouldHelp keeps only the organisations where this caller would
+// actually get through.
+//
+// Access.Switchable answers about the LEVEL alone - it is a pure function on
+// the rule and cannot know what somebody holds elsewhere. So a rule that names
+// two organisations AND asks for a role used to send a member of both to the
+// chooser, refuse them whichever they picked, and offer the other one again:
+// alice bouncing between acme and globex, told nothing, reaching nothing. The
+// offer has to be true, or it is a door painted on a wall.
+//
+// A refusal is not the hot path, so the extra read costs nothing where it
+// matters, and it is only taken when the rule asks for roles at all.
+func (rt *Router) switchWouldHelp(ctx context.Context, a store.Access, userID string, offer []string) []string {
+	if len(a.Roles) == 0 || userID == "" || len(offer) == 0 {
+		return offer
+	}
+	var kept []string
+	for _, id := range offer {
+		roles, err := rt.st.RolesReachableIn(ctx, userID, id)
+		if err != nil {
+			continue
+		}
+		if slices.ContainsFunc(roles, func(r string) bool { return slices.Contains(a.Roles, r) }) {
+			kept = append(kept, id)
+		}
+	}
+	return kept
 }
 
 // needsTenant reports whether the rule asks for an organisation at all.
@@ -1957,22 +2149,45 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 		`<meerkat-user-button` + attrs + `></meerkat-user-button>`
 }
 
-// upstreamTransport bounds how long an upstream may take to accept a
-// connection and start answering (ROUTE-07 - per-route/service overrides come
-// with the Service entity). Without it, a hung upstream hangs the client
-// forever; with it, the request fails fast as a 502. Body streaming is NOT
-// bounded - long downloads and websockets must live.
-var upstreamTransport http.RoundTripper = &http.Transport{
-	Proxy:                 http.ProxyFromEnvironment,
-	DialContext:           (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
-	TLSHandshakeTimeout:   5 * time.Second,
-	ResponseHeaderTimeout: 15 * time.Second,
-	ForceAttemptHTTP2:     true,
-	MaxIdleConnsPerHost:   8,
-	// Below the common load-balancer keep-alive (AWS ELB: 60s): OUR side drops
-	// an idle connection first, so a request never rides one the upstream
-	// already closed.
-	IdleConnTimeout: 55 * time.Second,
+// The transports, one per pair of bounds (ROUTE-07).
+//
+// A hung upstream hangs the client forever without them; with them the request
+// fails fast as a 502. Body streaming is NOT bounded, deliberately - a long
+// download and a websocket must live. What is bounded is how long an upstream
+// may take to ACCEPT a connection and to START answering.
+//
+// They used to be one global pair, which meant the slowest legitimate endpoint
+// in an installation set the wait for every other one. A route names its own
+// now, and routes that name the same numbers - which is every route on the
+// defaults, so almost all of them - SHARE a transport. That matters: a
+// transport is a connection pool, and one per route would multiply the
+// sockets held against every upstream by the number of routes pointing at it.
+var (
+	transportsMu sync.Mutex
+	transports   = map[[2]time.Duration]http.RoundTripper{}
+)
+
+func transportFor(connect, response time.Duration) http.RoundTripper {
+	key := [2]time.Duration{connect, response}
+	transportsMu.Lock()
+	defer transportsMu.Unlock()
+	if t, ok := transports[key]; ok {
+		return t
+	}
+	t := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: connect}).DialContext,
+		TLSHandshakeTimeout:   connect,
+		ResponseHeaderTimeout: response,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConnsPerHost:   8,
+		// Below the common load-balancer keep-alive (AWS ELB: 60s): OUR side
+		// drops an idle connection first, so a request never rides one the
+		// upstream already closed.
+		IdleConnTimeout: 55 * time.Second,
+	}
+	transports[key] = t
+	return t
 }
 
 // cookieStrippingTransport removes Meerkat's own session cookies at the very
@@ -2010,7 +2225,7 @@ func (t cookieStrippingTransport) RoundTrip(req *http.Request) (*http.Response, 
 	return res, err
 }
 
-func buildProxy(r store.Route, cf routing.CompiledFilters) (http.Handler, error) {
+func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteTimeouts) (http.Handler, error) {
 	target, err := url.Parse(r.Upstream)
 	if err != nil {
 		return nil, fmt.Errorf("bad upstream %q: %w", r.Upstream, err)
@@ -2019,8 +2234,9 @@ func buildProxy(r store.Route, cf routing.CompiledFilters) (http.Handler, error)
 		return nil, fmt.Errorf("bad upstream %q: scheme and host required", r.Upstream)
 	}
 
+	connect, response := r.Timeouts.Durations(defaults)
 	proxy := &httputil.ReverseProxy{
-		Transport: cookieStrippingTransport{upstreamTransport},
+		Transport: cookieStrippingTransport{transportFor(connect, response)},
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetXForwarded()
 			// Whatever the caller sent under this name goes: it tells the
@@ -2087,6 +2303,64 @@ func buildProxy(r store.Route, cf routing.CompiledFilters) (http.Handler, error)
 		return nil
 	}
 	return proxy, nil
+}
+
+// guarded puts the route's circuit breaker (ROUTE-09) in front of a handler.
+//
+// Off, it is one comparison against a threshold nothing can reach - "off" and
+// "on" travel the same path rather than the caller branching. On, a route
+// whose upstream has stopped answering stops being called at all: the caller
+// gets the unavailable page immediately instead of waiting out the timeout,
+// and the service is met by ONE request after the cool-down rather than by
+// everything that piled up.
+func (rt *Router) guarded(r store.Route, next http.Handler) http.Handler {
+	cfg := store.CircuitBreaker{}
+	if r.Breaker != nil {
+		cfg = *r.Breaker
+	}
+	if !cfg.Enabled {
+		return next
+	}
+	id := r.ID
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		br := rt.breakers.of(id)
+		state, allowed := br.take(cfg, time.Now())
+		if !allowed {
+			slog.Debug("circuit open, upstream not called", "route", r.Name)
+			rt.serveUnreachable(w, req)
+			return
+		}
+		ww := &watched{ResponseWriter: w}
+		next.ServeHTTP(ww, req)
+		switch {
+		case failedStatus(ww.status):
+			br.failed(ww.status, http.StatusText(ww.status), time.Now())
+			if state == circuitProbe {
+				slog.Info("upstream still down after the cool-down", "route", r.Name)
+			}
+		default:
+			if state != circuitClosed {
+				slog.Info("upstream answering again, circuit closed", "route", r.Name)
+			}
+			br.succeeded(ww.status, time.Now())
+		}
+	})
+}
+
+// serveUnreachable answers for a route whose circuit is open. The SAME page
+// the global switch and the maintenance brick serve, with the reason this
+// actually is: nobody planned this one.
+func (rt *Router) serveUnreachable(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if rt.Pages != nil {
+		rt.Pages(w, req, store.ReasonIncident, 0, "")
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Retry-After", "30")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = w.Write(routing.MaintenancePage())
 }
 
 // filterOwnResponse runs the route's outgoing filters over an answer the
@@ -2212,4 +2486,35 @@ func requireSession(sm *session.Manager, next http.Handler) http.Handler {
 
 func wantsHTML(req *http.Request) bool {
 	return req.Method == http.MethodGet && strings.Contains(req.Header.Get("Accept"), "text/html")
+}
+
+// serveSpecFile answers exactly one path with the route's deposited spec and
+// hands everything else to the route. It is a decoration of the route, not a
+// second target: same prefix, same access rule, one document.
+//
+// It SHADOWS whatever the upstream serves at the same path, which is the point
+// - replacing an incomplete or unannotated spec is why a file gets deposited -
+// so the console announces the collision when the file is deposited rather
+// than leaving it to be discovered.
+func serveSpecFile(path string, served, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != path || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		served.ServeHTTP(w, r)
+	})
+}
+
+// specFileHandler writes the spec, with the ETag that lets a client skip the
+// bytes it already has. The spec is a JSON document whatever was deposited.
+func specFileHandler(body []byte) http.Handler {
+	sum := sha256.Sum256(body)
+	etag := `"` + hex.EncodeToString(sum[:8]) + `"`
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeContent(w, r, "openapi.json", time.Time{}, bytes.NewReader(body))
+	})
 }

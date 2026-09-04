@@ -6,11 +6,12 @@ import (
 
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 func openStore(t *testing.T) *store.Store {
 	t.Helper()
-	s, err := store.Open(t.TempDir())
+	s, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

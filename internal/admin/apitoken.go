@@ -18,7 +18,7 @@ import (
 // so it carries no tenant/group context. Minting is root-only: the token acts
 // with the owner's capabilities, and only root should hand out control-plane
 // access. Only the token HASH is stored; the clear value is shown once.
-func (a *API) registerAdminTokens(mux *http.ServeMux) {
+func (a *API) registerAdminTokens(mux Mux) {
 	mux.Handle("GET /api/admin-tokens", a.rootOnly(a.listAdminTokens))
 	mux.Handle("POST /api/admin-tokens", a.rootOnly(a.createAdminToken))
 	mux.Handle("DELETE /api/admin-tokens/{id}", a.rootOnly(a.revokeAdminToken))
@@ -39,8 +39,11 @@ func (a *API) listAdminTokens(w http.ResponseWriter, r *http.Request, actor stor
 
 func (a *API) createAdminToken(w http.ResponseWriter, r *http.Request, actor store.User) {
 	var body struct {
-		Name string `json:"name"`
-		Days int    `json:"days"` // 0 = never expires
+		Name   string `json:"name"`
+		Days   int    `json:"days"`   // 0 = never expires
+		Scope  string `json:"scope"`  // full | readonly, empty = the safe one
+		Domain string `json:"domain"` // gateway | app, empty = the whole plane
+		From   string `json:"from"`   // CIDR ranges, empty = anywhere
 	}
 	if err := decodeStrict(r, &body); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())
@@ -54,6 +57,21 @@ func (a *API) createAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 	if len(name) > 60 {
 		name = name[:60]
 	}
+	scope, err := store.SanitizeTokenScope(body.Scope)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	domain, err := store.SanitizeTokenDomain(body.Domain)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	from, err := store.SanitizeTokenCIDRs(body.From)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	var expiresAt int64
 	if body.Days > 0 {
 		expiresAt = time.Now().Add(time.Duration(body.Days) * 24 * time.Hour).Unix()
@@ -64,14 +82,20 @@ func (a *API) createAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 		return
 	}
 	id := newID()
-	if err := a.st.AddAPIToken(r.Context(), id, actor.ID, name, hash, prefix, store.PlaneAdmin, "", "", expiresAt); err != nil {
+	if err := a.st.AddAPIToken(r.Context(), store.NewToken{
+		ID: id, UserID: actor.ID, Name: name, TokenHash: hash, Prefix: prefix,
+		Plane: store.PlaneAdmin, Scope: scope, Domain: domain, FromCIDRs: from,
+		ExpiresAt: expiresAt,
+	}); err != nil {
 		a.internal(w, err)
 		return
 	}
-	a.auditEvent(r.Context(), actor, "token.create", "token", id, name, "", "control-plane token")
+	a.auditEvent(r.Context(), actor, "token.create", "token", id, name, "",
+		"control-plane token, "+perimeterWords(scope, domain, from))
 	// The clear value travels exactly once, here.
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"id": id, "name": name, "prefix": prefix, "token": secret, "expiresAt": expiresAt,
+		"id": id, "name": name, "prefix": prefix, "token": secret,
+		"expiresAt": expiresAt, "scope": scope, "domain": domain, "fromCidrs": from,
 	})
 }
 
@@ -143,4 +167,21 @@ func mintToken() (secret, hash, prefix string, err error) {
 	hash = hex.EncodeToString(sum[:])
 	prefix = secret[:12]
 	return secret, hash, prefix, nil
+}
+
+// perimeterWords is the perimeter in the audit's own words. A trail saying
+// "control-plane token" for a read-only gateway token and for a root one alike
+// would be recording the least interesting half of the event.
+func perimeterWords(scope, domain, from string) string {
+	words := scope
+	switch domain {
+	case store.DomainGateway:
+		words += ", routing plane only"
+	case store.DomainApp:
+		words += ", application identity only"
+	}
+	if from != "" {
+		words += ", from " + from
+	}
+	return words
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 func pathRoute(id, name string, order int, pattern, upstream string, filters ...routing.Spec) store.Route {
@@ -28,9 +29,11 @@ func pathRoute(id, name string, order int, pattern, upstream string, filters ...
 	}
 }
 
-func newRouter(t *testing.T, routes ...store.Route) *Router {
+// testing.TB, not *testing.T: the benchmarks build routers the same way, and
+// a helper that only one of the two can call is a helper that gets copied.
+func newRouter(t testing.TB, routes ...store.Route) *Router {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -236,7 +239,7 @@ func TestInvalidRouteAbortsReloadKeepingOldSnapshot(t *testing.T) {
 		_, _ = io.WriteString(w, "ok")
 	}))
 	t.Cleanup(up.Close)
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +275,7 @@ func TestAuthenticatedRouteGating(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -348,7 +351,7 @@ func TestReloadPicksUpChanges(t *testing.T) {
 	}))
 	t.Cleanup(up.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -394,7 +397,7 @@ func TestCatchAllRouteTraps(t *testing.T) {
 	}))
 	t.Cleanup(up.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -426,17 +429,18 @@ func TestCatchAllRouteTraps(t *testing.T) {
 // TestUpstreamHangIs502: an upstream that never answers its headers must fail
 // fast as 502 thanks to the transport's ResponseHeaderTimeout (ROUTE-07).
 func TestUpstreamHangIs502(t *testing.T) {
-	prev := upstreamTransport
-	upstreamTransport = &http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond}
-	t.Cleanup(func() { upstreamTransport = prev })
-
 	release := make(chan struct{})
 	up := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		<-release // hang until the test ends
 	}))
 	t.Cleanup(func() { close(release); up.Close() })
 
-	rt := newRouter(t, pathRoute("r1", "hang", 1, "/**", up.URL))
+	// The route says how long it will wait, which is the point of ROUTE-07:
+	// one global bound meant the slowest legitimate endpoint in an
+	// installation set the wait for every other one.
+	route := pathRoute("r1", "hang", 1, "/**", up.URL)
+	route.Timeouts = &store.RouteTimeouts{Response: "PT1S"}
+	rt := newRouter(t, route)
 
 	start := time.Now()
 	rec := httptest.NewRecorder()
@@ -445,7 +449,21 @@ func TestUpstreamHangIs502(t *testing.T) {
 		t.Fatalf("hanging upstream: %d, want 502", rec.Code)
 	}
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
-		t.Fatalf("502 took %v - the timeout did not bound the wait", elapsed)
+		t.Fatalf("502 took %v - the route's own bound did not hold", elapsed)
+	}
+}
+
+// Routes naming the same bounds SHARE a transport, and a transport is a
+// connection pool: one per route would multiply the sockets held against every
+// upstream by the number of routes pointing at it.
+func TestRoutesWithTheSameBoundsShareAPool(t *testing.T) {
+	a := transportFor(store.DefaultConnectTimeout, store.DefaultResponseTimeout)
+	b := transportFor(store.DefaultConnectTimeout, store.DefaultResponseTimeout)
+	if a != b {
+		t.Error("two routes on the defaults got two connection pools")
+	}
+	if c := transportFor(2*time.Second, store.DefaultResponseTimeout); c == a {
+		t.Error("a route that asked for something else got the shared pool anyway")
 	}
 }
 
@@ -574,7 +592,7 @@ func TestValidateIdentity(t *testing.T) {
 // headers reach the upstream, spoofed inbound values are purged, anonymous
 // requests carry nothing.
 func TestIdentityForwardHeadersReachUpstream(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -648,7 +666,7 @@ func TestIdentityForwardHeadersReachUpstream(t *testing.T) {
 // claims in an Authorization: Bearer token, purges an inbound Authorization
 // spoof, and writes nothing for an anonymous caller.
 func TestIdentityForwardJWT(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -740,7 +758,7 @@ func TestIdentityForwardJWT(t *testing.T) {
 // forwards a token the gateway signed (ES256), and that token verifies against
 // the very key the gateway publishes at /.well-known/jwks.json.
 func TestIdentityForwardSignedJWT(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -915,7 +933,7 @@ func TestOutgoingFiltersApplyToTheRoutesOwnAnswer(t *testing.T) {
 // all, with nothing anywhere saying why. Sign-in adopts the only membership
 // when there is exactly one; so does this, afterwards.
 func TestJoiningTakesEffectOnAnOpenSession(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1234,7 +1252,7 @@ func TestLocaleInTheURLFollowsThePerson(t *testing.T) {
 	r.Locales = &store.LocalesConfig{Mechanism: "path"}
 	// The offer is the APPLICATION's: without it a route has no language to
 	// recognise in a path.
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1313,7 +1331,7 @@ func TestLocaleQueryFollowsThePerson(t *testing.T) {
 	r := pathRoute("q", "q", 1, "/app/**", up.URL)
 	r.IsUI = true
 	r.Locales = &store.LocalesConfig{Mechanism: "query", Param: "lg"}
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1446,7 +1464,7 @@ func TestSetHostSurvivesTheProxyRewrite(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1488,7 +1506,7 @@ func TestPreserveHostSurvivesTheProxyRewrite(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

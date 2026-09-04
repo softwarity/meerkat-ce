@@ -9,13 +9,14 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The direction has to reach the PAGE, not just the helper: one attribute on
 // <html> is what mirrors the whole layout, and it is the kind of thing that
 // silently stops being rendered when a template is reshuffled.
 func TestSignInPageCarriesTheWritingDirection(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

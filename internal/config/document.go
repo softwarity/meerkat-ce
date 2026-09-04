@@ -61,6 +61,13 @@ type Document struct {
 	AuthProviders []store.AuthProvider `json:"authProviders,omitempty"`
 	MailRelay     *mail.Config         `json:"mailRelay,omitempty"`
 	Themes        []store.Theme        `json:"themes,omitempty"`
+	// Specs holds the OpenAPI files deposited on routes, by route id. It is
+	// NOT part of the document: a spec is a media, like the branding's
+	// pictures, and the json tag says so - Marshal encodes through JSON, so a
+	// dash here is what keeps megabytes of contract out of a file people read
+	// and diff. It is filled by an export and by reading a package, and it is
+	// what MarshalBundle writes beside the YAML.
+	Specs map[string][]byte `json:"-"`
 }
 
 // Empty reports whether the document would change nothing, which is what a
@@ -76,9 +83,9 @@ func (d *Document) Empty() bool {
 // state). Deliberately absent:
 //
 //   - the mail relay, which has its own section;
-//   - the signing keys, which are private key material - like a certificate,
-//     it is generated where it is used and never travels in a document that
-//     calls itself public;
+//   - the signing keys and the simulation key, which are secrets - like a
+//     certificate, they are generated where they are used and never travel in
+//     a document that calls itself public;
 //   - the internal guards (theme presets seeded, tls names seeded...), which
 //     only mean something for the install that wrote them.
 var ExportedSettings = []string{
@@ -97,6 +104,11 @@ var ExportedSettings = []string{
 	store.SettingPagesScheme,
 	store.SettingPageLayout,
 	store.SettingDevMode,
+	// What the gateway will hold in memory while it proxies (PERF-02). It
+	// travels because it describes the SHAPE of the installation, not its
+	// hardware: an environment that answers big documents needs the same
+	// ceiling wherever this configuration lands.
+	store.SettingProxyLimits,
 	// The TLS names and the authority that issues for them. WHICH names this
 	// gateway answers to is configuration in the same sense a route's host
 	// predicate is, and it travels for the same reason: a configuration landing

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/certs"
+	"github.com/softwarity/meerkat/internal/cluster"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -40,6 +41,11 @@ type API struct {
 	// that have no listener to open, where saving material still has to work.
 	TLS *certs.Supervisor
 
+	// Bus tells the other nodes what this one just reloaded (STORE-03). Wired
+	// by main; nil wherever there is one node, which is every test and every
+	// single-binary installation - see reload.go.
+	Bus *cluster.Bus
+
 	st     *store.Store
 	sm     *session.Manager
 	router *gateway.Router
@@ -51,9 +57,23 @@ func New(st *store.Store, sm *session.Manager, router *gateway.Router) *API {
 	return &API{st: st, sm: sm, router: router}
 }
 
+// Mux is the slice of *http.ServeMux the control plane registers onto.
+//
+// An interface rather than the concrete type for ONE reason: a *http.ServeMux
+// cannot be asked what was registered on it, and a surface nobody can
+// enumerate is a surface nobody can hold to a rule. A test passes a recorder
+// here and checks that every endpoint has been classified - read or write
+// (tokenscope.go), and covered by an agent tool or knowingly not
+// (mcp_coverage_test.go). Adding an endpoint is then a decision, not an
+// oversight waiting to be found.
+type Mux interface {
+	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+}
+
 // Register mounts the API on mux. The routing plane is GATEWAY scope
 // (RBAC-05): root or the infra-admin capability.
-func (a *API) Register(mux *http.ServeMux) {
+func (a *API) Register(mux Mux) {
 	mux.Handle("GET /api/catalog", a.gw(a.catalog))
 	mux.Handle("GET /api/routes", a.gw(a.listRoutes))
 	mux.Handle("POST /api/routes/reorder", a.infraAdmin(a.reorderRoutes))
@@ -73,8 +93,12 @@ func (a *API) Register(mux *http.ServeMux) {
 	a.registerRBAC(mux)
 	a.registerGroupRules(mux)
 	a.registerAdminTokens(mux)
+	a.registerMCP(mux)
 	a.registerAPIDocs(mux)
 	a.registerIssues(mux)
+	a.registerProxyLimits(mux)
+	a.registerRouteHealth(mux)
+	a.registerServices(mux)
 	a.registerEdition(mux)
 	a.registerConfig(mux)
 	a.registerConfigurations(mux)
@@ -186,7 +210,7 @@ func (a *API) reorderRoutes(w http.ResponseWriter, r *http.Request, actor store.
 		a.internal(w, err)
 		return
 	}
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("reordered, but reload failed: %w", err))
 		return
 	}
@@ -206,39 +230,89 @@ func (a *API) putRoute(w http.ResponseWriter, r *http.Request, actor store.User)
 		return
 	}
 	route.ID = r.PathValue("id")
-	if strings.TrimSpace(route.Name) == "" {
-		writeErr(w, http.StatusUnprocessableEntity, "route name is required")
-		return
-	}
-	if len(route.Predicates) == 0 {
-		writeErr(w, http.StatusUnprocessableEntity, "a route needs at least one predicate")
-		return
-	}
-	if err := a.validateRoute(r.Context(), route); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	// The prior route (if any) so the audit tells a create from an update diff.
-	old, hadRoute := store.Route{}, false
-	if prev, err := a.st.GetRoute(r.Context(), route.ID); err == nil {
-		old, hadRoute = prev, true
-	}
-	if err := a.st.SaveRoute(r.Context(), route); err != nil {
+	saved, err := a.saveRoute(r.Context(), actor, route)
+	if err != nil {
+		if isInvalid(err) {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		a.internal(w, err)
 		return
 	}
-	if err := a.router.Reload(r.Context()); err != nil {
+	writeJSON(w, http.StatusOK, saved)
+}
+
+// saveRoute creates or updates one route and applies it: validate, store,
+// reload, record. Shared by the endpoint and by the agent's save_route tool,
+// because a second implementation would be a second set of rules about what a
+// route may be - and the one an agent uses would be the one nobody reviews.
+func (a *API) saveRoute(ctx context.Context, actor store.User, route store.Route) (store.Route, error) {
+	if strings.TrimSpace(route.ID) == "" {
+		return route, invalid("a route needs an id: it is what names it in an export and in the audit")
+	}
+	if strings.TrimSpace(route.Name) == "" {
+		return route, invalid("route name is required")
+	}
+	if len(route.Predicates) == 0 {
+		return route, invalid("a route needs at least one predicate")
+	}
+	if route.API != nil && route.API.Spec != nil {
+		if route.API.Spec.Empty() {
+			route.API.Spec = nil
+		} else if err := store.SanitizeRouteSpec(route.API.Spec); err != nil {
+			return route, invalidErr(err)
+		}
+	}
+	if err := a.validateRoute(ctx, route); err != nil {
+		return route, invalidErr(err)
+	}
+	// The prior route (if any) so the audit tells a create from an update diff.
+	old, hadRoute := store.Route{}, false
+	if prev, err := a.st.GetRoute(ctx, route.ID); err == nil {
+		old, hadRoute = prev, true
+	}
+	// A route that stops declaring a deposited spec drops the file with it:
+	// bytes nothing names any more are bytes nobody will ever delete on
+	// purpose, and they would come back to life the day the declaration does.
+	if hadRoute && old.Spec().Type == store.SpecFile && route.Spec().Type != store.SpecFile {
+		if err := a.st.DeleteRouteSpec(ctx, route.ID); err != nil {
+			return route, err
+		}
+	}
+	if err := a.st.SaveRoute(ctx, route); err != nil {
+		return route, err
+	}
+	if err := a.reloadRouting(ctx); err != nil {
 		// This route is valid, so a reload failure means another stored route
 		// is broken - surface it instead of pretending everything applied.
-		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
-		return
+		return route, fmt.Errorf("saved, but reload failed: %w", err)
 	}
 	if hadRoute {
-		a.auditUpdate(r.Context(), actor, "route.update", "route", route.ID, route.Name, "", old, route)
+		a.auditUpdate(ctx, actor, "route.update", "route", route.ID, route.Name, "", old, route)
 	} else {
-		a.auditEvent(r.Context(), actor, "route.create", "route", route.ID, route.Name, "", "")
+		a.auditEvent(ctx, actor, "route.create", "route", route.ID, route.Name, "", "")
 	}
-	writeJSON(w, http.StatusOK, route)
+	return route, nil
+}
+
+// invalidError marks what the CALLER got wrong, as opposed to what broke. The
+// two answer differently over HTTP (422 against 500) and read differently to
+// an agent ("fix your arguments" against "something is wrong here").
+type invalidError struct{ err error }
+
+func (e invalidError) Error() string { return e.err.Error() }
+func (e invalidError) Unwrap() error { return e.err }
+
+func invalid(format string, args ...any) error { return invalidError{fmt.Errorf(format, args...)} }
+func invalidErr(err error) error               { return invalidError{err} }
+
+func isInvalid(err error) bool {
+	var t invalidError
+	// store.ErrInvalid counts too: the sanitisers live in the store so that
+	// every writer of a route passes through them, and a refusal that crossed
+	// that boundary used to reach the operator as "internal error" while the
+	// sentence naming what is allowed stayed in the log.
+	return errors.As(err, &t) || errors.Is(err, store.ErrInvalid)
 }
 
 // validateRoute compiles the route the ENGINE will run: the stored route with
@@ -261,23 +335,32 @@ func (a *API) validateRoute(ctx context.Context, route store.Route) error {
 }
 
 func (a *API) deleteRoute(w http.ResponseWriter, r *http.Request, actor store.User) {
-	id := r.PathValue("id")
-	route, _ := a.st.GetRoute(r.Context(), id) // capture the name before deletion
-	existed, err := a.st.DeleteRoute(r.Context(), id)
-	if err != nil {
+	switch err := a.dropRoute(r.Context(), actor, r.PathValue("id")); {
+	case err == nil:
+		w.WriteHeader(http.StatusNoContent)
+	case isInvalid(err):
+		writeErr(w, http.StatusNotFound, err.Error())
+	default:
 		a.internal(w, err)
-		return
+	}
+}
+
+// dropRoute removes one route and applies it. Shared with the agent's tool for
+// the same reason saveRoute is.
+func (a *API) dropRoute(ctx context.Context, actor store.User, id string) error {
+	route, _ := a.st.GetRoute(ctx, id) // capture the name before deletion
+	existed, err := a.st.DeleteRoute(ctx, id)
+	if err != nil {
+		return err
 	}
 	if !existed {
-		writeErr(w, http.StatusNotFound, "route not found")
-		return
+		return invalid("route not found")
 	}
-	if err := a.router.Reload(r.Context()); err != nil {
-		a.internal(w, fmt.Errorf("deleted, but reload failed: %w", err))
-		return
+	if err := a.reloadRouting(ctx); err != nil {
+		return fmt.Errorf("deleted, but reload failed: %w", err)
 	}
-	a.auditEvent(r.Context(), actor, "route.delete", "route", id, route.Name, "", "")
-	w.WriteHeader(http.StatusNoContent)
+	a.auditEvent(ctx, actor, "route.delete", "route", id, route.Name, "", "")
+	return nil
 }
 
 func (a *API) internal(w http.ResponseWriter, err error) {

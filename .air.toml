@@ -20,7 +20,12 @@ exclude_dir = ["bin", "data", "dist", "docs", "tmp"]
 exclude_regex = ["_test\\.go"]
 delay = 200            # ms of quiet before rebuilding
 send_interrupt = true  # SIGINT first: the gateway shuts down gracefully
-kill_delay = "2s"
+# Longer than the gateway's own shutdown grace (10s in main.go), so air never
+# force-kills in the middle of one. A killed process can still hold its
+# listeners for an instant, and the rebuild that starts right after then dies
+# on "address already in use" - which looks like air stopped working and is
+# repaired by hand.
+kill_delay = "12s"
 
 [log]
 main_only = true

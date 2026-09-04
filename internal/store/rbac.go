@@ -208,7 +208,7 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 	}
 	for _, rid := range g.RoleIDs {
 		if _, err = tx.ExecContext(ctx,
-			`INSERT OR IGNORE INTO group_roles (group_id, role_id) VALUES (?, ?)`, g.ID, rid); err != nil {
+			`INSERT INTO group_roles (group_id, role_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, g.ID, rid); err != nil {
 			return fmt.Errorf("store: save group %q roles: %w", g.Name, err)
 		}
 	}
@@ -335,7 +335,8 @@ func (s *Store) SetMemberGroups(ctx context.Context, tenantID, userID string, gr
 	}
 	for _, gid := range groupIDs {
 		if _, err = tx.ExecContext(ctx,
-			`INSERT OR IGNORE INTO member_groups (tenant_id, user_id, group_id, source) VALUES (?, ?, ?, '')`,
+			`INSERT INTO member_groups (tenant_id, user_id, group_id, source) VALUES (?, ?, ?, '')
+			 ON CONFLICT DO NOTHING`,
 			tenantID, userID, gid); err != nil {
 			return fmt.Errorf("store: set member groups: %w", err)
 		}
@@ -386,6 +387,26 @@ func (s *Store) SessionRoleNames(ctx context.Context, userID, tenantID, groupID 
 			}
 		}
 		return nil, nil
+	}
+	return s.EffectiveRoleNames(ctx, ids)
+}
+
+// RolesReachableIn returns every role a user could hold in a tenant: the union
+// over all their groups there, whatever the tenant's group mode.
+//
+// It answers a DIFFERENT question from SessionRoleNames, which says what they
+// hold right now - in exclusive mode, nothing at all until a group is chosen.
+// The difference is the whole point when deciding whether switching
+// organisation would lift a refusal, because the group is chosen after the
+// organisation is: asking what she holds there before she has been there
+// answers no every time.
+func (s *Store) RolesReachableIn(ctx context.Context, userID, tenantID string) ([]string, error) {
+	if tenantID == "" || userID == "" {
+		return nil, nil
+	}
+	ids, err := s.MemberGroupIDs(ctx, tenantID, userID)
+	if err != nil || len(ids) == 0 {
+		return nil, err
 	}
 	return s.EffectiveRoleNames(ctx, ids)
 }

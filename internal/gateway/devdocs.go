@@ -14,6 +14,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/admin/apidocs"
 	"github.com/softwarity/meerkat/internal/openapi"
+	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -202,7 +203,7 @@ func (rt *Router) devDocsCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 	if routes, err := rt.st.ListRoutes(r.Context()); err == nil {
 		for _, route := range routes {
-			if route.API == nil || strings.TrimSpace(route.API.OpenapiURL) == "" {
+			if route.Spec().Empty() {
 				continue
 			}
 			out.Specs = append(out.Specs, specEntry{ID: route.ID, Name: route.Name, Disabled: !route.Enabled})
@@ -221,16 +222,23 @@ func (rt *Router) devDocsSpec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	route, err := rt.st.GetRoute(r.Context(), r.PathValue("id"))
-	if err != nil || route.API == nil || strings.TrimSpace(route.API.OpenapiURL) == "" {
+	spec := route.Spec()
+	if err != nil || spec.Empty() {
 		http.NotFound(w, r)
 		return
 	}
-	specURL := strings.TrimSpace(route.API.OpenapiURL)
 	var body []byte
-	if strings.HasPrefix(specURL, "http://") || strings.HasPrefix(specURL, "https://") {
-		body, err = rt.fetchDevSpecDirect(r.Context(), specURL)
-	} else {
-		body, err = rt.fetchDevSpecThroughRoute(r, route, specURL)
+	switch {
+	case spec.Type == store.SpecFile:
+		// Read from the store rather than through the route it is served on:
+		// this page deliberately lists DISABLED routes too, and a disabled
+		// route is not compiled, so asking the router would 404 on exactly
+		// the routes a developer opens to see what is being built.
+		body, err = rt.depositedSpec(r.Context(), route)
+	case strings.HasPrefix(spec.Path, "http://") || strings.HasPrefix(spec.Path, "https://"):
+		body, err = rt.fetchDevSpecDirect(r.Context(), spec.Path)
+	default:
+		body, err = rt.fetchDevSpecThroughRoute(r, route, spec.Path)
 	}
 	if err != nil {
 		http.Error(w, "spec fetch failed: "+err.Error(), http.StatusBadGateway)
@@ -242,6 +250,18 @@ func (rt *Router) devDocsSpec(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	_, _ = w.Write(body)
+}
+
+// depositedSpec returns the file deposited on a route, as JSON.
+func (rt *Router) depositedSpec(ctx context.Context, route store.Route) ([]byte, error) {
+	raw, ok, err := rt.st.RouteSpecContent(ctx, route.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("route %q declares a deposited spec but none was stored", route.Name)
+	}
+	return openapi.Normalize(raw)
 }
 
 func (rt *Router) fetchDevSpecDirect(ctx context.Context, specURL string) ([]byte, error) {
@@ -259,7 +279,11 @@ func (rt *Router) fetchDevSpecDirect(ctx context.Context, specURL string) ([]byt
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("upstream answered %s", res.Status)
 	}
-	return io.ReadAll(io.LimitReader(res.Body, 8<<20))
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 8<<20))
+	if err != nil {
+		return nil, err
+	}
+	return openapi.Normalize(raw)
 }
 
 // fetchDevSpecThroughRoute resolves a relative spec url through the route, in
@@ -286,7 +310,7 @@ func (rt *Router) fetchDevSpecThroughRoute(r *http.Request, route store.Route, r
 	if rec.status != http.StatusOK {
 		return nil, fmt.Errorf("the route answered %d for %s", rec.status, path)
 	}
-	return rec.buf.Bytes(), nil
+	return openapi.Normalize(rec.buf.Bytes())
 }
 
 // devSpecRecorder captures the in-process answer, bounded.
@@ -308,16 +332,7 @@ func (r *devSpecRecorder) Write(p []byte) (int, error) {
 // routeMatchPrefix is the static prefix a client's path must carry to enter
 // the route ("/demo/**" -> "/demo") - where its relative spec lives publicly.
 func routeMatchPrefix(route store.Route) string {
-	for _, p := range route.Predicates {
-		if p.Type != "path" {
-			continue
-		}
-		if patterns := devSpecStrings(p.Args["patterns"]); len(patterns) > 0 {
-			return devStaticPrefix(patterns[0])
-		}
-		break
-	}
-	return ""
+	return routing.MatchPrefix(route.Predicates)
 }
 
 // routeLiteralHost returns the first wildcard-free host the route matches on,
@@ -334,22 +349,6 @@ func routeLiteralHost(route store.Route) string {
 		}
 	}
 	return ""
-}
-
-// devStaticPrefix keeps the pattern's leading literal segments:
-// "/demo/v1/**" -> "/demo/v1", "/{tenant}/api/**" -> "".
-func devStaticPrefix(pattern string) string {
-	var kept []string
-	for _, seg := range strings.Split(strings.Trim(pattern, "/"), "/") {
-		if seg == "" || strings.ContainsAny(seg, "*{") {
-			break
-		}
-		kept = append(kept, seg)
-	}
-	if len(kept) == 0 {
-		return ""
-	}
-	return "/" + strings.Join(kept, "/")
 }
 
 // devSpecStrings coerces a decoded JSON list into its string items.

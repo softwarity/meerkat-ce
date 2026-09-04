@@ -144,6 +144,15 @@ export const routes: Routes = [
           import('./gateway/access-tokens-page.component').then((m) => m.AccessTokensPageComponent),
       },
       {
+        // Connecting an agent (MCP-01/07). Its own section, below the
+        // configuration: "let my assistant work on this gateway" is a
+        // different question from "give me a key for the REST API", and the
+        // OAuth flow answers the first one without producing a key at all.
+        path: 'mcp',
+        canActivate: [rootOnly],
+        loadComponent: () => import('./gateway/mcp-page.component').then((m) => m.McpPageComponent),
+      },
+      {
         // The configuration screen (CFG-02/03/05). Root only: a document
         // crosses both planes at once. Three tabs, and they are child ROUTES so
         // a bookmark on one comes back to it.

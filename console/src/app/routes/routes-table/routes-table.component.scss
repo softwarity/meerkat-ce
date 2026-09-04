@@ -64,8 +64,11 @@ mat-row.clickable:hover {
   cursor: grabbing;
 }
 /* Filtered: the order belongs to the whole list, so there is nothing to drag.
-   The handle says it by going dim and losing its grip cursor - no sentence
-   needed for a control that visibly does not respond. */
+   Dim, and without its grip cursor. That WAS the whole explanation, on the
+   grounds that a control which visibly does not respond needs no sentence -
+   and the first report it produced was "I cannot reorder the routes any more".
+   Dim says something is off; it does not say what, or what to do about it. The
+   handle carries a tooltip now. */
 .handle.idle {
   opacity: 0.3;
   cursor: default;
@@ -100,4 +103,18 @@ mat-row.clickable:hover {
   margin-left: 6px;
   color: var(--mat-sys-on-surface-variant);
   flex: none;
+}
+
+/* Whether the service behind a route ANSWERED - the other half of the dot that
+   says somebody enabled it. Only ever drawn when there is something to say. */
+.trouble {
+  font-size: 17px;
+  width: 17px;
+  height: 17px;
+  margin-left: 6px;
+  color: var(--mat-sys-tertiary);
+  flex: none;
+}
+.trouble.open {
+  color: var(--mat-sys-error);
 }

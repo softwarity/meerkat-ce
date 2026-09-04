@@ -6,6 +6,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // A passkey is a shortcut past the authority that owns a person, not a way
@@ -15,7 +16,7 @@ import (
 
 func revalHandler(t *testing.T) (*Handler, *store.Store) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

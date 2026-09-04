@@ -21,6 +21,35 @@
       }
     },
     {
+      "id": "api-gw-route-spec-deposit",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/routes/no-such-route/spec?filename=orders.yaml",
+        "body": "openapi: 3.0.0",
+        "allowedStatus": [404]
+      },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Deposit an OpenAPI spec on a route", "fr": "Déposer une spec OpenAPI sur une route" },
+      "description": {
+        "en": "A route may hold its contract as a deposited file rather than an upstream url, and the gateway then serves it on the route's own prefix. Depositing belongs to the routing plane: root and infra-admin only, every other profile gets 403. The probe names a route that does not exist, so an allowed caller gets 404 - which proves the barrier without depending on a fixture route.",
+        "fr": "Une route peut porter son contrat sous forme de fichier déposé plutôt que d'URL amont, et la gateway le sert alors sur le préfixe de la route. Le dépôt appartient au plan de routage : root et l'admin gateway seulement, tout autre profil reçoit 403. La sonde nomme une route inexistante, donc un appelant autorisé reçoit 404, ce qui prouve la barrière sans dépendre d'une route de fixture."
+      }
+    },
+    {
+      "id": "api-gw-route-spec-remove",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": { "method": "DELETE", "path": "/api/routes/no-such-route/spec", "allowedStatus": [404] },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Remove a route's deposited spec", "fr": "Retirer la spec déposée d'une route" },
+      "description": {
+        "en": "Removing drops the file AND the declaration that names it, in one move: a route left pointing at a file that is gone is the dangling reference this feature exists to avoid. Same plane and same holders as the deposit.",
+        "fr": "Le retrait supprime le fichier ET la déclaration qui le nomme, d'un seul geste : une route qui pointe vers un fichier absent est justement la référence pendante que cette fonction évite. Même plan et mêmes porteurs que le dépôt."
+      }
+    },
+    {
       "id": "api-gw-version-preview",
       "domain": "gateway",
       "kind": "api",
@@ -280,6 +309,54 @@
       }
     },
     {
+      "id": "api-infra-maintenance",
+      "domain": "infra",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/settings/maintenance" },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Read the maintenance switch", "fr": "Lire le commutateur de maintenance" },
+      "description": {
+        "en": "The switch that closes an installation to its visitors (LIFE-05) answers 503 for every route at once, without a single route being edited. Why it is closed is picked from a translated list rather than typed, because that page is read in twenty languages. Closing every application is an operator's act: only root and infra admins read or flip it, and whoever administers or develops can still go through to check the fix before reopening.",
+        "fr": "Le commutateur qui ferme une installation a ses visiteurs (LIFE-05) repond 503 pour toutes les routes d'un coup, sans qu'une seule route soit modifiee. La raison se choisit dans une liste traduite plutot que de se saisir, parce que cette page se lit en vingt langues. Fermer toutes les applications est un acte d'exploitant : seuls root et les admins infra le lisent ou le basculent, et quiconque administre ou developpe peut passer pour verifier le correctif avant de rouvrir."
+      }
+    },
+    {
+      "id": "api-infra-services",
+      "domain": "infra",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/services" },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "List what the runtime can route to", "fr": "Lister ce vers quoi la gateway peut router" },
+      "description": {
+        "en": "What the runtime says exists beside this gateway (SVC-02), asked when a route is created: an upstream typed by hand is where the typos live, and none of them show up until traffic does. Always available in both editions and with no switch - what gates it is what the deployment grants, a mounted socket or a service account. An installation with no runtime to ask answers WHY rather than failing.",
+        "fr": "Ce que l'execution declare exister a cote de la gateway (SVC-02), demande au moment ou une route est creee : un amont tape a la main est la ou vivent les fautes de frappe, et aucune ne se voit avant le trafic. Toujours disponible dans les deux editions et sans interrupteur - ce qui l'ouvre est ce que le deploiement accorde, un socket monte ou un compte de service. Une installation sans execution a interroger repond POURQUOI plutot que d'echouer."
+      }
+    },
+    {
+      "id": "api-infra-route-health",
+      "domain": "infra",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/routes/health" },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Read which routes are answering", "fr": "Lire quelles routes repondent" },
+      "description": {
+        "en": "The console has always shown what is CONFIGURED and never what WORKS (SVC-04). This reports what the circuit breaker already watches on every answer, per node - so it needs no prober of its own, and it sits on the routing plane's perimeter like the routes it describes.",
+        "fr": "La console a toujours montre ce qui est CONFIGURE et jamais ce qui MARCHE (SVC-04). Ceci rapporte ce que le disjoncteur observe deja sur chaque reponse, noeud par noeud - donc sans sonde propre, et dans le perimetre du plan de routage comme les routes qu'il decrit."
+      }
+    },
+    {
+      "id": "api-infra-proxy-limits",
+      "domain": "infra",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/settings/proxy" },
+      "allowed": ["root", "infra-admin"],
+      "title": { "en": "Read the gateway's own limits", "fr": "Lire les limites propres a la gateway" },
+      "description": {
+        "en": "How much memory the proxy may spend on a body it rewrites (PERF-02) is a property of the INSTALLATION, not of the application it serves - so it lives in the Routes page's Global drawer, with the other things that are true of every route at once, and an application administrator cannot move it.",
+        "fr": "La memoire que le proxy peut depenser pour reecrire un corps (PERF-02) est une propriete de l'INSTALLATION, pas de l'application servie : elle vit donc dans le tiroir Global de la page Routes, avec ce qui est vrai de toutes les routes a la fois, et un administrateur d'application ne peut pas la deplacer."
+      }
+    },
+    {
       "id": "api-infra-issues-setting",
       "domain": "infra",
       "kind": "api",
@@ -335,8 +412,53 @@
       "allowed": ["root"],
       "title": { "en": "List control-plane access tokens", "fr": "Lister les tokens d'accès control-plane" },
       "description": {
-        "en": "Control-plane tokens grant headless access to the admin port (the foundation for a CLI/MCP, planned). Minting and listing them is root-only; the tokens authenticate on the admin plane only, never the data plane.",
-        "fr": "Les tokens control-plane donnent un accès sans navigateur au port d'administration (base d'un CLI/MCP, prévu). Leur création et leur liste sont réservées à root ; ils authentifient sur le plan admin uniquement, jamais le plan data."
+        "en": "Control-plane tokens grant headless access to the admin port: this is what connects an agent (MCP-01). Minting and listing them is root-only; the tokens authenticate on the admin plane only, never the data plane, and each carries a perimeter (readonly or full).",
+        "fr": "Les tokens control-plane donnent un accès sans navigateur au port d'administration : c'est ce qui branche un agent (MCP-01). Leur création et leur liste sont réservées à root ; ils authentifient sur le plan admin uniquement, jamais le plan data, et chacun porte un périmètre (readonly ou full)."
+      }
+    },
+    {
+      "id": "api-gw-agent-endpoint",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": { "method": "GET", "path": "/api/settings/agent" },
+      "allowed": ["root"],
+      "title": { "en": "The agent endpoint's switch", "fr": "L'interrupteur de l'endpoint agent" },
+      "description": {
+        "en": "The MCP endpoint ships OFF (MCP-01) and only root may open it: a control-plane token is required either way, but the door's existence is a decision somebody takes, not something inherited from an upgrade.",
+        "fr": "L'endpoint MCP est livré ÉTEINT (MCP-01) et seul root peut l'ouvrir : un token control-plane reste nécessaire de toute façon, mais l'existence de la porte est une décision que quelqu'un prend, pas un héritage de mise à jour."
+      }
+    },
+    {
+      "id": "api-gw-agent-oauth",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/oauth/authorize?response_type=code&client_id=none&code_challenge=x&code_challenge_method=S256",
+        "allowedStatus": [400]
+      },
+      "allowed": ["root"],
+      "title": { "en": "Approving an agent is a root decision", "fr": "Approuver un agent est une décision root" },
+      "description": {
+        "en": "The consent page (MCP-07) hands an agent the approver's own powers over the whole gateway, so only root reaches it; everyone else is refused before seeing it. Root reaches the handler and 400s on the probe's unknown client, without registering anything.",
+        "fr": "La page de consentement (MCP-07) donne à un agent les pouvoirs de celui qui approuve sur toute la gateway : seul root l'atteint, tout autre profil est refusé avant de la voir. Root atteint le handler et renvoie 400 sur le client inconnu de la sonde, sans rien enregistrer."
+      }
+    },
+    {
+      "id": "api-gw-agent-mcp",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/mcp",
+        "body": { "jsonrpc": "2.0", "id": 1, "method": "tools/list" },
+        "allowedStatus": [404]
+      },
+      "allowed": ["root", "infra-admin", "app-admin", "tenant-admin", "user"],
+      "title": { "en": "Drive the gateway from an agent", "fr": "Piloter le gateway depuis un agent" },
+      "description": {
+        "en": "One endpoint, the Model Context Protocol over Streamable HTTP. It sits behind the same door as the API, and the tools it offers are the caller's own: a signed-in session reaches it, the tools then answer with that person's powers. Off by default, hence the 404 on a fresh installation.",
+        "fr": "Un seul endpoint, le Model Context Protocol en Streamable HTTP. Il est derrière la même porte que l'API, et les outils offerts sont ceux de l'appelant : une session connectée l'atteint, les outils répondent ensuite avec les pouvoirs de cette personne. Éteint par défaut, d'où le 404 sur une installation neuve."
       }
     },
     {

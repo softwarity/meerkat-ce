@@ -5,8 +5,10 @@ Guidance for Claude Code sessions working on this repository.
 ## What this is
 
 **Meerkat** is an app-gateway (Go) with an Angular admin console, by Softwarity.
-The product contract lives in **`requirements.md`** (French) - read it before any
-structural change; every requirement has a stable ID (AUTH-xx, ROUTE-xx...).
+What the product does, and how far each piece is built, lives in **`FEATURES.md`**
+(French) - read it before any structural change. One table, one line per feature, a
+stable ID (AUTH-xx, ROUTE-xx...) that is never reused, and the state read from the code.
+**Shipping something means ticking its box in the same commit.**
 
 **Session handoff**: read **`memory.md`** first (current state, known pitfalls, next
 milestones) and update it before ending a work session that changed the state.
@@ -50,6 +52,10 @@ See "Development" in README.md: `npm start` (console, `ng serve` on :4200)
 - **Commits**: author is the repo owner's git identity (set `user.name`/`user.email`
   locally per repo - the harness may reset the global config). English messages,
   imperative subject.
+- **A new control-plane endpoint answers one question**: can an agent do this? Either add its
+  tool to `admin.tools()` and name it in `agentCovers`, or say in `agentIgnores` why an agent
+  has no business there - and classify it in `readsNothing` or `writesSomething` so a read-only
+  token's perimeter stays true. `internal/admin/mcp_coverage_test.go` refuses silence.
 - **Never commit secrets** - no exceptions (lesson from V1).
 - Validate work by **running it** (the smoke chain: login -> route via data plane ->
   admin API), not only by unit tests.

@@ -16,6 +16,8 @@ import (
 	"sort"
 	"strings"
 
+	yaml "go.yaml.in/yaml/v4"
+
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/orderedmap"
 )
@@ -140,7 +142,75 @@ func Fetch(ctx context.Context, client *http.Client, url string) (*Spec, []byte,
 	if err != nil {
 		return nil, nil, err
 	}
+	// What comes back is JSON, always: the callers that edit it cannot do so
+	// in YAML, and the ones that only read it do not care which it was.
+	body, err = Normalize(body)
+	if err != nil {
+		return nil, nil, err
+	}
 	return spec, body, nil
+}
+
+// Normalize returns a spec as JSON, whatever it was written in.
+//
+// The specification admits exactly two representations, JSON and YAML, and
+// they describe the same object - so this loses nothing a reader needs. What
+// it BUYS is that everything downstream works: Rewrite and InjectSimulation
+// only know how to edit JSON, and a YAML spec used to travel through them
+// untouched, silently costing an upstream that publishes YAML both its
+// retargeting to the gateway and its simulation Authorize.
+//
+// One conversion, one place, for a spec fetched from an upstream and for a
+// deposited file alike. It does not go through libopenapi: its JSON renderer
+// exists for OpenAPI 3 only and refuses Swagger 2.0, while YAML decoded into
+// any re-encodes as JSON for both - including the response codes YAML reads as
+// integers, which come back out as the string keys the format requires.
+func Normalize(raw []byte) ([]byte, error) {
+	if trimmed := strings.TrimLeft(string(raw), " \t\r\n"); strings.HasPrefix(trimmed, "{") {
+		return raw, nil
+	}
+	var doc any
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("openapi: this is neither JSON nor YAML: %w", err)
+	}
+	out, err := json.MarshalIndent(stringKeys(doc), "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("openapi: converting the YAML spec to JSON: %w", err)
+	}
+	return out, nil
+}
+
+// stringKeys makes the mapping keys strings, which is what JSON has and YAML
+// does not: `200:` in a responses block is an INTEGER key, and json.Marshal
+// refuses a map that is not keyed by a string.
+//
+// Doing it here rather than trusting the decoder, because the decoder is not
+// something to trust with this. The same version of the same YAML library
+// returned map[string]any under one Go release and map[any]any under the one
+// before it, and the difference only showed up on a build machine: every test
+// was green on a workstation a minor version ahead. Whether a customer's
+// specification loads must not depend on which toolchain compiled the gateway.
+func stringKeys(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, val := range t {
+			t[k] = stringKeys(val)
+		}
+		return t
+	case map[any]any:
+		out := make(map[string]any, len(t))
+		for k, val := range t {
+			out[fmt.Sprint(k)] = stringKeys(val)
+		}
+		return out
+	case []any:
+		for i, val := range t {
+			t[i] = stringKeys(val)
+		}
+		return t
+	default:
+		return v
+	}
 }
 
 // Rewrite adjusts a raw spec so a swagger-ui served BEHIND the gateway calls

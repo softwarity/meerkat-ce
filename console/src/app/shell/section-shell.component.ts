@@ -44,6 +44,10 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
         icon: 'import_export',
         roles: 'root',
       },
+      // Below the configuration, and on its own: connecting an assistant is
+      // not the same act as minting a key, and the flow that does it produces
+      // no key at all.
+      { path: 'mcp', label: $localize`:@@MCP:MCP`, icon: 'smart_toy', roles: 'root' },
     ],
   },
   application: {

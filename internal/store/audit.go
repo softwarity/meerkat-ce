@@ -47,6 +47,10 @@ type AuditEvent struct {
 	// ActorID survives the actor's deletion (no FK); ActorName is joined on read.
 	ActorID   string `json:"actorId"`
 	ActorName string `json:"actorName,omitempty"`
+	// ActorToken names the control-plane token that acted, when one did
+	// (MCP-03). An agent holds a token minted on somebody's account, so the
+	// account alone would read as if that person had done it by hand.
+	ActorToken string `json:"actorToken,omitempty"`
 	// Action is a dotted verb: "tenant.update", "member.remove", "settings.update"...
 	Action string `json:"action"`
 	// Target is the object kind ("tenant", "user", "membership", "role",
@@ -113,9 +117,9 @@ func (s *Store) AddAuditEvent(ctx context.Context, ev AuditEvent) error {
 		changes = string(b)
 	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO audit_events (id, at, actor_id, action, target, target_id, target_name, tenant_id, changes, detail)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		ev.ID, ev.At, ev.ActorID, ev.Action, ev.Target, ev.TargetID, ev.TargetName, ev.TenantID, changes, ev.Detail)
+		`INSERT INTO audit_events (id, at, actor_id, actor_token, action, target, target_id, target_name, tenant_id, changes, detail)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		ev.ID, ev.At, ev.ActorID, ev.ActorToken, ev.Action, ev.Target, ev.TargetID, ev.TargetName, ev.TenantID, changes, ev.Detail)
 	if err != nil {
 		return fmt.Errorf("store: add audit event %q: %w", ev.Action, err)
 	}
@@ -174,7 +178,7 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 	if limit <= 0 {
 		limit = 200
 	}
-	q := `SELECT e.id, e.at, e.actor_id, COALESCE(u.username, ''), e.action, e.target,
+	q := `SELECT e.id, e.at, e.actor_id, COALESCE(u.username, ''), e.actor_token, e.action, e.target,
 	             e.target_id, e.target_name, e.tenant_id, e.changes, e.detail
 	      FROM audit_events e
 	      LEFT JOIN users u ON u.id = e.actor_id`
@@ -197,7 +201,7 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 	for rows.Next() {
 		var ev AuditEvent
 		var changes string
-		if err := rows.Scan(&ev.ID, &ev.At, &ev.ActorID, &ev.ActorName, &ev.Action, &ev.Target,
+		if err := rows.Scan(&ev.ID, &ev.At, &ev.ActorID, &ev.ActorName, &ev.ActorToken, &ev.Action, &ev.Target,
 			&ev.TargetID, &ev.TargetName, &ev.TenantID, &changes, &ev.Detail); err != nil {
 			return nil, fmt.Errorf("store: scan audit event: %w", err)
 		}

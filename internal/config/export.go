@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -45,6 +44,15 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		trimRoute(&routes[i])
 	}
 	doc.Routes = routes
+	// The deposited specs. An upstream spec has nothing to carry - the url
+	// alone re-fetches it - but a deposited file has no other home than this
+	// gateway, so an export that dropped it would produce an import whose
+	// per-endpoint policies point at operations nothing can list any more.
+	if specs, err := st.RouteSpecContents(ctx); err == nil && len(specs) > 0 {
+		doc.Specs = specs
+	} else if err != nil {
+		return nil, nil, err
+	}
 
 	roles, err := st.ListRoles(ctx)
 	if err != nil {
@@ -152,7 +160,7 @@ func trimRoute(r *store.Route) {
 			}
 		}
 	}
-	if r.API != nil && strings.TrimSpace(r.API.OpenapiURL) == "" && r.API.Security == nil {
+	if r.API != nil && r.Spec().Empty() && r.API.Security == nil {
 		r.API = nil
 	}
 }

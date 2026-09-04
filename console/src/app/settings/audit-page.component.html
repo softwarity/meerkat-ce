@@ -50,6 +50,15 @@
             <div class="action">{{ e.action }}</div>
             <div class="who">
               <ng-container i18n="@@by">by</ng-container> {{ e.actorName || e.actorId || '?' }}
+              @if (e.actorToken) {
+                <!-- An agent or a script acted with this person's token. Naming
+                     it is the difference between "root did this" and "the agent
+                     root handed a token to did this". -->
+                <span class="token" i18n-matTooltip="@@Acted_through_a_control_plane_token"
+                      matTooltip="Acted through a control-plane token">
+                  <mat-icon>smart_toy</mat-icon>{{ e.actorToken }}
+                </span>
+              }
             </div>
           </div>
           <div>

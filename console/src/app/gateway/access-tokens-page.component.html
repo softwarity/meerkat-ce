@@ -8,11 +8,11 @@
 
 <div class="content">
   <div class="planned">
-    <mat-icon>smart_toy</mat-icon>
-    <span i18n="@@Access_tokens_planned">
-      Control-plane tokens grant browserless access to the admin port with your powers. They are
-      the foundation for a Meerkat CLI and MCP server, which let an AI or a script manage the
-      gateway. That tooling is planned; the tokens work today for your own automation.
+    <mat-icon>key</mat-icon>
+    <span i18n="@@Access_tokens_rest">
+      Control-plane tokens open the admin REST API without a browser, for a script or a pipeline. A
+      token acts with your own powers, narrowed by its perimeter. To connect an assistant, use the
+      MCP section instead: it needs no token at all.
     </span>
   </div>
 
@@ -27,7 +27,26 @@
           <mat-icon>delete</mat-icon>
         </button>
         <span class="meta">
-          <code class="prefix">{{ t.prefix }}...</code>
+          <span class="scope" [class.ro]="t.scope === 'readonly'">
+            @if (t.scope === 'readonly') {
+              <ng-container i18n="@@Read_only">Read only</ng-container>
+            } @else {
+              <ng-container i18n="@@Full_access">Full access</ng-container>
+            }
+          </span>
+          @if (t.domain) {
+            <span class="scope domain">
+              @if (t.domain === 'gateway') {
+                <ng-container i18n="@@The_routing_plane">The routing plane</ng-container>
+              } @else {
+                <ng-container i18n="@@The_applications_identity">The application's identity</ng-container>
+              }
+            </span>
+          }
+          @if (t.fromCidrs) {
+            <span class="scope domain"><code>{{ t.fromCidrs }}</code></span>
+          }
+          &nbsp;-&nbsp;<code class="prefix">{{ t.prefix }}...</code>
           &nbsp;-&nbsp;<ng-container i18n="@@Created_on">Created on</ng-container> {{ day(t.createdAt) }}
           &nbsp;-&nbsp;{{ expiryLabel(t.expiresAt) }}
           &nbsp;-&nbsp;{{ lastUsedLabel(t.lastUsedAt) }}

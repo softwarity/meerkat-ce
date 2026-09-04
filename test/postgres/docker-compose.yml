@@ -1,0 +1,32 @@
+# The other database, on a laptop.
+#
+# Meerkat ships on the embedded database and always will; PostgreSQL is what
+# several gateways serving one installation share (STORE-03). The whole suite
+# runs on either - see internal/store/dbtest - so this is only here to make
+# the second pass one command instead of a paragraph.
+#
+#   make pg-up      start it
+#   make test-pg    run the whole suite against it
+#   make pg-down    stop and forget
+#
+# Port 55432, not 5432: a developer's machine often has a PostgreSQL of its
+# own, and taking its port to run a test suite is not a trade anyone agreed to.
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: meerkat-postgres
+    environment:
+      POSTGRES_USER: meerkat
+      POSTGRES_PASSWORD: meerkat
+      POSTGRES_DB: meerkat
+    ports:
+      - "55432:5432"
+    # No volume, deliberately: every test creates its own schema and drops
+    # it, so the data lives in the container's own layer and `pg-down` is the
+    # end of it. (No tmpfs either - postgres:18 moved its data directory, and
+    # mounting the old path is how the container refuses to start.)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meerkat"]
+      interval: 3s
+      timeout: 3s
+      retries: 20

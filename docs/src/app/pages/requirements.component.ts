@@ -8,12 +8,11 @@ import { Component } from '@angular/core';
     <h2>Requirements</h2>
 
     <p>
-      The product is specified before it is built: the full requirements document —
-      functional and non-functional, with every structural decision recorded — lives in the
-      repository as
-      <a href="https://github.com/softwarity/meerkat/blob/main/requirements.md" target="_blank"
-        rel="noopener"><code>requirements.md</code></a>
-      (currently maintained in French). The highlights:
+      What the gateway does, and how far each piece is built, is one table in the repository:
+      <a href="https://github.com/softwarity/meerkat/blob/main/FEATURES.md" target="_blank"
+        rel="noopener"><code>FEATURES.md</code></a>
+      (maintained in French) — one line per feature, its state read from the code, and the
+      edition that carries it. The highlights:
     </p>
 
     <table>

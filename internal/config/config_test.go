@@ -11,12 +11,13 @@ import (
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 	"github.com/softwarity/meerkat/internal/vault"
 )
 
 func openTemp(t *testing.T) *store.Store {
 	t.Helper()
-	s, err := store.Open(t.TempDir())
+	s, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

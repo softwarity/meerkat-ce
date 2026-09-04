@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION=1.26
+ARG GO_VERSION=1.27
 ARG NODE_VERSION=24
 # The plug client this image hands out, and which edition carries it. Declared
 # here because a FROM can only read an ARG from the global scope.

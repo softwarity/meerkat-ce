@@ -14,6 +14,7 @@ import (
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The developer docs: the dev capability is the gate; every route
@@ -34,7 +35,7 @@ func TestDevDocs(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,10 +75,10 @@ func TestDevDocs(t *testing.T) {
 			Access:     store.Access{Roles: []string{"auditor"}},
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/pets/**"}}}},
 			Filters:    []routing.Spec{{Type: "strip-prefix", Args: map[string]any{"parts": float64(1)}}},
-			API:        &store.RouteAPI{OpenapiURL: "/openapi.json"}},
+			API:        &store.RouteAPI{Spec: &store.RouteSpec{Type: store.SpecUpstream, Path: "/openapi.json"}}},
 		{ID: "wip", Name: "wip", Enabled: false, Upstream: upstream.URL,
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/wip/**"}}}},
-			API:        &store.RouteAPI{OpenapiURL: "/openapi.json"}},
+			API:        &store.RouteAPI{Spec: &store.RouteSpec{Type: store.SpecUpstream, Path: "/openapi.json"}}},
 		{ID: "bare", Name: "bare", Enabled: true, Upstream: upstream.URL,
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/bare/**"}}}}},
 	} {

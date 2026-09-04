@@ -10,6 +10,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The installation-wide developer switch (DEV-01). The capability says WHO may
@@ -28,7 +29,7 @@ func TestDeveloperModeClosesEveryDoor(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // What is served reaches every open page, developer or not: an override
@@ -98,7 +99,7 @@ func TestWithoutAnAgentTheTunnelExplainsItself(t *testing.T) {
 // the gateway without the tunnel. Distinct from the usual case, where a port
 // IS named and the tunnel decides for itself whether it can do the job.
 func TestAnEmptyAddressTurnsTheTunnelOff(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +128,7 @@ func TestTheTunnelIsAskedBeforeItIsAnnounced(t *testing.T) {
 	pollEvery = 50 * time.Millisecond
 	t.Cleanup(func() { hooks, pollEvery = saved, savedPoll })
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

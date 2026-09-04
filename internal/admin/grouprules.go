@@ -14,7 +14,7 @@ import (
 // writes it. An infra admin configures the authority; they do not decide who
 // it lets into whose organisation.
 
-func (a *API) registerGroupRules(mux *http.ServeMux) {
+func (a *API) registerGroupRules(mux Mux) {
 	mux.Handle("GET /api/tenants/{id}/group-rules", a.tenantScoped(a.listGroupRules))
 	mux.Handle("POST /api/tenants/{id}/group-rules", a.tenantScoped(a.createGroupRule))
 	mux.Handle("PUT /api/tenants/{id}/group-rules/{ruleId}", a.tenantScoped(a.updateGroupRule))

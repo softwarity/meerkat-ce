@@ -35,12 +35,12 @@ func (a *API) authed(next userHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess, err := a.sm.Resolve(r.Context(), r)
 		if err != nil {
-			writeErr(w, http.StatusUnauthorized, "authentication required")
+			a.unauthorized(w, r, "authentication required")
 			return
 		}
 		if sess.Pending != "" {
 			// AUTH-05: the login flow is not complete - nothing else answers.
-			writeErr(w, http.StatusUnauthorized, "login flow incomplete: finish the "+sess.Pending+" step first")
+			a.unauthorized(w, r, "login flow incomplete: finish the "+sess.Pending+" step first")
 			return
 		}
 		actor, err := a.st.GetUserByID(r.Context(), sess.UserID)
@@ -48,6 +48,20 @@ func (a *API) authed(next userHandler) http.Handler {
 			writeErr(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
+		// The token's perimeter, checked once for the whole control plane
+		// (MCP-02). It only ever takes away: a full token changes nothing to
+		// what its owner may do, and a browser session carries no perimeter
+		// at all.
+		if sess.TokenScope == store.ScopeReadOnly && !readsOnly(r) {
+			writeErr(w, http.StatusForbidden,
+				"this token is read-only: it may read the gateway and run the testers, not change anything")
+			return
+		}
+		// From here on, the audit knows WHICH token acted (MCP-03), and the
+		// actor is narrowed to the token's domain: what follows sees a user
+		// who simply does not hold what the token gave up.
+		r = r.WithContext(withActorToken(r.Context(), sess))
+		actor = narrowTo(actor, sess.TokenDomain)
 		// Every write goes through here, which is the only reason the tape can
 		// be complete: an endpoint added next month is recorded without anyone
 		// remembering to record it.
@@ -72,6 +86,18 @@ func (w *statusWriter) WriteHeader(code int) {
 // Unwrap keeps http.ResponseController working (flush, hijack) for the handlers
 // that stream - the console's log tail among them.
 func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// unauthorized answers a 401, and the agent endpoint owes more than the rest:
+// a bare refusal leaves a client with nothing to discover, while this one
+// names where to go and authorise (RFC 9728). That header is the whole
+// difference between "paste a token in a file" and "a browser opens".
+func (a *API) unauthorized(w http.ResponseWriter, r *http.Request, detail string) {
+	if r.Pattern == "/mcp" {
+		w.Header().Set("WWW-Authenticate",
+			`Bearer resource_metadata="`+originOf(r)+`/.well-known/oauth-protected-resource"`)
+	}
+	writeErr(w, http.StatusUnauthorized, detail)
+}
 
 // rootOnly restricts a handler to root users.
 func (a *API) rootOnly(next userHandler) http.Handler {
@@ -124,6 +150,12 @@ func (a *API) tenantScoped(next userHandler) http.Handler {
 // administersTenant reports whether the user administers the tenant: its OWNER
 // (owner_id, member or not) or an enabled ADMIN member. Root bypasses this.
 func (a *API) administersTenant(ctx context.Context, userID, tenantID string) bool {
+	// A token confined to the routing plane administers no organisation: the
+	// capability booleans are masked, but tenant administration is a
+	// membership and would survive the mask.
+	if tokenDomain(ctx) == store.DomainGateway {
+		return false
+	}
 	if t, err := a.st.GetTenant(ctx, tenantID); err == nil && t.OwnerID == userID {
 		return true
 	}
@@ -132,7 +164,7 @@ func (a *API) administersTenant(ctx context.Context, userID, tenantID string) bo
 }
 
 // registerIdentity mounts the identity endpoints on mux.
-func (a *API) registerIdentity(mux *http.ServeMux) {
+func (a *API) registerIdentity(mux Mux) {
 	mux.Handle("GET /api/me", a.authed(a.me))
 
 	// Users are the APPLICATION's identity (RBAC-05): app-admin scope. Granting
@@ -1196,7 +1228,7 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	// The default route lives in the data plane's snapshot - apply on save.
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
 		return
 	}

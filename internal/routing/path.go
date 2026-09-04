@@ -42,24 +42,43 @@ func compilePathPattern(raw string) (pathPattern, error) {
 	return p, nil
 }
 
+// match walks the path segment by segment WITHOUT cutting it into a slice.
+//
+// This runs once per route on every request, and splitPath allocates. On a
+// table of two hundred routes that was two hundred slices built from the same
+// string to answer the same question, and a profile of route selection put
+// 82% of everything it allocated in strings.Split. The walk below is the same
+// comparison with an index instead of a slice: same segment boundaries, same
+// treatment of an empty segment, nothing on the heap.
 func (p pathPattern) match(path string) bool {
-	segs := splitPath(path)
-	if p.tail {
-		if len(segs) < len(p.segments) {
+	rest := strings.TrimSuffix(strings.TrimPrefix(path, "/"), "/")
+	if rest == "" {
+		// No segments at all: only a pattern that wants none can take it,
+		// tail or no tail - "/api/**" does not match "/".
+		return len(p.segments) == 0
+	}
+	// `more` and not `rest != ""`: a rest of "/" still holds ONE segment, an
+	// empty one, and "///" against "/{x}" is where the difference shows. The
+	// slice this replaces counted that segment, so this has to as well.
+	more := true
+	for _, want := range p.segments {
+		if !more {
+			return false // the path ran out before the pattern did
+		}
+		var seg string
+		if i := strings.IndexByte(rest, '/'); i >= 0 {
+			seg, rest = rest[:i], rest[i+1:]
+		} else {
+			seg, rest, more = rest, "", false
+		}
+		// A variable segment takes whatever is there, including an empty one:
+		// splitPath yields one for "//", and the two must agree.
+		if !strings.HasPrefix(want, "{") && seg != want {
 			return false
 		}
-	} else if len(segs) != len(p.segments) {
-		return false
 	}
-	for i, want := range p.segments {
-		if strings.HasPrefix(want, "{") {
-			continue // variable segment: any single segment matches
-		}
-		if segs[i] != want {
-			return false
-		}
-	}
-	return true
+	// The pattern is satisfied. Without a tail the path has to end here too.
+	return p.tail || !more
 }
 
 // splitPath cuts a path into segments, ignoring a single trailing slash
@@ -156,4 +175,34 @@ func allStrings(args map[string]any, key string) []string {
 		return out
 	}
 	return nil
+}
+
+// MatchPrefix is the static head a client's path must carry to enter a route
+// ("/demo/**" -> "/demo"): the first path predicate's first pattern, cut at the
+// first segment that matches more than itself. It is where a route's own
+// documents live publicly - the spec it serves, and the base its operations
+// are reachable from - so the gateway and the console must compute it the same
+// way, from here.
+func MatchPrefix(specs []Spec) string {
+	for _, spec := range specs {
+		if spec.Type != "path" {
+			continue
+		}
+		patterns := allStrings(spec.Args, "patterns")
+		if len(patterns) == 0 {
+			break
+		}
+		var kept []string
+		for _, seg := range splitPath(patterns[0]) {
+			if strings.ContainsAny(seg, "*{") {
+				break
+			}
+			kept = append(kept, seg)
+		}
+		if len(kept) == 0 {
+			return ""
+		}
+		return "/" + strings.Join(kept, "/")
+	}
+	return ""
 }

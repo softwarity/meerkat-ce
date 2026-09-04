@@ -12,6 +12,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The language menu writes the choice on the ACCOUNT, not only in a cookie
@@ -75,7 +76,7 @@ func TestPickedLocaleLandsOnTheAccount(t *testing.T) {
 // from what they chose, wherever they chose it.
 func TestSignInCarriesTheChosenLanguage(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

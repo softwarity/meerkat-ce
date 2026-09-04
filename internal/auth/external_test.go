@@ -11,6 +11,7 @@ import (
 	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The rule this whole feature exists for: an authority proves WHO someone is,
@@ -20,7 +21,7 @@ import (
 
 func externalFixture(t *testing.T) (*Handler, *store.Store) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

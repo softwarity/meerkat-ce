@@ -1,5 +1,20 @@
 version: 2
 
+# NOT read here, and the name is why: Dependabot looks for
+# `.github/dependabot.yml` and nothing else. This file is mirror-ce's, which
+# renames it into place on the public tree - so the community repository runs
+# the updates and this one runs none.
+#
+# The setting in the repository's own options was not enough. It stops the
+# pull requests; it does not stop the "Dependabot Updates" job, which fires on
+# every push that touches a manifest, and on a PRIVATE repository those minutes
+# are billed. Absence is the only switch that cannot be left half-on.
+#
+# Why the public side and not this one: the community tree is what the outside
+# world clones, and it is the one whose minutes are free. A bump lands there,
+# is mirrored back by hand into this tree, and is tested here by CI like any
+# other change.
+
 # Grouped on purpose. Ungrouped, Dependabot opens one pull request per
 # dependency: three were open at once for three actions, each rerunning the
 # whole pipeline to move a version number. What matters is that the update

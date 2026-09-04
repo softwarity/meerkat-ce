@@ -11,6 +11,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -18,7 +19,7 @@ import (
 // stamped with the SESSION's identity (never the body's), bounded, and the
 // user-button payload carries the feature flag.
 func TestIssueReports(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

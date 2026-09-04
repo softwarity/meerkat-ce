@@ -9,11 +9,36 @@ export interface Spec {
   args?: Record<string, unknown>;
 }
 
+// Where a route's OpenAPI spec comes from (SVC-06). Two sources, one at a
+// time, and the difference is LIVING or FROZEN: an upstream spec is re-read on
+// every screen that needs it, a deposited file moves only when someone
+// deposits a new one. For a file, path is the single segment the gateway
+// serves it under inside the route's own prefix, and filename is where it came
+// from - the name it takes inside an exported package.
+export interface RouteSpecSource {
+  type: 'upstream' | 'file';
+  path: string;
+  filename?: string;
+}
+
 // API-route options (ROUTE-02): the OpenAPI spec this route exposes, and the
 // per-endpoint access control (RBAC-07) posed on that spec's operations.
 export interface RouteAPIOptions {
-  openapiUrl?: string;
+  spec?: RouteSpecSource;
   security?: EndpointSecurity;
+}
+
+// What comes back from depositing a file: what the spec turned out to be,
+// where it is served now, and whether the upstream already answers there.
+export interface SpecDeposit {
+  title?: string;
+  version?: string;
+  format: string;
+  operations: number;
+  path: string;
+  url: string;
+  filename: string;
+  shadows?: number;
 }
 
 // A unified access rule (RBAC-06/07), used as a route-wide default and as a
@@ -343,6 +368,28 @@ export interface Route {
   ui?: RouteUIOptions;
   identity?: IdentityForward;
   locales?: LocalesConfig;
+  // How long this upstream may take (ROUTE-07), as ISO-8601 durations chosen
+  // from a list. Absent means the installation's defaults.
+  timeouts?: { connect?: string; response?: string };
+  // When to stop calling an upstream that stopped answering (ROUTE-09). Off
+  // unless somebody turned it on.
+  breaker?: { enabled?: boolean; trip?: number; cool?: string };
+}
+
+// Whether a route is actually answering (SVC-04), as the gateway knows it -
+// from watching real answers, not from a prober of its own. Per node: it is
+// the gateway that was asked which replies.
+export interface RouteHealth {
+  state: 'closed' | 'open' | 'probe';
+  // Whether a breaker is armed. A route with none can still be failing, and
+  // showing the same thing for "healthy" and "nobody is watching" would be
+  // worse than showing nothing.
+  armed: boolean;
+  failures?: number;
+  lastStatus?: number;
+  lastError?: string;
+  lastAt?: number;
+  lastOkAt?: number;
 }
 
 export interface Param {
@@ -664,6 +711,10 @@ export interface AuditEvent {
   at: number;
   actorId: string;
   actorName?: string;
+  // The control-plane token that acted, when one did (MCP-03): an agent holds
+  // a token minted on somebody's account, so the account alone would read as
+  // if that person had done it by hand.
+  actorToken?: string;
   action: string;
   target: string;
   targetId?: string;
@@ -727,10 +778,32 @@ export interface Issue {
 }
 
 // A control-plane API token as listed (never carries the secret out).
+// A control-plane token's perimeter (MCP-02). It can only ever TAKE AWAY: the
+// token acts with its owner's capabilities, and "readonly" rogne them. This is
+// what makes handing one to an agent survivable, and it is checked on the
+// server for the whole control plane - the REST API and the agent endpoint
+// alike, since the same token opens both.
+export type TokenScope = 'readonly' | 'full';
+
+// The second axis: what a token may act ON. It MASKS its owner's capabilities
+// rather than adding a rights model of its own - a gateway token minted by
+// root runs the routing plane and nothing else, root-only screens included.
+export type TokenDomain = '' | 'gateway' | 'app';
+
 export interface AdminToken {
   id: string;
   name: string;
   prefix: string;
+  scope: TokenScope;
+  domain: TokenDomain;
+  // Comma-separated CIDR ranges, empty for anywhere. Judged on the TCP peer,
+  // so it only means something when agents reach the port directly.
+  fromCidrs?: string;
+  // The registered agent this token was issued to (MCP-07), empty for one
+  // minted by hand. A token with one is a CONNECTION, listed and cut off under
+  // MCP rather than here.
+  clientId?: string;
+  clientName?: string;
   enabled: boolean;
   createdAt: number;
   expiresAt: number; // 0 = never
@@ -743,6 +816,9 @@ export interface AdminTokenCreated {
   name: string;
   prefix: string;
   token: string; // mk_... shown once
+  scope: TokenScope;
+  domain: TokenDomain;
+  fromCidrs?: string;
   expiresAt: number;
 }
 
@@ -947,6 +1023,75 @@ export interface MailOAuth2 {
   scope?: string;
 }
 
+// The gateway's own bounds while it proxies (PERF-02). One number today, and
+// an object anyway - the next bound belongs beside this one.
+// What the runtime says exists beside this gateway (SVC-02), asked at the
+// moment a route is created: an upstream typed by hand is where the typos
+// live, and none of them show up until traffic does.
+export interface DiscoveredService {
+  // The identity: the full service name.
+  name: string;
+  // What actually RESOLVES to it from inside the network, best first - a
+  // stack service answers to its short alias ("mongodb") as well as its full
+  // name ("neo_mongodb"), and the short one is what people write.
+  names?: string[];
+  ports?: { target: number; published?: number }[];
+  networks?: string[];
+  // The DECLARED state: running against asked for. Zero of zero is a service
+  // deliberately stopped, which is not the same as a broken one.
+  ready: number;
+  wanted: number;
+  // False only when this gateway's own networks are KNOWN and the service
+  // shares none of them: then NO name resolves from here, short or full.
+  reachable?: boolean;
+  suggested?: string;
+}
+
+export interface Discovery {
+  source: string;
+  services: DiscoveredService[];
+  // The networks this gateway is on, when it could find out - which is what
+  // decides reachability, a stack boundary not being one. Empty means it
+  // could not: the list is then the cluster's inventory, not what this
+  // gateway can reach.
+  reach?: string[];
+  // Why nothing answered, naming what would make it work. Empty when it did.
+  unavailable?: string;
+}
+
+export interface ProxyLimits {
+  // MiB a body-rewriting filter may hold in memory. A bigger answer is
+  // forwarded untouched.
+  bodyRewriteMiB: number;
+  // What every route waits unless it says otherwise (ROUTE-07). An
+  // installation's numbers: what counts as a slow service depends on the
+  // network it sits on, which no constant in a binary can know.
+  timeouts?: { connect?: string; response?: string };
+}
+
+// The switch that closes an installation to its visitors (LIFE-05).
+//
+// The reason is a KEY from a closed list, never free text: the unavailable
+// page is read in twenty languages, and a sentence typed here would be one of
+// them. `until` is optional - zero means "we are not saying when", which the
+// page reads as soon. `since` is stamped by the server when it goes on and
+// kept while it stays on: changing the reason does not restart the clock,
+// because the question the console has to be able to ask is "how long has this
+// been on".
+export type UnavailableReason = '' | 'maintenance' | 'upgrade' | 'incident';
+
+export interface Maintenance {
+  enabled: boolean;
+  reason?: UnavailableReason;
+  // How long it should take, as an ISO-8601 duration chosen from a list
+  // (PT1H, PT4H, P1D...). The server turns it into `until` and hands both
+  // back: this one is what was decided and is shown again unchanged, that one
+  // is when it lands.
+  for?: string;
+  until?: number;
+  since?: number;
+}
+
 export interface MailRelay {
   host: string;
   port: number;
@@ -1080,6 +1225,8 @@ export interface Background {
   dim?: number;
 }
 
+export type LogoSize = '' | 'large' | 'xlarge';
+
 export interface Branding {
   // Removes the "powered by Meerkat" line from the served pages. A choice the
   // white-label feature grants the right to make - the server refuses it
@@ -1088,6 +1235,9 @@ export interface Branding {
   appName: string;
   tagline: string;
   logo: string;
+  // How big the logo is drawn on the built-in pages. Empty is the normal
+  // 56px box; a wide wordmark needs more room than a square mark does.
+  logoSize?: LogoSize;
   // The browser-tab icon. Empty means "use the logo", which is what the
   // gateway serves on /meerkat/favicon.
   favicon?: string;
@@ -1161,6 +1311,23 @@ export class ApiService {
     return this.http.get<RouteOperations>(`/api/routes/${encodeURIComponent(id)}/operations`);
   }
 
+  // Deposits a spec file on a route (SVC-06). The body is the file itself,
+  // JSON or YAML - the two forms the specification admits - and the server
+  // parses it before storing anything: what is not a spec is refused here
+  // rather than found later in an empty swagger. The deposit switches the
+  // route to that file in the same move.
+  depositRouteSpec(id: string, file: File, path: string): Observable<SpecDeposit> {
+    const params = new HttpParams().set('filename', file.name).set('path', path);
+    return this.http.put<SpecDeposit>(`/api/routes/${encodeURIComponent(id)}/spec`, file, { params });
+  }
+
+  // Drops the deposited file AND the declaration naming it: a route left
+  // pointing at a file that is gone is the dangling reference this feature is
+  // built to avoid.
+  deleteRouteSpec(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/routes/${encodeURIComponent(id)}/spec`);
+  }
+
   // Saves the route's base Access ("whole route") plus the per-operation
   // overrides. No override and an empty Access clears security entirely.
   saveRouteSecurity(id: string, security: RouteSecurity): Observable<RouteSecurity> {
@@ -1218,6 +1385,36 @@ export class ApiService {
 
   saveIssuesSetting(enabled: boolean): Observable<{ enabled: boolean }> {
     return this.http.put<{ enabled: boolean }>('/api/settings/issues', { enabled });
+  }
+
+  // What bounds the gateway's own appetite while it proxies (PERF-02). Its own
+  // endpoint under the infra perimeter rather than a field of the application
+  // settings: deciding how much memory the proxy may spend is not an
+  // application administrator's call.
+  // What the runtime can route to (SVC-02).
+  services(): Observable<Discovery> {
+    return this.http.get<Discovery>('/api/services');
+  }
+
+  // Which routes are answering (SVC-04). Keyed by route id.
+  routeHealth(): Observable<Record<string, RouteHealth>> {
+    return this.http.get<Record<string, RouteHealth>>('/api/routes/health');
+  }
+
+  proxyLimits(): Observable<ProxyLimits> {
+    return this.http.get<ProxyLimits>('/api/settings/proxy');
+  }
+
+  saveProxyLimits(limits: ProxyLimits): Observable<ProxyLimits> {
+    return this.http.put<ProxyLimits>('/api/settings/proxy', limits);
+  }
+
+  maintenance(): Observable<Maintenance> {
+    return this.http.get<Maintenance>('/api/settings/maintenance');
+  }
+
+  saveMaintenance(m: Maintenance): Observable<Maintenance> {
+    return this.http.put<Maintenance>('/api/settings/maintenance', m);
   }
 
   // Issue reports (ISSUE-03), scoped server-side: root and infra/app admins
@@ -1744,12 +1941,28 @@ export class ApiService {
   // Control-plane API tokens (root-only): headless access to the admin port,
   // the foundation for a future CLI or MCP server. The clear token is returned
   // exactly once, on creation.
+  // The agent endpoint's switch (MCP-01), root only. It ships off: a token is
+  // required either way, so this says the door exists at all.
+  getAgentEndpoint(): Observable<{ enabled: boolean }> {
+    return this.http.get<{ enabled: boolean }>('/api/settings/agent');
+  }
+
+  setAgentEndpoint(enabled: boolean): Observable<{ enabled: boolean }> {
+    return this.http.put<{ enabled: boolean }>('/api/settings/agent', { enabled });
+  }
+
   listAdminTokens(): Observable<AdminToken[]> {
     return this.http.get<AdminToken[]>('/api/admin-tokens');
   }
 
-  createAdminToken(name: string, days: number): Observable<AdminTokenCreated> {
-    return this.http.post<AdminTokenCreated>('/api/admin-tokens', { name, days });
+  createAdminToken(
+    name: string,
+    days: number,
+    scope: TokenScope,
+    domain: TokenDomain,
+    from: string,
+  ): Observable<AdminTokenCreated> {
+    return this.http.post<AdminTokenCreated>('/api/admin-tokens', { name, days, scope, domain, from });
   }
 
   toggleAdminToken(id: string, enabled: boolean): Observable<void> {

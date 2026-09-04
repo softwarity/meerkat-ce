@@ -26,7 +26,7 @@ import (
 // an import of that copy, with the same preview, the same vault holes and the
 // same reload as any other.
 
-func (a *API) registerConfigurations(mux *http.ServeMux) {
+func (a *API) registerConfigurations(mux Mux) {
 	mux.Handle("GET /api/configurations", a.rootOnly(a.listConfigurations))
 	mux.Handle("POST /api/configurations", a.rootOnly(a.captureConfiguration))
 	mux.Handle("POST /api/configurations/import", a.rootOnly(a.storeConfigurationFile))
@@ -449,7 +449,7 @@ func (a *API) activateConfiguration(w http.ResponseWriter, r *http.Request, acto
 	// Saving IS applying. A reload that fails means a route in this
 	// configuration no longer compiles: say so rather than report a clean
 	// switch - the previous snapshot keeps serving in the meantime.
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("activated, but the routing table could not be reloaded: %w", err))
 		return
 	}

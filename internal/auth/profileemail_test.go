@@ -10,6 +10,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // An account can perfectly well have no address - seeded, made by an
@@ -18,7 +19,7 @@ import (
 // Setting it is theirs to do, not an administrator's to be asked for.
 func TestProfileEmailIsSelfService(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +79,7 @@ func TestProfileEmailIsSelfService(t *testing.T) {
 // The console is a plane too, and whoever administers the gateway needs the
 // same things: a photo, a passkey, an address. The pages were data-plane only.
 func TestProfileServedOnBothPlanes(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +125,7 @@ func TestProfileServedOnBothPlanes(t *testing.T) {
 // carries its apps menu: someone who came to add a passkey has finished, and
 // the browser's back button is not an answer a product gives.
 func TestConsoleProfileLeadsBack(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,10 +2,26 @@
 
 > **Rôle** : passer le relais entre sessions de travail (Claude Code locale sur le M5,
 > session distante, ou humain qui reprend le fil). À **mettre à jour en fin de session**
-> quand l'état change. Le contrat produit reste `requirements.md` ; les conventions,
+> quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-08-19 : **la boucle de dev construisait la
+_Derniere mise a jour : 2026-09-03 : **la gateway se protege de ce qu'elle proxifie** -
+delais par route (ROUTE-07), disjoncteur (ROUTE-09) et etat des amonts dans la console
+(SVC-04, ROUTE-11) - voir la section dediee. Avant : 2026-09-02 : **PERF-02 et LIFE-05 coches** - le plafond de
+reecriture de corps est reglable (et une reponse au-dessus n'est plus tronquee), et le
+commutateur global de maintenance existe ; les deux vivent dans un tiroir **Global** sur
+la page Routes, avec les cles de signature - voir la section dediee. Avant :
+2026-09-01 : **la clusterisation est faite** (STORE-03, PERF-03,
+PERF-04, AUTH-11) - la suite entiere tourne sur PostgreSQL en CI (QUAL-01), le **bus de
+changement** (`internal/cluster`) recharge / invalide / relaie entre noeuds, un **verrou
+consultatif** garde l'emission ACME et l'entretien, et la cle de simulation comme le
+compteur anti-force brute sont en base - voir la section dediee. Avant : 2026-08-30 : **la CI se partage entre les depots** - le prive ne
+teste plus que ce qui a besoin de `ee/`, le miroir public fait le reste gratuitement ;
+`RELEASE_NOTES.md` ouvert pour release-flow - voir la section dediee. Avant : 2026-08-29 : **la spec OpenAPI deposee** (SVC-06) - une route
+porte son contrat par URL amont OU par fichier depose, que la gateway sert sur le
+prefixe de la route ; le YAML est converti en JSON a la volee pour les deux sources ;
+`requirements.md` a laisse la place a `FEATURES.md` - voir la section dediee. Avant :
+2026-08-19 : **la boucle de dev construisait la
 communautaire** (balise `ee` passee au binaire au lieu du build - corrige dans
 `.air.toml`), la console **verrouillait tout l'Enterprise sur les deux images**
 (le CSS attendait des classes `ee-<fonction>` que plus personne n'ecrit depuis
@@ -29,6 +45,637 @@ developpeur escamotable + lisere, identite simulee session+route pour VOIR ce qu
 role voit. Avant cela : testeur de routage (ROUTE-15). Rappel 2026-07-30 : auth externe (AUTH-19) livree ; tout est sur
 `main`, la branche `feat/endpoint-security-openapi` avait ete repliee et supprimee
 (Francois : "je t'ai jamais demande de creer des branches")._
+
+### Suite du 2026-09-01 - le reste de la clusterisation
+
+Francois : "ben il faut continuer la CI est verte feu", puis "allez oui".
+
+**Le verrou consultatif** (`internal/store/locks.go`). `WithLock` attend, `TryLock` passe son
+tour. Local d'abord (un mutex par nom, ce qui empeche deux goroutines d'UN noeud de faire la
+queue sur la base), partage ensuite (`pg_advisory_lock` sur une connexion **reservee**, parce
+qu'un verrou consultatif appartient a une session). Le mutex local n'est PAS conditionnel : la
+promesse doit vouloir dire la meme chose sur les deux bases.
+
+Piege majeur : `conn.Close()` **rend** la connexion au pool, il ne la ferme pas. Un verrou
+laisse dessus serait tenu par une session qui continue a servir des requetes, et rien ne le
+relacherait jamais. D'ou un `pg_advisory_unlock` explicite, execute meme sur un contexte mort
+(`context.WithoutCancel`), et un test qui prend/relache plus de fois que le pool n'a de
+connexions - il echoue en 10 s si ca fuit.
+
+Il garde : l'**emission ACME** (`internal/certs/issue.go`) et l'**entretien periodique**. Le
+verrou d'emission n'est PAS pris a chaque poignee de main - le Manager retient quand expire le
+certificat qu'il a servi et ne le prend qu'a la premiere, ou a l'approche du renouvellement.
+Le challenge TLS-ALPN est deliberement hors du verrou : c'est l'autorite qui nous rappelle au
+milieu de la commande, le verrouiller serait la gateway qui s'attend elle-meme.
+
+**La cle de simulation** est en base (`internal/store/simkey.go`), reglage secret comme les
+cles de signature, jamais exportee. Chargee dans `Reload`. Corrige aussi le cas mono-noeud :
+un redemarrage n'invalide plus le jeton qu'un operateur venait de copier.
+
+**Les signaux** : deuxieme genre de message sur le meme canal, plus faible que les sujets. Un
+SUJET dit "relis la table" ; un SIGNAL porte la chose et n'a rien derriere. Autorise seulement
+la ou perdre un message coute ce qui est deja accepte. Trois usages :
+- **cache de sessions** : le condensat du jeton (jamais le jeton), ou l'identifiant utilisateur
+  quand un reset revoque tout. A ferme au passage un trou mono-noeud : le reset supprimait les
+  lignes et laissait les caches les servir 5 s.
+- **canal live** : un message publie sur un noeud n'atteignait qu'une fraction de l'audience.
+- Chaque signal porte l'**identifiant du noeud emetteur** : PostgreSQL livre la notification a
+  l'emetteur aussi, donc sans ce tampon le noeud qui publie se relaie a lui-meme et ses pages
+  recoivent l'evenement DEUX fois. Un test le prouve dans les deux sens.
+
+**Le compteur anti-force brute** est une table (`login_attempts`, une ligne par echec). Beaucoup
+de lignes pour ce qui pourrait etre un nombre - et c'est la bonne forme, parce que la fenetre
+GLISSE : un compteur remis a zero periodiquement repond faux a chaque frontiere. Toutes les
+methodes **echouent ouvert** : refuser une connexion parce que le compteur est illisible
+transformerait un hoquet de base en verrouillage, et la connexion a de toute facon besoin de la
+ligne utilisateur.
+
+**Verifie en le faisant tourner** (deux gateways sur un PostgreSQL) : jeton de simulation frappe
+par A accepte par B (200/200, 403/403 pour un faux) ; trois echecs de connexion sur A + deux sur
+B comptes comme cinq ; une deconnexion sur A repondue 401 par B a la requete suivante, apres que
+B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste dans
+`pg_locks`.
+
+**Piege trouve au passage, non corrige** : `PUT /api/routes/{id}` avec un `access.level` invalide
+repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
+pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
+mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+
+## Session 2026-09-03 - ce que la gateway subit de ses amonts
+
+Francois avait demande quelles features seraient importantes ensuite ; ma reponse : le produit
+sait dire QUI a le droit, il ne sait pas encore SE PROTEGER de ce qu'il proxifie. Il a repondu
+"vas y pour 1 a 3".
+
+### ROUTE-07 - les delais par route
+
+Les bornes existaient mais formaient **une seule paire globale** : l'endpoint legitime le plus
+lent de l'installation fixait l'attente de tous les autres. Une route nomme les siennes
+(ISO-8601, choisies dans une liste), deux bornes parce qu'elles repondent a deux questions -
+accepter la connexion, et COMMENCER a repondre. Le **corps n'est jamais borne** : un
+telechargement ou un websocket deja commence vit aussi longtemps qu'il faut.
+
+**Les routes qui nomment les memes bornes partagent un transport**, et ca compte plus qu'il n'y
+parait : un transport est un pool de connexions, un par route multiplierait les sockets tenues
+contre chaque amont par le nombre de routes qui pointent dessus.
+
+### Le defaut collateral, enfin corrige
+
+`store.ErrInvalid`. Les assainisseurs vivent dans le store (six ecrivains sauvent une route, une
+regle appliquee dans cinq d'entre eux ne vaut rien) mais ca les mettait derriere une frontiere
+que l'API lisait comme "quelque chose a casse" : un `access.level` inconnu repondait **500
+internal error** pendant que la phrase nommant les valeurs permises restait dans le log. C'est
+un 422 avec ses propres mots maintenant. La sentinelle est portee **sans etre imprimee** -
+`errors.Join` aurait prefixe chaque message par "invalid" et un saut de ligne.
+
+### ROUTE-09 - le disjoncteur
+
+Apres N echecs consecutifs la route cesse d'appeler, sert la page d'indisponibilite (la MEME que
+le commutateur global et la brique, avec la raison "incident"), et laisse passer **une seule**
+requete apres le refroidissement.
+
+Trois decisions a retenir :
+- **Eteint par defaut** : un disjoncteur transforme une panne en une autre, ca se choisit.
+- **Un 500 ne compte pas** : un service qui repond 500 est debout et a un bug ; le sortir du
+  service fermerait une route entiere pour un endpoint, y compris ceux qui marchent.
+- **L'etat est par noeud** : deux gateways peuvent legitimement diverger sur un amont (chemin
+  reseau, reponse DNS, sidecar), et un verdict partage laisserait la mauvaise minute d'un noeud
+  fermer le circuit pour tout le monde.
+
+### SVC-04 / ROUTE-11 - l'etat dans la console
+
+Presque gratuit une fois le disjoncteur la : il regarde deja chaque reponse. La table des routes
+marque celle qui ne repond plus et dit pourquoi. **Observe plutot que sonde** - pas de sonde
+propre, donc pas de second avis forme sur du trafic que personne n'a envoye, a propos d'un chemin
+que les vraies requetes n'empruntent peut-etre pas. Une route que personne n'a appelee ne dit
+rien, ce qui est exactement ce que la gateway sait. `GET /api/routes/health`, perimetre infra.
+
+### Piege du banc d'essai, revenu deux fois
+
+**La session admin du harnais expire.** Deux fois j'ai conclu a un bug produit (le layout qui ne
+changeait pas, puis les durees qui ne s'enregistraient pas) alors que mes PUT partaient en
+**401** en silence, parce que je jetais la sortie. Toujours verifier le code HTTP d'un PUT avant
+d'accuser le produit.
+
+## Session 2026-09-02 - PERF-02, LIFE-05, et un tiroir Global sur la page Routes
+
+### PERF-02 : le plafond devient reglable, et cesse de tronquer
+
+Le plafond de 20 Mio des filtres de reecriture de corps etait une constante. Il est
+maintenant un reglage **global** (`SettingProxyLimits`, 1 a 256 Mio, defaut 20), pose par
+`router.Reload` dans un atomic de `internal/filters` - donc il voyage sur le bus de
+changement sans mecanisme supplementaire.
+
+**Global et pas par route, et c'est la modelisation, pas un raccourci** : la facture est
+par requete EN VOL, donc un plafond par route donnerait "requetes simultanees x le plus
+grand chiffre que quelqu'un a tape", sans rien pour le borner. Ce qu'on protege est le
+processus.
+
+**Le test a trouve un vrai bug, anterieur** : une reponse AU-DESSUS du plafond etait
+**tronquee**. `RewriteBody` lisait plafond+1 octets, **fermait** le corps amont, et rendait
+l'echantillon - donc toute reponse en chunked (sans `Content-Length`, invisible pour la
+garde d'entree) traversant une route a filtre de reecriture arrivait coupee a 20 Mio et un
+octet, silencieusement, avec un statut correct. Corrige : ce qui repart est l'echantillon
+**suivi du reste du corps reste ouvert**, avec le closer d'origine (type `joined`).
+
+### LIFE-05 : le commutateur global de maintenance
+
+La brique filtre existait, le commutateur non. Un reglage, aucune route touchee, rien a
+remettre. **La frontiere est la conception** : il repond 503 pour LES ROUTES.
+
+- **Les pages propres a la gateway continuent** : elles sont montees a cote du routeur, pas
+  dedans. Il le FAUT - le commutateur est leve par quelqu'un qui doit d'abord se connecter.
+  Un test l'epingle au niveau du mux.
+- **Le plan de controle** est un autre port, un autre mux.
+- **Qui administre ou developpe passe** (`maintenanceBypass`, meme forme que
+  `simulationActor`), sinon le seul moyen de verifier que l'appli est revenue est de
+  rouvrir a tout le monde.
+- **Une seule page** : `routing.MaintenancePage` est exportee, le filtre et le commutateur
+  servent les memes octets.
+- Le serveur **horodate** l'allumage et le garde a travers une edition du message : la vraie
+  faille de cette fonction n'est pas "le commutateur ne marche pas", c'est une maintenance
+  du mardi encore allumee le jeudi.
+
+### Le tiroir Global (IA console)
+
+Francois : un bouton **GLOBAL a droite de ROUTING TEST**, ouvrant un tiroir avec le
+disjoncteur, le plafond des corps (deplace depuis infra/general) et les cles de signature.
+**C'est juste** : la page Routes liste la config PAR route, donc l'axe est propre - ce
+tiroir tient ce qui vaut pour toutes et n'appartient a aucune.
+
+Consequences : l'ecran `Infra > General` que j'avais ouvert une heure plus tot pour une
+seule ligne **disparait** (c'etait la bonne critique : ne pas ouvrir un ecran pour une
+ligne, mettre la ligne aupres de son sujet), et le dialogue des cles de signature devient
+un panneau. UN seul `mat-drawer` avec deux contenus (editeur de route OU panneau global) :
+deux tiroirs sur le meme bord, Material refuse.
+
+**Ce que j'ai ajoute de moi-meme** : la maintenance est **lisible sans ouvrir le tiroir** -
+tant qu'elle est active, le bouton Global devient un "Under maintenance" rouge. Un
+interrupteur qu'il faut aller chercher est un interrupteur qu'on oublie allume.
+
+### Rappel de methode qui a paye deux fois aujourd'hui
+
+Chaque test important a sa **verification negative** : je casse le mecanisme et je verifie
+que le test devient rouge. C'est ce qui a montre que les tests de session passaient sans le
+signal (le cache de 5 s expirait pendant la boucle d'attente - corrige avec
+`session.WithCacheTTL(time.Minute)`).
+
+## Session 2026-09-01 - la clusterisation : la suite sur PostgreSQL, puis le bus de changement
+
+Francois : "je voudrait que l'on continue la clusterisation, que nous manque t'il pour
+que tout soit fonctionnel ?", puis, apres l'inventaire : "vas y, 0 et 1 d'abord".
+
+### 0. La suite entiere sur PostgreSQL (QUAL-01, coche)
+
+L'etat de depart : **une seule** preuve que le produit tournait sur PostgreSQL - une
+ligne utilisateur, un reglage, le numero de schema. Les cent-soixante autres requetes
+etaient prises sur parole.
+
+`internal/store/dbtest.URL(t)` repond "quelle base ce test ouvre" : rien par defaut,
+donc `go test ./...` sur un portable est exactement ce qu'il etait, et un **schema prive**
+sur le serveur que `MEERKAT_TEST_DATABASE_URL` nomme quand il y en a un. Les 79 appels a
+`store.Open(t.TempDir())` sont devenus `store.OpenAt(t.TempDir(), dbtest.URL(t))`. Pas de
+seconde suite : une variable.
+
+**La premiere execution a trouve deux vraies fautes**, ce qui est tout l'argument :
+- **51 colonnes `INTEGER`**, 64 bits sur SQLite et **32 sur PostgreSQL**. Or chaque date
+  de ce schema est une seconde Unix : une session valide jusqu'en 2100 a deborde du
+  premier coup, les autres attendaient 2038. Toutes en `BIGINT` (schema v52).
+- **deux `INSERT OR IGNORE`**, que PostgreSQL ne parle pas. `ON CONFLICT DO NOTHING` est
+  compris des deux : une seule orthographe, pas de branche.
+
+Deux garde-fous dans `internal/store/dialectguard_test.go`, qui tournent **sans serveur** :
+le schema ne peut plus dire `INTEGER`, et aucun litteral SQL du paquet ne peut employer une
+tournure SQLite-only (lu **par le parser**, pas par un grep - la moitie de ces mots
+apparaissent dans les commentaires qui expliquent pourquoi on ne les emploie pas).
+
+Cote CI : un job `postgres` avec un service container, qui **prouve qu'il a atteint le
+serveur** au lieu de faire confiance a une coche verte (le test-temoin SKIP sans la
+variable, et un skip passe). Il garde les deux publications. En local : `make pg-up`,
+`make test-pg`, `make pg-down` (port **55432**, pas 5432 : ne pas voler le port d'un
+PostgreSQL de travail).
+
+### 1. Le bus de changement (STORE-03)
+
+Le trou : une gateway ne garde en memoire que **deux** choses - son plan de routage
+compile et les certificats que ses ecouteurs tiennent. Elles sont rechargees quand le
+noeud prend lui-meme une ecriture, et **seulement lui**. Une route enregistree sur A
+restait absente de B jusqu'a un redemarrage, et l'operateur, qui regarde A, voit un
+produit qui marche.
+
+`internal/cluster`, deux moities voulues :
+- **`change_marks`** (v52), une version par sujet. **C'est la verite** : un noeud compare
+  avec ce qu'il a deja applique et recharge ce qui a bouge. C'est ce qui fait qu'un
+  changement arrive **tout court**.
+- **un `NOTIFY`** portant le sujet, qui n'est **qu'un indice**. Perdable par nature
+  (personne n'ecoute pendant un redemarrage) ; en perdre un coute de la latence, jamais
+  de la justesse.
+
+Detail qui compte : **le rattrapage se fait APRES le `LISTEN`, pas avant**. Rattraper
+d'abord laisse une fenetre large d'un aller-retour ou une annonce tombe sur personne.
+`store.Listen` appelle donc le callback une fois avec un sujet vide des que la connexion
+est enregistree. Une connexion coupee se rebranche en 5 s et referme son propre trou ; un
+minuteur de 30 s est le filet en dessous.
+
+**La regle tient en une ligne** - ce qu'un noeud recharge apres sa propre ecriture, il
+l'annonce - et elle etait eparpillee sur quinze sites d'appel. Donc `internal/admin/reload.go`
+possede la paire (`reloadRouting`, `applyTLS`) et **`reload_test.go` refuse tout autre
+chemin**. `Announce` tolere un bus nil : un changement qui ne compte qu'en cluster ne doit
+pas exiger un cluster pour etre teste.
+
+**La base embarquee ne paie rien** : un seul processus possede ce fichier, donc `Run`
+retourne tout de suite et `Announce` ne fait rien. Un test le dit, parce qu'une goroutine
+qui ne peut jamais se declencher est le genre de chose que personne ne remarque.
+
+**Valide en le faisant tourner** : deux gateways sur un meme PostgreSQL (ports 18081/19091
+et 18082/19092), une route creee par le plan de controle de A et servie par B une seconde
+plus tard, sans redemarrage ; puis la connexion d'ecoute de B **tuee depuis le serveur**
+(`pg_terminate_backend`) et le changement fait pendant son absence rattrape a la
+reconnexion. Le test de bout en bout repond 404 quand on retire le bus.
+
+### Ce qui reste pour le cluster, dans l'ordre ou ca mord
+
+1. **Aucun verrou consultatif** : deux noeuds armes en ACME peuvent demander deux
+   certificats pour le meme nom, et les purges periodiques tournent N fois.
+   `pg_advisory_lock` autour de l'emission et des purges.
+2. **La cle de simulation** (`Router.simTokenKey`, `internal/gateway/router.go:57`) est
+   tiree **a chaque demarrage** : un jeton frappe par un noeud est refuse par les autres,
+   donc l'ecran de simulation et l'outil MCP `test_routing` cassent derriere un
+   repartiteur sans affinite. Elle doit rejoindre les cles de signature en base.
+3. **Le cache de sessions** (5 s, `internal/session/session.go:49`) n'est pas branche sur
+   le bus : une revocation converge en 5 s, et un `SetTenant` fait sur A peut etre ignore
+   par B pendant ce temps - en plein choix d'organisation.
+4. **Le hub d'evenements** (`internal/events`) est local au processus.
+5. **Le compteur anti-force brute** (`internal/auth/register.go:98`) aussi : N noeuds,
+   N fois le quota (AUTH-11).
+
+### Pieges rencontres
+
+- **`postgres:18` a deplace son repertoire de donnees** : un `tmpfs` sur
+  `/var/lib/postgresql/data` empeche le conteneur de demarrer. Pas de volume du tout dans
+  `test/postgres/docker-compose.yml`, c'est suffisant.
+- **`pkill -x meerkat` reste interdit** : les deux noeuds d'essai portaient le meme nom que
+  la gateway `air` de Francois. Arretes par PID, verifie avec `pgrep -lx meerkat`.
+
+## Session 2026-08-31 - un nom oublie dans une regle qui ne conditionne rien
+
+**Signale par Francois** (capture) : la table des routes affichait "Users:
+alice" sur `ops-app`, dont l'editeur dit "Delegated". Deux ecrans, deux
+verites.
+
+**Le moteur avait raison.** `store.Access.Empty()` vaut vrai quand
+`Level == delegated && len(Roles) == 0`, **en ignorant Users** : un nom est une
+EXCEPTION, et une exception a besoin d'une condition a laquelle echapper. Donc
+`Grants` laisse tout le monde passer et alice n'est pas une restriction. Le
+commentaire de `Empty()` raconte deja l'incident precedent (compter une telle
+regle comme posee faisait exiger une session, et le trafic tombait en silence
+sur l'attrape-tout).
+
+**Deux fautes, donc, et aucune dans le moteur :**
+1. **La pastille** de `access-badges` s'allumait sur `users.length > 0` sans
+   consulter `isEmpty` - qui existait pourtant dans le meme dossier. Elle
+   annoncait une decision de securite que personne n'avait prise. Corrigee :
+   elle compte 0 sur une regle vide, et l'infobulle DIT que le nom est la mais
+   ignore, plutot que de le cacher.
+2. **La donnee** restait en base, invisible dans l'editeur (qui masque le champ
+   sous Delegated) et donc non supprimable. Piege : remonter le niveau plus
+   tard ressuscitait le nom comme porte d'entree. Nouveau `SanitizeAccess`
+   appele dans **`store.SaveRoute`** - l'entonnoir par lequel passent les six
+   ecrivains (console, agent, trois chemins OpenAPI, import de configuration) :
+   un nom sur une regle vide saute, une liste de tenants hors du niveau
+   `tenants` saute, les blancs sautent, et un niveau invente est **refuse** en
+   nommant les niveaux admis (avant, il se comportait comme `auth` en silence).
+
+### Les horaires d'ouverture : deux choses, une reelle et une trouvee en route
+
+**Symptome de Francois** : alice se connecte sur le plan data, choisit acme ou
+globex, et n'atteint rien. **Reproduit sur une instance neuve** : avec des
+horaires 08:00-18:00 sur l'organisation et un essai a 22:18, le choix rend
+**403 et re-affiche le selecteur** avec "Access to acme is refused: outside
+your working hours". Les deux choix font pareil, donc "aucun n'aboutit". La
+page LE DIT, mais la ligne d'erreur passe inapercue quand on cherche un
+probleme de route.
+
+**Le bug trouve en montant le decor** (different, et dans l'autre sens) :
+Go decode un `businessAccess` absent comme la valeur zero, dont `Inherited`
+vaut FALSE. `ResolveBusinessAccess` lit alors "ce niveau surcharge, sans
+restriction" et s'arrete la. Donc une adhesion creee par l'API, un import ou
+une regle de groupe **echappait silencieusement aux horaires de son
+organisation**, et une organisation creee pareil echappait aux horaires
+globaux. La console envoie toujours `inherited:true` : la fonctionnalite avait
+donc l'air de marcher partout ou quelqu'un avait clique, et nulle part
+ailleurs. Corrige par `SanitizeBusinessAccess` dans `SaveMembership` et
+`SaveTenant`.
+
+**Methode qui a paye** : apres deux deductions fausses a partir de captures,
+**reproduire le decor exact** (alice, deux organisations, mode multi, route
+attrape-tout publique) et suivre chaque saut au curl. Le flux nominal marchait
+- ce qui a prouve que le probleme etait dans la configuration - et le decor
+lui-meme a revele le bug d'heritage.
+
+### Diagnostiquer SUR l'instance de Francois, avec le MCP Chrome
+
+Apres trois deductions fausses a partir de captures, Francois : "essaye avec ton
+MCP / essaye toi meme directement". C'etait la bonne idee et il faut y aller
+plus tot. Le navigateur avait deja les identifiants de la console enregistres :
+un clic sur Sign in, puis tout se lit en JavaScript depuis l'onglet
+(`fetch('/api/routes', {credentials:'include'})`).
+
+**Lu en trois appels** : les routes avec leur regle, les organisations pour
+resoudre les ids en noms, les adhesions d'alice, le journal d'audit (qui date
+les changements !), et la **sonde de routage** avec l'identite d'alice.
+
+**Sa configuration** : deux attrape-tout sur `/**` - `httpbin-acme` (ordre 5,
+`tenants:[acme] + roles:[app-admin-suite, auditor] + users:[admin]`) et
+`httpbin-globex` (ordre 6, publique). Alice est USER dans acme et ADMIN dans
+globex. Dans globex elle echoue sur l'organisation -> "That page belongs to
+another organisation" ; dans acme elle passe l'organisation et echoue sur les
+roles. MAIS la selection **retombe** sur la route suivante quand la regle
+refuse (sauf `deny`), donc `httpbin-globex` la sert : la sonde ET un GET
+anonyme sur le plan data l'ont confirme. Son symptome venait d'un etat
+anterieur - le journal montre `httpbin-acme` basculee trois fois ce soir.
+
+**A retenir** : le journal d'audit DATE les changements, c'est la premiere
+chose a lire quand "ca marchait avant". Et je n'ai rien ecrit chez lui : que
+des GET plus la sonde (qui n'ecrit rien).
+
+### Le ping-pong acme/globex (meme session, symptome suivant)
+
+**Signale** : alice se connecte sur le plan data, Meerkat demande acme ou
+globex, et AUCUN des deux choix n'atteint la page.
+
+**Cause** : `Access.Switchable` est une fonction PURE sur la regle et
+l'appelant - elle ne regarde donc que le NIVEAU. Avec
+`level: tenants [acme, globex]` **plus** `roles: [ops]`, elle repond "globex
+lever ait le refus" alors qu'alice n'y detient pas le role non plus. D'ou :
+acme refuse -> on propose globex -> globex refuse -> on propose acme, sans fin.
+Reproduit dans un test qui, sans le correctif, rend
+`303 /select-tenant?next=%2F&why=roles`.
+
+**Seule cette combinaison boucle** : `AccessTenant` ne propose que si aucune
+organisation n'est active (donc une fois), `AccessAuth` ne propose jamais.
+
+**Correctif** : `Router.switchWouldHelp` filtre l'offre par ce que la personne
+detiendrait VRAIMENT dans chaque organisation candidate, via un nouveau
+`store.RolesReachableIn` - l'union des roles sur tous ses groupes la-bas, et
+pas `SessionRoleNames` qui repond "ce qu'elle detient maintenant" (nil en mode
+exclusif tant qu'aucun groupe n'est choisi ; or le groupe se choisit APRES
+l'organisation). Un refus n'est pas le chemin chaud, la lecture ne coute rien,
+et elle n'est faite que si la regle demande des roles.
+
+**Regle generale qui se degage** : une offre doit etre VRAIE, sinon c'est une
+porte peinte sur un mur. Et `refuse()` prend desormais l'userID (trois sites
+d'appel, dont un qui devait retenir `candUserID` dans la boucle).
+
+**A retenir** : quand deux ecrans se contredisent, lire le MOTEUR d'abord. Ici
+la logique de verite existait aux deux endroits (Go et TypeScript) et c'est
+l'affichage qui ne la consultait pas.
+
+## Session 2026-08-30 (2) - le pilotage par un agent (MCP-01/02/03/04/06)
+
+**La question de Francois** : port dedie, ou un endpoint qui recoit des commandes ?
+**Reponse** : sa preference EST le standard. MCP a deux transports, stdio et
+**Streamable HTTP**, et le second est exactement "un endpoint" : POST, JSON-RPC dans
+le corps, reponse en JSON. Donc `/mcp` sur le plan de controle, aucun port a ouvrir -
+un port ici serait un `certs.NewListener`, une valeur de plus dans la colonne `plane`
+de `certificates`, une regle d'ingress, une variable d'env, pour zero gain puisque
+l'admin atteint deja :9090 (sa console y est).
+
+**Ce qu'il a tranche** : le client CLI est ECARTE ("l'admin utilise l'UI ou le MCP") ;
+la feature est CE ; l'agent doit connaitre l'edition avant de tenter une commande EE ;
+et il faut un test de couverture des commandes.
+
+**Les cinq choses a retenir** :
+
+1. **Le jeu d'outils n'est PAS une frontiere de securite.** Le meme jeton ouvre toute
+   l'API REST sur le meme port, et un agent a curl. La frontiere est le **perimetre du
+   jeton** (`readonly`/`full`, colonne `scope` sur api_tokens, v49), verifie dans
+   `admin.authed` - l'entonnoir unique par lequel passent le REST ET l'agent.
+2. **Ce qui compte comme une lecture se decide par ENDPOINT, pas par le verbe.** Le
+   testeur de routage, les apercus et la sonde de relais sont des POST qui n'ecrivent
+   rien, et `/mcp` est lui-meme un POST qui porte les deux. D'ou `admin.readsNothing`
+   (clef = `http.Request.Pattern`, disponible depuis Go 1.22) et son jumeau
+   `writesSomething` dans le test.
+3. **Les outils ne sont pas une seconde porte.** Piege que j'ai ouvert puis referme :
+   les premiers outils appelaient le store sans regarder QUI appelle, donc un
+   utilisateur simple connecte aurait lu la liste des comptes. Chaque outil porte
+   desormais un `Allow func(ctx) bool` qui reprend la garde de l'endpoint REST
+   correspondant, et `auditScope` est partage entre l'endpoint et l'outil.
+4. **Un `mux *http.ServeMux` ne se laisse pas enumerer.** `admin.Register` prend
+   maintenant une interface `Mux` (Handle + HandleFunc) : c'est ce qui rend le test de
+   couverture possible. La maille est la **section** (`/api/<section>/...`), pas
+   l'endpoint - un outil repond a une question, une question couvre six endpoints.
+   Le test refuse toute section que personne n'a tranchee (`agentCovers` ou
+   `agentIgnores` avec sa raison), toute entree morte dans les deux sens, et tout
+   non-GET non classe. Il a attrape trois de mes propres erreurs des le premier run.
+5. **`POST /mcp` ne suffit pas comme motif** : l'attrape-tout de la console est sous
+   `/`, donc un GET /mcp tombait sur la SPA et repondait 200 avec du HTML. Le chemin
+   entier est monte (`mux.Handle("/mcp", ...)`) pour que le transport reponde 405 avec
+   son `Allow: POST`.
+
+**Aussi** : l'audit nomme le jeton (colonne `actor_token`, tampon pose dans `audit()`
+et pas dans ses 80 appelants) ; l'endpoint est livre ETEINT
+(`SettingAgentEnabled`, interrupteur sur l'ecran Access tokens, patron ISSUE-04) ;
+la console remet le JSON `mcpServers` + la ligne `claude mcp add` au moment de la
+frappe du jeton, seul instant ou la valeur claire existe ; Origin refuse en bloc
+(rebinding DNS - un agent n'est pas un navigateur) ; pas de SDK officiel Go
+(8 dependances dont x/tools pour un sous-ensemble fige), transport ecrit a la main.
+
+**Verifie en vrai** sur :19091 : handshake, 8 outils, describe_gateway, list_routes,
+test_routing, refus 403 du jeton readonly sur PUT /api/settings, et le journal qui
+affiche "admin | jeton: deploy-bot".
+
+**MCP-05 : brouillon-puis-activation ESSAYE PUIS RETIRE.** Premiere version :
+l'agent deposait une configuration nommee qu'une personne activait dans la
+console. Francois a tranche contre, et il a raison : "quand tu utilises le MCP
+gh, tu me demandes pas d'aller valider dans l'UI de gh ce que tu as fait". On
+faisait payer une ceremonie sur CHAQUE changement pour un risque qui se traite
+autrement. Version retenue : **ecriture directe** (`save_route`,
+`delete_route`, via la MEME fonction que `putRoute` - une seule implementation,
+donc les memes refus), et le filet est celui qui existait deja :
+
+- `markConfigPoint` dans `authed` ecrit un **point de restauration apres chaque
+  changement** du plan de controle (CFG-06), etiquete des mots du journal. Il
+  dedoublonne par digest, donc un appel /mcp en lecture n'ecrit rien.
+- le journal nomme le jeton (MCP-03), le perimetre decide de ce qui est propose.
+- `save_configuration` range l'etat courant sous un nom : c'est ce qu'un admin
+  prudent demande EN MOTS avant un gros changement. **Un outil, pas un rite** -
+  paye par qui le demande.
+
+**`list_route_bricks`** ajoute au passage : sans le catalogue des predicats et
+filtres (20 Ko, filtrable par kind/type), l'agent invente des types qui seront
+refuses a l'enregistrement.
+
+**Console** : la config MCP est desormais **recuperable a tout moment** depuis
+la ligne du jeton (pas seulement a la frappe), et par defaut elle reference une
+**variable d'environnement** au lieu du jeton en clair - un .mcp.json finit dans
+un depot. L'inline est un interrupteur, disponible seulement quand le secret est
+encore en main.
+
+**MCP-02 termine ensuite** (perimetre a trois axes). L'idee qui evite un second
+modele de droits : le **domaine MASQUE** les capacites du porteur (`narrowTo`
+dans tokenscope.go, applique une fois dans `authed`). Chaque garde du paquet lit
+deja `actor.Root/InfraAdmin/AppAdmin`, donc masquer une fois confine le REST,
+les outils MCP et tout ce qu'on ajoutera - aucune liste a tenir. Root est
+RETIRE et non conserve : un domaine qui laisserait root debout ne confinerait
+rien. Piege attrape : l'administration de tenant est une ADHESION, pas un
+booleen du User, donc elle survivait au masque -> garde explicite dans
+`administersTenant` pour le domaine gateway.
+
+**CIDR sur le pair TCP** (`r.RemoteAddr`), jamais X-Forwarded-For. Consequence
+dite a l'ecran : derriere un reverse proxy la restriction ne veut plus rien
+dire. Un refus est un "pas de session" muet pour l'appelant mais JOURNALISE
+(slog.Warn avec le nom du jeton et l'adresse), sinon l'admin n'a rien pour
+comprendre. Detail utile : une adresse v4 sur un listener dual-stack arrive en
+`::ffff:10.0.0.7`, d'ou le `.Unmap()` sans lequel une plage v4 ne matche jamais.
+
+**Convention de message confirmee** : un sanitizer destine a un ecran ne porte
+PAS le prefixe `store:` (compare `SanitizeConfigurationName`) ; le prefixe est
+pour les pannes d'infrastructure. J'avais mis "store: token address ..." dans un
+dialogue, corrige.
+
+**MCP-07 : branchement OAuth (comme Jira), livre.** Point de depart : Francois a
+demande comment on donne le token au MCP de Jira. Reponse : **on ne le donne
+pas**, sa conf est `{"type":"http","url":"https://mcp.atlassian.com/..."}` et
+rien d'autre - le jeton vient d'un tour par le navigateur et Claude Code le
+range dans le trousseau macOS. D'ou : "pas de token, on fait l'oauth2, c'est
+plus classe".
+
+Meerkat est donc son propre serveur d'autorisation pour son plan de controle
+(`internal/auth/oauth.go`, tables v51). La chaine : 401 sur /mcp avec
+`WWW-Authenticate: ... resource_metadata=` (RFC 9728) -> deux documents de
+metadonnees -> enregistrement dynamique du client (RFC 7591, clients PUBLICS,
+aucun secret) -> page de consentement -> code + PKCE S256 -> jeton.
+
+**Les trois idees qui evitent une seconde mecanique :**
+1. Le jeton emis **EST** un `api_tokens` ordinaire (plane=admin, avec
+   `client_id`). Donc `session.resolveToken`, le perimetre, le masquage de
+   domaine, l'audit et la revocation marchent dessus sans une ligne de plus.
+2. **Le perimetre se choisit sur la page de consentement** - il a quitte la
+   boite de frappe. La personne qui branche est celle qui decide, au moment ou
+   elle decide.
+3. Le rafraichissement **renouvelle la meme ligne** (`RenewAPIToken`) : une
+   connexion avec une nouvelle cle, pas une connexion de plus toutes les 12 h.
+
+**Pieges traites** : redirection loopback dont le PORT change a chaque
+lancement du CLI (`SameRedirect` ignore le port) ; une erreur de client ou de
+redirection se rend SUR LA PAGE et jamais par redirection (sinon on construit
+un open redirector) ; code et refresh token depenses une seule fois ; approuver
+est **root only** comme frapper un jeton.
+
+**i18n** : `loadMessages` complete desormais chaque catalogue avec l'anglais
+pour les cles absentes - avant, une cle manquante rendait une chaine VIDE, en
+silence. Les 14 chaines du consentement sont dans les 20 langues.
+
+**Console** : section **MCP** propre (Infra, sous Configuration), avec la
+commande verifiee pour Claude Code, Gemini CLI, Kimi CLI (`mcp add --transport
+http <nom> <url>`), Codex CLI (`codex mcp add <nom> --url <url>` puis `codex
+mcp login`) et un JSON generique ; la liste des agents branches ; et un volet
+repliable "mon client ne sait pas faire" qui renvoie vers Access tokens.
+Access tokens redevient l'ecran des jetons REST (filtre sur `clientId` vide).
+
+**HTTPS verifie en vrai** (2026-08-31) : certificat auto-signe sur le plan
+console, porte ouverte, et tout le flux refait dessus - 401 avec
+`resource_metadata="https://..."`, decouverte qui annonce du https, jeton
+obtenu et utilise en https, 13 outils. La redirection reste `http://127.0.0.1`
+et c'est correct : c'est le callback du CLI, pas notre adresse (RFC 8252).
+**Piege pour le vrai monde** : un certificat auto-signe fera echouer le client
+de l'agent (il ne fait pas confiance a l'AC), pas seulement le navigateur.
+
+**Durcissement au passage** : `origin(r)` se construit sur `r.Host` et
+`X-Forwarded-Proto`, donc un appelant peut faire dire aux documents de
+decouverte ce qu'il veut - dans SA propre reponse, ce qui ne lui apprend rien,
+sauf si un cache la partage. D'ou `Cache-Control: no-store` sur les deux
+documents. Garder la confiance en X-Forwarded-Proto est deliberé : sans elle,
+un plan de controle derriere un proxy qui termine le TLS annoncerait du http
+et aucun agent ne se connecterait.
+
+**Reste sur MCP** : rien de cadre. Le tableau MCP-01..07 est coche.
+
+## Session 2026-08-30 - la CI se partage entre les deux arbres
+
+**Le probleme** : plus de minutes Actions sur le depot prive (Dependabot les a
+consommees, il est desormais desactive). Or le miroir `softwarity/meerkat-ce` est
+**public**, donc ses minutes sont gratuites et illimitees - et il executait deja la
+suite ENTIERE (lint, console, doc, Playwright, LDAP, AD, Dex) sur les memes sources,
+quelques minutes apres. On payait donc pour un travail refait gratuitement juste apres.
+
+**Ce qui a ete ecarte** : faire tirer `ee/` par un job du depot public via un token.
+Trois fuites, aucune theorique - les logs d'un depot public sont publics (une erreur de
+compilation cite le code vendu), le token qui ouvre le prive habiterait la vitrine ou
+n'importe qui peut ouvrir une PR, et artefacts comme cache s'y telechargent sans
+authentification.
+
+**Ce qui est fait** : le prive ne fait plus que ce que le miroir ne PEUT pas faire.
+`docs` et `coverage-of-the-split` ne tournent que sur l'arbre communautaire ; dans
+`unit`, `test` et `build`, la moitie sans tag est laissee au miroir. Restent ici les
+tests `-tags ee`, les deux annuaires LDAP/AD, l'integration Playwright (les scenarios
+multi-organisation) et les publications, qui ont besoin de secrets.
+
+**Pieges** :
+- Un `needs` vers un job saute fait sauter le dependant : `coverage-of-the-split` a du
+  sortir des `needs` de `image` et `image-ee`, ou la publication n'aurait jamais tire.
+- `matrix` n'est PAS lisible dans le `if` d'un job (seulement dans celui d'un step) :
+  sauter la seule ligne Dex de `directories` demanderait de construire la matrice en
+  JSON dans le job `edition`. Environ une minute contre un tableau lisible : Dex tourne
+  donc des deux cotes, assume.
+- `paths-ignore` sur les `.md` reste interdit : la barriere de `docker-release` attend
+  la CI du commit tague, et release-flow tague justement un commit qui ne touche que
+  `RELEASE_NOTES.md`.
+
+**Le filet** : une regression purement communautaire se voit desormais sur le miroir,
+apres coup - mais `mirror-ce.yml` fait deja `go build ./... && go test ./...` sur l'arbre
+CE avant de publier, donc le coeur reste verifie de ce cote.
+
+## Session 2026-08-29 - la spec OpenAPI deposee (SVC-06)
+
+### 1. Le contrat produit a change de fichier
+
+`requirements.md`, `authentication.md` et `licensing.md` sont supprimes : trois
+documents qui derivaient chacun de leur cote, dont un qui se declarait lui-meme en
+retard sur le produit. A la place, **`FEATURES.md`** : un tableau, une ligne par
+fonction, un identifiant stable jamais reutilise, une case cochee, une colonne
+disant CE ou EE et une autre disant **ce qui manque** quand l'implementation est
+partielle. Sous le tableau, les points durs et leur solution. Livrer quelque chose,
+c'est cocher sa case dans le meme commit.
+
+### 2. Une route porte sa spec, de deux facons
+
+`api.openapiUrl` devient `api.spec {type: upstream|file, path, filename}`. La vraie
+difference n'est pas "URL ou fichier" mais **vivant ou fige** : une spec amont est
+relue a chaque ecran, un fichier depose est un instantane. Ce qui ne change pas :
+**la spec a toujours une URL sur la route**, servie par l'amont ou par Meerkat.
+
+Le fichier est servi sur le prefixe de la route, **hors du garde d'endpoint** : un
+deny-by-default pose sur les operations refuserait sinon le document qui les liste.
+Il herite de la regle d'acces de la route, et rien de plus - pas de case "publique".
+
+### 3. Trois pieges rencontres
+
+- **Le contenu ne va pas dans la colonne `api`** : elle est relue en entier par
+  chaque `ListRoutes` (le tableau de la console, chaque rechargement du routeur).
+  D'ou la table `route_specs`, cle (route, genre) - le premier binaire du produit
+  range a part, les images de la marque etant des data URI dans un reglage.
+- **libopenapi ne sait pas rendre du JSON pour Swagger 2.0** (`RenderJSON` n'existe
+  que pour OpenAPI 3, `Render()` refuse la 2.0). La conversion passe donc par `yaml`
+  puis `json`. Verifie : `go.yaml.in/yaml/v4` rend `map[string]interface{}` et ecrit
+  en chaine les codes de reponse que le YAML lit comme des entiers (`200:`).
+- **L'editeur de route ecrasait la securite par endpoint** : `route.api = {...}` la
+  reconstruisait sans `security`. Corrige au passage.
+
+### 4. Le media suit la regle de la marque
+
+Le contenu est absent du YAML simple et present dans le paquet ZIP, sous
+`assets/specs/<route-id>/<fichier>` - un dossier par route, parce que les trois
+images ont pu prendre des noms fixes seulement puisqu'il n'y a qu'une marque. Un
+import qui ne le porte pas ne detruit rien et le signale (`missingFiles`).
+
+### 5. Ce qui reste
+
+Le mode record (apprendre les endpoints du trafic observe) est la derniere piece de
+SVC-06. Le swagger developpeur lit le fichier **dans la base** et non a travers la
+route : cette page liste deliberement les routes desactivees, qui ne sont pas
+compilees. Deux chemins de lecture, pour une raison qui tient.
 
 ## Session 2026-08-23 - le catalogue de briques : formes, ecrans, explications
 
@@ -2820,6 +3467,50 @@ séparément.
 **Le mode test UI et les jetons swagger** restent par processus, assumé : à N
 nœuds une simulation saute d'une requête à l'autre. À **dire dans la doc**
 plutôt qu'à corriger.
+
+## Minutes de CI - ce qui coûte, mesuré le 2026-08-27
+
+**Seul `softwarity/meerkat` facture.** `plug` et `meerkat-ce` sont **publics**,
+donc leurs minutes sont gratuites et illimitées - alors que plug pesait 76% du
+volume brut d'août (27 499 min). Ne pas se laisser impressionner par les
+montants affichés : ils sont intégralement remisés.
+
+**Le compte** : plan **Team, 3 000 min/mois incluses**. `meerkat` a consommé
+**7 247 min** en août (~8 600 en équivalent-Linux, macOS ×10, Windows ×2), soit
+presque trois fois l'enveloppe. Les minutes se rechargent au début du cycle de
+facturation (l'API agrège par mois calendaire ; la date exacte est dans
+Settings > Billing, l'endpoint demande le scope `admin:org`).
+
+**Un run de CI = 18 jobs, ~50 minutes cumulées.** Le détail au moment de la
+mesure : Whole tree 10,7 / Admin API 7 / Routing 5,9 / Authentication 5,8 /
+Builds deux arch 3,3 / Lint 3 / Playwright 3 / Storage 2,9 / AD 2,2 / Secrets
+1,6 / OpenLDAP 1,6 / Dex 1,6 / le reste ~1,6.
+
+**Ce qui a été corrigé (commit `aeb7e55`)** : `Whole tree` lançait
+`go test -race ./...`, donc **re-testait tout ce que les cinq aires venaient de
+tester**, et deux fois avec le tag. Il ne fait plus que `./cmd/... ./ee/...
+./tools/...`, ce que sa propre raison d'être disait. Et les `go vet` par aire
+ont sauté : ils étaient payés dix fois (cinq aires × deux éditions) alors que
+Whole tree vette déjà `./...` dans les deux. **~1 300 min/mois.**
+
+**Piège à ne pas répéter** : `golangci-lint run` tourne **sans le tag `ee`**,
+donc il ne remplace PAS `go vet -tags ee`. C'est pourquoi les vets restent dans
+Whole tree et pas seulement dans Lint.
+
+**Dependabot pesait ~40% du quota** : 24 runs de CI déclenchés en août, à 50 min
+pièce, plus 39 runs « Dependabot Updates ». François l'a désactivé le 2026-08-27.
+
+**Le levier restant, non fait, parce que c'est une décision de confiance** : le
+miroir public exécute déjà la suite communautaire **gratuitement**. Le dépôt
+privé la paie donc une seconde fois. Il pourrait ne garder que ce que le miroir
+ne peut pas prouver (les jambes `ee/`, les annuaires, les images Enterprise) -
+au prix que **le miroir pousse après coup**, donc n'est pas une barrière avant
+merge. À trancher par lui.
+
+**Ce qui NE vaut pas le détour** : tunneler OpenLDAP/AD/Dex ailleurs (Tailscale
+ou autre). Ces trois jobs pèsent 5,4 min sur 50, et le job paierait de toute
+façon son temps d'attente - contre un tailnet, des clés et une dépendance
+réseau à la place d'un `localhost`.
 
 ## Prochains chantiers (ordre suggéré)
 

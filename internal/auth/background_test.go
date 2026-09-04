@@ -101,3 +101,38 @@ func TestPlaceholderStaysWithoutABackground(t *testing.T) {
 		t.Errorf("the placeholder should be visible when nothing else is:\n%.900s", body)
 	}
 }
+
+// The mark's SIZE (THEME-02): a wide wordmark drawn in the 56px square comes
+// out a third of its height, so the box is a branding choice. It rides as a
+// class, and the rule that grows it is in the page - a served page never
+// depends on the console to be drawn right.
+func TestLogoSizeRidesAsAClass(t *testing.T) {
+	mux, _, st := setupFlow(t)
+	b := store.DefaultBranding()
+	b.Logo = pngPixel
+	b.LogoSize = store.LogoXLarge
+	if err := st.SetSetting(context.Background(), store.SettingBranding, b); err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, mux, "/login", nil).Body.String()
+	if !strings.Contains(body, `class="applogo xlarge"`) {
+		t.Errorf("the chosen size should reach the mark:\n%.900s", body)
+	}
+	if !strings.Contains(body, ".applogo.xlarge {") {
+		t.Error("the page must carry the rule that draws the size it asks for")
+	}
+}
+
+// The normal size adds nothing: a page branded before the field existed is
+// byte for byte the page it was.
+func TestNormalLogoSizeAddsNoClass(t *testing.T) {
+	mux, _, st := setupFlow(t)
+	b := store.DefaultBranding()
+	b.Logo = pngPixel
+	if err := st.SetSetting(context.Background(), store.SettingBranding, b); err != nil {
+		t.Fatal(err)
+	}
+	if body := get(t, mux, "/login", nil).Body.String(); !strings.Contains(body, `class="applogo"`) {
+		t.Errorf("the mark should wear the bare class:\n%.900s", body)
+	}
+}

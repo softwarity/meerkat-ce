@@ -25,10 +25,16 @@ import (
 //	applyLanguage(code) this page acts on a language, whoever chose it
 //	onLanguage(fn)      called when it does, BEFORE the page's own hook
 //	applyScheme(v)      light | dark | auto, applied to the document
+//	pickScheme(v)       someone chose a scheme here
 //	resolvedLanguage()  the language this page was served in
 //	signedOut()         tell the other pages the session just ended
 //	data()              the shared /meerkat/user-button.json read
 //	onEvent(type, fn)   what the GATEWAY has to say, live
+//
+// It also draws ONE thing of its own, and only one: the strip naming what a
+// developer's machine is serving (DEV-11). Chrome belongs to the button; this
+// is here because it is not chrome - it says the page in front of you is not
+// the deployed version, and that has to reach a route whose button is off.
 //
 // Three channels, and the split between them is by WHO knows the thing.
 //
@@ -82,6 +88,9 @@ const pageJS = `(() => {
       root.style.colorScheme = '';
       root.removeAttribute('data-meerkat-scheme');
     }
+    // The strip lives outside this inheritance, in its own root: it has to be
+    // told, or a toggle leaves it in the scheme the page just left.
+    syncStripScheme();
     const mech = cfg.schemeMechanism;
     if (!mech) return;
     const light = cfg.schemeLight || '', dark = cfg.schemeDark || '';
@@ -193,6 +202,37 @@ const pageJS = `(() => {
       credentials: 'same-origin',
     }).catch(() => {});
     applyLanguage(code);
+  };
+
+  // Picking a scheme, in the same order and for the same reasons as a
+  // language: the cookie first (the server renders the next page in it), the
+  // account next (so it follows the person to their other browser), the page
+  // last. The integrator may have settled light or dark for everyone, and then
+  // there is nothing to pick - the switch is not drawn at all.
+  const pickScheme = (v) => {
+    if (!v) return;
+    setCookie(COOKIE_SCHEME, v);
+    try { new BroadcastChannel('meerkat-scheme').postMessage({ scheme: v }); } catch { /* no channel */ }
+    fetch('/meerkat/scheme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scheme: v }),
+      credentials: 'same-origin',
+    }).catch(() => {});
+    applyScheme(v);
+  };
+
+  // A scheme picked in one page reaches the other pages of this browser, the
+  // way a language does: the portal and the application it frames must not
+  // disagree on light or dark for the time it takes to reload.
+  const listenForScheme = () => {
+    if (typeof BroadcastChannel !== 'function') return;
+    let channel;
+    try { channel = new BroadcastChannel('meerkat-scheme'); } catch { return; }
+    channel.onmessage = (e) => {
+      const v = e.data && e.data.scheme;
+      if (v && !schemeImposed) applyScheme(v);
+    };
   };
 
   // The other pages of this browser, live. A language picked in one page
@@ -353,8 +393,228 @@ const pageJS = `(() => {
     if (!document.hidden && !socket && handlers.size) { attempt = 0; openEvents(); }
   });
 
+  // ---- what this application IS right now (DEV-11) --------------------
+  // A strip saying which names answer from somebody's machine instead of the
+  // cluster. Shown to EVERY visitor, signed in or not: it changes what the
+  // page in front of them is.
+  //
+  // It lives in the AGENT and not in the user button, and that is not where it
+  // started - the button is injected only when a route enables it, so on a
+  // route without one the message that must reach everyone reached nobody.
+  // The split at the top of this file already said where it belongs: the
+  // button is chrome, the agent is behaviour, and "this is not the deployed
+  // version" is behaviour.
+  //
+  // Its own shadow root, like the button's, so the application's CSS cannot
+  // reach in and the strip cannot leak out. position: fixed, so it adds no
+  // height to the document and moves nothing.
+  let servedNow = [], stripHost = null, stripRoot = null;
+
+  const stripCSS =
+    // all: initial cuts the inheritance that would let the application reach
+    // in - and it cuts color-scheme with it, so Canvas and CanvasText would
+    // resolve light on a dark desktop. Said again here, and overridden below
+    // when the integrator settled the question (THEME-05).
+    ':host { all: initial; color-scheme: light dark; }' +
+    ':host([data-scheme="dark"]) { color-scheme: dark; }' +
+    ':host([data-scheme="light"]) { color-scheme: light; }' +
+    // Draggable along its edge, so it can be moved off whatever it happens to
+    // cover. --pb-x is the anchor: unset means centred, which is where it
+    // starts and where it stays for anyone who never touches it.
+    '.pb { position: fixed; bottom: 0; left: var(--pb-x, 50%); transform: translateX(-50%); z-index: 2147483000;' +
+    ' display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 6px 12px;' +
+    ' max-width: min(760px, calc(100vw - 20px));' +
+    ' background: Canvas; color: CanvasText; border: 1px solid #f59e0b; border-bottom: 0;' +
+    ' border-radius: 10px 10px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.25);' +
+    ' font-family: system-ui, sans-serif; font-size: 12px; line-height: 1.4; }' +
+    '.pb.min > *:not(.pb-tab) { display: none; }' +
+    '.pb.min { padding: 0; border: 0; box-shadow: none; }' +
+    '.pb-tab { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);' +
+    ' display: flex; align-items: center; gap: 5px; padding: 2px 10px; font: inherit;' +
+    ' background: Canvas; color: inherit; border: 1px solid #f59e0b; border-bottom: 0;' +
+    ' border-radius: 8px 8px 0 0;' +
+    // Grab, not pointer: the handle both collapses the strip and slides it,
+    // and the cursor is what says the second one is there at all.
+    ' cursor: grab; touch-action: none; user-select: none; }' +
+    '.pb-tab:active { cursor: grabbing; }' +
+    '.pb-badge { background: #f59e0b; color: #1c1c22; font-weight: 700; border-radius: 4px;' +
+    ' padding: 1px 6px; font-size: 11px; }' +
+    '.pb-title { font-weight: 700; }' +
+    '.pb-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }' +
+    // One entry per DEVELOPER, their names inside it: with four services
+    // plugged by one person, four separate chips repeated the same name four
+    // times and buried the only thing that varies.
+    '.pb-list li { display: flex; align-items: center; gap: 5px; border: 1px solid rgba(128,128,128,.4);' +
+    ' border-radius: 6px; padding: 1px 7px; }' +
+    // A badge, not just a bolder word: side by side in one line, the person
+    // and the names they serve read as one run of text, and the name of the
+    // person is the part that changes.
+    '.pb-who { font-weight: 600; padding: 1px 8px; border-radius: 999px;' +
+    ' background: rgba(128,128,128,.28); }' +
+    // A service name is an identifier: it wraps BETWEEN names, never inside
+    // one - a name split across two lines reads as two that do not exist.
+    '.pb-names > span { white-space: nowrap; }' +
+    '.pb-names { font-family: ui-monospace, monospace; }' +
+    '';
+
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // Where the strip sits, as a fraction of the viewport width. Clamped on
+  // every placement rather than on save: a position that fitted yesterday's
+  // window has to keep the strip reachable in today's.
+  let anchor = 0.5, dragged = false;
+
+  const placeStrip = (fraction, bar) => {
+    const half = bar.getBoundingClientRect().width / 2;
+    const min = half + 8, max = Math.max(min, window.innerWidth - half - 8);
+    anchor = Math.min(Math.max(fraction * window.innerWidth, min), max) / window.innerWidth;
+    bar.style.setProperty('--pb-x', (anchor * 100).toFixed(3) + '%');
+  };
+
+  // What look the strip wears. Its own shadow root cuts colour-scheme along
+  // with everything else, so it has to be told - and told the same thing the
+  // rest of the page was.
+  //
+  // The integrator's choice comes FIRST (THEME-05). Unchecking dark for the
+  // built-in pages made them light and left this strip dark on a dark desktop,
+  // because it was only ever reading the per-route switch, which a route that
+  // does not offer one never writes.
+  let imposedScheme = '';
+  const syncStripScheme = () => {
+    if (!stripHost) return;
+    const scheme = imposedScheme || document.documentElement.getAttribute('data-meerkat-scheme');
+    if (scheme) stripHost.setAttribute('data-scheme', scheme);
+    else stripHost.removeAttribute('data-scheme');
+  };
+
+  const renderServed = (labels) => {
+    const L = labels || {};
+    const lb = (k, d) => L[k] || d;
+    if (!servedNow.length) {
+      if (stripHost) { stripHost.remove(); stripHost = null; stripRoot = null; }
+      return;
+    }
+    if (!stripHost) {
+      stripHost = document.createElement('div');
+      stripHost.setAttribute('data-meerkat-plugged', '');
+      stripRoot = stripHost.attachShadow({ mode: 'open' });
+      const style = document.createElement('style');
+      style.textContent = stripCSS;
+      stripRoot.appendChild(style);
+      stripRoot.appendChild(document.createElement('div'));
+      document.body.appendChild(stripHost);
+      try {
+        const saved = parseFloat(localStorage.getItem('mk-plugbar-x'));
+        if (saved >= 0 && saved <= 1) anchor = saved;
+      } catch { /* opaque storage: it stays centred */ }
+      // A window that narrows must not leave the strip half off the screen.
+      addEventListener('resize', () => {
+        const b = stripRoot && stripRoot.lastElementChild;
+        if (b) placeStrip(anchor, b);
+      });
+    }
+    // Follow whatever the page settled on: the agent writes the resolved
+    // choice on <html>, and the strip is outside that inheritance.
+    syncStripScheme();
+    let collapsed = false;
+    try { collapsed = sessionStorage.getItem('mk-plugbar-min') === '1'; } catch { /* opaque storage */ }
+    // Grouped by whoever is serving, and sorted on both levels: an unchanged
+    // state must look unchanged between two renders, or the list appears to
+    // shuffle on every event.
+    const byWho = new Map();
+    for (const s of servedNow.slice().sort((a, b) => a.name.localeCompare(b.name))) {
+      const k = s.who || '';
+      if (!byWho.has(k)) byWho.set(k, []);
+      byWho.get(k).push(s);
+    }
+    const groups = [...byWho.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const bar = stripRoot.lastElementChild;
+    bar.className = 'pb' + (collapsed ? ' min' : '');
+    bar.innerHTML =
+      '<button class="pb-tab" title="' + esc(lb('pluggedTitle', 'Served from a developer machine')) + '">' +
+      '<span class="pb-badge">plug</span><span class="pb-chev">' + (collapsed ? '\u25b4' : '\u25be') + '</span></button>' +
+      '<span class="pb-title">' + esc(lb('pluggedTitle', 'Served from a developer machine')) + '</span>' +
+      '<ul class="pb-list">' + groups.map(([who, list]) =>
+        '<li>' +
+        (who ? '<span class="pb-who">' + esc(who) + '</span>' : '') +
+        '<span class="pb-names">' + list.map((s) => '<span>' + esc(s.name) + '</span>').join(', ') + '</span>' +
+        '</li>').join('') + '</ul>';
+    placeStrip(anchor, bar);
+    const tab = bar.querySelector('.pb-tab');
+    tab.addEventListener('click', () => {
+      // A drag ends with a click the browser fires anyway; swallowing it here
+      // is what keeps moving the strip from also collapsing it.
+      if (dragged) { dragged = false; return; }
+      const min = !bar.classList.contains('min');
+      bar.classList.toggle('min', min);
+      bar.querySelector('.pb-chev').textContent = min ? '\u25b4' : '\u25be';
+      try { sessionStorage.setItem('mk-plugbar-min', min ? '1' : '0'); } catch { /* ditto */ }
+    });
+    // Dragging the handle slides the strip along its edge. The only real
+    // defect of a fixed strip is that it covers something; letting it be moved
+    // costs a few lines and removes the whole complaint.
+    //
+    // The position is kept as a FRACTION of the viewport, in localStorage: a
+    // pixel offset saved on a wide screen puts the strip off a narrow one, and
+    // this is a preference rather than a session's business.
+    tab.addEventListener('pointerdown', (e) => {
+      const start = e.clientX;
+      const rect = bar.getBoundingClientRect();
+      const grip = start - (rect.left + rect.width / 2);
+      dragged = false;
+      tab.setPointerCapture(e.pointerId);
+      const move = (ev) => {
+        // Below a few pixels it is a click, not a drag: a handle that slides
+        // when someone means to collapse it is a handle that fights back.
+        if (!dragged && Math.abs(ev.clientX - start) < 4) return;
+        dragged = true;
+        placeStrip((ev.clientX - grip) / window.innerWidth, bar);
+      };
+      const up = () => {
+        tab.removeEventListener('pointermove', move);
+        tab.removeEventListener('pointerup', up);
+        if (dragged) {
+          try { localStorage.setItem('mk-plugbar-x', String(anchor)); } catch { /* ditto */ }
+        }
+      };
+      tab.addEventListener('pointermove', move);
+      tab.addEventListener('pointerup', up);
+    });
+  };
+
+  // The payload is the state; the channel only keeps it fresh. A page whose
+  // socket never opens still shows the truth it was served with, and simply
+  // stops learning - it never shows nothing by accident.
+  const watchServed = () => {
+    // A framed page draws no strip, exactly as the user button draws no menu
+    // there (UIF-03). A portal and the application it frames are two pages of
+    // this origin, both carrying the agent, and both drew one - the same strip
+    // twice, one of them inside the frame. The portal is the page someone is
+    // actually looking at, so it keeps it.
+    //
+    // The CLIENT decides, never the server: the HTML served is identical for
+    // everyone, so no cache can hand one context the other's page.
+    if (window.self !== window.top) return;
+    data().then((d) => {
+      if (d && d.schemeImposed && d.scheme) imposedScheme = d.scheme;
+      servedNow = Array.isArray(d.served) ? d.served.slice() : [];
+      renderServed(d.labels);
+      onEvent('served', (s) => {
+        if (!s || !s.name) return;
+        servedNow = servedNow.filter((x) => x.name !== s.name).concat([s]);
+        renderServed(d.labels);
+      });
+      onEvent('unserved', (s) => {
+        if (!s || !s.name) return;
+        servedNow = servedNow.filter((x) => x.name !== s.name);
+        renderServed(d.labels);
+      });
+    }).catch(() => {});
+  };
+
   window.meerkatPage = {
-    data, applyScheme, applyLanguage, pickLanguage, resolvedLanguage, onEvent,
+    data, applyScheme, pickScheme, applyLanguage, pickLanguage, resolvedLanguage, onEvent,
     onLanguage: (fn) => { if (typeof fn === 'function') listeners.push(fn); },
     // Called by the button after /logout: the cookie is already gone here, so
     // the other tabs learn it from the message rather than from a failure.
@@ -362,6 +622,7 @@ const pageJS = `(() => {
   };
 
   watchSession();
+  watchServed();
 
   if (cfg.scheme === 'select') {
     applyScheme(getCookie(COOKIE_SCHEME) || 'auto');
@@ -375,6 +636,7 @@ const pageJS = `(() => {
     data().then(d => {
       if (d && d.schemeImposed) { schemeImposed = true; applyScheme(d.scheme); }
     }).catch(() => {});
+    listenForScheme();
   }
   if (languages().length) {
     listenForLanguage();

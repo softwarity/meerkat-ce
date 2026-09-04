@@ -15,6 +15,7 @@ import (
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 func setup(t *testing.T) (*http.ServeMux, *session.Manager) {
@@ -33,7 +34,7 @@ func setupWithStore(t *testing.T) (*http.ServeMux, *store.Store) {
 
 func setupAll(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -136,7 +137,7 @@ func TestLogoutClearsSession(t *testing.T) {
 }
 
 func TestSeedAdminOnlyOnEmptyStore(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -165,7 +166,7 @@ func TestSeedAdminOnlyOnEmptyStore(t *testing.T) {
 // setupFlow is setup with the store exposed, for tenant-flow tests.
 func setupFlow(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -300,7 +301,7 @@ func TestLoginMultiTenantGoesThroughSelection(t *testing.T) {
 }
 
 func TestAdminPlaneSkipsTenantFlow(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +406,7 @@ func TestForcedPasswordStepCannotBeBypassed(t *testing.T) {
 // TestAdminPlaneKeepsMeerkatChrome: the theme editor restyles the DATA plane
 // only - the admin plane's pages keep the built-in identity.
 func TestAdminPlaneKeepsMeerkatChrome(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +482,7 @@ func baDays(from, to string, days ...int) []store.DayRange {
 // The login page offers the enabled, unauthenticated UI routes as links;
 // API routes and authenticated routes stay out (AUTH/ROUTE public entry).
 func TestLoginPageOffersPublicUIRoutes(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

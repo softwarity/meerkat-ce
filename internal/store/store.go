@@ -1,7 +1,8 @@
-// Package store is Meerkat's embedded storage: a single SQLite file, pure Go
-// (no CGO), transactional. It is the zero-dependency default backend; an
-// external database backend (for clustering) will plug behind the same
-// interface later.
+// Package store is Meerkat's storage. Two databases behind one set of
+// queries: a single SQLite file, pure Go (no CGO), which is the
+// zero-dependency default; and PostgreSQL, which is what several gateways
+// serving one installation share (STORE-03). What differs between them is in
+// dialect.go and db.go, and nowhere else.
 package store
 
 import (
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver
@@ -26,6 +28,9 @@ import (
 // Store wraps the embedded database.
 type Store struct {
 	db *database
+	// locks holds the per-process half of the cluster locks (locks.go): one
+	// mutex per name, kept for the life of the store.
+	locks sync.Map
 	// vaultCipher seals the vault's secret entries at rest (VAULT-01). The
 	// master key comes from MEERKAT_VAULT_KEY, or a 0600 key file in dataDir.
 	vaultCipher *vault.Cipher
@@ -127,17 +132,32 @@ func (s *Store) Close() error { return s.db.Close() }
 // data plane only, an admin (control-plane) token on the admin port only -
 // each plane accepts its own scope, never the other's. Admin tokens are the
 // foundation for headless management (CLI/MCP), minted by root.
+// v48 accounts carry their colour scheme beside their language (THEME-05):
+// both are preferences of the PERSON, so both are re-applied to the cookie at
+// sign-in, on a browser that never knew them.
+// v47 a route's OpenAPI spec may be DEPOSITED rather than declared upstream
+// (SVC-06): route.api.spec names the source (upstream|file) and, for a file,
+// the single segment the gateway serves it under; the bytes live in
+// route_specs, out of the routes' api column.
 // v33 issue reports (ISSUE-01/02): user-filed reports from the injected
 // user-button panel - description, captured context (url, console, browser),
 // an optional screenshot, statuses and team comments.
 // schemaSQL is the WHOLE schema, always current: every column a build knows
 // about is declared here, and an existing database catches up through
 // addMissingColumns below.
+//
+// One spelling for both databases, which is what makes that possible - and it
+// is why whole numbers are BIGINT and never INTEGER. On the embedded database
+// the two are the same word; on PostgreSQL, INTEGER is 32 bits, and every
+// timestamp in here is a Unix second. A session valid until 2100 already
+// overflowed it, and the rest would have waited until 2038 to say so. The
+// guard in schemaguard_test.go refuses the narrow spelling so the next column
+// does not learn it by copying its neighbour.
 const schemaSQL = `
 CREATE TABLE IF NOT EXISTS routes (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL UNIQUE,
-  ord           INTEGER NOT NULL DEFAULT 0,
+  ord           BIGINT NOT NULL DEFAULT 0,
   enabled       BOOLEAN NOT NULL DEFAULT TRUE,
   is_ui         BOOLEAN NOT NULL DEFAULT FALSE,
   upstream      TEXT NOT NULL,
@@ -147,9 +167,28 @@ CREATE TABLE IF NOT EXISTS routes (
   ui            TEXT NOT NULL DEFAULT '{}',
   identity      TEXT NOT NULL DEFAULT '{}',
   locales       TEXT NOT NULL DEFAULT '{}',
+  -- How long this upstream may take (v54, ROUTE-07). '{}' is the
+  -- installation's defaults, which is what every route ran with when the
+  -- bounds were global.
+  timeouts      TEXT NOT NULL DEFAULT '{}',
+  -- When to stop calling an upstream that stopped answering (v55, ROUTE-09).
+  breaker       TEXT NOT NULL DEFAULT '{}',
   -- The route's unified base security (RBAC-06): who may call it at all,
   -- which per-endpoint rules then override (RBAC-07).
   access        TEXT NOT NULL DEFAULT '{}'
+);
+
+-- A spec deposited on a route (SVC-06). Kept out of the routes' api column on
+-- purpose: that column is read in full by every ListRoutes - the console's
+-- table, every reload of the router - and a spec is the one thing there big
+-- enough to make listing names cost megabytes. The key is (route, genre) so a
+-- second attachment would not need a table of its own. The file is stored AS
+-- DEPOSITED; JSON is what leaves, converted on the way out.
+CREATE TABLE IF NOT EXISTS route_specs (
+  route_id TEXT NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+  kind     TEXT NOT NULL DEFAULT 'openapi',
+  content  TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (route_id, kind)
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -169,15 +208,19 @@ CREATE TABLE IF NOT EXISTS users (
   infra_admin          BOOLEAN NOT NULL DEFAULT FALSE,
   app_admin            BOOLEAN NOT NULL DEFAULT FALSE,
   locale               TEXT NOT NULL DEFAULT '',
+  -- The colour scheme the person chose: "" (follow the system), light, dark.
+  -- Beside the language for the same reason - both are read by the pages the
+  -- gateway serves, and both follow the PERSON rather than the machine.
+  scheme               TEXT NOT NULL DEFAULT '',
   timezone             TEXT NOT NULL DEFAULT 'UTC',
-  created_at           INTEGER NOT NULL DEFAULT 0,
-  updated_at           INTEGER NOT NULL DEFAULT 0,
-  last_connection_at   INTEGER NOT NULL DEFAULT 0,
+  created_at           BIGINT NOT NULL DEFAULT 0,
+  updated_at           BIGINT NOT NULL DEFAULT 0,
+  last_connection_at   BIGINT NOT NULL DEFAULT 0,
   must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
   -- When the password was last set, for the expiry rule (AUTH-10). Checked at
   -- SIGN-IN, never by a clock: expiring at three in the morning would sign
   -- nobody out, it would only refuse the next login.
-  password_changed_at  INTEGER NOT NULL DEFAULT 0,
+  password_changed_at  BIGINT NOT NULL DEFAULT 0,
   -- The second factor (MFA-01). totp_secret is the confirmed base32 TOTP
   -- secret ('' = not enrolled); totp_pending holds a secret mid-enrolment,
   -- before the first code confirms it; totp_scratch is a JSON array of the
@@ -213,8 +256,8 @@ CREATE TABLE IF NOT EXISTS vault_entries (
   value       TEXT NOT NULL DEFAULT '',
   description TEXT NOT NULL DEFAULT '',
   tags        TEXT NOT NULL DEFAULT '[]',
-  created_at  INTEGER NOT NULL DEFAULT 0,
-  updated_at  INTEGER NOT NULL DEFAULT 0,
+  created_at  BIGINT NOT NULL DEFAULT 0,
+  updated_at  BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (scope, name)
 );
 
@@ -224,14 +267,14 @@ CREATE TABLE IF NOT EXISTS vault_entries (
 CREATE TABLE IF NOT EXISTS password_history (
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   password_hash TEXT NOT NULL,
-  changed_at    INTEGER NOT NULL
+  changed_at    BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_password_history_user ON password_history(user_id, changed_at DESC);
 
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  expires_at INTEGER NOT NULL,
+  expires_at BIGINT NOT NULL,
   -- The active tenant chosen at login or on the select-tenant page
   -- (TENANT-03); '' = none chosen (no membership, or selection pending).
   tenant_id  TEXT NOT NULL DEFAULT '',
@@ -248,7 +291,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   method     TEXT NOT NULL DEFAULT '',
   -- The lifetime this session was issued with, in seconds: the deadline above
   -- slides, and pushing it needs the value the login resolved.
-  ttl        INTEGER NOT NULL DEFAULT 0,
+  ttl        BIGINT NOT NULL DEFAULT 0,
   plane      TEXT NOT NULL DEFAULT 'data'
 );
 CREATE INDEX IF NOT EXISTS sessions_expires ON sessions(expires_at);
@@ -268,8 +311,8 @@ CREATE TABLE IF NOT EXISTS tenants (
   -- transferable, and INDEPENDENT of membership - an owner need not be a
   -- member. This is why there is no OWNER membership type.
   owner_id        TEXT NOT NULL DEFAULT '',
-  created_at      INTEGER NOT NULL DEFAULT 0,
-  updated_at      INTEGER NOT NULL DEFAULT 0
+  created_at      BIGINT NOT NULL DEFAULT 0,
+  updated_at      BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS memberships (
@@ -282,8 +325,8 @@ CREATE TABLE IF NOT EXISTS memberships (
   enabled         BOOLEAN NOT NULL DEFAULT TRUE,
   business_access TEXT NOT NULL DEFAULT '{"inherited":true}',
   session_ttl     TEXT NOT NULL DEFAULT '',
-  created_at      INTEGER NOT NULL DEFAULT 0,
-  updated_at      INTEGER NOT NULL DEFAULT 0,
+  created_at      BIGINT NOT NULL DEFAULT 0,
+  updated_at      BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, tenant_id)
 );
 CREATE INDEX IF NOT EXISTS memberships_tenant ON memberships(tenant_id);
@@ -300,8 +343,8 @@ CREATE TABLE IF NOT EXISTS themes (
   flat       BOOLEAN NOT NULL DEFAULT FALSE,
   dark       TEXT NOT NULL DEFAULT '{}',
   light      TEXT NOT NULL DEFAULT '{}',
-  created_at INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL DEFAULT 0
+  created_at BIGINT NOT NULL DEFAULT 0,
+  updated_at BIGINT NOT NULL DEFAULT 0
 );
 
 -- RBAC (v8): a GLOBAL role catalogue (hierarchical), per-tenant groups bundling
@@ -313,8 +356,8 @@ CREATE TABLE IF NOT EXISTS roles (
   parent_id   TEXT REFERENCES roles(id) ON DELETE SET NULL,
   tags        TEXT NOT NULL DEFAULT '[]',
   system      BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at  INTEGER NOT NULL DEFAULT 0,
-  updated_at  INTEGER NOT NULL DEFAULT 0
+  created_at  BIGINT NOT NULL DEFAULT 0,
+  updated_at  BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -324,8 +367,8 @@ CREATE TABLE IF NOT EXISTS groups (
   -- A human description (RBAC-02), editable from the matrix's group menu and
   -- shown as the label the roles hang under.
   description TEXT NOT NULL DEFAULT '',
-  created_at INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL DEFAULT 0,
+  updated_at BIGINT NOT NULL DEFAULT 0,
   UNIQUE (tenant_id, name)
 );
 CREATE INDEX IF NOT EXISTS groups_tenant ON groups(tenant_id);
@@ -363,7 +406,7 @@ CREATE TABLE IF NOT EXISTS group_rules (
   provider_id TEXT NOT NULL DEFAULT '',
   external    TEXT NOT NULL DEFAULT '',
   group_id    TEXT REFERENCES groups(id) ON DELETE CASCADE,
-  created_at  INTEGER NOT NULL DEFAULT 0,
+  created_at  BIGINT NOT NULL DEFAULT 0,
   UNIQUE (tenant_id, provider_id, external, group_id)
 );
 CREATE INDEX IF NOT EXISTS group_rules_tenant ON group_rules(tenant_id);
@@ -376,8 +419,8 @@ CREATE TABLE IF NOT EXISTS trusted_browsers (
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   label      TEXT NOT NULL DEFAULT '',
-  created_at INTEGER NOT NULL DEFAULT 0,
-  expires_at INTEGER NOT NULL
+  created_at BIGINT NOT NULL DEFAULT 0,
+  expires_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS trusted_browsers_user ON trusted_browsers(user_id);
 
@@ -390,8 +433,8 @@ CREATE TABLE IF NOT EXISTS webauthn_credentials (
   credential_id TEXT NOT NULL UNIQUE,
   data          TEXT NOT NULL,
   label         TEXT NOT NULL DEFAULT '',
-  created_at    INTEGER NOT NULL DEFAULT 0,
-  last_used_at  INTEGER NOT NULL DEFAULT 0
+  created_at    BIGINT NOT NULL DEFAULT 0,
+  last_used_at  BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS webauthn_credentials_user ON webauthn_credentials(user_id);
 
@@ -401,7 +444,7 @@ CREATE INDEX IF NOT EXISTS webauthn_credentials_user ON webauthn_credentials(use
 CREATE TABLE IF NOT EXISTS challenges (
   id         TEXT PRIMARY KEY,
   data       TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
+  expires_at BIGINT NOT NULL
 );
 DROP TABLE IF EXISTS webauthn_challenges;
 
@@ -417,7 +460,7 @@ CREATE TABLE IF NOT EXISTS login_events (
   ip           TEXT NOT NULL DEFAULT '',
   country      TEXT NOT NULL DEFAULT '',
   browser_hash TEXT NOT NULL DEFAULT '',
-  at           INTEGER NOT NULL
+  at           BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS login_events_user ON login_events(user_id, at);
 
@@ -427,7 +470,7 @@ CREATE TABLE IF NOT EXISTS email_tokens (
   token_hash TEXT PRIMARY KEY,
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   purpose    TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
+  expires_at BIGINT NOT NULL
 );
 
 -- External authentication (v30, AUTH-19): one row per configured authority.
@@ -438,7 +481,7 @@ CREATE TABLE IF NOT EXISTS auth_providers (
   kind          TEXT NOT NULL,                    -- oidc | ldap | saml
   name          TEXT NOT NULL,                    -- what the login page shows
   enabled       BOOLEAN NOT NULL DEFAULT FALSE,
-  ord           INTEGER NOT NULL DEFAULT 0,
+  ord           BIGINT NOT NULL DEFAULT 0,
   config        TEXT NOT NULL DEFAULT '{}',
   -- Per-provider policies: '' inherits the application setting. An authority
   -- that already enforces its own second factor has no use for ours.
@@ -453,8 +496,8 @@ CREATE TABLE IF NOT EXISTS auth_providers (
   -- arrival through a directory or an identity provider already proved itself
   -- over there.
   captcha       BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at    INTEGER NOT NULL DEFAULT 0,
-  updated_at    INTEGER NOT NULL DEFAULT 0
+  created_at    BIGINT NOT NULL DEFAULT 0,
+  updated_at    BIGINT NOT NULL DEFAULT 0
 );
 
 -- The link between a local account and what an authority calls that person.
@@ -469,8 +512,8 @@ CREATE TABLE IF NOT EXISTS user_identities (
   external_id  TEXT NOT NULL,
   user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   groups       TEXT NOT NULL DEFAULT '',
-  created_at   INTEGER NOT NULL DEFAULT 0,
-  last_seen_at INTEGER NOT NULL DEFAULT 0,
+  created_at   BIGINT NOT NULL DEFAULT 0,
+  last_seen_at BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (provider_id, external_id)
 );
 CREATE INDEX IF NOT EXISTS user_identities_user ON user_identities(user_id);
@@ -488,12 +531,56 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   tenant_id    TEXT NOT NULL DEFAULT '',
   group_id     TEXT NOT NULL DEFAULT '',
   plane        TEXT NOT NULL DEFAULT 'data',
+  -- The token's perimeter (v49, MCP-02): 'full' or 'readonly'. Checked on the
+  -- control plane, which is where a token can rewrite a gateway.
+  scope        TEXT NOT NULL DEFAULT 'full',
+  -- The second axis of the perimeter (v50, MCP-02): '' the whole control
+  -- plane, 'gateway' the routing plane, 'app' the application's identity. It
+  -- MASKS the owner's capabilities, so a token is at most its owner.
+  domain       TEXT NOT NULL DEFAULT '',
+  -- Where the token may be used from (v50): comma-separated CIDR ranges,
+  -- empty for anywhere. Judged on the TCP peer, never on a header.
+  from_cidrs   TEXT NOT NULL DEFAULT '',
+  -- The registered agent this token belongs to (v51, MCP-07), empty for one
+  -- minted by hand. It is what turns the token list into a list of CONNECTED
+  -- AGENTS, each revocable where it stands.
+  client_id    TEXT NOT NULL DEFAULT '',
   enabled      BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at   INTEGER NOT NULL DEFAULT 0,
-  expires_at   INTEGER NOT NULL DEFAULT 0,
-  last_used_at INTEGER NOT NULL DEFAULT 0
+  created_at   BIGINT NOT NULL DEFAULT 0,
+  expires_at   BIGINT NOT NULL DEFAULT 0,
+  last_used_at BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS api_tokens_user ON api_tokens(user_id);
+
+-- The OAuth flow that connects an agent without anybody copying a secret
+-- (v51, MCP-07). Three short-lived things and one registration: clients are
+-- public (no secret - a CLI cannot keep one), codes live five minutes and are
+-- spent once, refresh tokens rotate.
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL DEFAULT '',
+  redirect_uris TEXT NOT NULL DEFAULT '',
+  created_at    BIGINT NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS oauth_codes (
+  code_hash    TEXT PRIMARY KEY,
+  client_id    TEXT NOT NULL DEFAULT '',
+  user_id      TEXT NOT NULL DEFAULT '',
+  redirect_uri TEXT NOT NULL DEFAULT '',
+  challenge    TEXT NOT NULL DEFAULT '',
+  scope        TEXT NOT NULL DEFAULT '',
+  domain       TEXT NOT NULL DEFAULT '',
+  resource     TEXT NOT NULL DEFAULT '',
+  expires_at   BIGINT NOT NULL DEFAULT 0
+);
+-- The refresh token points at the api_tokens row it renews: the access token
+-- IS an ordinary control-plane token, so the perimeter, the audit and the
+-- revocation all work on it without a second machinery.
+CREATE TABLE IF NOT EXISTS oauth_refresh (
+  token_hash TEXT PRIMARY KEY,
+  token_id   TEXT NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+  expires_at BIGINT NOT NULL DEFAULT 0
+);
 
 -- Audit trail (v25): one row per administrative mutation. actor_id/target_id
 -- are NOT foreign keys - the trail must outlive a deleted actor or target
@@ -502,12 +589,15 @@ CREATE INDEX IF NOT EXISTS api_tokens_user ON api_tokens(user_id);
 -- (before/after); tenant_id scopes tenant-admin visibility ("" = global).
 CREATE TABLE IF NOT EXISTS audit_events (
   id          TEXT PRIMARY KEY,
-  at          INTEGER NOT NULL,
+  at          BIGINT NOT NULL,
   actor_id    TEXT NOT NULL DEFAULT '',
   action      TEXT NOT NULL,
   target      TEXT NOT NULL DEFAULT '',
   target_id   TEXT NOT NULL DEFAULT '',
   target_name TEXT NOT NULL DEFAULT '',
+  -- The NAME of the control-plane token that acted (v49, MCP-03), empty when a
+  -- human did it from the console. "root" is who, "claude-desktop" is what.
+  actor_token TEXT NOT NULL DEFAULT '',
   tenant_id   TEXT NOT NULL DEFAULT '',
   changes     TEXT NOT NULL DEFAULT '[]',
   detail      TEXT NOT NULL DEFAULT ''
@@ -524,8 +614,8 @@ CREATE INDEX IF NOT EXISTS audit_events_actor ON audit_events(actor_id, at);
 -- (lists never carry it). console_log and comments are JSON arrays.
 CREATE TABLE IF NOT EXISTS issues (
   id            TEXT PRIMARY KEY,
-  created_at    INTEGER NOT NULL,
-  updated_at    INTEGER NOT NULL,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL,
   reporter_id   TEXT NOT NULL DEFAULT '',
   reporter_name TEXT NOT NULL DEFAULT '',
   tenant_id     TEXT NOT NULL DEFAULT '',
@@ -564,8 +654,8 @@ CREATE TABLE IF NOT EXISTS configurations (
   -- hash them would undo exactly what that saves.
   digest      TEXT NOT NULL DEFAULT '',
   active      BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at  INTEGER NOT NULL DEFAULT 0,
-  updated_at  INTEGER NOT NULL DEFAULT 0
+  created_at  BIGINT NOT NULL DEFAULT 0,
+  updated_at  BIGINT NOT NULL DEFAULT 0
 );
 -- One active configuration at a time, enforced by the index rather than by a
 -- transaction everyone has to remember.
@@ -584,7 +674,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS configurations_active ON configurations(active
 -- megabyte of base64 repeated two hundred times.
 CREATE TABLE IF NOT EXISTS config_points (
   id         TEXT PRIMARY KEY,
-  at         INTEGER NOT NULL,
+  at         BIGINT NOT NULL,
   actor_id   TEXT NOT NULL DEFAULT '',
   label      TEXT NOT NULL DEFAULT '',
   digest     TEXT NOT NULL DEFAULT '',
@@ -625,12 +715,12 @@ CREATE TABLE IF NOT EXISTS certificates (
   key_type     TEXT NOT NULL DEFAULT '',
   dns_names    TEXT NOT NULL DEFAULT '[]',
   ip_addresses TEXT NOT NULL DEFAULT '[]',
-  chain        INTEGER NOT NULL DEFAULT 0,
+  chain        BIGINT NOT NULL DEFAULT 0,
   self_signed  BOOLEAN NOT NULL DEFAULT FALSE,
-  not_before   INTEGER NOT NULL DEFAULT 0,
-  not_after    INTEGER NOT NULL DEFAULT 0,
-  created_at   INTEGER NOT NULL DEFAULT 0,
-  updated_at   INTEGER NOT NULL DEFAULT 0
+  not_before   BIGINT NOT NULL DEFAULT 0,
+  not_after    BIGINT NOT NULL DEFAULT 0,
+  created_at   BIGINT NOT NULL DEFAULT 0,
+  updated_at   BIGINT NOT NULL DEFAULT 0
 );
 
 -- The ACME account key and the certificates an authority issued (SSL-05).
@@ -641,17 +731,54 @@ CREATE TABLE IF NOT EXISTS certificates (
 CREATE TABLE IF NOT EXISTS acme_cache (
   key        TEXT PRIMARY KEY,
   value      TEXT NOT NULL DEFAULT '',
-  updated_at INTEGER NOT NULL DEFAULT 0
+  updated_at BIGINT NOT NULL DEFAULT 0
+);
+
+-- What each node has to re-read, and when it last moved (v52, STORE-03). One row
+-- per topic, a counter that only goes up.
+--
+-- The NOTIFY that goes out with a write is a HINT, not the truth: it is lost
+-- if nobody is listening at that instant, and a listening connection can drop
+-- without saying so. This table is the truth - a node that reconnects, or
+-- simply wakes up on its slow timer, compares the versions it acted on with
+-- the ones in here and reloads what moved. That is also what makes a change
+-- made straight in SQL, by a migration or by hand, eventually arrive.
+-- Failed sign-in attempts, one row each (v53, AUTH-11). Shared, so a limit of
+-- five is five for the installation rather than five per gateway, and a
+-- restart no longer forgives whoever was being throttled.
+--
+-- Milliseconds rather than seconds: the window is read as "how many since a
+-- moment", and two attempts inside the same second are two.
+CREATE TABLE IF NOT EXISTS login_attempts (
+  key TEXT NOT NULL,
+  at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_key ON login_attempts (key, at);
+
+CREATE TABLE IF NOT EXISTS change_marks (
+  topic   TEXT PRIMARY KEY,
+  version BIGINT NOT NULL DEFAULT 0,
+  at      BIGINT NOT NULL DEFAULT 0
 );`
 
-const schemaVersion = 46
+const schemaVersion = 55
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
 	if err != nil {
 		return err
 	}
-	_ = v // design phase: no data migrations, the columns catch up on their own.
+	// Before anything is written to it. A database a LATER build wrote is one
+	// this one cannot maintain, and finding that out after the first INSERT is
+	// finding it out too late.
+	if err := checkNotNewer(v, schemaVersion); err != nil {
+		return err
+	}
+	// A database that has never been opened: v is zero, and the DDL below is
+	// already the end state. The ledger says how OLDER databases reach it, and
+	// there is no older database here - running its steps would ask a fresh
+	// schema to undo changes it never had.
+	fresh := v == 0
 	if _, err := s.db.Exec(schemaSQL); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
@@ -660,6 +787,18 @@ func (s *Store) migrate() error {
 	if err := s.addMissingColumns(); err != nil {
 		return err
 	}
+	// The steps a CREATE cannot express, in order, each once. Skipped on a
+	// fresh database for the reason above.
+	if !fresh {
+		if err := s.runMigrations(migrations, v); err != nil {
+			return err
+		}
+	}
+	// Two leftovers from the design phase, run unconditionally on every start
+	// because there was nowhere to record that they had already run. They stay
+	// until the first release, whose baseline makes them unreachable: no
+	// database at or above it can hold either shape.
+	//
 	// A certificate now belongs to a host (v44). Rows written before that have
 	// an empty one and cannot be expressed in the model at all - they belong to
 	// no name, so no screen can show them and no handshake can pick them. They
@@ -709,8 +848,8 @@ const (
 // and the endpoint-level security (RBAC-07) posed on that spec's operations,
 // which secures an upstream that does not enforce access itself.
 type RouteAPI struct {
-	OpenapiURL string            `json:"openapiUrl,omitempty"`
-	Security   *EndpointSecurity `json:"security,omitempty"`
+	Spec     *RouteSpec        `json:"spec,omitempty"`
+	Security *EndpointSecurity `json:"security,omitempty"`
 }
 
 // Access levels (RBAC-06), the BELONGING axis of an access rule. They are
@@ -796,6 +935,55 @@ func (a Access) Empty() bool {
 	// passed over and served by whatever matched next - the catch-all, in
 	// practice, silently and with nothing on screen to say so.
 	return a.Level == AccessDelegated && len(a.Roles) == 0
+}
+
+// AccessLevels are the levels a rule may take, in the order a form offers
+// them: from the one that poses no condition to the one that refuses everyone.
+var AccessLevels = []string{AccessDelegated, AccessAuth, AccessTenant, AccessTenants, AccessDeny}
+
+// SanitizeAccess drops what a rule cannot use, so the stored rule says exactly
+// what the engine reads - and the screens showing it stop describing a
+// restriction nobody applies.
+//
+// The one that bit: NAMED USERS on a rule that poses no condition. Users are
+// an exception, and an exception needs something to be an exception TO (see
+// Empty), so the engine ignores such a name entirely - while the routes table
+// lit a badge saying "Users: alice" on a route delegated to its service. Worse
+// than the wrong badge: raise the level later and that forgotten name comes
+// silently back to life as a way in.
+//
+// Cleaning happens on SAVE rather than on read, because a value nobody can see
+// and nobody can remove is the actual defect; a rule saved once is then true
+// on disk, and an import or an agent cannot reintroduce one.
+func SanitizeAccess(a *Access) error {
+	a.Level = strings.ToLower(strings.TrimSpace(a.Level))
+	if !slices.Contains(AccessLevels, a.Level) {
+		return fmt.Errorf("access level %q: allowed are %s (or none, to delegate to the service)",
+			a.Level, strings.Join(AccessLevels[1:], ", "))
+	}
+	a.Roles = nonEmpty(a.Roles)
+	a.Users = nonEmpty(a.Users)
+	a.Tenants = nonEmpty(a.Tenants)
+	// A tenant list belongs to the level that reads it, and nowhere else.
+	if a.Level != AccessTenants {
+		a.Tenants = nil
+	}
+	if a.Empty() {
+		a.Users = nil
+	}
+	return nil
+}
+
+// nonEmpty drops blank entries and keeps nil nil: a rule with an empty list
+// and a rule with no list are the same rule, and they should serialize alike.
+func nonEmpty(in []string) []string {
+	var out []string
+	for _, v := range in {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // Grants reports whether the gateway lets a caller through.
@@ -1129,12 +1317,20 @@ type Route struct {
 	// languages by default) and its forwarding mechanism - both types too:
 	// an API takes the locale as a header or query parameter.
 	Locales *LocalesConfig `json:"locales,omitempty"`
+	// Timeouts bounds how long this upstream may take (ROUTE-07). Nil means
+	// the installation's defaults, which is what every route ran with when the
+	// bounds were global.
+	Timeouts *RouteTimeouts `json:"timeouts,omitempty"`
+	// Breaker stops calling an upstream that has stopped answering (ROUTE-09).
+	// Nil, or present and off, is off - the state of every route until
+	// somebody turns it on.
+	Breaker *CircuitBreaker `json:"breaker,omitempty"`
 }
 
 // ListRoutes returns every route ordered by ascending Order.
 func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access
+		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker
 		 FROM routes ORDER BY ord ASC, name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list routes: %w", err)
@@ -1143,9 +1339,9 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 	var routes []Route
 	for rows.Next() {
 		var r Route
-		var preds, filts, api, ui, identity, locales, access string
+		var preds, filts, api, ui, identity, locales, access, timeouts, breaker string
 		if err := rows.Scan(&r.ID, &r.Name, &r.Order, &r.Enabled,
-			&r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access); err != nil {
+			&r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker); err != nil {
 			return nil, fmt.Errorf("store: scan route: %w", err)
 		}
 		if err := json.Unmarshal([]byte(preds), &r.Predicates); err != nil {
@@ -1154,7 +1350,7 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 		if err := json.Unmarshal([]byte(filts), &r.Filters); err != nil {
 			return nil, fmt.Errorf("store: route %q: bad filters: %w", r.Name, err)
 		}
-		if err := decodeRouteOptions(&r, api, ui, identity, locales, access); err != nil {
+		if err := decodeRouteOptions(&r, api, ui, identity, locales, access, timeouts, breaker); err != nil {
 			return nil, fmt.Errorf("store: route %q: %w", r.Name, err)
 		}
 		routes = append(routes, r)
@@ -1167,6 +1363,26 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 
 // SaveRoute inserts or replaces a route by ID.
 func (s *Store) SaveRoute(ctx context.Context, r Route) error {
+	// Here rather than in the handlers: six callers write routes - the console,
+	// the agent, three OpenAPI paths and a configuration import - and a rule
+	// cleaned in five of them is a rule nobody can trust.
+	if err := SanitizeAccess(&r.Access); err != nil {
+		return invalidf(err)
+	}
+	if err := SanitizeRouteTimeouts(r.Timeouts); err != nil {
+		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
+	}
+	if err := SanitizeCircuitBreaker(r.Breaker); err != nil {
+		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
+	}
+	if r.API != nil && r.API.Security != nil {
+		for i := range r.API.Security.Endpoints {
+			if err := SanitizeAccess(&r.API.Security.Endpoints[i].Access); err != nil {
+				return invalidf(fmt.Errorf("%s %s: %w",
+					r.API.Security.Endpoints[i].Method, r.API.Security.Endpoints[i].Path, err))
+			}
+		}
+	}
 	preds, err := json.Marshal(orEmpty(r.Predicates))
 	if err != nil {
 		return fmt.Errorf("store: route %q: %w", r.Name, err)
@@ -1204,21 +1420,37 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 		}
 		locales = string(b)
 	}
+	timeouts := "{}"
+	if r.Timeouts != nil {
+		b, err := json.Marshal(r.Timeouts)
+		if err != nil {
+			return fmt.Errorf("store: route %q: %w", r.Name, err)
+		}
+		timeouts = string(b)
+	}
+	breaker := "{}"
+	if r.Breaker != nil {
+		b, err := json.Marshal(r.Breaker)
+		if err != nil {
+			return fmt.Errorf("store: route %q: %w", r.Name, err)
+		}
+		breaker = string(b)
+	}
 	access, err := json.Marshal(r.Access)
 	if err != nil {
 		return fmt.Errorf("store: route %q: %w", r.Name, err)
 	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO routes (id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO routes (id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, ord = excluded.ord, enabled = excluded.enabled,
 		   is_ui = excluded.is_ui, upstream = excluded.upstream,
 		   predicates = excluded.predicates, filters = excluded.filters,
 		   api = excluded.api, ui = excluded.ui, identity = excluded.identity, locales = excluded.locales,
-		   access = excluded.access`,
+		   access = excluded.access, timeouts = excluded.timeouts, breaker = excluded.breaker`,
 		r.ID, r.Name, r.Order, r.Enabled, r.IsUI, r.Upstream,
-		string(preds), string(filts), api, ui, identity, locales, string(access))
+		string(preds), string(filts), api, ui, identity, locales, string(access), timeouts, breaker)
 	if err != nil {
 		return fmt.Errorf("store: save route %q: %w", r.Name, err)
 	}
@@ -1248,11 +1480,11 @@ func (s *Store) ReorderRoutes(ctx context.Context, ids []string) error {
 // GetRoute returns one route by ID, or an error wrapping sql.ErrNoRows.
 func (s *Store) GetRoute(ctx context.Context, id string) (Route, error) {
 	var r Route
-	var preds, filts, api, ui, identity, locales, access string
+	var preds, filts, api, ui, identity, locales, access, timeouts, breaker string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access
+		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker
 		 FROM routes WHERE id = ?`, id).
-		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access)
+		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker)
 	if err != nil {
 		return Route{}, fmt.Errorf("store: get route %q: %w", id, err)
 	}
@@ -1262,7 +1494,7 @@ func (s *Store) GetRoute(ctx context.Context, id string) (Route, error) {
 	if err := json.Unmarshal([]byte(filts), &r.Filters); err != nil {
 		return Route{}, fmt.Errorf("store: route %q: bad filters: %w", id, err)
 	}
-	if err := decodeRouteOptions(&r, api, ui, identity, locales, access); err != nil {
+	if err := decodeRouteOptions(&r, api, ui, identity, locales, access, timeouts, breaker); err != nil {
 		return Route{}, fmt.Errorf("store: route %q: %w", id, err)
 	}
 	return r, nil
@@ -1280,7 +1512,7 @@ func (s *Store) DeleteRoute(ctx context.Context, id string) (bool, error) {
 
 // decodeRouteOptions hydrates the per-type option objects; "{}" stays nil so
 // the JSON API omits what was never configured.
-func decodeRouteOptions(r *Route, api, ui, identity, locales, access string) error {
+func decodeRouteOptions(r *Route, api, ui, identity, locales, access, timeouts, breaker string) error {
 	if access != "" && access != "{}" {
 		if err := json.Unmarshal([]byte(access), &r.Access); err != nil {
 			return fmt.Errorf("bad access options: %w", err)
@@ -1296,6 +1528,18 @@ func decodeRouteOptions(r *Route, api, ui, identity, locales, access string) err
 		r.UI = &RouteUI{}
 		if err := json.Unmarshal([]byte(ui), r.UI); err != nil {
 			return fmt.Errorf("bad ui options: %w", err)
+		}
+	}
+	if breaker != "" && breaker != "{}" {
+		r.Breaker = &CircuitBreaker{}
+		if err := json.Unmarshal([]byte(breaker), r.Breaker); err != nil {
+			return fmt.Errorf("bad breaker: %w", err)
+		}
+	}
+	if timeouts != "" && timeouts != "{}" {
+		r.Timeouts = &RouteTimeouts{}
+		if err := json.Unmarshal([]byte(timeouts), r.Timeouts); err != nil {
+			return fmt.Errorf("bad timeouts: %w", err)
 		}
 	}
 	if identity != "" && identity != "{}" {
@@ -1357,9 +1601,14 @@ type User struct {
 	// Split administration (RBAC-05): InfraAdmin runs the routing plane
 	// (routes, built-in pages), AppAdmin runs the application's identity
 	// (users, roles, settings). Root implies both.
-	InfraAdmin       bool   `json:"infraAdmin"`
-	AppAdmin         bool   `json:"appAdmin"`
-	Locale           string `json:"locale"`
+	InfraAdmin bool   `json:"infraAdmin"`
+	AppAdmin   bool   `json:"appAdmin"`
+	Locale     string `json:"locale"`
+	// Scheme is the person's light/dark choice ("" = follow the system). Like
+	// the language it is written by the person alone (SetUserScheme), and
+	// deliberately absent from UpdateUser: an administrator's save carries no
+	// value for it, and would blank what its owner picked.
+	Scheme           string `json:"scheme"`
 	Timezone         string `json:"timezone"`
 	CreatedAt        int64  `json:"createdAt"`
 	UpdatedAt        int64  `json:"updatedAt"`
@@ -1386,14 +1635,14 @@ type User struct {
 }
 
 const userCols = `id, username, password_hash, fullname, email, enabled,
-	root, dev, tester, tenant_creator, infra_admin, app_admin, locale, timezone,
+	root, dev, tester, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
 	created_at, updated_at, last_connection_at, must_change_password, mfa_required,
 	email_verified, self_registered, password_changed_at`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Fullname, &u.Email, &u.Enabled,
-		&u.Root, &u.Dev, &u.Tester, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Timezone,
+		&u.Root, &u.Dev, &u.Tester, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastConnectionAt, &u.MustChangePassword, &u.MFARequired,
 		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt)
 	// Derived here so every read carries it and no caller has to remember: the
@@ -1673,6 +1922,36 @@ func (s *Store) SetUserLocale(ctx context.Context, id, locale string) error {
 	return nil
 }
 
+// Schemes are the colour-scheme choices a person may store. "" is the fourth
+// and the default: follow the system, which is what someone who never chose
+// has - and what "auto" means on the pages.
+var Schemes = []string{"light", "dark"}
+
+// SetUserScheme stores a user's own light/dark choice (self-service, from the
+// scheme switch of the flow pages and of the injected user button - THEME-05).
+// "" is allowed and means "follow the system".
+func (s *Store) SetUserScheme(ctx context.Context, id, scheme string) error {
+	scheme = strings.TrimSpace(scheme)
+	if scheme == "auto" {
+		// What the pages call auto is what the account calls nothing: storing
+		// the word would make "chose to follow the system" and "never chose"
+		// two different states nobody can tell apart.
+		scheme = ""
+	}
+	if scheme != "" && !slices.Contains(Schemes, scheme) {
+		return fmt.Errorf("store: set scheme %q: allowed are %s, or empty to follow the system",
+			scheme, strings.Join(Schemes, ", "))
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET scheme = ? WHERE id = ?`, scheme, id)
+	if err != nil {
+		return fmt.Errorf("store: set scheme: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoRows
+	}
+	return nil
+}
+
 // SetUserTimezone stores a user's own timezone (self-service, from the profile
 // page). The NAME is validated by the caller against the platform's zone
 // database; the store only refuses an empty one, which would mean "no zone" -
@@ -1760,6 +2039,14 @@ type Session struct {
 	// each plane uses its own cookie name AND every resolve checks the plane -
 	// a data-plane token pasted into the admin cookie dies here.
 	Plane string // "data" | "admin"
+	// The three fields below are NOT columns: they exist only on the session
+	// SYNTHESIZED for an "Authorization: Bearer" call, and they are what tells
+	// the guard that this caller is a token rather than a person - which token
+	// (the audit names it, MCP-03) and how far it may go (MCP-02).
+	TokenID     string
+	TokenName   string
+	TokenScope  string
+	TokenDomain string
 }
 
 // CreateSession persists a session.

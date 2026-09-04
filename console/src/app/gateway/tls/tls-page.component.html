@@ -259,12 +259,14 @@
       <button matIconButton (click)="download(e.cert)" i18n-matTooltip="@@Download" matTooltip="Download">
         <mat-icon>download</mat-icon>
       </button>
-      <!-- Replace, not delete. Nobody wants a host left with no certificate:
-           what they want is a different one, and the old is dropped only once
-           the new one is in. -->
+      <!-- The three ways to put a DIFFERENT certificate on this name sit here,
+           in the order somebody would reach for them, and the old one is
+           dropped only once the new one is in. The last item is not one of
+           them - it takes the name back into the clear - which is why this
+           button says Actions and not Replace. -->
       <button matButton [matMenuTriggerFor]="swap">
-        <mat-icon>swap_horiz</mat-icon>
-        <ng-container i18n="@@Replace">Replace</ng-container>
+        <mat-icon>more_horiz</mat-icon>
+        <ng-container i18n="@@Actions">Actions</ng-container>
       </button>
       <mat-menu #swap>
         <button mat-menu-item (click)="replace('import', e)">

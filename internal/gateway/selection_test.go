@@ -9,6 +9,7 @@ import (
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // A route's security takes part in CHOOSING it, not only in permitting it.
@@ -126,7 +127,7 @@ func upstreamSaying(t *testing.T, what string) *httptest.Server {
 
 func storeWithTwoTenants(t *testing.T) (*store.Store, *session.Manager) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

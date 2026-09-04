@@ -31,7 +31,7 @@ const DOCS: Record<string, string> = {
   'remove-response-header': $localize`:@@doc_Remove_a_response_header:Remove a response header`,
   'set-status': $localize`:@@doc_Force_the_response_status:Force the response status code`,
   redirect: $localize`:@@doc_Answer_with_a_redirect:Answer with a redirect instead of proxying`,
-  maintenance: $localize`:@@doc_Answer_503_maintenance:Answer 503 with a gateway maintenance page`,
+  maintenance: $localize`:@@doc_Answer_503_unavailable:Answer 503 with the gateway's unavailable page`,
 };
 
 export function brickDoc(type: string): string {

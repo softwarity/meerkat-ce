@@ -25,7 +25,7 @@ import (
 // There is no "switch HTTPS on": having a certificate is what opens the door,
 // and deleting it is what closes it. A switch that can be on with nothing
 // behind it is a switch that lies.
-func (a *API) registerCertificates(mux *http.ServeMux) {
+func (a *API) registerCertificates(mux Mux) {
 	mux.Handle("GET /api/certificates", a.infraAdmin(a.listCertificates))
 	mux.Handle("POST /api/certificates/import", a.infraAdmin(a.importCertificate))
 	mux.Handle("POST /api/certificates/self-signed", a.infraAdmin(a.selfSignedCertificate))
@@ -487,4 +487,5 @@ func (a *API) applyTLS(ctx context.Context) {
 		return
 	}
 	_ = a.TLS.Reload(ctx)
+	a.announce(ctx, store.TopicCertificates)
 }

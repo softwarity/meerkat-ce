@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"crypto/sha1" //nolint:gosec // the handshake's own hash, see ws.go.
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -211,5 +213,84 @@ func TestAnOversizedFrameEndsTheConnection(t *testing.T) {
 	}
 	if code := binary.BigEndian.Uint16(payload); code != closeTooBig {
 		t.Fatalf("close code = %d", code)
+	}
+}
+
+// A page served over HTTP/2 still gets its socket - on a SECOND connection, in
+// HTTP/1.1, which is the shape Go leaves in place by keeping RFC 8441 extended
+// CONNECT off. What has to hold is that one port answers both: h2 is told
+// which protocol to speak rather than hanging on a hijack it cannot do, and an
+// HTTP/1.1 handshake on that very port opens.
+func TestASocketOpensNextToHTTP2(t *testing.T) {
+	h := NewHub()
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sub, err := h.Subscribe(TopicAll)
+		if err != nil {
+			http.Error(w, "full", http.StatusServiceUnavailable)
+			return
+		}
+		_ = Serve(w, r, sub)
+	}))
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+
+	resp, err := srv.Client().Get(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.Proto != "HTTP/2.0" {
+		t.Fatalf("the test did not even reach h2: %s", resp.Proto)
+	}
+	if resp.StatusCode != http.StatusUpgradeRequired {
+		t.Fatalf("an h2 request got %s", resp.Status)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "HTTP/1.1") {
+		t.Fatalf("the refusal must name the protocol to speak, got %q", body)
+	}
+
+	// The same port, over TLS, in HTTP/1.1: the handshake goes through. The
+	// client config comes from the test server, so nothing is skipped here -
+	// only the protocol list changes.
+	cfg := srv.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
+	cfg.NextProtos = []string{"http/1.1"}
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := tls.Dial("tcp", u.Host, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	var nonce [16]byte
+	_, _ = rand.Read(nonce[:])
+	key := base64.StdEncoding.EncodeToString(nonce[:])
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Sec-WebSocket-Key", key)
+	req.Header.Set("Sec-WebSocket-Version", "13")
+	if err := req.Write(c); err != nil {
+		t.Fatal(err)
+	}
+	br := bufio.NewReader(c)
+	ws, err := http.ReadResponse(br, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("the HTTP/1.1 handshake on the h2 port got %s", ws.Status)
+	}
+	sum := sha1.Sum([]byte(key + wsGUID)) //nolint:gosec // see ws.go.
+	if got := ws.Header.Get("Sec-WebSocket-Accept"); got != base64.StdEncoding.EncodeToString(sum[:]) {
+		t.Fatalf("the handshake did not prove it read our key: %q", got)
+	}
+	h.Publish(TopicAll, Message{Type: "hello"})
+	op, payload := readFrame(t, c, br)
+	if op != opText || !strings.Contains(string(payload), "hello") {
+		t.Fatalf("frame %#x %q", op, payload)
 	}
 }

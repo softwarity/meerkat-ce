@@ -196,7 +196,7 @@ type simTokenClaims struct {
 func (rt *Router) MintSimulationToken(user string, roles []string, ttl time.Duration) (string, time.Time) {
 	exp := time.Now().Add(ttl)
 	payload, _ := json.Marshal(simTokenClaims{User: user, Roles: roles, Exp: exp.Unix()})
-	mac := hmac.New(sha256.New, rt.simTokenKey)
+	mac := hmac.New(sha256.New, rt.simKey())
 	mac.Write(payload)
 	return SimTokenPrefix + base64.RawURLEncoding.EncodeToString(payload) +
 		"." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), exp
@@ -216,7 +216,7 @@ func (rt *Router) verifySimulationToken(token string) (identityData, bool) {
 	if err != nil {
 		return identityData{}, false
 	}
-	mac := hmac.New(sha256.New, rt.simTokenKey)
+	mac := hmac.New(sha256.New, rt.simKey())
 	mac.Write(payload)
 	if !hmac.Equal(sig, mac.Sum(nil)) {
 		return identityData{}, false

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	_ "time/tzdata" // IANA zones for business-access windows, even on distroless
@@ -21,9 +22,11 @@ import (
 	"github.com/softwarity/meerkat/internal/admin"
 	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/certs"
+	"github.com/softwarity/meerkat/internal/cluster"
 	"github.com/softwarity/meerkat/internal/config"
 	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -224,7 +227,20 @@ func run(o options) error {
 	// registry lives in the trunk because trunk code READS it; only the
 	// Enterprise agent ever writes to it, so in the community image it stays
 	// empty and every screen built on it shows nothing, without a guard.
+	// The unavailable page (LIFE-05) is a page the gateway SERVES, so it goes
+	// through the same chrome as the sign-in page: theme, layout, mark, and
+	// the visitor's language. The router cannot reach that package on its own
+	// - internal/auth already imports internal/routing - so the wire is made
+	// here, where both are already known. The per-route maintenance FILTER
+	// gets the same one: two ways to turn maintenance on, one page.
+	router.Pages = authHandler.ServeMaintenance
+	router.Stripe = authHandler.MaintenanceStripe
+	routing.SetMaintenanceHandler(authHandler.ServeMaintenance)
+
 	served := devtunnel.NewRegistry(authHandler.Events())
+	// The pages read it, the tunnel writes it. In the community image nothing
+	// writes, so what every page reads is an empty list.
+	authHandler.WatchServed(served)
 	authHandler.Mailer = mailer
 	authHandler.Register(mux)
 	router.RegisterDevDocs(mux) // /meerkat/apidocs - developer docs (dev capability)
@@ -242,6 +258,63 @@ func run(o options) error {
 	adminAPI := admin.New(st, adminSessions, router)
 	adminAPI.Mailer = mailer
 	adminAPI.DataAddr = addr
+	// The change bus (STORE-03): what this node reloads after a write, the
+	// others reload too. Registered here rather than inside each package
+	// because this is the only file that knows there are exactly two things a
+	// node keeps in memory. On the embedded database Run returns at once.
+	bus := cluster.New(st)
+	bus.Register(store.TopicRouting, router.Reload)
+	adminAPI.Bus = bus
+
+	// The session caches, both planes. A session changed on one gateway - the
+	// organisation just chosen, the login step just completed, the account
+	// just revoked - is dropped from the memory of all of them, or the next
+	// request served by another node answers with the previous state for the
+	// few seconds the cache holds.
+	//
+	// Both managers forget on every signal: a token hash belongs to exactly
+	// one of the two planes, so telling the other one costs a map lookup and
+	// saves this wiring from having to know which.
+	planes := []*session.Manager{sessions, adminSessions}
+	tell := func(topic, arg string) { bus.Signal(context.Background(), topic, arg) }
+	for _, sm := range planes {
+		sm.Notify(tell)
+	}
+	bus.OnSignal(store.TopicSession, func(tokenHash string) {
+		for _, sm := range planes {
+			sm.Forget(tokenHash)
+		}
+	})
+	bus.OnSignal(store.TopicSessionUser, func(userID string) {
+		for _, sm := range planes {
+			sm.ForgetUser(userID)
+		}
+	})
+
+	// The live channel. A page is held open by whichever gateway the load
+	// balancer gave it, so a message published on one node reaches a fraction
+	// of the audience: a developer taking over a service is announced to the
+	// people whose socket happens to be on the right node, and the others see
+	// nothing. Relayed, it reaches all of them.
+	//
+	// The channel is never REQUIRED - every page has its state from a fetch at
+	// load - so a message too big to travel, or a database that will not carry
+	// it, costs the freshness and nothing else.
+	hubs := []*events.Hub{authHandler.Events(), adminAuth.Events()}
+	for _, hub := range hubs {
+		hub.Relay(func(topic string, payload []byte) {
+			bus.Signal(context.Background(), store.TopicEvent, topic+" "+string(payload))
+		})
+	}
+	bus.OnSignal(store.TopicEvent, func(arg string) {
+		topic, payload, ok := strings.Cut(arg, " ")
+		if !ok {
+			return
+		}
+		for _, hub := range hubs {
+			hub.Deliver(topic, []byte(payload))
+		}
+	})
 	adminAPI.Register(adminMux)
 	if err := admin.RegisterConsole(adminMux, consoleURL, st, adminSessions); err != nil {
 		return err
@@ -249,29 +322,24 @@ func run(o options) error {
 
 	// Periodic TTL upkeep: expired sessions, lapsed e-mail tokens, and
 	// self-registrations abandoned before confirming (7 days).
+	//
+	// One node at a time (STORE-03). Nothing here is unsafe to repeat - they
+	// are DELETEs on a predicate - but N gateways scanning the same tables
+	// every minute is N times the work for the same one row, and the audit
+	// table is the biggest in the product. A node that finds the lock taken
+	// skips this minute rather than queueing: the work comes round again in
+	// sixty seconds, so waiting for a turn would only mean doing it twice.
 	go func() {
 		for range time.Tick(time.Minute) {
 			ctx := context.Background()
-			if n, err := sessions.PurgeExpired(ctx); err != nil {
-				slog.Error("session purge failed", "err", err)
-			} else if n > 0 {
-				slog.Debug("purged expired sessions", "count", n)
-			}
-			if _, err := st.PurgeExpiredEmailTokens(ctx, time.Now().Unix()); err != nil {
-				slog.Error("email token purge failed", "err", err)
-			}
-			if n, err := st.PurgeUnconfirmedSelfRegistrations(ctx, time.Now().Add(-7*24*time.Hour).Unix()); err != nil {
-				slog.Error("unconfirmed sign-up purge failed", "err", err)
-			} else if n > 0 {
-				slog.Info("purged unconfirmed sign-ups", "count", n)
-			}
-			if _, err := st.PurgeExpiredAPITokens(ctx, time.Now().Unix()); err != nil {
-				slog.Error("api token purge failed", "err", err)
-			}
-			if n, err := st.PurgeAuditEventsBefore(ctx, time.Now().Add(-admin.AuditRetention).Unix()); err != nil {
-				slog.Error("audit purge failed", "err", err)
-			} else if n > 0 {
-				slog.Debug("purged old audit events", "count", n)
+			ran, err := st.TryLock(ctx, "upkeep", func(ctx context.Context) error {
+				purge(ctx, sessions, st)
+				return nil
+			})
+			if err != nil {
+				slog.Error("upkeep lock failed", "err", err)
+			} else if !ran {
+				slog.Debug("upkeep skipped: another node is doing it")
 			}
 		}
 	}()
@@ -308,7 +376,11 @@ func run(o options) error {
 		dataRedirect,
 	)
 	tlsSup.Ports(addr, adminAddr)
+	// One gateway orders a certificate, the others wait and find it in the
+	// shared cache (PERF-03). A no-op on the embedded database.
+	tlsSup.SerialiseIssuance(st.WithLock)
 	adminAPI.TLS = tlsSup
+	bus.Register(store.TopicCertificates, tlsSup.Reload)
 	if err := tlsSup.Reload(ctx); err != nil {
 		// Not fatal: a taken HTTPS port must not keep the gateway from serving
 		// the plain one, or a typo in an address would take the whole
@@ -326,6 +398,14 @@ func run(o options) error {
 			}
 		}
 	}()
+
+	// The change bus, listening for what the OTHER nodes write. It shares the
+	// tunnel's lifetime for the same reason: both are background loops that
+	// must stop before the process does, and neither has anything to say on a
+	// single-node installation.
+	busCtx, stopBus := context.WithCancel(context.Background())
+	defer stopBus()
+	go bus.Run(busCtx)
 
 	// The developer tunnel follows the developer-mode switch: mode off, no
 	// agent, no port, nothing listening. The community image linked no agent
@@ -521,4 +601,44 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// purge is one round of TTL upkeep. Extracted from the loop above so the lock
+// wraps a call rather than a block: what runs under a lock should be readable
+// as one thing.
+//
+// Every failure is logged and the next one is still attempted. They are
+// independent tables, and giving up on the audit trail because an e-mail token
+// would not delete is how a minute of upkeep becomes none.
+func purge(ctx context.Context, sessions *session.Manager, st *store.Store) {
+	if n, err := sessions.PurgeExpired(ctx); err != nil {
+		slog.Error("session purge failed", "err", err)
+	} else if n > 0 {
+		slog.Debug("purged expired sessions", "count", n)
+	}
+	if _, err := st.PurgeExpiredEmailTokens(ctx, time.Now().Unix()); err != nil {
+		slog.Error("email token purge failed", "err", err)
+	}
+	if n, err := st.PurgeUnconfirmedSelfRegistrations(ctx, time.Now().Add(-7*24*time.Hour).Unix()); err != nil {
+		slog.Error("unconfirmed sign-up purge failed", "err", err)
+	} else if n > 0 {
+		slog.Info("purged unconfirmed sign-ups", "count", n)
+	}
+	if _, err := st.PurgeExpiredAPITokens(ctx, time.Now().Unix()); err != nil {
+		slog.Error("api token purge failed", "err", err)
+	}
+	if n, err := st.PurgeAuditEventsBefore(ctx, time.Now().Add(-admin.AuditRetention).Unix()); err != nil {
+		slog.Error("audit purge failed", "err", err)
+	} else if n > 0 {
+		slog.Debug("purged old audit events", "count", n)
+	}
+	// The brute-force rows, past the longest window any policy can name. A day
+	// rather than the configured window: the policy is editable, and a purge
+	// that trims to the CURRENT setting would erase the evidence the moment
+	// someone widened it.
+	if n, err := st.PurgeAttemptsBefore(ctx, time.Now().Add(-24*time.Hour)); err != nil {
+		slog.Error("attempt purge failed", "err", err)
+	} else if n > 0 {
+		slog.Debug("purged old sign-in attempts", "count", n)
+	}
 }

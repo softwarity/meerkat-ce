@@ -24,8 +24,8 @@ import { ACCESS_LEVELS, AccessState, isEmpty, levelShort } from './access-editor
   template: `
     <span class="set" [class.delegated]="empty()" [class.unguarded]="unguarded()">
       <span class="lvl" [class.on]="gated()" [matTooltip]="levelTip()">{{ levelShort() }}</span>
-      <span class="d d-users" [class.on]="access().users.length > 0" [matTooltip]="usersTip()">
-        <mat-icon>group</mat-icon><span class="n">{{ access().users.length || '' }}</span>
+      <span class="d d-users" [class.on]="namedUsers()" [matTooltip]="usersTip()">
+        <mat-icon>group</mat-icon><span class="n">{{ namedUsers() || '' }}</span>
       </span>
       <span class="d d-roles" [class.on]="access().roles.length > 0" [matTooltip]="rolesTip()">
         <mat-icon>badge</mat-icon><span class="n">{{ access().roles.length || '' }}</span>
@@ -179,8 +179,20 @@ export class AccessBadgesComponent {
       ? $localize`:@@Endpoints_with_their_own_rule:Endpoints with their own rule` + ': ' + n
       : $localize`:@@Every_endpoint_follows_the_route:Every endpoint follows the route's rule`;
   });
+  // Named users count only where the rule can USE them. On a rule that poses
+  // no condition they except nobody from anything (see isEmpty), and lighting
+  // the badge there said "alice is allowed on this route" about a route open
+  // to the whole world - which is how one leftover name reads as a security
+  // decision somebody made on purpose.
+  protected readonly namedUsers = computed(() => (this.empty() ? 0 : this.access().users.length));
   protected readonly usersTip = computed(() => {
     const u = this.access().users;
+    if (this.empty() && u.length) {
+      // Say it rather than hide it: the name is really in there, it will go on
+      // the next save, and until then somebody looking at the data would
+      // otherwise wonder which of the two screens is lying.
+      return $localize`:@@Users_listed_but_ignored:Listed but ignored - this rule poses no condition, so there is nothing to except anyone from: ${u.join(', ')}:USERS:`;
+    }
     return u.length ? $localize`:@@Users:Users` + ': ' + u.join(', ') : $localize`:@@Users:Users`;
   });
   protected readonly rolesTip = computed(() => {

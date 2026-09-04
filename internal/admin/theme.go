@@ -15,7 +15,7 @@ import (
 // APPLICATION plane (RBAC-05): a theme is the product's visual identity - its
 // name, tagline, logo and colours. The gateway merely SERVES those pages; who
 // serves them is not who owns them.
-func (a *API) registerThemes(mux *http.ServeMux) {
+func (a *API) registerThemes(mux Mux) {
 	mux.Handle("GET /api/themes", a.appAdmin(a.listThemes))
 	mux.Handle("GET /api/themes/presets", a.appAdmin(a.listPresets))
 	mux.Handle("POST /api/themes", a.appAdmin(a.createTheme))

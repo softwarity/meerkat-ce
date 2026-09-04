@@ -28,8 +28,9 @@ the ground up, and is edited by **[Softwarity](https://softwarity.io)**.
 
 ## Status
 
-🚧 **Specification phase.** The full requirements document (currently in French) is in
-[requirements.md](./requirements.md). Implementation has not started yet.
+🚧 **Under construction, and running.** What the gateway does today, what is half-built and
+what is not started are one table in [FEATURES.md](./FEATURES.md) (French), with the state
+read from the code rather than from a plan.
 
 ## Why "Meerkat"?
 

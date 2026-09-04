@@ -51,6 +51,18 @@ func (d *database) QueryRow(query string, args ...any) *sql.Row {
 	return d.DB.QueryRow(rebind(d.dialect, query), args...)
 }
 
+// The same translation on a RESERVED connection. Advisory locks are held by a
+// session, so locks.go has to run its queries on one connection rather than on
+// the pool - and a query that leaves this package's `?` spelling behind is
+// exactly what the guard in dialect_test.go refuses.
+func (d *database) execOn(ctx context.Context, c *sql.Conn, query string, args ...any) (sql.Result, error) {
+	return c.ExecContext(ctx, rebind(d.dialect, query), args...)
+}
+
+func (d *database) queryRowOn(ctx context.Context, c *sql.Conn, query string, args ...any) *sql.Row {
+	return c.QueryRowContext(ctx, rebind(d.dialect, query), args...)
+}
+
 func (d *database) BeginTx(ctx context.Context, opts *sql.TxOptions) (*transaction, error) {
 	t, err := d.DB.BeginTx(ctx, opts)
 	if err != nil {

@@ -19,7 +19,7 @@ import (
 // authenticated, so the address travels with the credentials. What the product
 // does choose is the display NAME in front of it, and that stays with the
 // application (see settingsPayload.SMTP).
-func (a *API) registerMailRelay(mux *http.ServeMux) {
+func (a *API) registerMailRelay(mux Mux) {
 	mux.Handle("GET /api/settings/mail-relay", a.infraAdmin(a.getMailRelay))
 	mux.Handle("PUT /api/settings/mail-relay", a.infraAdmin(a.putMailRelay))
 	mux.Handle("POST /api/settings/mail-relay/test", a.infraAdmin(a.testMailRelay))

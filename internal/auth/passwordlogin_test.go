@@ -14,6 +14,7 @@ import (
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The accounts held here are an AUTHORITY like any other (AUTH-24), and
@@ -25,7 +26,7 @@ import (
 // plane and the admin plane serving it.
 func planes(t *testing.T) (*store.Store, *http.ServeMux, *http.ServeMux) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

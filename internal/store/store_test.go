@@ -5,12 +5,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/softwarity/meerkat/internal/store/dbtest"
+
 	"github.com/softwarity/meerkat/internal/routing"
 )
 
 func openTemp(t *testing.T) *Store {
 	t.Helper()
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

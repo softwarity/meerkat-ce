@@ -50,7 +50,7 @@ func TestRouteOperationsProjection(t *testing.T) {
 	  "access":{"level":"auth"},
 	  "predicates":[{"type":"path","args":{"patterns":["/api/**"]}}],
 	  "filters":[{"type":"strip-prefix","args":{"parts":1}}],
-	  "api":{"openapiUrl":"%s/spec.json"}
+	  "api":{"spec":{"type":"upstream","path":"%s/spec.json"}}
 	}`, up.URL, up.URL)
 	if code, out := f.call(t, "PUT", "/api/routes/r1", route, f.rootC); code != http.StatusOK {
 		t.Fatalf("put route: %d %s", code, out)
@@ -96,7 +96,7 @@ func TestPutRouteSecurityEnforced(t *testing.T) {
 	  "access":{"level":"auth"},
 	  "predicates":[{"type":"path","args":{"patterns":["/api/**"]}}],
 	  "filters":[{"type":"strip-prefix","args":{"parts":1}}],
-	  "api":{"openapiUrl":"%s/spec.json"}
+	  "api":{"spec":{"type":"upstream","path":"%s/spec.json"}}
 	}`, up.URL, up.URL)
 	if code, out := f.call(t, "PUT", "/api/routes/r1", route, f.rootC); code != http.StatusOK {
 		t.Fatalf("put route: %d %s", code, out)
@@ -158,7 +158,7 @@ func TestRelativeSpecURLFollowsTheRoutesPath(t *testing.T) {
 		r := store.Route{
 			Upstream:   "http://fpl-svc:3000",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []string{"/fpl-svc/**"}}}},
-			API:        &store.RouteAPI{OpenapiURL: "openapi.json"},
+			API:        &store.RouteAPI{Spec: &store.RouteSpec{Type: store.SpecUpstream, Path: "openapi.json"}},
 		}
 		if strip {
 			r.Filters = []routing.Spec{{Type: "strip-prefix", Args: map[string]any{"parts": 1}}}
@@ -176,12 +176,12 @@ func TestRelativeSpecURLFollowsTheRoutesPath(t *testing.T) {
 		{"an absolute url is left alone", store.Route{
 			Upstream:   "http://fpl-svc:3000",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []string{"/fpl-svc/**"}}}},
-			API:        &store.RouteAPI{OpenapiURL: "https://elsewhere.example/spec.json"},
+			API:        &store.RouteAPI{Spec: &store.RouteSpec{Type: store.SpecUpstream, Path: "https://elsewhere.example/spec.json"}},
 		}, "https://elsewhere.example/spec.json"},
 		{"a catch-all adds nothing", store.Route{
 			Upstream:   "http://portal:9191",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []string{"/**"}}}},
-			API:        &store.RouteAPI{OpenapiURL: "/v3/api-docs"},
+			API:        &store.RouteAPI{Spec: &store.RouteSpec{Type: store.SpecUpstream, Path: "/v3/api-docs"}},
 		}, "http://portal:9191/v3/api-docs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

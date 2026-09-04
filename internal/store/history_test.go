@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 func TestLoginEventsNewestFirstAndPruned(t *testing.T) {
-	st, err := Open(t.TempDir())
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

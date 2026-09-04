@@ -21,8 +21,11 @@ func bearer(token string) *http.Request {
 func mintToken(t *testing.T, st *store.Store, userID, tenantID, groupID string, expiresAt int64) string {
 	t.Helper()
 	secret := "mk_" + "secret-" + userID + "-" + groupID + tenantID
-	if err := st.AddAPIToken(context.Background(), "tok-"+userID+groupID+tenantID, userID, "test",
-		hashToken(secret), secret[:10], store.PlaneData, tenantID, groupID, expiresAt); err != nil {
+	if err := st.AddAPIToken(context.Background(), store.NewToken{
+		ID: "tok-" + userID + groupID + tenantID, UserID: userID, Name: "test",
+		TokenHash: hashToken(secret), Prefix: secret[:10], Plane: store.PlaneData,
+		Scope: store.ScopeFull, TenantID: tenantID, GroupID: groupID, ExpiresAt: expiresAt,
+	}); err != nil {
 		t.Fatalf("AddAPIToken: %v", err)
 	}
 	return secret
@@ -97,7 +100,10 @@ func TestBearerTokenPlaneIsolation(t *testing.T) {
 
 	// An ADMIN token resolves on the admin plane but not the data plane.
 	adminClear := "mk_admin-secret-value"
-	if err := st.AddAPIToken(ctx, "atok", "root", "cli", hashToken(adminClear), adminClear[:10], store.PlaneAdmin, "", "", 0); err != nil {
+	if err := st.AddAPIToken(ctx, store.NewToken{
+		ID: "atok", UserID: "root", Name: "cli", TokenHash: hashToken(adminClear),
+		Prefix: adminClear[:10], Plane: store.PlaneAdmin, Scope: store.ScopeFull,
+	}); err != nil {
 		t.Fatalf("AddAPIToken(admin): %v", err)
 	}
 	if _, err := adminM.Resolve(ctx, bearer(adminClear)); err != nil {

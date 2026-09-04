@@ -1,0 +1,92 @@
+<div class="banner">
+  <h1 i18n="@@MCP">MCP</h1>
+</div>
+
+<div class="content">
+  <div class="intro">
+    <mat-icon>smart_toy</mat-icon>
+    <span i18n="@@MCP_intro">
+      Meerkat answers the Model Context Protocol on this port, so an assistant can read this
+      gateway and work on it with you. Connecting one opens a browser: you sign in here, you choose
+      what it may do, and no key is ever written into a file.
+    </span>
+  </div>
+
+  <div class="endpoint">
+    <mat-slide-toggle [checked]="enabled()" (change)="setEnabled($event.checked)">
+      <ng-container i18n="@@Answer_agents_on_this_port">Answer agents on this port</ng-container>
+    </mat-slide-toggle>
+    <span class="meta">
+      @if (enabled()) {
+        <code>{{ url }}</code>
+      } @else {
+        <ng-container i18n="@@Agent_endpoint_off_here">
+          Off: nothing answers, and nothing can be connected.
+        </ng-container>
+      }
+    </span>
+  </div>
+
+  <h2 i18n="@@Connect_an_agent">Connect an agent</h2>
+  <mat-button-toggle-group [value]="client().id" hideSingleSelectionIndicator>
+    @for (c of clients; track c.id) {
+      <mat-button-toggle [value]="c.id" (click)="pick(c)">{{ c.label }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+
+  <div class="row">
+    <pre>{{ command() }}</pre>
+    <button matIconButton (click)="copy(command(), 'cmd')" i18n-matTooltip="@@Copy" matTooltip="Copy">
+      <mat-icon>{{ copied() === 'cmd' ? 'check' : 'content_copy' }}</mat-icon>
+    </button>
+  </div>
+  <p class="hint" i18n="@@MCP_first_call_hint">
+    The first call opens your browser on this console. Approve it, and the agent is connected.
+  </p>
+
+  <mat-expansion-panel class="fallback">
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@My_client_cannot_do_that">My client cannot do that</mat-panel-title>
+    </mat-expansion-panel-header>
+    <p class="hint" i18n="@@MCP_token_fallback_hint">
+      Some clients do not know how to authenticate through a browser. For those, generate a
+      control-plane token and pass it as a header. Keep it in an environment variable rather than in
+      the file: a configuration file is a thing people commit.
+    </p>
+    <p class="hint">
+      <a routerLink="/infra/access-tokens" i18n="@@Generate_a_token">Generate a token</a>
+    </p>
+    <div class="row">
+      <pre>{{ tokenCommand() }}</pre>
+      <button matIconButton (click)="copy(tokenCommand(), 'tok')" i18n-matTooltip="@@Copy" matTooltip="Copy">
+        <mat-icon>{{ copied() === 'tok' ? 'check' : 'content_copy' }}</mat-icon>
+      </button>
+    </div>
+  </mat-expansion-panel>
+
+  <h2 i18n="@@Connected_agents">Connected agents</h2>
+  @if (loading()) {
+    <loading-indicator withContainer />
+  } @else {
+    @for (a of agents(); track a.id) {
+      <div class="agent">
+        <mat-icon>smart_toy</mat-icon>
+        <span class="name">{{ a.clientName || a.name }}</span>
+        <button
+          matIconButton
+          (click)="revoke(a)"
+          i18n-matTooltip="@@Disconnect"
+          matTooltip="Disconnect"
+        >
+          <mat-icon>link_off</mat-icon>
+        </button>
+        <span class="meta">
+          {{ perimeter(a) }}
+          &nbsp;-&nbsp;{{ lastUsed(a.lastUsedAt) }}
+        </span>
+      </div>
+    } @empty {
+      <p class="empty" i18n="@@No_agent_connected">No agent connected yet.</p>
+    }
+  }
+</div>

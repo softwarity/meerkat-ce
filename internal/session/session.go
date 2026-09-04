@@ -50,6 +50,9 @@ type Manager struct {
 
 	mu    sync.Mutex
 	cache map[string]cacheEntry
+	// notify tells the other gateways to drop what this node just changed
+	// (invalidate.go). Nil on a single one.
+	notify func(topic, arg string)
 }
 
 type cacheEntry struct {
@@ -243,9 +246,7 @@ func (m *Manager) SetPending(ctx context.Context, r *http.Request, step string) 
 	if err := m.st.SetSessionPending(ctx, th, step); err != nil {
 		return err
 	}
-	m.mu.Lock()
-	delete(m.cache, th)
-	m.mu.Unlock()
+	m.dropped(th)
 	return nil
 }
 
@@ -260,9 +261,7 @@ func (m *Manager) SetTenant(ctx context.Context, r *http.Request, tenantID strin
 	if err := m.st.SetSessionTenant(ctx, th, tenantID); err != nil {
 		return err
 	}
-	m.mu.Lock()
-	delete(m.cache, th)
-	m.mu.Unlock()
+	m.dropped(th)
 	return nil
 }
 
@@ -277,9 +276,7 @@ func (m *Manager) SetGroup(ctx context.Context, r *http.Request, groupID string)
 	if err := m.st.SetSessionGroup(ctx, th, groupID); err != nil {
 		return err
 	}
-	m.mu.Lock()
-	delete(m.cache, th)
-	m.mu.Unlock()
+	m.dropped(th)
 	return nil
 }
 
@@ -358,6 +355,15 @@ func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Sess
 	if m.plane == DataPlane && !m.st.APITokensAllowed(ctx) {
 		return store.Session{}, false
 	}
+	// Where the token may be used from (MCP-02), judged on the TCP PEER: a
+	// forwarding header is written by whoever sends it. A refusal here is a
+	// plain "no session" - the caller learns nothing about which token exists
+	// - so it is logged, or an administrator would have nothing to go on.
+	if !store.AllowsAddress(tok.FromCIDRs, r.RemoteAddr) {
+		slog.Warn("api token refused: address outside its allowed range",
+			"token", tok.Name, "from", r.RemoteAddr, "allowed", tok.FromCIDRs)
+		return store.Session{}, false
+	}
 	u, err := m.st.GetUserByID(ctx, tok.UserID)
 	if err != nil || !u.Enabled {
 		return store.Session{}, false
@@ -370,6 +376,10 @@ func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Sess
 	return store.Session{
 		UserID: tok.UserID, TenantID: tok.TenantID, GroupID: tok.GroupID,
 		Plane: m.plane, ExpiresAt: now.Add(m.ttl).Unix(),
+		// What a cookie session can never carry: this caller is a token. The
+		// guard reads the perimeter (MCP-02) and the audit reads the name
+		// (MCP-03) - both would be unanswerable from the account alone.
+		TokenID: tok.ID, TokenName: tok.Name, TokenScope: tok.Scope, TokenDomain: tok.Domain,
 	}, true
 }
 
@@ -384,9 +394,7 @@ func (m *Manager) Destroy(ctx context.Context, w http.ResponseWriter, r *http.Re
 		if err := m.st.DeleteSession(ctx, th); err != nil {
 			return err
 		}
-		m.mu.Lock()
-		delete(m.cache, th)
-		m.mu.Unlock()
+		m.dropped(th)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     m.cookieName,

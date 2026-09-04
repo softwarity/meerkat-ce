@@ -25,7 +25,7 @@ import (
 //     the fingerprint. The tape talks about configuration by construction
 //     rather than by discipline.
 
-func (a *API) registerConfigPoints(mux *http.ServeMux) {
+func (a *API) registerConfigPoints(mux Mux) {
 	mux.Handle("GET /api/config/history", a.rootOnly(a.listConfigPoints))
 	mux.Handle("GET /api/config/history/{id}", a.rootOnly(a.readConfigPoint))
 	mux.Handle("GET /api/config/history/{id}/plan", a.rootOnly(a.configPointPlan))
@@ -194,7 +194,7 @@ func (a *API) restoreConfigPoint(w http.ResponseWriter, r *http.Request, actor s
 		return
 	}
 	a.auditEvent(r.Context(), actor, "config.restore", "config", p.ID, pointName(p), "", summarise(plan))
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("restored, but the routing table could not be reloaded: %w", err))
 		return
 	}

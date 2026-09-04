@@ -3,6 +3,7 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { StatusCodeFieldComponent } from '../../shared/status-code-field.component';
 import { RespondEditorComponent } from './respond-editor.component';
@@ -56,7 +57,7 @@ export class HeaderFilterComponent {
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Header_name">Header name</mat-label>
-        <input matInput [value]="name()" (input)="set($any($event.target).value)" />
+        <input matInput required [value]="name()" (input)="set($any($event.target).value)" />
       </mat-form-field>
     </div>
   `,
@@ -105,7 +106,7 @@ export class SetQueryParamFilterComponent {
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Query_param">Query parameter</mat-label>
-        <input matInput [value]="name()" (input)="set($any($event.target).value)" />
+        <input matInput required [value]="name()" (input)="set($any($event.target).value)" />
       </mat-form-field>
     </div>
   `,
@@ -176,7 +177,7 @@ export class StripPrefixFilterComponent {
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Prefix">Prefix</mat-label>
-        <input matInput [value]="prefix()" placeholder="/api" (input)="set($any($event.target).value)" />
+        <input matInput required [value]="prefix()" placeholder="/api" (input)="set($any($event.target).value)" />
       </mat-form-field>
     </div>
   `,
@@ -198,11 +199,11 @@ export class PrefixPathFilterComponent {
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Pattern">Pattern</mat-label>
-        <input matInput [value]="pattern()" (input)="set('pattern', $any($event.target).value)" />
+        <input matInput required [value]="pattern()" (input)="set('pattern', $any($event.target).value)" />
       </mat-form-field>
       <mat-form-field>
         <mat-label i18n="@@Replacement">Replacement</mat-label>
-        <input matInput [value]="replacement()" (input)="set('replacement', $any($event.target).value)" />
+        <input matInput required [value]="replacement()" (input)="set('replacement', $any($event.target).value)" />
       </mat-form-field>
     </div>
   `,
@@ -246,7 +247,7 @@ export class SetStatusFilterComponent {
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Location">Location</mat-label>
-        <input matInput [value]="location()" placeholder="/login" (input)="set('location', $any($event.target).value)" />
+        <input matInput required [value]="location()" placeholder="/login" (input)="set('location', $any($event.target).value)" />
       </mat-form-field>
       <mat-form-field>
         <mat-label i18n="@@Status_code">Status code</mat-label>
@@ -267,29 +268,32 @@ export class RedirectFilterComponent {
   }
 }
 
-// The built-in maintenance answer: just the optional message shown on the page.
+// The built-in unavailable answer for ONE route: which reason its page gives.
+//
+// A list, not a text field, and for the reason the global switch uses one too:
+// that page is served to visitors in twenty languages, and a sentence typed
+// here would be a sentence in one of them.
 @Component({
   selector: 'app-maintenance-filter',
-  imports: [MatFormFieldModule, MatInputModule],
+  imports: [MatFormFieldModule, MatSelectModule],
   styles: [FIELDS_STYLE],
   template: `
     <div class="fields">
       <mat-form-field>
-        <mat-label i18n="@@Message">Message</mat-label>
-        <input
-          matInput
-          i18n-placeholder="@@Back_soon"
-          placeholder="Back soon"
-          [value]="message()"
-          (input)="set('message', $any($event.target).value)"
-        />
+        <mat-label i18n="@@Reason">Reason</mat-label>
+        <mat-select [value]="reason()" (valueChange)="set('reason', $event)">
+          <mat-option value="" i18n="@@Say_nothing">Do not say why</mat-option>
+          <mat-option value="maintenance" i18n="@@Reason_maintenance">Planned maintenance</mat-option>
+          <mat-option value="upgrade" i18n="@@Reason_upgrade">Update being rolled out</mat-option>
+          <mat-option value="incident" i18n="@@Reason_incident">Technical incident</mat-option>
+        </mat-select>
       </mat-form-field>
     </div>
   `,
 })
 export class MaintenanceFilterComponent {
   readonly spec = model.required<Spec>();
-  protected readonly message = computed(() => argStr(this.spec(), 'message'));
+  protected readonly reason = computed(() => argStr(this.spec(), 'reason'));
   protected set(key: string, v: string): void {
     this.spec.update((s) => patchSpec(s, key, v));
   }

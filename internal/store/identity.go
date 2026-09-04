@@ -33,6 +33,36 @@ type BusinessAccess struct {
 	DateTo    string     `json:"dateTo,omitempty"`
 }
 
+// Restricts reports whether this window actually restricts anything: a
+// timezone alone does not, and neither does an empty schedule.
+func (b BusinessAccess) Restricts() bool {
+	return len(b.Days) > 0 || b.DateFrom != "" || b.DateTo != ""
+}
+
+// SanitizeBusinessAccess turns a window that says NOTHING into an inherited
+// one - which is what a caller who never mentioned opening hours meant.
+//
+// The trap it closes: Go decodes a missing "businessAccess" as the zero value,
+// whose Inherited is FALSE. The resolution then reads "this level overrides,
+// with no restriction" and stops there, so a membership created through the
+// API, an import or a group rule silently escaped the hours set on its
+// organisation - and the organisation itself escaped the global ones. Nothing
+// on screen said so: the console sends inherited:true and was never the
+// culprit, which is why the hours looked like they worked.
+//
+// An EXPLICIT "no hours for this person" is still expressible: it is what a
+// window with a timezone and no days means, and it keeps Inherited false.
+func SanitizeBusinessAccess(b *BusinessAccess) {
+	if !b.Inherited && !b.Restricts() && b.Timezone == "" {
+		b.Inherited = true
+	}
+	if b.Inherited {
+		// An inherited window carries nothing of its own: leftovers here would
+		// come back to life the day somebody unticks the box.
+		b.Timezone, b.Days, b.DateFrom, b.DateTo = "", nil, "", ""
+	}
+}
+
 // Tenant is an isolation space (an organization - TENANT-01). Its settings
 // inherit from the global ones unless overridden; SessionTTL "" means
 // inherited (TENANT-05).
@@ -138,6 +168,10 @@ type UserTenant struct {
 
 // SaveTenant inserts or replaces a tenant by ID.
 func (s *Store) SaveTenant(ctx context.Context, t Tenant) error {
+	// Same trap one level up: an organisation created without opening hours
+	// used to OVERRIDE the global ones with nothing, so the installation's
+	// window stopped applying to it.
+	SanitizeBusinessAccess(&t.BusinessAccess)
 	ba, err := json.Marshal(t.BusinessAccess)
 	if err != nil {
 		return fmt.Errorf("store: tenant %q: encode business access: %w", t.Name, err)
@@ -251,6 +285,10 @@ func (s *Store) SaveMembership(ctx context.Context, m Membership) error {
 	if err := validMemberType(m.Type); err != nil {
 		return fmt.Errorf("store: membership %s@%s: %w", m.UserID, m.TenantID, err)
 	}
+	// Here rather than in the handler: a membership is also written by an
+	// import and by the group rules, and a window nobody stated must mean
+	// "inherit" wherever it comes from.
+	SanitizeBusinessAccess(&m.BusinessAccess)
 	ba, err := json.Marshal(m.BusinessAccess)
 	if err != nil {
 		return fmt.Errorf("store: membership %s@%s: encode business access: %w", m.UserID, m.TenantID, err)
@@ -426,6 +464,14 @@ const (
 	// data plane accepts reports. Ships OFF; the switch lives on the Issues
 	// screen, next to what it fills.
 	SettingIssuesEnabled = "issues_enabled"
+	// SettingAgentEnabled opens the agent endpoint (MCP-01): /mcp on the
+	// control plane, where an administrator's agent reads this gateway.
+	// Ships OFF, like the issue tracker and for the same reason - a surface
+	// nobody asked for should not appear on an upgrade. A control-plane token
+	// is still required either way; this is the switch that says the door
+	// exists at all, and it lives on the Access tokens screen, next to the
+	// tokens that open it.
+	SettingAgentEnabled = "agent_enabled"
 	// SettingTenancy records the mode this installation was FIRST started in:
 	// TenancySingle (one implicit organisation, the notion never surfaces) or
 	// TenancyMulti. It is chosen at startup and never changes afterwards -

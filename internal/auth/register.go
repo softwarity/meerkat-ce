@@ -10,7 +10,6 @@ import (
 	"net/http"
 	netmail "net/mail"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -91,69 +90,60 @@ func (h *Handler) sendMail(ctx context.Context, msg mail.Message) error {
 	return h.Mailer(ctx, msg)
 }
 
-// rateLimiter is a small sliding-window attempt counter (SEC-10). Lives ON
-// the handler (not a package global) so instances - and tests - never share
-// counters. In-memory, per node: enough for the single-binary deployment;
-// the cluster backend will revisit it.
-type rateLimiter struct {
-	mu   sync.Mutex
-	hits map[string][]time.Time
-}
+// rateLimiter is a sliding-window attempt counter (SEC-10, AUTH-11), kept in
+// the database so every gateway counts the same attempts - see
+// internal/store/attempts.go for why that is not a map any more.
+//
+// Every method FAILS OPEN. If the database will not answer, refusing the
+// sign-in would turn a blip into a lockout, and the sign-in was going to fail
+// on the very next query anyway: it needs the user row.
+type rateLimiter struct{ st *store.Store }
 
-func newRateLimiter() *rateLimiter { return &rateLimiter{hits: map[string][]time.Time{}} }
+func newRateLimiter(st *store.Store) *rateLimiter { return &rateLimiter{st: st} }
 
-// hit records one attempt for key, pruning entries older than window.
-func (l *rateLimiter) hit(key string, window time.Duration) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.hits[key] = append(l.prune(key, window), time.Now())
+// hit records one attempt for key.
+func (l *rateLimiter) hit(ctx context.Context, key string) {
+	if err := l.st.RecordAttempt(ctx, key); err != nil {
+		slog.Warn("attempt not counted", "err", err)
+	}
 }
 
 // count reports the live attempts for key within window.
-func (l *rateLimiter) count(key string, window time.Duration) int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	kept := l.prune(key, window)
-	l.hits[key] = kept
-	return len(kept)
+func (l *rateLimiter) count(ctx context.Context, key string, window time.Duration) int {
+	n, err := l.st.CountAttempts(ctx, key, time.Now().Add(-window))
+	if err != nil {
+		slog.Warn("attempts not counted", "err", err)
+		return 0
+	}
+	return n
 }
 
 // reset clears the key (a successful sign-in forgives the failures).
-func (l *rateLimiter) reset(key string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	delete(l.hits, key)
+func (l *rateLimiter) reset(ctx context.Context, key string) {
+	if err := l.st.ClearAttempts(ctx, key); err != nil {
+		slog.Warn("attempts not cleared", "err", err)
+	}
 }
 
 // allow counts THIS attempt against the limit (register-style: every try
 // costs, success or not).
-func (l *rateLimiter) allow(key string, limit int, window time.Duration) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	kept := l.prune(key, window)
-	if len(kept) >= limit {
-		l.hits[key] = kept
+//
+// Reading then writing is not atomic across nodes, so a burst arriving on
+// several gateways at the same instant can land one or two over the limit.
+// That is the accepted precision of a throttle: what it exists to stop is a
+// thousand tries, not the sixth.
+func (l *rateLimiter) allow(ctx context.Context, key string, limit int, window time.Duration) bool {
+	if l.count(ctx, key, window) >= limit {
 		return false
 	}
-	l.hits[key] = append(kept, time.Now())
+	l.hit(ctx, key)
 	return true
-}
-
-func (l *rateLimiter) prune(key string, window time.Duration) []time.Time {
-	now := time.Now()
-	kept := l.hits[key][:0]
-	for _, t := range l.hits[key] {
-		if now.Sub(t) < window {
-			kept = append(kept, t)
-		}
-	}
-	return kept
 }
 
 // registerAllow is the fixed policy of the unauthenticated WRITE endpoints
 // (/register, /forgot-password): 5 tries per IP per 15 minutes.
-func (h *Handler) registerAllow(ip string) bool {
-	return h.regLimit.allow("reg|"+ip, 5, 15*time.Minute)
+func (h *Handler) registerAllow(ctx context.Context, ip string) bool {
+	return h.regLimit.allow(ctx, "reg|"+ip, 5, 15*time.Minute)
 }
 
 // ---- pages ----
@@ -352,7 +342,7 @@ func (h *Handler) doRegister(w http.ResponseWriter, r *http.Request) {
 		h.renderRegister(w, r, withErr(data, h.tr(r, "errBadEmail")), http.StatusUnprocessableEntity)
 		return
 	}
-	if !h.registerAllow(clientIP(r)) {
+	if !h.registerAllow(r.Context(), clientIP(r)) {
 		h.renderRegister(w, r, withErr(data, h.tr(r, "errTooManyAttempts")), http.StatusTooManyRequests)
 		return
 	}

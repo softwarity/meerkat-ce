@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/softwarity/meerkat/internal/filters"
 )
@@ -94,6 +95,32 @@ type filterDef struct {
 	compileTerminal func(a decoded) (http.Handler, error)
 	// needsIdentity: the terminal reads the caller (see CompiledFilters).
 	needsIdentity bool
+}
+
+// TerminalType names the terminal filter a route carries ("redirect",
+// "respond", "maintenance"), or "" when the route proxies its upstream. One
+// target per route (ROUTE-16), so there is at most one - and reading it from
+// the REGISTRY rather than from a list written somewhere else is what keeps a
+// terminal added tomorrow from being invisible to whoever asks the question.
+func TerminalType(specs []Spec) string {
+	for _, s := range specs {
+		if def, ok := filterRegistry[s.Type]; ok && def.Phase == phaseTerminal {
+			return s.Type
+		}
+	}
+	return ""
+}
+
+// MatchPaths returns the path patterns a route matches on, in declared order.
+// The short answer to "what does this route catch", for a listing.
+func MatchPaths(specs []Spec) []string {
+	var out []string
+	for _, spec := range specs {
+		if spec.Type == "path" {
+			out = append(out, allStrings(spec.Args, "patterns")...)
+		}
+	}
+	return out
 }
 
 // CompileFilters turns specs into executable chains, applied in declared
@@ -968,16 +995,28 @@ func init() {
 
 	registerFilter(filterDef{
 		Type: "maintenance", Phase: phaseTerminal,
-		Doc:     "Answers 503 with a gateway maintenance page instead of proxying.",
+		Doc:     "Answers 503 with the gateway's unavailable page instead of proxying.",
 		Details: "Answers the unavailable page without calling the service. The route keeps matching, so no other route takes its traffic while the service is down.",
 		Params: []Param{
-			{Name: "message", Kind: KindString, Doc: "optional text shown on the page"},
+			// A key from a closed list rather than free text: the page is read
+			// in twenty languages, and a sentence typed here is a sentence in
+			// one of them. Empty says nothing, which is allowed.
+			{Name: "reason", Kind: KindString,
+				Doc: `why, from: "" (say nothing), maintenance, upgrade, incident`},
 		},
 		compileTerminal: func(a decoded) (http.Handler, error) {
-			page := maintenancePage(a.str("message"))
-			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			reason := a.str("reason")
+			page := MaintenancePage()
+			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Cache-Control", "no-store")
+				// The served page when there is one: a route answering "not
+				// available" is not a lesser page than the one the global
+				// switch shows, and both wear the installation's clothes.
+				if fn := maintenanceHandler.Load(); fn != nil {
+					(*fn)(w, req, reason, 0, "")
+					return
+				}
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.Header().Set("Retry-After", "300")
 				w.WriteHeader(http.StatusServiceUnavailable)
 				_, _ = w.Write(page)
@@ -1066,20 +1105,88 @@ func dropPath(node any, path []string) bool {
 	return false
 }
 
-// maintenancePage renders the built-in "under maintenance" answer: a sober
-// dark page, self-contained (the gateway must run offline). The message is
-// the admin's own text, escaped.
-func maintenancePage(message string) []byte {
-	extra := ""
-	if message != "" {
-		extra = `<p class="msg">` + html.EscapeString(message) + `</p>`
+// MaintenanceBrand is what the unavailable page borrows from the installation
+// (THEME-06): its mark and its name. Nothing else - the page has to render
+// with the application down and the network gone, so the logo is the sanitized
+// data URI the branding already stores and there is no second request in it.
+type MaintenanceBrand struct {
+	LogoURL  string
+	LogoSize string // "", "large", "xlarge" - sanitized by the store
+	AppName  string
+}
+
+// brand is the installation's, set once at every reload by the router. A
+// package-level value rather than an argument threaded through the filter
+// catalogue: there is ONE installation, and the maintenance filter is compiled
+// from a spec that has no way to reach a store.
+var brand atomic.Pointer[MaintenanceBrand]
+
+// SetMaintenanceBrand installs it. Called from the route reload, so a change
+// of logo shows on the next request - and on every node, through the same bus
+// as the routes.
+func SetMaintenanceBrand(b MaintenanceBrand) { brand.Store(&b) }
+
+// maintenanceHandler renders the unavailable page through the flow chrome, so
+// the FILTER below answers with the same page the global switch does. Wired by
+// main; nil leaves the self-contained block, which is what a package test gets.
+var maintenanceHandler atomic.Pointer[func(http.ResponseWriter, *http.Request, string, int64, string)]
+
+// SetMaintenanceHandler installs it.
+func SetMaintenanceHandler(fn func(w http.ResponseWriter, r *http.Request, reason string, until int64, continueURL string)) {
+	maintenanceHandler.Store(&fn)
+}
+
+// MaintenancePage renders the built-in "not available" answer: a sober
+// dark page wearing the installation's mark, self-contained (the gateway must
+// run offline). The message is the admin's own text, escaped.
+//
+// Exported because there are two ways to turn maintenance on and there must be
+// ONE page: the filter below, put on a route whose service is down, and the
+// global switch (LIFE-05), which answers for every route at once without
+// anybody editing a route on the day everything is being taken down.
+func MaintenancePage() []byte {
+	return MaintenancePageWith("")
+}
+
+// MaintenancePageWith is the same page plus a footer, which is how the global
+// switch offers an administrator the way through (LIFE-05). door is trusted
+// HTML built by the caller, never anything a request carried.
+func MaintenancePageWith(door string) []byte {
+	// No reason on this one, and that is not an omission: the reasons are a
+	// translated catalogue, and the catalogue lives with the pages. This is
+	// the fallback for a gateway wired without them, so it says the only thing
+	// it can say without a language - the fact.
+	const extra = ""
+	// The installation's mark, above the title, the way every other page this
+	// product serves carries it. This is the page EVERY visitor meets during
+	// an outage: unbranded, it says the outage belongs to some gateway they
+	// have never heard of.
+	mark, title := "", ""
+	if b := brand.Load(); b != nil {
+		if b.LogoURL != "" {
+			size := ""
+			if b.LogoSize != "" {
+				size = " " + html.EscapeString(b.LogoSize)
+			}
+			mark = `<img class="logo` + size + `" src="` + html.EscapeString(b.LogoURL) + `" alt="">`
+		}
+		if b.AppName != "" {
+			title = `<p class="app">` + html.EscapeString(b.AppName) + `</p>`
+		}
 	}
 	return []byte(`<!doctype html><html><head><meta charset="utf-8"><title>Maintenance</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"><style>
 body { margin:0; min-height:100vh; display:grid; place-items:center; background:#1b2f40; color:#e6edf3; font-family:system-ui,sans-serif; }
-main { text-align:center; padding:24px; }
+main { text-align:center; padding:24px; max-width:56ch; }
+.logo { display:block; margin:0 auto 14px; max-width:180px; max-height:64px; object-fit:contain; }
+.logo.large { max-width:240px; max-height:96px; }
+.logo.xlarge { max-width:320px; max-height:128px; }
+.app { margin:0 0 22px; font-size:1rem; font-weight:500; color:#c6d4e2; }
 h1 { font-size:1.3rem; letter-spacing:.1em; text-transform:uppercase; }
-.msg { color:#9fb3c8; max-width:52ch; }
+.msg { color:#9fb3c8; }
 .dot { width:10px; height:10px; margin:20px auto 0; border-radius:50%; background:#25c2e0; box-shadow:0 0 12px #25c2e0; }
-</style></head><body><main><h1>Under maintenance</h1>` + extra + `<div class="dot"></div></main></body></html>`)
+.door { margin-top:34px; font-size:.82rem; line-height:1.5; color:#7f95ab; }
+.door a { color:#25c2e0; display:inline-block; margin-top:6px; }
+</style></head><body><main>` + mark + title +
+		`<h1>Under maintenance</h1>` + extra + `<div class="dot"></div>` + door + `</main></body></html>`)
 }

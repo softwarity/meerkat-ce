@@ -24,6 +24,15 @@ type Manager struct {
 	fallback  *Material
 	acme      *autocert.Manager
 	acmeHosts []string
+	// serialise makes the ORDER one-at-a-time across the gateways sharing a
+	// database (issue.go). Nil on a single node.
+	serialise Serialiser
+
+	// issued remembers, per host, when the certificate this process last
+	// served expires - the fast path that keeps the lock off every handshake.
+	// Its own lock, because it is written from handshakes rather than from the
+	// wiring the mutex above guards.
+	issued issuedAt
 }
 
 // New builds an empty manager: it serves nothing until Set is called, and says
@@ -87,6 +96,7 @@ func (m *Manager) Live(now time.Time) bool {
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	m.mu.RLock()
 	materials, fallback, am, hosts := m.materials, m.fallback, m.acme, m.acmeHosts
+	serialise := m.serialise
 	m.mu.RUnlock()
 
 	// FIRST, before anything else: a TLS-ALPN-01 challenge. The authority
@@ -104,7 +114,9 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 			return c.TLS(), nil
 		}
 		if am != nil && slices.Contains(hosts, name) {
-			return am.GetCertificate(hello)
+			// The one path that can ORDER a certificate, and therefore the
+			// one that other gateways must not walk at the same time.
+			return m.issue(hello, am, serialise, name)
 		}
 	}
 	if fallback != nil {

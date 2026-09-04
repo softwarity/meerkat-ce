@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { Background, PageLayout } from '../../api.service';
+import { Background, LogoSize, PageLayout } from '../../api.service';
 import { CSS_VARS } from '../theme-tokens';
 
 // The live preview: the gateway-rendered flow-page specimen, dark and light
@@ -29,6 +29,9 @@ export class ThemePreviewComponent {
   readonly brandName = input.required<string>();
   readonly brandTagline = input.required<string>();
   readonly brandLogo = input.required<string>();
+  // The size the mark is drawn at, pushed like the rest: the frame turns it
+  // into a class, so trying one is not a reload.
+  readonly brandLogoSize = input<LogoSize>('');
   // The background as it is being edited: the console holds the picked image
   // long before it is saved, so the panes show it from the drop.
   readonly background = input<Background>({});
@@ -79,6 +82,7 @@ export class ThemePreviewComponent {
         this.brandName(),
         this.brandTagline(),
         this.brandLogo(),
+        this.brandLogoSize(),
         this.flat(),
         this.background(),
         this.layout(),
@@ -95,6 +99,7 @@ export class ThemePreviewComponent {
       this.brandName(),
       this.brandTagline(),
       this.brandLogo(),
+      this.brandLogoSize(),
       this.flat(),
       this.background(),
       this.layout(),
@@ -124,6 +129,7 @@ export class ThemePreviewComponent {
     name: string,
     tagline: string,
     logo: string,
+    logoSize: LogoSize,
     flat: boolean,
     background: Background,
     layout: PageLayout,
@@ -137,7 +143,7 @@ export class ThemePreviewComponent {
     }
     // The flat-design switch: 0 collapses every decorative effect at once.
     vars['--mk-glow'] = flat ? '0' : '1';
-    this.post({ vars, brand: { name, tagline, logo }, background, layout });
+    this.post({ vars, brand: { name, tagline, logo, logoSize }, background, layout });
   }
 
   private pushHighlight(cssVar: string): void {

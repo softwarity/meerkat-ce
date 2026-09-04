@@ -245,16 +245,16 @@ func (h *Handler) doTOTP(w http.ResponseWriter, r *http.Request) {
 		window = d
 	}
 	totpKey := "totp|" + sess.UserID
-	if pol.TotpAttempts > 0 && h.regLimit.count(totpKey, window) >= pol.TotpAttempts {
+	if pol.TotpAttempts > 0 && h.regLimit.count(r.Context(), totpKey, window) >= pol.TotpAttempts {
 		h.renderChallenge(w, r, h.tr(r, "errTooManyAttempts"), http.StatusTooManyRequests)
 		return
 	}
 	if !h.verifySecondFactor(r, sess.UserID, r.PostFormValue("code")) {
-		h.regLimit.hit(totpKey, window)
+		h.regLimit.hit(r.Context(), totpKey)
 		h.renderChallenge(w, r, h.tr(r, "errBadCode"), http.StatusUnprocessableEntity)
 		return
 	}
-	h.regLimit.reset(totpKey)
+	h.regLimit.reset(r.Context(), totpKey)
 	// "Remember this browser" (MFA-03) - best-effort; issueTrust re-checks policy.
 	if r.PostFormValue("trust") != "" {
 		h.issueTrust(w, r, sess.UserID)
@@ -619,6 +619,9 @@ const totpChallengeBody = `    <form method="post" action="/totp">
       .trust { display: flex; align-items: center; gap: 9px; font-size: .82rem; color: var(--mk-on-surface-variant); cursor: pointer; }
       .trust input { width: auto; margin: 0; accent-color: var(--mk-primary); }
     </style>
+    <form method="post" action="logout" class="leave">
+      <button type="submit">{{.T.signOut}}</button>
+    </form>
 `
 
 const totpEnrollBody = `    <style>
@@ -663,7 +666,12 @@ const totpEnrollBody = `    <style>
       <input type="hidden" name="step" value="confirm">
       <button type="submit">{{.T.confirm}}</button>
     </form>
-    {{if .Cancel}}<p class="back"><a href="{{.Cancel}}">{{.T.cancel}}</a></p>{{end}}
+    {{if .Cancel}}<p class="back"><a href="{{.Cancel}}">{{.T.cancel}}</a></p>
+    {{else}}
+    <form method="post" action="logout" class="leave">
+      <button type="submit">{{.T.signOut}}</button>
+    </form>
+    {{end}}
     {{end}}
 `
 

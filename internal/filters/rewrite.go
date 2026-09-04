@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // Rewriting a response body, once, for everything that needs it.
@@ -34,10 +35,33 @@ import (
 // the ETag. The upstream's ETag describes the upstream's bytes; keeping it on
 // bytes we changed makes a cache serve one under the name of the other.
 
+// DefaultMaxRewritableBody is the ceiling an installation runs with until an
+// operator changes it - and what every installation ran with when it was a
+// constant.
+const DefaultMaxRewritableBody = 20 << 20 // 20 MiB
+
+// ceiling is the live value. A package-level variable rather than a parameter
+// threaded through every filter, and that is the modelling, not a shortcut:
+// the bill is per REQUEST IN FLIGHT, so a per-route ceiling would make the
+// memory cost "concurrent requests times the largest number anybody typed",
+// with nothing bounding it. What this protects is the process, so it is one
+// number for the process.
+var ceiling atomic.Int64
+
+// SetMaxRewritableBody installs the operator's ceiling, in bytes. Called from
+// the route reload, so a change reaches every gateway through the same bus as
+// the routes themselves. A value of zero restores the default.
+func SetMaxRewritableBody(n int64) { ceiling.Store(n) }
+
 // MaxRewritableBody caps what will be buffered to be rewritten. Bigger
 // responses pass through - the ceiling is not a failure, it is the promise
 // that a gateway's memory does not follow the size of what it proxies.
-const MaxRewritableBody = 20 << 20 // 20 MiB
+func MaxRewritableBody() int64 {
+	if n := ceiling.Load(); n > 0 {
+		return n
+	}
+	return DefaultMaxRewritableBody
+}
 
 // Rewritable reports whether this response can be rewritten at all, before
 // anyone reads a byte of it. Exported because a filter may want to say "not
@@ -58,7 +82,7 @@ func Rewritable(res *http.Response) bool {
 	if isStream(res) {
 		return false
 	}
-	if res.ContentLength > MaxRewritableBody {
+	if res.ContentLength > MaxRewritableBody() {
 		return false
 	}
 	return canRecode(strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Encoding"))))
@@ -84,19 +108,28 @@ func RewriteBody(res *http.Response, transform func([]byte) []byte) error {
 		return nil
 	}
 	encoding := strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Encoding")))
-	body, err := io.ReadAll(io.LimitReader(res.Body, MaxRewritableBody+1))
-	closeErr := res.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(res.Body, MaxRewritableBody()+1))
 	if err != nil {
+		_ = res.Body.Close()
 		return fmt.Errorf("rewrite: read body: %w", err)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("rewrite: close body: %w", closeErr)
 	}
 	// Over the ceiling despite the Content-Length check: a chunked response
 	// announces no length at all, so this is where most of them are caught.
-	if len(body) > MaxRewritableBody {
-		res.Body = io.NopCloser(bytes.NewReader(body))
+	//
+	// What goes back is the sample we read FOLLOWED BY the rest of the
+	// upstream body, still open. Reading a sample, closing the upstream and
+	// handing back the sample is how a 200 MB download used to arrive
+	// truncated to the ceiling plus one byte - silently, with a correct
+	// status, through any route carrying a body-rewriting filter. The ceiling
+	// promises that a bigger answer passes through UNTOUCHED, and untouched
+	// includes whole.
+	if int64(len(body)) > MaxRewritableBody() {
+		res.Body = joined{Reader: io.MultiReader(bytes.NewReader(body), res.Body), Closer: res.Body}
 		return nil
+	}
+	// Under the ceiling the body is fully read, so this closes what we drained.
+	if err := res.Body.Close(); err != nil {
+		return fmt.Errorf("rewrite: close body: %w", err)
 	}
 	plain, err := decode(encoding, body)
 	if err != nil {
@@ -124,4 +157,13 @@ func RewriteBody(res *http.Response, transform func([]byte) []byte) error {
 	// next conditional request would be answered 304 with the wrong body.
 	res.Header.Del("ETag")
 	return nil
+}
+
+// joined is what a body handed back in two pieces has to be: the bytes already
+// read in front, the upstream connection behind, and the ORIGINAL closer - so
+// whoever finishes with this response still releases the connection it came
+// on.
+type joined struct {
+	io.Reader
+	io.Closer
 }

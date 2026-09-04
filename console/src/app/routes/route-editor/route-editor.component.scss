@@ -501,3 +501,81 @@ mat-list-option .mark {
   font-size: 0.78rem;
   color: var(--mat-sys-secondary);
 }
+
+/* The deposited spec (SVC-06): a button, the name of the file that is there,
+   and what to do with it - on one line, because it is one fact. */
+.spec-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.spec-file .spec-name {
+  font-family: var(--mat-sys-body-medium-font);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* Where the file answers, and the collision with the upstream when there is
+   one. Stated, never in the way: replacing a spec IS why one deposits a file. */
+.spec-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.spec-note.warn {
+  color: var(--mat-sys-tertiary);
+}
+
+/* Two bounds that are one decision: side by side, and they wrap on a narrow
+   drawer rather than each taking a line of its own. */
+.pair {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pair mat-form-field {
+  flex: 1 1 160px;
+}
+.field-hint {
+  margin: -6px 0 4px;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+
+/* A checkbox between two form fields has no subscript row to stand on, so it
+   ends up glued to whatever follows. The rule is on the checkbox rather than
+   on its neighbour: the gap belongs to the thing that lacks one. */
+mat-checkbox.standalone {
+  display: block;
+  margin-bottom: 14px;
+}
+
+/* A section that is always required wears a star, the way a required field
+   does inside one. It stays whatever the state: it is a fact about a route,
+   not about this moment. */
+mat-selection-list .req {
+  margin-left: 3px;
+  color: var(--mat-sys-on-surface-variant);
+}
+/* And a section with something missing wears the error colour until it has
+   not - the fact about this moment. Together they read as "what is left".
+
+   Through the tokens, not through `color`: the label lives inside the list
+   option's own template, where this component's styles cannot reach, and it
+   paints itself from these three. The hover one goes too, or the entry turns
+   back to ordinary under the cursor - exactly when it is being read. */
+mat-selection-list .mat-mdc-list-item.wants {
+  --mat-list-list-item-label-text-color: var(--mat-sys-error);
+  --mat-list-list-item-hover-label-text-color: var(--mat-sys-error);
+  --mat-list-list-item-focus-label-text-color: var(--mat-sys-error);
+}
+mat-selection-list .mat-mdc-list-item.wants .req {
+  color: var(--mat-sys-error);
+}
+/* The count sits at the LEFT of the footer, away from Cancel and Save: it is
+   not a third thing to press by accident, it is what explains the greyed one. */
+footer .gaps {
+  margin-right: auto;
+  --mat-button-text-label-text-color: var(--mat-sys-error);
+  --mat-button-text-icon-color: var(--mat-sys-error);
+}

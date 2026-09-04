@@ -33,7 +33,7 @@ import (
 // <body> (same mechanism as UI routes, hard-wired here): capability roles as
 // classes and data-meerkat-* attributes - the console boots without calling
 // /api/me, and the role-CSS visibility applies from the first paint.
-func RegisterConsole(mux *http.ServeMux, target string, st *store.Store, sm *session.Manager) error {
+func RegisterConsole(mux Mux, target string, st *store.Store, sm *session.Manager) error {
 	if target != "" {
 		u, err := url.Parse(target)
 		if err != nil || u.Scheme == "" || u.Host == "" {

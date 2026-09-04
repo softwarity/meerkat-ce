@@ -13,6 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 type fixture struct {
@@ -41,7 +42,7 @@ func setup(t *testing.T) fixture {
 // tests use to assert refusals on an installation that is otherwise identical.
 func setupBare(t *testing.T) fixture {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

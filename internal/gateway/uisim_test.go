@@ -12,6 +12,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The UI test mode (DEV-10): dead while the switch is off, dev-only, scoped
@@ -34,7 +35,7 @@ func TestUISim(t *testing.T) {
 	gated := pathRoute("r-gated", "gated", 2, "/gated/**", upstream.URL)
 	gated.Access = store.Access{Roles: []string{"admin"}}
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

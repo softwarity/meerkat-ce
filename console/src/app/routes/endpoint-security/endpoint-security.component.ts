@@ -124,7 +124,7 @@ export class EndpointSecurityComponent {
   // Exclusive expand: at most one row is open for editing at a time.
   private readonly expanded = signal<string>('');
 
-  protected readonly apiRoutes = computed(() => this.routes().filter((r) => !!r.api?.openapiUrl));
+  protected readonly apiRoutes = computed(() => this.routes().filter((r) => !!r.api?.spec));
   protected readonly operations = computed(() => this.data()?.operations ?? []);
   protected readonly columns = ['status', 'method', 'path', 'tags', 'summary', 'expand'];
 
@@ -224,7 +224,7 @@ export class EndpointSecurityComponent {
       this.users.set(users);
       this.tenants.set(tenants);
       this.routes.set(routes);
-      const exposing = routes.filter((r) => !!r.api?.openapiUrl);
+      const exposing = routes.filter((r) => !!r.api?.spec);
       const pick = exposing.find((r) => r.id === preselect)?.id ?? exposing[0]?.id ?? '';
       if (pick) await this.selectRoute(pick);
     } catch (e) {

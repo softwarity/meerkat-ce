@@ -24,7 +24,7 @@ import (
 // admin session into permanent control of the gateway. Restoring happens with
 // the service stopped, and the console prints the exact commands.
 
-func (a *API) registerBackup(mux *http.ServeMux) {
+func (a *API) registerBackup(mux Mux) {
 	mux.Handle("GET /api/backup", a.rootOnly(a.downloadSnapshot))
 	mux.Handle("GET /api/backup/info", a.rootOnly(a.backupInfo))
 }

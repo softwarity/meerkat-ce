@@ -337,8 +337,13 @@ func TestQueryEncodingPreserved(t *testing.T) {
 }
 
 // The built-in maintenance terminal answers 503 with the gateway page.
+//
+// Its "reason" is a KEY from a closed catalogue, not a sentence: the page is
+// read in twenty languages, and free text would be one of them. The wording
+// itself lives with the catalogue - this package only carries the fallback,
+// for a gateway wired without the served pages.
 func TestMaintenanceTerminal(t *testing.T) {
-	cf, err := CompileFilters([]Spec{{Type: "maintenance", Args: map[string]any{"message": "back at <noon>"}}})
+	cf, err := CompileFilters([]Spec{{Type: "maintenance", Args: map[string]any{"reason": "incident"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +356,12 @@ func TestMaintenanceTerminal(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" {
 		t.Fatalf("code=%d headers=%v", rec.Code, rec.Header())
 	}
-	if !strings.Contains(body, "Under maintenance") || !strings.Contains(body, "back at &lt;noon&gt;") {
-		t.Fatalf("page wrong (message must be escaped): %s", body)
+	if !strings.Contains(body, "Under maintenance") {
+		t.Fatalf("page wrong: %s", body)
+	}
+	// Free text is refused rather than ignored: an argument that silently does
+	// nothing is a message an operator believes they published.
+	if _, err := CompileFilters([]Spec{{Type: "maintenance", Args: map[string]any{"message": "back at noon"}}}); err == nil {
+		t.Error("a free-text message was accepted")
 	}
 }

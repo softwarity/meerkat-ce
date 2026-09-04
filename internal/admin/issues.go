@@ -13,7 +13,7 @@ import (
 // from the injected user-button panel on the data plane. The GET/PUT settings
 // pair is the switch that turns the whole feature on (ISSUE-04); it lives on
 // the Issues screen, next to the reports it fills.
-func (a *API) registerIssues(mux *http.ServeMux) {
+func (a *API) registerIssues(mux Mux) {
 	mux.Handle("GET /api/settings/issues", a.infraAdmin(a.getIssuesSetting))
 	mux.Handle("PUT /api/settings/issues", a.infraAdmin(a.putIssuesSetting))
 	mux.Handle("GET /api/issues", a.authed(a.listIssues))

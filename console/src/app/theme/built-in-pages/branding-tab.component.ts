@@ -13,6 +13,13 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
   imports: [MatCardModule, MatSlideToggleModule, EeLockComponent, BrandingCardComponent],
   styles: [
     `
+      /* See layout-tab: the panel's gap lands on this host, not between the
+         cards inside it, so the host carries it. */
+      :host {
+        display: grid;
+        gap: 16px;
+        align-content: start;
+      }
       .mark-card {
         padding: 16px 20px;
       }

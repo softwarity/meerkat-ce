@@ -369,6 +369,23 @@ func loadMessages() map[string]map[string]string {
 		}
 		out[strings.TrimSuffix(name, ".json")] = m
 	}
+	// A key a catalogue does not carry falls back to English, filled in HERE
+	// rather than at every lookup: half this package indexes the map directly
+	// (t := messages[lang]; t[key]), so a fallback in one accessor would leave
+	// the other half rendering an empty string - which is what a missing key
+	// used to do, silently, on the page nobody tested in Thai.
+	if en := out["en"]; en != nil {
+		for lang, m := range out {
+			if lang == "en" {
+				continue
+			}
+			for key, text := range en {
+				if _, ok := m[key]; !ok {
+					m[key] = text
+				}
+			}
+		}
+	}
 	return out
 }
 

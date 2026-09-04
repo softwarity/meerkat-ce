@@ -9,6 +9,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // A single-organisation instance never names the organisation: the console
@@ -18,7 +19,7 @@ import (
 func TestProfileNamesTheOrganisationOnlyInMulti(t *testing.T) {
 	profile := func(mode string) string {
 		ctx := context.Background()
-		st, err := store.Open(t.TempDir())
+		st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 		if err != nil {
 			t.Fatal(err)
 		}

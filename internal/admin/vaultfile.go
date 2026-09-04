@@ -50,7 +50,7 @@ type vaultImportReport struct {
 	Skipped []string `json:"skipped"`
 }
 
-func (a *API) registerVaultFile(mux *http.ServeMux) {
+func (a *API) registerVaultFile(mux Mux) {
 	mux.Handle("POST /api/vault/export", a.authed(a.exportVault))
 	mux.Handle("POST /api/vault/import", a.authed(a.importVault))
 }
@@ -136,7 +136,7 @@ func (a *API) importVault(w http.ResponseWriter, r *http.Request, actor store.Us
 			len(report.Conflicts)+len(report.Skipped)))
 	// New entries change what an already-written $name resolves to, and a route
 	// that was inert because its reference held nothing can now serve.
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("imported, but the routing table could not be reloaded: %w", err))
 		return
 	}

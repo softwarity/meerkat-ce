@@ -16,7 +16,7 @@ import (
 // it is TRANSVERSE: several kinds of administrator keep values here, so the
 // guard only asks for a session and each handler scopes the caller to the
 // planes their capabilities cover (RBAC-05).
-func (a *API) registerVault(mux *http.ServeMux) {
+func (a *API) registerVault(mux Mux) {
 	mux.Handle("GET /api/vault", a.authed(a.listVault))
 	mux.Handle("PUT /api/vault/{scope}/{name}", a.authed(a.putVaultEntry))
 	mux.Handle("DELETE /api/vault/{scope}/{name}", a.authed(a.deleteVaultEntry))
@@ -141,7 +141,7 @@ func (a *API) putVaultEntry(w http.ResponseWriter, r *http.Request, actor store.
 	}
 	// A vault change moves what the routes resolve to: apply it now, exactly
 	// like saving a route does.
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
 		return
 	}

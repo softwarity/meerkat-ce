@@ -1,0 +1,127 @@
+<div class="head">
+  <h2 i18n="@@Global">Global</h2>
+  <span class="grow"></span>
+  <button matIconButton (click)="closed.emit()" i18n-matTooltip="@@Close" matTooltip="Close" i18n-aria-label="@@Close" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+<p class="lead" i18n="@@Global_lead">
+  What is true of every route at once, and belongs to none of them.
+</p>
+
+<section [class.on]="maintenance().enabled">
+  <div class="row">
+    <mat-icon>public_off</mat-icon>
+    <div class="grow">
+      <div class="title">
+        <ng-container i18n="@@Unavailable">Unavailable</ng-container>
+        @if (maintenance().enabled) {
+          <span class="badge">{{ since() }}</span>
+        }
+      </div>
+      <p class="hint" i18n="@@Unavailable_hint">
+        Closes every route at once, without a single route being edited - and nothing to put back
+        afterwards. The sign-in pages keep working, and anyone who administers or develops here can
+        still go through, so the fix can be checked before reopening.
+      </p>
+    </div>
+    <mat-slide-toggle
+      [checked]="maintenance().enabled"
+      [disabled]="switching()"
+      (change)="setEnabled($event.checked)"
+    />
+  </div>
+  <!-- What the page SAYS. A list rather than a text field: the page is read in
+       twenty languages, and a sentence typed here would be one of them. -->
+  <div class="says">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label i18n="@@Reason">Reason</mat-label>
+      <mat-select [value]="reason()" (valueChange)="reason.set($event); saveDetails()">
+        @for (r of reasons; track r.key) {
+          <mat-option [value]="r.key">{{ r.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label i18n="@@How_long">How long</mat-label>
+      <mat-select [value]="howLong()" (valueChange)="howLong.set($event); saveDetails()">
+        @for (d of durations; track d.key) {
+          <mat-option [value]="d.key">{{ d.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <p class="hint" i18n="@@Back_in_hint">
+      Optional, and an estimate rather than an appointment. The page keeps the size of what you
+      chose - a day announced still reads as a day an hour later - and only says something smaller
+      once what is left really is smaller. It never repeats it to the minute: a promise to the
+      minute is one a window famously breaks. Left empty, the page says service will be back shortly
+      rather than leaving a blank; an outage with no horizon reads as an abandoned service.
+    </p>
+  </div>
+</section>
+
+<!-- How long every route waits unless it says otherwise (ROUTE-07). Here
+     because it is true of all of them, and a route overrides it one bound at
+     a time. -->
+<section>
+  <div class="row">
+    <mat-icon>timer</mat-icon>
+    <div class="grow">
+      <div class="title" i18n="@@Upstream_waits">How long to wait for a service</div>
+      <p class="hint" i18n="@@Upstream_waits_hint">
+        The first is the time to establish the connection - a service that is not listening, a
+        closed port, a network swallowing packets. The second starts once the request is sent and
+        bounds the wait for the answer's first line: the service is thinking. Past either, the
+        caller gets a 502 instead of waiting. What follows the first line is never bounded: a
+        download or a websocket runs as long as it needs.
+      </p>
+    </div>
+  </div>
+  <div class="says">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label i18n="@@Connect_timeout">Connect within</mat-label>
+      <mat-select [value]="connect()" (valueChange)="connect.set($event); saveLimits()">
+        @for (d of connectOffered(); track d.key) {
+          <mat-option [value]="d.key">{{ d.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label i18n="@@Response_timeout">First answer within</mat-label>
+      <mat-select [value]="response()" (valueChange)="response.set($event); saveLimits()">
+        @for (d of responseOffered(); track d.key) {
+          <mat-option [value]="d.key">{{ d.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+</section>
+
+<section>
+  <div class="row">
+    <mat-icon>memory</mat-icon>
+    <div class="grow">
+      <div class="title" i18n="@@Body_rewrite_ceiling">Body rewriting ceiling</div>
+      <p class="hint" i18n="@@Body_rewrite_ceiling_hint">
+        Filters that change a response body - injecting, removing JSON fields - have to hold it in
+        memory to do it. Past this size the answer is forwarded untouched instead: nothing breaks,
+        the filter simply does not apply. The cost is per request being served at that moment, so a
+        large ceiling multiplies by however many arrive together.
+      </p>
+    </div>
+  </div>
+  <div class="message">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label i18n="@@Megabytes">MiB</mat-label>
+      <input
+        matInput
+        type="number"
+        [min]="minMiB"
+        [max]="maxMiB"
+        [value]="bodyRewriteMiB()"
+        (input)="bodyRewriteMiB.set(+$any($event.target).value)"
+      />
+    </mat-form-field>
+    <button matButton (click)="saveLimits()" [disabled]="savingLimits()" i18n="@@Save">Save</button>
+  </div>
+</section>

@@ -57,9 +57,16 @@ var themeTokens = []struct{ Key, CSSVar string }{
 // skip - after which the sign-in page of their application wears Meerkat's
 // sentinel, which is the one place it must not.
 type Branding struct {
-	AppName    string     `json:"appName"`
-	Tagline    string     `json:"tagline"`
-	Logo       string     `json:"logo"`
+	AppName string `json:"appName"`
+	Tagline string `json:"tagline"`
+	Logo    string `json:"logo"`
+	// LogoSize is how big that mark is drawn: "" (normal), "large" or
+	// "xlarge". A logo is not a fixed shape - a square sentinel and a wide
+	// wordmark do not fill the same box, and the wordmark laid in the square
+	// one comes out a third of its height. The alternative was to guess from
+	// the image's aspect ratio, which decides for the integrator on a page
+	// that is theirs. Three sizes, chosen once, next to the picture.
+	LogoSize   string     `json:"logoSize,omitempty"`
 	Favicon    string     `json:"favicon,omitempty"`
 	Background Background `json:"background,omitzero"`
 	// HideMark removes the "powered by Meerkat" line from the served pages.
@@ -68,6 +75,14 @@ type Branding struct {
 	// asked keeps the mark. Ignored - and refused on save - without it.
 	HideMark bool `json:"hideMark,omitempty"`
 }
+
+// The two sizes past the normal one. Named here because the served pages turn
+// them into a class and the console offers them as a choice, and a third
+// spelling would be a size that saves and does nothing.
+const (
+	LogoLarge  = "large"
+	LogoXLarge = "xlarge"
+)
 
 // Background is the image behind the built-in pages (THEME-06). It belongs to
 // the BRANDING and not to a theme on purpose: a photograph of a building or a
@@ -115,6 +130,15 @@ func SanitizeBranding(b *Branding) error {
 	}
 	if err := checkImageDataURI("logo", b.Logo, 300_000); err != nil {
 		return err
+	}
+	// The normal size is stored as nothing: it is what every branding written
+	// before this field said, and what an export should keep saying.
+	switch b.LogoSize {
+	case "", "normal":
+		b.LogoSize = ""
+	case LogoLarge, LogoXLarge:
+	default:
+		return fmt.Errorf("branding logo size %q: allowed are normal, %s, %s", b.LogoSize, LogoLarge, LogoXLarge)
 	}
 	// A favicon is a 32-pixel square: what does not fit in 64 KiB is a full
 	// image someone dropped in by mistake, and it would ride on every page.

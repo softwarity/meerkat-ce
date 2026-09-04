@@ -14,7 +14,7 @@ import (
 // registerSigning mounts the identity signing-key surface: read the public keys
 // (PEM + JWKS location) for backends verifying signed-jwt, and rotate them.
 // Routing plane (GATEWAY scope): read for infra-admin, rotate for infra-admin.
-func (a *API) registerSigning(mux *http.ServeMux) {
+func (a *API) registerSigning(mux Mux) {
 	mux.Handle("GET /api/identity/signing-keys", a.gw(a.getSigningKeys))
 	mux.Handle("POST /api/identity/signing-keys/renew", a.infraAdmin(a.renewSigningKeys))
 	mux.Handle("POST /api/identity/preview", a.infraAdmin(a.previewIdentity))
@@ -149,7 +149,7 @@ func (a *API) renewSigningKeys(w http.ResponseWriter, r *http.Request, actor sto
 	}
 	// Reload so the gateway signs with the new keys and publishes the new JWKS
 	// (the previous public keys linger there through their grace window).
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("renewed, but reload failed: %w", err))
 		return
 	}

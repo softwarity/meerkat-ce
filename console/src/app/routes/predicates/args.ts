@@ -71,7 +71,30 @@ export function cleanPredicates(specs: Spec[]): Spec[] {
   return out;
 }
 
-// Filters share the same "keep empties while editing, drop them on save" rule as
-// predicates, and their order is significant - cleanPredicates already preserves
-// it, so this is just a clearer name at the filter call sites.
-export const cleanSpecs = cleanPredicates;
+// Filters are NOT predicates, and sharing one cleaner cost exactly this: a
+// brick whose arguments were all left at their defaults has no args at all,
+// was read as a half-typed row, and vanished on save. Someone had clicked
+// "add" - that IS the intent - and several filters are complete with nothing
+// filled in: preserve-host takes no argument by design, strip-prefix strips
+// one segment, security-headers and cookie-attributes carry sensible values of
+// their own. Seven bricks in the catalogue have no required parameter, and
+// preserve-host could never be saved from the console at all.
+//
+// So a filter is kept whatever it holds; only the empties INSIDE it go. The
+// order is significant and preserved.
+export function cleanSpecs(specs: Spec[]): Spec[] {
+  return specs.map((s) => {
+    const args: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(s.args ?? {})) {
+      if (Array.isArray(v)) {
+        const arr = v.map(String).map((x) => x.trim()).filter((x) => x !== '');
+        if (arr.length) args[k] = arr;
+      } else if (typeof v === 'boolean') {
+        args[k] = v;
+      } else if (v !== '' && v !== null && v !== undefined) {
+        args[k] = v;
+      }
+    }
+    return Object.keys(args).length ? { type: s.type, args } : { type: s.type };
+  });
+}

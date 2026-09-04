@@ -21,6 +21,7 @@ func (h *Handler) registerUserButton(mux *http.ServeMux) {
 	mux.HandleFunc("GET /meerkat/user-button.json", h.userButtonJSON)
 	mux.HandleFunc("GET /meerkat/page.js", h.pageJS)
 	mux.HandleFunc("POST /meerkat/locale", h.setLocale)
+	mux.HandleFunc("POST /meerkat/scheme", h.setScheme)
 }
 
 // setLocale records the language someone picked from the button's menu on
@@ -55,6 +56,35 @@ func (h *Handler) setLocale(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.st.SetUserLocale(r.Context(), sess.UserID, code); err != nil {
 		http.Error(w, "could not store the language", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// setScheme records the light/dark choice on the ACCOUNT, exactly as
+// setLocale records the language (THEME-05). Both switches sit side by side in
+// the same bar, and behaving differently is what nobody can explain: one would
+// follow you to another machine and the other would not.
+//
+// Signed out - which most of the flow pages are - it answers 204 and only the
+// cookie remains, which is all there is to remember.
+func (h *Handler) setScheme(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Scheme string `json:"scheme"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&body); err != nil {
+		http.Error(w, "malformed body", http.StatusBadRequest)
+		return
+	}
+	sess, err := h.sm.Resolve(r.Context(), r)
+	if err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err := h.st.SetUserScheme(r.Context(), sess.UserID, body.Scheme); err != nil {
+		// The store names what it allows; a value from a page that invented one
+		// is a bad request, not a broken server.
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -123,12 +153,33 @@ type userButtonPayload struct {
 	// DevDocs turns the Developer submenu on (DOCS-01): the caller holds the
 	// dev capability, which is the whole gate. Same reason as Issues for
 	// riding here: the JS is cached, this payload is not.
-	DevDocs bool              `json:"devDocs,omitempty"`
-	Labels  map[string]string `json:"labels"`
+	DevDocs bool `json:"devDocs,omitempty"`
+	// DevKey says this developer has already deposited a public key (DEV-11).
+	// It carries a CHECK MARK in the menu and nothing else - never the key
+	// itself, which is public but has no business travelling to every page.
+	DevKey bool              `json:"devKey,omitempty"`
+	Labels map[string]string `json:"labels"`
 	// ThemeCSS carries the ACTIVE theme's tokens rescoped to :host - the
 	// button wears the selected theme inside its shadow root, falling back to
 	// system colors when a token is missing.
 	ThemeCSS string `json:"themeCss"`
+	// Served is what a developer's machine is answering for right now
+	// (DEV-11), and it goes to EVERY visitor rather than to developers: it
+	// changes what the application in front of them IS, so it is news for
+	// whoever is looking at it.
+	//
+	// It rides here, in the payload the page fetches at load, because that is
+	// the state - the live channel only keeps it fresh. A page whose socket
+	// never opens still shows the truth it was served with.
+	Served []servedName `json:"served,omitempty"`
+}
+
+// servedName is one overridden name, as a page needs it: what is served, and
+// by whom. The ports and the cluster details are the operator's business, not
+// a visitor's.
+type servedName struct {
+	Name string `json:"name"`
+	Who  string `json:"who,omitempty"`
 }
 
 // userButtonJSON answers the component's data: who is signed in, which tenants
@@ -159,7 +210,8 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 		"issueCrop", "issueApply", "issueReset", "issueRemove", "issueSend", "issueSending",
 		"issueSent", "issueFailed", "issueTooLarge", "issueCaptureFailed",
 		"issueDescriptionRequired", "issueContextNote",
-		"devTools", "devUser", "devRoles", "devApply", "devExit", "devNote", "devFailed"} {
+		"devTools", "devUser", "devRoles", "devApply", "devExit", "devNote", "devFailed",
+		"pluggedTitle", "pluggedBy", "devKey", "devKeySet"} {
 		labels[k] = t[k]
 	}
 	css, _, _ := h.chrome()
@@ -173,6 +225,7 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 	payload := userButtonPayload{
 		Scheme: scheme, SchemeImposed: imposed, Labels: labels,
 		ThemeCSS: strings.Replace(string(css), ":root", ":host", 1),
+		Served:   h.servedNames(),
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -197,6 +250,10 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 	// Both halves: the installation offers the developer surface, and this
 	// account holds the capability (DEV-01).
 	payload.DevDocs = h.st.DevAllowed(r.Context(), u)
+	if payload.DevDocs {
+		key, err := h.st.GetUserDevKey(r.Context(), sess.UserID)
+		payload.DevKey = err == nil && key != ""
+	}
 	if avatar, err := h.st.GetUserAvatar(r.Context(), sess.UserID); err == nil {
 		payload.Avatar = avatar
 	}
@@ -429,6 +486,19 @@ const userButtonJS = `(() => {
           ? '<button class="sw on" data-scheme-cycle="' + (SCHEME_NEXT[data.scheme] || 'light') +
             '" title="' + esc(L.colorScheme) + '">' + (SCHEME_ICONS[data.scheme] || '◐') + '</button>'
           : '';
+        // Where we are travels with the link, so the profile can send someone
+        // back HERE rather than to the application's front door - its
+        // Applications list is built from route entry points and can only land
+        // on a root.
+        //
+        // The href is written when the menu OPENS, not here: an application
+        // that routes on the client changes the address without redrawing
+        // this component, and a value baked at render time is the address of
+        // whatever page happened to be showing when it first loaded.
+        //
+        // And the parameter is named from, not next: next is the sign-in
+        // flow's word for where to go AFTER, it is written by other hands, and
+        // sharing it is how a profile ended up offering "back to /login".
         items.push('<div class="head-row"><a class="head" href="/profile" title="' + esc(L.profile) + '"><strong>' + esc(data.username) + '</strong>' +
           (data.tenantName ? '<span class="sub-line">' + esc(data.tenantName) + '</span>' : '') + '</a>' + schemeBtn + '</div>');
         // The fronted applications this session may open; the current one is
@@ -475,7 +545,14 @@ const userButtonJS = `(() => {
           // Second entry: the UI test mode (DEV-10), only on a proxied UI
           // route (the route attribute names it).
           items.push(subMenu(L.developer || 'Developer',
-            '<a class="item" href="/meerkat/apidocs/"><span>' + esc(L.apiDocs || 'API docs') + '</span></a>' +
+            // The key FIRST, because it is the prerequisite: without it
+            // deposited, plug is refused and the message names a fingerprint
+            // the person has no way to match against anything they hold. It
+            // lived two levels down in the profile, which is where it was
+            // never found.
+            '<a class="item" href="/profile/dev/key"><span>' + esc(L.devKey || 'plug key') + '</span>' +
+            (data.devKey ? mark() : '') + '</a>' +
+            '<a class="item" href="/meerkat/apidocs/"><span>' + esc(L.apiDocs || 'OpenAPI docs') + '</span></a>' +
             (this.getAttribute('route')
               ? '<button class="item" id="devtools"><span>' + esc(L.devTools || 'UI test mode') + '</span>' +
                 (sim && sim.active ? mark() : '') + '</button>'
@@ -586,7 +663,10 @@ const userButtonJS = `(() => {
         // served under a simulated identity. Amber on purpose: NOT themed,
         // it must stand out on any application.
         '.db-frame { position: fixed; inset: 0; pointer-events: none; border: 3px solid #f59e0b; z-index: 1; }' +
-        '.db { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 2;' +
+        // Draggable along its edge, like the plug strip at the bottom: the one
+        // real defect of a fixed bar is that it covers something. --db-x is
+        // the anchor, unset meaning centred.
+        '.db { position: fixed; top: 0; left: var(--db-x, 50%); transform: translateX(-50%); z-index: 2;' +
         ' display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 10px;' +
         ' max-width: min(720px, calc(100vw - 20px));' +
         ' background: var(--mk-surface-container, Canvas); color: var(--mk-on-surface, CanvasText);' +
@@ -599,9 +679,11 @@ const userButtonJS = `(() => {
         // The handle: a drawer pull hanging under the bar, CENTERED, so the
         // bar retracts around it without the handle jumping sideways.
         '.db-tab { position: absolute; top: 100%; left: 50%; transform: translateX(-50%);' +
-        ' display: flex; align-items: center; gap: 5px; padding: 2px 10px; cursor: pointer; font: inherit;' +
+        ' display: flex; align-items: center; gap: 5px; padding: 2px 10px; font: inherit;' +
+        ' cursor: grab; touch-action: none; user-select: none;' +
         ' background: var(--mk-surface-container, Canvas); color: inherit;' +
         ' border: 1px solid #f59e0b; border-top: 0; border-radius: 0 0 8px 8px; }' +
+        '.db-tab:active { cursor: grabbing; }' +
         '.db-badge { background: #f59e0b; color: #1c1c22; font-weight: 700; border-radius: 4px; padding: 1px 6px; font-size: 11px; }' +
         '.db label { display: flex; align-items: center; gap: 5px; }' +
         // Scoped to the text input: a bare ".db input" would also stretch the
@@ -650,10 +732,19 @@ const userButtonJS = `(() => {
       const closeSubs = () => {
         for (const o of this.shadowRoot.querySelectorAll('.has-sub.open')) o.classList.remove('open');
       };
+      // Read at the moment of opening, so it is the page someone is looking
+      // at - not the one this component was drawn on.
+      const stampHere = () => {
+        const head = this.shadowRoot.querySelector('a.head');
+        if (!head) return;
+        head.setAttribute('href', '/profile?from=' +
+          encodeURIComponent(location.pathname + location.search + location.hash));
+      };
       this.shadowRoot.getElementById('toggle').addEventListener('click', (e) => {
         e.stopPropagation();
         closeSubs();
         menu.classList.toggle('open');
+        if (menu.classList.contains('open')) stampHere();
       });
       document.addEventListener('click', () => { closeSubs(); menu.classList.remove('open'); });
       menu.addEventListener('click', (e) => e.stopPropagation());
@@ -699,9 +790,22 @@ const userButtonJS = `(() => {
       const cyc = this.shadowRoot.querySelector('[data-scheme-cycle]');
       if (cyc) cyc.addEventListener('click', () => {
         const v = cyc.dataset.schemeCycle;
-        setCookie(COOKIE_SCHEME, v);
+        // Through the agent when the route injected one: it owns the page, the
+        // channel to the other tabs and the call that stores the choice on the
+        // account. Alone (the developer bar), the button does the two parts it
+        // can do by itself.
+        if (page() && page().pickScheme) {
+          page().pickScheme(v);
+        } else {
+          setCookie(COOKIE_SCHEME, v);
+          fetch('/meerkat/scheme', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scheme: v }),
+            credentials: 'same-origin',
+          }).catch(() => {});
+        }
         this.wearScheme(v);
-        if (page()) page().applyScheme(v);
         cyc.textContent = SCHEME_ICONS[v] || '◐';
         cyc.dataset.schemeCycle = SCHEME_NEXT[v] || 'light';
       });
@@ -844,10 +948,53 @@ const userButtonJS = `(() => {
       if (!e.target.closest('.db-dd')) q('.db-pop').classList.remove('open');
     });
     document.addEventListener('click', () => q('.db-pop').classList.remove('open'));
-    q('.db-tab').addEventListener('click', () => {
+    // Where the bar sits, as a FRACTION of the viewport: a pixel offset saved
+    // on a wide screen puts it off a narrow one. Clamped on every placement
+    // rather than on save, so a window that shrinks keeps it reachable.
+    let anchor = 0.5, dragged = false;
+    const place = (fraction) => {
+      const half = bar.getBoundingClientRect().width / 2;
+      const lo = half + 8, hi = Math.max(lo, window.innerWidth - half - 8);
+      anchor = Math.min(Math.max(fraction * window.innerWidth, lo), hi) / window.innerWidth;
+      bar.style.setProperty('--db-x', (anchor * 100).toFixed(3) + '%');
+    };
+    try {
+      const saved = parseFloat(localStorage.getItem('mk-devbar-x'));
+      if (saved >= 0 && saved <= 1) anchor = saved;
+    } catch (e) { /* opaque storage: it stays centred */ }
+    place(anchor);
+    window.addEventListener('resize', () => place(anchor));
+    const tab = q('.db-tab');
+    tab.addEventListener('click', () => {
+      // The browser fires a click at the end of a drag; swallowing it is what
+      // keeps moving the bar from also collapsing it.
+      if (dragged) { dragged = false; return; }
       const min = bar.classList.toggle('min');
       q('.db-chev').textContent = min ? '▾' : '▴';
       try { sessionStorage.setItem('mk-devbar-min', min ? '1' : '0'); } catch (e) { /* opaque storage */ }
+    });
+    tab.addEventListener('pointerdown', (e) => {
+      const start = e.clientX;
+      const rect = bar.getBoundingClientRect();
+      const grip = start - (rect.left + rect.width / 2);
+      dragged = false;
+      tab.setPointerCapture(e.pointerId);
+      const move = (ev) => {
+        // Under a few pixels it is a click: a handle that slides when someone
+        // means to collapse it is a handle that fights back.
+        if (!dragged && Math.abs(ev.clientX - start) < 4) return;
+        dragged = true;
+        place((ev.clientX - grip) / window.innerWidth);
+      };
+      const up = () => {
+        tab.removeEventListener('pointermove', move);
+        tab.removeEventListener('pointerup', up);
+        if (dragged) {
+          try { localStorage.setItem('mk-devbar-x', String(anchor)); } catch (e) { /* ditto */ }
+        }
+      };
+      tab.addEventListener('pointermove', move);
+      tab.addEventListener('pointerup', up);
     });
     const apply = () => {
       const user = q('.db-user').value.trim();
@@ -1174,3 +1321,25 @@ const userButtonJS = `(() => {
 // classToken keeps role names usable as CSS classes/attribute values - a role
 // with spaces or punctuation is silently left out of the page.
 var classToken = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// servedNames is what the developer tunnel holds right now, in the shape a
+// page needs. Filled BEFORE the session is resolved, and deliberately: an
+// application may be public, and a visitor with no account is looking at the
+// same overridden service as everybody else.
+//
+// Empty in the community image, always: nothing there writes to the registry,
+// so every screen built on this shows nothing without a guard to get wrong.
+func (h *Handler) servedNames() []servedName {
+	if h.served == nil {
+		return nil
+	}
+	live := h.served.List()
+	if len(live) == 0 {
+		return nil
+	}
+	out := make([]servedName, 0, len(live))
+	for _, s := range live {
+		out = append(out, servedName{Name: s.Name, Who: s.Who})
+	}
+	return out
+}

@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The checklist and the refusal come from ONE function: what the page shows is
@@ -76,7 +78,7 @@ func TestPasswordPolicyIsBounded(t *testing.T) {
 // "Reset your <application> password" - two names for one identity, free to
 // disagree, and they did.
 func TestSenderNameIsTheApplicationName(t *testing.T) {
-	st, err := Open(t.TempDir())
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { DateTime } from 'luxon';
 import { ApiService, AuditChange, AuditEvent } from '../api.service';
@@ -23,6 +24,7 @@ import { ApiService, AuditChange, AuditEvent } from '../api.service';
     MatIconModule,
     MatInputModule,
     MatSelectModule,
+    MatTooltipModule,
     LoadingIndicatorComponent,
   ],
   styleUrl: './audit-page.component.scss',
@@ -45,7 +47,7 @@ export class AuditPageComponent {
     const q = this.search().trim().toLowerCase();
     if (!q) return this.events();
     return this.events().filter((e) =>
-      [e.action, e.actorName, e.actorId, e.target, e.targetName]
+      [e.action, e.actorName, e.actorId, e.actorToken, e.target, e.targetName]
         .some((v) => (v ?? '').toLowerCase().includes(q)),
     );
   });

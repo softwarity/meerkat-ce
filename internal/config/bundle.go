@@ -8,20 +8,21 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// A configuration with its images (CFG-05).
+// A configuration with its media (CFG-05).
 //
-// The branding's pictures - the logo, the pages background, the tab icon - live
-// in a setting as data URIs, and they are the only binaries a configuration
-// carries. Left inline they are base64 lines of up to a million characters in
-// the middle of a file people read and diff - the surest way to make them stop
-// opening it.
+// Two kinds travel: the branding's pictures - the logo, the pages background,
+// the tab icon - which live in a setting as data URIs, and the OpenAPI specs
+// deposited on routes (SVC-06), which live in a table of their own. Left
+// inline they are base64 lines, or megabytes of contract, in the middle of a
+// file people read and diff - the surest way to make them stop opening it.
 //
-// So a document with an image travels as a ZIP: the YAML, and the picture next
+// So a document with a media travels as a ZIP: the YAML, and the files next
 // to it. What matters is that BOTH forms stay self-contained - the plain YAML
 // keeps its data URI, and the assets/ path only ever exists inside a package
 // that carries the file it names. A dangling reference cannot be produced by
@@ -59,7 +60,30 @@ var imageFields = []struct {
 // HasImage reports whether doc carries a picture, which is what decides between
 // a plain file and a package: a ZIP holding nothing but one YAML would be a
 // wrapper nobody asked for.
-func HasImage(doc *Document) bool { return imageBytes(doc) > 0 }
+func HasImage(doc *Document) bool { return imageBytes(doc) > 0 || len(doc.Specs) > 0 }
+
+// specDir holds the OpenAPI files a package carries, one directory per route:
+// two routes may both have deposited an "openapi.yaml", and the branding's
+// three pictures could take fixed names only because there is one branding.
+const specDir = "assets/specs"
+
+// specAssets lists the deposited specs as files inside a package, and returns
+// the routes they belong to. The route ID names the directory - a name can be
+// edited between an export and the import that reads it, an ID cannot - and
+// the file keeps the name it was deposited under, which is what makes an
+// unzipped package readable.
+func specAssets(doc *Document) map[string][]byte {
+	out := map[string][]byte{}
+	for _, r := range doc.Routes {
+		content, ok := doc.Specs[r.ID]
+		decl := r.Spec()
+		if !ok || len(content) == 0 || decl.Type != store.SpecFile || decl.Filename == "" {
+			continue
+		}
+		out[path.Join(specDir, r.ID, decl.Filename)] = content
+	}
+	return out
+}
 
 // MarshalBundle renders doc as a ZIP: the YAML with each picture replaced by a
 // relative path, and the pictures as files beside it.
@@ -83,6 +107,10 @@ func MarshalBundle(doc *Document) ([]byte, error) {
 		assets = append(assets, asset{name, content})
 		setPath(branding, f.path, name)
 	}
+	for name, content := range specAssets(doc) {
+		assets = append(assets, asset{name, content})
+	}
+	sort.Slice(assets, func(i, j int) bool { return assets[i].name < assets[j].name })
 	if len(assets) == 0 {
 		// Nothing to extract: a package would add a layer for no reason.
 		return nil, fmt.Errorf("config: this configuration carries no image")
@@ -216,13 +244,31 @@ func UnmarshalBundle(body []byte) (*Document, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The deposited specs ride ALONGSIDE the document rather than inside it:
+	// the route names the file, the package holds it, and an import that got
+	// only the YAML simply has none (importRoutes says so and destroys
+	// nothing).
+	for _, r := range parsed.Routes {
+		decl := r.Spec()
+		if decl.Type != store.SpecFile || decl.Filename == "" {
+			continue
+		}
+		if content, ok := files[path.Join(specDir, r.ID, decl.Filename)]; ok {
+			if parsed.Specs == nil {
+				parsed.Specs = map[string][]byte{}
+			}
+			parsed.Specs[r.ID] = content
+		}
+	}
 	return inlineAssets(parsed, files)
 }
 
-// maxAsset bounds one file inside a package. The branding refuses a background
-// over ~1 400 000 characters anyway; this stops a package from being read into
-// memory before that refusal can happen.
-const maxAsset = 2 << 20
+// maxAsset bounds one file inside a package. It is sized on the biggest media a
+// configuration may carry, which is no longer a picture but a deposited OpenAPI
+// spec (the store refuses one over 4 MiB); the branding refuses a background
+// over ~1 400 000 characters of its own. This stops a package from being read
+// into memory before either refusal can happen.
+const maxAsset = 4 << 20
 
 // inlineAssets puts the pictures back where the document points at them.
 func inlineAssets(doc *Document, files map[string][]byte) (*Document, error) {

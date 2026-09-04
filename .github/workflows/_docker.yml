@@ -111,6 +111,11 @@ jobs:
             GIT_REV=${{ steps.ver.outputs.rev }}
             BUILD_DATE=${{ steps.ver.outputs.date }}
             GO_TAGS=${{ inputs.go-tags }}
+            # What the linker puts in decides the code; EDITION decides what
+            # travels BESIDE it. Without this line the Enterprise image built
+            # here carried no plug client at all - the agent was linked in, and
+            # the account that hands the client out had nothing to hand.
+            EDITION=${{ inputs.go-tags == 'ee' && 'ee' || 'ce' }}
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ needs.preflight.outputs.publish }}

@@ -21,7 +21,7 @@ import (
 // data URI, so a legitimate file is not tiny; nothing legitimate is this big.
 const maxConfigBytes = 8 << 20
 
-func (a *API) registerConfig(mux *http.ServeMux) {
+func (a *API) registerConfig(mux Mux) {
 	mux.Handle("GET /api/config/export", a.rootOnly(a.exportConfig))
 	mux.Handle("GET /api/config/report", a.rootOnly(a.exportReport))
 	mux.Handle("GET /api/config/document", a.rootOnly(a.currentDocument))
@@ -156,7 +156,7 @@ func (a *API) importConfig(w http.ResponseWriter, r *http.Request, actor store.U
 	// Saving IS applying, here as everywhere else. A reload that fails means a
 	// stored route no longer compiles: say so instead of reporting a clean
 	// import - the previous snapshot keeps serving in the meantime.
-	if err := a.router.Reload(r.Context()); err != nil {
+	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("imported, but the routing table could not be reloaded: %w", err))
 		return
 	}

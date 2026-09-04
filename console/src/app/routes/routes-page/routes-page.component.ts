@@ -11,13 +11,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { forkJoin } from 'rxjs';
-import { ApiService, CatalogEntry, Route } from '../../api.service';
+import { ApiService, CatalogEntry, Maintenance, Route, RouteHealth } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { RouteEditorComponent } from '../route-editor/route-editor.component';
 import { RouteProbeDialogComponent } from '../route-probe-dialog.component';
 import { RoutesTableComponent } from '../routes-table/routes-table.component';
-import { SigningKeysDialogComponent } from '../signing-keys-dialog.component';
+import { GlobalPanelComponent } from '../global-panel/global-panel.component';
+import { SigningKeysPanelComponent } from '../signing-keys/signing-keys-panel.component';
 
 @Component({
   selector: 'app-routes-page',
@@ -32,6 +33,8 @@ import { SigningKeysDialogComponent } from '../signing-keys-dialog.component';
     RoutesTableComponent,
     RouteEditorComponent,
     FormFieldComponent,
+    GlobalPanelComponent,
+    SigningKeysPanelComponent,
   ],
   templateUrl: './routes-page.component.html',
   styleUrl: './routes-page.component.scss',
@@ -60,6 +63,17 @@ export class RoutesPageComponent {
   });
   protected readonly catalog = signal<CatalogEntry[]>([]);
 
+  // The Global drawer, and the one piece of its state this page needs on its
+  // own banner: an operator must see that everything is down without going
+  // looking for it.
+  protected readonly globalOpen = signal(false);
+  protected readonly keysOpen = signal(false);
+  protected readonly maintenance = signal<Maintenance | null>(null);
+  // What the gateway has actually seen from each upstream (SVC-04). Read once
+  // with the list and refreshed with it: this screen shows what is configured,
+  // and it now shows what answers.
+  protected readonly health = signal<Record<string, RouteHealth>>({});
+
   // The URL drives the drawer (F5-proof): /routes/new = creating,
   // /routes/:id/:section = editing that route on that section.
   private readonly params = toSignal(this.ar.paramMap);
@@ -84,6 +98,11 @@ export class RoutesPageComponent {
 
   constructor() {
     this.load();
+    // Read once, for the banner. A failure is silence rather than an error:
+    // the routes are what this page is for, and a badge that could not be
+    // fetched must not put a red box in front of them.
+    this.api.maintenance().subscribe({ next: (m) => this.maintenance.set(m), error: () => {} });
+    this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
   }
 
   protected openEdit(route: Route): void {
@@ -94,10 +113,28 @@ export class RoutesPageComponent {
     void this.router.navigate(['/infra/routes', 'new']);
   }
 
-  // The gateway-wide JWT signing keys (signed-jwt identity forwarding): view the
-  // public keys / JWKS and rotate them.
-  protected openSigningKeys(): void {
-    this.dialog.open(SigningKeysDialogComponent, { width: '680px', restoreFocus: true });
+  // What applies to every route at once (maintenance, the body-rewriting
+  // ceiling, the signing keys). Not URL-driven, unlike the editor: it holds no
+  // selection worth surviving an F5, and a maintenance switch behind a
+  // bookmarkable URL is a switch somebody flips from a stale tab.
+  protected openGlobal(): void {
+    this.keysOpen.set(false);
+    this.globalOpen.set(true);
+  }
+
+  // The signing keys, in a drawer of their own. The drawer shows one thing at
+  // a time, so opening either closes the other rather than stacking them.
+  protected openKeys(): void {
+    this.globalOpen.set(false);
+    this.keysOpen.set(true);
+  }
+
+  // A route named by the signing keys: land on its Identity section, which is
+  // where the algorithm that put it in that list is chosen. The drawer swaps
+  // content rather than stacking - it shows one thing at a time.
+  protected openIdentity(routeId: string): void {
+    this.keysOpen.set(false);
+    void this.router.navigate(['/infra/routes', routeId, 'identity']);
   }
 
   // Route probe (ROUTE-15): compose a fictional request, see which route takes
@@ -110,6 +147,19 @@ export class RoutesPageComponent {
       data: { routes: this.routes() },
       restoreFocus: true,
     });
+  }
+
+  // The drawer's own close: whichever content it is showing.
+  protected async closeDrawer(): Promise<void> {
+    if (this.globalOpen()) {
+      this.globalOpen.set(false);
+      return;
+    }
+    if (this.keysOpen()) {
+      this.keysOpen.set(false);
+      return;
+    }
+    await this.closeEditor();
   }
 
   protected async closeEditor(): Promise<void> {

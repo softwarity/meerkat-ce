@@ -63,6 +63,9 @@ const selectGroupBody = `    <form method="post" action="/select-group">
       {{end}}
       <input type="hidden" name="next" value="{{.Next}}">
     </form>
+    <form method="post" action="logout" class="leave">
+      <button type="submit">{{.T.signOut}}</button>
+    </form>
 `
 
 func (h *Handler) showSelectGroup(w http.ResponseWriter, r *http.Request) {

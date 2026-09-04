@@ -1,107 +1,81 @@
-import { Component, ElementRef, Input, computed, inject, input, output, signal } from '@angular/core';
-import { MatFormFieldControl } from '@angular/material/form-field';
+import { Component, booleanAttribute, computed, input, model } from '@angular/core';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { Subject } from 'rxjs';
 
 const SCHEME = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/(.*)$/;
 
-// A custom MatFormFieldControl for a URL: a protocol select, "://", and the
-// host/path, living together inside the parent's <mat-form-field> as ONE
-// control (label, outline, focus all come from the parent). Signal-driven.
-// It cannot be a Signal-Forms FormValueControl at the same time (both reserve a
-// `value` member with incompatible types), so it binds through [(value)] on the
-// form's value signal instead of [formField]. The bound value is a whole URL
-// ("https://svc:8080"); pasting a full URL into the host splits its scheme off.
+// One host the caller knows about, offered inside the field.
+export interface UrlSuggestion {
+  /** The host part exactly as it goes into the field: "service:8080". */
+  value: string;
+  /** A word beside it - a state, a source. Never part of the value. */
+  hint?: string;
+  /** Offered, but doubtful: rendered quieter. Order is the caller's. */
+  muted?: boolean;
+}
+
+// A URL field: a scheme select, "://", and the host/path, in ONE form field.
+//
+//   <app-url-input i18n-label="@@Upstream" label="Upstream"
+//     [protocols]="['http', 'https']" [suggestions]="services()"
+//     [value]="url()" (valueChange)="save($event)" />
+//
+// It owns its <mat-form-field> and composes standard Material inside it - a
+// mat-select as a prefix, a matInput, a mat-autocomplete - the same shape as
+// app-form-field. It used to BE a MatFormFieldControl instead, wrapping a bare
+// <input> the parent's form field adopted: sixty lines reimplementing what
+// Material already does (focus, float, describedBy) to gain nothing.
+//
+// The bound value is a whole URL ("https://svc:8080"); pasting one into the
+// host splits its scheme off, and a suggestion carries the host alone so the
+// scheme already chosen stands.
 @Component({
   selector: 'app-url-input',
-  imports: [MatSelectModule, MatInputModule],
-  providers: [{ provide: MatFormFieldControl, useExisting: UrlInputComponent }],
-  host: {
-    class: 'app-url-input',
-    '[id]': 'id',
-    '[attr.aria-describedby]': 'describedBy()',
-    '(focusin)': 'onFocusIn()',
-    '(focusout)': 'onFocusOut($event)',
-  },
+  imports: [MatAutocompleteModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   styleUrl: './url-input.component.scss',
   templateUrl: './url-input.component.html',
 })
-export class UrlInputComponent implements MatFormFieldControl<string> {
-  private static seq = 0;
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-
-  // ── MatFormFieldControl surface ────────────────────────────────────────────
-  readonly stateChanges = new Subject<void>();
-  readonly id = `app-url-input-${UrlInputComponent.seq++}`;
-  readonly controlType = 'app-url-input';
-  readonly ngControl = null;
-  readonly placeholder = '';
-  readonly required = false;
-  readonly disabled = false;
-  readonly errorState = false;
-
-  private readonly _describedBy = signal('');
-  protected readonly describedBy = computed(() => this._describedBy() || null);
-  private _focused = false;
-
-  get focused(): boolean {
-    return this._focused;
-  }
-  get empty(): boolean {
-    return !this.rest();
-  }
-  get shouldLabelFloat(): boolean {
-    return this._focused || !this.empty;
-  }
-
-  setDescribedByIds(ids: string[]): void {
-    this._describedBy.set(ids.join(' '));
-  }
-  onContainerClick(): void {
-    this.host.nativeElement.querySelector('input')?.focus();
-  }
-  protected onFocusIn(): void {
-    if (!this._focused) {
-      this._focused = true;
-      this.stateChanges.next();
-    }
-  }
-  protected onFocusOut(e: FocusEvent): void {
-    if (!this.host.nativeElement.contains(e.relatedTarget as Node | null)) {
-      this._focused = false;
-      this.stateChanges.next();
-    }
-  }
-
-  // ── value: two-way via [(value)] (or [value] + (valueChange)) ──────────────
-  private readonly _value = signal('');
-  @Input()
-  get value(): string {
-    return this._value();
-  }
-  set value(v: string | null) {
-    this._value.set(v ?? '');
-    this.stateChanges.next();
-  }
-  readonly valueChange = output<string>();
-
-  // ── protocol / host split ──────────────────────────────────────────────────
+export class UrlInputComponent {
+  readonly value = model('');
+  readonly label = input('');
+  // Material draws the asterisk itself from the control's own required flag,
+  // so a mandatory field says so where it is rather than only in a list of
+  // what is missing.
+  readonly required = input(false, { transform: booleanAttribute });
+  readonly hint = input('');
+  readonly hintAlign = input<'start' | 'end'>('start');
   // The schemes this field accepts, in preference order: an upstream is
   // http(s), a directory ldap(s). The first one is what a fresh field uses.
   readonly protocols = input<string[]>(['https', 'http']);
-  // What the host part suggests once the label floats, and what a screen
-  // reader calls this control. Both belong to the caller: "service:8080/base"
-  // means nothing on a directory.
+  // What the host part suggests once the label floats. It belongs to the
+  // caller: "service:8080/base" means nothing on a directory.
   readonly hostPlaceholder = input('');
-  readonly hostLabel = input('');
-  protected readonly protocol = computed(() => split(this._value()).proto ?? this.protocols()[0] ?? 'https');
-  protected readonly rest = computed(() => split(this._value()).rest);
+  // Hosts the caller knows exist, offered INSIDE the field.
+  //
+  // Beside it, as a second control, they read as a second value: the operator
+  // sees an empty box that does not announce it holds a list, and types the
+  // url from memory anyway - which is the mistake the list exists to remove.
+  // Here, focusing the field IS asking the question.
+  readonly suggestions = input<UrlSuggestion[]>([]);
+
+  protected readonly protocol = computed(
+    () => split(this.value()).proto ?? this.protocols()[0] ?? 'https',
+  );
+  protected readonly rest = computed(() => split(this.value()).rest);
   // Keep an out-of-catalogue stored scheme selectable.
   protected readonly protoOptions = computed(() => {
     const list = this.protocols();
     const cur = this.protocol();
     return list.includes(cur) ? list : [cur, ...list];
+  });
+  // Typing filters. Nothing matching means an upstream outside the catalogue,
+  // which is a legitimate thing to type, so the list simply steps aside.
+  protected readonly offered = computed(() => {
+    const typed = this.rest().trim().toLowerCase();
+    const all = this.suggestions();
+    return typed ? all.filter((s) => s.value.toLowerCase().includes(typed)) : all;
   });
 
   protected setProtocol(p: string): void {
@@ -115,12 +89,13 @@ export class UrlInputComponent implements MatFormFieldControl<string> {
       this.commit(this.protocol(), raw);
     }
   }
+  // A suggestion is a host, so the scheme already chosen stands.
+  protected pick(host: string): void {
+    this.commit(this.protocol(), host);
+  }
 
   private commit(proto: string, rest: string): void {
-    const v = rest ? `${proto}://${rest}` : '';
-    this._value.set(v);
-    this.valueChange.emit(v);
-    this.stateChanges.next();
+    this.value.set(rest ? `${proto}://${rest}` : '');
   }
 }
 

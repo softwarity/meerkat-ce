@@ -46,13 +46,19 @@ var (
 // its own (not under Application): the handler scopes each caller to the
 // domains their capabilities cover, so routes show to infra admins and
 // identity changes to app admins.
-func (a *API) auditRegisterViewer(mux *http.ServeMux) {
+func (a *API) auditRegisterViewer(mux Mux) {
 	mux.Handle("GET /api/audit", a.authed(a.listAudit))
 }
 
 // audit records one event, best-effort: an audit write must never fail the
 // mutation it trails, so an error is logged, not propagated.
+//
+// The acting TOKEN is stamped here rather than at the call sites (MCP-03):
+// there are five of them today and there will be more, and a trail that names
+// the agent in four cases out of five is worse than one that never does - it
+// reads as if a human had done the fifth.
 func (a *API) audit(ctx context.Context, ev store.AuditEvent) {
+	ev.ActorToken = actorToken(ctx)
 	if err := a.st.AddAuditEvent(ctx, ev); err != nil {
 		slog.Error("audit write failed", "action", ev.Action, "target", ev.Target, "err", err)
 	}
@@ -202,29 +208,13 @@ func (a *API) listAudit(w http.ResponseWriter, r *http.Request, actor store.User
 	// app-admin -> identity targets, tenant admin -> their tenants (by tenant_id).
 	// Administering nothing -> 403 (the trail is an administrative view, not an
 	// empty page).
-	if !actor.Root {
-		scope := &store.AuditScope{}
-		if actor.InfraAdmin {
-			scope.Targets = append(scope.Targets, infraTargets...)
-		}
-		if actor.AppAdmin {
-			scope.Targets = append(scope.Targets, appTargets...)
-		}
-		administered, err := a.st.ListTenantsAdministeredBy(r.Context(), actor.ID)
-		if err != nil {
-			a.internal(w, err)
-			return
-		}
-		for _, t := range administered {
-			scope.TenantIDs = append(scope.TenantIDs, t.ID)
-		}
-		if len(scope.Targets) == 0 && len(scope.TenantIDs) == 0 {
-			writeErr(w, http.StatusForbidden,
-				"the audit trail requires root, a gateway/app-admin capability, or a tenant administration")
-			return
-		}
-		f.Scope = scope
+	scope, ok := a.auditScope(r.Context(), actor)
+	if !ok {
+		writeErr(w, http.StatusForbidden,
+			"the audit trail requires root, a gateway/app-admin capability, or a tenant administration")
+		return
 	}
+	f.Scope = scope
 	events, err := a.st.ListAuditEvents(r.Context(), f)
 	if err != nil {
 		a.internal(w, err)
@@ -234,6 +224,36 @@ func (a *API) listAudit(w http.ResponseWriter, r *http.Request, actor store.User
 		events = []store.AuditEvent{}
 	}
 	writeJSON(w, http.StatusOK, events)
+}
+
+// auditScope is the visibility window of one caller, shared by the endpoint
+// and by the agent's read_audit tool. nil scope with ok = the whole trail
+// (root); ok false = this caller administers nothing, and the trail is an
+// administrative view rather than an empty page.
+//
+// Shared rather than reimplemented: an agent that saw a wider trail than the
+// console would be a way around RBAC-05, and it would be nobody's fault in
+// particular.
+func (a *API) auditScope(ctx context.Context, actor store.User) (*store.AuditScope, bool) {
+	if actor.Root {
+		return nil, true
+	}
+	scope := &store.AuditScope{}
+	if actor.InfraAdmin {
+		scope.Targets = append(scope.Targets, infraTargets...)
+	}
+	if actor.AppAdmin {
+		scope.Targets = append(scope.Targets, appTargets...)
+	}
+	if administered, err := a.st.ListTenantsAdministeredBy(ctx, actor.ID); err == nil {
+		for _, t := range administered {
+			scope.TenantIDs = append(scope.TenantIDs, t.ID)
+		}
+	}
+	if len(scope.Targets) == 0 && len(scope.TenantIDs) == 0 {
+		return nil, false
+	}
+	return scope, true
 }
 
 func atoi64(s string) int64 {

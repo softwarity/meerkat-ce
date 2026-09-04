@@ -1,0 +1,183 @@
+:host {
+  display: block;
+  padding: 16px 24px 32px;
+}
+/* Same head as the Global drawer beside it: two drawers on one banner that
+   open differently read as two products. */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.head h2 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.workflow {
+  margin: 0 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.jwks {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  /* One line inside now that the label is on the border: the box no longer
+     needs the height of two. */
+  padding: 4px 14px;
+  border-radius: var(--mk-radius);
+  border: 1px solid color-mix(in srgb, var(--mk-signal) 45%, transparent);
+  background: color-mix(in srgb, var(--mk-signal) 8%, var(--mat-sys-surface-container));
+}
+/* Notched into the border. The background is what is BEHIND the box - the
+   drawer - so the label cuts the line rather than sitting on a patch of the
+   wrong colour. */
+.jwks .lbl,
+.jwks .badge {
+  position: absolute;
+  top: 0;
+  transform: translateY(-50%);
+  padding: 0 6px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  background: var(--mat-sys-surface-container-high);
+}
+.jwks .lbl {
+  left: 12px;
+  text-transform: uppercase;
+  color: var(--mat-sys-on-surface-variant);
+}
+.jwks .badge {
+  right: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  border-radius: 999px;
+  color: var(--mk-signal);
+  font-weight: 600;
+}
+.jwks .path {
+  font-family: var(--mk-mono);
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+.spacer {
+  flex: 1;
+}
+.fallback {
+  margin: 10px 0 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+}
+/* Air between the rows. Flush against each other they read as one block with
+   internal rules, which is half of why three keys looked like one thing. */
+.key {
+  margin-bottom: 8px;
+  border-radius: var(--mk-radius);
+  /* Material grows the header from 48px to 64px when the panel opens, and the
+     title stays centred - so the extra sixteen fall UNDER it and read as a
+     blank before the content. One height, open or closed. */
+  --mat-expansion-header-expanded-state-height: 48px;
+}
+.key:last-of-type {
+  margin-bottom: 0;
+}
+.key .alg {
+  font-family: var(--mk-mono);
+  font-weight: 600;
+}
+/* The collapsed row's payload: how many routes sign with this key. An
+   algorithm nobody uses says so plainly rather than looking like the others. */
+/* The key id, right of the row and muted: it names the key without competing
+   with the name that means something. */
+.key .kid {
+  font-family: var(--mk-mono);
+  font-size: 0.72rem;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+.key .used {
+  font-weight: 600;
+  margin-right: 4px;
+}
+.key .idle {
+  font-style: italic;
+  opacity: 0.7;
+}
+/* The routes, once open: a plain list, one line each, straight to the section
+   that put them here. */
+.routes-lbl {
+  margin: 0 0 2px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mat-sys-on-surface-variant);
+}
+ul.routes {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+ul.routes li {
+  margin: 0;
+}
+/* Tight: this is a list of names, not a menu. The default button height turns
+   three routes into a screenful. */
+ul.routes button {
+  --mat-button-text-container-height: 30px;
+  margin-left: -8px;
+}
+/* A route NAME is an identifier: it is shown as it was typed. The button
+   styling would upper-case it, and "API-ORDERS" is not what anybody named. */
+ul.routes button {
+  text-transform: none;
+  font-family: var(--mk-mono);
+}
+/* The rule belongs to the route LIST, not to the PEM: a key no route uses has
+   nothing to separate, and a divider with air above it was the panel padding
+   plus a margin of mine on top of it. */
+.pem-wrap {
+  position: relative;
+}
+.pem-wrap .pem-copy {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  --mat-icon-button-state-layer-size: 32px;
+  color: var(--mat-sys-on-surface-variant);
+}
+/* The PEM WRAPS (no horizontal scrollbar): newlines kept, the long base64
+   lines break within the box. */
+pre.pem {
+  margin: 0;
+  padding: 8px 40px 8px 10px;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container-low);
+  font-family: var(--mk-mono);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: hidden;
+}
+.warn {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.82rem;
+  margin-right: auto;
+}

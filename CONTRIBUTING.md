@@ -8,7 +8,7 @@
 | `ee/` | [Softwarity Commercial](./ee/LICENSE.md) | Enterprise features, source-visible, unlocked by license key |
 | `cmd/meerkat/` | FSL | The single binary entry point |
 | `internal/` | FSL | Core packages (not importable from outside the module) |
-| `requirements.md` | FSL | Product requirements (French, working document) |
+| `FEATURES.md` | FSL | What the product does and how far it is built (French) |
 
 One repository, one binary: EE code compiles into every build and stays
 absent from the community image entirely: the `ee` build tag decides what

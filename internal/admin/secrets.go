@@ -237,7 +237,7 @@ func (a *API) stashSecret(w http.ResponseWriter, r *http.Request, actor store.Us
 	}
 	// A new entry changes what an already-written $name resolves to, same as
 	// saving one from the vault screen does.
-	if err := a.router.Reload(ctx); err != nil {
+	if err := a.reloadRouting(ctx); err != nil {
 		a.internal(w, fmt.Errorf("moved, but reload failed: %w", err))
 		return
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The page offers whatever zones the BROWSER knows (Intl.supportedValuesOf),
@@ -20,7 +21,7 @@ import (
 // fail later, at formatting time, on someone else's screen.
 func TestProfileTimezoneIsSavedAndValidated(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

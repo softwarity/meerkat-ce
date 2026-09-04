@@ -98,7 +98,7 @@ export class MethodPredicateComponent {
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Name">Name</mat-label>
-        <input matInput [value]="name()" (input)="set('name', $any($event.target).value)" />
+        <input matInput required [value]="name()" (input)="set('name', $any($event.target).value)" />
       </mat-form-field>
       <!-- Disabled rather than hidden when a list is posed: the two are
            exclusive on the server, and a field that vanishes leaves the reader
@@ -222,11 +222,11 @@ export class WindowPredicateComponent {
     <div class="fields">
       <mat-form-field>
         <mat-label i18n="@@Group">Group</mat-label>
-        <input matInput [value]="group()" (input)="set('group', $any($event.target).value)" />
+        <input matInput required [value]="group()" (input)="set('group', $any($event.target).value)" />
       </mat-form-field>
       <mat-form-field>
         <mat-label i18n="@@Weight">Weight</mat-label>
-        <input matInput type="number" min="1" [value]="weight()" (input)="setWeight($any($event.target).value)" />
+        <input matInput type="number" min="1" required [value]="weight()" (input)="setWeight($any($event.target).value)" />
       </mat-form-field>
     </div>
   `,

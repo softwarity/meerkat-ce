@@ -15,13 +15,14 @@ import (
 	"github.com/softwarity/meerkat/internal/mfa"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // mfaSetup is like setup but hands back the store so a test can enrol the user
 // or flip the global MFA policy.
 func mfaSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

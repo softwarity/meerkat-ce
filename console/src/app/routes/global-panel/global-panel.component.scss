@@ -1,0 +1,95 @@
+:host {
+  display: block;
+  padding: 16px 24px 32px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.head h2 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.lead {
+  margin: 4px 0 20px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+
+section {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mk-radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+// While maintenance is ON the section says so without being read: the switch
+// somebody has to notice from across the room.
+section.on {
+  border-color: color-mix(in srgb, var(--mat-sys-error) 55%, transparent);
+  background: color-mix(in srgb, var(--mat-sys-error) 7%, transparent);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.row > mat-icon {
+  flex-shrink: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+.row .title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.row .hint {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+  line-height: 1.45;
+}
+.badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+}
+.message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 0 40px;
+}
+/* What the page says: the reason and, optionally, when. Side by side because
+   they are one sentence to a visitor. */
+.says {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 14px 0 0 40px;
+}
+.says mat-form-field {
+  flex: 1 1 200px;
+  max-width: 260px;
+}
+.says .hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.message mat-form-field {
+  flex: 1 1 auto;
+  max-width: 420px;
+}

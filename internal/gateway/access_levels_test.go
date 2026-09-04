@@ -9,6 +9,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The gate end to end (RBAC-06), and above all what a REFUSAL looks like on a
@@ -24,7 +25,7 @@ func TestAccessLevelsOverHTTP(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
@@ -170,4 +171,115 @@ func requestWith(base string, c *http.Cookie) *http.Request {
 	req := httptest.NewRequest("GET", base, nil)
 	req.AddCookie(c)
 	return req
+}
+
+// The ping-pong of 2026-08-31, reported from the data plane: alice signs in,
+// Meerkat asks which organisation, and NEITHER answer reaches the page.
+//
+// The rule named both organisations AND asked for a role. Access.Switchable
+// answers about the level alone - it is pure, and cannot know what somebody
+// holds elsewhere - so acme was refused and globex offered, globex refused and
+// acme offered, forever, with nothing on screen saying why. An offer has to be
+// true or it is a door painted on a wall.
+func TestASwitchIsOfferedOnlyWhereItWouldHelp(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("upstream"))
+	}))
+	t.Cleanup(upstream.Close)
+
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+
+	if err := st.CreateUser(ctx, store.User{ID: "u-alice", Username: "alice", Enabled: true, PasswordHash: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"acme", "globex"} {
+		if err := st.SaveTenant(ctx, store.Tenant{ID: id, Name: id, Enabled: true}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.SaveMembership(ctx, store.Membership{
+			UserID: "u-alice", TenantID: id, Type: store.MemberUser, Enabled: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	route := pathRoute("r-home", "r-home", 1, "/**", upstream.URL)
+	route.IsUI = true
+	route.Access = store.Access{
+		Level:   store.AccessTenants,
+		Tenants: []string{"acme", "globex"},
+		Roles:   []string{"ops"},
+	}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+
+	sm := session.NewManager(st)
+	rt := New(st, sm)
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	get := func(t *testing.T, c *http.Cookie) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest("GET", srv.URL+"/", nil)
+		req.Header.Set("Accept", "text/html")
+		req.AddCookie(c)
+		res, err := noRedirect.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = res.Body.Close() })
+		return res
+	}
+
+	alice := issueSession(t, sm, "u-alice")
+
+	// Holding the role NOWHERE: the refusal is final in both, and it says what
+	// is missing instead of sending her back to a chooser that cannot help.
+	for _, tenant := range []string{"acme", "globex"} {
+		if err := sm.SetTenant(ctx, requestWith(srv.URL, alice), tenant); err != nil {
+			t.Fatal(err)
+		}
+		res := get(t, alice)
+		if res.StatusCode != http.StatusForbidden {
+			t.Fatalf("in %s, alice got %d (%s) - want a refusal, not another chooser",
+				tenant, res.StatusCode, res.Header.Get("Location"))
+		}
+	}
+
+	// Now give her the role in globex ALONE. From acme the switch is worth
+	// offering again, because this time it leads somewhere.
+	if err := st.SaveRole(ctx, store.Role{ID: "ops", Name: "ops"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "globex", Name: "ops", RoleIDs: []string{"ops"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetMemberGroups(ctx, "globex", "u-alice", []string{"g-ops"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.SetTenant(ctx, requestWith(srv.URL, alice), "acme"); err != nil {
+		t.Fatal(err)
+	}
+	res := get(t, alice)
+	if res.StatusCode != http.StatusSeeOther || !strings.Contains(res.Header.Get("Location"), "/select-tenant") {
+		t.Fatalf("from acme, alice got %d %s - want the chooser, since globex would work",
+			res.StatusCode, res.Header.Get("Location"))
+	}
+	// And from globex she is simply through.
+	if err := sm.SetTenant(ctx, requestWith(srv.URL, alice), "globex"); err != nil {
+		t.Fatal(err)
+	}
+	if res := get(t, alice); res.StatusCode != http.StatusOK {
+		t.Fatalf("in globex, where she holds the role, alice got %d", res.StatusCode)
+	}
 }

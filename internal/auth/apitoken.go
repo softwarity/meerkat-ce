@@ -400,8 +400,16 @@ func (h *Handler) createToken(w http.ResponseWriter, r *http.Request, sess store
 	}
 	token := apiTokenClearPrefix + secret
 	prefix := token[:12]
-	if err := h.st.AddAPIToken(r.Context(), randomID(), sess.UserID, name,
-		hashTrust(token), prefix, store.PlaneData, sess.TenantID, sess.GroupID, expiresAt); err != nil {
+	if err := h.st.AddAPIToken(r.Context(), store.NewToken{
+		ID: randomID(), UserID: sess.UserID, Name: name,
+		TokenHash: hashTrust(token), Prefix: prefix,
+		Plane: store.PlaneData,
+		// A personal token calls an application's own API, where "read only"
+		// would be the application's business and not the gateway's: the
+		// perimeter is a control-plane notion (MCP-02).
+		Scope:    store.ScopeFull,
+		TenantID: sess.TenantID, GroupID: sess.GroupID, ExpiresAt: expiresAt,
+	}); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

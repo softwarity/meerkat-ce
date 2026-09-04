@@ -1,9 +1,22 @@
-<!-- While the parent's label sits in the placeholder position, it must be the
-     ONLY thing in the box: showing the protocol select underneath puts the two
-     on top of each other. Everything appears as soon as the label floats, which
-     is exactly when the field is focused or holds a value. -->
-@if (shouldLabelFloat) {
+<!-- The label always floats: a prefix is visible in the resting state, and a
+     resting label would sit beside "://" as though the field were filled.
+     Material's own answer for a field that shows something before its
+     value. -->
+<mat-form-field floatLabel="always">
+  <mat-label>{{ label() }}</mat-label>
+  <!-- The input comes FIRST in source order on purpose: mat-form-field adopts
+       the first MatFormFieldControl in its content, and a mat-select is one
+       too. matPrefix puts the scheme before it whatever that order says. -->
+  <input
+    matInput
+    [required]="required()"
+    [value]="rest()"
+    (input)="onInput($any($event.target).value)"
+    [placeholder]="hostPlaceholder()"
+    [matAutocomplete]="known"
+  />
   <mat-select
+    matPrefix
     class="proto"
     [value]="protocol()"
     (selectionChange)="setProtocol($event.value)"
@@ -14,12 +27,16 @@
       <mat-option [value]="p">{{ p }}</mat-option>
     }
   </mat-select>
-  <span class="sep">://</span>
-}
-<input
-  class="host-input"
-  [value]="rest()"
-  (input)="onInput($any($event.target).value)"
-  [placeholder]="shouldLabelFloat ? hostPlaceholder() : ''"
-  [attr.aria-label]="hostLabel() || null"
-/>
+  <span matTextPrefix class="sep">://</span>
+  <!-- Empty when the caller offers nothing: Material hides a panel with no
+       options, so a field with no catalogue behaves exactly as it did. -->
+  <mat-autocomplete #known class="mk-url-suggestions" (optionSelected)="pick($event.option.value)">
+    @for (s of offered(); track s.value) {
+      <mat-option [value]="s.value" [class.muted]="s.muted">
+        {{ s.value }}
+        @if (s.hint) {<span class="hint">{{ s.hint }}</span>}
+      </mat-option>
+    }
+  </mat-autocomplete>
+  <mat-hint [align]="hintAlign()">{{ hint() }}</mat-hint>
+</mat-form-field>

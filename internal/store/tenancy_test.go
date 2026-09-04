@@ -3,13 +3,15 @@ package store
 import (
 	"context"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // Every installation owns one organisation from its first boot, single mode or
 // not. It is what lets groups, memberships and roles work unchanged while the
 // console never says the word: there is no "no organisation" branch anywhere.
 func TestDefaultTenantExistsOnAFreshDatabase(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +78,7 @@ func TestDefaultTenantIsSeededOnce(t *testing.T) {
 // CountTenants is what the boot checks before accepting single mode on a
 // database that grew several organisations under a license.
 func TestCountTenantsSeesTheSecondOne(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func TestCountTenantsSeesTheSecondOne(t *testing.T) {
 // would serve none of them - which is exactly the case of one that ran in
 // multi and came back.
 func TestPrimaryTenantIsTheOldest(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +133,7 @@ func TestPrimaryTenantIsTheOldest(t *testing.T) {
 // The mode is a setting the console owns, switchable both ways at any time:
 // it is read per request, so it takes effect at once and reverses as fast.
 func TestSetTenancyBothWays(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

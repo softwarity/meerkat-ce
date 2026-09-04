@@ -38,6 +38,25 @@
   </div>
 </mat-card>
 
+<mat-card appearance="outlined" class="size-card">
+  <h3 i18n="@@Logo_size">Logo size</h3>
+  <p class="hint text-muted" i18n="@@Logo_size_hint">
+    The box the logo is drawn in. A wide wordmark laid in the normal one comes out a quarter of its
+    height. Banner draws the mark at its own size, and there is nothing to size until a logo is set
+    on the Branding tab.
+  </p>
+  <mat-button-toggle-group
+    [value]="scope.logoSize()"
+    [disabled]="!sizable()"
+    (change)="setLogoSize($event.value)"
+    hideSingleSelectionIndicator
+  >
+    @for (s of sizes; track s.value) {
+      <mat-button-toggle [value]="s.value">{{ s.label }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</mat-card>
+
 <mat-card appearance="outlined" class="side-card">
   <h3 i18n="@@Which_side">Which side</h3>
   <p class="hint text-muted" i18n="@@Which_side_hint">

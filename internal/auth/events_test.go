@@ -14,9 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -24,7 +26,7 @@ import (
 // Everything downstream publishes to a topic and never asks a permission
 // question, so this is where the answer has to be right.
 func TestTheLiveChannelGrantsRoomsFromTheSession(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +94,7 @@ func TestTheLiveChannelGrantsRoomsFromTheSession(t *testing.T) {
 // can only reach the caller's own pages: a developer debugging a socket must
 // not be able to write on everyone's screen.
 func TestTheChannelEchoOnlyReachesItsOwnPages(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +146,7 @@ func TestTheChannelEchoOnlyReachesItsOwnPages(t *testing.T) {
 // of them are these. Mounting it on both would have been one line and a second
 // place to keep the grant right.
 func TestTheLiveChannelIsNotOnTheAdminPlane(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,6 +249,133 @@ func postJSON(t *testing.T, mux *http.ServeMux, path, body string, cookie *http.
 	t.Helper()
 	req := httptest.NewRequest("POST", path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	return rec
+}
+
+// What a developer's machine is serving travels in the payload the page
+// fetches at load - to EVERY visitor, signed in or not. The live channel only
+// keeps it fresh: a page whose socket never opens still shows the truth it was
+// served with, which is what makes the channel safe to be missing.
+func TestWhatIsServedTravelsToEveryVisitor(t *testing.T) {
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	mux := http.NewServeMux()
+	h := New(st, session.NewManager(st))
+	h.Register(mux)
+
+	// Nothing registered: the field is absent, which is the community image's
+	// whole behaviour here - no guard, nothing to show.
+	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, nil)); strings.Contains(body, `"served"`) {
+		t.Fatalf("an empty registry still put a served list on the wire: %s", body)
+	}
+
+	reg := devtunnel.NewRegistry(h.Events())
+	h.WatchServed(reg)
+	reg.Set(devtunnel.Served{Name: "checkout", Who: "alice", Parked: true})
+
+	// Anonymous: no cookie at all, and it still learns. An application may be
+	// public, and what it IS changed for whoever is looking at it.
+	body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, nil))
+	// The NAME and WHO, and nothing else: a visitor needs to know this service
+	// is answered from somebody's machine, not the state of the deployed one
+	// it stands in for. That was an operator's fact on a visitor's strip.
+	for _, want := range []string{`"name":"checkout"`, `"who":"alice"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("the payload misses %s: %s", want, body)
+		}
+	}
+
+	// And the labels the strip needs ride along, since the component's JS is
+	// cached for five minutes and this payload is not.
+	for _, want := range []string{"pluggedTitle", "pluggedBy"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("the payload misses the %s label", want)
+		}
+	}
+
+	reg.Drop("checkout")
+	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, nil)); strings.Contains(body, "checkout") {
+		t.Fatalf("a dropped name is still announced: %s", body)
+	}
+}
+
+// Signing in while a developer's machine is answering for something lands on a
+// halt naming it, once, before starting. It INFORMS rather than gates: the
+// login is already recorded when it appears, and the destination is still
+// reachable by hand.
+func TestSigningInLandsOnTheHaltWhenSomethingIsServed(t *testing.T) {
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("s3cret"), bcrypt.MinCost)
+	if err := st.CreateUser(ctx, store.User{ID: "u", Username: "alice", PasswordHash: string(hash), Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	h := New(st, session.NewManager(st))
+	h.Register(mux)
+
+	// Nothing served: the sign-in goes where it was going, untouched.
+	rec := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}})
+	if loc := rec.Header().Get("Location"); strings.HasPrefix(loc, "/plugged") {
+		t.Fatalf("a halt appeared with nothing served: %s", loc)
+	}
+
+	reg := devtunnel.NewRegistry(h.Events())
+	h.WatchServed(reg)
+	reg.Set(devtunnel.Served{Name: "checkout", Who: "alice"})
+
+	rec = postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}})
+	loc := rec.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/plugged") {
+		t.Fatalf("the sign-in did not stop at the halt: %s", loc)
+	}
+	cookie := rec.Result().Cookies()[0]
+
+	// The login was recorded BEFORE the halt, so walking past it cannot lose
+	// the record - which is what makes the halt safe to skip.
+	if events, err := st.ListLoginEvents(ctx, "u"); err != nil || len(events) == 0 {
+		t.Fatalf("the sign-in was not recorded before the halt: %v %v", events, err)
+	}
+
+	page := bodyString(do(t, mux, "GET", "/plugged?next=%2F", nil, cookie))
+	for _, want := range []string{"checkout", "alice"} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the halt does not name %s: %s", want, page)
+		}
+	}
+
+	// Continuing resumes the sign-in rather than redirecting on its own: the
+	// organisation still has to be resolved.
+	done := postJSONForm(t, mux, "/plugged", "next=%2F", cookie)
+	if done.Code != http.StatusSeeOther {
+		t.Fatalf("continuing from the halt: %d", done.Code)
+	}
+
+	// And once nothing is served, the halt sends the person straight on rather
+	// than showing a page announcing nothing.
+	reg.Drop("checkout")
+	if res := do(t, mux, "GET", "/plugged?next=%2F", nil, cookie); res.Code != http.StatusSeeOther {
+		t.Fatalf("an empty halt still rendered: %d", res.Code)
+	}
+}
+
+// postJSONForm posts a urlencoded body, which is what the halt's own form does.
+func postJSONForm(t *testing.T, mux *http.ServeMux, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest("POST", path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}

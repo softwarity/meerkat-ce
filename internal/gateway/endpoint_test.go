@@ -11,6 +11,7 @@ import (
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // End to end: per-endpoint security (RBAC-07) enforced by the router. The route
@@ -22,7 +23,7 @@ func TestEndpointSecurityEnforcement(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

@@ -4,8 +4,8 @@
 > ressort avec des roles. Comptes, mots de passe, ports, et ce qu'on doit voir a
 > chaque etape.
 >
-> Ce fichier dit **comment faire tourner**. Pour **ce que le produit fait** (la
-> matrice des portes d'entree, les leviers, la couverture de tests) : `authentication.md`.
+> Ce fichier dit **comment faire tourner**. Pour **ce que le produit fait** (les portes
+> d'entree, les leviers, ce qui est livre ou pas) : `FEATURES.md`.
 > Pour le cycle de developpement courant : `DEV.md`.
 >
 > Derniere execution de bout en bout : 2026-08-17.
@@ -23,7 +23,7 @@
 
 Les deux plans sont **deux portes distinctes**, avec deux cookies de session. On
 teste une connexion utilisateur sur **8082**, jamais sur 9092 : le plan admin
-accepte toujours le mot de passe local, par construction (voir `authentication.md`).
+accepte toujours le mot de passe local, par construction (voir `FEATURES.md`, AUTH-24).
 
 ## 2. Monter la gateway
 

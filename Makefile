@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build build-ee ui dev dev-ce test test-ee lint fmt vet clean ldap-up ldap-down ldap-test
+.PHONY: build build-ee ui dev dev-ce test test-ee test-pg lint fmt vet clean ldap-up ldap-down ldap-test pg-up pg-down
 
 # Hot-reload dev loop: rebuilds and restarts the gateway on every .go save.
 # Requires air (once): go install github.com/air-verse/air@latest
@@ -99,3 +99,22 @@ ldap-down:
 # not in the FSL tree. Dex stays in internal/idp: OIDC is community.
 ldap-test:
 	go test ./ee/directories/ ./internal/idp/ -run 'LDAP|OIDCAgainstDex' -count=1 -v
+
+# The same suite on the other database (QUAL-01). Every test asks
+# internal/store/dbtest which database to open, so this needs no second suite
+# and no tag - just a server, and one variable naming it.
+#
+# What it buys is the only thing the embedded database cannot say: that the
+# queries in internal/store, written once with `?` placeholders, actually run
+# on PostgreSQL. The first run of it found a 32-bit column holding a Unix
+# second and two INSERT OR IGNORE nobody else speaks.
+pg-up:
+	cd test/postgres && docker compose up -d --wait
+	@echo "postgres://meerkat:meerkat@localhost:55432/meerkat?sslmode=disable"
+
+pg-down:
+	cd test/postgres && docker compose down -v
+
+test-pg:
+	MEERKAT_TEST_DATABASE_URL='postgres://meerkat:meerkat@localhost:55432/meerkat?sslmode=disable' \
+		go test -tags ee ./... -count=1

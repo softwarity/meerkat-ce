@@ -11,6 +11,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // A 1x1 PNG and a 1x1 GIF, small enough to read: what matters here is which
@@ -80,7 +81,7 @@ func TestFaviconFollowsTheBranding(t *testing.T) {
 // The console is Meerkat's own product: it wears Meerkat's face whatever the
 // integrator sets, exactly as its theme is not theirs to restyle.
 func TestAdminFaviconIgnoresTheBranding(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +123,7 @@ func TestBrandingRefusesAnUnusableIcon(t *testing.T) {
 // The admin plane speaks English, whatever the integrator declares for their
 // own users: it is the door to a console that speaks English anyway.
 func TestAdminSignInIsEnglishOnly(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +218,7 @@ func TestPagesSchemeCanBeImposed(t *testing.T) {
 // Meerkat's own door, and an operator securing their own account does not
 // depend on what an integrator decided for their users.
 func TestAdminSignInOffersThePasskeyItCanHonour(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}

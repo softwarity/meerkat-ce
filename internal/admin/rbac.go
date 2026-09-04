@@ -12,7 +12,7 @@ import (
 // per-tenant groups + member↔group assignments (root or the tenant's
 // OWNER/ADMIN, via tenantScoped). Roles are created at the application level;
 // groups are the tenant admin's responsibility within their org.
-func (a *API) registerRBAC(mux *http.ServeMux) {
+func (a *API) registerRBAC(mux Mux) {
 	mux.Handle("GET /api/roles", a.appAdmin(a.listRoles))
 	mux.Handle("POST /api/roles", a.appAdmin(a.createRole))
 	mux.Handle("PUT /api/roles/{id}", a.appAdmin(a.updateRole))

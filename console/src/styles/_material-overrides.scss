@@ -95,3 +95,70 @@ input:autofill:focus {
     color: var(--mat-sys-on-surface-variant);
   }
 }
+
+// The hosts a url field offers (SVC-02): the name is what is being chosen, so
+// what sits beside it - a declared state - stays quiet. Overlay, so global -
+// opted in via the panel's own class.
+// Offered, but doubtful - an upstream this gateway shares no network with.
+// Dimmed rather than dropped: a service unreachable today is one somebody
+// attaches the gateway to tomorrow, and a silent omission reads as a bug.
+.mk-url-suggestions .mat-mdc-option.muted {
+  opacity: 0.55;
+}
+.mk-url-suggestions .hint {
+  margin-left: 10px;
+  font-family: var(--mk-mono, monospace);
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// What is missing, one row per gap: the section on the first line, what it
+// wants under it. Overlay, so global - opted in via the menu's own class.
+.mk-gap-menu {
+  max-width: 460px;
+
+  .mat-mdc-menu-item {
+    height: auto;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .mat-mdc-menu-item .mat-mdc-menu-item-text {
+    display: grid;
+    gap: 1px;
+    white-space: normal;
+  }
+  .gap-where {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mat-sys-error);
+  }
+  .gap-what {
+    font-size: 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+// A required field with NOTHING IN IT, said straight away.
+//
+// Material waits for a field to be touched before it says anything, which is
+// right for a form somebody is filling in and wrong for one whose whole
+// question is "what is still missing": on a route being created, the answer
+// has to be readable before the first keystroke. So the native required flag,
+// which is already there for the label's star and for screen readers, drives
+// the same colours Material paints an invalid field with.
+//
+// Opt-in per screen rather than product-wide: a dialog that opens on an empty
+// required name has not asked anything yet, and answering in red would be
+// shouting at somebody who has just arrived.
+.mk-show-missing {
+  .mat-mdc-form-field:has(.mat-mdc-form-field-infix > :is(input, textarea):required:invalid) {
+    .mdc-floating-label {
+      color: var(--mat-sys-error);
+    }
+    .mat-mdc-notch-piece {
+      border-color: var(--mat-sys-error);
+    }
+  }
+}

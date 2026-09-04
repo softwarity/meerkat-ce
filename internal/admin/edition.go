@@ -13,7 +13,7 @@ import (
 // A single place answers it, because the console has to draw the same thing in
 // several screens - a locked control here, a hidden menu entry there - and two
 // sources would drift.
-func (a *API) registerEdition(mux *http.ServeMux) {
+func (a *API) registerEdition(mux Mux) {
 	mux.Handle("GET /api/edition", a.authed(a.getEdition))
 	mux.Handle("PUT /api/settings/tenancy", a.rootOnly(a.putTenancy))
 }

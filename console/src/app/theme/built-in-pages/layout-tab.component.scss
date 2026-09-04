@@ -1,4 +1,14 @@
+/* The cards of a tab, spaced. The panel above sets a grid gap, but its only
+   child is this component's host: the gap fell between the outlet and the
+   host, never between the cards. So the host carries the same 16px. */
+:host {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
 .gallery-card,
+.size-card,
 .side-card {
   padding: 16px 20px;
 }

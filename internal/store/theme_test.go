@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // The flat-design switch (THEME-04) rides on a single CSS token, --mk-glow: the
@@ -56,7 +58,7 @@ func TestPresetThemes(t *testing.T) {
 
 // A fresh store seeds every preset with exactly one active.
 func TestSeedThemesInstallsPresets(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -82,7 +84,7 @@ func TestSeedThemesInstallsPresets(t *testing.T) {
 // The flat flag must survive a save/read round-trip - it is a real column, not
 // a transient view concern.
 func TestThemeFlatRoundTrips(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -166,6 +168,35 @@ func TestBackgroundSanitizeAndCSS(t *testing.T) {
 	tile := Background{Image: px, Fit: "tile"}
 	if css := tile.CSS("/x"); !strings.Contains(css, "background-repeat: repeat") {
 		t.Errorf("a tiled background must repeat:\n%s", css)
+	}
+}
+
+// TestLogoSizeSanitize: the mark's box is one of three, and the normal one is
+// stored as nothing - what every branding written before the field said, and
+// what an export should keep saying. A fourth spelling is refused rather than
+// saved as a class no page dresses.
+func TestLogoSizeSanitize(t *testing.T) {
+	for _, in := range []string{"", "normal"} {
+		b := Branding{AppName: "App", LogoSize: in}
+		if err := SanitizeBranding(&b); err != nil {
+			t.Fatalf("%q was refused: %v", in, err)
+		}
+		if b.LogoSize != "" {
+			t.Errorf("%q should normalize to the empty size, got %q", in, b.LogoSize)
+		}
+	}
+	for _, in := range []string{LogoLarge, LogoXLarge} {
+		b := Branding{AppName: "App", LogoSize: in}
+		if err := SanitizeBranding(&b); err != nil {
+			t.Fatalf("%q was refused: %v", in, err)
+		}
+		if b.LogoSize != in {
+			t.Errorf("%q should survive, got %q", in, b.LogoSize)
+		}
+	}
+	bad := Branding{AppName: "App", LogoSize: "huge"}
+	if err := SanitizeBranding(&bad); err == nil {
+		t.Error("an unknown logo size should be refused")
 	}
 }
 

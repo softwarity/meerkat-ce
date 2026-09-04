@@ -66,3 +66,12 @@ mat-drawer {
   margin-right: auto;
 }
 
+/* The Global button while everything is down. It is the one state on this page
+   that has to be legible from across a room, so it borrows the error role
+   rather than a colour of its own - the console already means "wrong" with it,
+   and inventing a second alarm colour teaches nobody anything. */
+.banner .maintaining {
+  --mat-button-tonal-container-color: var(--mat-sys-error);
+  --mat-button-tonal-label-text-color: var(--mat-sys-on-error);
+  --mat-button-tonal-icon-color: var(--mat-sys-on-error);
+}

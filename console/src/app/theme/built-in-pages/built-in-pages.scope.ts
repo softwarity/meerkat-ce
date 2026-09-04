@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ApiService, Background, PageLayout, Settings, Theme } from '../../api.service';
+import { ApiService, Background, LogoSize, PageLayout, Settings, Theme } from '../../api.service';
 import { CSS_VARS } from '../theme-tokens';
 
 type Fit = 'cover' | 'contain' | 'tile';
@@ -43,6 +43,7 @@ export class BuiltInPagesScope {
   readonly appName = signal('');
   readonly tagline = signal('');
   readonly logo = signal('');
+  readonly logoSize = signal<LogoSize>('');
   readonly favicon = signal('');
   readonly background = signal('');
   readonly backgroundFit = signal<Fit>('cover');
@@ -78,6 +79,7 @@ export class BuiltInPagesScope {
         this.appName.set(b.appName);
         this.tagline.set(b.tagline);
         this.logo.set(b.logo);
+        this.logoSize.set(b.logoSize ?? '');
         this.favicon.set(b.favicon ?? '');
         this.background.set(b.background?.image ?? '');
         this.backgroundFit.set(b.background?.fit ?? 'cover');
@@ -224,6 +226,7 @@ export class BuiltInPagesScope {
         appName: this.appName().trim(),
         tagline: this.tagline().trim(),
         logo: this.logo(),
+        logoSize: this.logoSize(),
         favicon: this.favicon(),
         // No picture, no framing: the settings that described it would be
         // exported as decisions about something that is not there.
@@ -235,6 +238,16 @@ export class BuiltInPagesScope {
         next: () => this.version.update((v) => v + 1),
         error: (err) => this.fail(err),
       });
+  }
+
+  // The size of the mark is edited on the LAYOUT tab - it is a question about
+  // the page, and one arrangement (banner) answers it itself - but it is
+  // stored with the branding, where the picture is: it must survive changing
+  // arrangement, and travel with the logo in an exported configuration.
+  // Written on the click, like the layout beside it: a toggle IS the setting.
+  setLogoSize(size: LogoSize): void {
+    this.logoSize.set(size);
+    this.saveBranding();
   }
 
   // ── scheme and layout ─────────────────────────────────────────────────────

@@ -1,11 +1,11 @@
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
-import { booleanAttribute, Component, input, output } from '@angular/core';
+import { booleanAttribute, computed, Component, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RowActionsDirective } from '@softwarity/row-actions';
-import { Route } from '../../api.service';
+import { Route, RouteHealth } from '../../api.service';
 import { AccessBadgesComponent } from '../endpoint-security/access-badges.component';
 import { AccessState, emptyAccess, isEmpty } from '../endpoint-security/access-editor.component';
 
@@ -31,6 +31,10 @@ export class RoutesTableComponent {
   // WHOLE list: dragging row 3 above row 1 of a filtered view would move it
   // above whatever sits at index 0 of the real one.
   readonly reorderable = input(true, { transform: booleanAttribute });
+  // What the gateway has actually seen from each upstream (SVC-04), keyed by
+  // route id. Empty until it is loaded, and a route with no entry says nothing
+  // - which is the honest answer for one nobody has called yet.
+  readonly health = input<Record<string, RouteHealth>>({});
   readonly edit = output<Route>();
   readonly remove = output<Route>();
   readonly duplicate = output<Route>();
@@ -39,6 +43,15 @@ export class RoutesTableComponent {
   readonly reorder = output<string[]>();
 
   protected readonly columns = ['name', 'access', 'matching', 'upstream'];
+
+  // Order is first-match-wins, so it means nothing on a subset: a row dragged
+  // to the top of three visible rows would land above whatever really sits
+  // first. Saying it beats a handle that quietly ignores the mouse.
+  protected readonly handleTip = computed(() =>
+    this.reorderable()
+      ? $localize`:@@Drag_to_reorder:Drag to reorder`
+      : $localize`:@@Clear_the_search_to_reorder:Reordering applies to the whole list: clear the search to move a route`,
+  );
 
   // Row-actions toolbars self-close on row click (closeOnClick, 3.1.0) -
   // nothing floats over the editor drawer this click opens.
@@ -66,7 +79,7 @@ export class RoutesTableComponent {
   // that exposes no OpenAPI spec: there is nothing to override there, and a
   // badge counting to zero would only be noise.
   protected endpointRules(r: Route): number | null {
-    if (!r.api?.openapiUrl) return null;
+    if (!r.api?.spec) return null;
     return r.api?.security?.endpoints?.length ?? 0;
   }
 
@@ -86,5 +99,31 @@ export class RoutesTableComponent {
       })
       .join(' AND ');
     return r.filters.length ? `${preds} - ${r.filters.length} filter(s)` : preds;
+  }
+
+  // What to show beside a route's name, or null when there is nothing worth
+  // saying. Three states and no fourth: refusing, failing, and quiet.
+  protected trouble(r: Route): { icon: string; open: boolean; tip: string } | null {
+    const h = this.health()[r.id];
+    if (!h) return null;
+    if (h.state !== 'closed') {
+      return {
+        icon: 'heart_broken',
+        open: true,
+        tip: $localize`:@@Not_answering_tip:Not answering - callers are getting the unavailable page. Last: ${
+          h.lastError || h.lastStatus || '?'
+        }:LAST:`,
+      };
+    }
+    if (h.failures) {
+      return {
+        icon: 'warning',
+        open: false,
+        tip: $localize`:@@Failing_tip:${h.failures}:COUNT: failed answers in a row. Last: ${
+          h.lastError || h.lastStatus || '?'
+        }:LAST:`,
+      };
+    }
+    return null;
   }
 }

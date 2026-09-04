@@ -10,6 +10,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -40,7 +41,7 @@ func TestLoginPageFollowsASessionOpenedElsewhere(t *testing.T) {
 // The two ports carry different sessions, so the login page of one must read
 // the other's deadline no more than it reads its cookie.
 func TestAdminLoginPageWatchesTheAdminDeadline(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
