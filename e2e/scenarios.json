@@ -435,7 +435,8 @@
       "probe": {
         "method": "GET",
         "path": "/oauth/authorize?response_type=code&client_id=none&code_challenge=x&code_challenge_method=S256",
-        "allowedStatus": [400]
+        "allowedStatus": [400],
+        "anonymousStatus": [303]
       },
       "allowed": ["root"],
       "title": { "en": "Approving an agent is a root decision", "fr": "Approuver un agent est une décision root" },
@@ -451,8 +452,7 @@
       "probe": {
         "method": "POST",
         "path": "/mcp",
-        "body": { "jsonrpc": "2.0", "id": 1, "method": "tools/list" },
-        "allowedStatus": [404]
+        "body": { "jsonrpc": "2.0", "id": 1, "method": "tools/list" }
       },
       "allowed": ["root", "infra-admin", "app-admin", "tenant-admin", "user"],
       "title": { "en": "Drive the gateway from an agent", "fr": "Piloter le gateway depuis un agent" },

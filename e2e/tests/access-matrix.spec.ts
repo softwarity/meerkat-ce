@@ -35,8 +35,21 @@ for (const sc of scenarios.filter((s) => s.kind === 'api')) {
       const res = await ctx.fetch(resolvePath(sc.probe!.path), {
         method: sc.probe!.method,
         data: sc.probe!.body === undefined ? undefined : sc.probe!.body,
+        // Not followed, on purpose. An API answers 401 and redirects nowhere,
+        // so this changes nothing for one - but a page that bounces a stranger
+        // to the sign-in form was being followed to the form's own 200, and a
+        // refusal that reads as a success is the one thing this test exists to
+        // catch.
+        maxRedirects: 0,
       });
-      expect(res.status()).toBe(401);
+      // 401 unless the scenario says otherwise: a consent PAGE sends a person
+      // to the sign-in form, and asserting 401 there would be asserting that
+      // it is an API.
+      if (sc.probe!.anonymousStatus) {
+        expect(sc.probe!.anonymousStatus, await res.text()).toContain(res.status());
+      } else {
+        expect(res.status(), await res.text()).toBe(401);
+      }
       await ctx.dispose();
     });
   });

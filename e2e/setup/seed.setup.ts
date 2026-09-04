@@ -55,6 +55,14 @@ setup('seed profiles and tenant', async () => {
   // admin would on the Issues screen, so the matrix exercises /api/issues.
   expect((await root.put('/api/settings/issues', { data: { enabled: true } })).ok()).toBeTruthy();
 
+  // The agent endpoint (MCP-01) ships OFF too, and the two scenarios that
+  // probe it were written against a gateway where somebody had turned it on.
+  // Left off, /mcp and /oauth/authorize answer 404 to EVERYONE - which is the
+  // right product behaviour and makes the access matrix meaningless: "who may
+  // reach this" has no answer while the door does not exist. Root flips it
+  // here the way an administrator would on the MCP screen.
+  expect((await root.put('/api/settings/agent', { data: { enabled: true } })).ok()).toBeTruthy();
+
   const create = async (user: Record<string, unknown>) => {
     const res = await root.post('/api/users', { data: user });
     expect(res.status(), `create ${user.username}: ${await res.text()}`).toBe(201);

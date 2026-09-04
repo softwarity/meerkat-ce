@@ -12,7 +12,16 @@ export interface Scenario {
   // allowedStatus: acceptable statuses for ALLOWED profiles when plain 2xx is
   // not guaranteed (e.g. 422 while a dependency is not configured) - the
   // point stays that it is NOT 401/403.
-  probe?: { method: string; path: string; body?: unknown; allowedStatus?: number[] };
+  // anonymousStatus: what a caller with no session gets, when it is not the
+  // 401 an API answers. A page meant for a browser bounces to the sign-in
+  // form instead, which is right for a person and wrong to assert as 401.
+  probe?: {
+    method: string;
+    path: string;
+    body?: unknown;
+    allowedStatus?: number[];
+    anonymousStatus?: number[];
+  };
   check?: { railItem: string };
   spec?: string;
   // "ee" when the scenario needs the Enterprise product (several

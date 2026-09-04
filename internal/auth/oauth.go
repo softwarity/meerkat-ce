@@ -186,6 +186,15 @@ func (h *Handler) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// WHO, before WHAT. This ran fourth, so a stranger's parameters were
+	// parsed and judged before anybody asked who was asking - and redirectError
+	// below answers with a 302 to the client's own redirect_uri, which an
+	// unauthenticated caller could therefore set going. The page hands an
+	// agent the approver's powers over the whole gateway; nothing about it
+	// should move before the approver is known.
+	if _, _, ok := h.consentActor(w, r); !ok {
+		return
+	}
 	q := r.URL.Query()
 	client, redirect, ok := h.checkAuthorizeRequest(w, r)
 	if !ok {
@@ -200,9 +209,6 @@ func (h *Handler) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 	if rt := q.Get("response_type"); rt != "code" {
 		redirectError(w, r, redirect, q.Get("state"), "unsupported_response_type",
 			"only the authorization code flow is supported")
-		return
-	}
-	if _, _, ok := h.consentActor(w, r); !ok {
 		return
 	}
 	data := consentData{
