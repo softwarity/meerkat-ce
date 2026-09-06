@@ -1,0 +1,272 @@
+:host {
+  display: block;
+  height: 100%;
+}
+mat-drawer-content > * {
+  padding-inline: 24px;
+}
+mat-drawer-content > header {
+  padding-top: 16px;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 500;
+}
+.grow {
+  flex: 1;
+}
+.hint,
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  max-width: 72ch;
+}
+.empty {
+  margin: 24px 0;
+}
+
+/* The four numbers, before any curve: what somebody arriving mid-incident
+   reads first. A chart answers "since when"; these answer "how bad". */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.figure {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.figure .value {
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+.figure .what {
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.figure.bad .value,
+td.bad {
+  color: var(--mat-sys-error);
+}
+
+section {
+  margin-bottom: 28px;
+}
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.chart {
+  height: 240px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.routes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.routes th,
+.routes td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.routes th {
+  font-weight: 500;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.78rem;
+}
+.routes .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The drawer, same head as the ones on the routes banner. */
+mat-drawer {
+  /* Wide enough for a configuration file. The snippets scroll rather than
+     wrap - a wrapped line of YAML is a line somebody pastes wrong - so the
+     width is what decides whether the comments are readable in place. */
+  width: 680px;
+  max-width: 96vw;
+  padding: 16px 24px 32px;
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.drawer-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--mat-sys-on-surface);
+}
+/* The container is the page: a drawer draws inside it, so it has to hold the
+   content rather than follow it. */
+mat-drawer-container {
+  background: transparent;
+  min-height: 100%;
+}
+mat-drawer-content {
+  background: transparent;
+  overflow: visible;
+}
+
+/* The period the four figures cover, said rather than guessed: "46% refused"
+   means nothing until a reader knows over what. */
+h2.over {
+  margin-bottom: 8px;
+}
+
+/* The ranking's head reads as ONE sentence - "routes, slowest, over 2 min" -
+   so the selector sits between the two halves of the title rather than at the
+   far end of the row. Which means it has to be the SIZE of a title: Material's
+   own tokens, not a transform, so the control keeps its states. */
+.rank-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.rank-head h2 {
+  margin: 0;
+}
+.rank-head mat-button-toggle-group {
+  --mat-standard-button-toggle-height: 26px;
+  --mat-standard-button-toggle-label-text-size: 0.72rem;
+  --mat-standard-button-toggle-shape: 999px;
+  border-radius: 999px;
+}
+/* How many are failing, on the tab itself. The point of putting it there is
+   that nobody has to switch to find out whether switching is worth it. */
+.rank-head .count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+  font-size: 0.72rem;
+}
+/* The column the order is on, so the table says WHY it is in this order. */
+.routes th.sorted {
+  color: var(--mat-sys-on-surface);
+  font-weight: 600;
+}
+
+/* A route that can name its endpoints opens on them. One that cannot looks
+   exactly like what it is: an ordinary row, no chevron, no pointer. */
+.routes tr.route.named {
+  cursor: pointer;
+}
+.routes tr.route.named:hover {
+  background: var(--mat-sys-surface-container-low);
+}
+.routes tr.route.open {
+  background: var(--mat-sys-surface-container);
+}
+.chevron {
+  vertical-align: middle;
+  margin-right: 4px;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* The opened endpoints: rows of the same table, so their figures fall under
+   the columns that name them. Only the ground and the indent say they belong
+   to the route above rather than being five more routes. */
+.routes tr.note > td,
+.routes tr.end > td {
+  background: var(--mat-sys-surface-container);
+  border-bottom: none;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.routes tr.note > td {
+  padding-left: 40px;
+  padding-top: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+}
+.routes tr.end > td:first-child {
+  padding-left: 40px;
+}
+/* The last one closes the block, and the line under it belongs to the route,
+   not to the endpoint. */
+.routes tr.end:last-of-type > td {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.verb {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--mat-sys-on-surface-variant);
+  margin-right: 8px;
+}
+.routes tr.end code {
+  font-size: 0.85rem;
+}
+
+/* A guess, said as one. Quiet on purpose: it must be readable next to the
+   template without competing with the figures the row is there for. */
+.guessed {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  cursor: help;
+}
+
+/* The drawer's own body: it is read once, by somebody with a terminal open
+   beside it, so it is allowed to be long - as long as each half folds away
+   until it is the one being followed. */
+mat-drawer {
+  overflow-y: auto;
+}
+.expose {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 16px 0;
+}
+.expose .hint {
+  margin: 10px 0 6px;
+}
+.expose a {
+  font-size: 0.82rem;
+  color: var(--mat-sys-primary);
+}
+.how {
+  display: block;
+  margin-bottom: 16px;
+}
+.how .hint {
+  margin: 0 0 12px;
+}

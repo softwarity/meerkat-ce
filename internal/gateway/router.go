@@ -26,9 +26,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	filtering "github.com/softwarity/meerkat/internal/filters"
+	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/openapi"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
@@ -42,6 +44,13 @@ import (
 type Router struct {
 	st *store.Store
 	sm *session.Manager
+
+	// loaded is false until the first Reload has finished. See Ready.
+	loaded atomic.Bool
+
+	// metrics counts what passes through (OBS-01). Each compiled route holds a
+	// pointer into it, so the request path never looks anything up.
+	metrics *metrics.Registry
 
 	// lottery draws the per-request value consumed by weight predicates
 	// (canary). Overridable in tests for determinism.
@@ -99,6 +108,14 @@ type Router struct {
 	// node, deliberately - see internal/gateway/breaker.go.
 	breakers *breakers
 
+	// opsSlots holds, per route id, WHICH operations its requests are
+	// attributed to (endpoints.go). Kept OUTSIDE the compiled routes on
+	// purpose: a reload rebuilds those, and the control plane pushes into
+	// these on a schedule of its own - a push must not be lost because
+	// somebody saved a route in between.
+	opsMu    sync.Mutex
+	opsSlots map[string]*opsSlot
+
 	// tagsMu guards the catalogue's tag -> role names table, read by routes
 	// that narrow what they forward. Cached: the catalogue changes far less
 	// often than requests arrive, and a few seconds late is invisible.
@@ -118,6 +135,14 @@ type compiledRoute struct {
 	// meant the first one always won and the second was unreachable.
 	access store.Access
 	isUI   bool
+	// counters are this route's own, resolved at COMPILE time so answering a
+	// request costs an atomic add and no lookup.
+	counters *metrics.Route
+	// ops names WHICH operation a request was, when the route carries enough
+	// to say so without guessing. Shared with the router rather than owned
+	// here, so what the control plane resolves survives a reload. See
+	// endpoints.go.
+	ops *opsSlot
 	// breaker is the route's circuit configuration, kept on the compiled route
 	// so the health view can report against the same numbers the guard uses.
 	breaker store.CircuitBreaker
@@ -135,7 +160,8 @@ func New(st *store.Store, sm *session.Manager) *Router {
 	if _, err := cryptorand.Read(key); err != nil {
 		panic(err) // the OS entropy source is gone; nothing sensible remains
 	}
-	return &Router{st: st, sm: sm, lottery: rand.Float64, simTokenKey: key, breakers: newBreakers()}
+	return &Router{st: st, sm: sm, lottery: rand.Float64, simTokenKey: key,
+		breakers: newBreakers(), metrics: metrics.NewRegistry()}
 }
 
 // Reload compiles the enabled routes from the store and swaps them in
@@ -257,6 +283,9 @@ func (rt *Router) Reload(ctx context.Context) error {
 		alive[c.id] = true
 	}
 	rt.breakers.forget(alive)
+	// Same for what its requests were attributed to: a route that is gone has
+	// no operations, and its slot would be a map entry nobody ever reads again.
+	rt.pruneOps(alive)
 
 	rt.mu.Lock()
 	rt.routes = compiled
@@ -267,8 +296,54 @@ func (rt *Router) Reload(ctx context.Context) error {
 		rt.simTokenKey = simKey
 	}
 	rt.mu.Unlock()
+	rt.loaded.Store(true)
 	slog.Info("routes reloaded", "count", len(compiled))
 	return nil
+}
+
+// Ready reports whether this router has ever finished a reload.
+//
+// For the READINESS probe. Between accepting connections and compiling its
+// first table, a node answers 404 to everything it is about to route - which
+// an orchestrator reads as a healthy instance serving a wrong answer, and a
+// rolling update sends live traffic straight into it. Zero routes is a
+// legitimate answer here: an installation with an empty table is ready to say
+// so. Never having asked is not.
+func (rt *Router) Ready() bool { return rt.loaded.Load() }
+
+// Metrics is what the console reads and what /metrics exposes.
+func (rt *Router) Metrics() *metrics.Registry { return rt.metrics }
+
+// record wraps the writer so a route learns what it answered and how long it
+// took, and returns the function that writes it down.
+//
+// Called by EVERY exit that belongs to a route, refusals included: a route
+// that turns everybody away with a 403 is answering, and showing it idle would
+// hide exactly the route somebody is asking about. A handler that wrote
+// nothing at all still answered 200 as far as net/http is concerned, which is
+// why the zero is resolved here rather than counted as an unnameable status.
+func record(w http.ResponseWriter) (*watched, time.Time) {
+	return &watched{ResponseWriter: w}, time.Now()
+}
+
+// observed writes down what record watched. A plain call and not a closure
+// returned by record: a closure capturing the writer and the start escapes to
+// the heap, which is a second allocation on the path of every request for the
+// convenience of writing `defer` at the call site.
+func observed(r *compiledRoute, req *http.Request, ww *watched, start time.Time) {
+	status := ww.status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	took := time.Since(start)
+	r.counters.Observe(status, took)
+	// And the operation, when the route can name one. The lookup happens once
+	// the request is ANSWERED rather than before it: it costs a handful of
+	// template comparisons, and paying them on the way out keeps them off the
+	// path of a request that is still waiting for its upstream.
+	if op := r.ops.of(req); op != nil {
+		op.Observe(status, took)
+	}
 }
 
 // adminOrigin reports whether origin is this gateway's own admin console: the
@@ -542,20 +617,26 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// person rather than on the identity under test.
 		r, hit := &routes[i], rt.applyUISim(req, routes[i].id)
 		if r.access.Empty() {
-			r.handler.ServeHTTP(w, hit)
+			ww, start := record(w)
+			r.handler.ServeHTTP(ww, hit)
+			observed(r, hit, ww, start)
 			return
 		}
 		d, ok := rt.sessionIdentity(hit)
 		who := rt.caller(hit, d, ok)
 		if (ok && r.access.Grants(who)) || isSpecRead(hit.Context()) {
-			r.handler.ServeHTTP(w, hit)
+			ww, start := record(w)
+			r.handler.ServeHTTP(ww, hit)
+			observed(r, hit, ww, start)
 			return
 		}
 		// A closed door stays closed. Falling through a "deny" to whatever
 		// matches next would turn the one rule written to shut a path into a
 		// rule that merely redirects it.
 		if r.access.Level == store.AccessDeny {
-			rt.refuse(w, hit, r.access, r.isUI, ok, who, d.UserID)
+			ww, start := record(w)
+			rt.refuse(ww, hit, r.access, r.isUI, ok, who, d.UserID)
+			observed(r, hit, ww, start)
 			return
 		}
 		if cand == nil {
@@ -563,9 +644,15 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if cand != nil {
-		rt.refuse(w, candReq, cand.access, cand.isUI, candOK, candWho, candUserID)
+		ww, start := record(w)
+		rt.refuse(ww, candReq, cand.access, cand.isUI, candOK, candWho, candUserID)
+		observed(cand, candReq, ww, start)
 		return
 	}
+	// No route at all. Counted gateway-wide rather than nowhere: a rising
+	// number of requests that match nothing is a misconfiguration somebody
+	// should see, and it belongs to no route by definition.
+	rt.metrics.Unmatched()
 	http.NotFound(w, req)
 }
 
@@ -778,8 +865,11 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte) (c
 	if r.Breaker != nil {
 		cfg = *r.Breaker
 	}
+	ops := rt.opsFor(r.ID)
+	ops.setBase(stripPrefixCount(r.Filters), baseOperations(r, deposited))
 	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler, breaker: cfg,
-		access: selectAccess, isUI: r.IsUI}, nil
+		access: selectAccess, isUI: r.IsUI, counters: rt.metrics.For(r.ID, r.Name),
+		ops: ops}, nil
 }
 
 // Validate checks that a route would compile - same checks as Reload, minus

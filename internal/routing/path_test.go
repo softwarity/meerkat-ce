@@ -70,3 +70,59 @@ func TestMatchingWithoutSplittingAgrees(t *testing.T) {
 		}
 	}
 }
+
+// stripBySplitting is what StripSegments used to be, kept as the ORACLE for
+// the same reason matchBySplitting is: a table of expected answers would have
+// been written by whoever wrote the new walk, and would have agreed with it
+// wherever the walk was wrong. This function runs on the way to every upstream
+// that carries a strip-prefix, so "it looks right" is not a standard.
+func stripBySplitting(path string, n int) string {
+	segs := splitPath(path)
+	if n >= len(segs) {
+		return "/"
+	}
+	return "/" + strings.Join(segs[n:], "/")
+}
+
+func TestStripSegmentsMatchesSplitting(t *testing.T) {
+	paths := []string{
+		"", "/", "//", "///", "/a", "/a/", "//a", "/a//", "/a/b", "/a//b",
+		"/a/b/", "/a/b/c", "/a/b/c/d", "/ab", "/demolition", "/a/b//c",
+		"a/b", "a", "/a/%20", "/A/b",
+	}
+	alphabet := []string{"", "a", "b"}
+	for n := 0; n <= 4; n++ {
+		var build func(prefix []string)
+		build = func(prefix []string) {
+			if len(prefix) == n {
+				joined := strings.Join(prefix, "/")
+				paths = append(paths, "/"+joined, "/"+joined+"/", joined)
+				return
+			}
+			for _, a := range alphabet {
+				build(append(prefix, a))
+			}
+		}
+		build(nil)
+	}
+	// From zero: splitting PANICKED on a negative count (segs[n:]), so there
+	// is no answer there to compare against. The walk simply strips nothing,
+	// and no caller can reach it - stripPrefixCount never returns below zero.
+	for _, path := range paths {
+		for n := 0; n <= 5; n++ {
+			if got, want := StripSegments(path, n), stripBySplitting(path, n); got != want {
+				t.Errorf("path %q, n=%d: walking says %q, splitting says %q", path, n, got, want)
+			}
+		}
+	}
+}
+
+// And that it costs nothing, which is why it was rewritten.
+func TestStripSegmentsDoesNotAllocate(t *testing.T) {
+	if n := testing.AllocsPerRun(200, func() {
+		_ = StripSegments("/orders/12345/items", 1)
+		_ = StripSegments("/anything/whatever", 0)
+	}); n != 0 {
+		t.Errorf("StripSegments allocated %v times per run, want 0", n)
+	}
+}

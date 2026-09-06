@@ -1,3 +1,4 @@
+import { provideLivewire } from '@softwarity/livewire';
 import { ApplicationConfig } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { MAT_BUTTON_TOGGLE_DEFAULT_OPTIONS } from '@angular/material/button-toggle';
@@ -12,6 +13,11 @@ import { authInterceptor } from './auth.interceptor';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes, withComponentInputBinding()),
+    // One socket for the whole console (OBS-01 and whatever follows it): a
+    // screen registers a topic rather than opening a connection of its own.
+    // Root-relative, so it goes out on the origin the console was served from
+    // and carries the session cookie that authorises it.
+    provideLivewire({ path: '/api/live' }),
     provideHttpClient(withInterceptors([authInterceptor])),
     // Persist UI table preferences (sort, filters) in browser storage.
     provideStore(),

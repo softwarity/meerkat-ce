@@ -40,6 +40,10 @@ var readsNothing = map[string]bool{
 	// The agent endpoint carries both kinds and sorts them per tool: an
 	// annotated read-only tool answers, a mutating one is refused by name.
 	"/mcp": true,
+	// The exposition. Registered without a verb - a scraper that mistypes the
+	// method must be refused here rather than answered by the console's
+	// catch-all - so the verb cannot classify it, and it reads counters.
+	"/metrics": true,
 }
 
 // readsOnly reports whether this request only reads.

@@ -2,6 +2,15 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
+// Whether /metrics is exposed, whether this image could, and where it answers.
+// The path comes from the gateway rather than being assembled here: one place
+// decides it, and an example a reader pastes has to carry the real one.
+export interface MetricsSetting {
+  enabled: boolean;
+  enterprise: boolean;
+  path: string;
+}
+
 // One shape everywhere: these mirror the Go types (routing.Spec, store.Route,
 // routing.CatalogEntry) - the console never invents its own model.
 export interface Spec {
@@ -783,7 +792,11 @@ export interface Issue {
 // what makes handing one to an agent survivable, and it is checked on the
 // server for the whole control plane - the REST API and the agent endpoint
 // alike, since the same token opens both.
-export type TokenScope = 'readonly' | 'full';
+// The narrowest first, which is also the order a form offers them in.
+// `metrics` opens /metrics and nothing else: a scraper's credential sits in a
+// monitoring stack's configuration, often another team's repository, and a
+// read-only token there would hand whoever finds it the whole configuration.
+export type TokenScope = 'metrics' | 'readonly' | 'full';
 
 // The second axis: what a token may act ON. It MASKS its owner's capabilities
 // rather than adding a rights model of its own - a gateway token minted by
@@ -1949,6 +1962,18 @@ export class ApiService {
 
   setAgentEndpoint(enabled: boolean): Observable<{ enabled: boolean }> {
     return this.http.put<{ enabled: boolean }>('/api/settings/agent', { enabled });
+  }
+
+  // Whether this gateway exposes /metrics for a monitoring stack to scrape
+  // (OBS-05). `enterprise` is read-only: which image is running is decided by
+  // what was deployed, never by a request, so the console shows the switch as
+  // LOCKED rather than as off.
+  metricsSetting(): Observable<MetricsSetting> {
+    return this.http.get<MetricsSetting>('/api/settings/metrics');
+  }
+
+  setMetricsSetting(enabled: boolean): Observable<MetricsSetting> {
+    return this.http.put<MetricsSetting>('/api/settings/metrics', { enabled });
   }
 
   listAdminTokens(): Observable<AdminToken[]> {

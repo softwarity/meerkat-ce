@@ -326,11 +326,11 @@ forme du produit.
 
 | Fait | ID | Mot-clé | Description | Ce qui manque | Éd. |
 |:---:|---|---|---|---|:---:|
-| [ ] | OBS-01 | **Tableau de bord** | Observabilité intégrée à la console : tableaux de bord natifs - trafic par route/service, latences (percentiles), codes d'erreur | tout : aucun agrégat de trafic, de latence ni d'erreurs | CE |
-| [~] | OBS-02 | **Health checks** | Health checks (liveness/readiness) exploitables par l'orchestrateur | liveness et readiness pointent le même `/healthz`, qui ne vérifie pas la base | CE |
+| [~] | OBS-01 | **Tableau de bord** | Observabilité intégrée à la console : tableaux de bord natifs - trafic par route et par endpoint, latences, codes d'erreur. **Les compteurs sont livrés** (`internal/metrics`) : par route, les requêtes par classe de statut, un histogramme de latence à douze bornes, les échecs d'amont par genre, plus le vol en cours, les connexions et ce qui ne matche aucune route. Chaque route compilée **possède** son bloc, donc enregistrer une requête coûte un ajout atomique et zéro allocation, ce qu'un test prouve. Un échantillonneur en tire une fenêtre glissante d'une heure (5 s de pas) : les compteurs restent monotones pour Prometheus, la fenêtre en dérive - l'inverse perdrait ce qui sort par le bout. **L'écran est livré** : deux courbes ECharts alimentées par livewire, quatre chiffres sur la dernière minute, et un classement des routes sur trois axes (lentes, en échec, coûteuses). Une route s'ouvre sur **ses endpoints** : l'unité est le gabarit (`/orders/{id}`), jamais le chemin brut - un chemin, c'est une série par commande, choisie par celui qui envoie les requêtes. Deux origines, et l'écran dit laquelle : **déclarée** (spec OpenAPI déposée, règles par endpoint, ou spec d'amont que le **plan de contrôle** résout et pousse dans le routeur - la lire en compilant ferait attendre un rechargement sur un service lent), ou **déduite** de la forme du chemin quand rien n'est déclaré, les segments qui ressemblent à un identifiant pliés en `{id}`, avec un plafond de 200 gabarits par route et un seau au-delà. La déduction se trompe parfois (l'année de `/files/2024/report` n'est pas un id), donc ces lignes sont marquées | la courbe des percentiles (l'histogramme est là, p95 n'est pas tracé) | CE |
+| [x] | OBS-02 | **Health checks** | Deux sondes qui répondent à deux questions. `/healthz` est la **vivacité** : elle décide de **tuer** le processus, donc elle ne regarde aucune dépendance - une sonde qui tomberait avec la base transformerait une coupure de base en redémarrage simultané de tous les nœuds, chacun tué pour une faute qu'aucun ne répare en mourant. `/readyz` est la **disponibilité** : elle décide d'**envoyer du trafic**, donc elle demande à la base si elle répond (2 s) et au routeur s'il a compilé sa table au moins une fois. Un nœud dont la base est tombée garde sa table compilée et répond encore : c'est exactement l'état qui se déclarait prêt. 503 avec la raison, parce qu'un exploitant qui lit un échec de sonde a besoin de savoir laquelle des deux. Les deux échappent à la redirection TLS, sinon un 308 se lit comme « pas prêt » | - | CE |
 | [~] | OBS-03 | **Logs** | Logs structurés, niveaux configurables à chaud ; journal des requêtes activable | aucun handler configuré : niveau non réglable, pas de journal de requêtes | CE |
 | [ ] | OBS-04 | **Tracing** | Tracing distribué (traceparent/W3C propagé aux amonts) | tout : aucun `traceparent` propagé | CE |
-| [ ] | OBS-05 | **Prometheus** | Endpoint Prometheus optionnel pour les entreprises déjà équipées d'une stack de monitoring - un complément, jamais un prérequis de | tout : aucun `/metrics` | CE |
+| [x] | OBS-05 | **Prometheus** | **Enterprise**, et le découpage est celui-ci : les compteurs et les tableaux de bord intégrés sont dans les deux éditions - c'est la promesse « zéro dépendance », et la CE a des courbes sans rien installer ; ce qui se vend est **l'externalisation** vers la stack de monitoring que le client a déjà. `/metrics` sur le plan de contrôle (`ee/prometheus`, absent de l'image communautaire : du code absent refuse tout seul), derrière un **interrupteur livré éteint** et un jeton de portée `metrics` qui n'ouvre que ce chemin - une crédentiale de scraper vit dans la configuration d'une stack de supervision, souvent le dépôt d'une autre équipe, l'endroit où un jeton a le plus de chances de fuiter et le moins d'être tourné. Format texte : totaux monotones, histogramme cumulatif, un label `source` qui sépare les gabarits déclarés des déduits. Le tiroir de l'écran Metrics porte l'interrupteur et les fichiers à écrire - Swarm, Kubernetes, Grafana - copiables et téléchargeables, avec l'adresse de **cette** installation dedans. Prometheus **tire** (scrape), il ne reçoit pas : la vue intégrée est donc plus temps réel que lui, pas une version dégradée | - | EE |
 
 ### Déploiement
 
@@ -594,13 +594,55 @@ celui des autres non, avec un menu de choix pour la capacité `tester`. **Point 
 décision se prend par requête, donc elle doit être lisible depuis la session sans coûter une
 lecture de base.
 
-### L'observabilité est vide (OBS-01, OBS-04, OBS-05)
+### L'observabilité : une seule période, et ce qui reste (OBS-01, OBS-04, OBS-05)
 
-Aucune métrique, aucune trace, un `/healthz` qui répond toujours UP - liveness et readiness
-pointent le même chemin, donc un nœud dont la base est tombée se déclare prêt. **Solution
-minimale** : séparer les deux sondes et faire vérifier la base par la readiness. Ensuite un
-`/metrics` optionnel, et la propagation de `traceparent` vers l'amont, qui ne coûte qu'un
-en-tête à recopier.
+Les sondes sont séparées (OBS-02) et les compteurs sont là. Le point de conception qui a coûté
+le plus de tours, c'est la **période**. Les endpoints ont d'abord été des totaux courants depuis
+le démarrage, sous un tableau de routes qui, lui, couvre une fenêtre : une route affichait
+1 échec sur 17 minutes et trois endpoints en échec en dessous. Une légende l'expliquait. Une
+légende qui explique pourquoi les chiffres ne s'additionnent pas est le symptôme, pas la
+réponse - un lecteur qui remarque ça cesse de croire tout l'écran.
+
+Les endpoints répondent donc **sur la période demandée**, celle que la table dessine. Mais pas
+via la fenêtre échantillonnée : une entrée par endpoint toutes les cinq secondes, c'est ce que
+chaque nœud garderait et ce que l'anneau porterait, multiplié par le nombre d'opérations que
+déclare une spec. Ils ont leur propre **historique grossier** (`internal/metrics/history.go`) :
+un point par minute, trois nombres (requêtes, échecs, temps passé), et **écrit seulement quand
+quelque chose s'est passé**. Ce dernier point n'est pas une optimisation, c'est ce qui rend la
+réponse juste malgré les trous : un trou veut dire aucun trafic, donc différencier contre le
+dernier point avant la période donne exactement le trafic de la période.
+
+Une seule chose reste à dire, et seulement en cluster : les courbes sont sommées sur tous les
+nœuds, un endpoint est compté sur celui qui a répondu.
+
+Autre point de conception : un **chemin brut n'est jamais une série**. Compter
+`/orders/1042` et `/orders/1043` séparément, c'est une série par commande, gardée pour la vie du
+processus, et **choisie par celui qui envoie les requêtes** - une boucle `curl /orders/$i` fait
+tomber la gateway par son propre instrument. Ce n'est pas de l'imprécision, c'est un déni de
+service.
+
+Le nom d'un endpoint vient donc d'un gabarit **déclaré** (spec déposée, règles par endpoint, ou
+spec d'amont résolue par le plan de contrôle sur son propre rythme), et à défaut d'un gabarit
+**déduit** de la forme du chemin : les segments qui ressemblent à un identifiant - tout chiffres,
+UUID, hexadécimal long - sont pliés en un seul `{id}`, et ce qui survit au pliage est plafonné à
+200 gabarits par route, le reste tombant dans un seau unique. Le pire cas est donc borné, et il
+l'est deux fois.
+
+La déduction se trompe parfois : l'année de `/files/2024/report` n'est pas un identifiant. C'est
+pourquoi ces lignes portent la mention **déduit** partout où elles s'affichent - une supposition
+et une déclaration ne sont pas le même genre de fait, et les confondre est pire que de deviner.
+
+Troisième point, appris en une après-midi : **le plan de contrôle et la console partagent un
+port**, et tout ce que l'API sert hors `/api` est un chemin exact qui bat le catch-all de
+l'application. Une route de console qui porte l'un de ces noms marche tant qu'on clique - le
+routeur Angular ne demande rien au serveur - et casse au rechargement, sur un marque-page ou sur
+un lien collé. `/metrics` a tenu les deux rôles une après-midi. La règle est donc : hors `/api`,
+les chemins du plan de contrôle appartiennent au produit, et l'écran s'est déplacé
+(`/traffic`). `internal/admin/consoleroutes_test.go` refuse la prochaine collision.
+
+**Ce qui reste** : la courbe des percentiles (l'histogramme est collecté et exposé, p95 n'est pas
+tracé dans la console - un Grafana le fait, et la requête est dans le tiroir), et la propagation
+de `traceparent` vers l'amont (OBS-04), qui ne coûte qu'un en-tête à recopier.
 
 ### Le pilotage par un agent (MCP-01 à 06)
 

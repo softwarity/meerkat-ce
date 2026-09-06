@@ -33,11 +33,21 @@ const (
 	// ScopeReadOnly: reads only. What counts as a read is decided by the
 	// endpoint, not by the HTTP verb - see admin.readsOnly.
 	ScopeReadOnly = "readonly"
+	// ScopeMetrics: /metrics and NOTHING else (OBS-05).
+	//
+	// Narrower than read-only on purpose, and it is the narrowness that makes
+	// it worth having. A scraper is a long-lived credential sitting in a
+	// monitoring stack's configuration, often in a different team's repository
+	// - the one place a token is most likely to leak and least likely to be
+	// rotated. A read-only token there would hand whoever finds it the whole
+	// configuration: every route, every upstream, every rule. This one hands
+	// over counters.
+	ScopeMetrics = "metrics"
 )
 
 // TokenScopes are the allowed perimeters, in the order a form should offer
-// them (the safe one first).
-var TokenScopes = []string{ScopeReadOnly, ScopeFull}
+// them (the narrowest first).
+var TokenScopes = []string{ScopeMetrics, ScopeReadOnly, ScopeFull}
 
 // The token's DOMAIN, the second axis of the perimeter (MCP-02). Scope says
 // how far a token may go; domain says over what.
@@ -147,10 +157,11 @@ func SanitizeTokenScope(scope string) (string, error) {
 	switch s := strings.ToLower(strings.TrimSpace(scope)); s {
 	case "":
 		return ScopeReadOnly, nil
-	case ScopeFull, ScopeReadOnly:
+	case ScopeFull, ScopeReadOnly, ScopeMetrics:
 		return s, nil
 	default:
-		return "", fmt.Errorf("token perimeter %q: allowed are %s and %s", scope, ScopeReadOnly, ScopeFull)
+		return "", fmt.Errorf("token perimeter %q: allowed are %s, %s and %s",
+			scope, ScopeMetrics, ScopeReadOnly, ScopeFull)
 	}
 }
 

@@ -94,6 +94,17 @@ export const vaultAccess: CanActivateFn = async (_route, state) => {
   return ok ? true : bounce(router, state, landing(me));
 };
 
+// metricsAccess gates the transverse Metrics section. What passed through the
+// gateway is infrastructure: it names every route and every service, which is
+// more than an application administrator is shown anywhere else.
+export const metricsAccess: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  const ok = me.isRoot() || me.isInfraAdmin();
+  return ok ? true : bounce(router, state, landing(me));
+};
+
 // auditAccess gates the transverse Audit section: anyone who administers a
 // domain may open it (root, infra-admin, app-admin, or a tenant admin). The
 // API scopes the CONTENT to that domain; this only guards the page itself.

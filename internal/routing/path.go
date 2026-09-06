@@ -109,14 +109,65 @@ func CompilePath(raw string) (CompiledPath, error) {
 // Match reports whether a concrete request path satisfies the template.
 func (c CompiledPath) Match(path string) bool { return c.p.match(path) }
 
+// CountSegments is how many segments a path holds, the way splitPath cuts it -
+// without cutting it.
+//
+// Allocation-free, because it runs per request: whoever indexes operations by
+// their length has to ask this of every incoming path, and building a slice to
+// count its length is the mistake pathPattern.match was just relieved of.
+func CountSegments(path string) int {
+	rest := strings.TrimSuffix(strings.TrimPrefix(path, "/"), "/")
+	if rest == "" {
+		return 0
+	}
+	n := 1
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == '/' {
+			n++
+		}
+	}
+	return n
+}
+
 // StripSegments removes the first n segments of a path - the strip-prefix
 // filter. Stripping more segments than the path has yields "/".
+//
+// Walked rather than split, for the same reason pathPattern.match is: this runs
+// PER REQUEST in three places - the strip-prefix filter on the way to the
+// upstream, the per-endpoint guard mapping a path back to its OpenAPI
+// coordinate, and naming the operation a request was. Splitting cost a slice
+// and a join every time, and the answer is almost always a slice of the path
+// that came in: the separator the walk stops on IS the "/" the answer starts
+// with, so there is nothing to build.
+//
+// The coordinates are splitPath's, exactly: one leading and one trailing "/"
+// are not separators, and TestStripSegmentsMatchesSplitting holds the two
+// implementations to the same answers.
 func StripSegments(path string, n int) string {
-	segs := splitPath(path)
-	if n >= len(segs) {
-		return "/"
+	start, end := 0, len(path)
+	if end > 0 && path[0] == '/' {
+		start = 1
 	}
-	return "/" + strings.Join(segs[n:], "/")
+	if end > start && path[end-1] == '/' {
+		end--
+	}
+	if start >= end {
+		return "/" // no segments at all
+	}
+	i := start
+	for k := 0; k < n; k++ {
+		j := strings.IndexByte(path[i:end], '/')
+		if j < 0 {
+			return "/" // asked for more segments than there are
+		}
+		i += j + 1
+	}
+	if i > 0 && path[i-1] == '/' {
+		return path[i-1 : end]
+	}
+	// A path with no leading slash, which no request has: the only case where
+	// the answer is not already in the string.
+	return "/" + path[i:end]
 }
 
 // PathPrefixes returns the LITERAL head of each path pattern the specs carry:

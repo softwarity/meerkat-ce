@@ -472,6 +472,16 @@ const (
 	// exists at all, and it lives on the Access tokens screen, next to the
 	// tokens that open it.
 	SettingAgentEnabled = "agent_enabled"
+	// SettingMetricsEndpoint opens /metrics on the control plane (OBS-05), for
+	// a Prometheus to scrape. Enterprise: the counters and the built-in
+	// screens are in both editions - that is the zero-dependency promise, and
+	// the community image has curves with nothing to install - what is sold is
+	// EXTERNALISING them into the monitoring stack a customer already runs.
+	//
+	// Ships OFF, like the agent endpoint and for the same reason: a surface
+	// nobody asked for should not appear on an upgrade. A token of scope
+	// metrics is still required either way; this says the door exists at all.
+	SettingMetricsEndpoint = "metrics_endpoint"
 	// SettingTenancy records the mode this installation was FIRST started in:
 	// TenancySingle (one implicit organisation, the notion never surfaces) or
 	// TenancyMulti. It is chosen at startup and never changes afterwards -

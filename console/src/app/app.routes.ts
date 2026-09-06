@@ -8,6 +8,7 @@ import {
   multiTenantOnly,
   singleTenantOnly,
   vaultAccess,
+  metricsAccess,
   firstTenantRedirect,
   infraOnly,
   landingRedirect,
@@ -353,6 +354,17 @@ export const routes: Routes = [
     path: 'vault',
     canActivate: [vaultAccess],
     loadComponent: () => import('./gateway/vault-page.component').then((m) => m.VaultPageComponent),
+  },
+  {
+    // NOT /metrics: that path belongs to the Prometheus exposition on this
+    // same port (OBS-05), and a console route taking it would be unreachable
+    // by reload, bookmark or a pasted link - the gateway would answer the
+    // scrape instead of the app. The same rule the agent endpoint follows:
+    // outside /api, the control plane's paths are the product's.
+    path: 'traffic',
+    canActivate: [metricsAccess],
+    loadComponent: () =>
+      import('./metrics/metrics-page.component').then((m) => m.MetricsPageComponent),
   },
   {
     path: 'audit',

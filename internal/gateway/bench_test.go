@@ -7,7 +7,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"testing"
+	"time"
 
+	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -169,5 +171,26 @@ func TestSelectionAllocationsDoNotGrowWithTheTable(t *testing.T) {
 			"something in the matching path allocates once per route, and an installation "+
 			"pays for it on every request",
 			many.AllocsPerOp(), one.AllocsPerOp())
+	}
+}
+
+// Counting must not be felt. The gateway is on the path of every request, so
+// an observation costs an atomic add on a pointer the compiled route already
+// holds - no map, no key built, no allocation. Read against
+// BenchmarkSelectionAmong1 above: the two must allocate the same.
+func TestCountingAllocatesNothing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("benchmarks")
+	}
+	res := testing.Benchmark(func(b *testing.B) {
+		r := &metrics.Route{ID: "r1", Name: "bench"}
+		b.ReportAllocs()
+		for b.Loop() {
+			r.Observe(200, 3*time.Millisecond)
+		}
+	})
+	if res.AllocsPerOp() != 0 {
+		t.Errorf("observing a request allocates %d times; it runs on every request",
+			res.AllocsPerOp())
 	}
 }

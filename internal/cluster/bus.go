@@ -64,7 +64,7 @@ type Bus struct {
 	// onSignal maps a signal to what acts on its argument. Separate from on
 	// because the two are answered differently: a topic sends the node back to
 	// the table, a signal carries everything it needs.
-	onSignal map[string]func(string)
+	onSignal map[string]func(from, arg string)
 	// acted records the version this node has already applied, whether it made
 	// the change itself or reloaded because another one did. It is the whole
 	// self-skip: a node that wrote does not reload twice, and a notification
@@ -79,7 +79,7 @@ func New(st *store.Store, opts ...Option) *Bus {
 		node:      nodeID(),
 		pollEvery: defaultPollEvery,
 		on:        map[string]func(context.Context) error{},
-		onSignal:  map[string]func(string){},
+		onSignal:  map[string]func(from, arg string){},
 		acted:     map[string]int64{},
 	}
 	for _, o := range opts {
@@ -117,10 +117,27 @@ func (b *Bus) Register(topic string, reload func(context.Context) error) {
 
 // OnSignal says what acts on a signal. Called at wiring time, before Run.
 func (b *Bus) OnSignal(topic string, act func(arg string)) {
+	b.OnSignalFrom(topic, func(_, arg string) { act(arg) })
+}
+
+// OnSignalFrom is OnSignal for a topic where WHO sent it is part of the
+// message.
+//
+// Most signals are anonymous, and rightly so: what they do is drop a cache
+// entry, and it does not matter whose keystroke caused it. A few are the
+// sender's own state - a node's counters, say - and those are only meaningful
+// attributed, because the receiver keeps one entry per node and has to know
+// which one to replace.
+func (b *Bus) OnSignalFrom(topic string, act func(from, arg string)) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.onSignal[topic] = act
 }
+
+// Node is this node's identity on the bus. Needed by whoever keeps one entry
+// per node - the metrics fleet reports the local node through the same door as
+// the remote ones, so there is no privileged member.
+func (b *Bus) Node() string { return b.node }
 
 // Signal passes an argument to the other nodes with nothing in the database
 // behind it - see the signal constants in internal/store for when that is the
@@ -196,7 +213,7 @@ func (b *Bus) Run(ctx context.Context) {
 					return // our own, already acted on where it happened
 				}
 				slog.Debug("a node signalled", "topic", topic, "from", from)
-				b.act(topic, arg)
+				b.act(topic, from, arg)
 				return
 			}
 			slog.Debug("a node announced a change", "topic", payload)
@@ -217,12 +234,12 @@ func (b *Bus) Run(ctx context.Context) {
 
 // act runs a signal's handler. A signal for something this node does not keep
 // is nothing to it.
-func (b *Bus) act(topic, arg string) {
+func (b *Bus) act(topic, from, arg string) {
 	b.mu.Lock()
 	fn := b.onSignal[topic]
 	b.mu.Unlock()
 	if fn != nil {
-		fn(arg)
+		fn(from, arg)
 	}
 }
 

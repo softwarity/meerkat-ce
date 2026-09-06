@@ -192,10 +192,18 @@ main { padding: 4px 8px 48px; }
 .swagger-ui svg.arrow { fill: var(--mk-muted); }
 .swagger-ui .authorization__btn svg { fill: var(--mk-muted); }
 
-/* Inputs */
-.swagger-ui input[type='text'], .swagger-ui input[type='password'],
-.swagger-ui input[type='search'], .swagger-ui input[type='email'],
-.swagger-ui input[type='file'], .swagger-ui textarea, .swagger-ui select {
+/* Inputs.
+   EVERY input, not a list of types. This declared `color-scheme: dark` above
+   and then dressed five named types, so an input swagger-ui renders with no
+   type attribute - or as number, or url - kept swagger's own white background
+   while the user agent gave its text the dark palette's colour. White on
+   white, and only in the fields somebody types into.
+   The lesson is the enumeration: a page that says it is dark has to answer for
+   all of itself, and a list of types is a list that the next release of a
+   third-party UI adds to. Checkboxes and radios are left native on purpose -
+   color-scheme dresses them correctly and swagger does not fight it. */
+.swagger-ui input:not([type='checkbox']):not([type='radio']),
+.swagger-ui textarea, .swagger-ui select {
   background: var(--mk-code-bg);
   border: 1px solid var(--mk-line);
   color: var(--mk-ink);

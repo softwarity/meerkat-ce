@@ -1,20 +1,54 @@
 {
   "$comment": "Single source of truth for the integration-test coverage. The Playwright suites execute every scenario listed here (kind api/ui data-driven, kind flow as a dedicated spec named by `spec`); the doc site renders this same file on its Test coverage page. Paths may carry {tenantId} / {aliceId} placeholders resolved from the seeded fixtures.",
   "profiles": [
-    { "id": "root", "username": "admin", "en": "Root: full control of the gateway", "fr": "Root : contrôle complet du gateway" },
-    { "id": "infra-admin", "username": "gwadmin", "en": "Gateway admin: routes and built-in pages only", "fr": "Admin gateway : routes et pages intégrées uniquement" },
-    { "id": "app-admin", "username": "appadmin", "en": "Application admin: users, roles and identity settings only", "fr": "Admin appli : utilisateurs, rôles et réglages d'identité uniquement" },
-    { "id": "tenant-admin", "username": "tadmin", "en": "Tenant admin: ADMIN member of the acme tenant", "fr": "Admin tenant : membre ADMIN du tenant acme" },
-    { "id": "user", "username": "alice", "en": "Plain user: USER member of the acme tenant, no capability", "fr": "Utilisateur simple : membre USER du tenant acme, aucune capacité" }
+    {
+      "id": "root",
+      "username": "admin",
+      "en": "Root: full control of the gateway",
+      "fr": "Root : contrôle complet du gateway"
+    },
+    {
+      "id": "infra-admin",
+      "username": "gwadmin",
+      "en": "Gateway admin: routes and built-in pages only",
+      "fr": "Admin gateway : routes et pages intégrées uniquement"
+    },
+    {
+      "id": "app-admin",
+      "username": "appadmin",
+      "en": "Application admin: users, roles and identity settings only",
+      "fr": "Admin appli : utilisateurs, rôles et réglages d'identité uniquement"
+    },
+    {
+      "id": "tenant-admin",
+      "username": "tadmin",
+      "en": "Tenant admin: ADMIN member of the acme tenant",
+      "fr": "Admin tenant : membre ADMIN du tenant acme"
+    },
+    {
+      "id": "user",
+      "username": "alice",
+      "en": "Plain user: USER member of the acme tenant, no capability",
+      "fr": "Utilisateur simple : membre USER du tenant acme, aucune capacité"
+    }
   ],
   "scenarios": [
     {
       "id": "api-gw-routes",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/routes" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "List the routes", "fr": "Lister les routes" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/routes"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "List the routes",
+        "fr": "Lister les routes"
+      },
       "description": {
         "en": "The routing plane belongs to the gateway scope: only root and infra-admin may read the route table; every other profile gets 403.",
         "fr": "Le plan de routage appartient au périmètre gateway : seuls root et l'admin gateway lisent la table des routes ; tout autre profil reçoit 403."
@@ -28,10 +62,18 @@
         "method": "PUT",
         "path": "/api/routes/no-such-route/spec?filename=orders.yaml",
         "body": "openapi: 3.0.0",
-        "allowedStatus": [404]
+        "allowedStatus": [
+          404
+        ]
       },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Deposit an OpenAPI spec on a route", "fr": "Déposer une spec OpenAPI sur une route" },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Deposit an OpenAPI spec on a route",
+        "fr": "Déposer une spec OpenAPI sur une route"
+      },
       "description": {
         "en": "A route may hold its contract as a deposited file rather than an upstream url, and the gateway then serves it on the route's own prefix. Depositing belongs to the routing plane: root and infra-admin only, every other profile gets 403. The probe names a route that does not exist, so an allowed caller gets 404 - which proves the barrier without depending on a fixture route.",
         "fr": "Une route peut porter son contrat sous forme de fichier déposé plutôt que d'URL amont, et la gateway le sert alors sur le préfixe de la route. Le dépôt appartient au plan de routage : root et l'admin gateway seulement, tout autre profil reçoit 403. La sonde nomme une route inexistante, donc un appelant autorisé reçoit 404, ce qui prouve la barrière sans dépendre d'une route de fixture."
@@ -41,9 +83,21 @@
       "id": "api-gw-route-spec-remove",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "DELETE", "path": "/api/routes/no-such-route/spec", "allowedStatus": [404] },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Remove a route's deposited spec", "fr": "Retirer la spec déposée d'une route" },
+      "probe": {
+        "method": "DELETE",
+        "path": "/api/routes/no-such-route/spec",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Remove a route's deposited spec",
+        "fr": "Retirer la spec déposée d'une route"
+      },
       "description": {
         "en": "Removing drops the file AND the declaration that names it, in one move: a route left pointing at a file that is gone is the dangling reference this feature exists to avoid. Same plane and same holders as the deposit.",
         "fr": "Le retrait supprime le fichier ET la déclaration qui le nomme, d'un seul geste : une route qui pointe vers un fichier absent est justement la référence pendante que cette fonction évite. Même plan et mêmes porteurs que le dépôt."
@@ -56,10 +110,23 @@
       "probe": {
         "method": "POST",
         "path": "/api/routes/version-preview",
-        "body": { "args": { "source": "path", "pattern": "/v(?<version>[0-9.]+)/", "from": "2.0" }, "sample": "/api/v2.1/orders" }
+        "body": {
+          "args": {
+            "source": "path",
+            "pattern": "/v(?<version>[0-9.]+)/",
+            "from": "2.0"
+          },
+          "sample": "/api/v2.1/orders"
+        }
       },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Preview a version predicate", "fr": "Aperçu d'un prédicat de version" },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Preview a version predicate",
+        "fr": "Aperçu d'un prédicat de version"
+      },
       "description": {
         "en": "The editor asks the ENGINE what a version pattern extracts while it is being typed, rather than guessing in the browser: Go uses RE2, which refuses lookarounds JavaScript allows, so a preview computed there would promise a match the gateway turns down at save. It reads and writes nothing, but it belongs to the routing plane and follows the route table's scope.",
         "fr": "L'éditeur demande au MOTEUR ce qu'un motif de version extrait pendant la frappe, plutôt que de deviner dans le navigateur : Go utilise RE2, qui refuse des lookarounds que JavaScript accepte, donc un aperçu calculé là promettrait une correspondance que la gateway refuse à l'enregistrement. Il ne lit ni n'écrit rien, mais il appartient au plan de routage et suit le périmètre de la table des routes."
@@ -69,9 +136,18 @@
       "id": "api-gw-catalog",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/catalog" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Read the brick catalog", "fr": "Lire le catalogue de briques" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/catalog"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the brick catalog",
+        "fr": "Lire le catalogue de briques"
+      },
       "description": {
         "en": "The predicates/modifiers catalog drives the route editor: gateway scope.",
         "fr": "Le catalogue des prédicats/modificateurs alimente l'éditeur de routes : périmètre gateway."
@@ -81,9 +157,18 @@
       "id": "api-app-themes",
       "domain": "application",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/themes" },
-      "allowed": ["root", "app-admin"],
-      "title": { "en": "Manage the built-in pages' themes", "fr": "Gérer les thèmes des pages intégrées" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/themes"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Manage the built-in pages' themes",
+        "fr": "Gérer les thèmes des pages intégrées"
+      },
       "description": {
         "en": "The flow pages (login, profile) carry the PRODUCT's face — name, logo, colours — so their themes and branding are application scope. The gateway merely serves them.",
         "fr": "Les pages de flux (login, profil) portent le visage du PRODUIT — nom, logo, couleurs — donc leurs thèmes et le branding sont du périmètre application. Le gateway ne fait que les servir."
@@ -93,9 +178,18 @@
       "id": "api-app-users",
       "domain": "application",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/users" },
-      "allowed": ["root", "app-admin"],
-      "title": { "en": "List the users", "fr": "Lister les utilisateurs" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/users"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "List the users",
+        "fr": "Lister les utilisateurs"
+      },
       "description": {
         "en": "The user base is the application's identity: app-admin scope. A gateway admin has no business reading it.",
         "fr": "La base d'utilisateurs est l'identité de l'application : périmètre admin appli. Un admin gateway n'a pas à la lire."
@@ -105,9 +199,18 @@
       "id": "api-app-roles",
       "domain": "application",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/roles" },
-      "allowed": ["root", "app-admin"],
-      "title": { "en": "Read the role catalogue", "fr": "Lire le catalogue de rôles" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/roles"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Read the role catalogue",
+        "fr": "Lire le catalogue de rôles"
+      },
       "description": {
         "en": "The global hierarchical role catalogue (RBAC-01) is application scope.",
         "fr": "Le catalogue global hiérarchique de rôles (RBAC-01) est du périmètre applicatif."
@@ -171,7 +274,10 @@
         "body": {
           "passphrase": "e2e passphrase long enough"
         },
-        "allowedStatus": [200, 422]
+        "allowedStatus": [
+          200,
+          422
+        ]
       },
       "allowed": [
         "root",
@@ -261,8 +367,13 @@
       "id": "api-config-collection",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/configurations" },
-      "allowed": ["root"],
+      "probe": {
+        "method": "GET",
+        "path": "/api/configurations"
+      },
+      "allowed": [
+        "root"
+      ],
       "title": {
         "en": "List the saved configurations",
         "fr": "Lister les configurations enregistrées"
@@ -276,9 +387,25 @@
       "id": "api-infra-mail-relay-test",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "POST", "path": "/api/settings/mail-relay/test", "body": { "to": "probe@e2e.test" }, "allowedStatus": [200, 422] },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Send a mail relay test message", "fr": "Envoyer un e-mail de test du relais" },
+      "probe": {
+        "method": "POST",
+        "path": "/api/settings/mail-relay/test",
+        "body": {
+          "to": "probe@e2e.test"
+        },
+        "allowedStatus": [
+          200,
+          422
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Send a mail relay test message",
+        "fr": "Envoyer un e-mail de test du relais"
+      },
       "description": {
         "en": "The mail relay is infrastructure (a third party host with credentials): only infra admins may fire the test (422 while it is not configured).",
         "fr": "Le relais mail est de l'infrastructure (un hôte tiers avec identifiants) : seuls les admins infra déclenchent le test (422 tant qu'il n'est pas configuré)."
@@ -288,9 +415,20 @@
       "id": "api-app-audit",
       "domain": "application",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/audit" },
-      "allowed": ["root", "infra-admin", "app-admin", "tenant-admin"],
-      "title": { "en": "Read the audit trail", "fr": "Lire la piste d'audit" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/audit"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin"
+      ],
+      "title": {
+        "en": "Read the audit trail",
+        "fr": "Lire la piste d'audit"
+      },
       "description": {
         "en": "The audit trail is a transverse section scoped by capability (RBAC-05): root sees all, infra-admin the routing plane (routes, themes), app-admin the identity (users, roles, settings), a tenant admin only their tenants' events. Anyone who administers nothing is refused.",
         "fr": "La piste d'audit est une section transverse cadrée par capacité (RBAC-05) : root voit tout, l'admin gateway le plan de routage (routes, thèmes), l'admin appli l'identité (utilisateurs, rôles, réglages), un admin de tenant seulement les événements de ses tenants. Quiconque n'administre rien est refusé."
@@ -300,9 +438,20 @@
       "id": "api-app-issues",
       "domain": "application",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/issues" },
-      "allowed": ["root", "infra-admin", "app-admin", "tenant-admin"],
-      "title": { "en": "Read the issue reports", "fr": "Lire les signalements d'anomalies" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/issues"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin"
+      ],
+      "title": {
+        "en": "Read the issue reports",
+        "fr": "Lire les signalements d'anomalies"
+      },
       "description": {
         "en": "The embedded issue tracker (ISSUE-03) is a transverse section: root and infra/app admins see every report, a tenant admin only those filed under their tenants. Anyone who administers nothing is refused.",
         "fr": "Le suivi d'anomalies embarqué (ISSUE-03) est une section transverse : root et les admins infra/appli voient tous les signalements, un admin de tenant seulement ceux déposés sous ses tenants. Quiconque n'administre rien est refusé."
@@ -312,9 +461,18 @@
       "id": "api-infra-maintenance",
       "domain": "infra",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/settings/maintenance" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Read the maintenance switch", "fr": "Lire le commutateur de maintenance" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/maintenance"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the maintenance switch",
+        "fr": "Lire le commutateur de maintenance"
+      },
       "description": {
         "en": "The switch that closes an installation to its visitors (LIFE-05) answers 503 for every route at once, without a single route being edited. Why it is closed is picked from a translated list rather than typed, because that page is read in twenty languages. Closing every application is an operator's act: only root and infra admins read or flip it, and whoever administers or develops can still go through to check the fix before reopening.",
         "fr": "Le commutateur qui ferme une installation a ses visiteurs (LIFE-05) repond 503 pour toutes les routes d'un coup, sans qu'une seule route soit modifiee. La raison se choisit dans une liste traduite plutot que de se saisir, parce que cette page se lit en vingt langues. Fermer toutes les applications est un acte d'exploitant : seuls root et les admins infra le lisent ou le basculent, et quiconque administre ou developpe peut passer pour verifier le correctif avant de rouvrir."
@@ -324,21 +482,85 @@
       "id": "api-infra-services",
       "domain": "infra",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/services" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "List what the runtime can route to", "fr": "Lister ce vers quoi la gateway peut router" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/services"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "List what the runtime can route to",
+        "fr": "Lister ce vers quoi la gateway peut router"
+      },
       "description": {
         "en": "What the runtime says exists beside this gateway (SVC-02), asked when a route is created: an upstream typed by hand is where the typos live, and none of them show up until traffic does. Always available in both editions and with no switch - what gates it is what the deployment grants, a mounted socket or a service account. An installation with no runtime to ask answers WHY rather than failing.",
         "fr": "Ce que l'execution declare exister a cote de la gateway (SVC-02), demande au moment ou une route est creee : un amont tape a la main est la ou vivent les fautes de frappe, et aucune ne se voit avant le trafic. Toujours disponible dans les deux editions et sans interrupteur - ce qui l'ouvre est ce que le deploiement accorde, un socket monte ou un compte de service. Une installation sans execution a interroger repond POURQUOI plutot que d'echouer."
       }
     },
     {
+      "id": "api-infra-live",
+      "domain": "infra",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/live",
+        "allowedStatus": [
+          400,
+          426
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Subscribe to what a screen shows",
+        "fr": "S abonner a ce qu un ecran montre"
+      },
+      "description": {
+        "en": "One websocket for the whole console, with a source per screen - the traffic curves first, the audit trail and the issue list next. It is mounted BEHIND the same funnel as every API call, so a subscription passes the same checks: session, pending login, token perimeter, narrowing to the token's domain. A plain GET is not an upgrade, so an allowed caller is refused by the protocol rather than by the perimeter, which is the point of the probe.",
+        "fr": "Un seul websocket pour toute la console, avec une source par ecran - les courbes de trafic d abord, le journal d audit et les incidents ensuite. Il est monte DERRIERE le meme entonnoir que chaque appel d API, donc un abonnement passe les memes controles : session, connexion en attente, perimetre du jeton, reduction au domaine du jeton. Un GET simple n est pas une montee en version, donc un appelant autorise est refuse par le protocole et non par le perimetre, ce qui est justement ce que la sonde verifie."
+      }
+    },
+    {
+      "id": "api-infra-metrics",
+      "domain": "infra",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/metrics"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read what passed through",
+        "fr": "Lire ce qui est passe"
+      },
+      "description": {
+        "en": "Traffic per route over the last hour: requests by status class, latency, upstream failures (OBS-01). It tells a route that is failing from one nobody is calling - the two look identical in a configuration. Summed over every node of a cluster, and each interval says how many it covers, so a partial curve never passes for a total. In memory: a restart starts a new hour, and an installation wanting a year scrapes the Enterprise /metrics into the time-series database it already runs. With ?endpoints=1 it also answers WHICH endpoint of a route the time went to, over the period ?since asks for - the same one the caller is drawing, so a route's endpoints add up to the route rather than to a longer story nobody asked about. The unit is the template, never a raw path - one series per order is chosen by whoever sends the requests, which makes it a denial of service and not an imprecision. A name is either DECLARED (a deposited spec, the per-endpoint rules, or what the control plane resolved from the upstream) or DEDUCED from the shape of the paths seen, with identifier-looking segments folded to {id} and a per-route budget past which everything shares one bucket. Deduced lines are marked, because a shape can be read wrong.",
+        "fr": "Le trafic par route sur la derniere heure : requetes par classe de statut, latence, echecs d amont (OBS-01). Il distingue une route qui echoue d une route que personne n appelle - les deux se ressemblent dans une configuration. Somme sur tous les noeuds d un cluster, et chaque intervalle dit combien il en couvre, pour qu une courbe partielle ne passe jamais pour un total. En memoire : un redemarrage commence une nouvelle heure, et qui veut un an scrape le /metrics Enterprise vers la base de series temporelles qu il a deja. Avec ?endpoints=1 il repond aussi QUEL endpoint d une route a pris le temps, sur la periode que ?since demande - celle que l appelant dessine, pour que les endpoints d une route s additionnent a la route et non a une histoire plus longue que personne n a demandee. L unite est le gabarit, jamais un chemin brut - une serie par commande, c est celui qui envoie les requetes qui la choisit, donc un deni de service et pas une imprecision. Un nom est soit DECLARE (spec deposee, regles par endpoint, ou ce que le plan de controle a resolu depuis l amont), soit DEDUIT de la forme des chemins vus, les segments qui ressemblent a un identifiant plies en {id}, avec un plafond par route au-dela duquel tout partage un seul seau. Les lignes deduites sont marquees, parce qu une forme peut se lire de travers."
+      }
+    },
+    {
       "id": "api-infra-route-health",
       "domain": "infra",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/routes/health" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Read which routes are answering", "fr": "Lire quelles routes repondent" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/routes/health"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read which routes are answering",
+        "fr": "Lire quelles routes repondent"
+      },
       "description": {
         "en": "The console has always shown what is CONFIGURED and never what WORKS (SVC-04). This reports what the circuit breaker already watches on every answer, per node - so it needs no prober of its own, and it sits on the routing plane's perimeter like the routes it describes.",
         "fr": "La console a toujours montre ce qui est CONFIGURE et jamais ce qui MARCHE (SVC-04). Ceci rapporte ce que le disjoncteur observe deja sur chaque reponse, noeud par noeud - donc sans sonde propre, et dans le perimetre du plan de routage comme les routes qu'il decrit."
@@ -348,9 +570,18 @@
       "id": "api-infra-proxy-limits",
       "domain": "infra",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/settings/proxy" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Read the gateway's own limits", "fr": "Lire les limites propres a la gateway" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/proxy"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the gateway's own limits",
+        "fr": "Lire les limites propres a la gateway"
+      },
       "description": {
         "en": "How much memory the proxy may spend on a body it rewrites (PERF-02) is a property of the INSTALLATION, not of the application it serves - so it lives in the Routes page's Global drawer, with the other things that are true of every route at once, and an application administrator cannot move it.",
         "fr": "La memoire que le proxy peut depenser pour reecrire un corps (PERF-02) est une propriete de l'INSTALLATION, pas de l'application servie : elle vit donc dans le tiroir Global de la page Routes, avec ce qui est vrai de toutes les routes a la fois, et un administrateur d'application ne peut pas la deplacer."
@@ -360,9 +591,18 @@
       "id": "api-infra-issues-setting",
       "domain": "infra",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/settings/issues" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Read the issue tracker switch", "fr": "Lire l'interrupteur du suivi d'anomalies" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/issues"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the issue tracker switch",
+        "fr": "Lire l'interrupteur du suivi d'anomalies"
+      },
       "description": {
         "en": "Turning user-filed issue reports on is an infrastructure decision (ISSUE-04): the switch sits on the Issues screen, ships OFF, and only infra admins read or flip it.",
         "fr": "Activer les signalements d'anomalies est une décision d'infrastructure (ISSUE-04) : l'interrupteur est posé sur l'écran Anomalies, livré ÉTEINT, et seuls les admins infra le lisent ou le basculent."
@@ -372,9 +612,18 @@
       "id": "api-tenant-members",
       "domain": "tenant",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/tenants/{tenantId}/members" },
-      "allowed": ["root", "tenant-admin"],
-      "title": { "en": "List a tenant's members", "fr": "Lister les membres d'un tenant" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/tenants/{tenantId}/members"
+      },
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "title": {
+        "en": "List a tenant's members",
+        "fr": "Lister les membres d'un tenant"
+      },
       "description": {
         "en": "Tenant administration is ownership or the ADMIN membership on THAT tenant: neither capability admins nor plain members reach another tenant's member list.",
         "fr": "L'administration d'un tenant est la propriété ou la membership ADMIN sur CE tenant : ni les admins par capacité ni les membres simples n'atteignent la liste des membres."
@@ -384,9 +633,18 @@
       "id": "api-tenant-member-logins",
       "domain": "tenant",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/tenants/{tenantId}/members/{aliceId}/logins" },
-      "allowed": ["root", "tenant-admin"],
-      "title": { "en": "Read a member's sign-in history", "fr": "Lire l'historique de connexions d'un membre" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/tenants/{tenantId}/members/{aliceId}/logins"
+      },
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "title": {
+        "en": "Read a member's sign-in history",
+        "fr": "Lire l'historique de connexions d'un membre"
+      },
       "description": {
         "en": "The sign-in history of a member is visible to root and to that tenant's owner or ADMIN, nobody else.",
         "fr": "L'historique de connexions d'un membre est visible par root et par le propriétaire ou l'ADMIN de son tenant, personne d'autre."
@@ -396,9 +654,24 @@
       "id": "api-tenant-transfer-owner",
       "domain": "tenant",
       "kind": "api",
-      "probe": { "method": "POST", "path": "/api/tenants/{tenantId}/owner", "body": { "userId": "e2e-nonexistent" }, "allowedStatus": [200, 422] },
-      "allowed": ["root"],
-      "title": { "en": "Transfer tenant ownership", "fr": "Transférer la propriété d'un tenant" },
+      "probe": {
+        "method": "POST",
+        "path": "/api/tenants/{tenantId}/owner",
+        "body": {
+          "userId": "e2e-nonexistent"
+        },
+        "allowedStatus": [
+          200,
+          422
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Transfer tenant ownership",
+        "fr": "Transférer la propriété d'un tenant"
+      },
       "description": {
         "en": "Ownership is a tenant field (TENANT-02): only root or the current owner may transfer it. A tenant ADMIN reaches the endpoint but is refused (403); root reaches the handler and 422s on the probe's unknown user, without changing anything.",
         "fr": "La propriété est un champ du tenant (TENANT-02) : seuls root ou le propriétaire actuel peuvent la transférer. Un ADMIN de tenant atteint l'endpoint mais est refusé (403) ; root atteint le handler et renvoie 422 sur l'utilisateur inconnu de la sonde, sans rien changer."
@@ -408,9 +681,17 @@
       "id": "api-gw-admin-tokens",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/admin-tokens" },
-      "allowed": ["root"],
-      "title": { "en": "List control-plane access tokens", "fr": "Lister les tokens d'accès control-plane" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/admin-tokens"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "List control-plane access tokens",
+        "fr": "Lister les tokens d'accès control-plane"
+      },
       "description": {
         "en": "Control-plane tokens grant headless access to the admin port: this is what connects an agent (MCP-01). Minting and listing them is root-only; the tokens authenticate on the admin plane only, never the data plane, and each carries a perimeter (readonly or full).",
         "fr": "Les tokens control-plane donnent un accès sans navigateur au port d'administration : c'est ce qui branche un agent (MCP-01). Leur création et leur liste sont réservées à root ; ils authentifient sur le plan admin uniquement, jamais le plan data, et chacun porte un périmètre (readonly ou full)."
@@ -420,12 +701,60 @@
       "id": "api-gw-agent-endpoint",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/settings/agent" },
-      "allowed": ["root"],
-      "title": { "en": "The agent endpoint's switch", "fr": "L'interrupteur de l'endpoint agent" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/agent"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "The agent endpoint's switch",
+        "fr": "L'interrupteur de l'endpoint agent"
+      },
       "description": {
         "en": "The MCP endpoint ships OFF (MCP-01) and only root may open it: a control-plane token is required either way, but the door's existence is a decision somebody takes, not something inherited from an upgrade.",
         "fr": "L'endpoint MCP est livré ÉTEINT (MCP-01) et seul root peut l'ouvrir : un token control-plane reste nécessaire de toute façon, mais l'existence de la porte est une décision que quelqu'un prend, pas un héritage de mise à jour."
+      }
+    },
+    {
+      "id": "api-gw-metrics-endpoint",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/metrics"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "The Prometheus exposition's switch",
+        "fr": "L'interrupteur de l'exposition Prometheus"
+      },
+      "description": {
+        "en": "Whether this gateway exposes /metrics for a monitoring stack to scrape (OBS-05), and whether this image can at all. Enterprise, and the split is deliberate: the counters and the built-in curves are in BOTH editions - that is the promise a community image makes, a gateway you can see with nothing to install - what is sold is externalising them into the stack a customer already runs. Ships OFF and only root may open it: a token is required either way, but the door's existence is a decision somebody takes.",
+        "fr": "Si cette gateway expose /metrics pour qu une stack de supervision le scrape (OBS-05), et si cette image en est capable. Enterprise, et le decoupage est voulu : les compteurs et les courbes integrees sont dans LES DEUX editions - c est la promesse de l image communautaire, une gateway qu on voit sans rien installer - ce qui se vend, c est de les externaliser vers la stack que le client a deja. Livre ETEINT et seul root peut l ouvrir : un jeton reste necessaire de toute facon, mais l existence de la porte est une decision que quelqu un prend."
+      }
+    },
+    {
+      "id": "api-gw-metrics-exposition",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/metrics"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "What a Prometheus scrapes",
+        "fr": "Ce qu un Prometheus scrape"
+      },
+      "description": {
+        "en": "The counters in Prometheus' text format: monotonic totals, never a window, because a scraper does its own differencing on its own schedule. Behind the SAME funnel as every other control-plane call, so a scraper authenticates the way an operator does - and a token minted with the metrics perimeter opens this path and nothing else, which is the point of having that perimeter: a scraper's credential lives in a monitoring stack's configuration, often another team's repository, the one place a token is most likely to leak and least likely to be rotated. Refuses with its reason when the image is the community one, or when the switch is off.",
+        "fr": "Les compteurs au format texte de Prometheus : des totaux monotones, jamais une fenetre, parce qu un scraper fait sa propre difference a son propre rythme. Derriere le MEME entonnoir que tout autre appel du plan de controle, donc un scraper s authentifie comme un exploitant - et un jeton frappe avec le perimetre metrics ouvre ce chemin et rien d autre, ce qui est tout l interet de ce perimetre : la crédentiale d un scraper vit dans la configuration d une stack de supervision, souvent le depot d une autre equipe, l endroit ou un jeton a le plus de chances de fuiter et le moins d etre tourne. Refuse en disant pourquoi quand l image est communautaire, ou quand l interrupteur est eteint."
       }
     },
     {
@@ -435,11 +764,20 @@
       "probe": {
         "method": "GET",
         "path": "/oauth/authorize?response_type=code&client_id=none&code_challenge=x&code_challenge_method=S256",
-        "allowedStatus": [400],
-        "anonymousStatus": [303]
+        "allowedStatus": [
+          400
+        ],
+        "anonymousStatus": [
+          303
+        ]
       },
-      "allowed": ["root"],
-      "title": { "en": "Approving an agent is a root decision", "fr": "Approuver un agent est une décision root" },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Approving an agent is a root decision",
+        "fr": "Approuver un agent est une décision root"
+      },
       "description": {
         "en": "The consent page (MCP-07) hands an agent the approver's own powers over the whole gateway, so only root reaches it; everyone else is refused before seeing it. Root reaches the handler and 400s on the probe's unknown client, without registering anything.",
         "fr": "La page de consentement (MCP-07) donne à un agent les pouvoirs de celui qui approuve sur toute la gateway : seul root l'atteint, tout autre profil est refusé avant de la voir. Root atteint le handler et renvoie 400 sur le client inconnu de la sonde, sans rien enregistrer."
@@ -452,10 +790,23 @@
       "probe": {
         "method": "POST",
         "path": "/mcp",
-        "body": { "jsonrpc": "2.0", "id": 1, "method": "tools/list" }
+        "body": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/list"
+        }
       },
-      "allowed": ["root", "infra-admin", "app-admin", "tenant-admin", "user"],
-      "title": { "en": "Drive the gateway from an agent", "fr": "Piloter le gateway depuis un agent" },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin",
+        "user"
+      ],
+      "title": {
+        "en": "Drive the gateway from an agent",
+        "fr": "Piloter le gateway depuis un agent"
+      },
       "description": {
         "en": "One endpoint, the Model Context Protocol over Streamable HTTP. It sits behind the same door as the API, and the tools it offers are the caller's own: a signed-in session reaches it, the tools then answer with that person's powers. Off by default, hence the 404 on a fresh installation.",
         "fr": "Un seul endpoint, le Model Context Protocol en Streamable HTTP. Il est derrière la même porte que l'API, et les outils offerts sont ceux de l'appelant : une session connectée l'atteint, les outils répondent ensuite avec les pouvoirs de cette personne. Éteint par défaut, d'où le 404 sur une installation neuve."
@@ -465,9 +816,21 @@
       "id": "api-docs-specs",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/apidocs/specs.json" },
-      "allowed": ["root", "infra-admin", "app-admin", "tenant-admin", "user"],
-      "title": { "en": "The console documents the control plane", "fr": "La console documente le control plane" },
+      "probe": {
+        "method": "GET",
+        "path": "/apidocs/specs.json"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin",
+        "user"
+      ],
+      "title": {
+        "en": "The console documents the control plane",
+        "fr": "La console documente le control plane"
+      },
       "description": {
         "en": "Every signed-in console user may open the swagger-ui page: it lists Meerkat's own admin API, and nothing else — the routes' specs live on the data plane, for developers. Anonymous callers get 401.",
         "fr": "Tout utilisateur connecté à la console peut ouvrir la page swagger-ui : elle liste l'API admin de Meerkat, et rien d'autre — les specs des routes vivent sur le plan data, pour les développeurs. Un appel anonyme reçoit 401."
@@ -477,9 +840,17 @@
       "id": "ui-rail-infra",
       "domain": "console",
       "kind": "ui",
-      "check": { "railItem": "Infra" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "The Infra rail entry shows only for its admins", "fr": "L'entrée Infra du rail n'apparaît que pour ses admins" },
+      "check": {
+        "railItem": "Infra"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "The Infra rail entry shows only for its admins",
+        "fr": "L'entrée Infra du rail n'apparaît que pour ses admins"
+      },
       "description": {
         "en": "The console rail hides the Gateway scope from profiles that cannot use it (and the API refuses them anyway).",
         "fr": "Le rail de la console cache le périmètre Gateway aux profils qui ne peuvent pas l'utiliser (et l'API les refuse de toute façon)."
@@ -489,9 +860,17 @@
       "id": "ui-rail-application",
       "domain": "console",
       "kind": "ui",
-      "check": { "railItem": "Application" },
-      "allowed": ["root", "app-admin"],
-      "title": { "en": "The Application rail entry shows only for its admins", "fr": "L'entrée Application du rail n'apparaît que pour ses admins" },
+      "check": {
+        "railItem": "Application"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "The Application rail entry shows only for its admins",
+        "fr": "L'entrée Application du rail n'apparaît que pour ses admins"
+      },
       "description": {
         "en": "Users, roles and identity settings are gated behind the app-admin capability in the console navigation.",
         "fr": "Utilisateurs, rôles et réglages d'identité sont derrière la capacité admin appli dans la navigation console."
@@ -502,9 +881,17 @@
       "domain": "console",
       "kind": "ui",
       "edition": "ee",
-      "check": { "railItem": "Tenants" },
-      "allowed": ["root", "tenant-admin"],
-      "title": { "en": "The Tenants rail entry shows for tenant admins", "fr": "L'entrée Tenants du rail apparaît pour les admins de tenant" },
+      "check": {
+        "railItem": "Tenants"
+      },
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "title": {
+        "en": "The Tenants rail entry shows for tenant admins",
+        "fr": "L'entrée Tenants du rail apparaît pour les admins de tenant"
+      },
       "description": {
         "en": "A tenant owner or ADMIN (or a tenant creator) sees the Tenants scope; plain members and capability admins without a tenant do not.",
         "fr": "Un propriétaire ou ADMIN de tenant (ou un créateur de tenants) voit le périmètre Tenants ; les membres simples et les admins par capacité sans tenant, non."
@@ -514,9 +901,19 @@
       "id": "ui-rail-issues",
       "domain": "console",
       "kind": "ui",
-      "check": { "railItem": "Issues" },
-      "allowed": ["root", "infra-admin", "app-admin", "tenant-admin"],
-      "title": { "en": "The Issues rail entry shows for administrators", "fr": "L'entrée Anomalies du rail apparaît pour les administrateurs" },
+      "check": {
+        "railItem": "Issues"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin"
+      ],
+      "title": {
+        "en": "The Issues rail entry shows for administrators",
+        "fr": "L'entrée Anomalies du rail apparaît pour les administrateurs"
+      },
       "description": {
         "en": "The issue reports section (ISSUE-03) follows the audit rule: anyone administering a domain may open it, the API scopes the content.",
         "fr": "La section des signalements (ISSUE-03) suit la règle de l'audit : quiconque administre un domaine peut l'ouvrir, l'API cadre le contenu."
@@ -527,8 +924,17 @@
       "domain": "console",
       "kind": "flow",
       "spec": "console-nav",
-      "allowed": ["root", "infra-admin", "app-admin", "tenant-admin", "user"],
-      "title": { "en": "Each profile lands on its own first screen", "fr": "Chaque profil atterrit sur son premier écran" },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin",
+        "user"
+      ],
+      "title": {
+        "en": "Each profile lands on its own first screen",
+        "fr": "Chaque profil atterrit sur son premier écran"
+      },
       "description": {
         "en": "Opening the console root: infra admins land on /infra/routes, app admins on /application/general, everyone else on their tenant.",
         "fr": "À l'ouverture de la console : les admins infra atterrissent sur /infra/routes, les admins appli sur /application/general, les autres sur leur tenant."
@@ -540,7 +946,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "A wrong password is refused without a session", "fr": "Un mauvais mot de passe est refusé sans session" },
+      "title": {
+        "en": "A wrong password is refused without a session",
+        "fr": "Un mauvais mot de passe est refusé sans session"
+      },
       "description": {
         "en": "The login page answers 401 with the same message whether the user or the password is wrong (no account enumeration) and no session cookie is issued.",
         "fr": "La page de login répond 401 avec le même message que l'utilisateur ou le mot de passe soit faux (pas d'énumération de comptes) et aucun cookie de session n'est émis."
@@ -551,8 +960,13 @@
       "domain": "auth",
       "kind": "flow",
       "spec": "flow-pages",
-      "allowed": ["user"],
-      "title": { "en": "A user sees their own sign-in history", "fr": "Un utilisateur voit son historique de connexions" },
+      "allowed": [
+        "user"
+      ],
+      "title": {
+        "en": "A user sees their own sign-in history",
+        "fr": "Un utilisateur voit son historique de connexions"
+      },
       "description": {
         "en": "After signing in, /profile/security links to /profile/history where the fresh sign-in shows with its method.",
         "fr": "Une fois connecté, /profile/security mène à /profile/history où la connexion fraîche apparaît avec sa méthode."
@@ -563,8 +977,13 @@
       "domain": "auth",
       "kind": "flow",
       "spec": "flow-pages",
-      "allowed": ["user"],
-      "title": { "en": "The profile flow links back to the applications", "fr": "Le flux profil ramène vers les applications" },
+      "allowed": [
+        "user"
+      ],
+      "title": {
+        "en": "The profile flow links back to the applications",
+        "fr": "Le flux profil ramène vers les applications"
+      },
       "description": {
         "en": "The profile hub (and the user button's Applications submenu) lists the UI routes the session may open — public, authenticated, and granted role-gated ones only.",
         "fr": "Le hub profil (et le sous-menu Applications du user-button) liste les routes UI que la session peut ouvrir — publiques, authentifiées, et à rôle requis seulement s'il est détenu."
@@ -576,7 +995,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "The developer page refuses non-dev users", "fr": "La page développeur refuse les non-développeurs" },
+      "title": {
+        "en": "The developer page refuses non-dev users",
+        "fr": "La page développeur refuse les non-développeurs"
+      },
       "description": {
         "en": "/profile/dev answers 403 for a user without the dev capability.",
         "fr": "/profile/dev répond 403 pour un utilisateur sans la capacité dev."
@@ -588,7 +1010,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "An app admin can never mint or promote a root", "fr": "Un admin appli ne peut jamais créer ni promouvoir un root" },
+      "title": {
+        "en": "An app admin can never mint or promote a root",
+        "fr": "Un admin appli ne peut jamais créer ni promouvoir un root"
+      },
       "description": {
         "en": "Creating a root user or setting the root flag on an existing user requires root itself: the API answers 403 to an app-admin.",
         "fr": "Créer un utilisateur root ou poser le drapeau root sur un utilisateur existant exige root : l'API répond 403 à un admin appli."
@@ -600,7 +1025,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "The built-in captcha gates self-registration", "fr": "Le captcha intégré protège l'auto-inscription" },
+      "title": {
+        "en": "The built-in captcha gates self-registration",
+        "fr": "Le captcha intégré protège l'auto-inscription"
+      },
       "description": {
         "en": "With the home-grown captcha on (the default), the register page carries a distorted-digits image; a wrong copy is refused, creates no account, and each challenge is single-use.",
         "fr": "Avec le captcha maison activé (le défaut), la page d'inscription porte une image de chiffres déformés ; une copie fausse est refusée, ne crée aucun compte, et chaque défi est à usage unique."
@@ -612,7 +1040,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "Self-registration end to end", "fr": "Auto-inscription de bout en bout" },
+      "title": {
+        "en": "Self-registration end to end",
+        "fr": "Auto-inscription de bout en bout"
+      },
       "description": {
         "en": "With the policy on and SMTP configured: the visitor registers, cannot sign in before confirming, opens the mailed one-shot link, the admins are notified, and the first sign-in lands on the waiting room until access is granted.",
         "fr": "Politique activée et SMTP configuré : le visiteur s'inscrit, ne peut pas se connecter avant de confirmer, ouvre le lien à usage unique reçu par mail, les admins sont notifiés, et la première connexion atterrit sur la salle d'attente jusqu'à l'attribution d'accès."
@@ -623,8 +1054,13 @@
       "domain": "auth",
       "kind": "flow",
       "spec": "flow-pages",
-      "allowed": ["user"],
-      "title": { "en": "Personal API tokens authenticate API calls", "fr": "Les jetons API personnels authentifient les appels API" },
+      "allowed": [
+        "user"
+      ],
+      "title": {
+        "en": "Personal API tokens authenticate API calls",
+        "fr": "Les jetons API personnels authentifient les appels API"
+      },
       "description": {
         "en": "A user mints a token on Profile → Security → API tokens (shown once); it captures their current tenant+group context and authenticates 'Authorization: Bearer mk_…' calls to the data-plane API routes with no browser session. Disabling or revoking it — or disabling the account — stops it at the next request; the admin port never accepts it.",
         "fr": "Un utilisateur crée un jeton dans Profil → Sécurité → Jetons API (affiché une fois) ; il capture son contexte tenant+groupe courant et authentifie les appels « Authorization: Bearer mk_… » vers les routes API du data plane sans session navigateur. Le désactiver ou le révoquer — ou désactiver le compte — l'arrête à la requête suivante ; le port admin ne l'accepte jamais."
@@ -636,7 +1072,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "Brute-force sign-ins are throttled", "fr": "Les connexions par force brute sont freinées" },
+      "title": {
+        "en": "Brute-force sign-ins are throttled",
+        "fr": "Les connexions par force brute sont freinées"
+      },
       "description": {
         "en": "Failed sign-ins are counted per address and account within a configurable window (Security page): past the budget the endpoint answers 429 without even checking, and a success forgives the counter. Wrong two-factor codes are throttled per account the same way.",
         "fr": "Les échecs de connexion sont comptés par adresse et par compte dans une fenêtre configurable (page Security) : au-delà du budget l'endpoint répond 429 sans même vérifier, et un succès remet le compteur à zéro. Les mauvais codes de double authentification sont freinés par compte de la même façon."
@@ -648,7 +1087,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "Forgot password resets through a mailed one-shot link", "fr": "Le mot de passe oublié se réinitialise par lien mail à usage unique" },
+      "title": {
+        "en": "Forgot password resets through a mailed one-shot link",
+        "fr": "Le mot de passe oublié se réinitialise par lien mail à usage unique"
+      },
       "description": {
         "en": "The sign-in page links the flow (when SMTP is configured): a neutral outcome whatever the address, a 1-hour one-shot link that survives mail-scanner prefetches (GET peeks, POST consumes), and a successful reset revokes every open session and notifies the owner.",
         "fr": "La page de connexion propose le flux (quand SMTP est configuré) : réponse neutre quelle que soit l'adresse, lien à usage unique valable 1 h qui survit aux préchargements des scanners de mail (le GET regarde, le POST consomme), et une réinitialisation réussie révoque toutes les sessions ouvertes et notifie le propriétaire."
@@ -659,8 +1101,13 @@
       "domain": "tenant",
       "kind": "flow",
       "spec": "flow-pages",
-      "allowed": ["user"],
-      "title": { "en": "Exclusive group mode asks which group at sign-in", "fr": "Le mode groupe exclusif demande quel groupe à la connexion" },
+      "allowed": [
+        "user"
+      ],
+      "title": {
+        "en": "Exclusive group mode asks which group at sign-in",
+        "fr": "Le mode groupe exclusif demande quel groupe à la connexion"
+      },
       "description": {
         "en": "With a tenant forced to SINGLE, a member holding several groups lands on /select-group after signing in (and again after each tenant switch); only the chosen group's roles apply to the session.",
         "fr": "Avec un tenant forcé en SINGLE, un membre de plusieurs groupes atterrit sur /select-group après connexion (et à chaque changement de tenant) ; seuls les rôles du groupe choisi s'appliquent à la session."
@@ -672,7 +1119,10 @@
       "kind": "flow",
       "spec": "flow-pages",
       "allowed": [],
-      "title": { "en": "Disabling passkeys removes the affordance and refuses the ceremonies", "fr": "Désactiver les passkeys retire le bouton et refuse les cérémonies" },
+      "title": {
+        "en": "Disabling passkeys removes the affordance and refuses the ceremonies",
+        "fr": "Désactiver les passkeys retire le bouton et refuse les cérémonies"
+      },
       "description": {
         "en": "When the global passkey policy is off, the login page hides the passkey button and the WebAuthn endpoints answer 403.",
         "fr": "Quand la politique globale passkey est coupée, la page de login cache le bouton passkey et les endpoints WebAuthn répondent 403."
@@ -699,7 +1149,9 @@
       "kind": "flow",
       "spec": "tenancy",
       "edition": "ee",
-      "allowed": ["root"],
+      "allowed": [
+        "root"
+      ],
       "title": {
         "en": "Single-organisation mode is switched live, and gives the others back",
         "fr": "Le mode mono-organisation se bascule a chaud, et rend les autres"
@@ -713,9 +1165,18 @@
       "id": "api-infra-certificates",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/certificates" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "List the TLS certificates", "fr": "Lister les certificats TLS" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/certificates"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "List the TLS certificates",
+        "fr": "Lister les certificats TLS"
+      },
       "description": {
         "en": "What the gateway presents at a handshake is infrastructure, like the upstream of a route: only infra admins may read the certificates. Key material never appears in the payload, whoever asks.",
         "fr": "Ce que la gateway présente à la poignée de main est de l'infrastructure, comme l'amont d'une route : seuls les admins infra lisent les certificats. Le matériel de clé n'apparaît dans la charge utile, pour personne."
@@ -728,11 +1189,22 @@
       "probe": {
         "method": "POST",
         "path": "/api/certificates/self-signed",
-        "body": { "plane": "app", "host": "e2e.test" },
-        "allowedStatus": [201]
+        "body": {
+          "plane": "app",
+          "host": "e2e.test"
+        },
+        "allowedStatus": [
+          201
+        ]
       },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Generate a self-signed certificate", "fr": "Générer un certificat auto-signé" },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Generate a self-signed certificate",
+        "fr": "Générer un certificat auto-signé"
+      },
       "description": {
         "en": "HTTPS in one click, for a laboratory or a first integration: the gateway is its own authority, and the certificate says so.",
         "fr": "HTTPS en un clic, pour un labo ou une première intégration : la gateway est sa propre autorité, et le certificat le dit."
@@ -745,11 +1217,22 @@
       "probe": {
         "method": "POST",
         "path": "/api/certificates/signing-request",
-        "body": { "plane": "app", "host": "csr.e2e.test" },
-        "allowedStatus": [201]
+        "body": {
+          "plane": "app",
+          "host": "csr.e2e.test"
+        },
+        "allowedStatus": [
+          201
+        ]
       },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Create a certificate signing request", "fr": "Créer une demande de signature" },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Create a certificate signing request",
+        "fr": "Créer une demande de signature"
+      },
       "description": {
         "en": "The offline door: the request leaves for whoever runs the authority, the private key stays. Nothing here needs a route to the internet.",
         "fr": "La porte hors ligne : la demande part vers qui tient l'autorité, la clé privée reste. Rien ici n'a besoin d'un accès internet."
@@ -759,9 +1242,18 @@
       "id": "api-infra-tls-settings",
       "domain": "gateway",
       "kind": "api",
-      "probe": { "method": "GET", "path": "/api/settings/tls" },
-      "allowed": ["root", "infra-admin"],
-      "title": { "en": "Read the TLS settings", "fr": "Lire les réglages TLS" },
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/tls"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the TLS settings",
+        "fr": "Lire les réglages TLS"
+      },
       "description": {
         "en": "Which HTTPS doors are open, and whether an ACME authority issues on its own. The external-account HMAC key follows the vault rule: a literal never travels back.",
         "fr": "Quelles portes HTTPS sont ouvertes, et si une autorité ACME émet toute seule. La clé HMAC de compte externe suit la règle du coffre : un littéral ne revient jamais."

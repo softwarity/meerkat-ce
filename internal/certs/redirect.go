@@ -91,8 +91,10 @@ func secureHost(asked, tlsAddr string) string {
 	return net.JoinHostPort(host, port)
 }
 
-// exemptFromRedirect keeps the liveness probe answering in the clear. A health
-// check asks whether the process is alive, not whether it is secured, and it
-// is usually a container runtime with a fixed http:// URL that nobody can edit
-// without a redeploy.
-func exemptFromRedirect(path string) bool { return path == "/healthz" }
+// exemptFromRedirect keeps BOTH probes answering in the clear. A health check
+// asks whether the process is alive, or whether it may take traffic - not
+// whether it is secured - and it is usually a container runtime with a fixed
+// http:// URL that nobody can edit without a redeploy. Redirecting readiness
+// would make an orchestrator read a 308 as "not ready" and take the node out
+// of rotation for having TLS on.
+func exemptFromRedirect(path string) bool { return path == "/healthz" || path == "/readyz" }

@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -57,6 +59,15 @@ func (a *API) authed(next userHandler) http.Handler {
 				"this token is read-only: it may read the gateway and run the testers, not change anything")
 			return
 		}
+		// A scraper's token opens the exposition and nothing else (OBS-05).
+		// Refused HERE rather than by each endpoint declining it, for the same
+		// reason read-only is: a perimeter written once holds for the endpoint
+		// somebody adds next month without knowing this rule exists.
+		if sess.TokenScope == store.ScopeMetrics && r.URL.Path != expositionPath {
+			writeErr(w, http.StatusForbidden,
+				"this token opens "+expositionPath+" and nothing else: it is a scraper's credential, not an operator's")
+			return
+		}
 		// From here on, the audit knows WHICH token acted (MCP-03), and the
 		// actor is narrowed to the token's domain: what follows sees a user
 		// who simply does not hold what the token gave up.
@@ -86,6 +97,21 @@ func (w *statusWriter) WriteHeader(code int) {
 // Unwrap keeps http.ResponseController working (flush, hijack) for the handlers
 // that stream - the console's log tail among them.
 func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// Hijack is forwarded EXPLICITLY, and Unwrap is not enough for it.
+//
+// http.ResponseController follows Unwrap; a plain type assertion does not, and
+// a websocket library asking `w.(http.Hijacker)` gets a no from a wrapper that
+// only unwraps. The console's live channel is mounted behind this funnel, so
+// without this every upgrade answered 501 - the writer that records what was
+// answered was quietly the thing refusing the connection.
+func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hj.Hijack()
+}
 
 // unauthorized answers a 401, and the agent endpoint owes more than the rest:
 // a bare refusal leaves a client with nothing to discover, while this one

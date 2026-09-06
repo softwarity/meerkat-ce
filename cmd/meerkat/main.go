@@ -28,7 +28,9 @@ import (
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/gateway"
+	"github.com/softwarity/meerkat/internal/live"
 	"github.com/softwarity/meerkat/internal/mail"
+	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -222,6 +224,7 @@ func run(o options) error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
+	mux.HandleFunc("GET /readyz", readyz(st, router))
 	authHandler := auth.New(st, sessions)
 	// What a developer's machine is serving right now, and who by. The
 	// registry lives in the trunk because trunk code READS it; only the
@@ -252,6 +255,7 @@ func run(o options) error {
 	// console origin is self-sufficient for authentication.
 	adminMux := http.NewServeMux()
 	adminMux.HandleFunc("GET /healthz", healthz)
+	adminMux.HandleFunc("GET /readyz", readyz(st, router))
 	adminAuth := auth.NewAdmin(st, adminSessions)
 	adminAuth.Mailer = mailer
 	adminAuth.Register(adminMux)
@@ -315,6 +319,57 @@ func run(o options) error {
 			hub.Deliver(topic, []byte(payload))
 		}
 	})
+	// What passes through, counted here and pooled across the cluster (OBS-01).
+	//
+	// Every node broadcasts its running TOTALS and every node aggregates, so
+	// the console's curves are the cluster's rather than whichever node the
+	// load balancer handed the screen. Nothing is written to the database for
+	// this: at a five-second resolution that would be forty writes a second on
+	// the store that also serves sessions, forever, to hold a chart.
+	//
+	// A single-node installation takes exactly the same path with one member.
+	fleet := metrics.NewFleet()
+	window := metrics.NewWindow(metrics.DefaultWindow)
+	var lastSent map[string]metrics.RouteSnapshot
+	go metrics.Run(ctx, router.Metrics(), fleet, window, bus.Node(), metrics.DefaultInterval,
+		func(s metrics.Snapshot) {
+			// Only the routes whose totals moved: a table of a hundred and
+			// fifty is mostly idle in any given five seconds, and a
+			// notification may carry 7000 bytes.
+			var moved metrics.Snapshot
+			moved, lastSent = metrics.Moved(s, lastSent)
+			if len(moved.Routes) == 0 {
+				return
+			}
+			for _, msg := range metrics.Encode(moved, metrics.Chunk) {
+				bus.Signal(ctx, store.TopicMetrics, msg)
+			}
+		})
+	bus.OnSignalFrom(store.TopicMetrics, func(from, arg string) {
+		s, err := metrics.Decode(arg)
+		if err != nil {
+			// A node speaking another dialect during a rolling update, or a
+			// truncated payload. Logged once at debug and dropped: the next
+			// message carries totals and repairs whatever this one lost.
+			slog.Debug("could not read a node's counters", "from", from, "err", err)
+			return
+		}
+		fleet.Report(from, s, time.Now())
+	})
+
+	adminAPI.Metrics = window
+	// And WHICH endpoint of a route a request was. Resolved here rather than
+	// in the router: the common case is a spec the service publishes itself,
+	// and fetching it while compiling routes would make a reload wait on a
+	// service. See (*admin.API).RefreshOperations.
+	go adminAPI.RefreshOperations(ctx)
+	// One socket for the whole console, with a source per screen. The traffic
+	// curves are the first; the audit trail and the issue list are the obvious
+	// next ones, and they will register here rather than open sockets of their
+	// own.
+	liveServer := live.New()
+	liveServer.Register(live.TrafficTopic, live.NewTraffic(window))
+	adminAPI.Live = liveServer
 	adminAPI.Register(adminMux)
 	if err := admin.RegisterConsole(adminMux, consoleURL, st, adminSessions); err != nil {
 		return err
@@ -447,9 +502,50 @@ func run(o options) error {
 	}
 }
 
+// healthz is LIVENESS: is this process still running and serving?
+//
+// It answers UP unconditionally, and that is the correct answer rather than a
+// lazy one. Liveness decides whether to KILL the process. A liveness probe
+// that failed because the database was unreachable would turn a database blip
+// into a restart of every node at once - each one killed for a fault none of
+// them has and none of them can fix by dying. What belongs to a dependency
+// belongs to readiness, which decides whether to send traffic.
 func healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = fmt.Fprintf(w, `{"status":"UP","version":%q}`, version.Version)
+}
+
+// readyz is READINESS: can this node take a request right now?
+//
+// Two questions, and both were answered "yes" by a handler that looked at
+// nothing. A node whose store is gone still holds its compiled table and still
+// answers - so it declared itself ready while it could no longer resolve a
+// session, read a setting or reload a route. And a node that has accepted
+// connections but not yet compiled its first table answers 404 to everything,
+// which a rolling update reads as a healthy instance and feeds live traffic.
+//
+// 503 with the reason, because an operator reading a probe failure needs to
+// know which of the two it is.
+func readyz(st *store.Store, router *gateway.Router) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Short, and shorter than any sane probe period: a readiness check
+		// that hangs is a readiness check that says nothing, and the
+		// orchestrator's own timeout then decides on no information at all.
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		w.Header().Set("Content-Type", "application/json")
+		if err := st.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = fmt.Fprintf(w, `{"status":"DOWN","reason":"the store is not answering","version":%q}`, version.Version)
+			return
+		}
+		if router != nil && !router.Ready() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = fmt.Fprintf(w, `{"status":"DOWN","reason":"the routing table has not been compiled yet","version":%q}`, version.Version)
+			return
+		}
+		_, _ = fmt.Fprintf(w, `{"status":"UP","version":%q}`, version.Version)
+	}
 }
 
 // seedDemoRoute gives a fresh instance one visible route, so `docker run` +

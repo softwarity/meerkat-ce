@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/softwarity/meerkat/internal/config"
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/mcp"
+	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/version"
@@ -281,6 +283,25 @@ func (a *API) tools() []mcp.Tool {
 			Call:   a.toolListServices,
 		},
 		{
+			Name: "read_traffic", Allow: administersRouting, Title: "Read what is passing through", ReadOnly: true,
+			Description: "What the gateway has actually served over the last hour, per route: requests by " +
+				"status class, latency, and upstream failures by kind. Use it to answer 'is anything broken " +
+				"or slow right now', and to tell a route that is failing from one nobody is calling - the two " +
+				"look identical in a configuration. Summed over every node of a cluster, and each interval " +
+				"says how many it covers. In memory: a restart starts a new hour. " +
+				"It also answers WHICH endpoint the time went to, in `endpoints`: the costliest twenty " +
+				"operations, named by their template (/orders/{id}), never by a raw path. They cover the " +
+				"same minutes as the samples - `since` says from when - so a route's endpoints add up to " +
+				"the route, on the node that answered. " +
+				"A line marked `deduced` was named from the SHAPE of the paths seen, not from a spec: " +
+				"identifier-looking segments were folded to {id}, which can be wrong (a year reads like an " +
+				"id). Declaring an OpenAPI spec on the route is what makes its names exact.",
+			Schema: object(map[string]any{
+				"minutes": map[string]any{"type": "integer", "description": "How far back, 1 to 60 (default 15)."},
+			}),
+			Call: a.toolReadTraffic,
+		},
+		{
 			Name: "read_audit", Allow: a.administersSomething, Title: "Read the audit trail", ReadOnly: true,
 			Description: "Who changed what, most recent first, with the value before and after each field. " +
 				"Use it to answer 'when did this change and who did it'.",
@@ -549,4 +570,36 @@ func accessSummary(a store.Access) string {
 // toolListServices answers what the runtime can route to (SVC-02).
 func (a *API) toolListServices(ctx context.Context, _ json.RawMessage) (any, error) {
 	return discovery.Discover(ctx), nil
+}
+
+func (a *API) toolReadTraffic(_ context.Context, raw json.RawMessage) (any, error) {
+	var asked struct {
+		Minutes int `json:"minutes"`
+	}
+	_ = json.Unmarshal(raw, &asked)
+	if asked.Minutes <= 0 || asked.Minutes > 60 {
+		asked.Minutes = 15
+	}
+	if a.Metrics == nil {
+		return metricsAnswer{}, nil
+	}
+	samples := a.Metrics.Samples()
+	// An agent reading an hour of five-second samples spends its context on
+	// nothing: the shape of a curve is not what it can act on. Trimmed to
+	// what was asked for, as the console's own screen does.
+	if want := asked.Minutes * 60 / int(metrics.DefaultInterval.Seconds()); want < len(samples) {
+		samples = samples[len(samples)-want:]
+	}
+	answer := metricsAnswer{
+		Interval: int(metrics.DefaultInterval.Seconds()),
+		Buckets:  metrics.Buckets,
+		Samples:  samples,
+	}
+	// And WHICH endpoint, for the routes that can name theirs. Twenty is the
+	// head of a list sorted by time spent: an agent asked "what is slow" acts
+	// on the first few lines, and the rest is context spent on nothing.
+	// Over the same minutes the samples cover, so an agent reading both is
+	// reading one period and not two.
+	answer.endpoints(a.registry(), time.Now().Add(-time.Duration(asked.Minutes)*time.Minute), 20)
+	return answer, nil
 }

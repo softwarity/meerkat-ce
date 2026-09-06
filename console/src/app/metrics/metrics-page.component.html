@@ -1,0 +1,256 @@
+<!-- The other half of the feature, in a drawer off the header button: it is
+     read ONCE, when somebody wires a monitoring stack up. A page carrying the
+     explanation at the bottom forever makes every later reader scroll past
+     something they have already had.
+
+     The container WRAPS the page rather than sitting after it: a Material
+     drawer draws inside its container, and one placed at the end of the flow
+     with no content has no height to draw in - it opens, and nothing appears. -->
+<mat-drawer-container hasBackdrop>
+  <mat-drawer position="end" mode="over" [opened]="prometheusOpen()" (closedStart)="prometheusOpen.set(false)">
+    <div class="drawer-head">
+      <h2 i18n="@@Metrics_prometheus_title">Send it to Prometheus</h2>
+      <span class="grow"></span>
+      <button matIconButton (click)="prometheusOpen.set(false)" i18n-aria-label="@@Close" aria-label="Close">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <p class="hint" i18n="@@Metrics_prometheus_hint">
+      The curves on this page are held in memory and start again when the gateway restarts.
+      Prometheus reads the raw counters instead, on its own schedule, and keeps whatever history
+      you configure. The two are not two modes: this page goes on working while it scrapes.
+    </p>
+
+    <!-- The switch, locked on the community image. The counters and this
+         screen are in BOTH editions - a gateway you can see with nothing to
+         install is what the community image promises - and what is sold is
+         externalising them into the stack a customer already runs. -->
+    <div class="expose" ee-feature="prometheus">
+      <mat-slide-toggle
+        [checked]="exposed()"
+        [disabled]="saving()"
+        (change)="expose($event.checked)"
+      >
+        <ng-container i18n="@@Metrics_expose">Expose {{ exposePath() }}</ng-container>
+        <app-ee-lock
+          feature="OBS-05"
+          i18n-why="@@Metrics_prometheus_why"
+          why="Expose /metrics so an existing monitoring stack scrapes this gateway, with the history and the alerting it already has."
+        />
+      </mat-slide-toggle>
+      <p class="hint" i18n="@@Metrics_expose_hint">
+        It answers on the control plane, this port, and it needs a token minted with the
+        <strong>metrics</strong> perimeter - which opens this one path and nothing else. A
+        scraper's credential lives in a monitoring stack's configuration, often another team's
+        repository: the one place a token is most likely to leak and least likely to be rotated.
+      </p>
+      <a routerLink="/infra/access-tokens" i18n="@@Metrics_mint_token">Mint one under Access tokens</a>
+    </div>
+
+    <!-- Read once, when somebody wires the stack up, so each half is folded
+         away until it is the one being followed. -->
+    <mat-accordion class="how">
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title i18n="@@Metrics_swarm">Docker Swarm</mat-panel-title>
+        </mat-expansion-panel-header>
+        <p class="hint" i18n="@@Metrics_swarm_hint">
+          Prometheus and Grafana join the network this gateway is already on, so the scrape never
+          leaves the cluster. Only the two consoles are published.
+        </p>
+        <app-snippet filename="create-secret.sh" [content]="swarmSecret" />
+        <app-snippet filename="prometheus.yml" [content]="swarmScrape()" />
+        <app-snippet filename="monitoring.yml" [content]="swarmStack()" />
+      </mat-expansion-panel>
+
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title i18n="@@Metrics_k8s">Kubernetes</mat-panel-title>
+        </mat-expansion-panel-header>
+        <p class="hint" i18n="@@Metrics_k8s_hint">
+          With the Prometheus Operator, a ServiceMonitor is the whole configuration. Without it,
+          the plain scrape config below discovers the pods through the API - every gateway
+          answers, and each counts what it served.
+        </p>
+        <app-snippet filename="create-secret.sh" [content]="k8sSecret" />
+        <app-snippet filename="servicemonitor.yaml" [content]="k8sMonitor()" />
+        <app-snippet filename="scrape-config.yml" [content]="k8sScrape()" />
+      </mat-expansion-panel>
+
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title i18n="@@Metrics_grafana">Grafana</mat-panel-title>
+        </mat-expansion-panel-header>
+        <p class="hint" i18n="@@Metrics_grafana_hint">
+          The queries a gateway is read on, one per panel. A dashboard is something a team builds
+          around what it cares about; these are the questions worth starting from.
+        </p>
+        <app-snippet filename="datasource.yaml" [content]="grafanaSource" />
+        <app-snippet filename="queries.promql" [content]="grafanaQueries" />
+      </mat-expansion-panel>
+    </mat-accordion>
+  </mat-drawer>
+  <mat-drawer-content>
+<header>
+  <h1 i18n="@@Metrics">Metrics</h1>
+  <span class="grow"></span>
+  <button matButton="tonal" type="button" (click)="prometheusOpen.set(true)">
+    <mat-icon>open_in_new</mat-icon>
+    <ng-container i18n="@@Metrics_prometheus">Prometheus</ng-container>
+    <app-ee-lock
+      feature="OBS-05"
+      i18n-why="@@Metrics_prometheus_why"
+      why="Expose /metrics so an existing monitoring stack scrapes this gateway, with the history and the alerting it already has."
+    />
+  </button>
+</header>
+
+<!-- The charts are drawn whatever happens, empty included. A screen that
+   replaces them with a sentence when there is nothing to show says nothing
+   about whether it is WORKING - and "no traffic" and "not connected" are the
+   two answers a reader has to be able to tell apart. Empty axes plus the
+   note below say both. -->
+@if (samples().length === 0) {
+  <p class="empty" i18n="@@Metrics_empty">
+  Nothing measured yet. The first interval lands a few seconds after the gateway starts, and a
+  route that nobody has called has nothing to say.
+  </p>
+}
+<h2 class="over" i18n="@@Metrics_last_minute">Over the last minute</h2>
+<div class="figures">
+  <div class="figure">
+    <div class="value">{{ perSecond() | number: '1.0-2' }}</div>
+    <div class="what" i18n="@@Metrics_per_second">requests per second</div>
+  </div>
+  <div class="figure" [class.bad]="errorRate() > 1">
+    <div class="value">{{ errorRate() | number: '1.0-2' }}%</div>
+    <div class="what" i18n="@@Metrics_error_rate">refused or failed</div>
+  </div>
+  <div class="figure">
+    <div class="value">{{ meanMs() | number: '1.0-1' }} ms</div>
+    <div class="what" i18n="@@Metrics_mean">mean answer</div>
+  </div>
+  <div class="figure">
+    <div class="value">{{ latest()?.inFlight ?? 0 }}</div>
+    <div class="what" i18n="@@Metrics_in_flight">in flight</div>
+  </div>
+</div>
+
+<section>
+  <h2 i18n="@@Metrics_traffic">Traffic</h2>
+  <app-chart class="chart" [option]="trafficOption()" />
+</section>
+
+<section>
+  <h2 i18n="@@Metrics_latency">How long an answer takes</h2>
+  <app-chart class="chart" [option]="latencyOption()" />
+</section>
+
+<section>
+  <!-- The selector sits INSIDE the title, so the heading reads as the sentence
+       it is: routes, slowest first, over two minutes. Pushed to the far right
+       it was a control beside a title, and a reader had to join the two by
+       themselves to know what the table was showing.
+
+       The selector also carries the signal, which is what a selector usually
+       fails to do: the failing tab shows its count, so an eye is caught
+       without anybody switching to find out whether there is anything to
+       switch for. -->
+  <div class="rank-head">
+    <h2 i18n="@@Metrics_routes">Routes</h2>
+    <mat-button-toggle-group [value]="axis()" (change)="axis.set($event.value)" hideSingleSelectionIndicator>
+      @for (a of axes; track a.key) {
+        <mat-button-toggle [value]="a.key">
+          {{ a.label }}
+          @if (a.key === 'failing' && failingCount() > 0) {
+            <span class="count">{{ failingCount() }}</span>
+          }
+        </mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+    <h2 i18n="@@Metrics_over">over {{ coveredMinutes() }} min</h2>
+    <span class="grow"></span>
+  </div>
+  <table class="routes">
+    <thead>
+      <tr>
+        <th i18n="@@Route">Route</th>
+        <th class="n" i18n="@@Metrics_requests">Requests</th>
+        <th class="n" [class.sorted]="axis() === 'failing'" i18n="@@Metrics_errors">Refused or failed</th>
+        <th class="n" [class.sorted]="axis() === 'slow'" i18n="@@Metrics_mean">Mean answer</th>
+        <th class="n" [class.sorted]="axis() === 'costly'" i18n="@@Metrics_spent">Time spent</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of ranked(); track r.id) {
+        <!-- A route is a hundred endpoints, and "this route is slow" is where
+             the question starts. The row opens on the answer to the next one. -->
+        <tr class="route" [class.open]="open() === r.id" [class.named]="named().has(r.id)"
+            (click)="named().has(r.id) && toggle(r.id)">
+          <td>
+            @if (named().has(r.id)) {
+              <mat-icon class="chevron">{{ open() === r.id ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            } @else {
+              <!-- Nothing to open: a route whose traffic came in before this
+                   node started counting, or one whose whole answer is the row
+                   itself. No chevron pretending otherwise. -->
+              <span class="chevron"></span>
+            }
+            {{ r.name }}
+          </td>
+          <td class="n">{{ r.requests }}</td>
+          <td class="n" [class.bad]="r.errors > 0">{{ r.errors }}</td>
+          <td class="n">{{ r.meanMs | number: '1.0-1' }} ms</td>
+          <td class="n">{{ r.spent | number: '1.0-1' }} s</td>
+        </tr>
+        @if (open() === r.id) {
+          <!-- Rows of the SAME table, not a table inside a cell: a nested one
+               lays its columns out on its own contents, so an endpoint's
+               figures would sit under nothing in particular and the reader
+               would have to compare across two grids. -->
+          <!-- No caption saying what period this is: it is the SAME period as
+               the row above, so the lines add up and there is nothing to
+               explain. On a cluster one thing is still left to say - the
+               samples are summed over every node, an endpoint is counted on
+               the one that answered - and only there. -->
+          @if (nodes() > 1) {
+            <tr class="note">
+              <td colspan="5" i18n="@@Metrics_endpoints_node">On this gateway only</td>
+            </tr>
+          }
+          @for (e of openEndpoints(); track e.key) {
+            <tr class="end">
+              <td>
+                <span class="verb">{{ e.method }}</span><code>{{ e.path }}</code>
+                @if (e.deduced) {
+                  <!-- A guess and a declaration are two different kinds of
+                       fact, so the row says which it is. The tooltip carries
+                       the caveat; the chip only has to catch the eye. -->
+                  <span
+                    class="guessed"
+                    matTooltip="Inferred from the shape of the paths this gateway saw, not from a spec: the segments that look like identifiers were folded away. It can be wrong - a year reads like an id. Declare an OpenAPI spec on the route for exact names."
+                    i18n-matTooltip="@@Metrics_deduced_why"
+                    i18n="@@Metrics_deduced"
+                    >deduced</span
+                  >
+                }
+              </td>
+              <td class="n">{{ e.requests }}</td>
+              <td class="n" [class.bad]="e.errors > 0">{{ e.errors }}</td>
+              <td class="n">{{ e.meanMs | number: '1.0-1' }} ms</td>
+              <td class="n">{{ e.spent | number: '1.0-1' }} s</td>
+            </tr>
+          } @empty {
+            <tr class="note">
+              <td colspan="5" i18n="@@Metrics_endpoints_none">
+                Its endpoints are known, and none of them has been called yet.
+              </td>
+            </tr>
+          }
+        }
+      }
+    </tbody>
+  </table>
+</section>
+  </mat-drawer-content>
+</mat-drawer-container>

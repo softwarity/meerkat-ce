@@ -17,6 +17,7 @@ import (
 	"github.com/softwarity/meerkat/internal/cluster"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
+	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -49,6 +50,14 @@ type API struct {
 	st     *store.Store
 	sm     *session.Manager
 	router *gateway.Router
+	// Metrics is the live window the console draws (OBS-01). Set by main,
+	// which owns the sampler; nil in a build that runs none, and the endpoint
+	// answers an empty window rather than a 500.
+	Metrics *metrics.Window
+	// Live is the console's live channel: one socket for the whole control
+	// plane, with a source per screen. Set by main. Nil leaves the endpoint
+	// unmounted rather than answering an upgrade nothing feeds.
+	Live http.Handler
 }
 
 // New builds the admin API. router receives a hot reload after every
@@ -99,6 +108,7 @@ func (a *API) Register(mux Mux) {
 	a.registerProxyLimits(mux)
 	a.registerRouteHealth(mux)
 	a.registerServices(mux)
+	a.registerMetrics(mux)
 	a.registerEdition(mux)
 	a.registerConfig(mux)
 	a.registerConfigurations(mux)

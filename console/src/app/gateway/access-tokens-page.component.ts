@@ -145,18 +145,27 @@ export class AccessTokensPageComponent {
       <mat-form-field>
         <mat-label i18n="@@Perimeter">Perimeter</mat-label>
         <mat-select [value]="scope()" (selectionChange)="scope.set($event.value)">
+          <mat-option value="metrics" i18n="@@Metrics_only">Metrics only</mat-option>
           <mat-option value="readonly" i18n="@@Read_only">Read only</mat-option>
           <mat-option value="full" i18n="@@Full_access">Full access</mat-option>
         </mat-select>
         <mat-hint>
-          @if (scope() === 'readonly') {
-            <ng-container i18n="@@Perimeter_readonly_hint">
-              Reads the gateway and runs the testers. Changes nothing.
-            </ng-container>
-          } @else {
-            <ng-container i18n="@@Perimeter_full_hint">
-              Everything you can do, without a browser. Hand it out sparingly.
-            </ng-container>
+          @switch (scope()) {
+            @case ('metrics') {
+              <ng-container i18n="@@Perimeter_metrics_hint">
+                Opens /metrics and nothing else, for a Prometheus to scrape.
+              </ng-container>
+            }
+            @case ('readonly') {
+              <ng-container i18n="@@Perimeter_readonly_hint">
+                Reads the gateway and runs the testers. Changes nothing.
+              </ng-container>
+            }
+            @default {
+              <ng-container i18n="@@Perimeter_full_hint">
+                Everything you can do, without a browser. Hand it out sparingly.
+              </ng-container>
+            }
           }
         </mat-hint>
       </mat-form-field>

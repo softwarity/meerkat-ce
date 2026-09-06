@@ -50,6 +50,18 @@
     >
       <mat-icon>key</mat-icon>
     </rail-nav-item>
+    <!-- What passed through, below the vault and above the audit: the three are
+         transverse - they belong to no plane - and this one is read the way the
+         audit is, after the fact and across everything. -->
+    <rail-nav-item
+      i18n-label="@@Metrics"
+      label="Metrics"
+      routerLink="/traffic"
+      [active]="inMetrics()"
+      any-role="root infra-admin"
+    >
+      <mat-icon>monitoring</mat-icon>
+    </rail-nav-item>
     <rail-nav-item
       i18n-label="@@Audit"
       label="Audit"

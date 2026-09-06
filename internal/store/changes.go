@@ -63,6 +63,12 @@ const (
 	// hold open (internal/events). The argument is the hub topic, a space, and
 	// the encoded message.
 	TopicEvent = "event"
+	// TopicMetrics carries a node's own request counters to the others, so the
+	// console's curves are the CLUSTER's and not whichever node the load
+	// balancer happened to hand the screen (OBS-01). The argument is one
+	// encoded message; see internal/metrics for the format, and for why what
+	// travels is running totals rather than intervals.
+	TopicMetrics = "metrics"
 )
 
 // MaxSignalBytes is what a notification may carry. PostgreSQL refuses a

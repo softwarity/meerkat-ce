@@ -134,11 +134,11 @@ jobs:
       matrix:
         include:
           - area: Routing
-            packages: ./internal/routing/... ./internal/filters/... ./internal/gateway/...
+            packages: ./internal/routing/... ./internal/filters/... ./internal/gateway/... ./internal/discovery/... ./internal/metrics/...
           - area: Authentication
             packages: ./internal/auth/... ./internal/idp/... ./internal/mfa/... ./internal/session/... ./internal/captcha/... ./internal/events/... ./internal/devtunnel/...
           - area: Admin API
-            packages: ./internal/admin/... ./internal/mcp/... ./internal/openapi/... ./internal/config/...
+            packages: ./internal/admin/... ./internal/mcp/... ./internal/openapi/... ./internal/config/... ./internal/live/...
           - area: Storage
             packages: ./internal/store/... ./internal/cluster/... ./internal/edition/... ./internal/license/...
           - area: Secrets and signing
@@ -192,9 +192,14 @@ jobs:
           [ -z "$missing" ] || { echo "these have tests and belong to no area:"; echo "$missing"; exit 1; }
           echo "every tested package belongs to an area"
 
-  # What the areas leave: they cover ./internal, so cmd/, ee/ and tools/ would
+  # What the areas leave: they cover ./internal, so cmd/ and ee/ would
   # otherwise be tested by nobody. Plus `go vet` over the WHOLE tree, in both
   # editions, which is the one pass no other job makes.
+  #
+  # ./tools/... used to be named here too and matched nothing: the directory
+  # holds one Python script. Go answered with a warning rather than an error,
+  # so it printed on every run of every edition for months without meaning
+  # anything.
   #
   # Linux only, and that is the whole target: Meerkat ships as a Docker image
   # and nothing else. It used to run here on macOS and Windows too, which cost
@@ -225,12 +230,18 @@ jobs:
       #
       # The VETS above stay on ./..., because vet is the one thing no area
       # runs any more and it is cheap: it compiles, it does not execute.
+      #
+      # No ./ee/... on this side, and that is not a detail: the community tree
+      # is this commit with ee/ REMOVED, so naming it there is not an empty
+      # match Go shrugs at - it is `FAIL ./ee/... [setup failed]`. The job that
+      # exists to catch what the areas miss was itself failing on the mirror,
+      # for a directory the mirror is defined by not having.
       - name: Test, community
         if: needs.edition.outputs.enterprise == 'false'
-        run: go test -race ./cmd/... ./ee/... ./tools/...
+        run: go test -race ./cmd/...
       - name: Test, Enterprise
         if: needs.edition.outputs.enterprise == 'true'
-        run: go test -race -tags ee ./cmd/... ./ee/... ./tools/...
+        run: go test -race -tags ee ./cmd/... ./ee/...
 
   # The SAME suite, on the other database (QUAL-01).
   #

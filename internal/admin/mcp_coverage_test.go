@@ -26,6 +26,7 @@ var agentCovers = map[string][]string{
 	"routes":         {"list_routes", "get_route", "test_routing", "save_route", "delete_route"},
 	"catalog":        {"list_route_bricks"},
 	"services":       {"list_services"},
+	"metrics":        {"read_traffic"},
 	"users":          {"list_users"},
 	"tenants":        {"list_tenants"},
 	"audit":          {"read_audit"},
@@ -52,6 +53,8 @@ var agentIgnores = map[string]string{
 	"roles":          "the role catalogue is what every access rule points at; renaming one silently changes who reaches what, and no tool asked for it yet",
 	"issues":         "user-filed reports, with screenshots",
 	"mcp":            "the agent endpoint itself",
+	"live": "the console's websocket: an agent does not hold a socket open to watch a " +
+		"list change, and what it carries is answered by read_traffic on demand",
 }
 
 // patternRecorder collects what the API registers. See admin.Mux for why the
@@ -165,6 +168,7 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"DELETE /api/routes/{id}": true, "PUT /api/routes/{id}/security": true,
 		"PUT /api/routes/{id}/spec": true, "DELETE /api/routes/{id}/spec": true,
 		"PUT /api/settings": true, "PUT /api/settings/agent": true, "PUT /api/settings/issues": true,
+		"PUT /api/settings/metrics":     true,
 		"PUT /api/settings/proxy":       true,
 		"PUT /api/settings/maintenance": true,
 		"PUT /api/settings/mail-relay":  true, "PUT /api/settings/tenancy": true,
@@ -245,6 +249,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"list_tenants",
 		"list_users",
 		"read_audit",
+		"read_traffic",
 		"save_configuration",
 		"save_route",
 		"test_routing",

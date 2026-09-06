@@ -53,7 +53,7 @@ spec:
             httpGet: { path: /healthz, port: app }
             initialDelaySeconds: 5
           readinessProbe:
-            httpGet: { path: /healthz, port: app }
+            httpGet: { path: /readyz, port: app }
           volumeMounts:
             - name: data
               mountPath: /data

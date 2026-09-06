@@ -98,6 +98,15 @@ func (t *transaction) QueryRowContext(ctx context.Context, query string, args ..
 // functions, placeholders aside); it is the questions ABOUT the schema that
 // are not.
 
+// Ping asks the database whether it is still answering.
+//
+// For the READINESS probe and nothing else. A gateway whose store is gone can
+// still hold a connection open and still route from the table it compiled at
+// startup - so it looks alive from the outside while it can no longer resolve
+// a session, read a setting or reload a route. That is the state an
+// orchestrator has to be told about, and the only way to find out is to ask.
+func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
+
 // schemaVersion reports the version this database was last migrated to. Zero
 // on a database that has never been migrated.
 func (d *database) schemaVersion() (int, error) {

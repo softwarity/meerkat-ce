@@ -30,7 +30,8 @@ type apiTokenView struct {
 	ID       string
 	Name     string
 	Prefix   string
-	Context  string // "acme" or "acme - Support"
+	Context  string // "acme" or "acme - Support", or the "no organisation" label
+	Tenant   string // the organisation's own name, empty when there is none
 	Enabled  bool
 	Expiry   string // "" = never, else localized date, or "expired"
 	LastUsed string // "" = never used
@@ -81,6 +82,22 @@ const apiTokensBody = `    <style>
       .tk-meta { font-family: var(--mk-mono); font-size: .64rem; color: var(--mk-on-surface-variant); overflow-wrap: anywhere; }
       .tk-off { font-family: var(--mk-mono); font-size: .58rem; letter-spacing: .1em; text-transform: uppercase;
         color: var(--mk-on-surface-variant); border: 1px solid var(--mk-outline); border-radius: 999px; padding: 1px 7px; }
+      /* WHICH ORGANISATION a token acts in, beside its name rather than buried
+         in the technical line under it. This list is every token the account
+         holds, whatever organisation it was minted in - a personal credential
+         is not an organisation's asset, and one you cannot see is one you
+         cannot revoke. So the organisation has to be READABLE at a glance:
+         it is what decides which routes the token reaches, which makes it the
+         token's most consequential property and not a footnote next to its
+         prefix. */
+      .tk-org { font-size: .66rem; border-radius: 999px; padding: 1px 8px;
+        border: 1px solid var(--mk-outline); color: var(--mk-on-surface);
+        background: var(--mk-surface-variant); }
+      /* No organisation at all is a different KIND of token, not a weaker one:
+         it reaches whatever needs none. Dashed and muted, so the two never
+         read as the same badge with a different word in it. */
+      .tk-org.none { border-style: dashed; background: none;
+        color: var(--mk-on-surface-variant); }
       .tk-exp { color: var(--mk-error); }
       .tk form { margin: 0; padding: 0; width: auto; display: inline-grid;
         background: none; border: 0; box-shadow: none; backdrop-filter: none; animation: none; }
@@ -185,8 +202,8 @@ const apiTokensBody = `    <style>
       {{range .Tokens}}
       <div class="tk">
         <div class="tk-lines">
-          <span class="tk-name">{{.Name}}{{if not .Enabled}}<span class="tk-off">{{$.T.tokenDisabled}}</span>{{end}}</span>
-          <span class="tk-meta">{{.Prefix}}... - {{.Context}}{{if .Expiry}} - <span{{if .Expired}} class="tk-exp"{{end}}>{{.Expiry}}</span>{{end}}{{if .LastUsed}} - {{.LastUsed}}{{end}}</span>
+          <span class="tk-name">{{.Name}}<span class="tk-org{{if not .Tenant}} none{{end}}">{{.Context}}</span>{{if not .Enabled}}<span class="tk-off">{{$.T.tokenDisabled}}</span>{{end}}</span>
+          <span class="tk-meta">{{.Prefix}}...{{if .Expiry}} - <span{{if .Expired}} class="tk-exp"{{end}}>{{.Expiry}}</span>{{end}}{{if .LastUsed}} - {{.LastUsed}}{{end}}</span>
         </div>
         <form method="post" action="/profile/tokens">
           <input type="hidden" name="id" value="{{.ID}}">
@@ -324,7 +341,12 @@ func (h *Handler) renderTokens(w http.ResponseWriter, r *http.Request, sess stor
 	if tokens, err := h.st.ListAPITokens(r.Context(), sess.UserID, store.PlaneData); err == nil {
 		now := time.Now().Unix()
 		for _, tok := range tokens {
-			v := apiTokenView{ID: tok.ID, Name: tok.Name, Prefix: tok.Prefix, Enabled: tok.Enabled, Context: tok.TenantName}
+			// Tenant is kept apart from the label so the template can tell a
+			// token that belongs to an organisation from one that belongs to
+			// none - the second reaches only what needs no organisation, and
+			// that is worth looking different rather than reading the same.
+			v := apiTokenView{ID: tok.ID, Name: tok.Name, Prefix: tok.Prefix, Enabled: tok.Enabled,
+				Tenant: tok.TenantName, Context: tok.TenantName}
 			if v.Context == "" {
 				v.Context = t["tokenContextNone"]
 			}
