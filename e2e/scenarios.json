@@ -741,20 +741,22 @@
       "id": "api-gw-metrics-exposition",
       "domain": "gateway",
       "kind": "api",
+      "edition": "ee",
       "probe": {
         "method": "GET",
         "path": "/metrics"
       },
       "allowed": [
-        "root"
+        "root",
+        "infra-admin"
       ],
       "title": {
         "en": "What a Prometheus scrapes",
         "fr": "Ce qu un Prometheus scrape"
       },
       "description": {
-        "en": "The counters in Prometheus' text format: monotonic totals, never a window, because a scraper does its own differencing on its own schedule. Behind the SAME funnel as every other control-plane call, so a scraper authenticates the way an operator does - and a token minted with the metrics perimeter opens this path and nothing else, which is the point of having that perimeter: a scraper's credential lives in a monitoring stack's configuration, often another team's repository, the one place a token is most likely to leak and least likely to be rotated. Refuses with its reason when the image is the community one, or when the switch is off.",
-        "fr": "Les compteurs au format texte de Prometheus : des totaux monotones, jamais une fenetre, parce qu un scraper fait sa propre difference a son propre rythme. Derriere le MEME entonnoir que tout autre appel du plan de controle, donc un scraper s authentifie comme un exploitant - et un jeton frappe avec le perimetre metrics ouvre ce chemin et rien d autre, ce qui est tout l interet de ce perimetre : la crédentiale d un scraper vit dans la configuration d une stack de supervision, souvent le depot d une autre equipe, l endroit ou un jeton a le plus de chances de fuiter et le moins d etre tourne. Refuse en disant pourquoi quand l image est communautaire, ou quand l interrupteur est eteint."
+        "en": "The counters in Prometheus' text format: monotonic totals, never a window, because a scraper does its own differencing on its own schedule. Behind the SAME funnel as every other control-plane call, so a scraper authenticates the way an operator does - and a token minted with the metrics perimeter opens this path and nothing else, which is the point of having that perimeter: a scraper's credential lives in a monitoring stack's configuration, often another team's repository, the one place a token is most likely to leak and least likely to be rotated. Refuses with its reason when the image is the community one, or when the switch is off. Behind the same guard as the screen showing the same numbers: the counters name every route and every endpoint template, which is an operational map, and an application's user signing in through this gateway has no business reading it.",
+        "fr": "Les compteurs au format texte de Prometheus : des totaux monotones, jamais une fenetre, parce qu un scraper fait sa propre difference a son propre rythme. Derriere le MEME entonnoir que tout autre appel du plan de controle, donc un scraper s authentifie comme un exploitant - et un jeton frappe avec le perimetre metrics ouvre ce chemin et rien d autre, ce qui est tout l interet de ce perimetre : la crédentiale d un scraper vit dans la configuration d une stack de supervision, souvent le depot d une autre equipe, l endroit ou un jeton a le plus de chances de fuiter et le moins d etre tourne. Refuse en disant pourquoi quand l image est communautaire, ou quand l interrupteur est eteint. Derriere la meme garde que l ecran qui montre les memes chiffres : les compteurs nomment chaque route et chaque gabarit d endpoint, ce qui est une carte de l installation, et l utilisateur d une application qui se connecte a travers cette gateway n a rien a y lire."
       }
     },
     {

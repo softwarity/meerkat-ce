@@ -48,12 +48,19 @@ func (a *API) registerMetrics(mux Mux) {
 	mux.Handle("GET /api/metrics", a.infraAdmin(a.readMetrics))
 	mux.Handle("GET /api/settings/metrics", a.rootOnly(a.getMetricsSetting))
 	mux.Handle("PUT /api/settings/metrics", a.rootOnly(a.putMetricsSetting))
-	// Behind the same funnel as everything else: a scraper authenticates the
-	// way an operator does, and its token's perimeter is checked in the one
-	// place perimeters are checked (admin.authed). Mounted unconditionally and
-	// answering WHY when it will not serve - an endpoint that exists only in
-	// one build is one the coverage test cannot see.
-	mux.Handle(expositionPath, a.authed(a.serveExposition))
+	// Behind the same guard as the screen showing the same numbers, and NOT
+	// merely behind a session: the counters name every route, every route's
+	// name and every endpoint template, which is an operational map of the
+	// installation. An application's user signs in through this gateway and
+	// has no business reading it - the access matrix caught exactly that,
+	// with a plain user answered 200.
+	//
+	// The token's perimeter is still checked where perimeters are checked
+	// (admin.authed), and a control-plane token is root's, so a scraper's
+	// passes this. Mounted unconditionally and answering WHY when it will not
+	// serve: an endpoint that exists only in one build is one the coverage
+	// test cannot see.
+	mux.Handle(expositionPath, a.infraAdmin(a.serveExposition))
 	// The live channel, BEHIND the same funnel as everything else: a
 	// subscription passes exactly the checks an API call passes - session,
 	// pending login, token perimeter, narrowing to the token's domain - and

@@ -63,6 +63,15 @@ setup('seed profiles and tenant', async () => {
   // here the way an administrator would on the MCP screen.
   expect((await root.put('/api/settings/agent', { data: { enabled: true } })).ok()).toBeTruthy();
 
+  // And the Prometheus exposition (OBS-05), for the same reason: left off,
+  // /metrics answers 403 to everyone, and "who may reach this" has no answer
+  // while the door does not exist. Enterprise only - the community binary
+  // refuses the flip, which is the behaviour, so the scenario that probes the
+  // endpoint carries edition: "ee" and is left out there.
+  if (ENTERPRISE) {
+    expect((await root.put('/api/settings/metrics', { data: { enabled: true } })).ok()).toBeTruthy();
+  }
+
   const create = async (user: Record<string, unknown>) => {
     const res = await root.post('/api/users', { data: user });
     expect(res.status(), `create ${user.username}: ${await res.text()}`).toBe(201);
