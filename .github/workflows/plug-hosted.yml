@@ -27,6 +27,11 @@ jobs:
   tunnel:
     name: Serve a name from the runner
     runs-on: ubuntu-latest
+    # A ceiling, because the default one is six hours and the first run of this
+    # job spent them: Swarm's routing mesh accepts a connection on a published
+    # port before any task answers it, so a curl with no deadline hangs rather
+    # than failing, and a loop around it never advances.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
@@ -64,14 +69,25 @@ jobs:
           docker network create -d overlay --attachable tunnel-net
           docker stack deploy -c .github/plug-hosted/stack.yml tunnel
 
+      # Two things are watched, not one. A readiness probe answers when the
+      # gateway is up; it says nothing when the TASK is dead, and a published
+      # port answers the mesh either way - so a crash used to look exactly like
+      # a slow start until the deadline ran out.
       - name: Wait for the gateway
         run: |
           for i in $(seq 1 60); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:19090/readyz || true)
-            [ "$code" = "200" ] && { echo "ready"; exit 0; }
+            code=$(curl -s --max-time 5 --connect-timeout 3 -o /dev/null \
+                   -w '%{http_code}' http://localhost:19090/readyz || true)
+            [ "$code" = "200" ] && { echo "ready after ${i} tries"; exit 0; }
+            state=$(docker service ps tunnel_meerkat --format '{{.CurrentState}} {{.Error}}' | head -1)
+            case "$state" in
+              Failed*|Rejected*) echo "the gateway task did not start: $state"; break ;;
+            esac
             sleep 3
           done
-          docker service logs tunnel_meerkat --tail 80
+          echo "--- what the task says ---"
+          docker service ps tunnel_meerkat --no-trunc || true
+          docker service logs tunnel_meerkat --tail 120 || true
           echo "the gateway never became ready"; exit 1
 
       # The line that says the agent bound its port, and the version it
@@ -90,7 +106,8 @@ jobs:
         run: |
           set -e
           mkdir -p ~/.ssh && ssh-keyscan -p 2222 -H localhost >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -p 2222 -o StrictHostKeyChecking=no get@localhost install > install.sh
+          ssh -p 2222 -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            get@localhost install > install.sh
           cat install.sh
           grep -qi 'does not distribute' install.sh \
             && { echo "this image answered the community notice"; exit 1; }

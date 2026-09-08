@@ -55,8 +55,8 @@ echo "the deployed service is parked"
 # And the gateway says WHO. This is the Enterprise half: plug's own labels name
 # the agent that holds a session, never the person.
 jar=$(mktemp)
-curl -s -c "$jar" -o /dev/null -X POST "$admin/login" -d "username=admin&password=$password"
-served=$(curl -s -b "$jar" "http://localhost:18080/meerkat/user-button.json" || true)
+curl -s --max-time 15 -c "$jar" -o /dev/null -X POST "$admin/login" -d "username=admin&password=$password"
+served=$(curl -s --max-time 15 -b "$jar" "http://localhost:18080/meerkat/user-button.json" || true)
 echo "$served" | grep -q checkout || { echo "the gateway does not say the name is served: $served"; exit 1; }
 echo "the gateway names what is served"
 
