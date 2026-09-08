@@ -861,6 +861,15 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte) (c
 	// again. Refusing early is the whole point - an oversized body must not be
 	// read to be turned away.
 	handler = gateChain(filters.Gates, handler)
+	// And the rate limits (ROUTE-08) go on after them, so they sit further out
+	// still: a request over the bound is refused before its Content-Length is
+	// even looked at. The two kinds are wrapped at the same depth but in this
+	// order, so the bounds that need NO identity answer before the ones that
+	// cost a session resolve - a flood is turned away without ever touching
+	// the session store.
+	freeLimits, identifiedLimits := compileLimits(r.Limits)
+	handler = rt.rateGate(identifiedLimits, handler)
+	handler = rt.rateGate(freeLimits, handler)
 	cfg := store.CircuitBreaker{}
 	if r.Breaker != nil {
 		cfg = *r.Breaker
@@ -991,13 +1000,18 @@ func validateRouteType(r store.Route) error {
 		return nil
 	}
 	if s := r.UI.Scheme; s != nil {
-		switch s.Mechanism {
-		case "", "attribute", "class":
-		default:
-			return fmt.Errorf("scheme mechanism %q is not allowed: allowed mechanisms are \"\" (color-scheme only), attribute, class", s.Mechanism)
+		if s.Mechanism != "" && !slices.Contains(store.SchemeMechanisms, s.Mechanism) {
+			return fmt.Errorf("scheme mechanism %q is not allowed: allowed mechanisms are \"\" (color-scheme only), %s",
+				s.Mechanism, strings.Join(store.SchemeMechanisms, ", "))
 		}
-		if s.Mechanism == "attribute" && !schemeTokenOK.MatchString(s.Attribute) {
+		if store.SchemeSetsAttribute(s.Mechanism) && !schemeTokenOK.MatchString(s.Attribute) {
 			return fmt.Errorf("scheme attribute %q is not allowed: letters, digits, - and _ only", s.Attribute)
+		}
+		if s.Tag != "" && !tagNameOK.MatchString(s.Tag) {
+			return fmt.Errorf("scheme tag %q is not allowed: a tag name starts with a letter, then letters, digits and -", s.Tag)
+		}
+		if s.Button != "" && s.Button != "light" && s.Button != "dark" {
+			return fmt.Errorf("button scheme %q is not allowed: allowed schemes are \"\" (follow the visitor), light, dark", s.Button)
 		}
 		for _, v := range []string{s.Light, s.Dark} {
 			if v != "" && !schemeTokenOK.MatchString(v) {
@@ -1732,6 +1746,13 @@ func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Acces
 			http.Redirect(w, req, "/account-pending", http.StatusSeeOther)
 			return
 		}
+		// Nothing to switch to and nothing to wait for: still a browser, and
+		// still someone who did nothing wrong. The page says which rule turned
+		// them away and what this session CAN open - the same answer the other
+		// two refusals give, instead of a line of text on a blank page.
+		http.Redirect(w, req, "/refused?next="+url.QueryEscape(req.URL.RequestURI())+
+			"&why="+refusalCode(a, who), http.StatusSeeOther)
+		return
 	}
 	http.Error(w, refusalReason(a, who), http.StatusForbidden)
 }
@@ -1839,7 +1860,15 @@ func (rt *Router) endpointGuard(sec store.EndpointSecurity, routeAccess store.Ac
 		if err != nil {
 			return nil, fmt.Errorf("endpoint %d (%s %s): %w", i, e.Method, e.Path, err)
 		}
-		eps = append(eps, compiledEP{method: strings.ToUpper(e.Method), path: cp, gate: rt.accessGate(e.Access, isUI, next)})
+		// The operation's own bounds (QUOTA-05), OUTSIDE its access gate for
+		// the same reason the route's are outside the route's: a bound is
+		// there to refuse before work happens, and somebody hammering with
+		// credentials that do not work is exactly who it is for.
+		guarded := rt.accessGate(e.Access, isUI, next)
+		free, identified := compileLimits(e.Limits)
+		guarded = rt.rateGate(identified, guarded)
+		guarded = rt.rateGate(free, guarded)
+		eps = append(eps, compiledEP{method: strings.ToUpper(e.Method), path: cp, gate: guarded})
 	}
 	strip := stripPrefixCount(filters)
 	// The route's base Access is the default for any operation with no override
@@ -2159,9 +2188,12 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 		s := r.UI.Scheme
 		attrs += ` data-scheme="select"`
 		if s.Mechanism != "" {
-			attrs += fmt.Sprintf(` data-scheme-mechanism="%s" data-scheme-light="%s" data-scheme-dark="%s"`,
-				s.Mechanism, s.Light, s.Dark)
-			if s.Mechanism == "attribute" {
+			// Tag included, always: the browser half applies the mechanism to
+			// what it names, and defaulting it there rather than here would be
+			// a second place where "which element" is decided.
+			attrs += fmt.Sprintf(` data-scheme-mechanism="%s" data-scheme-tag="%s" data-scheme-light="%s" data-scheme-dark="%s"`,
+				s.Mechanism, orDefault(s.Tag, "html"), s.Light, s.Dark)
+			if store.SchemeSetsAttribute(s.Mechanism) {
 				attrs += fmt.Sprintf(` data-scheme-attribute="%s"`, s.Attribute)
 			}
 		}
@@ -2229,6 +2261,11 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 	// to the page is the agent's, and its configuration travels there.
 	if s := r.UI.Scheme; s != nil && s.Select {
 		attrs += ` scheme="select"`
+	} else if s != nil && (s.Button == "light" || s.Button == "dark") {
+		// No switch here, so nothing for the button to follow: the route says
+		// what it wears. An application with one look otherwise gets a button
+		// following the visitor's system, light on a page that is always dark.
+		attrs += fmt.Sprintf(` scheme-wear="%s"`, s.Button)
 	}
 	// The ROUTE's locale offer feeds the button's language submenu (codes are
 	// validated BCP 47, HTML-safe; the component renders the endonyms).

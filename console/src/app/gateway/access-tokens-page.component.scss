@@ -35,7 +35,9 @@
 }
 .token {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  /* Name, then one column per control. The count is the count: an edit button
+     was added without it and the delete fell to a line of its own. */
+  grid-template-columns: 1fr auto auto auto auto;
   align-items: center;
   gap: 4px 16px;
   padding: 12px 16px 12px 18px;

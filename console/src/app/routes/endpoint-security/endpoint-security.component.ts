@@ -7,18 +7,21 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatTable, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { sessionStored } from '@softwarity/store';
-import { Subject, catchError, debounceTime, firstValueFrom, of } from 'rxjs';
+import { Subject, catchError, debounceTime, firstValueFrom, map, of } from 'rxjs';
 import {
   Access,
   ApiService,
   EndpointPolicy,
   OpenAPIOperation,
+  RateLimit,
   Role,
   Route,
   RouteOperations,
@@ -28,12 +31,18 @@ import {
 } from '../../api.service';
 import { AccessBadgesComponent } from './access-badges.component';
 import { AccessEditorComponent, AccessState, emptyAccess, isEmpty } from './access-editor.component';
+import { RateLimitsComponent, limitLabel, limitScope, limitScopeTip } from '../rate-limits.component';
 
 // One operation's editable state: whether it overrides the route-wide default,
 // and (when it does) its own access rule.
 interface OpState {
   override: boolean;
   access: AccessState;
+  // What this one operation may carry (QUOTA-05). A SEPARATE axis from the
+  // access override: the expensive report of an otherwise open API needs its
+  // own ceiling without any rule about who may call it, and forcing the two
+  // together would make somebody pose a security rule to write a bound.
+  limits: RateLimit[];
 }
 
 function opKey(method: string, path: string): string {
@@ -49,12 +58,18 @@ function methodRank(m: string): number {
 
 // Turn the editor's non-optional access into the wire shape (a delegated level
 // and empty lists are simply omitted).
-function toPolicy(method: string, path: string, a: AccessState): EndpointPolicy {
+function toPolicy(method: string, path: string, s: OpState): EndpointPolicy {
   const ep: EndpointPolicy = { method: method.toUpperCase(), path };
-  if (a.level) ep.level = a.level;
-  if (a.tenants.length) ep.tenants = a.tenants;
-  if (a.roles.length) ep.roles = a.roles;
-  if (a.users.length) ep.users = a.users;
+  // The access half is only written when the operation actually overrides:
+  // an operation posed for its bound alone must not silently acquire a rule.
+  if (s.override) {
+    const a = s.access;
+    if (a.level) ep.level = a.level;
+    if (a.tenants.length) ep.tenants = a.tenants;
+    if (a.roles.length) ep.roles = a.roles;
+    if (a.users.length) ep.users = a.users;
+  }
+  if (s.limits.length) ep.limits = s.limits;
   return ep;
 }
 
@@ -67,7 +82,7 @@ function fromWire(a: Access | undefined): AccessState {
   };
 }
 
-// Endpoint security (RBAC-07): a dedicated Gateway page. Pick a route that
+// The Endpoints screen (RBAC-07, QUOTA-05): a dedicated Gateway page. Pick a route that
 // exposes an OpenAPI spec; its operations load in a table (sticky header,
 // scrolling rows, global Save in the footer). One access rule (authenticated /
 // users / roles) is set for the WHOLE route in the header, and any operation
@@ -85,12 +100,14 @@ function fromWire(a: Access | undefined): AccessState {
     MatIconModule,
     MatProgressBarModule,
     MatSelectModule,
+    MatSidenavModule,
     MatSlideToggleModule,
     MatSortModule,
     MatTableModule,
     MatTooltipModule,
     AccessEditorComponent,
     AccessBadgesComponent,
+    RateLimitsComponent,
   ],
   templateUrl: './endpoint-security.component.html',
   styleUrl: './endpoint-security.component.scss',
@@ -116,17 +133,34 @@ export class EndpointSecurityComponent {
 
   // The route-wide default rule (applies to every operation with no override).
   protected readonly routeAccess = signal<AccessState>(emptyAccess());
+
   // Per-operation edits, keyed by opKey.
   private readonly state = signal<Record<string, OpState>>({});
   // Saved overrides that match no listed operation: kept so a save never
   // silently drops policy.
   private readonly extras = signal<EndpointPolicy[]>([]);
-  // Exclusive expand: at most one row is open for editing at a time.
-  private readonly expanded = signal<string>('');
+  // Which operation the drawer is showing, and which of its two sections was
+  // aimed at. One at a time: a drawer is a place, not a stack.
+  // Which of the two questions this visit is about. It decides what the title
+  // says, what the table leads with, and which half of the drawer opens - not
+  // what is reachable: both halves are always there, or an entry would be a
+  // dead end for the other question.
+  protected readonly intent = toSignal(
+    inject(ActivatedRoute).data.pipe(map((d) => (d['intent'] === 'limits' ? 'limits' : 'security'))),
+    { initialValue: 'security' as 'security' | 'limits' },
+  );
+  // Which operation the drawer is showing. Which SECTION is no longer a
+  // question: the page decides, and the drawer carries the one the page is
+  // about.
+  protected readonly openKey = signal<string>('');
 
   protected readonly apiRoutes = computed(() => this.routes().filter((r) => !!r.api?.spec));
   protected readonly operations = computed(() => this.data()?.operations ?? []);
   protected readonly columns = ['status', 'method', 'path', 'tags', 'summary', 'expand'];
+
+  protected readonly openOp = computed(() =>
+    this.operations().find((o) => opKey(o.method, o.path) === this.openKey()) ?? null,
+  );
 
   // Distinct tags across the spec, for the column-header filter.
   protected readonly allTags = computed(() => {
@@ -237,7 +271,7 @@ export class EndpointSecurityComponent {
   protected async selectRoute(id: string): Promise<void> {
     this.selectedId.set(id);
     this.data.set(null);
-    this.expanded.set('');
+    this.close();
     this.error.set('');
     if (!id) return;
     this.loadingOps.set(true);
@@ -274,33 +308,67 @@ export class EndpointSecurityComponent {
       const k = opKey(o.method, o.path);
       const p = saved.get(k);
       if (p) {
-        st[k] = { override: true, access: fromWire(p) };
+        // An entry saved for its BOUND alone carries no access fields, and
+        // must not read back as an override of nothing.
+        st[k] = { override: !isEmpty(fromWire(p)), access: fromWire(p), limits: p.limits ?? [] };
         matched.add(k);
       } else {
-        st[k] = { override: false, access: emptyAccess() };
+        st[k] = { override: false, access: emptyAccess(), limits: [] };
       }
     }
     this.state.set(st);
     this.extras.set((ops.security?.endpoints ?? []).filter((e) => !matched.has(opKey(e.method, e.path))));
   }
 
-  // ── Row expand / collapse (exclusive: one open at a time) ───────────────────
-  protected toggle(o: OpenAPIOperation): void {
-    const k = opKey(o.method, o.path);
-    this.expanded.set(this.expanded() === k ? '' : k);
-    this.table()?.renderRows();
+  // ── The drawer ─────────────────────────────────────────────────────────────
+  //
+  // It replaced an inline fold, and the reason is arithmetic: the detail now
+  // carries two editors, so a seventy-row table pushed sixty of them several
+  // screens down to show one. A drawer has the room the fold never had, and
+  // the table stays a table.
+  // Opening is setting which operation the drawer is on, and nothing else.
+  //
+  // It used to also aim a scroll at one of the two sections, on a timer. Both
+  // sections fit in the panel, so the scroll moved nothing that needed moving
+  // and reached into the DOM from a component to do it - and the drawer opened,
+  // shut and opened again in front of whoever clicked. A panel that flickers is
+  // not paying for a nicety.
+  protected open(o: OpenAPIOperation): void {
+    this.openKey.set(opKey(o.method, o.path));
   }
 
-  protected isExpanded(o: OpenAPIOperation): boolean {
-    return this.expanded() === opKey(o.method, o.path);
+  protected close(): void {
+    this.openKey.set('');
   }
 
-  protected readonly isDetailRow = (_: number, o: OpenAPIOperation): boolean => this.isExpanded(o);
+  protected isOpen(o: OpenAPIOperation): boolean {
+    return this.openKey() === opKey(o.method, o.path);
+  }
 
-  // ── Access state ───────────────────────────────────────────────────────────
   protected stateOf(o: OpenAPIOperation): OpState {
-    return this.state()[opKey(o.method, o.path)] ?? { override: false, access: emptyAccess() };
+    return this.state()[opKey(o.method, o.path)] ?? { override: false, access: emptyAccess(), limits: [] };
   }
+
+  // One bound in a few characters, for the list on the limits page.
+  // The chips are on operations, so they name the operation and not the route.
+  protected readonly label = (l: RateLimit) => limitLabel(l, 'operation');
+  protected readonly scope = limitScope;
+  protected readonly scopeTip = limitScopeTip;
+  protected readonly inheritsTip = $localize`:@@Bounded_by_the_route:Bounded by whatever the route carries, and by nothing of its own.`;
+
+  protected setOpLimits(o: OpenAPIOperation, limits: RateLimit[]): void {
+    const k = opKey(o.method, o.path);
+    this.state.update((s) => ({ ...s, [k]: { ...this.stateOf(o), limits } }));
+    // Every other edit on this screen persists itself; this one did not, so a
+    // bound written on an operation lived until the page was left.
+    this.scheduleSave();
+  }
+
+  // How many operations carry a bound, for the header - the same reading as
+  // the override count beside it: what is posed here rather than inherited.
+  protected readonly boundCount = computed(
+    () => Object.values(this.state()).filter((s) => s.limits.length > 0).length,
+  );
 
   // How many operations carry their own rule, plus the saved overrides that
   // match no listed operation: what the badges need to tell "delegated on the
@@ -319,7 +387,7 @@ export class EndpointSecurityComponent {
 
   protected setOpAccess(o: OpenAPIOperation, access: AccessState): void {
     const k = opKey(o.method, o.path);
-    this.state.update((s) => ({ ...s, [k]: { override: true, access } }));
+    this.state.update((s) => ({ ...s, [k]: { ...this.stateOf(o), override: true, access } }));
     this.scheduleSave();
   }
 
@@ -328,10 +396,13 @@ export class EndpointSecurityComponent {
   protected setOverride(o: OpenAPIOperation, on: boolean): void {
     const k = opKey(o.method, o.path);
     this.state.update((s) => {
-      const cur = s[k] ?? { override: false, access: emptyAccess() };
-      if (!on) return { ...s, [k]: { override: false, access: emptyAccess() } };
+      const cur = s[k] ?? { override: false, access: emptyAccess(), limits: [] };
+      // Turning the override off drops the RULE and keeps the bound: they are
+      // two axes, and losing a limit because somebody stopped narrowing who
+      // may call the operation would be a deletion nobody asked for.
+      if (!on) return { ...s, [k]: { ...cur, override: false, access: emptyAccess() } };
       const seed = isEmpty(cur.access) ? { ...this.routeAccess() } : cur.access;
-      return { ...s, [k]: { override: true, access: seed } };
+      return { ...s, [k]: { ...cur, override: true, access: seed } };
     });
     this.scheduleSave();
   }
@@ -343,8 +414,9 @@ export class EndpointSecurityComponent {
     const endpoints: EndpointPolicy[] = [];
     for (const o of this.operations()) {
       const s = this.state()[opKey(o.method, o.path)];
-      if (!s?.override) continue;
-      endpoints.push(toPolicy(o.method, o.path, s.access));
+      // Posed for either reason: an access override, a bound, or both.
+      if (!s || (!s.override && s.limits.length === 0)) continue;
+      endpoints.push(toPolicy(o.method, o.path, s));
     }
     endpoints.push(...this.extras());
     const ra = this.routeAccess();

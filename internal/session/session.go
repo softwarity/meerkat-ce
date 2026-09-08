@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -158,7 +159,7 @@ func (m *Manager) untilCookieName() string {
 // row still lives signs someone out mid-work, and a deadline that outlives the
 // cookie makes a page believe in a session it no longer carries.
 func (m *Manager) setCookies(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration, expiresAt int64) {
-	secure := r.TLS != nil
+	secure := filters.Secure(r)
 	age := int(ttl.Seconds())
 	http.SetCookie(w, &http.Cookie{
 		Name:     m.cookieName,

@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { EditorState } from '@codemirror/state';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { catppuccin, editorSurface } from '../shared/catppuccin';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { Role } from '../api.service';
@@ -362,7 +362,8 @@ export class RoleExprDialogComponent {
           doc: this.data.expr || '{{join "," .Roles}}',
           extensions: [
             basicSetup,
-            oneDark,
+            catppuccin,
+            editorSurface,
             highlight,
             EditorView.lineWrapping,
             EditorView.theme({ '&': { maxHeight: '160px' }, ...TEMPLATE_COLORS, '.cm-content': { minHeight: '60px' } }),

@@ -1,0 +1,72 @@
+# docker stack deploy -c monitoring-compose.yml monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    # Behind a route, both UIs still have to know the public URL they answer
+    # under - the gateway strips the prefix, it does not rewrite their links.
+    command:
+      - --config.file=/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.external-url=http://localhost:8080/prometheus/
+      - --web.route-prefix=/
+    configs: [prometheus.yml]
+    volumes: [prometheus_data:/prometheus]
+    networks: [meerkat]
+    # Not published: give it a route on the gateway instead - path
+    # /prometheus/**, strip-prefix 1.
+    # ports: ["9091:9090"]
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SERVER_ROOT_URL: http://localhost:8080/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      # No second sign-in: whoever passed the route IS the Grafana user. The
+      # route's half is the identity forwarding, in headers, under these names.
+      GF_AUTH_PROXY_ENABLED: "true"
+      GF_AUTH_PROXY_HEADER_NAME: X-WEBAUTH-USER
+      GF_AUTH_PROXY_HEADER_PROPERTY: username
+      GF_AUTH_PROXY_HEADERS: Name:X-WEBAUTH-NAME Email:X-WEBAUTH-EMAIL
+      GF_AUTH_PROXY_AUTO_SIGN_UP: "true"
+      GF_AUTH_PROXY_SYNC_TTL: "60"
+      # Nothing else opens a session, which is what turns "not published" from
+      # a preference into a rule: the header IS the authentication now.
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_AUTH_DISABLE_SIGNOUT_MENU: "true"
+      # The route says who comes in, this says what they may do once inside.
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Editor
+    configs:
+      # Long form: Grafana reads its provisioning from directories.
+      - source: datasource.yaml
+        target: /etc/grafana/provisioning/datasources/datasource.yaml
+      - source: dashboards.yaml
+        target: /etc/grafana/provisioning/dashboards/dashboards.yaml
+      - source: dashboard.json
+        target: /etc/grafana/provisioning/dashboards/dashboard.json
+    volumes: [grafana_data:/var/lib/grafana]
+    networks: [meerkat]
+    # Same here: path /grafana/**, strip-prefix 1, plus preserve-host -
+    # Grafana refuses its own calls (403 "origin not allowed") when the Host
+    # it receives is not the one the browser's Origin says.
+    # ports: ["3000:3000"]
+
+configs:
+  prometheus.yml:
+    file: ./prometheus.yml
+  datasource.yaml:
+    file: ./datasource.yaml
+  dashboards.yaml:
+    file: ./dashboards.yaml
+  dashboard.json:
+    file: ./dashboard.json
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  meerkat:
+    external: true
+    name: meerkat_default # the gateway's own network

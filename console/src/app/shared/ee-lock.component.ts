@@ -34,8 +34,12 @@ import { RouterLink } from '@angular/router';
         gap: 4px;
         padding: 1px 8px 1px 6px;
         border-radius: 999px;
-        border: 1px solid var(--mat-sys-tertiary);
-        color: var(--mat-sys-tertiary);
+        /* Tertiary on an ordinary surface. On a COLORED ground - inside a
+           filled button, say - tertiary is a hue against a hue and the badge
+           goes unreadable, so whoever knows what the ground is sets
+           --mk-ee-lock-color (currentColor being the answer nearly always). */
+        border: 1px solid var(--mk-ee-lock-color, var(--mat-sys-tertiary));
+        color: var(--mk-ee-lock-color, var(--mat-sys-tertiary));
         font-size: 0.68rem;
         font-weight: 700;
         letter-spacing: 0.04em;
@@ -43,7 +47,7 @@ import { RouterLink } from '@angular/router';
         white-space: nowrap;
       }
       .lock:hover {
-        background: color-mix(in srgb, var(--mat-sys-tertiary) 14%, transparent);
+        background: color-mix(in srgb, var(--mk-ee-lock-color, var(--mat-sys-tertiary)) 14%, transparent);
       }
       .lock mat-icon {
         font-size: 14px;

@@ -20,10 +20,18 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
     title: $localize`:@@Infra:Infra`,
     links: [
       { path: 'routes', label: $localize`:@@Routes:Routes`, icon: 'alt_route' },
+      // One inventory, two questions somebody arrives with. A single entry
+      // named after the objects made neither findable: whoever came to write a
+      // rate limit had no word to look for.
       {
         path: 'endpoint-security',
         label: $localize`:@@Endpoint_security:Endpoint security`,
         icon: 'security',
+      },
+      {
+        path: 'endpoint-limits',
+        label: $localize`:@@Endpoint_rate_limits:Endpoint rate limits`,
+        icon: 'speed',
       },
       {
         path: 'auth-providers',

@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -94,6 +95,30 @@ type metricsSetting struct {
 	// Path is where a scraper points, sent rather than assembled in the
 	// console: one place decides it.
 	Path string `json:"path"`
+	// Port is the one a scraper connects to, and it is the port this gateway
+	// LISTENS on - not the one the console was reached at. The two are the
+	// same only when nothing sits between: a published port maps 9092 onto
+	// 9090, an ingress answers on 443, and a scrape addresses the container
+	// either way. The examples in the Prometheus drawer carry this number, and
+	// they used to carry the browser's, which was right only in development.
+	Port string `json:"port"`
+	// DataOrigin is where the data plane answers, as a reader would type it.
+	// The monitoring examples put it in the two UIs' own configuration: behind
+	// a route, Prometheus and Grafana still have to know the public URL they
+	// are served under, and neither can guess it.
+	DataOrigin string `json:"dataOrigin"`
+}
+
+// adminPort is the port the control plane listens on. "9090" when there is
+// nothing to ask - a test with no router, an address carrying no port - which
+// is also the default the flag itself carries.
+func (a *API) adminPort() string {
+	if a.router != nil {
+		if _, port, err := net.SplitHostPort(a.router.AdminAddr); err == nil && port != "" {
+			return port
+		}
+	}
+	return "9090"
 }
 
 func (a *API) metricsEnabled(ctx context.Context) bool {
@@ -104,7 +129,8 @@ func (a *API) metricsEnabled(ctx context.Context) bool {
 
 func (a *API) getMetricsSetting(w http.ResponseWriter, r *http.Request, _ store.User) {
 	writeJSON(w, http.StatusOK, metricsSetting{
-		Enabled: a.metricsEnabled(r.Context()), Enterprise: edition.Enterprise, Path: expositionPath,
+		Enabled: a.metricsEnabled(r.Context()), Enterprise: edition.Enterprise,
+		Path: expositionPath, Port: a.adminPort(), DataOrigin: a.dataOrigin(r),
 	})
 }
 
@@ -128,7 +154,8 @@ func (a *API) putMetricsSetting(w http.ResponseWriter, r *http.Request, actor st
 	a.auditUpdate(r.Context(), actor, "metrics.expose", "settings", "", "", "",
 		metricsSetting{Enabled: before.Enabled}, metricsSetting{Enabled: body.Enabled})
 	writeJSON(w, http.StatusOK, metricsSetting{
-		Enabled: body.Enabled, Enterprise: edition.Enterprise, Path: expositionPath,
+		Enabled: body.Enabled, Enterprise: edition.Enterprise,
+		Path: expositionPath, Port: a.adminPort(), DataOrigin: a.dataOrigin(r),
 	})
 }
 

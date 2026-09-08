@@ -16,7 +16,7 @@ import { EditorState } from '@codemirror/state';
 import { openSearchPanel, search, searchPanelOpen } from '@codemirror/search';
 import { unifiedMergeView } from '@codemirror/merge';
 import { yaml } from '@codemirror/lang-yaml';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { catppuccin, editorSurface } from '../../shared/catppuccin';
 import { basicSetup, EditorView } from 'codemirror';
 
 // A configuration, as the file it is (CFG-01) - read, then edited if asked.
@@ -207,7 +207,8 @@ export class ConfigurationYamlComponent {
       extensions: [
         basicSetup,
         yaml(),
-        oneDark,
+        catppuccin,
+        editorSurface,
         // At the TOP: a panel at the foot of a full-height drawer is a panel
         // under the buttons, and one nobody sees open.
         search({ top: true }),

@@ -9,6 +9,12 @@ export interface MetricsSetting {
   enabled: boolean;
   enterprise: boolean;
   path: string;
+  // The port the gateway listens on, which is not the one the console was
+  // reached at as soon as anything maps or terminates in between.
+  port: string;
+  // Where the data plane answers: the two monitoring UIs are served through a
+  // route, and neither can guess the public URL it lives under.
+  dataOrigin: string;
 }
 
 // One shape everywhere: these mirror the Go types (routing.Spec, store.Route,
@@ -66,11 +72,30 @@ export interface Access {
   users?: string[];
 }
 
+// One bound on how much a route or an operation carries (ROUTE-08, QUOTA-01).
+//
+// The word is PER, not FOR: `per` says what the counter is keyed on and the
+// budgets make themselves, one per caller. `applies` says who the rule is
+// about, in the same vocabulary as an access rule - which is what turns a role
+// into a pricing tier without inventing a concept. Several are true at once,
+// and the first one exceeded answers 429.
+export interface RateLimit {
+  per: 'route' | 'user' | 'token' | 'tenant' | 'ip';
+  requests: number;
+  // ISO 8601, like the route timeouts: PT1M, PT1H, P1D.
+  window: string;
+  applies?: Access;
+}
+
 // One method+path override (RBAC-07): the access fields are inlined next to the
 // operation coordinates. method is an upper-case verb or '*'.
 export interface EndpointPolicy extends Access {
   method: string;
   path: string;
+  // What this one operation may carry (QUOTA-05), on top of the route's own
+  // bounds. Chosen operation by operation and never a default over the whole
+  // inventory: a bound is a counter per (operation, caller).
+  limits?: RateLimit[];
 }
 
 // Per-operation overrides posed on a route's OpenAPI operations (RBAC-07). The
@@ -132,10 +157,12 @@ export const USER_BUTTON_POSITIONS = ['top-left', 'top-right', 'bottom-left', 'b
 // light/dark values) or a class pair can be driven.
 export interface SchemeConfig {
   select: boolean;
-  mechanism?: '' | 'attribute' | 'class';
+  mechanism?: '' | 'attribute' | 'add-attribute' | 'class';
+  tag?: string;
   attribute?: string;
   light?: string;
   dark?: string;
+  button?: '' | 'light' | 'dark';
 }
 
 // Puts the user's effective role names on the page - as classes (default) or
@@ -383,6 +410,9 @@ export interface Route {
   // When to stop calling an upstream that stopped answering (ROUTE-09). Off
   // unless somebody turned it on.
   breaker?: { enabled?: boolean; trip?: number; cool?: string };
+  // How much this route may carry (ROUTE-08). Several bounds at once, each
+  // keyed on something different, all true together.
+  limits?: RateLimit[];
 }
 
 // Whether a route is actually answering (SVC-04), as the gateway knows it -
@@ -698,6 +728,8 @@ export interface CurrentConfiguration {
 // it waited for (`ee-multi-tenant`) had no one left to write it.
 export interface Edition {
   enterprise: boolean;
+  // Where the applications answer - never the console's own origin.
+  dataOrigin: string;
   tenancy: 'single' | 'multi';
   primaryTenant: string;
   hiddenTenants: number;
@@ -1318,7 +1350,7 @@ export class ApiService {
     return this.http.post<RouteProbeResult>('/api/routes/probe', { request, as });
   }
 
-  // Endpoint security (RBAC-07): the spec is fetched and parsed server-side,
+  // The Endpoints screen (RBAC-07, QUOTA-05): the spec is fetched and parsed server-side,
   // so the console gets a flat operation list, never raw OpenAPI.
   getRouteOperations(id: string): Observable<RouteOperations> {
     return this.http.get<RouteOperations>(`/api/routes/${encodeURIComponent(id)}/operations`);
@@ -1988,6 +2020,37 @@ export class ApiService {
     from: string,
   ): Observable<AdminTokenCreated> {
     return this.http.post<AdminTokenCreated>('/api/admin-tokens', { name, days, scope, domain, from });
+  }
+
+  // What a token may do, changed without touching the token: the secret is a
+  // hash and encodes none of this, so whoever holds the key keeps holding the
+  // same key. Which is what makes narrowing one cheap.
+  updateAdminToken(
+    id: string,
+    name: string,
+    days: number,
+    scope: TokenScope,
+    domain: TokenDomain,
+    from: string,
+  ): Observable<AdminToken> {
+    return this.http.put<AdminToken>(`/api/admin-tokens/${encodeURIComponent(id)}`, {
+      name,
+      days,
+      scope,
+      domain,
+      from,
+    });
+  }
+
+  // A new secret for the same token: name, perimeter, domain, addresses and
+  // expiry all stay, so the audit keeps one history for one credential and the
+  // only thing to change anywhere is the value in one config. The old secret
+  // stops working at once - which is what a rotation is.
+  renewAdminToken(id: string): Observable<AdminTokenCreated> {
+    return this.http.post<AdminTokenCreated>(
+      `/api/admin-tokens/${encodeURIComponent(id)}/renew`,
+      {},
+    );
   }
 
   toggleAdminToken(id: string, enabled: boolean): Observable<void> {

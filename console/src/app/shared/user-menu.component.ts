@@ -5,6 +5,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RailnavItemComponent } from '@softwarity/rail-nav';
 import { SessionWatchService } from '../session';
+import { httpResource } from '@angular/common/http';
 import { ApiService } from '../api.service';
 import { MeService } from '../me.service';
 
@@ -23,8 +24,11 @@ import { MeService } from '../me.service';
       .avatar {
         display: grid;
         place-items: center;
+        /* flex: none, or the rail's row squeezes the circle into an ellipse. */
+        flex: none;
         width: 26px;
         height: 26px;
+        object-fit: cover;
         border-radius: 50%;
         background: var(--mat-sys-primary);
         color: var(--mat-sys-on-primary);
@@ -68,7 +72,9 @@ import { MeService } from '../me.service';
   ],
   template: `
     <rail-nav-item [label]="username()" [matMenuTriggerFor]="userMenu">
-      @if (initials()) {
+      @if (avatar()) {
+        <img class="avatar" [src]="avatar()" alt="" />
+      } @else if (initials()) {
         <span class="avatar">{{ initials() }}</span>
       } @else {
         <mat-icon>person</mat-icon>
@@ -83,7 +89,11 @@ import { MeService } from '../me.service';
            other, because they are the SAME pages an end user gets. -->
       @if (user(); as u) {
         <a class="who" href="/profile" i18n-matTooltip="@@My_profile" matTooltip="My profile">
-          <span class="avatar">{{ initials() }}</span>
+          @if (avatar()) {
+            <img class="avatar" [src]="avatar()" alt="" />
+          } @else {
+            <span class="avatar">{{ initials() }}</span>
+          }
           <span class="lines">
             <span class="name">{{ u.fullname || u.username }}</span>
             @if (u.email) {
@@ -107,6 +117,11 @@ export class UserMenuComponent {
 
   protected readonly user = inject(MeService).user;
   protected readonly username = computed(() => this.user()?.username ?? '');
+  // The profile photo, asked for on its own: the console reads its identity
+  // from the <body> stamp the gateway writes, and a data URI does not travel
+  // in an attribute. Empty answer, or none at all, falls back to the initials.
+  private readonly photo = httpResource<{ avatar: string }>(() => '/api/me/avatar');
+  protected readonly avatar = computed(() => this.photo.value()?.avatar ?? '');
   protected readonly initials = computed(() => {
     const u = this.user();
     if (!u) return '';

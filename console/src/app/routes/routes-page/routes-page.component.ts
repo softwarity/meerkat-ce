@@ -1,9 +1,11 @@
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { httpResource } from '@angular/common/http';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -11,7 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { forkJoin } from 'rxjs';
-import { ApiService, CatalogEntry, Maintenance, Route, RouteHealth } from '../../api.service';
+import { ApiService, CatalogEntry, Edition, Maintenance, Route, RouteHealth } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { RouteEditorComponent } from '../route-editor/route-editor.component';
@@ -25,6 +27,7 @@ import { SigningKeysPanelComponent } from '../signing-keys/signing-keys-panel.co
   imports: [
     MatButtonModule,
     MatFormFieldModule,
+    MatSelectModule,
     MatIconModule,
     MatInputModule,
     MatSidenavModule,
@@ -53,14 +56,26 @@ export class RoutesPageComponent {
   // what someone actually knows about a route - its name, where it sends, and
   // the paths it answers to, which is usually what is being hunted for.
   protected readonly query = signal('');
+  // UI routes are a different job from the rest - they are the ones with a
+  // button, a theme and a page someone opens - and on a list this long they
+  // are hard to pick out of the services around them.
+  protected readonly kind = signal<'all' | 'ui' | 'service'>('all');
   protected readonly shown = computed(() => {
     const q = this.query().trim().toLowerCase();
-    if (!q) return this.routes();
+    const kind = this.kind();
     return this.routes().filter((r) => {
+      if (kind === 'ui' && !r.isUi) return false;
+      if (kind === 'service' && r.isUi) return false;
+      if (!q) return true;
       const paths = (r.predicates ?? []).flatMap((p) => (p.args?.['patterns'] as string[]) ?? []);
       return [r.name, r.upstream ?? '', ...paths].some((s) => s.toLowerCase().includes(q));
     });
   });
+  // Where the applications answer. Asked of the gateway, never worked out from
+  // the console's own address: the two planes are two origins, and a published
+  // port or an ingress sits between them.
+  private readonly editionRes = httpResource<Edition>(() => '/api/edition');
+  protected readonly dataOrigin = computed(() => this.editionRes.value()?.dataOrigin ?? '');
   protected readonly catalog = signal<CatalogEntry[]>([]);
 
   // The Global drawer, and the one piece of its state this page needs on its

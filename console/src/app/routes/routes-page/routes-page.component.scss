@@ -75,3 +75,10 @@ mat-drawer {
   --mat-button-tonal-label-text-color: var(--mat-sys-on-error);
   --mat-button-tonal-icon-color: var(--mat-sys-on-error);
 }
+
+/* The kind filter, beside the search it narrows: same height, and no wider
+   than its longest entry - it is a companion to the search box, not a second
+   field competing with it. */
+.banner .kind {
+  width: 150px;
+}

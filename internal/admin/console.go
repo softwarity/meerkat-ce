@@ -91,9 +91,7 @@ func consoleHandler(fsys fs.FS, st *store.Store, sm *session.Manager) http.Handl
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if name := strings.TrimPrefix(path.Clean(r.URL.Path), "/"); name != "" {
 			if info, err := fs.Stat(fsys, name); err == nil && !info.IsDir() {
-				// Angular hashes every file name except index.html: safe to
-				// cache forever - a new build means new names.
-				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				w.Header().Set("Cache-Control", cacheFor(name))
 				http.ServeFileFS(w, r, fsys, name)
 				return
 			}
@@ -111,6 +109,22 @@ func consoleHandler(fsys fs.FS, st *store.Store, sm *session.Manager) http.Handl
 		w.Header().Set("Cache-Control", "no-cache")
 		serveStampedIndex(w, r, fsys, "index.html", st, sm)
 	})
+}
+
+// cacheFor decides how long a build file may be held.
+//
+// Immutable is a promise about the NAME, not about the file, and Angular only
+// makes it for what it BUILDS: every bundle carries a content hash, so a new
+// build means new names and a year is safe. Everything else the console ships
+// keeps its name across releases - the monitoring templates under
+// /monitoring/, the icons - and a year of immutable would hand a gateway
+// upgraded today last year's file with no way to ask for the new one.
+func cacheFor(name string) string {
+	switch path.Ext(name) {
+	case ".js", ".css", ".woff2":
+		return "public, max-age=31536000, immutable"
+	}
+	return "no-cache"
 }
 
 // serveStampedIndex writes the SPA shell with the identity and edition stamp

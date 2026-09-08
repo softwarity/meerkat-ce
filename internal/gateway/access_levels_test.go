@@ -147,8 +147,16 @@ func TestAccessLevelsOverHTTP(t *testing.T) {
 		if err := rt.Reload(ctx); err != nil {
 			t.Fatalf("Reload: %v", err)
 		}
-		if res := get(t, "/globex/x", jane); res.StatusCode != http.StatusForbidden {
-			t.Fatalf("jane on globex = %d, want 403", res.StatusCode)
+		// Refused, and told which rule did it - a UI route sends a browser to
+		// the refusal page rather than answering a line of text on a blank
+		// page. What matters here is that it is NOT the chooser: there is
+		// nothing to choose.
+		res := get(t, "/globex/x", jane)
+		if res.StatusCode != http.StatusSeeOther {
+			t.Fatalf("jane on globex = %d, want the refusal page", res.StatusCode)
+		}
+		if loc := res.Header.Get("Location"); !strings.HasPrefix(loc, "/refused?") {
+			t.Fatalf("jane on globex went to %q, want the refusal page", loc)
 		}
 	})
 
@@ -250,9 +258,14 @@ func TestASwitchIsOfferedOnlyWhereItWouldHelp(t *testing.T) {
 			t.Fatal(err)
 		}
 		res := get(t, alice)
-		if res.StatusCode != http.StatusForbidden {
-			t.Fatalf("in %s, alice got %d (%s) - want a refusal, not another chooser",
-				tenant, res.StatusCode, res.Header.Get("Location"))
+		loc := res.Header.Get("Location")
+		if res.StatusCode != http.StatusSeeOther || !strings.HasPrefix(loc, "/refused?") {
+			t.Fatalf("in %s, alice got %d (%s) - want the refusal page, not another chooser",
+				tenant, res.StatusCode, loc)
+		}
+		// And it says WHY, which is the whole reason the page exists.
+		if !strings.Contains(loc, "why=roles") {
+			t.Fatalf("in %s, the refusal does not name what was missing: %s", tenant, loc)
 		}
 	}
 

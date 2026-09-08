@@ -316,3 +316,160 @@ table.ops {
 .route-rule .rr-edit:hover {
   text-decoration: underline;
 }
+
+/* The bound, under the rule: two axes of the same operation, set apart so
+   neither reads as a detail of the other. */
+.op-limits {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+.op-limits-head {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+  margin-bottom: 4px;
+}
+.op-limits .hint {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--mat-sys-on-surface-variant);
+  max-width: 72ch;
+}
+
+/* The drawer replaced an inline fold: the detail carries two editors now, and
+   a seventy-row table pushed sixty of them several screens down to show one. */
+.page {
+  height: 100%;
+  background: transparent;
+}
+/* The column that bounds the table: the header and the footer keep their
+   height, the table takes the rest and scrolls inside it.
+
+   It has to be HERE and not on :host - the drawer put mat-drawer-container and
+   mat-drawer-content between the two, and a `flex: 1` whose parent is not a
+   bounded flex column grows to its content instead. The table was 3852px tall
+   in an 800px page, clipped by the container with nothing to scroll. */
+mat-drawer-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: transparent;
+  overflow: hidden;
+}
+/* The operation stays named while its rules scroll. A column with a header
+   that does not shrink and a body that takes the rest, rather than a sticky
+   header: sticky lets the content slide UNDER it, which needs an opaque
+   background and still shows a seam at the wrong scroll position. This has
+   neither problem, and the panel scrolls exactly where the scrolling is. */
+mat-drawer {
+  width: 720px;
+  max-width: 96vw;
+  padding: 0;
+}
+/* The column that owns the scrolling: the header does not shrink, the body
+   takes the rest. Inside a wrapper rather than on mat-drawer itself, because
+   Material puts its own container between the two. */
+.op-drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.op-head,
+.op-summary {
+  flex: none;
+}
+.op-head {
+  padding: 16px 24px 0;
+}
+.op-summary {
+  padding: 0 24px;
+}
+.op-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 24px 32px;
+}
+.op-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+/* The close button belongs at the far edge, and this is what puts it there:
+   .spacer is defined under .foot, so the one in this header pushed nothing and
+   the cross sat glued to the path. */
+.op-head .spacer {
+  flex: 1;
+}
+.op-head .path {
+  font-size: 0.95rem;
+}
+.op-summary {
+  margin: 0 0 20px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+  max-width: 72ch;
+}
+.op-panel section {
+  padding: 16px 0 20px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  scroll-margin-top: 8px;
+}
+.op-panel h3 {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+}
+/* A row opens a drawer now, so the chevron points where it goes. */
+.ops .chev {
+  color: var(--mat-sys-outline);
+}
+/* A badge that is a door looks like one. */
+.d-limits.act,
+.lvl.act {
+  cursor: pointer;
+}
+
+/* The label names the subject, the line under it explains. Descriptive
+   headings alone read well and leave nobody able to say WHAT they just
+   configured: "what this operation may carry" is a nice sentence and does not
+   contain the words rate limit. */
+.op-panel .sub {
+  margin: -6px 0 12px;
+  font-size: 0.82rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* A bound in the list: the shape at a glance, several per row when a route
+   carries several. */
+.bound {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-variant);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+.unbound {
+  color: var(--mat-sys-outline);
+}
+
+/* Who the bound is for, in the same few characters the access badges use.
+   Without it two rules differing only by their "Only for" read as one line
+   twice, which is a list saying the second one did nothing. */
+.bound .only {
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--mat-sys-outline-variant);
+  color: var(--mat-sys-tertiary);
+}

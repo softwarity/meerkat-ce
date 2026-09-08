@@ -1,0 +1,322 @@
+{
+  "uid": "meerkat",
+  "title": "Meerkat",
+  "tags": [
+    "meerkat"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Requests per second, by route",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (name) (rate(meerkat_requests_total[5m]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "In flight",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(meerkat_requests_in_flight)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Refused or failed",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(meerkat_requests_total{status=~\"4xx|5xx\"}[5m])) / sum(rate(meerkat_requests_total[5m]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Unmatched requests",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(meerkat_unmatched_total[5m])",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "legendFormat": "no route"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "What fraction is going wrong",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (name) (rate(meerkat_requests_total{status=~\"4xx|5xx\"}[5m])) / sum by (name) (rate(meerkat_requests_total[5m]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "95th percentile of the answer time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (name, le) (rate(meerkat_request_duration_seconds_bucket[5m])))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "table",
+      "title": "Slowest endpoints",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_sum[5m])) / sum by (name, endpoint, source) (rate(meerkat_endpoint_requests_total[5m])))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "description": "source=deduced is a shape folded from the paths this gateway saw, not a declared one: a year reads like an id. Declare an OpenAPI spec on the route for exact names."
+    },
+    {
+      "type": "table",
+      "title": "Endpoints costing the most",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_sum[5m])))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Services not answering",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (name, kind) (rate(meerkat_upstream_failures_total[5m]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "legendFormat": "{{name}} {{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Refused sign-ins",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "meerkat-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(meerkat_logins_total{outcome=\"refused\"}[5m])",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "meerkat-prometheus"
+          },
+          "legendFormat": "refused"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# /etc/grafana/provisioning/dashboards/ - the provider, beside the dashboard
+# it loads.
+
+apiVersion: 1
+providers:
+  - name: meerkat
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards

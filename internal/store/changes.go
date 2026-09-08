@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/jackc/pgx/v5/stdlib"
 )
 
 // The change bus, database side (STORE-03).
@@ -63,6 +61,19 @@ const (
 	// hold open (internal/events). The argument is the hub topic, a space, and
 	// the encoded message.
 	TopicEvent = "event"
+	// TopicServed carries the names a node's developer tunnel is answering
+	// for (DEV-11), so a page says "served from a developer's machine"
+	// whichever gateway the load balancer handed it. The TRAFFIC already
+	// crosses nodes on its own - plug plants a cluster-wide signpost that
+	// relays to the task holding the session - so what was node-local was
+	// only the telling, which is the worse half to lose: the developer's
+	// code arrives either way, and on the wrong node nothing says so.
+	//
+	// The argument is one node's WHOLE list, encoded as JSON, the way the
+	// metrics fleet reports totals: a receiver replaces that node's set, and
+	// a node it stops hearing from expires. That is what makes a node that
+	// starts late correct within one interval, with nothing to reconcile.
+	TopicServed = "served"
 	// TopicMetrics carries a node's own request counters to the others, so the
 	// console's curves are the CLUSTER's and not whichever node the load
 	// balancer happened to hand the screen (OBS-01). The argument is one
@@ -176,22 +187,10 @@ func (s *Store) Listen(ctx context.Context, on func(topic string)) error {
 		return fmt.Errorf("store: listen: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
-	return conn.Raw(func(dc any) error {
-		pc, ok := dc.(*stdlib.Conn)
-		if !ok {
-			return ErrNotClustered
-		}
-		raw := pc.Conn()
-		if _, err := raw.Exec(ctx, `LISTEN `+changeChannel); err != nil {
-			return fmt.Errorf("store: listen: %w", err)
-		}
-		on("")
-		for {
-			n, err := raw.WaitForNotification(ctx)
-			if err != nil {
-				return fmt.Errorf("store: listening: %w", err)
-			}
-			on(n.Payload)
-		}
-	})
+	// Waiting for a notification is the one thing that needs the driver's own
+	// type, so it is the Enterprise half that does it - see external.go.
+	if listenExternal == nil {
+		return ErrNotClustered
+	}
+	return listenExternal(ctx, conn, changeChannel, on)
 }

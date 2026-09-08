@@ -37,7 +37,13 @@
 
  // Outlined mat-form-field's floating label sits ~8px above the fieldset ->
  // clipped by parent's overflow:auto when it's the first child.
+ //
+ // The <p> is in the list because that is how the Material documentation
+ // stacks form fields, and a dialog that adopted the pattern silently stopped
+ // matching this rule: the label came back clipped, with nothing in the
+ // component to explain why.
  .mat-mdc-dialog-content > form:first-child,
+ .mat-mdc-dialog-content > p:first-child,
  .mat-mdc-dialog-content > .mat-mdc-form-field:first-child {
    margin-top: 12px;
  }

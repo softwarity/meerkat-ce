@@ -13,6 +13,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -23,7 +24,7 @@ const passkeyCookie = "MEERKAT_PASSKEY"
 func setPasskeyCookie(w http.ResponseWriter, r *http.Request, id string) {
 	http.SetCookie(w, &http.Cookie{
 		Name: passkeyCookie, Value: id, Path: "/",
-		HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: filters.Secure(r), SameSite: http.SameSiteLaxMode,
 		MaxAge: 365 * 24 * 3600,
 	})
 }
@@ -47,7 +48,7 @@ func hostOnly(hostport string) string {
 func (h *Handler) webAuthnFor(r *http.Request) (*webauthn.WebAuthn, error) {
 	host := hostOnly(r.Host)
 	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+	if filters.Secure(r) {
 		scheme = "https"
 	}
 	_, brand, _ := h.chrome()

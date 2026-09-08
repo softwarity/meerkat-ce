@@ -56,6 +56,9 @@ export class AccessTokensPageComponent {
     });
   }
 
+  protected readonly enableTip = $localize`:@@Enable_token:Enable this token`;
+  protected readonly disableTip = $localize`:@@Disable_token:Disable this token - it stops working, and can be turned back on`;
+
   protected async create(): Promise<void> {
     const res = await firstValueFrom(
       this.dialog
@@ -63,7 +66,7 @@ export class AccessTokensPageComponent {
           TokenCreateDialogComponent,
           void,
           { name: string; days: number; scope: TokenScope; domain: TokenDomain; from: string } | undefined
-        >(TokenCreateDialogComponent, { width: '480px', restoreFocus: true })
+        >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true })
         .afterClosed(),
     );
     if (!res) return;
@@ -76,6 +79,29 @@ export class AccessTokensPageComponent {
     });
   }
 
+  // Change what a token may do, without touching the token: the secret is a
+  // hash and encodes none of this, so whoever holds the key keeps holding the
+  // same key. Which is what makes narrowing one cheap - a read-only token in a
+  // scrape config becomes a metrics one without a second token and an edit in
+  // another team's repository.
+  protected async edit(t: AdminToken): Promise<void> {
+    const res = await firstValueFrom(
+      this.dialog
+        .open<
+          TokenCreateDialogComponent,
+          AdminToken,
+          { name: string; days: number; scope: TokenScope; domain: TokenDomain; from: string } | undefined
+        >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true, data: t })
+        .afterClosed(),
+    );
+    if (!res) return;
+    this.api.updateAdminToken(t.id, res.name, res.days, res.scope, res.domain, res.from).subscribe({
+      // No reveal dialog and no new secret: nothing was minted.
+      next: () => this.load(),
+      error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
+    });
+  }
+
   protected toggle(t: AdminToken, enabled: boolean): void {
     this.api.toggleAdminToken(t.id, enabled).subscribe({
       next: () => this.tokens.update((list) => list.map((x) => (x.id === t.id ? { ...x, enabled } : x))),
@@ -83,6 +109,28 @@ export class AccessTokensPageComponent {
         this.snack.open(errMsg(err), undefined, { duration: 4000 });
         this.load();
       },
+    });
+  }
+
+  // A new secret for the same token. Confirmed first, and the sentence says
+  // the one thing that matters: the key somebody is using stops working now,
+  // not when they get round to swapping it.
+  protected async renew(t: AdminToken): Promise<void> {
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Renew_token_NAME:New secret for "${t.name}:NAME:"?`,
+      message: $localize`:@@Renew_token_warning:The current secret stops working immediately. Whatever is using it is refused until the new one is in place.`,
+      confirmLabel: $localize`:@@Renew:New secret`,
+      danger: true,
+    });
+    if (!ok) return;
+    this.api.renewAdminToken(t.id).subscribe({
+      next: (created) => {
+        // Shown once, in the same dialog a freshly minted one uses: it IS a
+        // freshly minted secret, on a token that already existed.
+        this.dialog.open(TokenRevealDialogComponent, { data: { token: created.token }, width: '560px' });
+        this.load();
+      },
+      error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
     });
   }
 
@@ -121,18 +169,26 @@ export class AccessTokensPageComponent {
   imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   styles: [
     `
+      /* One rule. The dialog's WIDTH is set where a dialog's width is set -
+         in the open() config - and a width here only fought it, pushing the
+         fields out past the container. The SPACING is the paragraph's own
+         margin, which is how the Material documentation stacks form fields.
+         What is left is the only thing neither of them says. */
       mat-form-field {
         width: 100%;
-      }
-      mat-hint {
-        line-height: 1.3;
       }
     `,
   ],
   template: `
-    <h2 mat-dialog-title i18n="@@New_token">New token</h2>
+    <h2 mat-dialog-title>
+      @if (editing) {
+        <ng-container i18n="@@Edit_token">Edit token</ng-container>
+      } @else {
+        <ng-container i18n="@@New_token">New token</ng-container>
+      }
+    </h2>
     <mat-dialog-content>
-      <mat-form-field>
+      <p><mat-form-field>
         <mat-label i18n="@@Token_name">Token name</mat-label>
         <input
           matInput
@@ -141,8 +197,8 @@ export class AccessTokensPageComponent {
           (keydown.enter)="confirm()"
           cdkFocusInitial
         />
-      </mat-form-field>
-      <mat-form-field>
+      </mat-form-field></p>
+      <p><mat-form-field>
         <mat-label i18n="@@Perimeter">Perimeter</mat-label>
         <mat-select [value]="scope()" (selectionChange)="scope.set($event.value)">
           <mat-option value="metrics" i18n="@@Metrics_only">Metrics only</mat-option>
@@ -153,7 +209,7 @@ export class AccessTokensPageComponent {
           @switch (scope()) {
             @case ('metrics') {
               <ng-container i18n="@@Perimeter_metrics_hint">
-                Opens /metrics and nothing else, for a Prometheus to scrape.
+                Opens /metrics and nothing else.
               </ng-container>
             }
             @case ('readonly') {
@@ -163,24 +219,22 @@ export class AccessTokensPageComponent {
             }
             @default {
               <ng-container i18n="@@Perimeter_full_hint">
-                Everything you can do, without a browser. Hand it out sparingly.
+                Everything you can do, without a browser.
               </ng-container>
             }
           }
         </mat-hint>
-      </mat-form-field>
-      <mat-form-field>
+      </mat-form-field></p>
+      <p><mat-form-field>
         <mat-label i18n="@@Acts_on">Acts on</mat-label>
         <mat-select [value]="domain()" (selectionChange)="domain.set($event.value)">
           <mat-option value="gateway" i18n="@@The_routing_plane">The routing plane</mat-option>
           <mat-option value="app" i18n="@@The_applications_identity">The application's identity</mat-option>
           <mat-option value="" i18n="@@Everything_you_can_do">Everything you can do</mat-option>
         </mat-select>
-        <mat-hint i18n="@@Acts_on_hint">
-          A perimeter only ever takes away: the token is at most what you are.
-        </mat-hint>
-      </mat-form-field>
-      <mat-form-field>
+        <mat-hint i18n="@@Acts_on_hint">A perimeter only takes away: at most what you are.</mat-hint>
+      </mat-form-field></p>
+      <p><mat-form-field>
         <mat-label i18n="@@Used_from">Used from</mat-label>
         <input
           matInput
@@ -189,11 +243,10 @@ export class AccessTokensPageComponent {
           placeholder="10.0.0.0/24, 192.168.1.7"
         />
         <mat-hint i18n="@@Used_from_hint">
-          Optional. Judged on the connecting address, never on a forwarded header, so it only means
-          something when agents reach this port directly.
+          The connecting address, never a forwarded header.
         </mat-hint>
-      </mat-form-field>
-      <mat-form-field>
+      </mat-form-field></p>
+      <p><mat-form-field>
         <mat-label i18n="@@Expiry">Expiry</mat-label>
         <mat-select [value]="days()" (selectionChange)="days.set($event.value)">
           <mat-option [value]="0" i18n="@@never_expires">never expires</mat-option>
@@ -201,23 +254,35 @@ export class AccessTokensPageComponent {
           <mat-option [value]="90" i18n="@@in_90_days">90 days</mat-option>
           <mat-option [value]="365" i18n="@@in_1_year">1 year</mat-option>
         </mat-select>
-      </mat-form-field>
+      </mat-form-field></p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button matButton mat-dialog-close i18n="@@Cancel">Cancel</button>
-      <button matButton="filled" [disabled]="!name().trim()" (click)="confirm()" i18n="@@Create">Create</button>
+      <button matButton="filled" [disabled]="!name().trim()" (click)="confirm()">
+        @if (editing) {
+          <ng-container i18n="@@Save">Save</ng-container>
+        } @else {
+          <ng-container i18n="@@Create">Create</ng-container>
+        }
+      </button>
     </mat-dialog-actions>
   `,
 })
 export class TokenCreateDialogComponent {
   private readonly ref = inject(MatDialogRef<TokenCreateDialogComponent>);
-  protected readonly name = signal('');
+  // The token being changed, or null when one is being minted. ONE dialog for
+  // the two: the fields are the same fields, and a second component would be
+  // the same form with a different title and a copy of every hint.
+  protected readonly editing = inject<AdminToken | null>(MAT_DIALOG_DATA, { optional: true }) ?? null;
+
+  protected readonly name = signal(this.editing?.name ?? '');
   protected readonly days = signal(0);
-  // Read-only by default: a token handed to an agent is the common case, and
-  // the safe answer should be the one nobody has to think about.
-  protected readonly scope = signal<TokenScope>('readonly');
-  protected readonly domain = signal<TokenDomain>('');
-  protected readonly from = signal('');
+  // Read-only by default when minting: a token handed to an agent is the
+  // common case, and the safe answer should be the one nobody has to think
+  // about. When editing, what the token already is.
+  protected readonly scope = signal<TokenScope>(this.editing?.scope ?? 'readonly');
+  protected readonly domain = signal<TokenDomain>(this.editing?.domain ?? '');
+  protected readonly from = signal(this.editing?.fromCidrs ?? '');
 
   protected confirm(): void {
     const name = this.name().trim();

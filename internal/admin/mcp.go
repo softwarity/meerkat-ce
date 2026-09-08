@@ -11,6 +11,7 @@ import (
 	"github.com/softwarity/meerkat/internal/config"
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/mcp"
 	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -33,7 +34,7 @@ import (
 // originOf is this plane as the caller reached it.
 func originOf(r *http.Request) string {
 	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+	if filters.Secure(r) {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host

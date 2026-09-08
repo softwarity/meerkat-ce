@@ -3,7 +3,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { catppuccin, editorSurface } from '../../shared/catppuccin';
 import { basicSetup } from 'codemirror';
 import { ApiService } from '../../api.service';
 import { TEMPLATE_COLORS, templateHighlight } from '../template-highlight';
@@ -140,7 +140,8 @@ export class RespondEditorComponent {
             // is not enough, it has to be one SETUP too, or the two editors of
             // the same product show different gutters.
             basicSetup,
-            oneDark,
+            catppuccin,
+            editorSurface,
             highlight,
             EditorView.lineWrapping,
             EditorView.theme({

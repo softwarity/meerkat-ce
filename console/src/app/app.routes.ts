@@ -104,11 +104,30 @@ export const routes: Routes = [
           import('./routes/routes-page/routes-page.component').then((m) => m.RoutesPageComponent),
       },
       {
-        // Endpoint security (RBAC-07): a dedicated page with a route selector;
-        // picking a route that exposes an OpenAPI spec loads its operations in
-        // a swagger-like editor. Optional ?route=<id> preselects one.
+        // The operation inventory (RBAC-07, QUOTA-05): a dedicated page with a
+        // route selector; picking a route that exposes an OpenAPI spec loads
+        // its operations in a swagger-like editor. Optional ?route=<id>
+        // preselects one.
+        //
+        // TWO ENTRIES on one component, and that is not a screen listed twice:
+        // it is one inventory read on two axes, the way the traffic ranking is
+        // read on three. Security asks who may call an operation, Rate limits
+        // asks how much - two questions somebody arrives with, and a menu that
+        // names neither is a menu where neither is found. The intent decides
+        // what the table leads with and which half of the drawer opens; the
+        // other half is always one click away, so neither entry is a dead end.
         path: 'endpoint-security',
         canActivate: [infraOnly],
+        data: { intent: 'security' },
+        loadComponent: () =>
+          import('./routes/endpoint-security/endpoint-security.component').then(
+            (m) => m.EndpointSecurityComponent,
+          ),
+      },
+      {
+        path: 'endpoint-limits',
+        canActivate: [infraOnly],
+        data: { intent: 'limits' },
         loadComponent: () =>
           import('./routes/endpoint-security/endpoint-security.component').then(
             (m) => m.EndpointSecurityComponent,

@@ -62,6 +62,8 @@ const pageJS = `(() => {
   const setCookie = (k, v) => { document.cookie = k + '=' + v + ';path=/;max-age=31536000;SameSite=Lax'; };
   const getCookie = (k) => (document.cookie.split('; ').find(c => c.startsWith(k + '=')) || '').split('=')[1] || '';
   const darkMedia = matchMedia('(prefers-color-scheme: dark)');
+  // The last scheme applied, so the tag that appears later gets it too.
+  let lastScheme = 'auto';
   // What the ROUTE declared, written on the script tag by the gateway.
   const cfg = (document.currentScript && document.currentScript.dataset) || {};
   const languages = () => (cfg.languages || '').split(',').filter(Boolean);
@@ -80,6 +82,7 @@ const pageJS = `(() => {
   // route. Silent unless the route offers the switch.
   const applyScheme = (v) => {
     if (cfg.scheme !== 'select') return;
+    lastScheme = v;
     const root = document.documentElement;
     if (v === 'light' || v === 'dark') {
       root.style.colorScheme = v;
@@ -93,15 +96,30 @@ const pageJS = `(() => {
     syncStripScheme();
     const mech = cfg.schemeMechanism;
     if (!mech) return;
+    // The tag the ROUTE named, <html> unless it says otherwise - which is
+    // where a color scheme is read from, and where an application with no
+    // opinion puts it. It may not be PARSED yet: this runs from <head>, on
+    // purpose, so that <html> is dressed before the first paint. A <body>
+    // that does not exist yet is caught up with at DOMContentLoaded, never
+    // written on <html> instead - a class left on the wrong element is a
+    // theme nothing removes.
+    const el = document.querySelector(cfg.schemeTag || 'html');
+    if (!el) return;
     const light = cfg.schemeLight || '', dark = cfg.schemeDark || '';
     const resolved = (v === 'light' || v === 'dark') ? v : (darkMedia.matches ? 'dark' : 'light');
+    const value = resolved === 'dark' ? dark : light;
     if (mech === 'attribute') {
-      if (cfg.schemeAttribute) root.setAttribute(cfg.schemeAttribute, resolved === 'dark' ? dark : light);
+      if (cfg.schemeAttribute) el.setAttribute(cfg.schemeAttribute, value);
+    } else if (mech === 'add-attribute') {
+      // The two values ARE the attribute names, added bare and removed the
+      // way classes are: <body dark-theme>, and nothing in the other state.
+      if (light) el.removeAttribute(light);
+      if (dark) el.removeAttribute(dark);
+      if (value) el.setAttribute(value, '');
     } else if (mech === 'class') {
-      if (light) root.classList.remove(light);
-      if (dark) root.classList.remove(dark);
-      const cls = resolved === 'dark' ? dark : light;
-      if (cls) root.classList.add(cls);
+      if (light) el.classList.remove(light);
+      if (dark) el.classList.remove(dark);
+      if (value) el.classList.add(value);
     }
   };
 
@@ -626,6 +644,11 @@ const pageJS = `(() => {
 
   if (cfg.scheme === 'select') {
     applyScheme(getCookie(COOKIE_SCHEME) || 'auto');
+    // Said above: a mechanism aimed at anything but <html> has nothing to
+    // write on until the document is parsed.
+    if (cfg.schemeMechanism && document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => applyScheme(lastScheme), { once: true });
+    }
     // In auto, follow the system live - unless the integrator settled it.
     darkMedia.addEventListener('change', () => {
       if (schemeImposed) return;

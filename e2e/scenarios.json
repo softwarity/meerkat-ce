@@ -718,6 +718,54 @@
       }
     },
     {
+      "id": "api-gw-token-update",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/admin-tokens/no-such-token",
+        "body": "{\"name\":\"renamed\",\"scope\":\"metrics\",\"days\":0}",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Change what a token may do",
+        "fr": "Changer ce qu un jeton a le droit de faire"
+      },
+      "description": {
+        "en": "A token is editable for everything that is NOT in the token. The secret is a hash in a column and encodes no perimeter, no domain, no address, no expiry and no name, so none of them has to be reissued to be changed - and whoever holds the key keeps holding the same key. Which is what makes NARROWING cheap, and that is the reason this exists: a read-only token in a monitoring stack's scrape config should become a metrics one without minting a second and editing another team's repository, because that friction is why the safer move does not get made. Widening is possible too, and the audit records the before and after of every field. Root only, like every other control-plane token operation.",
+        "fr": "Un jeton est editable pour tout ce qui n est PAS dans le jeton. Le secret est un hache dans une colonne et n encode ni perimetre, ni domaine, ni adresse, ni expiration, ni nom : rien de tout cela n a besoin d etre reemis pour changer, et celui qui detient la cle detient toujours la meme cle. C est ce qui rend le RETRECISSEMENT bon marche, et c est la raison d etre de cet endpoint : un jeton read-only dans la config de scrape d une stack de supervision doit pouvoir devenir un jeton metrics sans en frapper un second et modifier le depot d une autre equipe, parce que cette friction est justement pourquoi le geste le plus sur ne se fait pas. L elargissement est possible aussi, et le journal d audit enregistre l avant et l apres de chaque champ. Root seulement, comme toute operation sur un jeton du plan de controle."
+      }
+    },
+    {
+      "id": "api-gw-token-renew",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/admin-tokens/no-such-token/renew",
+        "body": "{}",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Give a token a new secret",
+        "fr": "Donner un nouveau secret a un jeton"
+      },
+      "description": {
+        "en": "A rotation, and what it KEEPS is why it is not simply minting a second one: the name, the perimeter, the domain, the addresses and the expiry all stay, so the audit keeps one history for one credential and the only thing to change anywhere is the value in one configuration file. The old secret stops working the moment this answers - which is what a rotation is, and why the console asks first. The new value travels exactly once, in this response, like a freshly minted one. Root only.",
+        "fr": "Une rotation, et ce qu elle GARDE est ce qui la distingue d un second jeton frappe : le nom, le perimetre, le domaine, les adresses et l expiration restent, donc le journal d audit garde une seule histoire pour une seule cle et la seule chose a changer ou que ce soit est la valeur dans un fichier de configuration. L ancien secret cesse de fonctionner des que cette reponse part - c est ce qu est une rotation, et c est pourquoi la console demande d abord. La nouvelle valeur voyage exactement une fois, dans cette reponse, comme celle d un jeton neuf. Root seulement."
+      }
+    },
+    {
       "id": "api-gw-metrics-endpoint",
       "domain": "gateway",
       "kind": "api",

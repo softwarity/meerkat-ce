@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -81,16 +82,7 @@ func (h *Handler) agentEndpointOpen(r *http.Request) bool {
 // behind a TLS-terminating proxy would advertise http urls and no agent would
 // connect. A proxy that forwards a header a client sent is a proxy that has to
 // be fixed, here as everywhere else.
-func origin(r *http.Request) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	if fwd := r.Header.Get("X-Forwarded-Proto"); fwd == "https" {
-		scheme = "https"
-	}
-	return scheme + "://" + r.Host
-}
+func origin(r *http.Request) string { return filters.Origin(r) }
 
 func (h *Handler) protectedResource(w http.ResponseWriter, r *http.Request) {
 	if !h.agentEndpointOpen(r) {

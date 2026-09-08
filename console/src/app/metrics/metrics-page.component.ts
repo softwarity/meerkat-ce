@@ -1,4 +1,5 @@
 import { DecimalPipe } from '@angular/common';
+import { httpResource } from '@angular/common/http';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,21 +12,11 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { LiveWindowDataSource } from '@softwarity/livewire';
 import type { EChartsCoreOption } from 'echarts/core';
-import { ApiService } from '../api.service';
+import { ApiService, Discovery } from '../api.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
 import { SnippetComponent } from '../shared/snippet.component';
 import { ChartComponent } from './chart.component';
-import {
-  ExampleContext,
-  grafanaDatasource,
-  grafanaQueries,
-  k8sPlainScrape,
-  k8sSecret,
-  k8sServiceMonitor,
-  swarmScrapeConfig,
-  swarmSecret,
-  swarmStack,
-} from './prometheus-examples';
+import { MONITORING, PLATFORMS, gatewayNetwork, monitoringUrl, stamp, variant } from './monitoring-files';
 import {
   EndpointsAnswer,
   TrafficRoute,
@@ -323,6 +314,23 @@ export class MetricsPageComponent {
   protected readonly saving = signal(false);
   private readonly path = signal('/metrics');
   protected readonly exposePath = this.path.asReadonly();
+  protected readonly prometheusTip = computed(() =>
+    this.exposed()
+      ? $localize`:@@Metrics_tip_on:Exposed at ${this.path()}:PATH:`
+      : $localize`:@@Metrics_tip_off:Not exposed - nothing scrapes this gateway`,
+  );
+  // The port this gateway listens on, as it says itself. The examples below
+  // are scraped from inside the cluster, where the browser's own port means
+  // nothing.
+  private readonly port = signal('9090');
+  // The network the compose file has to join, asked of the runtime (SVC-02)
+  // when the drawer opens rather than on every visit: it is a call to the
+  // Docker socket with a five-second budget.
+  private readonly runtime = httpResource<Discovery>(() =>
+    this.prometheusOpen() ? '/api/services' : undefined,
+  );
+  private readonly network = computed(() => gatewayNetwork(this.runtime.value()?.reach ?? []));
+  private readonly dataOrigin = signal('');
 
   // Read once, when the screen is built rather than when the drawer opens: it
   // is one small call, and a switch that arrives after the drawer does flickers
@@ -334,6 +342,8 @@ export class MetricsPageComponent {
       .subscribe((s) => {
         this.exposed.set(s.enabled);
         this.path.set(s.path);
+        this.port.set(s.port);
+        this.dataOrigin.set(s.dataOrigin);
       });
   }
 
@@ -357,20 +367,47 @@ export class MetricsPageComponent {
       });
   }
 
-  // The examples, carrying THIS installation's own address: one with a
-  // placeholder host in it is one the reader has to translate, and the
-  // translation is where it goes wrong.
-  private ctx(): ExampleContext {
-    return { origin: window.location.origin, path: this.path() };
+  // The examples are FILES (console/public/monitoring), fetched from this
+  // gateway rather than built here, and stamped with THIS installation's own
+  // path and port on the way through: an example with a placeholder host in
+  // it is one the reader has to translate, and the translation is where it
+  // goes wrong.
+  //
+  // Fetched when the drawer OPENS, not when the page loads: six requests
+  // behind every visit to a screen that is read for its curves is six
+  // requests nobody asked for. An undefined URL is a request httpResource
+  // does not make, and that is what the closed drawer returns.
+  private file(name: string) {
+    const res = httpResource.text(() => (this.prometheusOpen() ? monitoringUrl(name) : undefined));
+    return computed(() => {
+      // A comment rather than an empty box: a panel showing nothing at all
+      // says nothing about whether there is nothing to show.
+      if (res.error()) return `# ${monitoringUrl(name)} did not answer`;
+      return stamp(res.value() ?? '', {
+        path: this.path(),
+        port: this.port(),
+        network: this.network(),
+        dataOrigin: this.dataOrigin(),
+      });
+    });
   }
-  protected readonly swarmSecret = swarmSecret();
-  protected swarmScrape = () => swarmScrapeConfig(this.ctx());
-  protected swarmStack = () => swarmStack(this.ctx());
-  protected readonly k8sSecret = k8sSecret();
-  protected k8sMonitor = () => k8sServiceMonitor(this.ctx());
-  protected k8sScrape = () => k8sPlainScrape(this.ctx());
-  protected readonly grafanaSource = grafanaDatasource();
-  protected readonly grafanaQueries = grafanaQueries();
+  protected readonly scrape = this.file(MONITORING.scrape);
+  protected readonly swarmStack = this.file(MONITORING.swarmStack);
+  protected readonly k8sMonitor = this.file(MONITORING.k8sMonitor);
+  protected readonly grafanaSource = this.file(MONITORING.grafanaSource);
+  protected readonly grafanaDashboards = this.file(MONITORING.grafanaDashboards);
+  protected readonly grafanaDashboard = this.file(MONITORING.grafanaDashboard);
+  protected readonly grafanaQueries = this.file(MONITORING.grafanaQueries);
+
+  // Shown whole, saved per platform. The panel carries both discoveries so a
+  // reader sees what the choice is; the buttons carry away a file that runs.
+  protected readonly scrapeVariants = computed(() =>
+    PLATFORMS.map((p) => ({
+      label: p.label,
+      filename: MONITORING.scrape,
+      content: variant(this.scrape(), p.key),
+    })),
+  );
 
   private lines(
     at: number[],

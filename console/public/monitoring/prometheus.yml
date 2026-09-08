@@ -1,0 +1,35 @@
+# Prometheus, scraping this gateway. Only the block at the end
+# changes from one platform to the other.
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: meerkat
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      # Console: Infra, Access tokens, perimeter "metrics".
+      # A secret and credentials_file beat this line.
+      credentials: mk_paste_the_token_here
+
+#swarm     # DOCKER SWARM. tasks.<service> gives one A record per task:
+#swarm     # the counters are per node, so the service name alone
+#swarm     # (meerkat:9090, a VIP) would sample a different node at
+#swarm     # every scrape and draw a curve that is nobody's.
+#swarm     dns_sd_configs:
+#swarm       - names: ['tasks.meerkat']
+#swarm         type: A
+#swarm         port: 9090
+
+#k8s     # KUBERNETES, without the Operator. With it, none of
+#k8s     # this is written: servicemonitor.yaml is the whole of it.
+#k8s     kubernetes_sd_configs:
+#k8s       - role: pod
+#k8s     relabel_configs:
+#k8s       - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+#k8s         action: keep
+#k8s         regex: meerkat
+#k8s       - source_labels: [__meta_kubernetes_pod_container_port_name]
+#k8s         action: keep
+#k8s         regex: admin

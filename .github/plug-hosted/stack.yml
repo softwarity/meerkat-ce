@@ -1,0 +1,36 @@
+# The smallest cluster that can be taken over from: a gateway with the agent
+# in it, and one service to plug over.
+services:
+  meerkat:
+    image: meerkat:ee
+    environment:
+      MEERKAT_ADMIN_PASSWORD: tunnel-Root-Password-1
+      MEERKAT_DATA: /data
+    # The socket is how the agent provisions a name and parks what held it.
+    # Root because the socket is root's, which is also what the neo stack does
+    # and for the reason written there.
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "18080:8080"
+      - "19090:9090"
+      - "2222:22222"
+    networks: [tunnel-net]
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+
+  # The service a developer takes over. Anything that answers HTTP and says
+  # which of the two answered - the whole assertion is that the same name
+  # reaches a different process afterwards.
+  checkout:
+    image: mccutchen/go-httpbin:latest
+    networks: [tunnel-net]
+    deploy:
+      replicas: 1
+
+networks:
+  tunnel-net:
+    external: true

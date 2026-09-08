@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 	"github.com/softwarity/meerkat/internal/vault"
 )
 
@@ -211,7 +210,10 @@ func (d *database) columnsOf(table string) ([]column, error) {
 // by the dialect - placeholders, the schema version, introspection - and
 // nothing else had to be written twice.
 func openPostgres(dataDir, url string) (*Store, error) {
-	raw, err := sql.Open("pgx", url)
+	if dialExternal == nil {
+		return nil, ErrExternalDatabase
+	}
+	raw, err := dialExternal(url)
 	if err != nil {
 		return nil, fmt.Errorf("store: open database: %w", err)
 	}

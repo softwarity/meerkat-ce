@@ -45,7 +45,7 @@ type API struct {
 	// Bus tells the other nodes what this one just reloaded (STORE-03). Wired
 	// by main; nil wherever there is one node, which is every test and every
 	// single-binary installation - see reload.go.
-	Bus *cluster.Bus
+	Bus cluster.Bus
 
 	st     *store.Store
 	sm     *session.Manager

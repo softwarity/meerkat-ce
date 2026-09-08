@@ -170,3 +170,66 @@ func TestTheTunnelIsAskedBeforeItIsAnnounced(t *testing.T) {
 		t.Fatal("the tunnel never started once it could")
 	}
 }
+
+// A plugged name has to be SAID on every node, not just the one holding the
+// tunnel. The traffic already crosses - plug's signpost is a service on the
+// overlay - so a developer reaching another gateway got a colleague's
+// work-in-progress with nothing on the page saying so, which is the one thing
+// the strip exists to prevent.
+func TestANameIsSaidOnEveryNode(t *testing.T) {
+	hub := events.NewHub()
+	r := NewRegistry(hub)
+	at := time.Now()
+	r.now = func() time.Time { return at }
+
+	// What node B says it serves reaches node A's pages.
+	r.Report("node-b", []Served{{Name: "checkout", Who: "alice"}}, at)
+	got := r.List()
+	if len(got) != 1 || got[0].Name != "checkout" || got[0].Who != "alice" {
+		t.Fatalf("a remote name did not reach this node: %+v", got)
+	}
+
+	// Its own and the others', merged and sorted.
+	r.Set(Served{Name: "billing", Who: "bob"})
+	names := []string{}
+	for _, s := range r.List() {
+		names = append(names, s.Name)
+	}
+	if len(names) != 2 || names[0] != "billing" || names[1] != "checkout" {
+		t.Fatalf("the two nodes were not merged: %v", names)
+	}
+
+	// A node that stops talking stops being believed - and its own answer is
+	// untouched, which is what keeps one gateway and five on the same path.
+	at = at.Add(DefaultStaleAfter + time.Second)
+	got = r.List()
+	if len(got) != 1 || got[0].Name != "billing" {
+		t.Fatalf("a silent node kept its names: %+v", got)
+	}
+	r.Forget()
+	if len(r.remote) != 0 {
+		t.Errorf("the silent node kept its place in the map: %v", r.remote)
+	}
+}
+
+// Every change travels at once. Waiting for the timer would leave a name on
+// four intervals' worth of screens after it went back to the cluster.
+func TestTheClusterHearsEveryChangeAtOnce(t *testing.T) {
+	r := NewRegistry(events.NewHub())
+	var told [][]Served
+	r.Relay(func(names []Served) { told = append(told, names) })
+
+	r.Set(Served{Name: "checkout"})
+	r.Drop("checkout")
+	r.Drop("checkout") // already gone: nothing to say
+
+	if len(told) != 2 {
+		t.Fatalf("told the cluster %d times, want one per real change", len(told))
+	}
+	if len(told[0]) != 1 || told[0][0].Name != "checkout" {
+		t.Errorf("the first message did not carry the name: %+v", told[0])
+	}
+	if len(told[1]) != 0 {
+		t.Errorf("the emptied list was not sent as empty: %+v", told[1])
+	}
+}

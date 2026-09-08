@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -23,13 +23,30 @@ import { ACCESS_LEVELS, AccessState, isEmpty, levelShort } from './access-editor
   imports: [MatIconModule, MatTooltipModule, RouterLink],
   template: `
     <span class="set" [class.delegated]="empty()" [class.unguarded]="unguarded()">
-      <span class="lvl" [class.on]="gated()" [matTooltip]="levelTip()">{{ levelShort() }}</span>
+      <span
+        class="lvl"
+        [class.act]="pickable()"
+        [class.on]="gated()"
+        [matTooltip]="levelTip()"
+        (click)="pick('access', $event)"
+      >{{ levelShort() }}</span>
       <span class="d d-users" [class.on]="namedUsers()" [matTooltip]="usersTip()">
         <mat-icon>group</mat-icon><span class="n">{{ namedUsers() || '' }}</span>
       </span>
       <span class="d d-roles" [class.on]="access().roles.length > 0" [matTooltip]="rolesTip()">
         <mat-icon>badge</mat-icon><span class="n">{{ access().roles.length || '' }}</span>
       </span>
+      @if (limits() !== null) {
+        <span
+          class="d d-limits"
+          [class.act]="pickable()"
+          [class.on]="(limits() ?? 0) > 0"
+          [matTooltip]="limitsTip()"
+          (click)="pick('limits', $event)"
+        >
+          <mat-icon>speed</mat-icon><span class="n">{{ limits() || '' }}</span>
+        </span>
+      }
       @if (endpoints() !== null) {
         @if (endpointsLink(); as link) {
           <a
@@ -144,6 +161,9 @@ export class AccessBadgesComponent {
   // the question does not arise here: a route exposing no OpenAPI spec has
   // nothing to override, and inside the endpoint screen a single operation is
   // one rule, not a set of them.
+  // How many bounds this row carries (ROUTE-08/QUOTA-05). Null hides the slot
+  // entirely, for the lists where the question does not arise.
+  readonly limits = input<number | null>(null);
   readonly endpoints = input<number | null>(null);
   // Where that count is edited. Given, the badge becomes the way in - which is
   // the difference between reading "3 endpoints have their own rule" and being
@@ -155,6 +175,13 @@ export class AccessBadgesComponent {
   // gating nothing anywhere, inside the endpoint screen an operation with no
   // override simply follows the route.
   readonly unguarded = input(false);
+  // Where a click on a badge should take the reader. Wired only where there is
+  // somewhere to go: on a plain list these are a reading, not a control.
+  readonly picked = output<'access' | 'limits'>();
+  // Whether these badges are a way IN or only a reading. Stated rather than
+  // inferred from whether anybody bound the output: a control that looks
+  // clickable on a list where nothing happens is worse than a plain badge.
+  readonly clickable = input(false);
 
   protected readonly empty = computed(() => isEmpty(this.access()));
   protected readonly gated = computed(() => this.access().level !== '');
@@ -173,6 +200,21 @@ export class AccessBadgesComponent {
   });
   protected readonly delegatedTip = $localize`:@@Delegated_to_backend:No gateway rule - delegated to the API backend`;
   protected readonly unguardedTip = $localize`:@@Nothing_gated_here:Meerkat gates nothing here, on the route or on any endpoint: the service decides alone.`;
+  protected readonly pickable = this.clickable;
+
+  protected pick(what: 'access' | 'limits', e: Event): void {
+    if (!this.clickable()) return;
+    e.stopPropagation();
+    this.picked.emit(what);
+  }
+
+  protected readonly limitsTip = computed(() => {
+    const n = this.limits() ?? 0;
+    return n === 0
+      ? $localize`:@@No_bound_here:No bound of its own: whatever the route carries applies, and nothing more.`
+      : $localize`:@@Bounds_here:${n}:count: bound(s) of its own, on top of the route's.`;
+  });
+
   protected readonly endpointsTip = computed(() => {
     const n = this.endpoints() ?? 0;
     return n

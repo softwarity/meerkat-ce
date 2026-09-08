@@ -58,6 +58,21 @@
       <mat-cell *matCellDef="let r" [class.off]="!r.enabled">
         <span class="mono">{{ r.upstream }}</span>
         <span rowActions="tonal">
+          @if (r.isUi && openUrl(r)) {
+            <a
+              matIconButton
+              [href]="openUrl(r)"
+              target="_blank"
+              rel="noopener"
+              (click)="$event.stopPropagation()"
+              i18n-matTooltip="@@Open_this_route"
+              matTooltip="Open this route in the data plane"
+              i18n-aria-label="@@Open_this_route"
+              aria-label="Open this route in the data plane"
+            >
+              <mat-icon>open_in_new</mat-icon>
+            </a>
+          }
           @if (r.enabled) {
             <button
               matIconButton

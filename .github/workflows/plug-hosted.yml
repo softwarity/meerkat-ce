@@ -1,0 +1,113 @@
+name: The developer tunnel, in a cluster
+
+# The tunnel is an agent EMBEDDED in the gateway (DEV-11), and everything about
+# it that can be answered in a unit test already is: which key opens it, under
+# whose name, what happens when the capability goes (ee/devplug). What no test
+# can reach is the half that needs an orchestrator - the agent identifies itself
+# by inspecting its own container, so a gateway started from a working tree
+# declines itself and says so.
+#
+# Hence one job, on a real single-node Swarm, and a cadence rather than a gate:
+# what it exercises moves when PLUG releases, not when a commit lands here, so
+# running it per push would re-answer the same question forty times a week. It
+# is also the only job that pays for a Swarm.
+on:
+  schedule:
+    - cron: "0 3 * * 2" # Tuesday, 03:00 UTC - the day after plug's own soak
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plug-hosted
+  cancel-in-progress: true
+
+jobs:
+  tunnel:
+    name: Serve a name from the runner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Both images, because half of what is checked here is the difference
+      # between them: one carries plug's payload, the other has nothing to hand
+      # out and nothing to run.
+      - name: Build the two images
+        run: |
+          docker build -q -f docker/Dockerfile --build-arg GO_TAGS=ee --build-arg EDITION=ee \
+            -t meerkat:ee .
+          docker build -q -f docker/Dockerfile -t meerkat:ce .
+
+      # The payload is a COPY from plug's image at build time, which is the one
+      # thing a Go test cannot see. And the version the gateway announces has
+      # to be the version it hands out: when the two drifted apart, the
+      # launcher asked for a version and went looking for a core that was not
+      # there.
+      - name: The Enterprise image carries a client, the community one does not
+        run: |
+          set -e
+          version=$(docker run --rm --entrypoint sh meerkat:ee -c 'cat /opt/plug/VERSION')
+          echo "the payload says: $version"
+          test -n "$version"
+          docker run --rm --entrypoint sh meerkat:ee -c 'ls /opt/plug' | grep -q . \
+            || { echo "the Enterprise image carries no client"; exit 1; }
+          if docker run --rm --entrypoint sh meerkat:ce -c 'ls /opt/plug 2>/dev/null' | grep -q .; then
+            echo "the community image carries a payload it has nobody to serve"; exit 1
+          fi
+          echo "PLUG_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: A cluster, and something to take over from
+        run: |
+          set -e
+          docker swarm init --advertise-addr 127.0.0.1
+          docker network create -d overlay --attachable tunnel-net
+          docker stack deploy -c .github/plug-hosted/stack.yml tunnel
+
+      - name: Wait for the gateway
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:19090/readyz || true)
+            [ "$code" = "200" ] && { echo "ready"; exit 0; }
+            sleep 3
+          done
+          docker service logs tunnel_meerkat --tail 80
+          echo "the gateway never became ready"; exit 1
+
+      # The line that says the agent bound its port, and the version it
+      # announces - compared with the payload above.
+      - name: The agent is up, on the version it hands out
+        run: |
+          set -e
+          docker service logs tunnel_meerkat --tail 200 2>&1 | tee log.txt
+          grep -q 'plug: ready' log.txt || { echo "the agent never announced itself"; exit 1; }
+          grep -q "$PLUG_VERSION" log.txt \
+            || { echo "the gateway announces a version it does not hand out"; exit 1; }
+
+      # What a developer reaches before they have a client at all. It is piped
+      # into a shell, so what it prints IS the answer.
+      - name: The anonymous account hands out a client
+        run: |
+          set -e
+          mkdir -p ~/.ssh && ssh-keyscan -p 2222 -H localhost >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -p 2222 -o StrictHostKeyChecking=no get@localhost install > install.sh
+          cat install.sh
+          grep -qi 'does not distribute' install.sh \
+            && { echo "this image answered the community notice"; exit 1; }
+          sh install.sh
+          plug --version || { echo "no client after the install"; exit 1; }
+
+      # A developer, their key, and the capability that lets it open anything.
+      - name: Deposit a developer's key
+        run: bash .github/plug-hosted/deposit-key.sh
+
+      # The takeover: the name leaves the cluster and answers from HERE.
+      - name: Serve a cluster name from this runner
+        run: bash .github/plug-hosted/serve.sh
+
+      - name: What the cluster says when it goes wrong
+        if: failure()
+        run: |
+          docker service logs tunnel_meerkat --tail 200 || true
+          docker service ls || true
+          docker service ps tunnel_checkout --no-trunc || true

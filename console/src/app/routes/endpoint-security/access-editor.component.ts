@@ -102,9 +102,9 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
     <!-- The pivot. Four short labels, so it takes the width it needs and
          leaves the rest alone. -->
     <mat-form-field class="level" subscriptSizing="dynamic">
-      <mat-label i18n="@@Who_may_call_it">Who may call it</mat-label>
+      <mat-label>{{ pivotLabel() }}</mat-label>
       <mat-select [value]="value().level" (selectionChange)="patch({ level: $event.value })">
-        @for (l of levels; track l.value) {
+        @for (l of levels(); track l.value) {
           <mat-option [value]="l.value">
             <span class="opt-main">{{ l.label }}</span>
           </mat-option>
@@ -184,9 +184,9 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
          route everyone is already through, and naming someone says nothing. -->
     @if (value().level !== '') {
       <div class="exception">
-        <div class="exception-head" i18n="@@Exception">Exception</div>
+        <div class="exception-head">{{ exceptionLabel() }}</div>
         <mat-form-field class="field" subscriptSizing="dynamic">
-          <mat-label i18n="@@Users_always_allowed">Users always allowed</mat-label>
+          <mat-label>{{ usersLabel() }}</mat-label>
           <mat-select multiple [value]="value().users" (selectionChange)="patch({ users: $event.value })">
             <mat-select-trigger>
               @if (value().users.length) {
@@ -211,7 +211,7 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
               </mat-option>
             }
           </mat-select>
-          <mat-hint align="end" i18n="@@Users_exception_hint">They pass whatever is required above.</mat-hint>
+          <mat-hint align="end">{{ usersHint() }}</mat-hint>
         </mat-form-field>
       </div>
     }
@@ -286,15 +286,58 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
 })
 export class AccessEditorComponent {
   readonly value = input.required<AccessState>();
+  // What this rule DOES with the callers it describes, which is not always
+  // "let them through". A rate limit reuses this editor to say WHO a bound is
+  // about, and there the same four fields select rather than admit - a field
+  // labelled "users always allowed" inside a limit reads as a way to grant
+  // access, which is the opposite of what it does.
+  readonly purpose = input<'admits' | 'selects'>('admits');
   readonly users = input<User[]>([]);
   readonly roles = input<Role[]>([]);
   readonly tenants = input<Tenant[]>([]);
   readonly valueChange = output<AccessState>();
 
-  protected readonly levels = ACCESS_LEVELS;
-  protected readonly levelHint = computed(
-    () => ACCESS_LEVELS.find((l) => l.value === this.value().level)?.hint ?? '',
+  // What the select OFFERS, which is not the same list in the two purposes.
+  //
+  // "Delegated" means no condition at all, so choosing it empties the rule -
+  // and in a limit that is what the Everybody button beside it does, except
+  // that it also makes the panel vanish under the mouse. Two controls for one
+  // act, one of them by surprise. So the select only ever narrows here, and
+  // widening has one door.
+  protected readonly levels = computed(() =>
+    this.purpose() === 'selects' ? ACCESS_LEVELS.filter((l) => l.value !== '') : ACCESS_LEVELS,
   );
+  protected readonly pivotLabel = computed(() =>
+    this.purpose() === 'selects'
+      ? $localize`:@@Which_callers:Which callers`
+      : $localize`:@@Who_may_call_it:Who may call it`,
+  );
+  protected readonly exceptionLabel = computed(() =>
+    this.purpose() === 'selects'
+      ? $localize`:@@And_also:And also`
+      : $localize`:@@Exception:Exception`,
+  );
+  protected readonly usersLabel = computed(() =>
+    this.purpose() === 'selects'
+      ? $localize`:@@Users_always_covered:Users always covered`
+      : $localize`:@@Users_always_allowed:Users always allowed`,
+  );
+  protected readonly usersHint = computed(() =>
+    this.purpose() === 'selects'
+      ? $localize`:@@Users_covered_hint:They are covered whatever the condition above says.`
+      : $localize`:@@Users_exception_hint:They pass whatever is required above.`,
+  );
+  protected readonly levelHint = computed(() => {
+    // "Nobody" plus a name is how this product already writes "only these
+    // people" (see Access.Grants: a named user is an exception, and an
+    // exception needs something to be excepted from). As a SELECTOR that is a
+    // perfectly ordinary thing to want, and the access wording - who gets
+    // through - would be describing the wrong act.
+    if (this.purpose() === 'selects' && this.value().level === 'deny') {
+      return $localize`:@@Selects_nobody_hint:Nobody, apart from the users named below - which is how to bound a few people by name.`;
+    }
+    return ACCESS_LEVELS.find((l) => l.value === this.value().level)?.hint ?? '';
+  });
   // Whether the rule can be narrowed further. Delegated lets everyone through
   // and deny lets nobody: neither has a caller left to filter on roles.
   protected readonly narrowable = computed(() => {

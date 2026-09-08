@@ -1647,3 +1647,98 @@ func TestForwardedPrefixIsAnnouncedAndNeverTrusted(t *testing.T) {
 		t.Fatalf("turned off, the caller's %q went through", got)
 	}
 }
+
+// Which ELEMENT carries the application's own light/dark switch is the route's
+// to say: the mechanisms used to be applied to <html> and nothing else, so an
+// application reading its theme off <body> - or off a wrapper it draws - could
+// declare the right attribute and still never see it.
+func TestSchemeSaysWhichTagCarriesIt(t *testing.T) {
+	route := func(s *store.SchemeConfig) store.Route {
+		r := pathRoute("ui", "ui", 1, "/app/**", "http://up")
+		r.IsUI = true
+		r.UI = &store.RouteUI{Scheme: s}
+		return r
+	}
+
+	// Unsaid is <html>, which is where it was applied before and where a
+	// color scheme is read from: the same page, not a new default.
+	got := pageAgentFragment(route(&store.SchemeConfig{
+		Select: true, Mechanism: "class", Light: "lt", Dark: "dk"}), nil)
+	if !strings.Contains(got, `data-scheme-tag="html"`) {
+		t.Errorf("the default tag is not the one it always applied to:\n%s", got)
+	}
+
+	got = pageAgentFragment(route(&store.SchemeConfig{
+		Select: true, Mechanism: "class", Tag: "body", Light: "lt", Dark: "dk"}), nil)
+	if !strings.Contains(got, `data-scheme-tag="body"`) {
+		t.Errorf("the route named a tag and the page was not told:\n%s", got)
+	}
+	if strings.Contains(got, "data-scheme-attribute") {
+		t.Errorf("the class mechanism was handed an attribute name:\n%s", got)
+	}
+
+	// add-attribute spells its two names out the way class does - they ARE the
+	// attributes - so it has no attribute name of its own to carry.
+	got = pageAgentFragment(route(&store.SchemeConfig{
+		Select: true, Mechanism: "add-attribute", Dark: "dark-theme"}), nil)
+	for _, want := range []string{
+		`data-scheme-mechanism="add-attribute"`, `data-scheme-light=""`,
+		`data-scheme-dark="dark-theme"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("add-attribute lost %s:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "data-scheme-attribute") {
+		t.Errorf("add-attribute was handed an attribute name of its own:\n%s", got)
+	}
+
+	// And what is refused says what is allowed - the new mechanism included,
+	// so the list cannot go stale while the switch above accepts it.
+	if err := Validate(route(&store.SchemeConfig{Select: true, Mechanism: "attr"})); err == nil {
+		t.Error("an unknown mechanism was accepted")
+	} else if !strings.Contains(err.Error(), "add-attribute") {
+		t.Errorf("the refusal does not list the mechanisms: %v", err)
+	}
+	if err := Validate(route(&store.SchemeConfig{
+		Select: true, Mechanism: "class", Tag: "body > div"})); err == nil {
+		t.Error("a tag name that is a selector was accepted")
+	}
+	if err := Validate(route(&store.SchemeConfig{
+		Select: true, Mechanism: "add-attribute", Tag: "body", Dark: "dark-theme"})); err != nil {
+		t.Errorf("a sound add-attribute route was refused: %v", err)
+	}
+}
+
+// A route that offers no switch has nothing for the button to follow, and the
+// button followed the visitor's system: light chrome floating on an
+// application that is always dark. The route says what it wears there.
+func TestButtonWearsWhatTheRouteSaysWhenThereIsNoSwitch(t *testing.T) {
+	route := func(s *store.SchemeConfig) store.Route {
+		r := pathRoute("ui", "ui", 1, "/app/**", "http://up")
+		r.IsUI = true
+		r.UI = &store.RouteUI{Scheme: s, UserButton: store.UserButton{Enabled: true}}
+		return r
+	}
+
+	got := userButtonFragment(route(&store.SchemeConfig{Button: "dark"}), nil)
+	if !strings.Contains(got, `scheme-wear="dark"`) {
+		t.Errorf("the button was not dressed:\n%s", got)
+	}
+
+	// Offering the switch settles it: the button must SHOW the choice, or the
+	// switch in its own menu would say one thing and the chrome another.
+	got = userButtonFragment(route(&store.SchemeConfig{Select: true, Button: "dark"}), nil)
+	if strings.Contains(got, "scheme-wear") {
+		t.Errorf("a button that offers the switch was dressed anyway:\n%s", got)
+	}
+	if !strings.Contains(got, `scheme="select"`) {
+		t.Errorf("the switch stopped being offered:\n%s", got)
+	}
+
+	if err := Validate(route(&store.SchemeConfig{Button: "sombre"})); err == nil {
+		t.Error("an unknown button scheme was accepted")
+	} else if !strings.Contains(err.Error(), "light, dark") {
+		t.Errorf("the refusal does not say what is allowed: %v", err)
+	}
+}

@@ -28,8 +28,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 )
 
 // Env is the variable that turns the PostgreSQL pass on. Named here so a test
@@ -49,6 +47,12 @@ func URL(t testing.TB) string {
 	base := strings.TrimSpace(os.Getenv(Env))
 	if base == "" {
 		return ""
+	}
+	// A build without the driver has nothing to connect with, and a suite
+	// pointed at a server it cannot open would FAIL rather than skip - the
+	// wrong answer to "not in this image".
+	if !haveDriver {
+		t.Skipf("dbtest: this build runs on the embedded database (%s is set but unusable here)", Env)
 	}
 	schema := schemaName()
 	admin, err := sql.Open("pgx", base)

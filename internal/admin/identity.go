@@ -192,6 +192,7 @@ func (a *API) administersTenant(ctx context.Context, userID, tenantID string) bo
 // registerIdentity mounts the identity endpoints on mux.
 func (a *API) registerIdentity(mux Mux) {
 	mux.Handle("GET /api/me", a.authed(a.me))
+	mux.Handle("GET /api/me/avatar", a.authed(a.myAvatar))
 
 	// Users are the APPLICATION's identity (RBAC-05): app-admin scope. Granting
 	// or revoking root itself still requires root (privilege escalation guard).
@@ -261,6 +262,24 @@ func (a *API) me(w http.ResponseWriter, r *http.Request, actor store.User) {
 		"user": actor, "tenants": tenants, "activeTenant": activeTenant, "tenantAdmin": tenantAdmin,
 		"tenancy": tenancy, "primaryTenant": primary,
 	})
+}
+
+// myAvatar answers the caller's profile photo, "" when they have none.
+//
+// Its own endpoint rather than a field of /api/me, and that is not tidiness:
+// in production the console never calls /api/me at all - the gateway stamps
+// the identity on <body> when it serves the page, and a 300 KB data URI does
+// not go in an attribute. The photo therefore has to be asked for, once, by
+// whoever draws it.
+func (a *API) myAvatar(w http.ResponseWriter, r *http.Request, actor store.User) {
+	avatar, err := a.st.GetUserAvatar(r.Context(), actor.ID)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	// Always a body, even empty: a 204 leaves the caller parsing nothing, and
+	// "this person has no photo" is an answer rather than an absence.
+	writeJSON(w, http.StatusOK, map[string]string{"avatar": avatar})
 }
 
 // requireBusinessHours refuses a CHANGE to a working-hours window without the

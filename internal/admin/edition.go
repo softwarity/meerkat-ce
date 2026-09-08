@@ -34,6 +34,12 @@ type editionInfo struct {
 	HiddenTenants  int    `json:"hiddenTenants"`
 	TenancyLocked  bool   `json:"tenancyLocked"`
 	TenancyLockWhy string `json:"tenancyLockWhy,omitempty"`
+	// DataOrigin is where the APPLICATIONS answer, scheme and host. The console
+	// is served by the other plane and cannot work it out from its own address:
+	// a published port or an ingress sits between the two, and the browser only
+	// ever sees the admin one. It is the same answer the auth authorities are
+	// given for their callbacks, from the same place.
+	DataOrigin string `json:"dataOrigin"`
 }
 
 func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -42,6 +48,7 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 		Enterprise: edition.Enterprise,
 		Edition:    edition.Name,
 		Tenancy:    a.st.Tenancy(ctx),
+		DataOrigin: a.dataOrigin(r),
 	}
 	if primary, err := a.st.PrimaryTenant(ctx); err == nil {
 		info.PrimaryTenant = primary.ID

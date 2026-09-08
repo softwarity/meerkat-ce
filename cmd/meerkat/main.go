@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -345,6 +346,32 @@ func run(o options) error {
 				bus.Signal(ctx, store.TopicMetrics, msg)
 			}
 		})
+	// What a developer's machine answers for, told across the cluster (DEV-11).
+	// The traffic already crosses on its own - plug's signpost is a service on
+	// the overlay - so what travels here is only the SAYING, and losing that is
+	// how somebody reads a page of a colleague's work-in-progress without one
+	// word telling them. Same shape as the metrics fleet: a node publishes its
+	// whole list, the others keep one entry per node, silence expires.
+	served.Relay(func(names []devtunnel.Served) {
+		msg, err := json.Marshal(names)
+		if err != nil {
+			return
+		}
+		bus.Signal(ctx, store.TopicServed, string(msg))
+	})
+	bus.OnSignalFrom(store.TopicServed, func(from, arg string) {
+		if from == bus.Node() {
+			return // its own list, already the truth here
+		}
+		var names []devtunnel.Served
+		if err := json.Unmarshal([]byte(arg), &names); err != nil {
+			slog.Debug("a served-names message could not be read", "from", from, "err", err)
+			return
+		}
+		served.Report(from, names, time.Now())
+	})
+	go served.Tell(ctx, metrics.DefaultInterval)
+
 	bus.OnSignalFrom(store.TopicMetrics, func(from, arg string) {
 		s, err := metrics.Decode(arg)
 		if err != nil {

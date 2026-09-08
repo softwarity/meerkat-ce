@@ -1,6 +1,12 @@
 package store
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/softwarity/meerkat/internal/store/dbtest"
+)
 
 // The addresses a token may be used from (MCP-02). A typo here would silently
 // allow nobody, and its owner would blame the token.
@@ -73,5 +79,65 @@ func TestSanitizeTokenDomain(t *testing.T) {
 	}
 	if _, err := SanitizeTokenDomain("routes"); err == nil {
 		t.Error("an invented domain was accepted")
+	}
+}
+
+// Editing a token changes what it MAY DO and never the token.
+//
+// That is the whole basis for allowing it: the secret is a hash in a column
+// and encodes no perimeter, no domain, no address, no expiry and no name - so
+// whoever holds the key keeps holding the same key, and a narrowing costs
+// nobody a redeployment.
+func TestEditingATokenLeavesTheSecretAlone(t *testing.T) {
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	if err := st.CreateUser(ctx, User{ID: "u1", Username: "root", PasswordHash: "x", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	hash := "the-hash-nobody-may-touch"
+	if err := st.AddAPIToken(ctx, NewToken{
+		ID: "t1", UserID: "u1", Name: "prometheus", TokenHash: hash, Prefix: "mk_abc",
+		Plane: PlaneAdmin, Scope: ScopeFull, ExpiresAt: 0,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := st.UpdateAPIToken(ctx, "u1", "t1", TokenEdit{
+		Name: "prometheus (scraper)", Scope: ScopeMetrics, Domain: DomainGateway,
+		FromCIDRs: "10.0.0.7", ExpiresAt: 0,
+	})
+	if err != nil || !ok {
+		t.Fatalf("UpdateAPIToken: %v (existed=%v)", err, ok)
+	}
+
+	// The same secret still resolves, and to the narrowed token.
+	got, err := st.ResolveAPIToken(ctx, hash, time.Now().Unix())
+	if err != nil {
+		t.Fatalf("the token stopped resolving after an edit: %v", err)
+	}
+	if got.Scope != ScopeMetrics {
+		t.Errorf("perimeter is %q, want %q", got.Scope, ScopeMetrics)
+	}
+	if got.Domain != DomainGateway {
+		t.Errorf("domain is %q, want %q", got.Domain, DomainGateway)
+	}
+	if got.Name != "prometheus (scraper)" {
+		t.Errorf("name is %q, want the edited one", got.Name)
+	}
+	if got.FromCIDRs != "10.0.0.7/32" {
+		t.Errorf("addresses are %q, want the sanitized 10.0.0.7/32", got.FromCIDRs)
+	}
+
+	// And a perimeter nobody can spell is refused by name rather than stored.
+	if _, err := st.UpdateAPIToken(ctx, "u1", "t1", TokenEdit{Name: "x", Scope: "moon"}); err == nil {
+		t.Error("an invented perimeter was accepted")
+	}
+	// A token belonging to somebody else is not this account's to edit.
+	if ok, _ := st.UpdateAPIToken(ctx, "u2", "t1", TokenEdit{Name: "x", Scope: ScopeFull}); ok {
+		t.Error("another account edited this token")
 	}
 }

@@ -10,7 +10,7 @@
   <div class="planned">
     <mat-icon>key</mat-icon>
     <span i18n="@@Access_tokens_rest">
-      Control-plane tokens open the admin REST API without a browser, for a script or a pipeline. A
+      Admin tokens open the console's own API without a browser, for a script or a pipeline. A
       token acts with your own powers, narrowed by its perimeter. To connect an assistant, use the
       MCP section instead: it needs no token at all.
     </span>
@@ -22,13 +22,25 @@
     @for (t of tokens(); track t.id) {
       <div class="token" [class.off]="!t.enabled">
         <span class="name">{{ t.name }}</span>
-        <mat-slide-toggle [checked]="t.enabled" (change)="toggle(t, $event.checked)" />
+        <mat-slide-toggle
+          [checked]="t.enabled"
+          (change)="toggle(t, $event.checked)"
+          [matTooltip]="t.enabled ? disableTip : enableTip"
+        />
+        <button matIconButton (click)="edit(t)" i18n-matTooltip="@@Edit" matTooltip="Edit">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button matIconButton (click)="renew(t)" i18n-matTooltip="@@Renew" matTooltip="New secret">
+          <mat-icon>autorenew</mat-icon>
+        </button>
         <button matIconButton (click)="revoke(t)" i18n-matTooltip="@@Revoke" matTooltip="Revoke">
           <mat-icon>delete</mat-icon>
         </button>
         <span class="meta">
-          <span class="scope" [class.ro]="t.scope === 'readonly'">
-            @if (t.scope === 'readonly') {
+          <span class="scope" [class.ro]="t.scope !== 'full'">
+            @if (t.scope === 'metrics') {
+              <ng-container i18n="@@Metrics_only">Metrics only</ng-container>
+            } @else if (t.scope === 'readonly') {
               <ng-container i18n="@@Read_only">Read only</ng-container>
             } @else {
               <ng-container i18n="@@Full_access">Full access</ng-container>

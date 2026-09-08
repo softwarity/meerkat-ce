@@ -173,6 +173,14 @@ CREATE TABLE IF NOT EXISTS routes (
   timeouts      TEXT NOT NULL DEFAULT '{}',
   -- When to stop calling an upstream that stopped answering (v55, ROUTE-09).
   breaker       TEXT NOT NULL DEFAULT '{}',
+  -- What this route may CARRY, per caller (v58, ROUTE-08).
+  --
+  -- rate_limits and not limits: that name was ROUTE-04's size caps, retired
+  -- into the gate bricks. addMissingColumns never drops anything, so the dead
+  -- column is still there on every database old enough to have had it, with
+  -- its old default of '{}' - and a name reused is a column read with the
+  -- wrong shape, which is a gateway that will not start.
+  rate_limits   TEXT NOT NULL DEFAULT '[]',
   -- The route's unified base security (RBAC-06): who may call it at all,
   -- which per-endpoint rules then override (RBAC-07).
   access        TEXT NOT NULL DEFAULT '{}'
@@ -1066,6 +1074,12 @@ type EndpointPolicy struct {
 	Method string `json:"method"`
 	Path   string `json:"path"`
 	Access
+	// Limits bounds this operation on its own (QUOTA-05), on top of whatever
+	// the route carries. Chosen operation by operation and never a default
+	// over the whole inventory: a bound is a counter per (operation, caller),
+	// so a spec with two hundred of them and ten thousand keys is two million
+	// counters - the cardinality lesson, one level down.
+	Limits []RateLimit `json:"limits,omitempty"`
 }
 
 // Validate checks an endpoint-security block: every override path must compile
@@ -1076,6 +1090,9 @@ func (s *EndpointSecurity) Validate() error {
 	}
 	for i := range s.Endpoints {
 		e := &s.Endpoints[i]
+		if err := SanitizeRateLimits(e.Limits); err != nil {
+			return fmt.Errorf("endpoint %s %s: %w", e.Method, e.Path, err)
+		}
 		e.Method = strings.ToUpper(strings.TrimSpace(e.Method))
 		if e.Method != "*" && !validHTTPMethod(e.Method) {
 			return fmt.Errorf("endpoint %d (%s %s): invalid method %q", i, e.Method, e.Path, e.Method)
@@ -1127,14 +1144,45 @@ var UserButtonPositions = []string{
 
 // SchemeConfig describes whether and HOW the target application consumes a
 // color scheme: the user button always reflects the choice on the CSS
-// color-scheme; on top of it, an attribute (name + light/dark values) or a
-// pair of classes can be driven for applications with their own mechanism.
+// color-scheme of <html>; on top of it, one of three mechanisms can drive the
+// application's own switch, on a tag of the route's choosing.
+//
+// One of them names an attribute and gives it two values; the other two name
+// the two things themselves and put whichever is current on the tag:
+//
+//   - attribute: ONE attribute, named in Attribute, always written - to Light
+//     or to Dark. <body data-theme="dark">
+//   - add-attribute: Light and Dark are attribute NAMES, added bare and
+//     removed like classes. <body dark-theme>
+//   - class: Light and Dark are class names, the two removed and the current
+//     one added. <body class="dark">
+//
+// Which makes an empty value mean something in the last two - nothing on the
+// tag in that state, the common shape: nothing in light, dark in dark.
 type SchemeConfig struct {
 	Select    bool   `json:"select"`              // offer the switch in the user button
-	Mechanism string `json:"mechanism,omitempty"` // "" (color-scheme only) | attribute | class
-	Attribute string `json:"attribute,omitempty"` // attribute name (mechanism=attribute)
-	Light     string `json:"light,omitempty"`     // attribute value or class for light
-	Dark      string `json:"dark,omitempty"`      // attribute value or class for dark
+	Mechanism string `json:"mechanism,omitempty"` // "" (color-scheme only) | attribute | add-attribute | class
+	Tag       string `json:"tag,omitempty"`       // target tag, default html
+	Attribute string `json:"attribute,omitempty"` // the attribute written (mechanism=attribute)
+	Light     string `json:"light,omitempty"`     // value, attribute name or class for light
+	Dark      string `json:"dark,omitempty"`      // value, attribute name or class for dark
+	// Button is what the INJECTED BUTTON wears on this route - "" (follow the
+	// visitor), light or dark. Only read when Select is off: a button that
+	// offers the switch has to show the choice, or the switch would lie. It is
+	// there for the application that has one look and no switch, where the
+	// button otherwise follows the visitor's system and floats light on a dark
+	// page. It dresses the chrome alone; the page is never touched.
+	Button string `json:"button,omitempty"`
+}
+
+// SchemeMechanisms are the ways an application's own light/dark switch is
+// driven, "" (the CSS color-scheme alone) aside.
+var SchemeMechanisms = []string{"attribute", "add-attribute", "class"}
+
+// SchemeSetsAttribute says whether a mechanism carries an attribute NAME of
+// its own. The other two spell their two names out in Light and Dark.
+func SchemeSetsAttribute(mechanism string) bool {
+	return mechanism == "attribute"
 }
 
 // RolesConfig puts the user's EFFECTIVE role names on the page - as classes
@@ -1325,12 +1373,17 @@ type Route struct {
 	// Nil, or present and off, is off - the state of every route until
 	// somebody turns it on.
 	Breaker *CircuitBreaker `json:"breaker,omitempty"`
+	// Limits bounds how much this route carries (ROUTE-08). Several at once,
+	// each keyed on something different - the whole route, a user, a token, an
+	// organisation, an address - because they are bounds and you want all of
+	// them. See ratelimit.go.
+	Limits []RateLimit `json:"limits,omitempty"`
 }
 
 // ListRoutes returns every route ordered by ascending Order.
 func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker
+		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits
 		 FROM routes ORDER BY ord ASC, name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list routes: %w", err)
@@ -1339,9 +1392,9 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 	var routes []Route
 	for rows.Next() {
 		var r Route
-		var preds, filts, api, ui, identity, locales, access, timeouts, breaker string
+		var preds, filts, api, ui, identity, locales, access, timeouts, breaker, rateLimits string
 		if err := rows.Scan(&r.ID, &r.Name, &r.Order, &r.Enabled,
-			&r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker); err != nil {
+			&r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits); err != nil {
 			return nil, fmt.Errorf("store: scan route: %w", err)
 		}
 		if err := json.Unmarshal([]byte(preds), &r.Predicates); err != nil {
@@ -1350,7 +1403,8 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 		if err := json.Unmarshal([]byte(filts), &r.Filters); err != nil {
 			return nil, fmt.Errorf("store: route %q: bad filters: %w", r.Name, err)
 		}
-		if err := decodeRouteOptions(&r, api, ui, identity, locales, access, timeouts, breaker); err != nil {
+		if err := decodeRouteOptions(&r, routeColumns{api: api, ui: ui, identity: identity,
+			locales: locales, access: access, timeouts: timeouts, breaker: breaker, rateLimits: rateLimits}); err != nil {
 			return nil, fmt.Errorf("store: route %q: %w", r.Name, err)
 		}
 		routes = append(routes, r)
@@ -1368,6 +1422,9 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 	// cleaned in five of them is a rule nobody can trust.
 	if err := SanitizeAccess(&r.Access); err != nil {
 		return invalidf(err)
+	}
+	if err := SanitizeRateLimits(r.Limits); err != nil {
+		return err
 	}
 	if err := SanitizeRouteTimeouts(r.Timeouts); err != nil {
 		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
@@ -1440,17 +1497,26 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 	if err != nil {
 		return fmt.Errorf("store: route %q: %w", r.Name, err)
 	}
+	rateLimits := "[]"
+	if len(r.Limits) > 0 {
+		b, mErr := json.Marshal(r.Limits)
+		if mErr != nil {
+			return fmt.Errorf("store: route %q: %w", r.Name, mErr)
+		}
+		rateLimits = string(b)
+	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO routes (id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO routes (id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, ord = excluded.ord, enabled = excluded.enabled,
 		   is_ui = excluded.is_ui, upstream = excluded.upstream,
 		   predicates = excluded.predicates, filters = excluded.filters,
 		   api = excluded.api, ui = excluded.ui, identity = excluded.identity, locales = excluded.locales,
-		   access = excluded.access, timeouts = excluded.timeouts, breaker = excluded.breaker`,
+		   access = excluded.access, timeouts = excluded.timeouts, breaker = excluded.breaker,
+		   rate_limits = excluded.rate_limits`,
 		r.ID, r.Name, r.Order, r.Enabled, r.IsUI, r.Upstream,
-		string(preds), string(filts), api, ui, identity, locales, string(access), timeouts, breaker)
+		string(preds), string(filts), api, ui, identity, locales, string(access), timeouts, breaker, rateLimits)
 	if err != nil {
 		return fmt.Errorf("store: save route %q: %w", r.Name, err)
 	}
@@ -1480,11 +1546,11 @@ func (s *Store) ReorderRoutes(ctx context.Context, ids []string) error {
 // GetRoute returns one route by ID, or an error wrapping sql.ErrNoRows.
 func (s *Store) GetRoute(ctx context.Context, id string) (Route, error) {
 	var r Route
-	var preds, filts, api, ui, identity, locales, access, timeouts, breaker string
+	var preds, filts, api, ui, identity, locales, access, timeouts, breaker, rateLimits string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker
+		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits
 		 FROM routes WHERE id = ?`, id).
-		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker)
+		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits)
 	if err != nil {
 		return Route{}, fmt.Errorf("store: get route %q: %w", id, err)
 	}
@@ -1494,7 +1560,8 @@ func (s *Store) GetRoute(ctx context.Context, id string) (Route, error) {
 	if err := json.Unmarshal([]byte(filts), &r.Filters); err != nil {
 		return Route{}, fmt.Errorf("store: route %q: bad filters: %w", id, err)
 	}
-	if err := decodeRouteOptions(&r, api, ui, identity, locales, access, timeouts, breaker); err != nil {
+	if err := decodeRouteOptions(&r, routeColumns{api: api, ui: ui, identity: identity,
+		locales: locales, access: access, timeouts: timeouts, breaker: breaker, rateLimits: rateLimits}); err != nil {
 		return Route{}, fmt.Errorf("store: route %q: %w", id, err)
 	}
 	return r, nil
@@ -1512,7 +1579,29 @@ func (s *Store) DeleteRoute(ctx context.Context, id string) (bool, error) {
 
 // decodeRouteOptions hydrates the per-type option objects; "{}" stays nil so
 // the JSON API omits what was never configured.
-func decodeRouteOptions(r *Route, api, ui, identity, locales, access, timeouts, breaker string) error {
+// routeColumns is a route's JSON columns as they come out of the database.
+//
+// A struct rather than eight positional strings, for the reason NewToken gives
+// two hundred lines up: two of them swapped compiles, runs, and turns a
+// route's access rule into its timeouts. They are all the same type, so the
+// compiler has nothing to say about the order.
+type routeColumns struct {
+	api, ui, identity, locales, access, timeouts, breaker, rateLimits string
+}
+
+func decodeRouteOptions(r *Route, c routeColumns) error {
+	api, ui, identity := c.api, c.ui, c.identity
+	locales, access, timeouts, breaker := c.locales, c.access, c.timeouts, c.breaker
+	// Every spelling of "nothing here" is accepted, and that is not laxity: a
+	// column added to an existing database carries whatever default the
+	// ALTER gave it, which is not something the row's writer chose.
+	switch c.rateLimits {
+	case "", "[]", "{}", "null":
+	default:
+		if err := json.Unmarshal([]byte(c.rateLimits), &r.Limits); err != nil {
+			return fmt.Errorf("bad rate limits: %w", err)
+		}
+	}
 	if access != "" && access != "{}" {
 		if err := json.Unmarshal([]byte(access), &r.Access); err != nil {
 			return fmt.Errorf("bad access options: %w", err)

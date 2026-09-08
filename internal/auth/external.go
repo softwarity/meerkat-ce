@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -406,7 +407,7 @@ func (h *Handler) setAuthState(w http.ResponseWriter, r *http.Request, st authSt
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: authStateCookie, Value: base64.RawURLEncoding.EncodeToString(raw), Path: "/",
-		HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: filters.Secure(r), SameSite: http.SameSiteLaxMode,
 		MaxAge: int(authStateTTL.Seconds()),
 	})
 }
@@ -420,7 +421,7 @@ func (h *Handler) takeAuthState(w http.ResponseWriter, r *http.Request) (authSta
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: authStateCookie, Value: "", Path: "/", MaxAge: -1,
-		HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: filters.Secure(r), SameSite: http.SameSiteLaxMode,
 	})
 	raw, err := base64.RawURLEncoding.DecodeString(c.Value)
 	if err != nil {

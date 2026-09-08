@@ -255,13 +255,16 @@ jobs:
   # private schema when MEERKAT_TEST_DATABASE_URL names a server, and returns
   # nothing when it does not, so `go test ./...` on a laptop is untouched.
   #
-  # Runs on BOTH trees, like the integration suite: the mirror answers for the
-  # community half on free minutes, and the Enterprise tree answers for the
-  # code only it can link.
+  # This tree only. Connecting to an external database is one of the two
+  # images' differences, so it is the only one that can be pointed at a server:
+  # the other answers a database URL in words and every test that needs one
+  # skips. A job that spun up PostgreSQL over there would have been green about
+  # nothing, which is the failure this job was written to prevent.
   postgres:
     name: The suite on PostgreSQL
     runs-on: ubuntu-latest
     needs: edition
+    if: needs.edition.outputs.enterprise == 'true'
     services:
       postgres:
         image: postgres:18-alpine
@@ -291,16 +294,16 @@ jobs:
       # it is run alone, verbosely, and counted.
       - name: Prove the server is actually reached
         run: |
-          go test ./internal/store/ -run TestAgainstARealPostgres -count=1 -v 2>&1 | tee out.txt
+          go test -tags ee ./internal/store/ -run TestAgainstARealPostgres -count=1 -v 2>&1 | tee out.txt
           grep -q -- '--- PASS: TestAgainstARealPostgres' out.txt \
             || { echo "the suite did not reach PostgreSQL"; exit 1; }
       # No -race here: the point is the dialect, not the concurrency, and the
       # areas above already run the whole tree under the detector.
-      - name: Community
-        if: needs.edition.outputs.enterprise == 'false'
-        run: go test ./... -count=1
-      - name: Enterprise
-        if: needs.edition.outputs.enterprise == 'true'
+      #
+      # ./... and not the areas' list: this is where ee/changebus meets a real
+      # server, and two gateways agreeing with each other is the one thing no
+      # single-process test can answer.
+      - name: The suite
         run: go test -tags ee ./... -count=1
 
   # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
@@ -478,7 +481,15 @@ jobs:
     # and a skipped dependency skips its dependants - the publication would
     # never fire.
     needs: [edition, lint, unit, test, postgres, directories, e2e, build, console]
-    if: success() && github.event_name != 'pull_request' && needs.edition.outputs.enterprise == 'true'
+    # main, or asked for by hand. Every branch used to publish one, and
+    # `type=ref,event=branch` gave each its own tag - ten minutes a push for
+    # an image nobody pulls, which is the same waste the Dependabot branches
+    # were taken out of the pipeline for. A dispatch still builds one on
+    # demand, so the escape hatch stays.
+    if: >-
+      success() && github.event_name != 'pull_request'
+      && needs.edition.outputs.enterprise == 'true'
+      && (github.ref_name == 'main' || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
       # Granted, not used: a called workflow cannot request more than its
@@ -509,7 +520,15 @@ jobs:
     needs: [edition, lint, unit, test, postgres, directories, e2e, build, console]
     # And this one could not build at all without ee/: it IS the code the
     # linker puts in.
-    if: success() && github.event_name != 'pull_request' && needs.edition.outputs.enterprise == 'true'
+    # main, or asked for by hand. Every branch used to publish one, and
+    # `type=ref,event=branch` gave each its own tag - ten minutes a push for
+    # an image nobody pulls, which is the same waste the Dependabot branches
+    # were taken out of the pipeline for. A dispatch still builds one on
+    # demand, so the escape hatch stays.
+    if: >-
+      success() && github.event_name != 'pull_request'
+      && needs.edition.outputs.enterprise == 'true'
+      && (github.ref_name == 'main' || github.event_name == 'workflow_dispatch')
     secrets: inherit
     uses: ./.github/workflows/_docker.yml
     with:

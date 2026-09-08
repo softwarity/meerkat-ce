@@ -367,13 +367,19 @@ const userButtonJS = `(() => {
           console.error('meerkat: the user button failed to redraw', e);
         }
       });
-      // The button ITSELF always honors the user's scheme choice (the cookie
-      // set on the flow pages): the shadow's light-dark() theme tokens and
-      // system colors follow the host's color-scheme. Driving the PAGE is the
-      // agent's business, and only when the route offers the switch.
-      this.wearScheme(getCookie(COOKIE_SCHEME) || 'auto');
-      // In auto, follow the system live - unless the integrator settled it,
-      // which the payload tells us below.
+      // The button ITSELF honors the user's scheme choice (the cookie set on
+      // the flow pages): the shadow's light-dark() theme tokens and system
+      // colors follow the host's color-scheme. Driving the PAGE is the agent's
+      // business, and only when the route offers the switch.
+      //
+      // Unless the route dressed it: a page with no switch has nothing for the
+      // button to follow, so it says what the chrome wears here. It settles it
+      // the way the integrator's own choice does - the system is not followed
+      // and the payload does not override it below.
+      const wear = this.getAttribute('scheme-wear');
+      if (wear) this.schemeImposed = true;
+      this.wearScheme(wear || getCookie(COOKIE_SCHEME) || 'auto');
+      // In auto, follow the system live - unless it has been settled.
       darkMedia.addEventListener('change', () => {
         if (this.schemeImposed) return;
         if ((getCookie(COOKIE_SCHEME) || 'auto') === 'auto') this.wearScheme('auto');
@@ -383,7 +389,7 @@ const userButtonJS = `(() => {
           // The integrator settled light/dark: wear it, whatever the cookie or
           // the system say. Applied before rendering so the button never shows
           // one look and then swaps.
-          if (data.schemeImposed) {
+          if (data.schemeImposed && !wear) {
             this.schemeImposed = true;
             this.wearScheme(data.scheme);
           }

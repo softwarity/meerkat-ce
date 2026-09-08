@@ -59,8 +59,9 @@ func TestRegisterConsoleValidation(t *testing.T) {
 
 func TestEmbeddedConsoleServing(t *testing.T) {
 	fsys := fstest.MapFS{
-		"index.html":     {Data: []byte("<html>shell</html>")},
-		"main-K7KMUD.js": {Data: []byte("js")},
+		"index.html":                      {Data: []byte("<html>shell</html>")},
+		"main-K7KMUD.js":                  {Data: []byte("js")},
+		"monitoring/swarm/prometheus.yml": {Data: []byte("global:\n")},
 	}
 	// No store and no sessions: this test is about serving, and an unstamped
 	// shell is exactly what an anonymous visitor gets.
@@ -92,6 +93,20 @@ func TestEmbeddedConsoleServing(t *testing.T) {
 		}
 		if cc := res.Header.Get("Cache-Control"); !strings.Contains(cc, "immutable") {
 			t.Fatalf("Cache-Control %q: hashed asset must be immutable", cc)
+		}
+	})
+
+	// Angular hashes what it builds and nothing else. A file shipped under
+	// public/ keeps its name across releases, so a year of immutable would
+	// hand an upgraded gateway last year's monitoring template with no way to
+	// ask for the new one.
+	t.Run("a file that keeps its name revalidates", func(t *testing.T) {
+		res := get(t, "/monitoring/swarm/prometheus.yml", "")
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("got %d", res.StatusCode)
+		}
+		if cc := res.Header.Get("Cache-Control"); cc != "no-cache" {
+			t.Fatalf("Cache-Control %q, want no-cache: this name outlives the build", cc)
 		}
 	})
 

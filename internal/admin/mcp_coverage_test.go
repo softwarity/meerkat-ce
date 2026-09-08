@@ -149,6 +149,7 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 	// must cover every non-GET endpoint exactly once.
 	writesSomething := map[string]bool{
 		"POST /api/admin-tokens": true, "POST /api/admin-tokens/{id}/toggle": true,
+		"PUT /api/admin-tokens/{id}": true, "POST /api/admin-tokens/{id}/renew": true,
 		"DELETE /api/admin-tokens/{id}": true, "POST /api/apidocs/token": true,
 		"POST /api/certificates/import": true, "POST /api/certificates/self-signed": true,
 		"POST /api/certificates/signing-request": true, "POST /api/certificates/{id}/adopt": true,

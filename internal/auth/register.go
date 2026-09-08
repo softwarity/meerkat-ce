@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/softwarity/meerkat/internal/captcha"
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -414,7 +415,7 @@ func (h *Handler) sendConfirmation(r *http.Request, u store.User) error {
 // base a mailed link can use (the gateway fronts arbitrary domains).
 func (h *Handler) externalURL(r *http.Request) string {
 	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+	if filters.Secure(r) {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host

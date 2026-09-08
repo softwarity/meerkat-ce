@@ -8,94 +8,137 @@
      with no content has no height to draw in - it opens, and nothing appears. -->
 <mat-drawer-container hasBackdrop>
   <mat-drawer position="end" mode="over" [opened]="prometheusOpen()" (closedStart)="prometheusOpen.set(false)">
-    <div class="drawer-head">
-      <h2 i18n="@@Metrics_prometheus_title">Send it to Prometheus</h2>
-      <span class="grow"></span>
-      <button matIconButton (click)="prometheusOpen.set(false)" i18n-aria-label="@@Close" aria-label="Close">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
-    <p class="hint" i18n="@@Metrics_prometheus_hint">
-      The curves on this page are held in memory and start again when the gateway restarts.
-      Prometheus reads the raw counters instead, on its own schedule, and keeps whatever history
-      you configure. The two are not two modes: this page goes on working while it scrapes.
-    </p>
-
-    <!-- The switch, locked on the community image. The counters and this
-         screen are in BOTH editions - a gateway you can see with nothing to
-         install is what the community image promises - and what is sold is
-         externalising them into the stack a customer already runs. -->
-    <div class="expose" ee-feature="prometheus">
-      <mat-slide-toggle
-        [checked]="exposed()"
-        [disabled]="saving()"
-        (change)="expose($event.checked)"
-      >
-        <ng-container i18n="@@Metrics_expose">Expose {{ exposePath() }}</ng-container>
-        <app-ee-lock
-          feature="OBS-05"
-          i18n-why="@@Metrics_prometheus_why"
-          why="Expose /metrics so an existing monitoring stack scrapes this gateway, with the history and the alerting it already has."
-        />
-      </mat-slide-toggle>
-      <p class="hint" i18n="@@Metrics_expose_hint">
-        It answers on the control plane, this port, and it needs a token minted with the
-        <strong>metrics</strong> perimeter - which opens this one path and nothing else. A
-        scraper's credential lives in a monitoring stack's configuration, often another team's
-        repository: the one place a token is most likely to leak and least likely to be rotated.
+    <div class="drawer-body">
+      <div class="drawer-head">
+        <h2 i18n="@@Metrics_prometheus_title">Send it to Prometheus and display it in Grafana</h2>
+        <span class="grow"></span>
+        <button matIconButton (click)="prometheusOpen.set(false)" i18n-aria-label="@@Close" aria-label="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <p class="hint" i18n="@@Metrics_prometheus_hint">
+        The curves on this page are held in memory and start again when the gateway restarts.
+        Prometheus reads the raw counters instead, on its own schedule, and keeps whatever history
+        you configure. The two are not two modes: this page goes on working while it scrapes.
       </p>
-      <a routerLink="/infra/access-tokens" i18n="@@Metrics_mint_token">Mint one under Access tokens</a>
+
+      <!-- The switch, locked on the community image. The counters and this
+           screen are in BOTH editions - a gateway you can see with nothing to
+           install is what the community image promises - and what is sold is
+           externalising them into the stack a customer already runs. -->
+      <div class="expose" ee-feature="prometheus">
+        <mat-slide-toggle
+          [checked]="exposed()"
+          [disabled]="saving()"
+          (change)="expose($event.checked)"
+        >
+          <ng-container i18n="@@Metrics_expose">Expose {{ exposePath() }}</ng-container>
+          <app-ee-lock
+            feature="OBS-05"
+            i18n-why="@@Metrics_prometheus_why"
+            why="Expose /metrics so an existing monitoring stack scrapes this gateway, with the history and the alerting it already has."
+          />
+        </mat-slide-toggle>
+        <p class="hint" i18n="@@Metrics_expose_hint">
+          It answers on this port, the console's, and it needs a token minted with the
+          <strong>metrics</strong> perimeter - which opens this one path and nothing else. A
+          scraper's credential lives in a monitoring stack's configuration, often another team's
+          repository: the one place a token is most likely to leak and least likely to be rotated.
+        </p>
+        <a routerLink="/infra/access-tokens" i18n="@@Metrics_mint_token">Mint one under Access tokens</a>
+      </div>
+
+      <!-- Two groups: what the tools READ, and what a platform is handed.
+           Four panels in a row made Prometheus and Docker Swarm look like two
+           answers to one question. Content built on OPEN, not with the panel -
+           a snippet is a CodeMirror instance. -->
+      <h3 class="group" i18n="@@Metrics_group_config">Configuration</h3>
+      <mat-accordion class="how">
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title i18n="@@Metrics_scrape">Prometheus</mat-panel-title>
+          </mat-expansion-panel-header>
+          <ng-template matExpansionPanelContent>
+            <p class="hint" i18n="@@Metrics_scrape_hint">
+              One scrape everywhere. The only thing a platform changes is how the target is found, so
+              the file carries both ways, each commented with the platform it belongs to. Download the
+              one you need: its own block comes back uncommented, the other one is gone. Both find
+              every node rather than the service in front of them - the counters are per node, and a
+              load balancer would hand a different one to each scrape.
+            </p>
+            <app-snippet filename="prometheus.yml" [content]="scrape()" [variants]="scrapeVariants()" />
+          </ng-template>
+        </mat-expansion-panel>
+
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title i18n="@@Metrics_grafana">Grafana</mat-panel-title>
+          </mat-expansion-panel-header>
+          <ng-template matExpansionPanelContent>
+            <p class="hint" i18n="@@Metrics_grafana_hint">
+              A dashboard that shows up on its own: the three provisioning files below are mounted
+              by the compose file, and Grafana comes up with Meerkat already drawn. The queries are
+              underneath, one per panel, for the panels a team adds around what it cares about.
+            </p>
+            <app-snippet filename="datasource.yaml" [content]="grafanaSource()" />
+            <app-snippet filename="dashboards.yaml" [content]="grafanaDashboards()" />
+            <app-snippet filename="dashboard.json" [content]="grafanaDashboard()" />
+            <app-snippet filename="queries.promql" [content]="grafanaQueries()" />
+          </ng-template>
+        </mat-expansion-panel>
+      </mat-accordion>
+
+      <h3 class="group" i18n="@@Metrics_group_deploy">Deployment</h3>
+      <mat-accordion class="how">
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title i18n="@@Metrics_swarm">Docker Swarm</mat-panel-title>
+          </mat-expansion-panel-header>
+          <ng-template matExpansionPanelContent>
+            <p class="hint" i18n="@@Metrics_swarm_hint">
+              Prometheus and Grafana join the network this gateway is already on, so the scrape never
+              leaves the cluster. Nothing is published either: give each of them a route and they
+              are reached the way everything else behind this gateway is. Grafana's own sign-in is
+              off - the route forwards the account in headers and Grafana trusts them - so a
+              published port would hand it to anyone.
+            </p>
+            <app-snippet
+              filename="docker-compose.yml"
+              downloadAs="monitoring-compose.yml"
+              [content]="swarmStack()"
+            />
+          </ng-template>
+        </mat-expansion-panel>
+
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title i18n="@@Metrics_k8s">Kubernetes</mat-panel-title>
+          </mat-expansion-panel-header>
+          <ng-template matExpansionPanelContent>
+            <p class="hint" i18n="@@Metrics_k8s_hint">
+              With the Prometheus Operator, the object below is the whole configuration and there is
+              no scrape file to write. Without it, take the Kubernetes download above. Every gateway
+              answers, and each counts what it served.
+            </p>
+            <app-snippet filename="servicemonitor.yaml" [content]="k8sMonitor()" />
+          </ng-template>
+        </mat-expansion-panel>
+      </mat-accordion>
     </div>
-
-    <!-- Read once, when somebody wires the stack up, so each half is folded
-         away until it is the one being followed. -->
-    <mat-accordion class="how">
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title i18n="@@Metrics_swarm">Docker Swarm</mat-panel-title>
-        </mat-expansion-panel-header>
-        <p class="hint" i18n="@@Metrics_swarm_hint">
-          Prometheus and Grafana join the network this gateway is already on, so the scrape never
-          leaves the cluster. Only the two consoles are published.
-        </p>
-        <app-snippet filename="create-secret.sh" [content]="swarmSecret" />
-        <app-snippet filename="prometheus.yml" [content]="swarmScrape()" />
-        <app-snippet filename="monitoring.yml" [content]="swarmStack()" />
-      </mat-expansion-panel>
-
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title i18n="@@Metrics_k8s">Kubernetes</mat-panel-title>
-        </mat-expansion-panel-header>
-        <p class="hint" i18n="@@Metrics_k8s_hint">
-          With the Prometheus Operator, a ServiceMonitor is the whole configuration. Without it,
-          the plain scrape config below discovers the pods through the API - every gateway
-          answers, and each counts what it served.
-        </p>
-        <app-snippet filename="create-secret.sh" [content]="k8sSecret" />
-        <app-snippet filename="servicemonitor.yaml" [content]="k8sMonitor()" />
-        <app-snippet filename="scrape-config.yml" [content]="k8sScrape()" />
-      </mat-expansion-panel>
-
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title i18n="@@Metrics_grafana">Grafana</mat-panel-title>
-        </mat-expansion-panel-header>
-        <p class="hint" i18n="@@Metrics_grafana_hint">
-          The queries a gateway is read on, one per panel. A dashboard is something a team builds
-          around what it cares about; these are the questions worth starting from.
-        </p>
-        <app-snippet filename="datasource.yaml" [content]="grafanaSource" />
-        <app-snippet filename="queries.promql" [content]="grafanaQueries" />
-      </mat-expansion-panel>
-    </mat-accordion>
   </mat-drawer>
   <mat-drawer-content>
 <header>
   <h1 i18n="@@Metrics">Metrics</h1>
   <span class="grow"></span>
-  <button matButton="tonal" type="button" (click)="prometheusOpen.set(true)">
-    <mat-icon>open_in_new</mat-icon>
+  <!-- The button carries the STATE, so nobody opens the drawer to find out
+       whether anything is scraping. -->
+  <button
+    [matButton]="exposed() ? 'filled' : 'tonal'"
+    type="button"
+    (click)="prometheusOpen.set(true)"
+    [matTooltip]="prometheusTip()"
+  >
+    <mat-icon>{{ exposed() ? 'sensors' : 'sensors_off' }}</mat-icon>
     <ng-container i18n="@@Metrics_prometheus">Prometheus</ng-container>
     <app-ee-lock
       feature="OBS-05"

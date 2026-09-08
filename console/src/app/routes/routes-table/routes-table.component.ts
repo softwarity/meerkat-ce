@@ -35,6 +35,10 @@ export class RoutesTableComponent {
   // route id. Empty until it is loaded, and a route with no entry says nothing
   // - which is the honest answer for one nobody has called yet.
   readonly health = input<Record<string, RouteHealth>>({});
+  // Where the applications answer, from the gateway itself. Empty until it is
+  // loaded, and an empty one hides the open button rather than aiming it at
+  // the console's own origin - which is the one address that is always wrong.
+  readonly dataOrigin = input('');
   readonly edit = output<Route>();
   readonly remove = output<Route>();
   readonly duplicate = output<Route>();
@@ -52,6 +56,24 @@ export class RoutesTableComponent {
       ? $localize`:@@Drag_to_reorder:Drag to reorder`
       : $localize`:@@Clear_the_search_to_reorder:Reordering applies to the whole list: clear the search to move a route`,
   );
+
+  // Where a UI route ANSWERS, as a browser would ask for it: the first path
+  // pattern with its wildcards cut off. A route matched on the host alone has
+  // no path of its own and opens at the root.
+  //
+  // The link is left to the browser rather than fetched here: an unauthorised
+  // caller has to LAND on the gateway's own answer - the sign-in page, or the
+  // page saying which organisation or role was wanted - and a fetch would turn
+  // all of that into a status code nobody reads.
+  protected openUrl(r: Route): string {
+    const origin = this.dataOrigin();
+    if (!origin) return '';
+    const first = (r.predicates ?? [])
+      .filter((p) => p.type === 'path')
+      .flatMap((p) => (p.args?.['patterns'] as string[]) ?? [])[0];
+    const path = (first ?? '/').replace(/\*.*$/, '');
+    return origin + (path.startsWith('/') ? path : '/' + path);
+  }
 
   // Row-actions toolbars self-close on row click (closeOnClick, 3.1.0) -
   // nothing floats over the editor drawer this click opens.

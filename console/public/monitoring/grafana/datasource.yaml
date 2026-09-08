@@ -1,0 +1,11 @@
+# /etc/grafana/provisioning/datasources/
+
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    # Fixed, because the dashboard points at it by uid.
+    uid: meerkat-prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true

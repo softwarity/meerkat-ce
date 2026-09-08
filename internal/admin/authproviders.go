@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
@@ -301,10 +302,7 @@ func (a *API) callbackBase(r *http.Request) string {
 // has to be given (GitHub asks for a homepage AND a callback) is rooted here,
 // never in the console's own address.
 func (a *API) dataOrigin(r *http.Request) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
+	scheme := filters.Scheme(r)
 	host := a.DataAddr
 	if host == "" || strings.HasPrefix(host, ":") {
 		// No explicit data address: same hostname, its own port.

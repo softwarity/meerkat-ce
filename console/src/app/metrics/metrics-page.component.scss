@@ -102,11 +102,16 @@ h2 {
 
 /* The drawer, same head as the ones on the routes banner. */
 mat-drawer {
-  /* Wide enough for a configuration file. The snippets scroll rather than
-     wrap - a wrapped line of YAML is a line somebody pastes wrong - so the
-     width is what decides whether the comments are readable in place. */
+  /* Wide enough for a configuration file: the snippets WRAP rather than
+     scroll sideways, so the width is what decides how often a line of YAML is
+     read in two pieces. */
   width: 680px;
   max-width: 96vw;
+}
+/* Padded here and not on the drawer: Material scrolls the drawer's inner
+   container and centres a 48px touch target on a 40px icon button, so a close
+   button flush with that edge overhangs it and grows a horizontal scrollbar. */
+.drawer-body {
   padding: 16px 24px 32px;
 }
 .drawer-head {
@@ -267,6 +272,24 @@ mat-drawer {
   display: block;
   margin-bottom: 16px;
 }
+/* The two groups the four panels fall into: what Prometheus and Grafana read,
+   and what a platform has to be handed. */
+.group {
+  margin: 20px 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mat-sys-on-surface-variant);
+}
 .how .hint {
   margin: 0 0 12px;
+}
+
+/* The Enterprise badge rides INSIDE this button, and the button is filled
+   once /metrics is exposed - tertiary pink on the primary ground, which is
+   two hues and no contrast. On a button, the legible answer is the button's
+   own text color, whichever variant it is wearing. */
+header button app-ee-lock {
+  --mk-ee-lock-color: currentColor;
 }

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/softwarity/meerkat/internal/filters"
 )
 
 // Sending plaintext to the HTTPS door (SSL-06).
@@ -55,7 +57,7 @@ func (d *Redirect) state() (bool, string) {
 func (d *Redirect) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		on, to := d.state()
-		if !on || r.TLS != nil || exemptFromRedirect(r.URL.Path) {
+		if !on || filters.Secure(r) || exemptFromRedirect(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

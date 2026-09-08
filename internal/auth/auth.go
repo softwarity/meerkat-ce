@@ -1859,6 +1859,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		mux.HandleFunc("POST /register/captcha", h.doRegisterCaptcha)
 		mux.HandleFunc("GET /confirm", h.doConfirm)
 		mux.HandleFunc("GET /account-pending", h.showAccountPending)
+		// Signed in and refused anyway (RBAC-06), the third of the three
+		// refusals that has something to say.
+		mux.HandleFunc("GET /refused", h.showRefused)
 		// The injected <meerkat-user-button> web component (UI routes).
 		h.registerUserButton(mux)
 		// The live channel the served pages listen on (generic, not tied to

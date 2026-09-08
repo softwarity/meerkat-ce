@@ -11,6 +11,16 @@
           placeholder="Search"
         />
       </app-form-field>
+      <!-- UI routes are a different job from the services around them, and on a
+           long list they are hard to pick out: the marker beside a name only
+           helps once you have found the row. -->
+      <mat-form-field class="kind" subscriptSizing="dynamic">
+        <mat-select [value]="kind()" (selectionChange)="kind.set($event.value)">
+          <mat-option value="all" i18n="@@All_routes">All routes</mat-option>
+          <mat-option value="ui" i18n="@@UI_routes">UI routes</mat-option>
+          <mat-option value="service" i18n="@@Service_routes">Service routes</mat-option>
+        </mat-select>
+      </mat-form-field>
       <button matIconButton (click)="load()" i18n-matTooltip="@@Refresh" matTooltip="Refresh" i18n-aria-label="@@Refresh" aria-label="Refresh">
         @if (loading()) {<mat-icon spin>autorenew</mat-icon>} @else {<mat-icon>refresh</mat-icon>}
       </button>
@@ -61,11 +71,18 @@
       } @else if (routes().length === 0) {
         <div class="empty" i18n="@@No_route_yet_create_the_first_one">No route yet, create the first one.</div>
       } @else if (shown().length === 0) {
-        <div class="empty" i18n="@@No_route_matches_NAME">No route matches "{{ query() }}".</div>
+        @if (query().trim()) {
+          <div class="empty" i18n="@@No_route_matches_NAME">No route matches "{{ query() }}".</div>
+        } @else if (kind() === 'ui') {
+          <div class="empty" i18n="@@No_UI_route">No route serves pages in a browser.</div>
+        } @else {
+          <div class="empty" i18n="@@No_service_route">Every route serves pages in a browser.</div>
+        }
       } @else {
         <app-routes-table
           [routes]="shown()"
           [health]="health()"
+          [dataOrigin]="dataOrigin()"
           [reorderable]="!query().trim()"
           (edit)="openEdit($event)"
           (remove)="remove($event)"

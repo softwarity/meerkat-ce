@@ -1,4 +1,5 @@
 import { Range } from '@codemirror/state';
+import { MOCHA } from '../shared/catppuccin';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 
 // Colouring a Go template, shallowly.
@@ -44,9 +45,13 @@ export const TPL_COLORS = {
   action: 'var(--mat-sys-tertiary)',
   field: 'var(--mk-signal)',
   var: 'var(--mat-sys-primary)',
-  fn: '#f5a97f',
-  str: '#a6da95',
-  tag: '#eed49f',
+  // Catppuccin MOCHA, from the shared palette. These three were written in
+  // Macchiato back when nothing else in the console had a flavour at all - a
+  // verb that is one peach here and another in the YAML two screens away is
+  // the same "two products" this file's own comment warns about.
+  fn: MOCHA.peach,
+  str: MOCHA.green,
+  tag: MOCHA.yellow,
 } as const;
 
 export type TplKind = keyof typeof TPL_COLORS;

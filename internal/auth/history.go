@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/filters"
+
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -38,16 +40,10 @@ func browserTokenOf(r *http.Request) string {
 	return ""
 }
 
-// clientIP is the peer as seen from the gateway: the rightmost X-Forwarded-For
-// entry when a fronting proxy added one (the only hop-controlled value),
-// otherwise the connection's remote address.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[len(parts)-1])
-	}
-	return hostOnly(r.RemoteAddr)
-}
+// clientIP is the peer as seen from the gateway. The rule lives in
+// internal/filters because the rate limiter reads it too, and who gets counted
+// and what a history shows must not drift apart.
+func clientIP(r *http.Request) string { return filters.ClientIP(r) }
 
 // countryOf captures the viewer country a fronting CDN/LB resolved, when one
 // did: the gateway is offline-first and never calls a GeoIP service itself.
@@ -75,7 +71,7 @@ func (h *Handler) recordLogin(w http.ResponseWriter, r *http.Request, userID, me
 			token = t
 			http.SetCookie(w, &http.Cookie{
 				Name: browserCookieName, Value: token, Path: "/",
-				HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteLaxMode,
+				HttpOnly: true, Secure: filters.Secure(r), SameSite: http.SameSiteLaxMode,
 				MaxAge: 2 * 365 * 24 * 3600,
 			})
 		}

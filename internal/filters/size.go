@@ -3,6 +3,7 @@ package filters
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -146,4 +147,29 @@ func OversizeBody(err error) (*http.MaxBytesError, bool) {
 		return mbe, true
 	}
 	return nil, false
+}
+
+// ClientIP is the caller's address as this gateway is entitled to believe it.
+//
+// The RIGHTMOST X-Forwarded-For entry when a fronting proxy added one, and
+// that is the security part rather than a detail: the header is a list anybody
+// can prepend to, and only the last entry was written by the hop we are
+// actually talking to. Reading the leftmost - the "original client" the
+// specification describes - would let any caller name their own address, which
+// on a rate limit means bypassing it by inventing a new one per request.
+//
+// Written HERE so the two callers share one rule. It decides who gets counted
+// (internal/gateway) and what a sign-in history shows (internal/auth), and a
+// security rule written twice is a rule with a copy that drifts.
+func ClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
+			return last
+		}
+	}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }

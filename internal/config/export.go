@@ -187,7 +187,8 @@ func trimUI(ui *store.RouteUI) {
 		}
 	}
 	if ui.Scheme != nil && !ui.Scheme.Select && ui.Scheme.Mechanism == "" &&
-		ui.Scheme.Light == "" && ui.Scheme.Dark == "" && ui.Scheme.Attribute == "" {
+		ui.Scheme.Light == "" && ui.Scheme.Dark == "" && ui.Scheme.Attribute == "" &&
+		ui.Scheme.Tag == "" && ui.Scheme.Button == "" {
 		ui.Scheme = nil
 	}
 	if ui.Roles != nil && !ui.Roles.Enabled {

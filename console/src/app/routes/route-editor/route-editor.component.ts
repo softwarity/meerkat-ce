@@ -16,8 +16,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { LOCALE_ID } from '@angular/core';
-import { Access, ApiService, CatalogEntry, DiscoveredService, Spec, IDENTITY_FIELDS, IdentityAttr, IdentityForward, LocaleMechanism, PAGE_USER_FIELDS, Role, Route, Tenant, User, USER_BUTTON_POSITIONS } from '../../api.service';
+import { Access, ApiService, CatalogEntry, DiscoveredService, Spec, IDENTITY_FIELDS, IdentityAttr, IdentityForward, LocaleMechanism, PAGE_USER_FIELDS, RateLimit, Role, Route, Tenant, User, USER_BUTTON_POSITIONS } from '../../api.service';
 import { MaintenanceFilterComponent, RedirectFilterComponent, RespondFilterComponent } from '../filters/filter-fields.component';
+import { RateLimitsComponent } from '../rate-limits.component';
 import { runRoleExpr } from '../role-expr-dialog.component';
 import { ROLE_SYNTAX } from '../template-highlight';
 import { TplCodeComponent } from '../tpl-code.component';
@@ -25,6 +26,7 @@ import { MeService } from '../../me.service';
 import { humanDuration } from '../../shared/duration';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { Lazy } from '../../shared/lazy';
 import { UrlInputComponent, UrlSuggestion } from '../../shared/url-input.component';
 import { ACCESS_LEVELS, AccessEditorComponent, AccessState, emptyAccess, levelShort } from '../endpoint-security/access-editor.component';
 import { FiltersComponent } from '../filters/filters.component';
@@ -92,6 +94,7 @@ type Section =
   | 'target'
   | 'modin'
   | 'modout'
+  | 'limits'
   | 'identity'
   | 'button'
   | 'locales'
@@ -102,7 +105,7 @@ type Section =
 // bookmark on the General section that no longer exists - lands on Target
 // rather than on an empty panel.
 const SECTIONS: Section[] = [
-  'security', 'predicates', 'gates', 'target', 'modin', 'modout',
+  'security', 'predicates', 'gates', 'limits', 'target', 'modin', 'modout',
   'identity', 'button', 'locales', 'userinfo', 'inject',
 ];
 
@@ -124,6 +127,7 @@ const SECTION_LABEL: Record<Section, string> = {
   security: $localize`:@@Section_security:Security`,
   predicates: $localize`:@@Predicates:Predicates`,
   gates: $localize`:@@Gates:Gates`,
+  limits: $localize`:@@Section_limits:Rate limits`,
   target: $localize`:@@Section_target:Target`,
   modin: $localize`:@@Incoming:Incoming`,
   modout: $localize`:@@Outgoing:Outgoing`,
@@ -236,6 +240,9 @@ function draftOf(r: Route | null) {
     isUi: r?.isUi ?? false,
     predicates: r?.predicates ?? [],
     filters: r?.filters ?? [],
+    // What this route may carry (ROUTE-08). An empty list is a route with no
+    // bound, which is what every route is until somebody writes one.
+    limits: r?.limits ?? [],
     // How long this upstream may take (ROUTE-07). Undefined is the
     // installation's defaults, and stays undefined rather than becoming a pair
     // of empty strings - a route back on the defaults stores nothing.
@@ -254,9 +261,11 @@ function draftOf(r: Route | null) {
     // UI section
     schemeSelect: r?.ui?.scheme?.select ?? false,
     schemeMechanism: r?.ui?.scheme?.mechanism ?? '',
+    schemeTag: r?.ui?.scheme?.tag || 'html',
     schemeAttribute: r?.ui?.scheme?.attribute ?? '',
     schemeLight: r?.ui?.scheme?.light ?? '',
     schemeDark: r?.ui?.scheme?.dark ?? '',
+    schemeButton: r?.ui?.scheme?.button ?? '',
     rolesEnabled: r?.ui?.roles?.enabled ?? false,
     // ONE mode: an attribute on a tag, classes on a tag, or a meta tag.
     rolesMode: (r?.ui?.roles?.mechanism || 'class') as 'class' | 'attribute' | 'meta',
@@ -345,6 +354,7 @@ function draftOf(r: Route | null) {
     FormFieldComponent,
     EeLockComponent,
     AccessEditorComponent,
+    RateLimitsComponent,
     TplCodeComponent,
   ],
   // Opts this drawer into showing a required-and-empty field in the error
@@ -369,6 +379,7 @@ export class RouteEditorComponent {
 
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
+  private readonly lazy = inject(Lazy);
   private readonly router = inject(Router);
 
   protected readonly filterEntries = () => this.catalog().filter((e) => e.kind === 'filter');
@@ -553,6 +564,10 @@ export class RouteEditorComponent {
     this.draft.update((d) => ({ ...d, access: a }));
   }
 
+  protected setLimits(l: RateLimit[]): void {
+    this.draft.update((d) => ({ ...d, limits: l }));
+  }
+
   private readonly ttlLocale = inject(LOCALE_ID);
   // The token-TTL choices, plus the stored value if it is off the preset list.
   protected readonly ttlChoices = computed(() => {
@@ -632,7 +647,9 @@ export class RouteEditorComponent {
   }
 
   protected openRoleExpr(): void {
-    void import('../role-expr-dialog.component').then(({ RoleExprDialogComponent }) => {
+    void this.lazy.load(() => import('../role-expr-dialog.component')).then((mod) => {
+      if (!mod) return;
+      const { RoleExprDialogComponent } = mod;
       this.dialog
         .open(RoleExprDialogComponent, {
           data: { expr: this.draft().identityAttrs['roles'].expr, roles: this.roles(), others: this.otherExprs() },
@@ -904,6 +921,26 @@ export class RouteEditorComponent {
     }));
   }
 
+  // Switching the scheme mechanism DROPS the two values when they stop meaning
+  // the same kind of thing. "set attribute" takes VALUES for one named
+  // attribute - theme-dark="true" reads perfectly there; the other two take
+  // NAMES, and carried across untouched those same two words become a class
+  // called "true", which is what shipped to a live Grafana. Between the two
+  // name mechanisms nothing moves: a class name and a bare attribute name are
+  // the same word, and someone switching between them wants it kept.
+  protected setSchemeMechanism(value: string): void {
+    this.draft.update((d) => {
+      const names = (m: string) => m === 'class' || m === 'add-attribute';
+      const kept = names(d.schemeMechanism) === names(value);
+      return {
+        ...d,
+        schemeMechanism: value as '' | 'attribute' | 'add-attribute' | 'class',
+        schemeLight: kept ? d.schemeLight : '',
+        schemeDark: kept ? d.schemeDark : '',
+      };
+    });
+  }
+
   // Switching the roles mode retargets a name still in its default form.
   protected setRolesMode(value: string): void {
     this.draft.update((d) => {
@@ -1058,9 +1095,11 @@ export class RouteEditorComponent {
       | 'btnShape'
       | 'btnName'
       | 'schemeMechanism'
+      | 'schemeTag'
       | 'schemeAttribute'
       | 'schemeLight'
       | 'schemeDark'
+      | 'schemeButton'
       | 'rolesTag'
       | 'rolesAttribute'
       | 'userInfoMode'
@@ -1120,7 +1159,9 @@ export class RouteEditorComponent {
   // The code editor (CodeMirror) is LAZY-imported: it never weighs on the
   // initial bundle, only on the first "Add CSS/JavaScript" click.
   protected async editCode(kind: CodeKind): Promise<void> {
-    const { CodeDialogComponent } = await import('../code-dialog.component');
+    const mod = await this.lazy.load(() => import('../code-dialog.component'));
+    if (!mod) return;
+    const { CodeDialogComponent } = mod;
     const language = kind === 'css' ? 'css' : 'js';
     // The language script is handed the choice; it has to be told under what
     // name, or it is written by guesswork.
@@ -1180,6 +1221,9 @@ export class RouteEditorComponent {
       predicates: cleanPredicates(d.predicates),
       filters: trimTemplates(cleanSpecs(d.filters)),
       timeouts: d.timeouts,
+      // Absent rather than empty: a route with no bound stores nothing, the
+      // same reading as timeouts left on the defaults.
+      limits: d.limits.length ? d.limits : undefined,
       breaker: d.breakerOn
         ? {
             enabled: true,
@@ -1206,10 +1250,17 @@ export class RouteEditorComponent {
       route.ui = {
         scheme: {
           select: d.schemeSelect,
-          mechanism: d.schemeMechanism as '' | 'attribute' | 'class',
-          attribute: d.schemeAttribute.trim(),
+          mechanism: d.schemeMechanism as '' | 'attribute' | 'add-attribute' | 'class',
+          tag: d.schemeTag.trim(),
+          // Only the mechanism that has an attribute of its own keeps one: a
+          // name left over from a previous mode is a value nothing reads and
+          // everything exports.
+          attribute: d.schemeMechanism === 'attribute' ? d.schemeAttribute.trim() : '',
           light: d.schemeLight.trim(),
           dark: d.schemeDark.trim(),
+          // Only read when the switch is off - a button that offers it has to
+          // show the choice - so it is not saved when the switch is on.
+          button: d.schemeSelect ? '' : (d.schemeButton as '' | 'light' | 'dark'),
         },
         roles: {
           enabled: d.rolesEnabled,

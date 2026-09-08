@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/mfa"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -83,7 +84,7 @@ func (h *Handler) issueTrust(w http.ResponseWriter, r *http.Request, userID stri
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   filters.Secure(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(d.Seconds()),
 	})

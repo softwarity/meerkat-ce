@@ -1,6 +1,14 @@
+<mat-drawer-container class="page" hasBackdrop>
+  <mat-drawer-content>
 <header class="bar">
   <div class="title">
-    <h2 i18n="@@Endpoint_security">Endpoint security</h2>
+    <h2>
+      @if (intent() === 'limits') {
+        <ng-container i18n="@@Endpoint_rate_limits">Endpoint rate limits</ng-container>
+      } @else {
+        <ng-container i18n="@@Endpoint_security">Endpoint security</ng-container>
+      }
+    </h2>
     @if (data(); as d) {
       <span class="meta">
         @if (d.title) {<span>{{ d.title }}</span>}
@@ -19,9 +27,19 @@
     </mat-select>
   </mat-form-field>
 
-  <p class="intro" i18n="@@Endpoint_security_intro">
-    Gate an API's operations at the gateway, straight from its OpenAPI spec: prototype roles before wiring them into the backend, centralize access control, or protect a backend you cannot modify. An operation you leave untouched keeps being secured by the backend itself.
-  </p>
+  @if (intent() === 'limits') {
+    <p class="intro" i18n="@@Endpoint_limits_intro">
+      How much each operation may carry, straight from the route's OpenAPI spec. Put a ceiling on
+      the one expensive operation without touching the cheap ones beside it. An operation you
+      leave untouched is bounded by whatever the route carries, and by nothing of its own.
+    </p>
+  } @else {
+    <p class="intro" i18n="@@Endpoint_security_intro">
+      Who may call each operation, straight from the route's OpenAPI spec: prototype roles before
+      wiring them into the backend, centralize access control, or protect a backend you cannot
+      modify. An operation you leave untouched keeps being secured by the backend itself.
+    </p>
+  }
 </header>
 
 @if (loadingRoutes() || loadingOps()) {
@@ -42,23 +60,6 @@
     <span>{{ error() }}</span>
   </div>
 } @else if (!loadingOps() && data()) {
-  <!-- The whole-route rule is NOT here any more: it takes part in choosing the
-       route (a caller it turns away falls through to the next route matching
-       the same paths), so it belongs with the route, not with its operations.
-       This screen shows it, and says where it is edited. -->
-  <div class="route-rule">
-    <span class="rr-label" i18n="@@Whole_route_rule">Whole route</span>
-    <app-access-badges
-      [access]="routeAccess()"
-      [endpoints]="overrideCount()"
-      [unguarded]="isEmptyRule(routeAccess()) && overrideCount() === 0"
-    />
-    <span class="grow"></span>
-    <!-- Straight into the route's own security section: the drawer is
-         URL-driven, so there is no reason to land somewhere else and make
-         someone find it. -->
-    <a class="rr-edit" [routerLink]="['/infra/routes', selectedId(), 'security']" i18n="@@Edit_on_the_route">Edit on the route</a>
-  </div>
 
   <div class="table-wrap">
     <table
@@ -68,13 +69,40 @@
       [matSortActive]="view.$sortActive()"
       [matSortDirection]="view.$sortDir()"
       (matSortChange)="onSort($event)"
-      multiTemplateDataRows
       class="ops"
     >
       <ng-container matColumnDef="status">
         <th mat-header-cell *matHeaderCellDef class="c-status"></th>
         <td mat-cell *matCellDef="let o" class="c-status">
-          <app-access-badges [access]="effective(o)" />
+          <!-- The badges say what is posed AND are the way in: clicking the
+               access half or the bound half opens the same drawer with that
+               section under the eye. Two doors into one object rather than two
+               drawers - an operation split across two panels is one nobody can
+               check without recomposing it from memory. -->
+          <!-- The two pages do not show the same thing, and that is what makes
+               them two pages rather than one listed twice: an access rule has
+               no business on the page about bounds, and a bound none on the
+               page about who may call. -->
+          @if (intent() === 'limits') {
+            @if (stateOf(o).limits.length) {
+              @for (l of stateOf(o).limits; track $index) {
+                <span class="bound" [matTooltip]="scopeTip(l)">
+                  {{ label(l) }}
+                  @if (scope(l); as sc) {
+                    <span class="only">{{ sc }}</span>
+                  }
+                </span>
+              }
+            } @else {
+              <span class="unbound" [matTooltip]="inheritsTip">&mdash;</span>
+            }
+          } @else {
+            <app-access-badges
+              [clickable]="true"
+              [access]="effective(o)"
+              (picked)="open(o)"
+            />
+          }
         </td>
       </ng-container>
 
@@ -137,37 +165,7 @@
       <ng-container matColumnDef="expand">
         <th mat-header-cell *matHeaderCellDef class="c-expand"></th>
         <td mat-cell *matCellDef="let o" class="c-expand">
-          <mat-icon class="chev" [class.open]="isExpanded(o)">expand_more</mat-icon>
-        </td>
-      </ng-container>
-
-      <!-- Inline editor, shown only under an expanded row. -->
-      <ng-container matColumnDef="detail">
-        <td mat-cell *matCellDef="let o" [attr.colspan]="columns.length" class="detail-cell">
-          <div class="detail">
-            @if (o.operationId) {
-              <div class="detail-meta">
-                <span class="k" i18n="@@Operation_ID">Operation ID</span>
-                <code>{{ o.operationId }}</code>
-              </div>
-            }
-
-            <mat-slide-toggle [checked]="stateOf(o).override" (change)="setOverride(o, $event.checked)">
-              <span i18n="@@Override_route_default">Override the route config</span>
-            </mat-slide-toggle>
-
-            @if (stateOf(o).override) {
-              <app-access-editor
-                [value]="stateOf(o).access"
-                [users]="users()"
-                [roles]="roles()"
-                [tenants]="tenants()"
-                (valueChange)="setOpAccess(o, $event)"
-              />
-            } @else {
-              <span class="inherits" i18n="@@Inherits_route_default">Inherits the route config</span>
-            }
-          </div>
+          <mat-icon class="chev">chevron_right</mat-icon>
         </td>
       </ng-container>
 
@@ -177,17 +175,22 @@
         *matRowDef="let o; columns: columns"
         class="op-row"
         [class.secured]="stateOf(o).override"
-        [class.open]="isExpanded(o)"
-        (click)="toggle(o)"
+        [class.open]="isOpen(o)"
+        (click)="open(o)"
       ></tr>
-      <tr mat-row *matRowDef="let o; columns: ['detail']; when: isDetailRow" class="detail-row"></tr>
     </table>
   </div>
 
   <footer class="foot">
-    <span class="count" i18n="@@endpoints_secured_summary">
-      {{ (data()?.operations)?.length || 0 }} operations, {{ securedCount() }} secured
-    </span>
+    @if (intent() === 'limits') {
+      <span class="count" i18n="@@endpoints_bounded_summary">
+        {{ (data()?.operations)?.length || 0 }} operations, {{ boundCount() }} bounded
+      </span>
+    } @else {
+      <span class="count" i18n="@@endpoints_secured_summary">
+        {{ (data()?.operations)?.length || 0 }} operations, {{ securedCount() }} secured
+      </span>
+    }
     <span class="spacer"></span>
     @switch (saveState()) {
       @case ('saving') {
@@ -211,3 +214,90 @@
     }
   </footer>
 }
+  </mat-drawer-content>
+
+  <!-- One drawer per operation, two SECTIONS inside and not two tabs: there
+       are two of them, they are short, and they are complements rather than
+       alternatives - "who may call it" and "how much" are read together to
+       know whether an operation is configured. A tab would hide half of that
+       behind a click, in a panel whose whole point is having room. -->
+  <!-- editor-drawer is the house opt-in (styles/_material-overrides): Material
+       wraps drawer content in a scroll container of its own, so without it the
+       two nest and the body slides under the header instead of stopping at it. -->
+  <mat-drawer class="editor-drawer" position="end" mode="over" [opened]="!!openKey()" (closedStart)="close()">
+    @if (openOp(); as o) {
+    <div class="op-drawer">
+      <div class="op-head">
+        <span class="method m-{{ o.method.toLowerCase() }}">{{ o.method }}</span>
+        <code class="path">{{ o.path }}</code>
+        <span class="spacer"></span>
+        <button matIconButton type="button" (click)="close()" i18n-aria-label="@@Close" aria-label="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      @if (o.summary) {
+        <p class="op-summary">{{ o.summary }}</p>
+      }
+      <div class="op-panel">
+        @if (o.operationId) {
+          <div class="detail-meta">
+            <span class="k" i18n="@@Operation_ID">Operation ID</span>
+            <code>{{ o.operationId }}</code>
+          </div>
+        }
+
+        <!-- Section one: who. -->
+                <!-- ONE section: the page's own. Both were here so neither entry
+             would be a dead end, which was the wrong worry - the other
+             entry is in the menu, one click away, on the same row. A page
+             called Endpoint rate limits showing a security editor is the
+             same drift the whole-route bar was, one floor down. -->
+        @if (intent() === 'limits') {
+<section id="sec-limits">
+          <h3 i18n="@@Rate_limits">Rate limits</h3>
+          <p class="sub" i18n="@@What_this_operation_may_carry">What this operation may carry</p>
+          <p class="hint" i18n="@@Op_limits_hint">
+            On top of the route's own bounds, which still apply. Written here for the few
+            operations that need one, never as a default over the whole inventory: a bound is a
+            counter per operation and per caller.
+          </p>
+          <app-rate-limits
+            scope="operation"
+            [value]="stateOf(o).limits"
+            [users]="users()"
+            [roles]="roles()"
+            [tenants]="tenants()"
+            (valueChange)="setOpLimits(o, $event)"
+          />
+        </section>
+        } @else {
+<section id="sec-access">
+          <h3 i18n="@@Security">Security</h3>
+          <p class="sub" i18n="@@Who_may_call_this">Who may call this operation</p>
+          <mat-slide-toggle [checked]="stateOf(o).override" (change)="setOverride(o, $event.checked)">
+            <span i18n="@@Override_route_default">Override the route config</span>
+          </mat-slide-toggle>
+          @if (stateOf(o).override) {
+            <app-access-editor
+              [value]="stateOf(o).access"
+              [users]="users()"
+              [roles]="roles()"
+              [tenants]="tenants()"
+              (valueChange)="setOpAccess(o, $event)"
+            />
+          } @else {
+            <!-- The route's own rule is not on this screen at all now: it is
+                 the route's, it takes part in CHOOSING the route, and a page
+                 about endpoints carrying a bar about something else is a page
+                 whose subject drifts. But an operation that inherits has to be
+                 able to say what FROM, so the sentence is the way there. -->
+            <a class="inherits" [routerLink]="['/infra/routes', selectedId(), 'security']"
+               i18n="@@Inherits_route_default">Inherits the route config</a>
+          }
+        </section>
+        }
+      </div>
+    </div>
+    }
+  </mat-drawer>
+</mat-drawer-container>

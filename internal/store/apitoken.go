@@ -336,6 +336,54 @@ func (s *Store) SetAPITokenEnabled(ctx context.Context, userID, id string, enabl
 	return n > 0, nil
 }
 
+// TokenEdit is what may be changed about a token after it is minted.
+//
+// EVERYTHING EXCEPT THE TOKEN. The secret is a hash in a column: it encodes no
+// perimeter, no domain, no address, no expiry and no name, so none of them has
+// to be reissued to be changed. What cannot be edited is what IS the token -
+// the secret itself, and who it acts as.
+//
+// Which makes narrowing cheap, and that is the point. A read-only token
+// sitting in a monitoring stack's scrape config should become a metrics one
+// without minting a second and editing another team's repository: the friction
+// is why the safer move does not get made.
+type TokenEdit struct {
+	Name      string
+	Scope     string
+	Domain    string
+	FromCIDRs string
+	ExpiresAt int64 // 0 = never
+}
+
+// UpdateAPIToken changes what a token may do, reporting whether it existed.
+// Scoped by user like every other write here: a token is edited by whoever
+// holds the account it was minted on.
+func (s *Store) UpdateAPIToken(ctx context.Context, userID, id string, e TokenEdit) (bool, error) {
+	scope, err := SanitizeTokenScope(e.Scope)
+	if err != nil {
+		return false, err
+	}
+	domain := ""
+	if e.Domain != "" {
+		if domain, err = SanitizeTokenDomain(e.Domain); err != nil {
+			return false, err
+		}
+	}
+	cidrs, err := SanitizeTokenCIDRs(e.FromCIDRs)
+	if err != nil {
+		return false, err
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE api_tokens SET name = ?, scope = ?, domain = ?, from_cidrs = ?, expires_at = ?
+		 WHERE id = ? AND user_id = ?`,
+		e.Name, scope, domain, cidrs, e.ExpiresAt, id, userID)
+	if err != nil {
+		return false, fmt.Errorf("store: update api token %q: %w", id, err)
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // RevokeAPIToken deletes one of the user's tokens (scoped by user), reporting
 // whether it existed.
 func (s *Store) RevokeAPIToken(ctx context.Context, userID, id string) (bool, error) {

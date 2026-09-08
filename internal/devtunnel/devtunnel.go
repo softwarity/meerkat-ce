@@ -46,19 +46,121 @@ type Served struct {
 	Since  time.Time `json:"since"`
 }
 
-// Registry is what is served right now. In MEMORY, and that is a decision: a
-// restart takes the gateway and the agent together, and the agent sweeps its
-// leases on the way up, so both come back from an empty state that agrees.
-// Persisting it would buy a reconciliation problem and nothing else.
+// Registry is what is served right now, ON EVERY NODE.
+//
+// In MEMORY, and that is a decision: a restart takes the gateway and the agent
+// together, and the agent sweeps its leases on the way up, so both come back
+// from an empty state that agrees. Persisting it would buy a reconciliation
+// problem and nothing else.
+//
+// On a cluster the TRAFFIC needs nothing from this: plug plants a signpost
+// service on the overlay and relays it to the task holding the session, so a
+// plugged name answers from whichever gateway a request lands on. What was
+// node-local was only the TELLING - and that is the worse half to lose, since
+// the developer's code arrives either way and nothing on the other nodes said
+// so. Hence a node's own list travels to the others (store.TopicServed) and
+// each keeps one entry per node, the way the metrics fleet keeps totals: a
+// node that stops talking expires, a node that starts late is correct within
+// one interval, and nothing has to be reconciled.
 type Registry struct {
 	mu    sync.RWMutex
 	names map[string]Served
 	hub   *events.Hub
+	// What the OTHER nodes say they serve, by node id, with when they last
+	// said it. Never this node: its own answer is names above, so there is no
+	// privileged member and one gateway takes the same path as five.
+	remote map[string]remoteNames
+	// StaleAfter is how long a silent node keeps its place. Four intervals,
+	// for the metrics fleet's reason: enough that a lost message costs
+	// nothing, short enough that a node that is gone stops being believed.
+	StaleAfter time.Duration
+	// publish carries this node's whole list to the others. nil until the
+	// cluster wiring sets it, which is also the single-node case.
+	publish func([]Served)
+	now     func() time.Time
 }
+
+type remoteNames struct {
+	names []Served
+	at    time.Time
+}
+
+// DefaultStaleAfter is four report intervals.
+const DefaultStaleAfter = 20 * time.Second
 
 // NewRegistry builds an empty registry publishing on hub.
 func NewRegistry(hub *events.Hub) *Registry {
-	return &Registry{names: make(map[string]Served), hub: hub}
+	return &Registry{
+		names: make(map[string]Served), hub: hub,
+		remote: map[string]remoteNames{}, StaleAfter: DefaultStaleAfter,
+		now: time.Now,
+	}
+}
+
+// Relay wires the registry to the cluster: publish carries this node's list to
+// the others, and Report brings theirs in. Called once, before anything is
+// served. A registry with no relay is a single-node registry and behaves
+// exactly as it did.
+func (r *Registry) Relay(publish func([]Served)) {
+	r.mu.Lock()
+	r.publish = publish
+	r.mu.Unlock()
+}
+
+// Report records what one OTHER node says it serves. The whole list every
+// time, not a delta: a receiver replaces that node's set, so a message lost is
+// a message the next one repairs and there is no order to preserve.
+func (r *Registry) Report(node string, names []Served, at time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.remote[node] = remoteNames{names: names, at: at}
+}
+
+// Mine is this node's own list, which is what travels.
+func (r *Registry) Mine() []Served {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.mineLocked()
+}
+
+func (r *Registry) mineLocked() []Served {
+	out := make([]Served, 0, len(r.names))
+	for _, s := range r.names {
+		out = append(out, s)
+	}
+	sortByName(out)
+	return out
+}
+
+// tell hands this node's list to the cluster, if there is one to hand it to.
+// Called outside the lock: the publisher writes to the database.
+func (r *Registry) tell() {
+	r.mu.RLock()
+	pub, mine := r.publish, r.mineLocked()
+	r.mu.RUnlock()
+	if pub != nil {
+		pub(mine)
+	}
+}
+
+// Tell publishes this node's list on a timer, so a node that starts after a
+// session began learns about it, and one that stops talking is forgotten by
+// the others. A node serving nothing stays quiet - its entries expire on their
+// own, and a cluster where nobody plugs anything writes nothing at all.
+func (r *Registry) Tell(ctx context.Context, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			r.Forget()
+			if len(r.Mine()) > 0 {
+				r.tell()
+			}
+		}
+	}
 }
 
 // Set records a name as served and tells the open pages.
@@ -72,6 +174,7 @@ func (r *Registry) Set(s Served) {
 	r.mu.Unlock()
 	slog.Info("a name is served from a developer's machine", "name", s.Name, "who", s.Who, "parked", s.Parked)
 	r.hub.Publish(events.TopicAll, events.Message{Type: EventServed, Data: s})
+	r.tell()
 }
 
 // Drop records that a name went back to the cluster.
@@ -88,19 +191,56 @@ func (r *Registry) Drop(name string) {
 	}
 	slog.Info("a name went back to the cluster", "name", name)
 	r.hub.Publish(events.TopicAll, events.Message{Type: EventUnserved, Data: Served{Name: name}})
+	// Told at once, and told even when the list is now empty: waiting for it
+	// to expire would leave a name on four intervals' worth of screens.
+	r.tell()
 }
 
 // List is what a page asks for at load, before the channel has anything to
-// say. Sorted by name so two reads of an unchanged state look unchanged.
+// say - THIS node's names and the other nodes'. Sorted by name so two reads of
+// an unchanged state look unchanged.
+//
+// A name held by two nodes at once cannot happen (the agent refuses a name a
+// live session already holds, whichever task it landed on), but a node on its
+// way out and its replacement can overlap for an interval. This node's own
+// answer wins then, and a remote one only fills a gap: the node answering the
+// page is the one whose state a reader can check.
 func (r *Registry) List() []Served {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	seen := make(map[string]bool, len(r.names))
 	out := make([]Served, 0, len(r.names))
 	for _, s := range r.names {
 		out = append(out, s)
+		seen[s.Name] = true
+	}
+	cutoff := r.now().Add(-r.StaleAfter)
+	for _, rn := range r.remote {
+		if rn.at.Before(cutoff) {
+			continue
+		}
+		for _, s := range rn.names {
+			if !seen[s.Name] {
+				out = append(out, s)
+				seen[s.Name] = true
+			}
+		}
 	}
 	sortByName(out)
 	return out
+}
+
+// Forget drops the nodes that have gone quiet. List already ignores them; this
+// is what keeps the map from holding a name for every node that ever ran.
+func (r *Registry) Forget() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cutoff := r.now().Add(-r.StaleAfter)
+	for id, rn := range r.remote {
+		if rn.at.Before(cutoff) {
+			delete(r.remote, id)
+		}
+	}
 }
 
 func sortByName(s []Served) {

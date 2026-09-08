@@ -52,6 +52,15 @@
         ({{ n }})
       }
     </mat-list-option>
+    <!-- Next to the gates, because it is the same act: what this route refuses
+         to carry. A gate refuses one request for what it is, a limit refuses it
+         for how many came before it. -->
+    <mat-list-option value="limits" [selected]="section() === 'limits'">
+      <span i18n="@@Section_limits">Rate limits</span>
+      @if (draft().limits.length) {
+        ({{ draft().limits.length }})
+      }
+    </mat-list-option>
     <div matSubheader i18n="@@Modifiers">Modifiers</div>
     <!-- Disabled off proxy: CompileFilters drops every request filter when a
          route carries a terminal one, so editing these wrote settings the
@@ -233,9 +242,9 @@
             [disabled]="saving() || !draft().name.trim() || !draft().upstream.trim() || !draft().specPath.trim()"
             (click)="goEndpointSecurity()"
             i18n-matTooltip="@@Edit_endpoint_security"
-            matTooltip="Endpoint security"
+            matTooltip="Endpoints"
             i18n-aria-label="@@Edit_endpoint_security"
-            aria-label="Endpoint security"
+            aria-label="Endpoints"
           >
             <mat-icon svgIcon="openapi" />
           </button>
@@ -274,9 +283,9 @@
             [disabled]="saving() || !draft().name.trim()"
             (click)="goEndpointSecurity()"
             i18n-matTooltip="@@Edit_endpoint_security"
-            matTooltip="Endpoint security"
+            matTooltip="Endpoints"
             i18n-aria-label="@@Edit_endpoint_security"
-            aria-label="Endpoint security"
+            aria-label="Endpoints"
           >
             <mat-icon svgIcon="openapi" />
           </button>
@@ -324,8 +333,8 @@
       @case ('security') {
         <p class="section-hint" i18n="@@Route_security_hint">
           The route's base access, applied to the whole route. Leave it empty to delegate security to
-          the upstream; set it to gate at the edge. An API route can refine it per operation in
-          Endpoint security.
+          the upstream; set it to gate at the edge. An API route can refine it per operation under
+          Endpoints.
         </p>
         <app-access-editor
           [value]="draft().access"
@@ -333,6 +342,21 @@
           [roles]="roles()"
           [tenants]="tenants()"
           (valueChange)="setAccess($event)"
+        />
+      }
+      @case ('limits') {
+        <p class="section-hint" i18n="@@Route_limits_hint">
+          How much this route may carry. Several bounds at once, each counting something different:
+          one for the whole route protects the service behind it, one per user keeps a single caller
+          from taking it all, one per address covers whoever has no account. They are all true
+          together, and the first one exceeded answers 429 with the standard headers.
+        </p>
+        <app-rate-limits
+          [value]="draft().limits"
+          [users]="users()"
+          [roles]="roles()"
+          [tenants]="tenants()"
+          (valueChange)="setLimits($event)"
         />
       }
       @case ('predicates') {
@@ -617,7 +641,10 @@
         <p class="section-hint" i18n="@@Scheme_section_hint">
           Does the application support a color scheme? The choice is always reflected on the CSS
           color-scheme and a data-meerkat-scheme attribute; pick the application's own mechanism
-          on top if it has one.
+          on top if it has one. Set attribute names one attribute and gives it two values; add
+          attribute and class take the two names themselves - one bare attribute, or one class -
+          so an empty one means nothing on the tag in that state, the usual shape: nothing in
+          light, dark in dark.
         </p>
         <div class="flags">
           <mat-checkbox
@@ -640,12 +667,18 @@
           <div class="btn-row">
             <mat-form-field class="position-field">
               <mat-label i18n="@@Mechanism">Mechanism</mat-label>
-              <mat-select [value]="draft().schemeMechanism" (selectionChange)="patch('schemeMechanism', $event.value)">
+              <mat-select [value]="draft().schemeMechanism" (selectionChange)="setSchemeMechanism($event.value)">
                 <mat-option value="" i18n="@@scheme_none">color-scheme only</mat-option>
-                <mat-option value="attribute" i18n="@@scheme_attribute">attribute</mat-option>
+                <mat-option value="attribute" i18n="@@scheme_attribute">set attribute</mat-option>
+                <mat-option value="add-attribute" i18n="@@scheme_add_attribute">add attribute</mat-option>
                 <mat-option value="class" i18n="@@scheme_class">class</mat-option>
               </mat-select>
             </mat-form-field>
+            @if (draft().schemeMechanism) {
+              <app-form-field class="height-field wide" i18n-label="@@Tag_name" label="Tag name">
+                <input matInput placeholder="html" [value]="draft().schemeTag" (input)="patch('schemeTag', $any($event.target).value)" />
+              </app-form-field>
+            }
             @if (draft().schemeMechanism === 'attribute') {
               <app-form-field class="height-field wide" i18n-label="@@Attribute" label="Attribute">
                 <input matInput placeholder="data-theme" [value]="draft().schemeAttribute" (input)="patch('schemeAttribute', $any($event.target).value)" />
@@ -653,12 +686,28 @@
             }
             @if (draft().schemeMechanism) {
               <app-form-field class="height-field wide" i18n-label="@@Light_value" label="Light value">
-                <input matInput placeholder="light" [value]="draft().schemeLight" (input)="patch('schemeLight', $any($event.target).value)" />
+                <input matInput [placeholder]="draft().schemeMechanism === 'attribute' ? 'light' : 'empty'" [value]="draft().schemeLight" (input)="patch('schemeLight', $any($event.target).value)" />
               </app-form-field>
               <app-form-field class="height-field wide" i18n-label="@@Dark_value" label="Dark value">
-                <input matInput placeholder="dark" [value]="draft().schemeDark" (input)="patch('schemeDark', $any($event.target).value)" />
+                <input matInput [placeholder]="draft().schemeMechanism === 'add-attribute' ? 'dark-theme' : 'dark'" [value]="draft().schemeDark" (input)="patch('schemeDark', $any($event.target).value)" />
               </app-form-field>
             }
+          </div>
+        } @else {
+          <p class="section-hint" i18n="@@Button_scheme_hint">
+            No switch here, so nothing for the button to follow: it wears whatever the visitor chose
+            elsewhere, which on an application that has one look means light chrome floating on a
+            dark page. This dresses the button alone - the page is never touched.
+          </p>
+          <div class="btn-row">
+            <mat-form-field class="position-field">
+              <mat-label i18n="@@The_button_wears">The button wears</mat-label>
+              <mat-select [value]="draft().schemeButton" (selectionChange)="patch('schemeButton', $event.value)">
+                <mat-option value="" i18n="@@button_wears_choice">what the visitor chose</mat-option>
+                <mat-option value="light" i18n="@@button_wears_light">light</mat-option>
+                <mat-option value="dark" i18n="@@button_wears_dark">dark</mat-option>
+              </mat-select>
+            </mat-form-field>
           </div>
         }
 

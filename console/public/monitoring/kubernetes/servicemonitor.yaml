@@ -1,0 +1,31 @@
+# With the Prometheus Operator this object IS the configuration: no scrape file
+# to write, and the token is taken as a secret reference and nothing else.
+#
+#   kubectl create secret generic meerkat-metrics -n monitoring \
+#     --from-literal=token='mk_paste_the_token_here'
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: meerkat
+  namespace: monitoring
+  labels:
+    # Must match your Prometheus' serviceMonitorSelector, or this object is
+    # ignored in silence.
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames: [default]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: meerkat
+  endpoints:
+    # The port's NAME on the Service, not its number.
+    - port: admin
+      path: /metrics
+      interval: 15s
+      authorization:
+        type: Bearer
+        credentials:
+          name: meerkat-metrics
+          key: token

@@ -1,0 +1,37 @@
+# One per panel. Grouped by `name` - the route's name, which a person
+# recognises - while the series identity is `route`, its id: a route renamed
+# keeps its history and changes its label.
+
+# Requests per second, by route
+sum by (name) (rate(meerkat_requests_total[5m]))
+
+# What fraction is going wrong
+sum by (name) (rate(meerkat_requests_total{status=~"4xx|5xx"}[5m]))
+  / sum by (name) (rate(meerkat_requests_total[5m]))
+
+# 95th percentile of the answer time
+histogram_quantile(0.95,
+  sum by (name, le) (rate(meerkat_request_duration_seconds_bucket[5m])))
+
+# Slowest endpoints. `source` says whether the template was declared in a spec
+# or folded from the paths seen - a deduced one can be read wrong, so it is
+# carried rather than filtered out.
+topk(10,
+  sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_sum[5m]))
+    / sum by (name, endpoint, source) (rate(meerkat_endpoint_requests_total[5m])))
+
+# Endpoints costing the most overall - neither the slowest nor the busiest,
+# and usually what to fix first
+topk(10, sum by (name, endpoint) (rate(meerkat_endpoint_duration_seconds_sum[5m])))
+
+# Services not answering, by kind of failure
+sum by (name, kind) (rate(meerkat_upstream_failures_total[5m]))
+
+# Saturation
+sum(meerkat_requests_in_flight)
+
+# Refused sign-ins - what a brute-force attempt looks like from here
+rate(meerkat_logins_total{outcome="refused"}[5m])
+
+# Requests matching no route at all
+rate(meerkat_unmatched_total[5m])
