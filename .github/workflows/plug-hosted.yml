@@ -65,7 +65,7 @@ jobs:
       - name: A cluster, and something to take over from
         run: |
           set -e
-          docker swarm init --advertise-addr 127.0.0.1
+          docker swarm init --advertise-addr "$(hostname -I | awk '{print $1}')"
           docker network create -d overlay --attachable tunnel-net
           docker stack deploy -c .github/plug-hosted/stack.yml tunnel
 

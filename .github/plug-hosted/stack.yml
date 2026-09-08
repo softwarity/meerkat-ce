@@ -12,10 +12,17 @@ services:
     user: "0:0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    # Published in HOST mode, not through the routing mesh. On a single-node CI
+    # Swarm the mesh is the wrong machinery twice over: it needs a real
+    # advertise address to relay anything, and it ACCEPTS a connection on a
+    # published port before any task answers it - so a probe against it hangs
+    # instead of failing, and a gateway that came up perfectly looked dead for
+    # eight minutes. Host mode binds the node directly, and the port simply
+    # does not exist until the task does.
     ports:
-      - "18080:8080"
-      - "19090:9090"
-      - "2222:22222"
+      - { target: 8080, published: 18080, protocol: tcp, mode: host }
+      - { target: 9090, published: 19090, protocol: tcp, mode: host }
+      - { target: 22222, published: 2222, protocol: tcp, mode: host }
     networks: [tunnel-net]
     deploy:
       replicas: 1

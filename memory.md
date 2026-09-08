@@ -5,7 +5,7 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-09-03 : **la gateway se protege de ce qu'elle proxifie** -
+_Derniere mise a jour : 2026-09-08 : **l'edition tient** - la base externe (`ee/pgdriver`) et la boucle de synchronisation (`ee/changebus`) ne sont plus dans l'image communautaire, qui repond en mots a une URL de base ; page de refus, filtre et bouton d'ouverture sur l'ecran des routes, regle de schema unique (trois defauts derriere un repartiteur TLS), noms servis relayes entre noeuds, e2e a deux passerelles et job plug hosted hebdomadaire. **Les chantiers suivants sont decides** (extensions, gRPC, mesures de performance, emballage) - voir la section dediee. Avant : 2026-09-03 : **la gateway se protege de ce qu'elle proxifie** -
 delais par route (ROUTE-07), disjoncteur (ROUTE-09) et etat des amonts dans la console
 (SVC-04, ROUTE-11) - voir la section dediee. Avant : 2026-09-02 : **PERF-02 et LIFE-05 coches** - le plafond de
 reecriture de corps est reglable (et une reponse au-dessus n'est plus tronquee), et le
@@ -100,6 +100,92 @@ B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste
 repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+
+## Session 2026-09-07/08 - le tunnel en cluster, l'edition qui tient, et ce qu'on a decide de faire ensuite
+
+### Ce qui a ete livre
+
+- **Page de refus** (`/refused`, RBAC-06) : un refus sur une route UI atterrit sur une
+  page thematisee qui nomme la regle (organisation, role, compte nomme) et offre ce que
+  la session peut ouvrir, au lieu d'un `http.Error`. Vingt catalogues. Une route de
+  service garde son 403.
+- **Ecran des routes** (CONSOLE-12) : filtre toutes/UI/service, et un bouton qui ouvre
+  une route UI **dans le plan de donnees**, a l'adresse que la passerelle donne
+  elle-meme (nouveau champ `dataOrigin` sur `/api/edition`).
+- **La regle de schema, ecrite une fois** (`internal/filters.Secure/Scheme/Origin) :
+  douze endroits decidaient si la requete avait atteint le NAVIGATEUR en TLS, six
+  regardaient `r.TLS` seul - nul derriere un repartiteur qui termine le TLS. Trois
+  defauts reels d'un coup : cookies de session sans `Secure`, console annoncant des URL
+  `http://`, et **la redirection HTTPS qui bouclait a l'infini**.
+- **Noms servis relayes entre noeuds** (`store.TopicServed`) : le trafic traversait deja
+  seul (le panneau de plug est un service de l'overlay qui relaie vers la tache tenant la
+  session) ; ce qui manquait etait de le **dire**. Forme de la flotte de metriques.
+- **L'edition tient enfin** : `ee/pgdriver` (base externe) et `ee/changebus` (boucle de
+  synchronisation). L'image communautaire n'a plus de pilote - `go tool nm` n'y trouve
+  aucun symbole pgx - et repond en mots a une URL de base.
+- **CI** : passe PostgreSQL sur le seul arbre qui peut s'y connecter ; images publiees
+  depuis `main` seulement (10,4 min par push de branche rendues) ; **e2e a deux vraies
+  passerelles** dans le job PostgreSQL existant (2 s de cout marginal) ; job **plug
+  hosted** hebdomadaire sur un vrai Swarm.
+
+### Pieges qui ont coute cher
+
+1. **`GO_TAGS=ee` ET `EDITION=ee`** : j'ai construit et deploye **cinq images CE** de
+   suite en ne passant que la seconde. Docker ignore un build-arg inconnu sans broncher.
+   Francois s'est retrouve sans pouvoir plugger, et son Prometheus scrapait un `/metrics`
+   absent. **Toujours lire `edition=ee` dans le journal apres un deploiement.**
+2. **Un redeploiement coupe toutes les sessions plug** (elles vivent en memoire) : le
+   dire AVANT, pas apres.
+3. **air ne surveillait que `.go`** : les catalogues `internal/auth/locales/*.json` sont
+   `go:embed`, donc une nouvelle cle n'atteignait le binaire qu'apres une reconstruction.
+   Editer, recharger, lire des chaines vides. Corrige dans `.air.toml`.
+4. **Un chunk paresseux disparait a chaque redeploiement de la console** : un onglet
+   ouvert avant demande un nom de fichier qui n'existe plus, l'import echoue, et le bouton
+   ne fait **rien**. `shared/lazy.ts` le dit maintenant.
+5. **Un `curl` sans `--max-time` dans un job CI** : le maillage Swarm accepte une
+   connexion sur un port publie avant qu'une tache reponde, donc curl suspend et la boucle
+   n'avance jamais. Aurait tenu un runner six heures.
+
+### Chantiers a venir, decides en discussion le 2026-09-08
+
+Dans l'ordre ou je les prendrais. Le contexte : la comparaison de marche n'est **pas**
+Kong/Envoy (debit brut, plugins, gRPC) mais les proxys conscients de l'identite -
+Pomerium, Ory Oathkeeper, Cloudflare Access. Sur ce terrain-la le produit est devant,
+parce que le plan d'identite n'est pas un plugin : il **sert** la connexion, le profil,
+le MFA, le choix d'organisation, thematises et en vingt langues. Garder le mot
+**app-gateway**, pas API gateway.
+
+1. **Modele d'extension (ROUTE-21)** - le seul trou structurel. Toutes les passerelles qui
+   ont survecu en ont un. Sans lui, chaque besoin d'un prospect devient un commit ici :
+   ca tient a trois clients, pas a trente. **A traiter avant gRPC.**
+2. **gRPC (ROUTE-20)** - sur une grille d'appel d'offres c'est une case vide qui
+   disqualifie sans discussion, meme quand personne ne s'en sert.
+3. **Mesures de performance** - il en faut, et ce sont **deux artefacts distincts** :
+   - le banc de non-regression reste **relatif** et vit dans la CI (PERF-05 a raison :
+     un seuil chiffre devient une source de faux rouges) ;
+   - un **rapport mesure une fois**, absolu, publie avec la machine et la methode.
+     Jamais sur un runner GitHub.
+   Quatre points : proxy nu sur route publique / la meme en `access: auth` avec cookie /
+   plus l'identite en JWT signe ES256 / nginx en plancher, meme machine, meme amont.
+   L'argument de vente n'est pas "on fait plus donc on est plus lents" mais **la requete
+   authentifiee coute un processus, pas deux** - le concurrent qui fait pareil ajoute un
+   saut reseau (`ext_authz`, Redis, sidecar) la ou tout est en processus contre un cache
+   de 5 s.
+4. **Emballage** - chart Helm, operateur, provider Terraform. C'est ce qui fait passer de
+   "joli" a "deployable chez nous".
+5. **Fermer des `[~]` avant d'ouvrir des `[ ]`** - la surface depasse deja ce qu'une
+   personne tient au vert. Le 2026-09-08 seul a trouve une image CE livree pendant des
+   heures, une boucle de redirection, des cookies sans `Secure` et une page vide. Ce n'est
+   pas de la negligence, c'est l'arithmetique du perimetre.
+
+### Petite dette CI en attente
+
+`paths-ignore` sur `ci.yml` pour `.github/workflows/plug-hosted.yml` et
+`.github/plug-hosted/**` : iterer sur le job nocturne oblige a pousser sur `main` (un
+`workflow_dispatch` n'existe que depuis la branche par defaut), donc chaque correction de
+deux lignes de shell declenche un pipeline complet et le miroir. Un commit qui ne touche
+que ce job ne peut pas casser le produit. **A poser avec le prochain changement reel**,
+pas seul - sinon il coute le pipeline qu'il economise.
 
 ## Session 2026-09-03 - ce que la gateway subit de ses amonts
 
