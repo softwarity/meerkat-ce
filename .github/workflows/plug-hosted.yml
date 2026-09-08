@@ -112,7 +112,12 @@ jobs:
           grep -qi 'does not distribute' install.sh \
             && { echo "this image answered the community notice"; exit 1; }
           sh install.sh
-          plug --version || { echo "no client after the install"; exit 1; }
+          # Where its own installer puts it, and where the installer TELLS you
+          # to add: a fresh runner has no ~/.local/bin on PATH, so the check
+          # below was looking for a client that had just installed correctly.
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/plug" --version \
+            || { echo "no client after the install"; exit 1; }
 
       # A developer, their key, and the capability that lets it open anything.
       - name: Deposit a developer's key
