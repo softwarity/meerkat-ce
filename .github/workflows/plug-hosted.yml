@@ -116,8 +116,11 @@ jobs:
           # to add: a fresh runner has no ~/.local/bin on PATH, so the check
           # below was looking for a client that had just installed correctly.
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/plug" --version \
-            || { echo "no client after the install"; exit 1; }
+          test -x "$HOME/.local/bin/plug" || { echo "no client after the install"; exit 1; }
+          # `version`, a subcommand - and one of the three that do not need a
+          # configured cluster, so it answers on a machine that has only just
+          # installed the client.
+          "$HOME/.local/bin/plug" version
 
       # A developer, their key, and the capability that lets it open anything.
       - name: Deposit a developer's key
