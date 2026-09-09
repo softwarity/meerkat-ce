@@ -78,6 +78,8 @@
   "emailEdit": "Tetapkan alamat e-mail Anda",
   "emailHint": "Dipakai untuk masuk kembali jika Anda lupa kata sandi.",
   "emailNone": "belum diatur",
+  "errAccessEnded": "Akses ini berakhir pada %s.",
+  "errAccessNotOpen": "Akses ini dibuka pada %s.",
   "errAvatarSize": "Foto harus di bawah 200 KiB",
   "errAvatarType": "Gunakan gambar png, jpeg, atau webp",
   "errBadCode": "Kode itu tidak sah.",

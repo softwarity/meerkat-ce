@@ -104,6 +104,15 @@ export const routes: Routes = [
           import('./routes/routes-page/routes-page.component').then((m) => m.RoutesPageComponent),
       },
       {
+        // The SHAPE of what this installation keeps, starting with the
+        // account. Infra and not beside the accounts: defining a field and
+        // filling it are two acts by two people.
+        path: 'model',
+        canActivate: [infraOnly],
+        loadComponent: () =>
+          import('./model/user-model.component').then((m) => m.UserModelComponent),
+      },
+      {
         // The operation inventory (RBAC-07, QUOTA-05): a dedicated page with a
         // route selector; picking a route that exposes an OpenAPI spec loads
         // its operations in a swagger-like editor. Optional ?route=<id>

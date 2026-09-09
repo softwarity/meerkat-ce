@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/certs"
@@ -110,6 +111,7 @@ func (a *API) Register(mux Mux) {
 	a.registerServices(mux)
 	a.registerMetrics(mux)
 	a.registerEdition(mux)
+	a.registerUserModel(mux)
 	a.registerConfig(mux)
 	a.registerConfigurations(mux)
 	a.registerConfigPoints(mux)
@@ -341,7 +343,57 @@ func (a *API) validateRoute(ctx context.Context, route store.Route) error {
 	if len(missing) > 0 {
 		return fmt.Errorf("unknown vault entries: %s", strings.Join(missing, ", "))
 	}
-	return gateway.Validate(expanded)
+	if err := gateway.Validate(expanded); err != nil {
+		return err
+	}
+	return a.knownFields(ctx, expanded)
+}
+
+// knownFields refuses a route naming a custom identity field this installation
+// has not defined.
+//
+// gateway.Validate cannot ask: it is a pure function on a route, used by the
+// tests and by the agent, and handing it the settings would make every caller
+// carry a store to check a spelling. It therefore accepts any name that COULD
+// be one - so a configuration imported from another installation degrades to
+// forwarding nothing rather than failing the whole import.
+//
+// Here there is a store and a person, which is exactly where a typo should be
+// caught rather than discovered by a service that never received its header.
+func (a *API) knownFields(ctx context.Context, r store.Route) error {
+	var defs []store.UserField
+	_ = a.st.GetSetting(ctx, store.SettingUserFields, &defs)
+	known := func(name string, builtin []string) error {
+		if slices.Contains(builtin, name) {
+			return nil
+		}
+		for _, f := range defs {
+			if f.Name == name {
+				return nil
+			}
+		}
+		available := slices.Clone(builtin)
+		for _, f := range defs {
+			available = append(available, f.Name)
+		}
+		return fmt.Errorf("field %q is not one this gateway knows: %s",
+			name, strings.Join(available, ", "))
+	}
+	if r.Identity != nil {
+		for _, at := range r.Identity.Attributes {
+			if err := known(at.Field, store.IdentityFields); err != nil {
+				return err
+			}
+		}
+	}
+	if r.UI != nil && r.UI.UserInfo != nil {
+		for field := range r.UI.UserInfo.Fields {
+			if err := known(field, store.PageUserFields); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (a *API) deleteRoute(w http.ResponseWriter, r *http.Request, actor store.User) {

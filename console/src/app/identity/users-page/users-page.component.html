@@ -1,4 +1,11 @@
-<mat-drawer-container>
+<!-- ONE drawer, whose content changes: a new account, an existing one, and
+     inside that one three pages (the account, its security, its history). Two
+     drawers on the same edge is a position Material refuses - the container
+     draws a single backdrop, and a second panel there leaves it hidden and
+     shuts nothing. The backdrop is handled here so that a click outside gives
+     back exactly one level: the sub-page gives back the account, the account
+     gives back the table. -->
+<mat-drawer-container (backdropClick)="onBackdrop()">
   <mat-drawer-content>
     <div class="banner">
       <h1 i18n="@@Users">Users</h1>
@@ -107,15 +114,23 @@
     </button>
   </mat-drawer-content>
 
-  <mat-drawer position="end" mode="over" [opened]="editing() !== null" (closedStart)="onClose()">
-    @if (editing(); as u) {
-      <app-user-editor
-        [user]="u"
-        [globalMfaLabel]="globalMfaLabel()"
-        [meId]="meId()"
-        (saved)="onUserSaved($event)"
-        (closed)="onClose()"
-      />
-    }
+  <!-- disableClose, because Material's own handler shuts the drawer whole: the
+       click on the backdrop is answered by onBackdrop() instead, one level at
+       a time. -->
+  <mat-drawer position="end" mode="over" [opened]="creating() || editing() !== null" disableClose>
+    <div class="stack">
+      @if (creating()) {
+        <app-user-create (created)="onCreated()" (closed)="creating.set(false)" />
+      } @else if (editing(); as u) {
+        <app-user-editor
+          [user]="u"
+          [globalMfaLabel]="globalMfaLabel()"
+          [meId]="meId()"
+          [(view)]="panel"
+          (saved)="onUserSaved($event)"
+          (closed)="onClose()"
+        />
+      }
+    </div>
   </mat-drawer>
 </mat-drawer-container>

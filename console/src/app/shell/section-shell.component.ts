@@ -56,6 +56,10 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // not the same act as minting a key, and the flow that does it produces
       // no key at all.
       { path: 'mcp', label: $localize`:@@MCP:MCP`, icon: 'smart_toy', roles: 'root' },
+      // The shape of the objects this installation keeps, apart from the
+      // things that USE them: an account's fields are decided once, not
+      // administered daily.
+      { path: 'model', label: $localize`:@@Model:Model`, icon: 'schema' },
     ],
   },
   application: {

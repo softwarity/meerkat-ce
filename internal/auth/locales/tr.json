@@ -78,6 +78,8 @@
   "emailEdit": "E-posta adresinizi belirleyin",
   "emailHint": "Sifrenizi kaybederseniz geri girmenizi saglar.",
   "emailNone": "tanimlanmadi",
+  "errAccessEnded": "Bu erişim %s tarihinde sona erdi.",
+  "errAccessNotOpen": "Bu erişim %s tarihinde açılıyor.",
   "errAvatarSize": "Fotoğraf 200 KiB'nin altında olmalı",
   "errAvatarType": "png, jpeg veya webp bir görsel kullanın",
   "errBadCode": "Bu kod geçerli değil.",

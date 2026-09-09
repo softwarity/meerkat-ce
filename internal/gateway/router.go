@@ -938,7 +938,7 @@ func validateRouteType(r store.Route) error {
 		}
 		seen := make(map[string]bool, len(id.Attributes))
 		for _, a := range id.Attributes {
-			if !slices.Contains(store.IdentityFields, a.Field) {
+			if !slices.Contains(store.IdentityFields, a.Field) && !store.ValidFieldName(a.Field) {
 				return fmt.Errorf("identity attribute %q is not allowed: allowed attributes are %s",
 					a.Field, strings.Join(store.IdentityFields, ", "))
 			}
@@ -1064,7 +1064,7 @@ func validateRouteType(r store.Route) error {
 			return fmt.Errorf("user-info tag %q is not allowed: a tag name starts with a letter, then letters, digits and -", ui.Tag)
 		}
 		for field, name := range ui.Fields {
-			if !slices.Contains(store.PageUserFields, field) {
+			if !slices.Contains(store.PageUserFields, field) && !store.ValidFieldName(field) {
 				return fmt.Errorf("user-info field %q is not allowed: allowed fields are %s",
 					field, strings.Join(store.PageUserFields, ", "))
 			}
@@ -1135,7 +1135,12 @@ type identityData struct {
 	Locale     string
 	TenantID   string
 	Tenant     string
-	Roles      []string
+	// Fields are the installation's own facts about this person (store's
+	// userfields.go). Carried beside the built-ins because to everything
+	// downstream they are the same kind of thing: one more fact about the
+	// caller, selected and renamed the same way.
+	Fields map[string]string
+	Roles  []string
 }
 
 // sessionIdentity resolves the caller for per-request injections and
@@ -1150,11 +1155,13 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 		return identityData{}, false
 	}
 	u, err := rt.st.GetUserByID(req.Context(), sess.UserID)
-	if err != nil || !u.Enabled {
+	// Outside its validity window counts as disabled, and for the same reason:
+	// the decision was taken in advance rather than on the day (SEC-07).
+	if err != nil || !u.Enabled || !u.ValidAt(time.Now()) {
 		return identityData{}, false
 	}
 	d := identityData{UserID: u.ID, Username: u.Username, Fullname: u.Fullname,
-		Email: u.Email, Timezone: u.Timezone, Locale: u.Locale}
+		Email: u.Email, Timezone: u.Timezone, Locale: u.Locale, Fields: u.Fields}
 	tenantID := sess.TenantID
 	if tenantID == "" {
 		// The session was opened BEFORE this account joined an organisation.
@@ -1322,7 +1329,10 @@ func userFieldValue(d identityData, field string) string {
 		// Resolved by the caller against the route's own offer.
 		return d.Locale
 	}
-	return ""
+	// A custom field, last: a built-in name always wins, and the definition
+	// refuses a custom field that would shadow one - so this is reached only
+	// by a name the installation added.
+	return d.Fields[field]
 }
 
 // openTagRe matches the FIRST opening <tag ...> in the document (case-insensitive,

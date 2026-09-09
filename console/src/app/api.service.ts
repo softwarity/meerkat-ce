@@ -551,6 +551,12 @@ export interface User {
   // The account owes a password change at its next sign-in: set by an admin,
   // by a reset, or by the expiry rule (AUTH-10). Cleared when they change it.
   mustChangePassword?: boolean;
+  // The custom identity fields' values, by name (Infra > Model defines them).
+  fields?: Record<string, string>;
+  // The validity window, unix seconds, 0 or absent = no bound on that side.
+  // Days, not instants: valid until the 31st works all of the 31st.
+  validFrom?: number;
+  validUntil?: number;
 }
 
 // One completed sign-in, as the gateway records it (method: password | totp |
@@ -726,6 +732,17 @@ export interface CurrentConfiguration {
 // stopped sending them, `applyEdition` kept iterating `e.known`, and every
 // Enterprise control stayed dimmed on the Enterprise image because the class
 // it waited for (`ee-multi-tenant`) had no one left to write it.
+// A custom identity field's definition (Infra > Model). The values live on an
+// account; this is the shape a form asks for and a route may forward.
+export type UserFieldKind = 'text' | 'number' | 'date' | 'choice' | 'bool';
+
+export interface UserFieldDef {
+  name: string;
+  label?: string;
+  kind: UserFieldKind;
+  choices?: string[];
+}
+
 export interface Edition {
   enterprise: boolean;
   // Where the applications answer - never the console's own origin.
@@ -1049,6 +1066,15 @@ export interface ExternalIdentity {
   groups?: string[];
   createdAt: number;
   lastSeenAt?: number;
+}
+
+// The whole answer to "how can this person get in": the authorities linked to
+// the account, and whether a local password would open anything at all.
+export interface UserIdentities {
+  identities: ExternalIdentity[];
+  // The local-accounts authority is enabled (AUTH-24). Where it is disabled,
+  // setting a password is a promise nobody can keep.
+  localSignIn: boolean;
 }
 
 // Where a secret already sits, for the server to move it into the vault
@@ -1733,6 +1759,14 @@ export class ApiService {
   // What this installation is: edition, unlocked features, mode. One endpoint,
   // so a locked control on one screen and a hidden entry on another cannot
   // disagree.
+  userFields(): Observable<{ fields: UserFieldDef[] }> {
+    return this.http.get<{ fields: UserFieldDef[] }>('/api/model/user-fields');
+  }
+
+  saveUserFields(fields: UserFieldDef[]): Observable<{ fields: UserFieldDef[] }> {
+    return this.http.put<{ fields: UserFieldDef[] }>('/api/model/user-fields', { fields });
+  }
+
   edition(): Observable<Edition> {
     return this.http.get<Edition>('/api/edition');
   }
@@ -1781,8 +1815,8 @@ export class ApiService {
   // How this person can get in through an authority, and what that authority
   // said about them last time - the reported groups above all, since those are
   // what any mapping would be written against.
-  userIdentities(id: string): Observable<ExternalIdentity[]> {
-    return this.http.get<ExternalIdentity[]>(`/api/users/${encodeURIComponent(id)}/identities`);
+  userIdentities(id: string): Observable<UserIdentities> {
+    return this.http.get<UserIdentities>(`/api/users/${encodeURIComponent(id)}/identities`);
   }
 
   userLogins(id: string): Observable<LoginEvent[]> {

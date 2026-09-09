@@ -366,7 +366,9 @@ func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Sess
 		return store.Session{}, false
 	}
 	u, err := m.st.GetUserByID(ctx, tok.UserID)
-	if err != nil || !u.Enabled {
+	// A token outlives nothing its owner does not: an account past its window
+	// stops answering, machine-to-machine included.
+	if err != nil || !u.Enabled || !u.ValidAt(now) {
 		return store.Session{}, false
 	}
 	// Last-use stamp, throttled to at most once a minute (avoid a write per

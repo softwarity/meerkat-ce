@@ -78,6 +78,8 @@
   "emailEdit": "E-Mail-Adresse festlegen",
   "emailHint": "Damit Sie wieder hineinkommen, wenn Sie Ihr Passwort verlieren.",
   "emailNone": "nicht gesetzt",
+  "errAccessEnded": "Dieser Zugang endete am %s.",
+  "errAccessNotOpen": "Dieser Zugang beginnt am %s.",
   "errAvatarSize": "Das Foto muss unter 200 KiB bleiben",
   "errAvatarType": "Verwenden Sie ein PNG-, JPEG- oder WebP-Bild",
   "errBadCode": "Dieser Code ist ungültig.",

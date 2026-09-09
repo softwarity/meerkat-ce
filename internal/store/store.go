@@ -242,6 +242,16 @@ CREATE TABLE IF NOT EXISTS users (
   -- tenant selection (unlike a per-tenant override).
   mfa_required         TEXT NOT NULL DEFAULT '',
   avatar               TEXT NOT NULL DEFAULT '',
+  -- What this installation knows about a person that the product could not
+  -- have guessed (see userfields.go): a JSON object, keyed by the field names
+  -- the settings define. Empty on every account until an installation defines
+  -- one, and pruned back to the definitions on every save.
+  fields               TEXT NOT NULL DEFAULT '{}',
+  -- The validity window (see uservalidity.go), unix seconds, 0 = unbounded on
+  -- that side. Days rather than instants: an access valid until the 31st works
+  -- all of the 31st.
+  valid_from           BIGINT NOT NULL DEFAULT 0,
+  valid_until          BIGINT NOT NULL DEFAULT 0,
   -- A DEVELOPER's public SSH key (one authorized_keys line): the credential
   -- their plugged service authenticates with (DEV-11). Self-service, /profile.
   -- A key rather than a signed certificate, so that removing it takes effect
@@ -1721,19 +1731,28 @@ type User struct {
 	// not 1970: an account whose password predates the column must not be
 	// expired at its next sign-in because the column says the epoch.
 	PasswordChangedAt int64 `json:"passwordChangedAt,omitempty"`
+	// Fields are the custom identity fields' values, by name. Read and written
+	// like any other column; validated against the definitions by the caller
+	// that saves, because only it knows what the settings say.
+	Fields map[string]string `json:"fields,omitempty"`
+	// The validity window, unix seconds, 0 = no bound on that side.
+	ValidFrom  int64 `json:"validFrom,omitempty"`
+	ValidUntil int64 `json:"validUntil,omitempty"`
 }
 
 const userCols = `id, username, password_hash, fullname, email, enabled,
 	root, dev, tester, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
 	created_at, updated_at, last_connection_at, must_change_password, mfa_required,
-	email_verified, self_registered, password_changed_at`
+	email_verified, self_registered, password_changed_at, fields, valid_from, valid_until`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
+	var fields string
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Fullname, &u.Email, &u.Enabled,
 		&u.Root, &u.Dev, &u.Tester, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastConnectionAt, &u.MustChangePassword, &u.MFARequired,
-		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt)
+		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &fields, &u.ValidFrom, &u.ValidUntil)
+	u.Fields = decodeFields(fields)
 	// Derived here so every read carries it and no caller has to remember: the
 	// hash is json:"-", this boolean is what the console is allowed to know.
 	u.HasPassword = u.PasswordHash != ""
@@ -1753,12 +1772,12 @@ func (s *Store) CreateUser(ctx context.Context, u User) error {
 		`INSERT INTO users (id, username, password_hash, fullname, email, enabled,
 		   root, dev, tester, tenant_creator, infra_admin, app_admin, locale, timezone,
 		   created_at, updated_at, must_change_password, mfa_required,
-		   email_verified, self_registered)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		   email_verified, self_registered, fields, valid_from, valid_until)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		u.ID, u.Username, u.PasswordHash, u.Fullname, u.Email, u.Enabled,
 		u.Root, u.Dev, u.Tester, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
 		now, now, u.MustChangePassword, u.MFARequired,
-		u.EmailVerified, u.SelfRegistered)
+		u.EmailVerified, u.SelfRegistered, encodeFields(u.Fields), u.ValidFrom, u.ValidUntil)
 	if err != nil {
 		return fmt.Errorf("store: create user %q: %w", u.Username, err)
 	}
@@ -1774,11 +1793,12 @@ func (s *Store) UpdateUser(ctx context.Context, u User) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE users SET username = ?, fullname = ?, email = ?, enabled = ?,
 		   root = ?, dev = ?, tester = ?, tenant_creator = ?, infra_admin = ?, app_admin = ?,
-		   locale = ?, timezone = ?, mfa_required = ?, updated_at = ?
+		   locale = ?, timezone = ?, mfa_required = ?, updated_at = ?,
+		   fields = ?, valid_from = ?, valid_until = ?
 		 WHERE id = ?`,
 		u.Username, u.Fullname, u.Email, u.Enabled,
 		u.Root, u.Dev, u.Tester, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
-		u.MFARequired, time.Now().Unix(), u.ID)
+		u.MFARequired, time.Now().Unix(), encodeFields(u.Fields), u.ValidFrom, u.ValidUntil, u.ID)
 	if err != nil {
 		return fmt.Errorf("store: update user %q: %w", u.Username, err)
 	}

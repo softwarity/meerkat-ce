@@ -2036,6 +2036,22 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
+	// Outside its validity window (RBAC-05). Told plainly, WITH the date, and
+	// only to someone holding the correct password - the same line the
+	// unconfirmed account below is on. A contractor whose access ended
+	// yesterday needs the date, not a mystery: without it every expiry becomes
+	// a support call to ask the one thing the page could have said.
+	if why := user.ValidityReason(time.Now()); why != "" {
+		key := "errAccessEnded"
+		when := user.ValidUntil
+		if time.Now().Unix() < user.ValidFrom {
+			key, when = "errAccessNotOpen", user.ValidFrom
+		}
+		h.render(w, r, next,
+			fmt.Sprintf(h.tr(r, key), time.Unix(when, 0).UTC().Format(time.DateOnly)),
+			http.StatusForbidden)
+		return
+	}
 	h.regLimit.reset(r.Context(), loginKey)
 	// A self-registered account stays unusable until its address is confirmed
 	// (AUTH-20). Only revealed to someone holding the CORRECT password, and

@@ -78,6 +78,8 @@
   "emailEdit": "अपना ई-मेल पता सेट करें",
   "emailHint": "पासवर्ड भूल जाने पर वापस अंदर आने के लिए।",
   "emailNone": "सेट नहीं है",
+  "errAccessEnded": "यह पहुँच %s को समाप्त हो गई।",
+  "errAccessNotOpen": "यह पहुँच %s को शुरू होती है।",
   "errAvatarSize": "फ़ोटो 200 KiB से कम रखें",
   "errAvatarType": "png, jpeg या webp छवि का उपयोग करें",
   "errBadCode": "यह कोड मान्य नहीं है।",

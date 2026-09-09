@@ -78,6 +78,8 @@
   "emailEdit": "Set your e-mail address",
   "emailHint": "Used to get you back in if you lose your password.",
   "emailNone": "not set",
+  "errAccessEnded": "This access ended on %s.",
+  "errAccessNotOpen": "This access opens on %s.",
   "errAvatarSize": "Keep the photo under 200 KiB",
   "errAvatarType": "Use a png, jpeg or webp image",
   "errBadCode": "That code is not valid.",

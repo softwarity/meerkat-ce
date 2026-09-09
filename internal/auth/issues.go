@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -71,7 +72,7 @@ func (h *Handler) postIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.st.GetUserByID(r.Context(), sess.UserID)
-	if err != nil || !u.Enabled {
+	if err != nil || !u.Enabled || !u.ValidAt(time.Now()) {
 		issueErr(w, http.StatusUnauthorized, "sign in to report an issue")
 		return
 	}

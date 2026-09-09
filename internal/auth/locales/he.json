@@ -78,6 +78,8 @@
   "emailEdit": "הגדירו את כתובת הדוא\"ל שלכם",
   "emailHint": "משמשת כדי להחזיר אתכם פנימה אם תשכחו את הסיסמה.",
   "emailNone": "לא הוגדרה",
+  "errAccessEnded": "הגישה הזו הסתיימה ב-%s.",
+  "errAccessNotOpen": "הגישה הזו נפתחת ב-%s.",
   "errAvatarSize": "התמונה חייבת להיות קטנה מ-200 KiB",
   "errAvatarType": "השתמש בתמונת png, jpeg או webp",
   "errBadCode": "הקוד הזה אינו תקין.",

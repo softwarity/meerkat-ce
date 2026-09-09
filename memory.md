@@ -5,7 +5,11 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-09-08 : **l'edition tient** - la base externe (`ee/pgdriver`) et la boucle de synchronisation (`ee/changebus`) ne sont plus dans l'image communautaire, qui repond en mots a une URL de base ; page de refus, filtre et bouton d'ouverture sur l'ecran des routes, regle de schema unique (trois defauts derriere un repartiteur TLS), noms servis relayes entre noeuds, e2e a deux passerelles et job plug hosted hebdomadaire. **Les chantiers suivants sont decides** (extensions, gRPC, mesures de performance, emballage) - voir la section dediee. Avant : 2026-09-03 : **la gateway se protege de ce qu'elle proxifie** -
+_Derniere mise a jour : 2026-09-09 : **le modele des comptes** - champs maison definis
+dans `Infra > Modele` et transmis comme tout attribut (MODEL-01), fenetre de validite
+verifiee partout ou une session se resout (MODEL-02, reste le resume par e-mail), et
+l'ecran des utilisateurs passe a **un seul tiroir dont le contenu change** (creation =
+edition), l'historique par-dessus. Avant : 2026-09-08 : **l'edition tient** - la base externe (`ee/pgdriver`) et la boucle de synchronisation (`ee/changebus`) ne sont plus dans l'image communautaire, qui repond en mots a une URL de base ; page de refus, filtre et bouton d'ouverture sur l'ecran des routes, regle de schema unique (trois defauts derriere un repartiteur TLS), noms servis relayes entre noeuds, e2e a deux passerelles et job plug hosted hebdomadaire. **Les chantiers suivants sont decides** (extensions, gRPC, mesures de performance, emballage) - voir la section dediee. Avant : 2026-09-03 : **la gateway se protege de ce qu'elle proxifie** -
 delais par route (ROUTE-07), disjoncteur (ROUTE-09) et etat des amonts dans la console
 (SVC-04, ROUTE-11) - voir la section dediee. Avant : 2026-09-02 : **PERF-02 et LIFE-05 coches** - le plafond de
 reecriture de corps est reglable (et une reponse au-dessus n'est plus tronquee), et le
@@ -100,6 +104,70 @@ B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste
 repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+
+## Session 2026-09-09 - le modele des comptes (MODEL-01/02) et le tiroir unique
+
+### Ce qui a ete livre
+
+- **Champs de compte (MODEL-01)** : `Infra > Modele` definit ce que l'installation sait
+  d'une personne (texte, nombre, date, choix, oui/non ; JAMAIS obligatoire - un champ defini aujourd'hui est vide sur tous les comptes existants) ; les valeurs se
+  saisissent par compte dans `Application > Utilisateurs` ; elles voyagent comme
+  n'importe quel attribut (en-tete/JWT pour un service, attribut de page pour une UI).
+  Serveur : `internal/store/userfields.go` (+ colonne `fields`), `internal/admin/usermodel.go`
+  (`GET` pour tout signe, `PUT` reserve a l'infra), `knownFields` dans `internal/admin/api.go`
+  refuse une route qui cite un champ inexistant **en nommant ce qui existe**.
+- **Fenetre de validite (MODEL-02)** : `valid_from` / `valid_until` en JOURS
+  (`internal/store/uservalidity.go`) ; verifiee a la connexion (nomme la date), a la
+  resolution de session, sur le plan de donnees, aux passkeys. **Reste** : le resume
+  quotidien par e-mail aux admins, conditionne au SMTP.
+- **Un seul tiroir sur l'ecran des utilisateurs, dont le contenu change** : creer et
+  corriger sont la meme surface (`user-account-form` + `user-fields-form` partages par
+  `user-create` et `user-fields`) ; `user-dialog.component.ts` supprime. Le nom, le nom
+  complet et l'adresse s'editent enfin apres la creation.
+- **Trois pages dans ce tiroir** (`UserEditorView` = `account | security | history`,
+  un `model()` tenu par la page pour que le clic dehors sache quoi rendre) : le compte
+  (identite, adresse pleine largeur, fenetre d'acces, champs maison - ce qu'on REMPLIT),
+  la securite (second facteur, mot de passe, autorites) et l'historique, atteintes par
+  un `mat-action-list` pleine largeur et rendues par une fleche.
+
+### Pieges de ce tiroir, tous vus a l'ecran et pas dans la tete
+
+1. **Deux `mat-drawer` sur le meme bord, Material refuse la position** : le conteneur
+   ne dessine QU'UN fond, qui restait `visibility: hidden` sans jamais recevoir
+   `mat-drawer-shown` - donc le clic dehors ne fermait rien du tout. Le deuxieme niveau
+   se dessine DANS le tiroir.
+2. **Un panneau superpose dans le tiroir, essaye puis abandonne** : deux pieges y
+   attendaient (un bouton Material porte `z-index: 0`, donc il se peint APRES tout ce
+   qui est positionne en `z-index: auto` et traversait le panneau ; et un panneau ancre
+   dans la boite qui defile glisse de la hauteur du defilement). Francois a tranche
+   autrement : **un seul tiroir dont le composant interieur change**. Reste utile de
+   l'episode : `.body` de l'editeur possede son propre defilement, le tiroir ne defile
+   jamais.
+3. **Echap doit s'ecouter sur le DOCUMENT** : tourner une page dans le tiroir supprime
+   le bouton qui avait le focus, la touche atterrit sur `<body>`, et un `(keydown.escape)`
+   pose sur le conteneur ne repondait qu'une fois sur deux. Garde : si un panneau CDK
+   est ouvert (dialogue, `mat-select`), c'est lui qui possede la touche.
+4. **`GET /api/users/{id}/identities` rend un OBJET** (`{identities, localSignIn}`) et
+   la console le lisait comme un tableau : `@for` levait
+   `newCollection[Symbol.iterator] is not a function` et la section **Autorites
+   externes** ne s'affichait pas du tout. Corrige, et `localSignIn` sert enfin a dire
+   le cas qu'il existe pour nommer (un mot de passe qui n'ouvre rien).
+
+### La capacite `tester` : PAS un relicat a supprimer
+
+Francois a demande si elle avait encore un sens. Aujourd'hui elle ne donne rien (une des
+quatre conditions equivalentes pour un jeton de simulation - `dev` suffit - et une classe
+`tester` sur `<body>` qu'aucun ecran console ne teste). **Mais** la note de conception
+« Le mode dev est global, pas par developpeur » (DEV-05/06) la reserve explicitement :
+c'est la capacite qui portera le menu de choix de variante quand la portee des
+substitutions existera. A supprimer seulement si on renonce a DEV-05.
+
+### Verifie en le faisant tourner (instance de dev, `:9092`)
+
+Script Playwright (l'extension Chrome reste bloquee) : creation d'un compte dans le
+tiroir avec un champ maison et une date de fin -> le serveur stocke
+`{"employeeNumber":"E-4242"}` et `validUntil` au bon jour ; edition du nom complet dans
+le tiroir -> enregistre ; Echap ferme un niveau a la fois ; compte de test supprime.
 
 ## Session 2026-09-07/08 - le tunnel en cluster, l'edition qui tient, et ce qu'on a decide de faire ensuite
 

@@ -78,6 +78,8 @@
   "emailEdit": "Definir votre adresse e-mail",
   "emailHint": "Sert a vous laisser revenir si vous perdez votre mot de passe.",
   "emailNone": "non renseignee",
+  "errAccessEnded": "Cet accès a pris fin le %s.",
+  "errAccessNotOpen": "Cet accès s'ouvre le %s.",
   "errAvatarSize": "Gardez la photo sous 200 Kio",
   "errAvatarType": "Utilisez une image png, jpeg ou webp",
   "errBadCode": "Ce code n'est pas valide.",

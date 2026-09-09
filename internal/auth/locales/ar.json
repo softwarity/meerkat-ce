@@ -78,6 +78,8 @@
   "emailEdit": "حدد عنوان بريدك الإلكتروني",
   "emailHint": "يتيح لك استعادة الدخول إذا نسيت كلمة المرور.",
   "emailNone": "غير محدد",
+  "errAccessEnded": "انتهى هذا الوصول في %s.",
+  "errAccessNotOpen": "يبدأ هذا الوصول في %s.",
   "errAvatarSize": "يجب أن تقل الصورة عن 200 كيبيبايت",
   "errAvatarType": "استخدم صورة png أو jpeg أو webp",
   "errBadCode": "هذا الرمز غير صالح.",

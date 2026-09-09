@@ -1,74 +1,122 @@
 <header>
-  <h2 class="mono">{{ user().username }}</h2>
+  @if (view() !== 'account') {
+    <button
+      matIconButton
+      (click)="view.set('account')"
+      i18n-matTooltip="@@Back"
+      matTooltip="Back"
+      i18n-aria-label="@@Back"
+      aria-label="Back"
+    >
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+  }
+  <h2 [class.mono]="view() === 'account'">{{ heading() }}</h2>
+  @if (view() !== 'account') {
+    <span class="who mono">{{ user().username }}</span>
+  }
+  <span class="grow"></span>
   <button matIconButton (click)="closed.emit()" i18n-aria-label="@@Close" aria-label="Close">
     <mat-icon>close</mat-icon>
   </button>
 </header>
 
 <div class="body">
-  @if (user().fullname || user().email) {
-    <p class="identity">{{ user().fullname }}{{ user().fullname && user().email ? ' - ' : '' }}{{ user().email }}</p>
-  }
+  @switch (view()) {
+    <!-- Everything that decides HOW this person gets in, on one page: the
+         second factor, the password, and the authorities that can vouch for
+         them. Three answers to one question, and asked here rather than under
+         the identity because they are read together the day somebody cannot
+         sign in. -->
+    @case ('security') {
+      <section>
+        <h3 i18n="@@Two_factor">Two-factor</h3>
+        <app-mfa-select
+          [value]="user().mfaRequired"
+          [inheritedLabel]="globalMfaLabel()"
+          (valueChange)="setMfa($event)"
+        />
+      </section>
 
-  <section>
-    <h3 i18n="@@Two_factor">Two-factor</h3>
-    <app-mfa-select
-      [value]="user().mfaRequired"
-      [inheritedLabel]="globalMfaLabel()"
-      (valueChange)="setMfa($event)"
-    />
-  </section>
+      <mat-divider />
 
-  <mat-divider />
+      <section>
+        <h3 i18n="@@Password">Password</h3>
+        <div class="actions">
+          <!-- An account born at an authority holds no local password: offering
+               to RESET one would promise something that does not exist. Setting
+               one is a different, deliberate act - it opens a second way in. -->
+          <button matButton (click)="resetPassword()">
+            <mat-icon>lock_reset</mat-icon>
+            @if (user().hasPassword === false) {
+              <ng-container i18n="@@Set_a_password">Set a password</ng-container>
+            } @else {
+              <ng-container i18n="@@Reset_password">Reset password</ng-container>
+            }
+          </button>
+          @if (user().hasPassword !== false) {
+            <button matButton (click)="mustChange()" [disabled]="user().mustChangePassword">
+              <mat-icon>autorenew</mat-icon>
+              <ng-container i18n="@@Force_a_change">Force a change at next sign-in</ng-container>
+            </button>
+          }
+        </div>
+      </section>
 
-  <section>
-    <h3 i18n="@@Account">Account</h3>
-    <div class="actions">
-      <!-- An account born at an authority holds no local password: offering to
-           RESET one would promise something that does not exist. Setting one is
-           a different, deliberate act - it opens a second way in. -->
-      <button matButton (click)="resetPassword()">
-        <mat-icon>lock_reset</mat-icon>
-        @if (user().hasPassword === false) {
-          <ng-container i18n="@@Set_a_password">Set a password</ng-container>
-        } @else {
-          <ng-container i18n="@@Reset_password">Reset password</ng-container>
-        }
-      </button>
-      @if (user().hasPassword !== false) {
-        <button matButton (click)="mustChange()" [disabled]="user().mustChangePassword">
-          <mat-icon>autorenew</mat-icon>
-          <ng-container i18n="@@Force_a_change">Force a change at next sign-in</ng-container>
+      <mat-divider />
+
+      <section>
+        <h3 i18n="@@External_authorities">External authorities</h3>
+        <app-external-identities [userId]="user().id" [hasPassword]="user().hasPassword" />
+      </section>
+    }
+
+    @case ('history') {
+      <app-login-history [userId]="user().id" />
+    }
+
+    <!-- The page one lands on: who the person is, when their account works,
+         and what this installation records about them - the only part of this
+         drawer somebody FILLS. What is decided rather than filled is one tap
+         away, and comes back here. -->
+    @default {
+      <app-user-fields [user]="user()" (saved)="saved.emit($event)" />
+
+      <mat-action-list>
+        <button mat-list-item (click)="view.set('security')">
+          <mat-icon matListItemIcon>shield_person</mat-icon>
+          <span matListItemTitle i18n="@@Security">Security</span>
+          <span matListItemLine i18n="@@Security_line"
+            >Second factor, password, external authorities</span
+          >
+          <mat-icon matListItemMeta>chevron_right</mat-icon>
         </button>
-      }
-    </div>
-  </section>
+        <!-- A door, not a section. The history is a LIST - as long as the
+             account is old - and a list inside a page of settings pushes
+             everything under it out of reach, the danger zone included. -->
+        <button mat-list-item (click)="view.set('history')">
+          <mat-icon matListItemIcon>history</mat-icon>
+          <span matListItemTitle i18n="@@Sign_in_history">Sign-in history</span>
+          <span matListItemLine i18n="@@Sign_in_history_line"
+            >Every sign-in, where from and how</span
+          >
+          <mat-icon matListItemMeta>chevron_right</mat-icon>
+        </button>
+      </mat-action-list>
 
-  <mat-divider />
-
-  <section>
-    <h3 i18n="@@External_authorities">External authorities</h3>
-    <app-external-identities [userId]="user().id" [hasPassword]="user().hasPassword" />
-  </section>
-
-  <mat-divider />
-
-  <section class="history">
-    <h3 i18n="@@Sign_in_history">Sign-in history</h3>
-    <app-login-history [userId]="user().id" />
-  </section>
-
-  <!-- Its own zone, framed like every other destructive one: deleting an
-       account was a third button in a row of ordinary ones. -->
-  <section class="danger-zone">
-    <h3 i18n="@@Danger_zone">Danger zone</h3>
-    <p class="hint" i18n="@@Delete_user_hint">
-      The account, its memberships, its sessions and its tokens go with it. The audit trail keeps
-      an anonymized trace.
-    </p>
-    <button matButton [disabled]="isMe()" (click)="remove()">
-      <mat-icon>delete</mat-icon>
-      <ng-container i18n="@@Delete">Delete</ng-container>
-    </button>
-  </section>
+      <!-- Its own zone, framed like every other destructive one: deleting an
+           account was a third button in a row of ordinary ones. -->
+      <section class="danger-zone">
+        <h3 i18n="@@Danger_zone">Danger zone</h3>
+        <p class="hint" i18n="@@Delete_user_hint">
+          The account, its memberships, its sessions and its tokens go with it. The audit trail
+          keeps an anonymized trace.
+        </p>
+        <button matButton [disabled]="isMe()" (click)="remove()">
+          <mat-icon>delete</mat-icon>
+          <ng-container i18n="@@Delete">Delete</ng-container>
+        </button>
+      </section>
+    }
+  }
 </div>

@@ -568,8 +568,15 @@ func TestValidateIdentity(t *testing.T) {
 	if err := Validate(mk("carrier-pigeon")); err == nil {
 		t.Fatal("unknown mechanism accepted")
 	}
-	if err := Validate(mk("headers", store.IdentityAttr{Field: "shoesize"})); err == nil {
-		t.Fatal("unknown identity attribute accepted")
+	// A name that could be a custom field passes HERE: the list of those is
+	// configuration, and this function is pure on a route. What it still
+	// refuses is a name that could not be a field at all - and the admin API
+	// checks the rest against the definitions, where there is a store to ask.
+	if err := Validate(mk("headers", store.IdentityAttr{Field: "shoe size"})); err == nil {
+		t.Fatal("a name that cannot be a field was accepted")
+	}
+	if err := Validate(mk("headers", store.IdentityAttr{Field: "employeeNumber"})); err != nil {
+		t.Fatalf("a name that could be a custom field was refused: %v", err)
 	}
 	if err := Validate(mk("headers", store.IdentityAttr{Field: "email", As: "not a header"})); err == nil {
 		t.Fatal("bad header name accepted")

@@ -1,9 +1,10 @@
-import { Component, inject, input, output } from '@angular/core';
+import { Component, computed, inject, input, model, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
+import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService, User } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
@@ -11,20 +12,32 @@ import { ExternalIdentitiesComponent } from '../external-identities.component';
 import { LoginHistoryComponent } from '../login-history.component';
 import { MfaSelectComponent } from '../mfa-select.component';
 import { PasswordDialogComponent } from '../password-dialog.component';
+import { UserFieldsComponent } from '../user-fields.component';
 
-// A user's options, hosted in the users-page right drawer (opened by clicking a
-// row). Capabilities, the second-factor policy and account actions all live
-// here - nothing is edited inline on the table anymore.
+// Which page of the account drawer is on screen.
+export type UserEditorView = 'account' | 'security' | 'history';
+
+// A user's account, hosted in the users-page right drawer (opened by clicking
+// a row).
+//
+// THREE pages in one drawer, and the drawer never grows a second panel: the
+// account one lands on (identity, validity, this installation's own fields),
+// the security one (second factor, password, authorities) and the history.
+// What is FILLED stays on the first page; what is decided or read is one tap
+// away and comes back. The page above owns the view so that a click outside
+// gives back exactly one level - the sub-page first, the drawer after.
 @Component({
   selector: 'app-user-editor',
   imports: [
     MatButtonModule,
     MatDividerModule,
     MatIconModule,
+    MatListModule,
     MatTooltipModule,
     ExternalIdentitiesComponent,
     LoginHistoryComponent,
     MfaSelectComponent,
+    UserFieldsComponent,
   ],
   templateUrl: './user-editor.component.html',
   styleUrl: './user-editor.component.scss',
@@ -35,10 +48,26 @@ export class UserEditorComponent {
   readonly globalMfaLabel = input.required<string>();
   readonly meId = input.required<string>();
 
+  // Which of the three pages the drawer shows. A model and not a private
+  // signal: the page outside answers the click on the backdrop, and it has to
+  // know whether that click owes a sub-page or the whole drawer.
+  readonly view = model<UserEditorView>('account');
+
   // saved: a field changed, here is the fresh user (the page updates its list
   // and keeps the drawer in sync). closed: drawer dismissed or user deleted.
   readonly saved = output<User>();
   readonly closed = output<void>();
+
+  protected readonly heading = computed(() => {
+    switch (this.view()) {
+      case 'security':
+        return $localize`:@@Security:Security`;
+      case 'history':
+        return $localize`:@@Sign_in_history:Sign-in history`;
+      default:
+        return this.user().username;
+    }
+  });
 
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);

@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { catchError, of } from 'rxjs';
-import { ApiService, ExternalIdentity } from '../api.service';
+import { ApiService, UserIdentities } from '../api.service';
 
 // The authorities a person can sign in through (AUTH-19), and what each one
 // last said about them. Read-only, and deliberately raw.
@@ -28,7 +28,7 @@ export class ExternalIdentitiesComponent {
   readonly hasPassword = input<boolean | undefined>(undefined);
 
   private readonly api = inject(ApiService);
-  protected readonly identities = signal<ExternalIdentity[] | null>(null);
+  protected readonly identities = signal<UserIdentities | null>(null);
 
   constructor() {
     effect(() => {
@@ -41,8 +41,8 @@ export class ExternalIdentitiesComponent {
     this.identities.set(null);
     this.api
       .userIdentities(userId)
-      .pipe(catchError(() => of<ExternalIdentity[]>([])))
-      .subscribe((list) => this.identities.set(list));
+      .pipe(catchError(() => of<UserIdentities>({ identities: [], localSignIn: true })))
+      .subscribe((view) => this.identities.set(view));
   }
 
   // The icon says at a glance which kind of authority answered.

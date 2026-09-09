@@ -53,6 +53,10 @@ var agentIgnores = map[string]string{
 	"roles":          "the role catalogue is what every access rule points at; renaming one silently changes who reaches what, and no tool asked for it yet",
 	"issues":         "user-filed reports, with screenshots",
 	"mcp":            "the agent endpoint itself",
+	"model": "the shape of an account, not its contents: a field added or removed changes " +
+		"what every route may forward and what every form asks for, which is a decision " +
+		"about this installation rather than a task. An agent that fills the values it " +
+		"defines is save_user's business, not this",
 	"live": "the console's websocket: an agent does not hold a socket open to watch a " +
 		"list change, and what it carries is answered by read_traffic on demand",
 }
@@ -186,8 +190,8 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"POST /api/tenants/{id}/owner":                           true,
 		"POST /api/themes":                                       true, "PUT /api/themes/{id}": true,
 		"POST /api/themes/{id}/activate": true, "DELETE /api/themes/{id}": true,
-		"PUT /api/branding": true,
-		"POST /api/users":   true, "PUT /api/users/{id}": true, "DELETE /api/users/{id}": true,
+		"PUT /api/branding": true, "PUT /api/model/user-fields": true,
+		"POST /api/users": true, "PUT /api/users/{id}": true, "DELETE /api/users/{id}": true,
 		"POST /api/users/must-change-password":      true,
 		"POST /api/users/{id}/must-change-password": true,
 		"POST /api/users/{id}/reset-password":       true,

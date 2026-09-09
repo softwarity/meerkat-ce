@@ -78,6 +78,8 @@
   "emailEdit": "Dat dia chi e-mail cua ban",
   "emailHint": "Dung de dang nhap lai neu ban quen mat khau.",
   "emailNone": "chua dat",
+  "errAccessEnded": "Quyền truy cập này đã kết thúc vào %s.",
+  "errAccessNotOpen": "Quyền truy cập này mở vào %s.",
   "errAvatarSize": "Ảnh phải nhỏ hơn 200 KiB",
   "errAvatarType": "Hãy dùng ảnh png, jpeg hoặc webp",
   "errBadCode": "Mã này không hợp lệ.",

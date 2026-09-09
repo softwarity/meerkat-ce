@@ -78,6 +78,8 @@
   "emailEdit": "이메일 주소 설정",
   "emailHint": "비밀번호를 잊었을 때 다시 로그인하는 데 쓰입니다.",
   "emailNone": "설정되지 않음",
+  "errAccessEnded": "이 접근 권한은 %s에 종료되었습니다.",
+  "errAccessNotOpen": "이 접근 권한은 %s에 시작됩니다.",
   "errAvatarSize": "사진은 200 KiB 미만이어야 합니다",
   "errAvatarType": "png, jpeg 또는 webp 이미지를 사용하세요",
   "errBadCode": "이 코드는 유효하지 않습니다.",

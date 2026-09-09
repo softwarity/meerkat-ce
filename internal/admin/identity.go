@@ -340,6 +340,20 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusForbidden, "granting root requires root")
 		return
 	}
+	// The custom fields at CREATION too, and not only on the next save: a
+	// required field that can only be filled afterwards makes every new account
+	// invalid the moment it exists, which is the opposite of what "required"
+	// promises.
+	fields, err := a.checkedFields(r.Context(), u.Fields)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	u.Fields = fields
+	if err := store.ValidFromUntil(u.ValidFrom, u.ValidUntil); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	u.ID = newID()
 	// A generated one-time password, shown once in the response - the archway
 	// pattern; temporary-password expiry arrives with the password policy.
@@ -401,6 +415,21 @@ func (a *API) updateUser(w http.ResponseWriter, r *http.Request, actor store.Use
 			writeErr(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
+	}
+	// The custom fields, against the definitions (Infra > Model): a value that
+	// is not on a choice's list, a date that is not one, a required field left
+	// empty. Checked here rather than in the store because only the API knows
+	// what this installation defined - and refused with the sentence the form
+	// shows, which names the field the way the person reading it sees it.
+	fields, err := a.checkedFields(r.Context(), u.Fields)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	u.Fields = fields
+	if err := store.ValidFromUntil(u.ValidFrom, u.ValidUntil); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
 	}
 	if err := a.st.UpdateUser(r.Context(), u); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())

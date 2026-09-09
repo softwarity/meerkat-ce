@@ -124,7 +124,7 @@ func (h *Handler) passkeySession(w http.ResponseWriter, r *http.Request) (store.
 		return store.Session{}, store.User{}, false
 	}
 	u, err := h.st.GetUserByID(r.Context(), sess.UserID)
-	if err != nil || !u.Enabled {
+	if err != nil || !u.Enabled || !u.ValidAt(time.Now()) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return store.Session{}, store.User{}, false
 	}
@@ -317,7 +317,7 @@ func (h *Handler) passkeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 	var matched store.User
 	cred, err := wa.ValidateDiscoverableLogin(func(_, userHandle []byte) (webauthn.User, error) {
 		u, err := h.st.GetUserByID(r.Context(), string(userHandle))
-		if err != nil || !u.Enabled {
+		if err != nil || !u.Enabled || !u.ValidAt(time.Now()) {
 			return nil, fmt.Errorf("unknown or disabled user")
 		}
 		creds, err := h.passkeyCredentials(r, u.ID)

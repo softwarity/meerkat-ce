@@ -133,3 +133,15 @@ mat-drawer {
 }
 
 @include table.banded-rows;
+
+/* The one drawer's stack: whichever page is on screen fills it. Two drawers on
+   the same edge is a position Material refuses - a container draws ONE
+   backdrop, and a second panel would leave it hidden and shut nothing. So the
+   second level is a component swapped inside the first. */
+.stack {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  /* The panels scroll INSIDE themselves, never the drawer. */
+  overflow: hidden;
+}
