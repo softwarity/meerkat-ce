@@ -143,10 +143,13 @@
              focus it and they drop, type and they filter. Beside it they were
              a second control for one value, and an empty box does not announce
              it holds a list. Free text stays free - an upstream outside the
-             cluster is typed, and always will be. -->
+             cluster is typed, and always will be.
+             h2c is HTTP/2 over cleartext, which is what a gRPC service inside
+             a cluster speaks (ROUTE-20). Last, because it is the one an
+             operator picks knowing why. -->
         <app-url-input i18n-label="@@Upstream" label="Upstream" required
           [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
-          [protocols]="['http', 'https']" [suggestions]="upstreamChoices()"
+          [protocols]="['http', 'https', 'h2c']" [suggestions]="upstreamChoices()"
           [hint]="upstreamHint()" hintAlign="end" hostPlaceholder="service:8080/base" />
 
         <!-- How long this one may take (ROUTE-07), and when to stop asking

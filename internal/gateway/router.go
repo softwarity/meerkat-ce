@@ -900,8 +900,9 @@ func Validate(r store.Route) error {
 		if target.Scheme == "" || target.Host == "" {
 			return fmt.Errorf("bad upstream %q: scheme and host required", r.Upstream)
 		}
-		if target.Scheme != "http" && target.Scheme != "https" {
-			return fmt.Errorf("bad upstream %q: scheme %q is not supported: only http and https", r.Upstream, target.Scheme)
+		if !slices.Contains(upstreamSchemes, target.Scheme) {
+			return fmt.Errorf("bad upstream %q: scheme %q is not supported: %s",
+				r.Upstream, target.Scheme, strings.Join(upstreamSchemes, ", "))
 		}
 	}
 	return validateRouteType(r)
@@ -2362,8 +2363,16 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 	}
 
 	connect, response := r.Timeouts.Durations(defaults)
+	// The scheme said which transport; the request itself is plain http from
+	// here on, so everything downstream - filters, SetURL, the stamp - sees
+	// what it has always seen.
+	rt := transportFor(connect, response)
+	if target.Scheme == SchemeH2C {
+		rt = h2cTransportFor(connect, response)
+		target = h2cTarget(target)
+	}
 	proxy := &httputil.ReverseProxy{
-		Transport: cookieStrippingTransport{transportFor(connect, response)},
+		Transport: cookieStrippingTransport{rt},
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetXForwarded()
 			// Whatever the caller sent under this name goes: it tells the

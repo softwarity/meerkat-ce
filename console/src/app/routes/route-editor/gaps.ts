@@ -41,8 +41,11 @@ export function upstreamProblem(raw: string): string {
   if (!u.hostname) {
     return $localize`:@@Gap_upstream_no_host:the upstream has no host`;
   }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-    return $localize`:@@Gap_upstream_scheme:only http and https can be proxied`;
+  // Kept in step with the gateway's own list (internal/gateway/h2c.go): a
+  // console that refuses what the gateway accepts is a console that hides a
+  // working configuration behind a warning nobody can act on.
+  if (!['http:', 'https:', 'h2c:'].includes(u.protocol)) {
+    return $localize`:@@Gap_upstream_scheme:only http, https and h2c can be proxied`;
   }
   return '';
 }

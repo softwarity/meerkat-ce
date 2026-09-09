@@ -31,21 +31,20 @@ code=$(curl -s --max-time 15 -c "$jar" -o /dev/null -w '%{http_code}' \
   -X POST "$admin/login" -d "username=admin&password=$password")
 [ "$code" = "303" ] || { echo "signing in answered $code"; exit 1; }
 
-# The developer capability, read-modify-write: the account object is PUT whole,
-# so building one from the fields this script happens to know would quietly
-# clear every field it does not.
-# /api/me answers {"user": {...}, "tenants": [...], ...} - the account is one
-# level down, beside what else the console needs to draw itself.
-id=$(curl -s --max-time 15 -b "$jar" "$admin/api/me" \
-     | python3 -c 'import sys,json;print(json.load(sys.stdin)["user"]["id"])')
-curl -s --max-time 15 -b "$jar" "$admin/api/users/$id" > /tmp/user.json
-python3 -c "
-import json
-u = json.load(open('/tmp/user.json'))
-u['dev'] = True
-json.dump(u, open('/tmp/user.json','w'))
-print('dev capability set on', u['username'])
-"
+# /api/me answers {"user": {...}, "tenants": [...], ...} in one payload - what
+# the console needs to draw itself - and the account under "user" is the whole
+# object. There is no GET /api/users/{id} to read it back from, and none is
+# needed: this IS the read half of the read-modify-write.
+curl -s --max-time 15 -b "$jar" "$admin/api/me" > /tmp/me.json
+if ! python3 -c 'import json;me=json.load(open("/tmp/me.json"));u=me["user"];u["dev"]=True;json.dump(u,open("/tmp/user.json","w"));print("dev capability set on",u["username"])'; then
+  echo "--- what /api/me answered ---"
+  head -c 400 /tmp/me.json
+  exit 1
+fi
+id=$(python3 -c 'import json;print(json.load(open("/tmp/user.json"))["id"])')
+
+# Written back WHOLE: a PUT built from the fields this script happens to know
+# would clear every field it does not.
 code=$(curl -s --max-time 15 -b "$jar" -o /dev/null -w '%{http_code}' \
   -X PUT "$admin/api/users/$id" -H 'Content-Type: application/json' \
   --data-binary @/tmp/user.json)
