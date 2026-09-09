@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, MailRelay } from '../api.service';
@@ -34,6 +35,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     MatInputModule,
     MatRadioModule,
     MatSelectModule,
+    MatSlideToggleModule,
     LoadingIndicatorComponent,
     FormFieldComponent,
     SecretFieldComponent,
@@ -67,6 +69,28 @@ export class MailRelayPageComponent {
   // The display name comes from the application plane: shown, never edited.
   protected readonly fromName = signal('');
   protected readonly testTo = signal('');
+
+  // The daily notice about accounts whose window is closing (MODEL-02): the
+  // one message this gateway sends without being asked, so it is configured
+  // where the relay is.
+  protected readonly digestOn = signal(true);
+  protected readonly digestHour = signal(7);
+  protected readonly digestDays = signal(7);
+  // The gateway's own clock, read-only: an hour typed from another continent
+  // means nothing unless the page says which clock it is.
+  private readonly serverTime = signal('');
+  private readonly serverZone = signal('');
+  protected readonly hours = Array.from({ length: 24 }, (_, h) => h);
+
+  protected hourLabel(h: number): string {
+    return `${String(h).padStart(2, '0')}:00`;
+  }
+
+  protected readonly clockHint = computed(() => {
+    const time = this.serverTime();
+    if (!time) return $localize`:@@Gateway_time:Gateway time`;
+    return $localize`:@@Gateway_time_now:Gateway time - it is ${time}:TIME: there (${this.serverZone()}:ZONE:)`;
+  });
 
   // The sender address has two cases, and they call for opposite advice.
   // When the account IS an address, providers send as that one and little
@@ -146,6 +170,13 @@ export class MailRelayPageComponent {
     this.clientSecret.set(r.oauth2?.clientSecret ?? '');
     this.clientSecretSet.set(!!r.oauth2SecretSet);
     this.scope.set(r.oauth2?.scope ?? '');
+    if (r.digest) {
+      this.digestOn.set(r.digest.enabled);
+      this.digestHour.set(r.digest.hour);
+      this.digestDays.set(r.digest.days);
+    }
+    this.serverTime.set(r.serverTime ?? '');
+    this.serverZone.set(r.serverZone ?? '');
   }
 
   // The relay as the form has it right now - what both Save and Test act on.
@@ -163,6 +194,11 @@ export class MailRelayPageComponent {
         clientId: this.clientId().trim(),
         clientSecret: this.clientSecret(), // '' keeps the stored one
         scope: this.scope().trim(),
+      },
+      digest: {
+        enabled: this.digestOn(),
+        hour: this.digestHour(),
+        days: this.digestDays(),
       },
     };
   }

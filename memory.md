@@ -118,8 +118,18 @@ mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
   refuse une route qui cite un champ inexistant **en nommant ce qui existe**.
 - **Fenetre de validite (MODEL-02)** : `valid_from` / `valid_until` en JOURS
   (`internal/store/uservalidity.go`) ; verifiee a la connexion (nomme la date), a la
-  resolution de session, sur le plan de donnees, aux passkeys. **Reste** : le resume
-  quotidien par e-mail aux admins, conditionne au SMTP.
+  resolution de session, sur le plan de donnees, aux passkeys.
+- **Resume quotidien des expirations (NOTIF-04)** : `internal/expiry`, une boucle qui
+  tique toutes les dix minutes et n'envoie qu'une fois par jour - le jour envoye est
+  dans la base (`expiry_digest_sent`, un GARDE, donc hors export) et `store.TryLock`
+  tranche entre les noeuds. Rien a dire, rien envoye (mais le jour est coche) ; pas de
+  relais, rien envoye ET jour NON coche, pour que le premier matin ou un relais repond
+  l'avis parte ; envoi refuse partout, jour non coche non plus. Regle
+  (`expiry_digest` : interrupteur, heure en heure LOCALE de la passerelle, horizon)
+  porte par la charge utile du **relais** - pas de nouvel endpoint, donc rien a ajouter
+  dans la couverture MCP - et le champ est un POINTEUR : absent = ne pas y toucher,
+  sinon un ecran qui enregistre un hote couperait un avis qu'il n'affiche pas.
+  L'ecran Mail relay dit quelle horloge il parle (« it is 00:41 there (CEST) »).
 - **Un seul tiroir sur l'ecran des utilisateurs, dont le contenu change** : creer et
   corriger sont la meme surface (`user-account-form` + `user-fields-form` partages par
   `user-create` et `user-fields`) ; `user-dialog.component.ts` supprime. Le nom, le nom

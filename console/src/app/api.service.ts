@@ -1185,6 +1185,18 @@ export interface MailRelay {
   fromName?: string;
   // What the recipient will read, name and address combined.
   sender?: string;
+  // The daily notice about accounts whose access window is closing (MODEL-02).
+  // Absent on a PUT means "leave it alone", never "switch it off".
+  digest?: ExpiryDigest;
+  // The GATEWAY's own clock, read-only: the notice's hour is its local time.
+  serverTime?: string;
+  serverZone?: string;
+}
+
+export interface ExpiryDigest {
+  enabled: boolean;
+  hour: number;
+  days: number;
 }
 
 // The APPLICATION's side of outbound e-mail: the display NAME the recipient

@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
@@ -56,6 +57,22 @@ type mailRelayPayload struct {
 	// reference travels, a literal never does and only raises OAuth2SecretSet.
 	OAuth2          mail.OAuth2Config `json:"oauth2"`
 	OAuth2SecretSet bool              `json:"oauth2SecretSet"`
+	// Digest is the one message this gateway sends of its own accord
+	// (MODEL-02): the daily notice about accounts whose access window is
+	// closing. It rides with the relay rather than on an endpoint of its own
+	// because it is the same question - what leaves this gateway by e-mail -
+	// and because without a relay it is a switch with nothing behind it.
+	//
+	// A POINTER, and for the reason the secrets above are blank-tolerant: a
+	// caller that does not carry the field means "leave it alone", not "switch
+	// it off". A form that saves a relay must not silently stop a notice it
+	// never displayed.
+	Digest *store.ExpiryDigest `json:"digest,omitempty"`
+	// ServerTime and ServerZone are read-only: the digest's hour is the
+	// GATEWAY's local time, and an operator setting "7" from another continent
+	// has no way to know what that means unless the page says it.
+	ServerTime string `json:"serverTime,omitempty"`
+	ServerZone string `json:"serverZone,omitempty"`
 }
 
 // relayView takes the relay AS STORED, so every editable field comes back the
@@ -83,6 +100,11 @@ func (a *API) relayView(cfg mail.Config) mailRelayPayload {
 
 func (a *API) getMailRelay(w http.ResponseWriter, r *http.Request, _ store.User) {
 	v := a.relayView(a.st.RawSMTP(r.Context()))
+	digest := a.st.GetExpiryDigest(r.Context())
+	v.Digest = &digest
+	now := time.Now()
+	v.ServerTime = now.Format("15:04")
+	v.ServerZone, _ = now.Zone()
 	// Sender is the one READ-ONLY field: it previews what a recipient will
 	// actually see, so it is answered from the RESOLVED relay. Showing
 	// "${mail-from}" there would preview nothing.
@@ -125,11 +147,25 @@ func (a *API) putMailRelay(w http.ResponseWriter, r *http.Request, actor store.U
 	if strings.TrimSpace(cfg.OAuth2.ClientSecret) == "" {
 		cfg.OAuth2.ClientSecret = stored.OAuth2.ClientSecret
 	}
+	storedDigest := a.st.GetExpiryDigest(r.Context())
+	digest := storedDigest
+	if p.Digest != nil {
+		digest = *p.Digest
+		if err := store.SanitizeExpiryDigest(&digest); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+	}
 	if err := a.st.SetSetting(r.Context(), store.SettingSMTP, cfg); err != nil {
 		a.internal(w, err)
 		return
 	}
+	if err := a.st.SetSetting(r.Context(), store.SettingExpiryDigest, digest); err != nil {
+		a.internal(w, err)
+		return
+	}
 	before, after := a.relayView(stored), a.relayView(cfg)
+	before.Digest, after.Digest = &storedDigest, &digest
 	a.auditUpdate(r.Context(), actor, "mailrelay.update", "settings", "", "", "", before, after)
 	writeJSON(w, http.StatusOK, after)
 }

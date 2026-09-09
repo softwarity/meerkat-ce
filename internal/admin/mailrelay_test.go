@@ -156,3 +156,52 @@ func TestMailRelayTestResolvesVaultRefs(t *testing.T) {
 		t.Fatalf("the sender reference was not resolved: %q", used.From)
 	}
 }
+
+// The daily notice rides with the relay (MODEL-02), and a save that does not
+// carry it leaves it alone: a form saving a host must not silently stop a
+// message it never displayed.
+func TestSavingARelayDoesNotSilenceTheDigest(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+
+	// It ships on, so a GET says so before anybody has saved anything.
+	code, out := f.call(t, "GET", "/api/settings/mail-relay", "", f.rootC)
+	if code != http.StatusOK {
+		t.Fatalf("get: %d %s", code, out)
+	}
+	if !strings.Contains(out, `"enabled":true`) {
+		t.Fatalf("the digest is not reported as on: %s", out)
+	}
+	// The hour is the GATEWAY's, so the page can say which clock it means.
+	if !strings.Contains(out, `"serverZone"`) {
+		t.Fatalf("the server's own time is missing: %s", out)
+	}
+
+	relay := `{"host":"smtp.example.com","port":587,"security":"tls","username":"u","password":"","from":"g@example.com"}`
+	if code, out := f.call(t, "PUT", "/api/settings/mail-relay", relay, f.rootC); code != http.StatusOK {
+		t.Fatalf("put: %d %s", code, out)
+	}
+	if got := f.api.st.GetExpiryDigest(ctx); !got.Enabled {
+		t.Fatalf("saving a relay switched the digest off: %+v", got)
+	}
+
+	// Sent explicitly, it is stored - and refused when it names an hour that
+	// is not one, with a sentence saying what is allowed.
+	withDigest := `{"host":"smtp.example.com","port":587,"security":"tls","username":"u","password":"",` +
+		`"from":"g@example.com","digest":{"enabled":true,"hour":6,"days":14}}`
+	if code, out := f.call(t, "PUT", "/api/settings/mail-relay", withDigest, f.rootC); code != http.StatusOK {
+		t.Fatalf("put digest: %d %s", code, out)
+	}
+	if got := f.api.st.GetExpiryDigest(ctx); got.Hour != 6 || got.Days != 14 {
+		t.Fatalf("the digest was not stored: %+v", got)
+	}
+	bad := `{"host":"smtp.example.com","port":587,"security":"tls","username":"u","password":"",` +
+		`"from":"g@example.com","digest":{"enabled":true,"hour":25,"days":7}}`
+	code, out = f.call(t, "PUT", "/api/settings/mail-relay", bad, f.rootC)
+	if code != http.StatusUnprocessableEntity {
+		t.Fatalf("an impossible hour was accepted: %d %s", code, out)
+	}
+	if !strings.Contains(out, "0 to 23") {
+		t.Errorf("the refusal does not name what is allowed: %s", out)
+	}
+}

@@ -198,6 +198,55 @@
       </div>
     </mat-card>
 
+    <!-- The one message this gateway sends of its own accord (MODEL-02). It
+         sits with the relay because it is the same question - what leaves
+         here by e-mail - and because without a relay it is a switch with
+         nothing behind it. -->
+    <mat-card appearance="outlined">
+      <h3 i18n="@@Expiring_accounts">Expiring accounts</h3>
+      <p class="hint text-muted" i18n="@@Digest_hint">
+        Once a day, the administrators who carry an e-mail address are told which accounts are
+        about to lose access and which just did. A day with nothing to say sends nothing: a daily
+        message that says "nothing today" three hundred times is one nobody opens on the day it
+        matters.
+      </p>
+      <mat-slide-toggle [checked]="digestOn()" (change)="digestOn.set($event.checked)">
+        <ng-container i18n="@@Send_the_daily_notice">Send the daily notice</ng-container>
+      </mat-slide-toggle>
+
+      @if (digestOn()) {
+        <div class="fields digest-fields grid grid-cols-2">
+          <mat-form-field>
+            <mat-label i18n="@@Digest_hour">Hour</mat-label>
+            <mat-select [value]="digestHour()" (selectionChange)="digestHour.set($event.value)">
+              @for (h of hours; track h) {
+                <mat-option [value]="h">{{ hourLabel(h) }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>{{ clockHint() }}</mat-hint>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label i18n="@@Digest_days">Look ahead</mat-label>
+            <input
+              matInput
+              type="number"
+              min="1"
+              max="90"
+              [value]="digestDays()"
+              (input)="digestDays.set(+$any($event.target).value)"
+            />
+            <span matTextSuffix i18n="@@days_suffix">days</span>
+          </mat-form-field>
+        </div>
+        @if (!host().trim()) {
+          <p class="hint text-error" i18n="@@Digest_needs_a_relay">
+            No relay is configured, so nothing can be sent. The notice stays owed: it goes out the
+            morning a relay answers.
+          </p>
+        }
+      }
+    </mat-card>
+
     <div class="flex justify-end">
       <!-- A typed secret blocks the save: the admin holds it, so they can move
            it into the vault, and that is the only way it gets stored. -->
