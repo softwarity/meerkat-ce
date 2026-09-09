@@ -51,11 +51,20 @@ func (a *API) previewIdentity(w http.ResponseWriter, r *http.Request, _ store.Us
 	cfg := req.Identity
 	// Validate through the engine: a preview must refuse exactly what a save
 	// would refuse (unknown mechanism, bad attribute, bad claim name...).
-	if err := gateway.Validate(store.Route{
+	draft := store.Route{
 		Name: req.RouteName, Upstream: "http://preview.invalid",
 		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/**"}}}},
 		Identity:   &cfg,
-	}); err != nil {
+	}
+	if err := gateway.Validate(draft); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	// And through the settings: since a custom field is a name this
+	// installation defines (MODEL-01), the engine accepts any name that COULD
+	// be one, and only the store knows which ones ARE. Asked here too, or a
+	// preview would happily draw a header for a field the save then refuses.
+	if err := a.knownFields(r.Context(), draft); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}

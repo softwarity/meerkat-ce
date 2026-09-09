@@ -103,6 +103,12 @@ var ExportedSettings = []string{
 	store.SettingIssuesEnabled,
 	store.SettingPagesScheme,
 	store.SettingPageLayout,
+	// What an account carries beyond what this product invented (MODEL-01),
+	// and the notice about the windows closing (MODEL-02). The definitions
+	// travel because ROUTES travel: a route that forwards `employeeNumber`
+	// lands in an environment where nothing defines it otherwise.
+	store.SettingUserFields,
+	store.SettingExpiryDigest,
 	store.SettingDevMode,
 	// What the gateway will hold in memory while it proxies (PERF-02). It
 	// travels because it describes the SHAPE of the installation, not its

@@ -28,6 +28,7 @@ import (
 	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/events"
+	"github.com/softwarity/meerkat/internal/expiry"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/live"
 	"github.com/softwarity/meerkat/internal/mail"
@@ -488,6 +489,14 @@ func run(o options) error {
 	busCtx, stopBus := context.WithCancel(context.Background())
 	defer stopBus()
 	go bus.Run(busCtx)
+
+	// The daily notice about accounts whose window is closing (MODEL-02). It
+	// shares the same lifetime: a loop that only ever reads a setting and,
+	// once a day, sends one message. In a cluster every node runs it and one
+	// of them sends - the advisory lock and the recorded day settle which.
+	digestCtx, stopDigest := context.WithCancel(context.Background())
+	defer stopDigest()
+	go expiry.New(st, mailer).Run(digestCtx)
 
 	// The developer tunnel follows the developer-mode switch: mode off, no
 	// agent, no port, nothing listening. The community image linked no agent
