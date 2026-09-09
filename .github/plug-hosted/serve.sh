@@ -27,7 +27,10 @@ class H(http.server.BaseHTTPRequestHandler):
 http.server.HTTPServer(("0.0.0.0", int(sys.argv[1])), H).serve_forever()
 PY
 
-plug -H localhost --port 2222 -s checkout:8080:PORT \
+# The profile carries the host and the port (deposit-key.sh wrote it), and
+# {PORT} is plug's own placeholder: it picks a free one and writes it into the
+# command, so a shared runner has nothing to collide on.
+"$HOME/.local/bin/plug" -p ci -s checkout:8080:PORT \
   python3 /tmp/mine.py '{PORT}' > plug.log 2>&1 &
 plug_pid=$!
 trap 'kill $plug_pid 2>/dev/null || true' EXIT
