@@ -146,6 +146,47 @@ mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
    connexion sur un port publie avant qu'une tache reponde, donc curl suspend et la boucle
    n'avance jamais. Aurait tenu un runner six heures.
 
+### Session du 2026-09-09 (nuit) - le job du tunnel au vert, et gRPC
+
+**Le job plug hosted passe de bout en bout.** Sept iterations, et six des sept
+echecs etaient MON script, pas le produit :
+
+| Ce qui echouait | La vraie cause |
+|---|---|
+| Attente de la passerelle | maillage d'ingress Swarm sur `--advertise-addr 127.0.0.1` ; publication en **mode host** |
+| `plug --version` | c'est `plug version`, une sous-commande |
+| Client introuvable | l'installateur pose dans `~/.local/bin`, absent du PATH |
+| Cle du profil | ce n'est pas `~/.plug/profiles/<n>/id_ed25519` mais `plug keygen` + `plug pubkey`, dans `~/.plug/keys` |
+| `/api/users/{id}/capabilities` | n'existe pas ; c'est `PUT /api/users/{id}` avec l'objet entier |
+| `/api/me` -> `id` | l'objet est sous `user` |
+| Cle refusee par l'agent | **le dépôt s'est fait avec le cookie du plan d'ADMIN sur le plan de DONNEES** : redirection vers /login, 303, que le script comptait comme un succes |
+
+La derniere est la seule interessante : deux plans, deux origines, deux cookies.
+Le script signe maintenant sur les deux, verifie la **destination** de la
+redirection (le statut est 303 dans les deux cas) et **relit la clé** sur la page
+de profil, qui en imprime l'empreinte.
+
+Preuve finale dans le journal du run :
+
+```
+the gateway holds SHA256:nT/4dgv19zIOHyF2lCYvzBUG9rA5MbYPSFtztaw4jeI
+the cluster reaches this runner by name
+the deployed service is parked
+the gateway names what is served
+the cluster has its service back
+```
+
+**gRPC (ROUTE-20) passe a `[~]`.** L'amont declare son transport dans son schema :
+`h2c://checkout:50051`. `ForceAttemptHTTP2` ne suffisait pas (il monte par ALPN,
+donc sous TLS). Le HTTP/2 en clair vient de la **bibliotheque standard**
+(`http.Protocols`, Go 1.24), donc aucune dependance ajoutee - ni dans le produit
+ni dans les tests. Huit tests dans `internal/gateway/h2c_test.go`, dont celui qui
+compte : **les trailers traversent**, pour un succes et pour un echec.
+
+Ce qui manque est ecrit dans FEATURES : les metriques classent encore tout appel
+gRPC en 2xx (donc le taux d'echec d'une route gRPC lit zero), la securite par
+methode, et gRPC-Web.
+
 ### Chantiers a venir, decides en discussion le 2026-09-08
 
 Dans l'ordre ou je les prendrais. Le contexte : la comparaison de marche n'est **pas**
