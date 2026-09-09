@@ -34,8 +34,10 @@ code=$(curl -s --max-time 15 -c "$jar" -o /dev/null -w '%{http_code}' \
 # The developer capability, read-modify-write: the account object is PUT whole,
 # so building one from the fields this script happens to know would quietly
 # clear every field it does not.
+# /api/me answers {"user": {...}, "tenants": [...], ...} - the account is one
+# level down, beside what else the console needs to draw itself.
 id=$(curl -s --max-time 15 -b "$jar" "$admin/api/me" \
-     | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+     | python3 -c 'import sys,json;print(json.load(sys.stdin)["user"]["id"])')
 curl -s --max-time 15 -b "$jar" "$admin/api/users/$id" > /tmp/user.json
 python3 -c "
 import json
