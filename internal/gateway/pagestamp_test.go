@@ -138,7 +138,7 @@ func TestPageStampServerSide(t *testing.T) {
 // index.html as "public, max-age=300" is the normal case, not the exotic one:
 // it is what every static file server does.
 func TestAStampedPageIsNeverCacheable(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.Header().Set("Cache-Control", "public, max-age=300")
 		w.Header().Set("Expires", "Wed, 21 Oct 2099 07:28:00 GMT")
