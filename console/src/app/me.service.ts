@@ -99,7 +99,6 @@ export class MeService {
       email: b.getAttribute('data-meerkat-email') ?? '',
       root: has('root'),
       dev: has('dev'),
-      tester: has('tester'),
       tenantCreator: has('tenant-creator'),
       infraAdmin: has('infra-admin'),
       appAdmin: has('app-admin'),
@@ -112,7 +111,6 @@ export class MeService {
     const roles: string[] = [];
     if (me.user.root) roles.push('root');
     if (me.user.dev) roles.push('dev');
-    if (me.user.tester) roles.push('tester');
     if (me.user.tenantCreator) roles.push('tenant-creator');
     if (me.user.infraAdmin) roles.push('infra-admin');
     if (me.user.appAdmin) roles.push('app-admin');
@@ -123,7 +121,6 @@ export class MeService {
     document.body.classList.remove(
       'root',
       'dev',
-      'tester',
       'tenant-creator',
       'infra-admin',
       'app-admin',

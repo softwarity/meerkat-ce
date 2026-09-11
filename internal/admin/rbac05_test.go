@@ -77,7 +77,7 @@ func TestSplitAdministrationScopes(t *testing.T) {
 	if status, body := f.call(t, "POST", "/api/users", `{"username":"newbie"}`, apC); status != http.StatusCreated {
 		t.Fatalf("app-admin creating a user: %d %s", status, body)
 	}
-	if status, body := f.call(t, "PUT", "/api/users/bob", `{"username":"bob","enabled":true,"tester":true}`, apC); status != http.StatusOK {
+	if status, body := f.call(t, "PUT", "/api/users/bob", `{"username":"bob","enabled":true,"dev":true}`, apC); status != http.StatusOK {
 		t.Fatalf("app-admin editing a user: %d %s", status, body)
 	}
 	// And root still promotes.

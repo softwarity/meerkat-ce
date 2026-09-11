@@ -311,7 +311,7 @@ forme du produit.
 
 | Fait | ID | Mot-clé | Description | Ce qui manque | Éd. |
 |:---:|---|---|---|---|:---:|
-| [~] | SEC-01 | **CSRF** | Protection active sur toutes les opérations d'état en session cookie (désactivée dans la V1 - à re-spécifier et activer) | aucun jeton CSRF ni vérification d'`Origin` sur les écritures : `SameSite=Lax` est seul | CE |
+| [~] | SEC-01 | **CSRF** | Toute écriture du plan de contrôle en session cookie doit prouver qu'elle vient de la console : `Sec-Fetch-Site` (que la page ne peut pas forger) doit être `same-origin` ou `none`, sinon l'en-tête `Origin` doit être celui du plan. Ni l'un ni l'autre = un client non-navigateur (curl, sonde), qui n'est pas un vecteur CSRF et passe. Un appel par jeton n'y arrive jamais : un Bearer qu'un navigateur n'attache pas en cross-site ne peut pas être forgé. `SameSite=Lax` reste la première barrière | un jeton anti-rejeu par formulaire, si on veut la ceinture ET les bretelles ; et la même garde sur les écritures du plan de données servies en cookie | CE |
 | [~] | SEC-02 | **CORS** | Politique explicite et configurable (désactivé dans la V1) | la politique CORS n'est pas configurable, une seule origine est câblée | CE |
 | [x] | SEC-03 | **En-têtes de sécurité** | En-têtes de sécurité modernes configurables : HSTS, CSP, X-Frame-Options, Referrer-Policy | - | CE |
 | [x] | SEC-04 | **Aucun secret en clair** | Aucun secret en clair dans le dépôt ni dans les exports (la V1 committait des mots de passe dans config/ et docker-compose.yml) | - | CE |
@@ -493,10 +493,17 @@ masse dans la désactivation, exactement comme la réinitialisation de mot de pa
 
 ### CSRF (SEC-01)
 
-`SameSite=Lax` est aujourd'hui la seule barrière. C'est beaucoup, ce n'est pas tout : un
-sous-domaine voisin est same-site. **Solution** : un jeton par session dans les formulaires que
-la gateway sert, et une vérification d'`Origin` sur les écritures de l'API d'administration -
-l'API est en JSON, donc le coût est une ligne dans le décodeur.
+`SameSite=Lax` était la seule barrière. C'est beaucoup - il bloque le POST cross-site - mais
+pas tout : un sous-domaine voisin est same-site, et surtout ce n'est pas une défense qu'un
+audit lit, il cherche un contrôle explicite. **Fait** : toute écriture du plan de contrôle
+passe par un seul entonnoir (`authed`), et c'est là qu'on vérifie, pour une session cookie
+seulement, le signal que le navigateur pose et que la page ne peut pas forger - `Sec-Fetch-Site`
+d'abord, `Origin` en repli. Un jeton (Bearer) n'y arrive pas : un navigateur ne l'attache pas
+en cross-site, donc il n'est pas un vecteur. **Reste** : le jeton anti-rejeu dans les
+formulaires servis par la gateway (ceinture ET bretelles), et la même garde sur les écritures
+du plan de données faites en cookie - aujourd'hui les pages du flux sont en `no-store` et ne
+portent pas de formulaire d'écriture d'état côté gateway, mais la règle mérite d'être posée
+une fois.
 
 ### gRPC et h2c (ROUTE-20)
 
@@ -637,9 +644,12 @@ une raison qui tient.
 Une substitution vaut aujourd'hui pour tout le trafic ; deux développeurs sur le même nom se
 marchent dessus. C'est assumé et compensé par l'annonce (halte après connexion, bandeau
 permanent). **Ce qui manque** : que le trafic d'un développeur emprunte ses substitutions et
-celui des autres non, avec un menu de choix pour la capacité `tester`. **Point dur** : la
-décision se prend par requête, donc elle doit être lisible depuis la session sans coûter une
-lecture de base.
+celui des autres non, avec un menu par lequel un utilisateur choisit la variante qu'il veut
+voir. Cet opt-in par personne demandera **une capacité dédiée** - retirée en attendant, car
+elle ne servait rien (une classe CSS qu'aucun écran ne lisait, et une des quatre conditions,
+déjà couverte par `dev`, pour simuler une identité). Le jour où DEV-05 se construit, elle
+revient avec un rôle réel. **Point dur** : la décision se prend par requête, donc elle doit
+être lisible depuis la session sans coûter une lecture de base.
 
 ### L'observabilité : une seule période, et ce qui reste (OBS-01, OBS-04, OBS-05)
 

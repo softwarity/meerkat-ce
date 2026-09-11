@@ -443,7 +443,7 @@ func (a *API) toolListUsers(ctx context.Context, _ json.RawMessage) (any, error)
 			name string
 		}{
 			{u.Root, "root"}, {u.InfraAdmin, "gateway-admin"}, {u.AppAdmin, "app-admin"},
-			{u.TenantCreator, "tenant-creator"}, {u.Dev, "developer"}, {u.Tester, "tester"},
+			{u.TenantCreator, "tenant-creator"}, {u.Dev, "developer"},
 		} {
 			if c.on {
 				caps = append(caps, c.name)

@@ -29,11 +29,11 @@ func TestUserLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserByUsername: %v", err)
 	}
-	if got.Fullname != "Alice A" || !got.Dev || got.Tester || got.Timezone != "UTC" || got.CreatedAt == 0 {
+	if got.Fullname != "Alice A" || !got.Dev || got.TenantCreator || got.Timezone != "UTC" || got.CreatedAt == 0 {
 		t.Fatalf("round trip mismatch: %+v", got)
 	}
 
-	got.Tester = true
+	got.TenantCreator = true
 	got.Fullname = "Alice B"
 	if err := s.UpdateUser(ctx, got); err != nil {
 		t.Fatalf("UpdateUser: %v", err)
@@ -42,7 +42,7 @@ func TestUserLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserByID: %v", err)
 	}
-	if !again.Tester || again.Fullname != "Alice B" {
+	if !again.TenantCreator || again.Fullname != "Alice B" {
 		t.Fatalf("update lost: %+v", again)
 	}
 

@@ -68,10 +68,10 @@ func TestUsersCRUDIsRootScoped(t *testing.T) {
 		t.Fatalf("create payload: %s", body)
 	}
 
-	// Update: grant tester, then reset password.
+	// Update: grant dev, then reset password.
 	code, body = f.call(t, "PUT", "/api/users/"+created.User.ID,
-		`{"username":"carol","fullname":"Carol C","email":"c@example.com","enabled":true,"dev":true,"tester":true,"timezone":"UTC"}`, f.rootC)
-	if code != http.StatusOK || !strings.Contains(body, `"tester":true`) {
+		`{"username":"carol","fullname":"Carol C","email":"c@example.com","enabled":true,"dev":true,"timezone":"UTC"}`, f.rootC)
+	if code != http.StatusOK || !strings.Contains(body, `"dev":true`) {
 		t.Fatalf("update user: %d %s", code, body)
 	}
 	if code, body = f.call(t, "POST", "/api/users/"+created.User.ID+"/reset-password", "", f.rootC); code != http.StatusOK || !strings.Contains(body, "password") {

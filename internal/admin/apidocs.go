@@ -99,9 +99,9 @@ type testTokenRequest struct {
 // it carries the whole authorization - the same capabilities that may
 // simulate by header may mint.
 func (a *API) mintTestToken(w http.ResponseWriter, r *http.Request, actor store.User) {
-	mayMint := actor.Root || actor.InfraAdmin || actor.Dev || actor.Tester
+	mayMint := actor.Root || actor.InfraAdmin || actor.Dev
 	if !mayMint {
-		writeErr(w, http.StatusForbidden, "minting test tokens requires the root, infra-admin, dev or tester capability")
+		writeErr(w, http.StatusForbidden, "minting test tokens requires the root, infra-admin or dev capability")
 		return
 	}
 	var body testTokenRequest

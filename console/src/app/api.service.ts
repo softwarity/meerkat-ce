@@ -521,7 +521,7 @@ export interface RouteProbeResult {
 }
 
 // Identity - mirrors the Go types (store.User, store.Tenant, store.Member).
-// Superpowers (root/dev/tester/tenantCreator) are cross-cutting user flags;
+// Superpowers (root/dev/tenantCreator) are cross-cutting user flags;
 // tenant administration is either tenant ownership (Tenant.ownerId) or the
 // ADMIN membership type - ownership is decoupled from membership (TENANT-02).
 export interface User {
@@ -532,7 +532,6 @@ export interface User {
   enabled: boolean;
   root: boolean;
   dev: boolean;
-  tester: boolean;
   tenantCreator: boolean;
   // Split administration (RBAC-05): routing plane vs application identity.
   infraAdmin: boolean;

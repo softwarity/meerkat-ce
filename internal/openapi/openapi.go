@@ -288,7 +288,7 @@ func InjectSimulation(raw []byte) ([]byte, error) {
 	schemes := map[string]any{
 		"MeerkatSimulateUser": map[string]any{
 			"type": "apiKey", "in": "header", "name": "X-Meerkat-Simulate-User",
-			"description": "Try the route AS this username - no account needed. Honored only for signed-in gateway testers (root, infra-admin, dev, tester).",
+			"description": "Try the route AS this username - no account needed. Honored only for signed-in gateway testers (root, infra-admin, dev).",
 		},
 		"MeerkatSimulateRoles": map[string]any{
 			"type": "apiKey", "in": "header", "name": "X-Meerkat-Simulate-Roles",

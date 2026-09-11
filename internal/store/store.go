@@ -208,7 +208,6 @@ CREATE TABLE IF NOT EXISTS users (
   email                TEXT NOT NULL DEFAULT '',
   enabled              BOOLEAN NOT NULL DEFAULT TRUE,
   dev                  BOOLEAN NOT NULL DEFAULT FALSE,
-  tester               BOOLEAN NOT NULL DEFAULT FALSE,
   tenant_creator       BOOLEAN NOT NULL DEFAULT FALSE,
   -- Split administration (RBAC-05): the routing plane and the application's
   -- identity are separate concerns with separate admins. Tenant
@@ -1683,9 +1682,9 @@ func (s *Store) CountRoutes(ctx context.Context) (int, error) {
 // User is a local Meerkat account (the nominal identity model - §1.3 of the
 // requirements). Password is stored as a bcrypt hash, never in clear. The
 // boolean flags are the cross-cutting SUPERPOWERS (RBAC-05): root administers
-// the gateway, dev unlocks the developer tooling, tester can opt into dev
-// variants, tenant_creator may create tenants. Tenant administration is not a
-// superpower - it is the membership type (TENANT-02).
+// the gateway, dev unlocks the developer tooling, tenant_creator may create
+// tenants. Tenant administration is not a superpower - it is the membership
+// type (TENANT-02).
 type User struct {
 	ID            string `json:"id"`
 	Username      string `json:"username"`
@@ -1695,7 +1694,6 @@ type User struct {
 	Enabled       bool   `json:"enabled"`
 	Root          bool   `json:"root"`
 	Dev           bool   `json:"dev"`
-	Tester        bool   `json:"tester"`
 	TenantCreator bool   `json:"tenantCreator"`
 	// Split administration (RBAC-05): InfraAdmin runs the routing plane
 	// (routes, built-in pages), AppAdmin runs the application's identity
@@ -1741,7 +1739,7 @@ type User struct {
 }
 
 const userCols = `id, username, password_hash, fullname, email, enabled,
-	root, dev, tester, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
+	root, dev, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
 	created_at, updated_at, last_connection_at, must_change_password, mfa_required,
 	email_verified, self_registered, password_changed_at, fields, valid_from, valid_until`
 
@@ -1749,7 +1747,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
 	var fields string
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Fullname, &u.Email, &u.Enabled,
-		&u.Root, &u.Dev, &u.Tester, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
+		&u.Root, &u.Dev, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastConnectionAt, &u.MustChangePassword, &u.MFARequired,
 		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &fields, &u.ValidFrom, &u.ValidUntil)
 	u.Fields = decodeFields(fields)
@@ -1770,12 +1768,12 @@ func (s *Store) CreateUser(ctx context.Context, u User) error {
 	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO users (id, username, password_hash, fullname, email, enabled,
-		   root, dev, tester, tenant_creator, infra_admin, app_admin, locale, timezone,
+		   root, dev, tenant_creator, infra_admin, app_admin, locale, timezone,
 		   created_at, updated_at, must_change_password, mfa_required,
 		   email_verified, self_registered, fields, valid_from, valid_until)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		u.ID, u.Username, u.PasswordHash, u.Fullname, u.Email, u.Enabled,
-		u.Root, u.Dev, u.Tester, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
+		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
 		now, now, u.MustChangePassword, u.MFARequired,
 		u.EmailVerified, u.SelfRegistered, encodeFields(u.Fields), u.ValidFrom, u.ValidUntil)
 	if err != nil {
@@ -1792,12 +1790,12 @@ func (s *Store) UpdateUser(ctx context.Context, u User) error {
 	}
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE users SET username = ?, fullname = ?, email = ?, enabled = ?,
-		   root = ?, dev = ?, tester = ?, tenant_creator = ?, infra_admin = ?, app_admin = ?,
+		   root = ?, dev = ?, tenant_creator = ?, infra_admin = ?, app_admin = ?,
 		   locale = ?, timezone = ?, mfa_required = ?, updated_at = ?,
 		   fields = ?, valid_from = ?, valid_until = ?
 		 WHERE id = ?`,
 		u.Username, u.Fullname, u.Email, u.Enabled,
-		u.Root, u.Dev, u.Tester, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
+		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
 		u.MFARequired, time.Now().Unix(), encodeFields(u.Fields), u.ValidFrom, u.ValidUntil, u.ID)
 	if err != nil {
 		return fmt.Errorf("store: update user %q: %w", u.Username, err)

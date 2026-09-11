@@ -24,7 +24,7 @@ import (
 
 // Identity endpoints (users, tenants, memberships, global settings).
 //
-// Authorization model: superpowers (root/dev/tester/tenantCreator) are global
+// Authorization model: superpowers (root/dev/tenantCreator) are global
 // user flags; tenant administration is the OWNER/ADMIN membership on that
 // tenant (TENANT-02). Every handler receives the resolved session user and
 // enforces its own scope - the role-CSS gating in the console is comfort, the
@@ -66,6 +66,15 @@ func (a *API) authed(next userHandler) http.Handler {
 		if sess.TokenScope == store.ScopeMetrics && r.URL.Path != expositionPath {
 			writeErr(w, http.StatusForbidden,
 				"this token opens "+expositionPath+" and nothing else: it is a scraper's credential, not an operator's")
+			return
+		}
+		// A browser session (no token) that writes must prove it came from the
+		// console itself (SEC-01): the cookie rides every request to this
+		// origin, a token does not ride cross-site at all, so only the cookie
+		// case is a CSRF vector.
+		if sess.TokenID == "" && crossSiteWrite(r) {
+			writeErr(w, http.StatusForbidden,
+				"cross-site write refused: this endpoint answers the admin console on its own origin")
 			return
 		}
 		// From here on, the audit knows WHICH token acted (MCP-03), and the

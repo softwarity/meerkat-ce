@@ -19,7 +19,7 @@ import (
 // call a route AS an arbitrary user with arbitrary roles - no account, no
 // session to prepare. The two headers are honored only when the request ALSO
 // carries an admin session (the admin cookie rides along on a same-host
-// deployment) whose user is root, infra-admin, dev or tester; anyone else gets
+// deployment) whose user is root, infra-admin or dev; anyone else gets
 // an explicit 403. The simulated identity then replaces the data-plane session
 // everywhere it counts - access gates, endpoint security (RBAC-07), page stamp,
 // identity forwarding - so the route and the upstream behave exactly as they
@@ -30,7 +30,7 @@ const (
 )
 
 var errSimulationRefused = errors.New(
-	"identity simulation requires a signed-in admin session (root, infra-admin, dev or tester) or a data session with the dev capability")
+	"identity simulation requires a signed-in admin session (root, infra-admin or dev) or a data session with the dev capability")
 
 // simulationActor decides WHO may simulate: a privileged admin session (the
 // console's swagger and test tools) or a data-plane session whose user holds
@@ -40,7 +40,7 @@ func (rt *Router) simulationActor(req *http.Request) (actor store.User, via stri
 	if rt.AdminSessions != nil {
 		if sess, err := rt.AdminSessions.Resolve(req.Context(), req); err == nil && sess.Pending == "" {
 			if u, err := rt.st.GetUserByID(req.Context(), sess.UserID); err == nil && u.Enabled &&
-				(u.Root || u.InfraAdmin || u.Dev || u.Tester) {
+				(u.Root || u.InfraAdmin || u.Dev) {
 				return u, "console-swagger", true
 			}
 		}
@@ -192,7 +192,7 @@ type simTokenClaims struct {
 }
 
 // MintSimulationToken issues a test token for the given identity; the admin
-// API gates WHO may call this (root, infra-admin, dev or tester).
+// API gates WHO may call this (root, infra-admin or dev).
 func (rt *Router) MintSimulationToken(user string, roles []string, ttl time.Duration) (string, time.Time) {
 	exp := time.Now().Add(ttl)
 	payload, _ := json.Marshal(simTokenClaims{User: user, Roles: roles, Exp: exp.Unix()})

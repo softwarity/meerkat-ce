@@ -213,11 +213,6 @@ export class UsersPageComponent {
       label: "dev",
       tooltip: $localize`:@@Tooltip_dev:Unlocks the developer tooling: dev keys, service substitution (plug)`,
     },
-    {
-      key: "tester" as const,
-      label: "tester",
-      tooltip: $localize`:@@Tooltip_tester:Can opt into a developer's variant of the application`,
-    },
     // Single-organisation installations never show this one: there is one
     // organisation, nobody names it, and a second cannot be created - so the
     // power grants nothing and the badge would only invite a click that the
@@ -232,7 +227,7 @@ export class UsersPageComponent {
   protected toggleCapability(
     u: User,
     key:
-      "root" | "dev" | "tester" | "tenantCreator" | "infraAdmin" | "appAdmin",
+      "root" | "dev" | "tenantCreator" | "infraAdmin" | "appAdmin",
     event: Event,
   ): void {
     event.stopPropagation(); // the row click opens the drawer - not this

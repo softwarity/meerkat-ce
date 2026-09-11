@@ -31,7 +31,7 @@ func TestIdentitySimulation(t *testing.T) {
 	t.Cleanup(func() { _ = st.Close() })
 	ctx := context.Background()
 	for _, u := range []store.User{
-		{ID: "tess", Username: "tess", PasswordHash: "x", Enabled: true, Tester: true},
+		{ID: "tess", Username: "tess", PasswordHash: "x", Enabled: true, Dev: true},
 		{ID: "bob", Username: "bob", PasswordHash: "x", Enabled: true},
 	} {
 		if err := st.CreateUser(ctx, u); err != nil {
@@ -95,7 +95,7 @@ func TestIdentitySimulation(t *testing.T) {
 		}
 	})
 
-	t.Run("a tester simulates and the route grants the simulated role", func(t *testing.T) {
+	t.Run("a dev simulates and the route grants the simulated role", func(t *testing.T) {
 		res, body := call(t, tessC, "ghost", "auditor")
 		if res.StatusCode != http.StatusOK {
 			t.Fatalf("got %d: %s", res.StatusCode, body)
