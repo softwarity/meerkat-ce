@@ -132,3 +132,85 @@ func TestPageStampServerSide(t *testing.T) {
 		t.Fatalf("no client script expected in a server-side stamp: %s", body)
 	}
 }
+
+// A stamped page carries somebody's name, so it must not be stored by anything
+// - whatever the application says about caching it. An application serving its
+// index.html as "public, max-age=300" is the normal case, not the exotic one:
+// it is what every static file server does.
+func TestAStampedPageIsNeverCacheable(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		w.Header().Set("Expires", "Wed, 21 Oct 2099 07:28:00 GMT")
+		w.Header().Set("Last-Modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+		w.Header().Set("ETag", `"v1"`)
+		_, _ = io.WriteString(w, `<html><head></head><body>ok</body></html>`)
+	}))
+	t.Cleanup(upstream.Close)
+
+	route := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,
+		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
+	route.IsUI = true
+	route.UI = &store.RouteUI{
+		UserInfo: &store.UserInfoConfig{Enabled: true, Fields: map[string]string{"username": ""}},
+	}
+
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	if err := st.CreateUser(ctx, store.User{ID: "u1", Username: "alice", PasswordHash: "x", Enabled: true}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatalf("SaveRoute: %v", err)
+	}
+	sm := session.NewManager(st)
+	rt := New(st, sm)
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+
+	// Anonymous: nothing was written into the page, so the application's own
+	// caching stands - a landing page must stay cacheable.
+	res, err := http.Get(srv.URL + "/demo/page")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if got := res.Header.Get("Cache-Control"); got != "public, max-age=300" {
+		t.Errorf("an anonymous page lost the application's caching: %q", got)
+	}
+
+	// Signed in: the page now names somebody.
+	rec := httptest.NewRecorder()
+	if _, err := sm.Issue(ctx, rec, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	req, _ := http.NewRequest("GET", srv.URL+"/demo/page", nil)
+	req.Header.Set("Accept", "text/html")
+	req.AddCookie(rec.Result().Cookies()[0])
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if !strings.Contains(string(body), `username="alice"`) {
+		t.Fatalf("the page was not stamped, so this proves nothing: %s", body)
+	}
+	if got := res.Header.Get("Cache-Control"); !strings.Contains(got, "no-store") {
+		t.Errorf("a page carrying a name is cacheable: Cache-Control %q", got)
+	}
+	// The headers that could say the opposite in an old intermediary, and the
+	// validators that describe bytes we changed.
+	for _, h := range []string{"Expires", "Pragma", "Last-Modified", "ETag"} {
+		if got := res.Header.Get(h); got != "" {
+			t.Errorf("%s survived on a personalised page: %q", h, got)
+		}
+	}
+}

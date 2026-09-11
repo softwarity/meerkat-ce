@@ -140,6 +140,24 @@ mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
   la securite (second facteur, mot de passe, autorites) et l'historique, atteintes par
   un `mat-action-list` pleine largeur et rendues par une fleche.
 
+### Rien de personnel en cache (SEC-10) - trou trouve par Francois, corrige
+
+Question de Francois : « on ajoute des infos user dans les pages HTML, elles ne doivent pas
+etre mises en cache, on est ok ? » **On ne l'etait pas.** `pageStamp` ecrivait le nom, les
+roles et les champs dans le HTML proxifie et laissait passer les en-tetes de l'amont : un
+`Cache-Control: public, max-age=300` sur un index.html - le defaut de tout serveur de
+fichiers statiques - et un CDN, un proxy d'entreprise ou un navigateur partage servait la
+page d'Alice a Bob. Le test le prouve : sans le correctif il echoue en affichant
+`public, max-age=300` ET un `Expires` en 2099 sur une page portant `username="alice"`.
+
+`filters.Personal(h)` (`internal/filters/cache.go`) pose `no-store, private` et retire
+`Expires`, `Pragma`, `Last-Modified`, `ETag`. Appele depuis `pageStamp` **apres** le
+`return` anonyme (donc une page anonyme garde la mise en cache de l'application) et depuis
+l'injection du bandeau de maintenance. Le reste etait deja bon : `writeFlow` (toutes les
+pages du flux), la charge utile du bouton utilisateur, `respond`, la page de maintenance.
+Ce qui reste hors de notre main : une application qui se personnalise elle-meme a partir
+des en-tetes recus - le filtre `set-cache-control` est la pour le dire a sa place.
+
 ### Pieges de ce tiroir, tous vus a l'ecran et pas dans la tete
 
 1. **Deux `mat-drawer` sur le meme bord, Material refuse la position** : le conteneur

@@ -752,6 +752,11 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte) (c
 			if res.Request == nil || !bypassing(res.Request.Context()) {
 				return ""
 			}
+			// Personal for the same reason a stamped page is: only the
+			// administrator who took the door sees this band, and a cache
+			// that kept the page would show "under maintenance" to people
+			// who are not in maintenance - or, worse, the reverse.
+			filtering.Personal(res.Header)
 			if rt.Stripe != nil {
 				return rt.Stripe(res.Request)
 			}
@@ -1264,6 +1269,11 @@ func (rt *Router) pageStamp(r store.Route, localeCodes []string, res *http.Respo
 	if !ok {
 		return body
 	}
+	// From here the bytes belong to ONE person, whatever the application said
+	// about caching them: a CDN or a shared browser would otherwise hand this
+	// page, name and roles included, to the next visitor. An anonymous request
+	// returned above keeps the upstream's caching untouched.
+	filtering.Personal(res.Header)
 	var metas []byte
 	if ui.Roles != nil && ui.Roles.Enabled {
 		tag := orDefault(ui.Roles.Tag, "body")
