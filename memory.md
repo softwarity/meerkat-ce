@@ -135,8 +135,25 @@ mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
 Tests : `mailrender_test.go` (les trois formes, palette maigre toleree, logo Meerkat
 jamais embarque), `emailotp_test.go` (lien cache par defaut + 404 ; envoi + connexion ;
 usage unique ; sans adresse ; throttle ; repli PAS enrolement). Apercus HTML rendus dans
-le navigateur (confirmation + OTP). Toggle vu a l'ecran. Reste a faire un jour :
-harmoniser le HTML du digest (NOTIF-04) sur `buildMail` (aujourd'hui fait main, EN).
+le navigateur (confirmation + OTP). Toggle vu a l'ecran.
+
+### Refonte du rendu en package partage (meme session)
+
+Le rendu des mails vit maintenant dans **`internal/mail/render.go`** (types PLAINS :
+`Brand`, `Palette map[string]string`, `Spec` avec `Button`/`Group`/`Code`, `Compose(to,
+brand, palette, spec) Message`). Aucune dependance a `store` ni `auth` (store importe
+mail, donc l'inverse serait un cycle). `auth.buildMail` mappe `chrome()` + palette claire
+du theme vers `mail.Compose` ; **le digest (NOTIF-04) est rebranche dessus** avec une
+nouvelle forme `Group` (listes titrees) et lit lui-meme marque + theme depuis le store -
+donc il suit le theme comme les pages (verifie a l'ecran : mauve par defaut, vert avec un
+theme vert). Fini le HTML fait main dans expiry.
+
+**Question ouverte de Francois** (pas tranchee) : faut-il **choisir** le theme des mails
+quelque part, ou honorer le light/dark **choisi par l'utilisateur** destinataire ? Choix
+actuel : theme ACTIF, palette CLAIRE toujours (un dark mode mail est mal rendu par les
+clients). Un selecteur de theme mail = un reglage + un menu console ; honorer le scheme du
+destinataire = supporter une palette sombre cote mail (risque de rendu). A trancher avant
+d'ajouter le bouton.
 
 ## Session 2026-09-09 - le modele des comptes (MODEL-01/02) et le tiroir unique
 

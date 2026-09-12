@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"net/http"
 	"time"
+
+	"github.com/softwarity/meerkat/internal/mail"
 )
 
 // A second factor by e-mail (MFA-02), and a FALLBACK on purpose: the code in an
@@ -106,7 +108,7 @@ func (h *Handler) mailMFACode(r *http.Request, userID string) error {
 	}
 	t := messagesFor(u.Locale)
 	_, brand, _ := h.chrome()
-	return h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mailSpec{
+	return h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mail.Spec{
 		Subject:   fmt.Sprintf(t["mailOtpSubject"], brand.AppName),
 		Preheader: t["mailOtpHeading"],
 		Heading:   t["mailOtpHeading"],

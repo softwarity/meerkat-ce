@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/mail"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -147,12 +148,12 @@ func (h *Handler) sendReset(r *http.Request, userID, email, locale string) error
 	}
 	t := messagesFor(locale)
 	_, brand, _ := h.chrome()
-	return h.sendMail(r.Context(), h.buildMail(r.Context(), email, mailSpec{
+	return h.sendMail(r.Context(), h.buildMail(r.Context(), email, mail.Spec{
 		Subject:   fmt.Sprintf(t["mailResetSubject"], brand.AppName),
 		Preheader: t["mailResetHeading"],
 		Heading:   t["mailResetHeading"],
 		Intro:     []string{fmt.Sprintf(t["mailResetIntro"], brand.AppName)},
-		Button:    &mailButton{Label: t["mailResetCta"], URL: link},
+		Button:    &mail.Button{Label: t["mailResetCta"], URL: link},
 		Outro:     []string{t["mailResetOutro"]},
 	}))
 }
@@ -239,7 +240,7 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	if u, err := h.st.GetUserByID(r.Context(), userID); err == nil && u.Email != "" {
 		t := messagesFor(u.Locale)
 		_, brand, _ := h.chrome()
-		if err := h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mailSpec{
+		if err := h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mail.Spec{
 			Subject:   fmt.Sprintf(t["mailPwChangedSubject"], brand.AppName),
 			Preheader: fmt.Sprintf(t["mailPwChangedSubject"], brand.AppName),
 			Heading:   fmt.Sprintf(t["mailPwChangedSubject"], brand.AppName),

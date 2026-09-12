@@ -402,12 +402,12 @@ func (h *Handler) sendConfirmation(r *http.Request, u store.User) error {
 	link := h.externalURL(r) + "/confirm?token=" + token
 	t := messagesFor(u.Locale)
 	_, brand, _ := h.chrome()
-	return h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mailSpec{
+	return h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mail.Spec{
 		Subject:   fmt.Sprintf(t["mailConfirmSubject"], brand.AppName),
 		Preheader: fmt.Sprintf(t["mailConfirmHeading"], brand.AppName),
 		Heading:   fmt.Sprintf(t["mailConfirmHeading"], brand.AppName),
 		Intro:     []string{t["mailConfirmIntro"]},
-		Button:    &mailButton{Label: t["mailConfirmCta"], URL: link},
+		Button:    &mail.Button{Label: t["mailConfirmCta"], URL: link},
 		Outro:     []string{t["mailConfirmOutro"]},
 	}))
 }

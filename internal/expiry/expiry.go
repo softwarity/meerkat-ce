@@ -24,7 +24,6 @@ package expiry
 import (
 	"context"
 	"fmt"
-	"html"
 	"log/slog"
 	"strings"
 	"time"
@@ -190,38 +189,51 @@ func (d *Digest) sendToday(ctx context.Context, cfg store.ExpiryDigest, now time
 // translated surface (the catalogue in internal/auth).
 func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, ended []store.User) mail.Message {
 	app := appName(ctx, d.st)
-	var text, htmlBody strings.Builder
+	var groups []mail.Group
 	if len(ending) > 0 {
-		fmt.Fprintf(&text, "Losing access within %s:\n", days(cfg.Days))
-		fmt.Fprintf(&htmlBody, "<p>Losing access within %s:</p><ul>", days(cfg.Days))
-		for _, u := range ending {
-			fmt.Fprintf(&text, "  %s - last day %s\n", who(u), day(u.ValidUntil))
-			fmt.Fprintf(&htmlBody, "<li>%s - last day <strong>%s</strong></li>",
-				html.EscapeString(who(u)), day(u.ValidUntil))
+		items := make([]string, len(ending))
+		for i, u := range ending {
+			items[i] = fmt.Sprintf("%s - last day %s", who(u), day(u.ValidUntil))
 		}
-		htmlBody.WriteString("</ul>")
-		text.WriteString("\n")
+		groups = append(groups, mail.Group{Title: fmt.Sprintf("Losing access within %s", days(cfg.Days)), Items: items})
 	}
 	if len(ended) > 0 {
-		text.WriteString("No longer able to sign in:\n")
-		htmlBody.WriteString("<p>No longer able to sign in:</p><ul>")
-		for _, u := range ended {
-			fmt.Fprintf(&text, "  %s - last day was %s\n", who(u), day(u.ValidUntil))
-			fmt.Fprintf(&htmlBody, "<li>%s - last day was <strong>%s</strong></li>",
-				html.EscapeString(who(u)), day(u.ValidUntil))
+		items := make([]string, len(ended))
+		for i, u := range ended {
+			items[i] = fmt.Sprintf("%s - last day was %s", who(u), day(u.ValidUntil))
 		}
-		htmlBody.WriteString("</ul>")
-		text.WriteString("\n")
+		groups = append(groups, mail.Group{Title: "No longer able to sign in", Items: items})
 	}
-	const tail = "An account outside its window is refused at the next sign-in, with the date. " +
-		"Nobody is signed out mid-work by this. Change a window under Application, Users."
-	text.WriteString(tail + "\n")
-	fmt.Fprintf(&htmlBody, "<p>%s</p>", tail)
-	return mail.Message{
-		Subject: fmt.Sprintf("%s: %s", app, headline(ending, ended, cfg.Days)),
-		Text:    text.String(),
-		HTML:    htmlBody.String(),
+	// The same themed shell as the sign-in mails (NOTIF-01): the digest is one
+	// more message this gateway sends, and it wears the same clothes.
+	return mail.Compose("", d.brand(ctx), d.palette(ctx), mail.Spec{
+		Subject:   fmt.Sprintf("%s: %s", app, headline(ending, ended, cfg.Days)),
+		Preheader: headline(ending, ended, cfg.Days),
+		Heading:   "Expiring accounts",
+		Groups:    groups,
+		Outro: []string{
+			"An account outside its window is refused at the next sign-in, with the date. " +
+				"Nobody is signed out mid-work by this. Change a window under Application, Users.",
+		},
+	})
+}
+
+// brand and palette give the digest the same identity the sign-in pages and
+// their mails wear: the branding, and the active theme's LIGHT palette.
+func (d *Digest) brand(ctx context.Context) mail.Brand {
+	var b store.Branding
+	if err := d.st.GetSetting(ctx, store.SettingBranding, &b); err != nil || b.AppName == "" {
+		b = store.DefaultBranding()
 	}
+	return mail.Brand{AppName: b.AppName, LogoURL: b.Logo}
+}
+
+func (d *Digest) palette(ctx context.Context) map[string]string {
+	t, err := d.st.GetActiveTheme(ctx)
+	if err != nil || len(t.Light) == 0 {
+		t = store.DefaultTheme()
+	}
+	return t.Light
 }
 
 // headline is the subject's news, which has to survive being read in a list of
