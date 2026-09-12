@@ -230,7 +230,7 @@ func consoleBrand() mail.Brand {
 }
 
 func consolePalette() map[string]string {
-	return store.DefaultTheme().Light
+	return mail.ConsolePalette()
 }
 
 // headline is the subject's news, which has to survive being read in a list of

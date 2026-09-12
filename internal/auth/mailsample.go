@@ -47,7 +47,7 @@ func SampleMail(ctx context.Context, st *store.Store, kind, locale, base string)
 	brand, palette := sampleBrand(ctx, st), samplePalette(ctx, st)
 	if kind == "digest" {
 		brand = mail.Brand{AppName: store.MeerkatBranding().AppName, Meerkat: true}
-		palette = store.DefaultTheme().Light
+		palette = mail.ConsolePalette()
 	}
 	spec, ok := sampleSpec(kind, t, sampleAppName(ctx, st), base)
 	if !ok {

@@ -66,6 +66,25 @@ type Spec struct {
 	Outro    []string
 }
 
+// ConsolePalette is the admin console's own colours as a LIGHT mail palette:
+// the teal operators recognise, on neutral light surfaces. It is what a mail to
+// OPERATORS wears (the expiry digest), never the tenant's data-plane theme - and
+// it is fixed, because the console is the product's surface and does not fork
+// with a tenant's palette. Kept here so the digest and its relay-test sample can
+// never disagree about it.
+//
+// The values are the console's Material palette read in its light scheme: the
+// teal primary (tone 40) and the neutral tones the console is generated from
+// (#2e8595 primary, neutral greys), so a mailed notice matches the tool it is
+// about.
+func ConsolePalette() map[string]string {
+	return map[string]string{
+		"primary": "#00363f", "onPrimary": "#ffffff",
+		"surface": "#f7fafb", "surfaceContainer": "#eceff0",
+		"onSurface": "#181c1d", "onSurfaceVariant": "#5b5f60", "outline": "#c4c7c8",
+	}
+}
+
 // Compose turns a spec into a Message with both a plain-text and an HTML body:
 // a client that refuses HTML, and a person who prefers text, both get a
 // readable message rather than a wall of markup.
