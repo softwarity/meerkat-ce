@@ -176,6 +176,10 @@ type totpChallengeData struct {
 	Error      string
 	AllowTrust bool   // policy permits "remember this browser" (MFA-03)
 	TrustLabel string // localized "Trust this browser for N days"
+	// EmailOTP shows the "send me a code by e-mail" fallback (MFA-02); Sent
+	// switches the page to the just-mailed variant.
+	EmailOTP bool
+	Sent     bool
 }
 
 type totpEnrollData struct {
@@ -256,6 +260,7 @@ func (h *Handler) doTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.regLimit.reset(r.Context(), totpKey)
+	h.clearMFAEmail(r.Context(), sess.UserID)
 	// "Remember this browser" (MFA-03) - best-effort; issueTrust re-checks policy.
 	if r.PostFormValue("trust") != "" {
 		h.issueTrust(w, r, sess.UserID)
@@ -273,15 +278,31 @@ func (h *Handler) verifySecondFactor(r *http.Request, userID, code string) bool 
 	if mfa.Validate(totp.Secret, code, time.Now()) {
 		return true
 	}
-	ok, err := h.st.ConsumeScratch(r.Context(), userID, code)
-	return err == nil && ok
+	if ok, err := h.st.ConsumeScratch(r.Context(), userID, code); err == nil && ok {
+		return true
+	}
+	// A code we mailed (MFA-02): tried last, and only when the fallback is open.
+	return h.emailOTPOffered(r.Context(), userID) && h.verifyEmailOTP(r.Context(), userID, code)
 }
 
 func (h *Handler) renderChallenge(w http.ResponseWriter, r *http.Request, errMsg string, status int) {
-	data := totpChallengeData{flowChrome: h.flowData(r, "titleTwoFactor"), Error: errMsg}
+	h.renderChallengeWith(w, r, errMsg, status, false)
+}
+
+// renderChallengeSent is the challenge after a code was mailed: the same form,
+// with the fallback link replaced by a line saying to check the inbox.
+func (h *Handler) renderChallengeSent(w http.ResponseWriter, r *http.Request) {
+	h.renderChallengeWith(w, r, "", http.StatusOK, true)
+}
+
+func (h *Handler) renderChallengeWith(w http.ResponseWriter, r *http.Request, errMsg string, status int, sent bool) {
+	data := totpChallengeData{flowChrome: h.flowData(r, "titleTwoFactor"), Error: errMsg, Sent: sent}
 	if pol, err := h.st.GetTrustedBrowserPolicy(r.Context()); err == nil && pol.Allowed {
 		data.AllowTrust = true
 		data.TrustLabel = fmt.Sprintf(data.T["trustDays"], ttlDays(pol.TTL))
+	}
+	if sess, err := h.sm.Resolve(r.Context(), r); err == nil {
+		data.EmailOTP = h.emailOTPOffered(r.Context(), sess.UserID)
 	}
 	writeFlow(w, totpChallengePage, data, status)
 }
@@ -611,12 +632,23 @@ const totpChallengeBody = `    <form method="post" action="/totp">
       {{end}}
       <button type="submit">{{.T.verify}}</button>
     </form>
+    {{if .EmailOTP}}
+    {{if .Sent}}
+      <p class="hint sent">{{.T.otpSent}}</p>
+    {{else}}
+      <form method="post" action="/totp/email" class="altmail">
+        <button class="choice" type="submit">{{.T.otpSendByEmail}}</button>
+      </form>
+    {{end}}
+    {{end}}
     <form method="post" action="/logout" class="signout">
       <button class="choice" type="submit">{{.T.signOut}}</button>
     </form>
     <style>
       .hint { margin: 0; font-size: .82rem; color: var(--mk-on-surface-variant); }
       form.signout { margin-top: 14px; }
+      form.altmail { margin-top: 12px; }
+      .hint.sent { margin-top: 12px; color: var(--mk-primary); }
       .trust { display: flex; align-items: center; gap: 9px; font-size: .82rem; color: var(--mk-on-surface-variant); cursor: pointer; }
       .trust input { width: auto; margin: 0; accent-color: var(--mk-primary); }
     </style>

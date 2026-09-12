@@ -1922,6 +1922,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	// challenge for the enrolled, forced enrolment when MFA is mandatory.
 	mux.HandleFunc("GET /totp", h.showTOTP)
 	mux.HandleFunc("POST /totp", h.doTOTP)
+	mux.HandleFunc("POST /totp/email", h.sendMFAEmail)
 	mux.HandleFunc("GET /totp-enroll", h.showTOTPEnroll)
 	mux.HandleFunc("POST /totp-enroll", h.doTOTPEnroll)
 	mux.HandleFunc("GET /meerkat/favicon", h.favicon)

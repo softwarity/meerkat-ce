@@ -184,6 +184,26 @@ func (s *Store) TakeEmailToken(ctx context.Context, tokenHash, purpose string, n
 	return userID, nil
 }
 
+// MFAEmailOTPEnabled reports whether the second-factor-by-mail fallback is
+// switched on (MFA-02). A setting nobody saved and one that cannot be read look
+// the same to the login flow - both mean "off", the safe answer.
+func (s *Store) MFAEmailOTPEnabled(ctx context.Context) bool {
+	var on bool
+	_ = s.GetSetting(ctx, SettingMFAEmailOTP, &on)
+	return on
+}
+
+// ClearEmailTokens drops every live token of a purpose for one user - called
+// before a fresh MFA code is mailed, so a pile of old codes cannot accumulate
+// and only the latest one works.
+func (s *Store) ClearEmailTokens(ctx context.Context, userID, purpose string) error {
+	if _, err := s.db.ExecContext(ctx,
+		`DELETE FROM email_tokens WHERE user_id = ? AND purpose = ?`, userID, purpose); err != nil {
+		return fmt.Errorf("store: clear %s tokens for %q: %w", purpose, userID, err)
+	}
+	return nil
+}
+
 // MarkEmailVerified flips the user's address to verified.
 func (s *Store) MarkEmailVerified(ctx context.Context, userID string) error {
 	return s.execUser(ctx, userID,

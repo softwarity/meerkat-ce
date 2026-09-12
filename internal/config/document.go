@@ -95,6 +95,7 @@ var ExportedSettings = []string{
 	store.SettingBranding,
 	store.SettingLanguages,
 	store.SettingMFARequired,
+	store.SettingMFAEmailOTP,
 	store.SettingTrustedBrowser,
 	store.SettingRegistration,
 	store.SettingRateLimit,

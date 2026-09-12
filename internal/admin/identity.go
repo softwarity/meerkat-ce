@@ -1017,6 +1017,7 @@ type settingsPayload struct {
 	BusinessAccess  store.BusinessAccess       `json:"businessAccess"`
 	SessionTTL      string                     `json:"sessionTTL"`
 	MFARequired     bool                       `json:"mfaRequired"`     // gateway-wide second-factor policy (MFA-04)
+	MFAEmailOTP     bool                       `json:"mfaEmailOtp"`     // second-factor-by-mail fallback (MFA-02)
 	PasskeysAllowed bool                       `json:"passkeysAllowed"` // gateway-wide passkey policy (AUTH-15)
 	APITokens       bool                       `json:"apiTokens"`       // personal API tokens allowed (AUTH-16)
 	TrustedBrowser  store.TrustedBrowserPolicy `json:"trustedBrowser"`  // remember-this-browser policy (MFA-03)
@@ -1097,6 +1098,7 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	if err := a.st.GetSetting(ctx, store.SettingMFARequired, &p.MFARequired); err != nil {
 		return p, err
 	}
+	p.MFAEmailOTP = a.st.MFAEmailOTPEnabled(ctx)
 	p.PasswordPolicy = a.st.GetPasswordPolicy(ctx)
 	tb, err := a.st.GetTrustedBrowserPolicy(ctx)
 	if err != nil {
@@ -1201,6 +1203,10 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	if err := a.st.SetSetting(r.Context(), store.SettingMFARequired, p.MFARequired); err != nil {
+		a.internal(w, err)
+		return
+	}
+	if err := a.st.SetSetting(r.Context(), store.SettingMFAEmailOTP, p.MFAEmailOTP); err != nil {
 		a.internal(w, err)
 		return
 	}

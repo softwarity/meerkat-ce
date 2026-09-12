@@ -504,6 +504,13 @@ const (
 	// users may register passkeys and sign in with them. Global, never per
 	// tenant: a passkey login happens before the tenant is known.
 	SettingPasskeys = "passkeys_allowed"
+	// SettingMFAEmailOTP opens the second-factor-by-mail FALLBACK (MFA-02): an
+	// account already enrolled in TOTP may, at the challenge, ask for a code by
+	// e-mail when it cannot reach its authenticator. Ships OFF - it is a new
+	// delivery path, and a code in an inbox is a weaker factor than one in an
+	// app, so turning it on is a decision, not a default. It does nothing
+	// unless a relay is configured and the account carries an address.
+	SettingMFAEmailOTP = "mfa_email_otp"
 	// One-time guard: the theme presets have been topped up into an existing
 	// install (THEME-04). Prevents resurrecting a preset the admin deleted.
 	SettingThemePresetsSeeded = "theme_presets_seeded"
@@ -562,6 +569,7 @@ func (s *Store) seedDefaultSettings() error {
 		SettingBranding:       string(branding),
 		SettingMFARequired:    `false`,
 		SettingPasskeys:       `true`,
+		SettingMFAEmailOTP:    `false`,
 		SettingTrustedBrowser: string(trusted),
 		// AUTH-10: the eight characters the code used to demand in four
 		// places, now in one, and raisable.

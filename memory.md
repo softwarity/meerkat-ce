@@ -5,7 +5,7 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-09-09 : **le modele des comptes** - champs maison definis
+_Derniere mise a jour : 2026-09-12 : **le modele des comptes** - champs maison definis
 dans `Infra > Modele` et transmis comme tout attribut (MODEL-01), fenetre de validite
 verifiee partout ou une session se resout (MODEL-02, reste le resume par e-mail), et
 l'ecran des utilisateurs passe a **un seul tiroir dont le contenu change** (creation =
@@ -104,6 +104,39 @@ B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste
 repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+
+## Session 2026-09-12 - gabarits d'e-mail (NOTIF-01) et OTP par mail (MFA-02)
+
+### Ce qui a ete livre
+
+- **Gabarit unique** (`internal/auth/mailrender.go`) : `buildMail(ctx, to, mailSpec)` rend
+  texte + HTML, table + styles INLINE (un client mail ne charge pas de CSS), palette
+  CLAIRE du theme actif, logo de l'integrateur dans l'en-tete mais JAMAIS la marque
+  Meerkat. Trois formes en une : bouton-lien, gros code, avis simple. Confirmation
+  (`register.go`), mot de passe oublie + avis de changement (`reset.go`) rebascules
+  dessus. Chaines dans les fichiers `locales/*.json` (cle par cle : Heading/Intro/Cta/
+  Outro), EN rempli, FR traduit, le reste retombe sur EN au chargement. **Piege** : un
+  test verifie la PARITE EXACTE des cles entre locales - retirer une cle de en.json
+  oblige a la retirer des 20 fichiers (les anciennes mailConfirmBody/HTML, mailResetBody/
+  HTML supprimees partout).
+- **OTP par mail (MFA-02), en REPLI** (choix de Francois : "alternative de secours", pas
+  methode a part entiere) : `internal/auth/emailotp.go`. Au defi TOTP, un lien "envoyer
+  un code par e-mail" n'apparait que si les QUATRE tiennent : compte deja enrole TOTP,
+  adresse presente, option admin activee (`SettingMFAEmailOTP`, ships OFF, ecran
+  Securite), relais configure. Code 6 chiffres, 10 min, usage unique, lie au compte
+  (`hashTrust(userID+":"+code)`, purpose `mfaotp` dans email_tokens), envoi throttle
+  (45 s), efface a la reussite. Se saisit dans le MEME champ que le code TOTP
+  (`verifySecondFactor` essaie TOTP -> scratch -> code maile). Route `POST /totp/email`.
+- **Toggle console** : `Allow a one-time code by e-mail` sous Two-factor
+  (`security-page`), porte par `settingsPayload.mfaEmailOtp`.
+
+### Verifie
+
+Tests : `mailrender_test.go` (les trois formes, palette maigre toleree, logo Meerkat
+jamais embarque), `emailotp_test.go` (lien cache par defaut + 404 ; envoi + connexion ;
+usage unique ; sans adresse ; throttle ; repli PAS enrolement). Apercus HTML rendus dans
+le navigateur (confirmation + OTP). Toggle vu a l'ecran. Reste a faire un jour :
+harmoniser le HTML du digest (NOTIF-04) sur `buildMail` (aujourd'hui fait main, EN).
 
 ## Session 2026-09-09 - le modele des comptes (MODEL-01/02) et le tiroir unique
 

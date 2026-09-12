@@ -14,6 +14,15 @@
       <mat-slide-toggle [checked]="mfaRequired()" (change)="mfaRequired.set($event.checked)">
         <ng-container i18n="@@Require_two_factor">Require two-factor for everyone</ng-container>
       </mat-slide-toggle>
+
+      <p class="hint text-muted" i18n="@@MFA_email_otp_hint" style="margin-top:16px;">
+        Let an enrolled user who cannot reach their authenticator ask for a one-time code by
+        e-mail. A fallback, not a method: it needs a mail relay (Infra, Mail relay) and only
+        shows for accounts that carry an address and have already set up an authenticator.
+      </p>
+      <mat-slide-toggle [checked]="mfaEmailOtp()" (change)="mfaEmailOtp.set($event.checked)">
+        <ng-container i18n="@@Allow_email_code">Allow a one-time code by e-mail</ng-container>
+      </mat-slide-toggle>
     </mat-card>
 
     <mat-card appearance="outlined">

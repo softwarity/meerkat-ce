@@ -1230,6 +1230,10 @@ export interface Settings {
   sessionTTL: string;
   // Gateway-wide second-factor policy (MFA-04) - tenants/members may override.
   mfaRequired: boolean;
+  // Second-factor-by-mail fallback (MFA-02): an enrolled user may ask for a
+  // one-time code by e-mail. Needs a relay; shows only for accounts with an
+  // address that already set up an authenticator.
+  mfaEmailOtp: boolean;
   // Gateway-wide passkey policy (AUTH-15) - global, the login precedes the tenant.
   passkeysAllowed: boolean;
   // Personal API tokens allowed (AUTH-16).
