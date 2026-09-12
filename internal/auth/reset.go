@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
-
-	"github.com/softwarity/meerkat/internal/mail"
 )
 
 // Forgot password (AUTH-21): a one-shot mailed link, 1 hour, that lets the
@@ -149,13 +147,14 @@ func (h *Handler) sendReset(r *http.Request, userID, email, locale string) error
 	}
 	t := messagesFor(locale)
 	_, brand, _ := h.chrome()
-	return h.sendMail(r.Context(), mail.Message{
-		To:      []string{email},
-		Subject: fmt.Sprintf(t["mailResetSubject"], brand.AppName),
-		Text:    fmt.Sprintf(t["mailResetBody"], brand.AppName, link),
-		HTML: fmt.Sprintf(`<p>%s</p><p><a href="%s">%s</a></p>`,
-			fmt.Sprintf(t["mailResetHTML"], brand.AppName), link, t["mailResetCta"]),
-	})
+	return h.sendMail(r.Context(), h.buildMail(r.Context(), email, mailSpec{
+		Subject:   fmt.Sprintf(t["mailResetSubject"], brand.AppName),
+		Preheader: t["mailResetHeading"],
+		Heading:   t["mailResetHeading"],
+		Intro:     []string{fmt.Sprintf(t["mailResetIntro"], brand.AppName)},
+		Button:    &mailButton{Label: t["mailResetCta"], URL: link},
+		Outro:     []string{t["mailResetOutro"]},
+	}))
 }
 
 // showReset displays the new-password form. The token is only PEEKED here:
@@ -240,11 +239,12 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	if u, err := h.st.GetUserByID(r.Context(), userID); err == nil && u.Email != "" {
 		t := messagesFor(u.Locale)
 		_, brand, _ := h.chrome()
-		if err := h.sendMail(r.Context(), mail.Message{
-			To:      []string{u.Email},
-			Subject: fmt.Sprintf(t["mailPwChangedSubject"], brand.AppName),
-			Text:    fmt.Sprintf(t["mailPwChangedBody"], brand.AppName),
-		}); err != nil {
+		if err := h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mailSpec{
+			Subject:   fmt.Sprintf(t["mailPwChangedSubject"], brand.AppName),
+			Preheader: fmt.Sprintf(t["mailPwChangedSubject"], brand.AppName),
+			Heading:   fmt.Sprintf(t["mailPwChangedSubject"], brand.AppName),
+			Intro:     []string{fmt.Sprintf(t["mailPwChangedBody"], brand.AppName)},
+		})); err != nil {
 			slog.Warn("password-changed notice failed", "user", u.Username, "err", err)
 		}
 	}
