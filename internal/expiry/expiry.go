@@ -204,9 +204,12 @@ func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, en
 		}
 		groups = append(groups, mail.Group{Title: "No longer able to sign in", Items: items})
 	}
-	// The same themed shell as the sign-in mails (NOTIF-01): the digest is one
-	// more message this gateway sends, and it wears the same clothes.
-	return mail.Compose("", d.brand(ctx), d.palette(ctx), mail.Spec{
+	// The digest wears the CONSOLE's identity, not the application's: it goes to
+	// administrators, in the tool they run this gateway from, not to the users
+	// of the app behind it (NOTIF-01, NOTIF-04). So Meerkat's own mark and
+	// palette, never the data plane's theme - the app name still rides in the
+	// subject, to say which installation this is about.
+	return mail.Compose("", consoleBrand(), consolePalette(), mail.Spec{
 		Subject:   fmt.Sprintf("%s: %s", app, headline(ending, ended, cfg.Days)),
 		Preheader: headline(ending, ended, cfg.Days),
 		Heading:   "Expiring accounts",
@@ -218,22 +221,16 @@ func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, en
 	})
 }
 
-// brand and palette give the digest the same identity the sign-in pages and
-// their mails wear: the branding, and the active theme's LIGHT palette.
-func (d *Digest) brand(ctx context.Context) mail.Brand {
-	var b store.Branding
-	if err := d.st.GetSetting(ctx, store.SettingBranding, &b); err != nil || b.AppName == "" {
-		b = store.DefaultBranding()
-	}
-	return mail.Brand{AppName: b.AppName, LogoURL: b.Logo}
+// consoleBrand and consolePalette are the ADMIN plane's identity - Meerkat's
+// own, the look the console wears - shared by every mail that speaks to
+// operators rather than to the application's users. Fixed, because the console
+// is the product's surface and does not fork with the tenant's theme.
+func consoleBrand() mail.Brand {
+	return mail.Brand{AppName: store.MeerkatBranding().AppName, Meerkat: true}
 }
 
-func (d *Digest) palette(ctx context.Context) map[string]string {
-	t, err := d.st.GetActiveTheme(ctx)
-	if err != nil || len(t.Light) == 0 {
-		t = store.DefaultTheme()
-	}
-	return t.Light
+func consolePalette() map[string]string {
+	return store.DefaultTheme().Light
 }
 
 // headline is the subject's news, which has to survive being read in a list of

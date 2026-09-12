@@ -1539,8 +1539,15 @@ export class ApiService {
   // Tries the relay ON SCREEN without saving it: the config travels in the
   // body. A blank password falls back to the stored one, and the sender comes
   // from the application settings.
-  testMailRelay(relay: MailRelay, to: string): Observable<{ sent: string }> {
-    return this.http.post<{ sent: string }>('/api/settings/mail-relay/test', { ...relay, to });
+  // kind picks WHICH message to render ("" = the bare relay probe), locale the
+  // language it speaks. Both are ignored by the server when empty.
+  testMailRelay(
+    relay: MailRelay,
+    to: string,
+    kind = '',
+    locale = '',
+  ): Observable<{ sent: string }> {
+    return this.http.post<{ sent: string }>('/api/settings/mail-relay/test', { ...relay, to, kind, locale });
   }
 
   // ── the configuration as a file ────────────────────────────────────────────

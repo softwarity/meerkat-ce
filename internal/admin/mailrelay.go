@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
@@ -175,6 +176,10 @@ func (a *API) putMailRelay(w http.ResponseWriter, r *http.Request, actor store.U
 type mailRelayTest struct {
 	mailRelayPayload
 	To string `json:"to"`
+	// Kind picks WHICH message to render (auth.MailSampleKinds); "" is the bare
+	// "the relay connects" probe. Locale is the language the sample speaks.
+	Kind   string `json:"kind"`
+	Locale string `json:"locale"`
 }
 
 // testMailRelay sends one message through the config IN THE PAYLOAD, without
@@ -241,11 +246,23 @@ func (a *API) testMailRelay(w http.ResponseWriter, r *http.Request, actor store.
 	if send == nil {
 		send = mail.Send
 	}
-	if err := send(r.Context(), cfg, mail.Message{
+	// The message: a chosen sample (themed, in the chosen language), or the bare
+	// probe that only says the relay answered.
+	msg := mail.Message{
 		To:      []string{to},
 		Subject: "Meerkat mail relay test",
 		Text:    "This is Meerkat's test message. Outbound e-mail works.",
-	}); err != nil {
+	}
+	if body.Kind != "" {
+		sample, ok := auth.SampleMail(r.Context(), a.st, body.Kind, body.Locale, a.dataOrigin(r))
+		if !ok {
+			writeErr(w, http.StatusUnprocessableEntity, "unknown message type: "+body.Kind)
+			return
+		}
+		msg = sample
+		msg.To = []string{to}
+	}
+	if err := send(r.Context(), cfg, msg); err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}

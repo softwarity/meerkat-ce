@@ -205,3 +205,46 @@ func TestSavingARelayDoesNotSilenceTheDigest(t *testing.T) {
 		t.Errorf("the refusal does not name what is allowed: %s", out)
 	}
 }
+
+// A test send can render any supported message TYPE in a chosen language, so an
+// admin sees the real thing before an account triggers it. The message that
+// leaves carries the type's subject and wears the branding.
+func TestMailRelayTestRendersASample(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	if err := f.api.st.SetSetting(ctx, store.SettingSMTP, mail.Config{
+		From: "gw@example.com", Host: "smtp.example.com", Port: 587,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var brand store.Branding
+	_ = f.api.st.GetSetting(ctx, store.SettingBranding, &brand)
+
+	var got mail.Message
+	f.api.MailerWith = func(_ context.Context, _ mail.Config, m mail.Message) error {
+		got = m
+		return nil
+	}
+
+	// A themed sample of the sign-in code, in English.
+	body := `{"host":"smtp.example.com","port":587,"security":"tls","from":"gw@example.com",` +
+		`"to":"probe@example.com","kind":"otp","locale":"en"}`
+	if code, out := f.call(t, "POST", "/api/settings/mail-relay/test", body, f.rootC); code != http.StatusOK {
+		t.Fatalf("sample test: %d %s", code, out)
+	}
+	if got.To[0] != "probe@example.com" {
+		t.Fatalf("wrong recipient: %v", got.To)
+	}
+	if !strings.Contains(got.Subject, brand.AppName) || !strings.Contains(strings.ToLower(got.Subject), "sign-in code") {
+		t.Fatalf("the sample is not the sign-in code: %q", got.Subject)
+	}
+	if !strings.Contains(got.HTML, "123456") {
+		t.Fatalf("the sign-in sample carries no code:\n%s", got.HTML)
+	}
+
+	// An unknown kind is refused, not silently sent as something else.
+	bad := `{"host":"smtp.example.com","port":587,"security":"tls","from":"gw@example.com","to":"x@example.com","kind":"nope"}`
+	if code, _ := f.call(t, "POST", "/api/settings/mail-relay/test", bad, f.rootC); code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown kind: %d, want 422", code)
+	}
+}

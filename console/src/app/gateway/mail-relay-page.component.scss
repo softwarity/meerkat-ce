@@ -75,3 +75,7 @@ mat-card {
 .digest-fields {
   margin-top: 18px;
 }
+
+// The test row's selectors sit beside the recipient and the button.
+.test .kind { width: 200px; }
+.test .lang { width: 130px; }

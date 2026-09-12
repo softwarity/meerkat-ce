@@ -171,7 +171,31 @@
         }
       </div>
 
+      <p class="hint text-muted" i18n="@@Send_test_hint" style="margin-bottom:8px;">
+        Send a real message through this relay to see it land: pick which one and the language,
+        with fake values but the real look. The recipient defaults to your own address.
+      </p>
       <div class="test">
+        <mat-form-field class="kind" subscriptSizing="dynamic">
+          <mat-label i18n="@@Message_type">Message</mat-label>
+          <mat-select [value]="testKind()" (selectionChange)="testKind.set($event.value)">
+            @for (k of testKinds; track k.key) {
+              <mat-option [value]="k.key">{{ k.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field class="lang" subscriptSizing="dynamic">
+          <mat-label i18n="@@Language">Language</mat-label>
+          <mat-select
+            [value]="testLocale()"
+            (selectionChange)="testLocale.set($event.value)"
+            [disabled]="testKind() === '' || testKind() === 'digest'"
+          >
+            @for (l of testLangs(); track l) {
+              <mat-option [value]="l">{{ l }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
         <mat-form-field class="field" subscriptSizing="dynamic">
           <mat-label i18n="@@Test_recipient">Test recipient</mat-label>
           <input

@@ -69,6 +69,21 @@ export class MailRelayPageComponent {
   // The display name comes from the application plane: shown, never edited.
   protected readonly fromName = signal('');
   protected readonly testTo = signal('');
+  // What to send as a test: a message kind and the language it speaks. The
+  // kinds mirror auth.MailSampleKinds; "" is the bare "the relay connects"
+  // probe. The languages are the data plane's own pool (English always, since
+  // the flow pages fall back to it).
+  protected readonly testKind = signal('confirm');
+  protected readonly testLocale = signal('en');
+  protected readonly testLangs = signal<string[]>(['en']);
+  protected readonly testKinds = [
+    { key: '', label: $localize`:@@Mail_kind_probe:Relay check (plain)` },
+    { key: 'confirm', label: $localize`:@@Mail_kind_confirm:Account confirmation` },
+    { key: 'reset', label: $localize`:@@Mail_kind_reset:Password reset` },
+    { key: 'password-changed', label: $localize`:@@Mail_kind_pwchanged:Password changed` },
+    { key: 'otp', label: $localize`:@@Mail_kind_otp:Sign-in code` },
+    { key: 'digest', label: $localize`:@@Mail_kind_digest:Expiring accounts (English)` },
+  ];
 
   // The daily notice about accounts whose window is closing (MODEL-02): the
   // one message this gateway sends without being asked, so it is configured
@@ -138,6 +153,16 @@ export class MailRelayPageComponent {
     // is one click.
     this.testTo.set(this.me.user()?.email ?? '');
     this.reload();
+    // The data plane's language pool, English always in it (the flow pages fall
+    // back to English, so a sample can always be sent in it).
+    this.api.settings().subscribe({
+      next: (s) => {
+        const langs = [...new Set(['en', ...(s.languages ?? [])])];
+        this.testLangs.set(langs);
+        if (!langs.includes(this.testLocale())) this.testLocale.set('en');
+      },
+      error: () => undefined,
+    });
   }
 
   // Also called after a secret is moved into the vault: that move rewrites the
@@ -222,7 +247,7 @@ export class MailRelayPageComponent {
   // before committing to it.
   protected test(): void {
     this.testing.set(true);
-    this.api.testMailRelay(this.current(), this.testTo().trim()).subscribe({
+    this.api.testMailRelay(this.current(), this.testTo().trim(), this.testKind(), this.testLocale()).subscribe({
       next: ({ sent }) => {
         this.testing.set(false);
         this.snack.open($localize`:@@Test_email_sent_to_ADDR:Test email sent to ${sent}:ADDR:`, undefined, {
