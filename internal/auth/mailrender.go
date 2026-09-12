@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"html"
 	"html/template"
 	"strings"
@@ -186,13 +185,4 @@ func mailHTML(brand brandView, pal map[string]string, spec mailSpec) string {
 		return "<pre>" + html.EscapeString(mailText(brand, spec)) + "</pre>"
 	}
 	return b.String()
-}
-
-// fmtAll fills a %s-style catalogue string, or returns it unchanged when it
-// carries no verb - a convenience so a caller reads one line per paragraph.
-func fmtAll(format string, args ...any) string {
-	if !strings.Contains(format, "%") || len(args) == 0 {
-		return format
-	}
-	return fmt.Sprintf(format, args...)
 }
