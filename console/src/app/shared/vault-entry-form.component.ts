@@ -170,19 +170,19 @@ export interface VaultEntryFormData {
         ></textarea>
       </app-form-field>
 
-      @if (!stashing()) {
-        <!-- A reminder, not an expiry that acts: the wording says so, because a
-             field called "expires" on a secret reads as "stops working". -->
-        <app-form-field
-          i18n-label="@@Reminder_date"
-          label="Reminder date"
-          i18n-hint="@@Reminder_date_hint"
-          hint="To be warned before it lapses at its source - a token, a certificate. It does NOT make the secret obsolete: the reference keeps resolving. Empty for no reminder."
-          [clearable]="false"
-        >
-          <input matInput type="date" [value]="day()" (input)="setDay($any($event.target).value)" />
-        </app-form-field>
-      }
+      <!-- Offered when stashing too: moving a token in is the moment its expiry
+           is known. A reminder, not an expiry that acts - the wording says so,
+           because a field called "expires" on a secret reads as "stops
+           working". -->
+      <app-form-field
+        i18n-label="@@Reminder_date"
+        label="Reminder date"
+        i18n-hint="@@Reminder_date_hint"
+        hint="To be warned before it lapses at its source - a token, a certificate. It does NOT make the secret obsolete: the reference keeps resolving. Empty for no reminder."
+        [clearable]="false"
+      >
+        <input matInput type="date" [value]="day()" (input)="setDay($any($event.target).value)" />
+      </app-form-field>
 
       @if (error(); as e) {
         <p class="err">{{ e }}</p>
@@ -328,7 +328,7 @@ export class VaultEntryFormComponent implements OnInit {
     this.error.set('');
     const stash = this.data().stash;
     if (stash?.from) {
-      this.api.stashSecret(stash.from, this.name().trim(), this.description().trim()).subscribe({
+      this.api.stashSecret(stash.from, this.name().trim(), this.description().trim(), this.expiresAt()).subscribe({
         next: ({ name, scope }) => {
           void this.vault.reload();
           this.saving.set(false);

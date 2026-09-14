@@ -123,6 +123,9 @@ type stashRequest struct {
 	Field       string `json:"field"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	// ExpiresAt is the optional reminder date (day, 0 = none): moving a token in
+	// is the natural moment to note when it lapses at its source (VAULT-06).
+	ExpiresAt int64 `json:"expiresAt"`
 }
 
 // SuggestEntryName derives the name a secret lands under when the caller does
@@ -220,6 +223,7 @@ func (a *API) stashSecret(w http.ResponseWriter, r *http.Request, actor store.Us
 	entry := vault.Entry{
 		Name: name, Kind: vault.KindSecret, Scope: h.scope,
 		Value: literal, Description: strings.TrimSpace(req.Description),
+		ExpiresAt: req.ExpiresAt,
 	}
 	if entry.Description == "" {
 		entry.Description = label + " - " + req.Field

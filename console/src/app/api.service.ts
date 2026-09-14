@@ -1737,11 +1737,13 @@ export class ApiService {
     at: SecretLocation,
     name: string,
     description = '',
+    expiresAt = 0,
   ): Observable<{ name: string; scope: string; ref: string }> {
     return this.http.post<{ name: string; scope: string; ref: string }>('/api/vault/stash', {
       ...at,
       name,
       description,
+      expiresAt,
     });
   }
 
