@@ -250,6 +250,9 @@ export class FormFieldComponent {
     setTimeout(() => this.copied.set(false), 1500);
   }
 
+  protected readonly showLabel = $localize`:@@Show:Show`;
+  protected readonly hideLabel = $localize`:@@Hide:Hide`;
+
   protected toggleReveal(): void {
     this.revealed.set(!this.revealed());
     this.applyMask();

@@ -18,8 +18,8 @@
       matIconButton
       type="button"
       (click)="toggleReveal()"
-      i18n-aria-label="@@Toggle_visibility"
-      aria-label="Toggle visibility"
+      [matTooltip]="revealed() ? hideLabel : showLabel"
+      [attr.aria-label]="revealed() ? hideLabel : showLabel"
     ><mat-icon>{{ revealed() ? 'visibility_off' : 'visibility' }}</mat-icon></button>}
   @if (copyable()) {<button
       matSuffix
