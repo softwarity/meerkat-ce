@@ -405,3 +405,39 @@ func get(t *testing.T, f fixture, path string) string {
 func vaultSecret(name, value string) vault.Entry {
 	return vault.Entry{Name: name, Kind: vault.KindSecret, Scope: vault.ScopeInfra, Value: value}
 }
+
+// Editing a secret's metadata must NOT wipe its value. The console never
+// receives a stored secret, so it saves the entry back with an empty value
+// field; an empty value on a secret means KEEP, not clear. This is the exact
+// worry an admin has changing a description or a reminder date on a secret.
+func TestEditingASecretKeepsItsValue(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	if err := f.api.st.SaveVaultEntry(ctx, vaultSecret("api-key", "s3cr3t-value")); err != nil {
+		t.Fatal(err)
+	}
+	// Save again with NO value (as the console does), only new metadata.
+	if err := f.api.st.SaveVaultEntry(ctx, vault.Entry{
+		Name: "api-key", Kind: vault.KindSecret, Scope: vault.ScopeInfra,
+		Value: "", Description: "the billing API", ExpiresAt: 1893456000,
+	}); err != nil {
+		t.Fatalf("re-save with empty value: %v", err)
+	}
+	got, err := f.api.st.GetVaultEntry(ctx, vault.ScopeInfra, "api-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Value != "s3cr3t-value" {
+		t.Fatalf("the secret's value changed on a metadata edit: %q", got.Value)
+	}
+	if got.Description != "the billing API" || got.ExpiresAt != 1893456000 {
+		t.Fatalf("the metadata did not save: %+v", got)
+	}
+	// And a genuinely NEW value still replaces it.
+	if err := f.api.st.SaveVaultEntry(ctx, vaultSecret("api-key", "rotated-value")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := f.api.st.GetVaultEntry(ctx, vault.ScopeInfra, "api-key"); got.Value != "rotated-value" {
+		t.Fatalf("a new value did not replace the old: %q", got.Value)
+	}
+}
