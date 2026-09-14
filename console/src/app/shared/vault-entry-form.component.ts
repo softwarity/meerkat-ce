@@ -103,11 +103,11 @@ export interface VaultEntryFormData {
           </ng-container>
         } @else if (kind() === 'secret') {
           <ng-container i18n="@@Kind_secret_hint">
-            Encrypted at rest and never shown again. Referenced by $name wherever it is needed.
+            Encrypted at rest and never shown again.
           </ng-container>
         } @else {
           <ng-container i18n="@@Kind_value_hint">
-            Stored in clear and readable. Referenced by $name wherever it is needed.
+            Stored in clear and readable.
           </ng-container>
         }
       </p>
@@ -115,8 +115,9 @@ export interface VaultEntryFormData {
       <app-form-field
         i18n-label="@@Name"
         label="Name"
-        i18n-hint="@@Vault_name_hint"
-        hint="A letter, then letters, digits, dot, dash or underscore"
+        i18n-hint="@@Vault_name_ref_hint"
+        hint="Referenced by $name wherever it is needed"
+        [error]="nameError()"
       >
         <textarea
           matInput
@@ -324,9 +325,19 @@ export class VaultEntryFormComponent implements OnInit {
     this.value.set('');
   }
 
+  // The name rule, shown only once the field is wrong: a permanent "allowed
+  // characters" line is noise until it is broken, and then it is the error.
+  private readonly nameOK = /^[A-Za-z][A-Za-z0-9_.-]*$/;
+  protected readonly nameError = computed(() => {
+    const n = this.name().trim();
+    return n && !this.nameOK.test(n)
+      ? $localize`:@@Vault_name_rule:A letter, then letters, digits, dot, dash or underscore`
+      : '';
+  });
+
   protected readonly canSave = computed(
     () =>
-      /^[A-Za-z][A-Za-z0-9_.-]*$/.test(this.name().trim()) &&
+      this.nameOK.test(this.name().trim()) &&
       (this.editing() || this.stashing() || !!this.value()),
   );
 
