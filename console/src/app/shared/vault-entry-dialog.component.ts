@@ -67,6 +67,10 @@ export class VaultEntryDialogComponent {
   protected readonly name = signal(this.data.entry?.name ?? this.data.suggestedName ?? '');
   protected readonly value = signal(this.data.entry?.value ?? '');
   protected readonly description = signal(this.data.entry?.description ?? '');
+  // A REMINDER date, unix seconds day-aligned, 0 = none. It disables nothing -
+  // the gateway cannot know a token was rotated at its source - it only feeds
+  // the daily digest so the deadline is not missed.
+  protected readonly expiresAt = signal(this.data.entry?.expiresAt ?? 0);
   protected readonly saving = signal(false);
   protected readonly error = signal('');
 
@@ -118,6 +122,7 @@ export class VaultEntryDialogComponent {
         // the last place it exists outside the vault.
         value: stash?.value ?? this.value(),
         description: this.description().trim(),
+        expiresAt: this.expiresAt(),
       })
       .subscribe({
         next: (saved) => {
@@ -127,6 +132,17 @@ export class VaultEntryDialogComponent {
         },
         error: (err: unknown) => this.failed(err),
       });
+  }
+
+  // A date input speaks YYYY-MM-DD; the entry keeps unix seconds. Converted at
+  // UTC midnight both ways, so a date is the same day wherever it is read.
+  protected day(): string {
+    const u = this.expiresAt();
+    return u ? new Date(u * 1000).toISOString().slice(0, 10) : '';
+  }
+
+  protected setDay(v: string): void {
+    this.expiresAt.set(v ? Math.floor(Date.parse(v + 'T00:00:00Z') / 1000) : 0);
   }
 
   private failed(err: unknown): void {

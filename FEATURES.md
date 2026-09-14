@@ -162,6 +162,7 @@ forme du produit.
 | [x] | VAULT-03 | **Coffre portable** | Le coffre comme fichier chiffré, export et import, pour amorcer un environnement ou déménager une gateway - l'exact inverse de l'export de | - | CE |
 | [ ] | VAULT-04 | **Coffre externe** | Option d'adossement à un coffre externe (HashiCorp Vault, secrets Kubernetes/Docker) comme source alternative | tout : aucun backend externe (HashiCorp, secrets Kubernetes ou Docker) | CE |
 | [x] | VAULT-05 | **Champs sensibles** | Un champ sensible passe par le coffre | - | CE |
+| [x] | VAULT-06 | **Date de rappel** | Une entrée du coffre porte une **date de rappel** optionnelle (en jours) : le jour où le secret expire à sa source - un token, un certificat. **Purement un rappel, aucune application** : la passerelle ne peut pas savoir qu'un token a été renouvelé chez le fournisseur, donc la référence `$nom` continue de résoudre - la date ne fait que nourrir le digest quotidien (NOTIF-04), qui liste ce qui approche et ce qui vient de passer, jamais la valeur. Destinataires élargis aux infra-admin, puisque le coffre est infra | - | CE |
 
 ### TLS
 

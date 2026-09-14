@@ -9,6 +9,7 @@ import (
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/store/dbtest"
+	"github.com/softwarity/meerkat/internal/vault"
 )
 
 // A gateway with a working relay, one administrator who can be told, and a
@@ -179,7 +180,7 @@ func TestItReportsWhatHasJustExpired(t *testing.T) {
 		t.Fatalf("want one message, got %d", len(*sent))
 	}
 	m := (*sent)[0]
-	if !strings.Contains(m.Text, "No longer able to sign in") || !strings.Contains(m.Text, "gone") {
+	if !strings.Contains(m.Text, "no longer able to sign in") || !strings.Contains(m.Text, "gone") {
 		t.Errorf("the message does not report the account that expired:\n%s", m.Text)
 	}
 	// The last day it worked, not the day it stopped: that is the date on the
@@ -302,3 +303,35 @@ var errRelay = relayError("relay refused")
 type relayError string
 
 func (e relayError) Error() string { return string(e) }
+
+// A vault entry carrying a reminder date rides the same digest as the accounts,
+// in its own section - a reminder to rotate a token before it lapses (VAULT).
+// The value never appears; it is a reminder, not a leak.
+func TestDigestReportsExpiringVaultEntries(t *testing.T) {
+	st, sent, d := fixture(t)
+	// A value entry needs no cipher; a plain value with a reminder date is
+	// enough to prove the section renders.
+	if err := st.SaveVaultEntry(context.Background(), vault.Entry{
+		Name: "npm-token", Kind: vault.KindValue, Scope: "infra",
+		Value: "npm_xxx", ExpiresAt: lastDay("2026-09-14"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	d.Now = func() time.Time { return at("2026-09-10T07:05:00Z") }
+	if err := d.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(*sent) != 1 {
+		t.Fatalf("want one message, got %d", len(*sent))
+	}
+	m := (*sent)[0]
+	for _, want := range []string{"Vault entries expiring", "npm-token", "2026-09-14"} {
+		if !strings.Contains(m.Text, want) {
+			t.Errorf("the digest does not report the expiring secret (%q):\n%s", want, m.Text)
+		}
+	}
+	// The stored value never rides into the inbox.
+	if strings.Contains(m.Text, "npm_xxx") || strings.Contains(m.HTML, "npm_xxx") {
+		t.Errorf("the secret's value leaked into the digest")
+	}
+}

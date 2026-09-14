@@ -283,6 +283,10 @@ export interface VaultEntry {
   tags?: string[];
   createdAt: number;
   updatedAt: number;
+  // A REMINDER date (unix seconds, day-aligned, 0/absent = none): the day this
+  // entry's secret is known to lapse at its source. It disables nothing - the
+  // reference keeps resolving - it only feeds the daily digest.
+  expiresAt?: number;
   // Inherited from a wider scope: visible so one knows what $name resolves to,
   // but only shadowable, not editable.
   readOnly?: boolean;

@@ -74,6 +74,10 @@ type vaultEntryView struct {
 	Tags        []string `json:"tags,omitempty"`
 	CreatedAt   int64    `json:"createdAt"`
 	UpdatedAt   int64    `json:"updatedAt"`
+	// ExpiresAt is a REMINDER date (day, 0 = none): the day this entry's secret
+	// is known to lapse at its source. It disables nothing - it only feeds the
+	// daily digest (VAULT).
+	ExpiresAt int64 `json:"expiresAt,omitempty"`
 	// ReadOnly marks an inherited entry: a tenant admin sees the application
 	// values their scope falls back to, but may only shadow them.
 	ReadOnly bool `json:"readOnly,omitempty"`
@@ -106,7 +110,7 @@ func (a *API) listVault(w http.ResponseWriter, r *http.Request, actor store.User
 			// refused), and that value never travels.
 			HasValue:    e.Kind == vault.KindSecret || e.Value != "",
 			Description: e.Description, Tags: e.Tags,
-			CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt,
+			CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt, ExpiresAt: e.ExpiresAt,
 			ReadOnly: !slices.Contains(writable, e.Scope),
 			UsedBy:   usage[e.Name],
 		})

@@ -24,7 +24,7 @@ func (s *Store) ListVaultEntries(ctx context.Context, scopes []string) ([]vault.
 		args[i] = sc
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT name, kind, scope, value, description, tags, created_at, updated_at
+		`SELECT name, kind, scope, value, description, tags, created_at, updated_at, expires_at
 		 FROM vault_entries WHERE scope IN (`+placeholders(len(scopes))+`) ORDER BY name ASC`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: list vault entries: %w", err)
@@ -56,7 +56,7 @@ func (s *Store) VaultValues(ctx context.Context, scope string) (map[string]strin
 		args[i] = sc
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT name, kind, scope, value, description, tags, created_at, updated_at
+		`SELECT name, kind, scope, value, description, tags, created_at, updated_at, expires_at
 		 FROM vault_entries WHERE scope IN (`+placeholders(len(order))+`)`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: read vault values: %w", err)
@@ -104,7 +104,7 @@ func (s *Store) VaultValues(ctx context.Context, scope string) (map[string]strin
 // Callers that answer an API must blank a secret before writing it out.
 func (s *Store) GetVaultEntry(ctx context.Context, scope, name string) (vault.Entry, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT name, kind, scope, value, description, tags, created_at, updated_at
+		`SELECT name, kind, scope, value, description, tags, created_at, updated_at, expires_at
 		 FROM vault_entries WHERE scope = ? AND name = ?`, scope, name)
 	e, err := scanVaultEntry(row)
 	if err != nil {
@@ -163,13 +163,13 @@ func (s *Store) SaveVaultEntry(ctx context.Context, e vault.Entry) error {
 	}
 	now := time.Now().Unix()
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO vault_entries (name, kind, scope, value, description, tags, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO vault_entries (name, kind, scope, value, description, tags, created_at, updated_at, expires_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(scope, name) DO UPDATE SET
 		   kind = excluded.kind, scope = excluded.scope, value = excluded.value,
 		   description = excluded.description, tags = excluded.tags,
-		   updated_at = excluded.updated_at`,
-		e.Name, e.Kind, e.Scope, stored, e.Description, string(tags), now, now)
+		   updated_at = excluded.updated_at, expires_at = excluded.expires_at`,
+		e.Name, e.Kind, e.Scope, stored, e.Description, string(tags), now, now, e.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("store: save vault entry %q: %w", e.Name, err)
 	}
@@ -192,7 +192,7 @@ func (s *Store) ExportVaultEntries(ctx context.Context, scopes []string) ([]vaul
 		args[i] = sc
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT name, kind, scope, value, description, tags, created_at, updated_at
+		`SELECT name, kind, scope, value, description, tags, created_at, updated_at, expires_at
 		 FROM vault_entries WHERE scope IN (`+placeholders(len(scopes))+`)
 		 ORDER BY scope ASC, name ASC`, args...)
 	if err != nil {
@@ -297,7 +297,7 @@ type rowScanner interface{ Scan(dest ...any) error }
 func scanVaultEntry(r rowScanner) (vault.Entry, error) {
 	var e vault.Entry
 	var tags string
-	if err := r.Scan(&e.Name, &e.Kind, &e.Scope, &e.Value, &e.Description, &tags, &e.CreatedAt, &e.UpdatedAt); err != nil {
+	if err := r.Scan(&e.Name, &e.Kind, &e.Scope, &e.Value, &e.Description, &tags, &e.CreatedAt, &e.UpdatedAt, &e.ExpiresAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return vault.Entry{}, err
 		}
@@ -309,4 +309,31 @@ func scanVaultEntry(r rowScanner) (vault.Entry, error) {
 		}
 	}
 	return e, nil
+}
+
+// VaultEntriesExpiringBetween lists entries whose reminder date falls in
+// [from, to), soonest first, WITHOUT their values - this feeds the daily digest
+// (VAULT), which names what is about to lapse, never reads the secret itself.
+// A zero expiry (the default) is not a date and never matches.
+func (s *Store) VaultEntriesExpiringBetween(ctx context.Context, from, to int64) ([]vault.Entry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT name, kind, scope, value, description, tags, created_at, updated_at, expires_at
+		 FROM vault_entries WHERE expires_at > 0 AND expires_at >= ? AND expires_at < ?
+		 ORDER BY expires_at ASC, scope ASC, name ASC`, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("store: vault entries expiring: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []vault.Entry
+	for rows.Next() {
+		e, err := scanVaultEntry(rows)
+		if err != nil {
+			return nil, err
+		}
+		// The value never leaves for a reminder: blank it as ListVaultEntries
+		// does, so a digest can never carry a secret into an inbox.
+		e.Value = ""
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }

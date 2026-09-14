@@ -248,6 +248,30 @@ func (s *Store) ListNotifiableAdmins(ctx context.Context) ([]User, error) {
 	return out, rows.Err()
 }
 
+// ListDigestRecipients is who the daily operator digest reaches: enabled
+// accounts with an address that administer something the digest is about - root,
+// app admins (the accounts section) and infra admins (the vault section). Wider
+// than ListNotifiableAdmins, which is the app-identity audience alone.
+func (s *Store) ListDigestRecipients(ctx context.Context) ([]User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+userCols+` FROM users
+		 WHERE enabled = ? AND email != '' AND (root = ? OR app_admin = ? OR infra_admin = ?)
+		 ORDER BY username`, true, true, true, true)
+	if err != nil {
+		return nil, fmt.Errorf("store: list digest recipients: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: scan recipient: %w", err)
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
 // PurgeExpiredEmailTokens removes lapsed tokens (periodic upkeep).
 func (s *Store) PurgeExpiredEmailTokens(ctx context.Context, now int64) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM email_tokens WHERE expires_at <= ?`, now)

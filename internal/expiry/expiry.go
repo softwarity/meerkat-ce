@@ -30,6 +30,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/vault"
 )
 
 // lockName is the advisory lock the sending node holds. Two nodes waking at
@@ -143,22 +144,33 @@ func (d *Digest) sendToday(ctx context.Context, cfg store.ExpiryDigest, now time
 	if err != nil {
 		return err
 	}
-	if len(ending) == 0 && len(ended) == 0 {
+	// Vault entries carrying a reminder date (VAULT), the same two windows: a
+	// secret about to lapse, and one whose date has just passed. A reminder,
+	// never an enforcement - the value is not even read here.
+	secretsEnding, err := d.st.VaultEntriesExpiringBetween(ctx, start.Unix(), horizon.Unix())
+	if err != nil {
+		return err
+	}
+	secretsEnded, err := d.st.VaultEntriesExpiringBetween(ctx, since.Unix(), start.Unix())
+	if err != nil {
+		return err
+	}
+	if len(ending) == 0 && len(ended) == 0 && len(secretsEnding) == 0 && len(secretsEnded) == 0 {
 		// Nothing to say: the day is recorded all the same, or every tick for
 		// the rest of the day would ask the database the same question.
 		return d.st.MarkExpiryDigestSent(ctx, today)
 	}
-	admins, err := d.st.ListNotifiableAdmins(ctx)
+	admins, err := d.st.ListDigestRecipients(ctx)
 	if err != nil {
 		return err
 	}
 	if len(admins) == 0 {
 		slog.Warn("expiry digest: nobody to tell",
-			"ending", len(ending), "ended", len(ended),
-			"why", "no enabled root or app-admin account carries an e-mail address")
+			"accounts", len(ending)+len(ended), "secrets", len(secretsEnding)+len(secretsEnded),
+			"why", "no enabled root, app-admin or infra-admin account carries an e-mail address")
 		return d.st.MarkExpiryDigestSent(ctx, today)
 	}
-	msg := d.message(ctx, cfg, ending, ended)
+	msg := d.message(ctx, cfg, ending, ended, secretsEnding, secretsEnded)
 	// One message per administrator rather than one with everybody in To: a
 	// list of colleagues is not a secret, but it is not this message's news
 	// either, and a bounce for one address should not lose the others.
@@ -180,14 +192,14 @@ func (d *Digest) sendToday(ctx context.Context, cfg store.ExpiryDigest, now time
 		// silently dropped.
 		return lastErr
 	}
-	slog.Info("expiry digest sent", "recipients", sent, "ending", len(ending), "ended", len(ended))
+	slog.Info("expiry digest sent", "recipients", sent, "accounts", len(ending)+len(ended), "secrets", len(secretsEnding)+len(secretsEnded))
 	return d.st.MarkExpiryDigestSent(ctx, today)
 }
 
 // message writes the notice. English, like the console: its readers are the
 // people who administer this gateway, and the pages a visitor sees are the
 // translated surface (the catalogue in internal/auth).
-func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, ended []store.User) mail.Message {
+func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, ended []store.User, secretsEnding, secretsEnded []vault.Entry) mail.Message {
 	app := appName(ctx, d.st)
 	var groups []mail.Group
 	if len(ending) > 0 {
@@ -195,30 +207,56 @@ func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, en
 		for i, u := range ending {
 			items[i] = fmt.Sprintf("%s - last day %s", who(u), day(u.ValidUntil))
 		}
-		groups = append(groups, mail.Group{Title: fmt.Sprintf("Losing access within %s", days(cfg.Days)), Items: items})
+		groups = append(groups, mail.Group{Title: fmt.Sprintf("Accounts losing access within %s", days(cfg.Days)), Items: items})
 	}
 	if len(ended) > 0 {
 		items := make([]string, len(ended))
 		for i, u := range ended {
 			items[i] = fmt.Sprintf("%s - last day was %s", who(u), day(u.ValidUntil))
 		}
-		groups = append(groups, mail.Group{Title: "No longer able to sign in", Items: items})
+		groups = append(groups, mail.Group{Title: "Accounts no longer able to sign in", Items: items})
+	}
+	if len(secretsEnding) > 0 {
+		items := make([]string, len(secretsEnding))
+		for i, e := range secretsEnding {
+			items[i] = fmt.Sprintf("%s - expires %s", secretName(e), day(e.ExpiresAt))
+		}
+		groups = append(groups, mail.Group{Title: fmt.Sprintf("Vault entries expiring within %s", days(cfg.Days)), Items: items})
+	}
+	if len(secretsEnded) > 0 {
+		items := make([]string, len(secretsEnded))
+		for i, e := range secretsEnded {
+			items[i] = fmt.Sprintf("%s - expired %s", secretName(e), day(e.ExpiresAt))
+		}
+		groups = append(groups, mail.Group{Title: "Vault entries past their reminder date", Items: items})
 	}
 	// The digest wears the CONSOLE's identity, not the application's: it goes to
 	// administrators, in the tool they run this gateway from, not to the users
 	// of the app behind it (NOTIF-01, NOTIF-04). So Meerkat's own mark and
 	// palette, never the data plane's theme - the app name still rides in the
 	// subject, to say which installation this is about.
+	line := headline(ending, ended, secretsEnding, secretsEnded, cfg.Days)
 	return mail.Compose("", consoleBrand(), consolePalette(), mail.Spec{
-		Subject:   fmt.Sprintf("%s: %s", app, headline(ending, ended, cfg.Days)),
-		Preheader: headline(ending, ended, cfg.Days),
-		Heading:   "Expiring accounts",
+		Subject:   fmt.Sprintf("%s: %s", app, line),
+		Preheader: line,
+		Heading:   "Daily digest",
 		Groups:    groups,
 		Outro: []string{
-			"An account outside its window is refused at the next sign-in, with the date. " +
-				"Nobody is signed out mid-work by this. Change a window under Application, Users.",
+			"An account outside its window is refused at the next sign-in, with the date - nobody " +
+				"is signed out mid-work. A vault entry's date is a REMINDER only: it never stops a " +
+				"reference from resolving, since the gateway cannot know the secret was rotated at its " +
+				"source. Change either under the console.",
 		},
 	})
+}
+
+// secretName reads the way an operator finds the entry in the vault: its name,
+// and the scope when it matters (an app and an infra entry may share a name).
+func secretName(e vault.Entry) string {
+	if e.Scope != "" {
+		return fmt.Sprintf("%s (%s)", e.Name, e.Scope)
+	}
+	return e.Name
 }
 
 // consoleBrand and consolePalette are the ADMIN plane's identity - Meerkat's
@@ -235,7 +273,7 @@ func consolePalette() map[string]string {
 
 // headline is the subject's news, which has to survive being read in a list of
 // forty subjects: how many, and how soon.
-func headline(ending, ended []store.User, horizon int) string {
+func headline(ending, ended []store.User, secretsEnding, secretsEnded []vault.Entry, horizon int) string {
 	var parts []string
 	if n := len(ending); n > 0 {
 		parts = append(parts, fmt.Sprintf("%s lose access within %s", accounts(n), days(horizon)))
@@ -243,7 +281,20 @@ func headline(ending, ended []store.User, horizon int) string {
 	if n := len(ended); n > 0 {
 		parts = append(parts, fmt.Sprintf("%s can no longer sign in", accounts(n)))
 	}
+	if n := len(secretsEnding); n > 0 {
+		parts = append(parts, fmt.Sprintf("%s expiring within %s", secrets(n), days(horizon)))
+	}
+	if n := len(secretsEnded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%s past their date", secrets(n)))
+	}
 	return strings.Join(parts, ", ")
+}
+
+func secrets(n int) string {
+	if n == 1 {
+		return "1 vault entry"
+	}
+	return fmt.Sprintf("%d vault entries", n)
 }
 
 func accounts(n int) string {

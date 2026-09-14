@@ -82,7 +82,7 @@ export class MailRelayPageComponent {
     { key: 'reset', label: $localize`:@@Mail_kind_reset:Password reset` },
     { key: 'password-changed', label: $localize`:@@Mail_kind_pwchanged:Password changed` },
     { key: 'otp', label: $localize`:@@Mail_kind_otp:Sign-in code` },
-    { key: 'digest', label: $localize`:@@Mail_kind_digest:Expiring accounts (English)` },
+    { key: 'digest', label: $localize`:@@Mail_kind_digest:Daily digest (English)` },
   ];
 
   // The daily notice about accounts whose window is closing (MODEL-02): the

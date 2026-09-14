@@ -275,6 +275,10 @@ CREATE TABLE IF NOT EXISTS vault_entries (
   tags        TEXT NOT NULL DEFAULT '[]',
   created_at  BIGINT NOT NULL DEFAULT 0,
   updated_at  BIGINT NOT NULL DEFAULT 0,
+  -- A reminder date, in days, 0 = none (VAULT). It renders nothing obsolete:
+  -- the gateway cannot know a token was rotated at its provider, so this only
+  -- feeds the daily digest - never the resolution of a reference.
+  expires_at  BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (scope, name)
 );
 

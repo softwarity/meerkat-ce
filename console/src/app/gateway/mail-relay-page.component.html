@@ -227,12 +227,12 @@
          here by e-mail - and because without a relay it is a switch with
          nothing behind it. -->
     <mat-card appearance="outlined">
-      <h3 i18n="@@Expiring_accounts">Expiring accounts</h3>
+      <h3 i18n="@@Daily_digest">Daily digest</h3>
       <p class="hint text-muted" i18n="@@Digest_hint">
         Once a day, the administrators who carry an e-mail address are told which accounts are
-        about to lose access and which just did. A day with nothing to say sends nothing: a daily
-        message that says "nothing today" three hundred times is one nobody opens on the day it
-        matters.
+        about to lose access, which just did, and which vault entries are about to reach their
+        reminder date. A day with nothing to say sends nothing: a daily message that says "nothing
+        today" three hundred times is one nobody opens on the day it matters.
       </p>
       <mat-slide-toggle [checked]="digestOn()" (change)="digestOn.set($event.checked)">
         <ng-container i18n="@@Send_the_daily_notice">Send the daily notice</ng-container>

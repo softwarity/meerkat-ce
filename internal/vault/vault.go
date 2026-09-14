@@ -110,6 +110,12 @@ type Entry struct {
 	Tags        []string `json:"tags,omitempty"`
 	CreatedAt   int64    `json:"createdAt"`
 	UpdatedAt   int64    `json:"updatedAt"`
+	// ExpiresAt is a REMINDER date (unix seconds, day-aligned, 0 = none): the
+	// day this entry's secret is known to lapse at its source. It changes
+	// nothing about resolution - the gateway cannot tell whether a token was
+	// rotated upstream - it only lets the daily digest warn before the day
+	// comes. Naming it "expires" is a promise to WARN, not to disable.
+	ExpiresAt int64 `json:"expiresAt,omitempty"`
 }
 
 // ── references ───────────────────────────────────────────────────────────────
