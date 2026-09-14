@@ -4,6 +4,16 @@
   <ng-content />
   @if (error()) {<mat-error>{{ error() }}</mat-error>}
   @else if (hint()) {<mat-hint align="end">{{ hint() }}</mat-hint>}
+  @if (info()) {<button
+      matSuffix
+      matIconButton
+      type="button"
+      class="info-suffix"
+      [matTooltip]="info()"
+      matTooltipPositionAtOrigin
+      [attr.aria-label]="info()"
+      (click)="$event.preventDefault()"
+    ><mat-icon>info</mat-icon></button>}
   @if (actionIcon()) {<button
       matSuffix
       matIconButton

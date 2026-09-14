@@ -177,8 +177,8 @@ export interface VaultEntryFormData {
       <app-form-field
         i18n-label="@@Reminder_date"
         label="Reminder date"
-        i18n-hint="@@Reminder_date_hint"
-        hint="To be warned before it lapses at its source - a token, a certificate. It does NOT make the secret obsolete: the reference keeps resolving. Empty for no reminder."
+        i18n-info="@@Reminder_date_hint"
+        info="A day to be warned on, before this lapses at its source - a token, a certificate. It does NOT make the secret obsolete: the reference keeps resolving. Empty means no reminder."
         [clearable]="false"
       >
         <input matInput type="date" [value]="day()" (input)="setDay($any($event.target).value)" />

@@ -75,6 +75,12 @@ export class FormFieldComponent {
   // through ng-content is invisible to mat-form-field's content queries (same
   // reason the label is an input).
   readonly hint = input('');
+  // A small info icon in the suffix row carrying a tooltip: what a field means,
+  // when the explanation is longer than a hint should be. The house pattern for
+  // "explain this field" - a subscript hint clips in a modal and repeats a word
+  // everyone knows ("a reminder is a reminder"), while an icon says "there is
+  // more here" and hands the detail on hover or tap without taking a line.
+  readonly info = input('');
   // An error under the field, in place of the hint, with the field itself
   // marked invalid. Same reason as the hint for being an input, plus one:
   // mat-form-field only reveals a <mat-error> when the CONTROL says it is in
