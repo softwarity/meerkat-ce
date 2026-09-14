@@ -1,3 +1,5 @@
+<mat-drawer-container (backdropClick)="editor.set(null)">
+  <mat-drawer-content>
 <div class="banner">
   <h1 i18n="@@Vault">Vault</h1>
   <p class="hint" i18n="@@Vault_hint">
@@ -118,3 +120,14 @@
 >
   <mat-icon>add</mat-icon>
 </button>
+  </mat-drawer-content>
+
+  <!-- The editor, in a drawer to match routes and users. The pickers that open
+       it from inside ANOTHER editor use the modal instead - a drawer cannot
+       host the drawer that must lie over it. -->
+  <mat-drawer position="end" mode="over" [opened]="editor() !== null" disableClose (keydown.escape)="editor.set(null)">
+    @if (editor(); as data) {
+      <app-vault-entry-form [data]="data" (saved)="onSaved()" (closed)="editor.set(null)" />
+    }
+  </mat-drawer>
+</mat-drawer-container>

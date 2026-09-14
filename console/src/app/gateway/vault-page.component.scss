@@ -1,10 +1,27 @@
 @use '../../styles/table';
 
 :host {
+  display: block;
+  height: 100%;
+}
+mat-drawer-container {
+  height: 100%;
+  background: transparent;
+}
+mat-drawer-content {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
+}
+mat-drawer {
+  width: min(520px, 96vw);
+  border-left: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-high);
+}
+mat-drawer app-vault-entry-form {
+  height: 100%;
 }
 .banner {
   display: flex;

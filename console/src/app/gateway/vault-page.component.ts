@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -9,7 +10,7 @@ import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { RowActionsDirective } from '@softwarity/row-actions';
 import { ApiService, VaultEntry } from '../api.service';
 import { DialogsService } from '../shared/dialogs.service';
-import { VaultEntryDialogComponent, VaultEntryDialogData } from '../shared/vault-entry-dialog.component';
+import { VaultEntryFormComponent, VaultEntryFormData } from '../shared/vault-entry-form.component';
 import { VaultService } from '../shared/vault.service';
 import { VaultFileDialogComponent, VaultFileDialogData } from './vault-file-dialog.component';
 
@@ -23,10 +24,12 @@ import { VaultFileDialogComponent, VaultFileDialogData } from './vault-file-dial
   imports: [
     MatButtonModule,
     MatIconModule,
+    MatSidenavModule,
     MatTableModule,
     MatTooltipModule,
     LoadingIndicatorComponent,
     RowActionsDirective,
+    VaultEntryFormComponent,
   ],
   styleUrl: './vault-page.component.scss',
   templateUrl: './vault-page.component.html',
@@ -41,6 +44,10 @@ export class VaultPageComponent {
   protected readonly loading = signal(true);
   protected readonly entries = computed(() => this.vault.entries());
   protected readonly columns = ['name', 'kind', 'value', 'usedBy'];
+
+  // The editor lives in a right drawer here (the routes/users pattern), holding
+  // the shared form. null = shut; a value carries what the form seeds from.
+  protected readonly editor = signal<VaultEntryFormData | null>(null);
 
   constructor() {
     void this.vault.reload().then(() => this.loading.set(false));
@@ -69,19 +76,16 @@ export class VaultPageComponent {
   }
 
   protected create(): void {
-    this.dialog.open<VaultEntryDialogComponent, VaultEntryDialogData>(VaultEntryDialogComponent, {
-      data: {},
-      restoreFocus: true,
-      disableClose: true,
-    });
+    this.editor.set({});
   }
 
   protected edit(entry: VaultEntry): void {
-    this.dialog.open<VaultEntryDialogComponent, VaultEntryDialogData>(VaultEntryDialogComponent, {
-      data: { entry },
-      restoreFocus: true,
-      disableClose: true,
-    });
+    this.editor.set({ entry });
+  }
+
+  // The form reloads the vault itself; here we just shut the drawer.
+  protected onSaved(): void {
+    this.editor.set(null);
   }
 
   protected async remove(entry: VaultEntry): Promise<void> {
