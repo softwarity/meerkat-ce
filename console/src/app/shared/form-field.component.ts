@@ -21,7 +21,7 @@ import { MatInput } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { VaultEntry } from '../api.service';
-import { VaultEntryDialogComponent, VaultEntryDialogData } from './vault-entry-dialog.component';
+import type { VaultEntryDialogComponent, VaultEntryDialogData } from './vault-entry-dialog.component';
 import { VaultService } from './vault.service';
 
 // A mat-form-field wrapper that projects a matInput input or textarea and adds
@@ -152,14 +152,20 @@ export class FormFieldComponent {
 
   // Declare a new entry without leaving the screen being configured, then use
   // it right away.
-  protected createEntry(): void {
+  // Declared async and imported dynamically ON PURPOSE: a static import of the
+  // dialog would close a cycle (form-field -> dialog -> form -> form-field) that
+  // Angular reports as NG0919 the moment the dialog is opened. The dialog is
+  // only ever needed on this click, so loading it here costs nothing and cuts
+  // the edge.
+  protected async createEntry(): Promise<void> {
     const data: VaultEntryDialogData = {
       kinds: this.vaultKinds(),
       scopes: [this.vaultScope()],
       suggestedName: '',
     };
+    const { VaultEntryDialogComponent: Dialog } = await import('./vault-entry-dialog.component');
     this.dialog
-      .open<VaultEntryDialogComponent, VaultEntryDialogData, VaultEntry>(VaultEntryDialogComponent, {
+      .open<VaultEntryDialogComponent, VaultEntryDialogData, VaultEntry>(Dialog, {
         data,
         disableClose: true,
       })

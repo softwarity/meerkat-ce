@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
@@ -255,7 +255,7 @@ export interface VaultEntryFormData {
     }
   `,
 })
-export class VaultEntryFormComponent {
+export class VaultEntryFormComponent implements OnInit {
   readonly data = input<VaultEntryFormData>({});
   readonly saved = output<VaultEntry>();
   readonly closed = output<void>();
@@ -263,27 +263,36 @@ export class VaultEntryFormComponent {
   private readonly api = inject(ApiService);
   private readonly vault = inject(VaultService);
 
-  // The signals seed from the data ONCE, when the component is created; the two
-  // hosts always mount a fresh instance per open, so an input() read in the
-  // field initialisers is the value for this edit.
-  private readonly d = this.data();
-
-  protected readonly editing = signal(!!this.d.entry);
-  protected readonly stashing = signal(!!this.d.stash);
-  protected readonly kinds = signal<('value' | 'secret')[]>(
-    this.stashing() ? ['secret'] : this.d.kinds?.length ? this.d.kinds : ['value', 'secret'],
-  );
-  protected readonly kind = signal<'value' | 'secret'>(this.d.entry?.kind ?? this.kinds()[0]);
-  protected readonly scopes = signal<string[]>(
-    this.d.scopes?.length ? this.d.scopes : ['infra', 'app'],
-  );
-  protected readonly scope = signal<string>(this.d.entry?.scope ?? this.scopes()[0]);
-  protected readonly name = signal(this.d.entry?.name ?? this.d.suggestedName ?? '');
-  protected readonly value = signal(this.d.entry?.value ?? '');
-  protected readonly description = signal(this.d.entry?.description ?? '');
-  protected readonly expiresAt = signal(this.d.entry?.expiresAt ?? 0);
+  // Seeded in ngOnInit, NOT in the field initialisers: an input() is not bound
+  // yet while the component is constructed, so reading data() there would give
+  // the default {} and lose an edit's entry or a stash. Both hosts mount a
+  // fresh instance per open, so seeding once on init is the value for this edit.
+  protected readonly editing = signal(false);
+  protected readonly stashing = signal(false);
+  protected readonly kinds = signal<('value' | 'secret')[]>(['value', 'secret']);
+  protected readonly kind = signal<'value' | 'secret'>('value');
+  protected readonly scopes = signal<string[]>(['infra', 'app']);
+  protected readonly scope = signal<string>('infra');
+  protected readonly name = signal('');
+  protected readonly value = signal('');
+  protected readonly description = signal('');
+  protected readonly expiresAt = signal(0);
   protected readonly saving = signal(false);
   protected readonly error = signal('');
+
+  ngOnInit(): void {
+    const d = this.data();
+    this.editing.set(!!d.entry);
+    this.stashing.set(!!d.stash);
+    this.kinds.set(this.stashing() ? ['secret'] : d.kinds?.length ? d.kinds : ['value', 'secret']);
+    this.kind.set(d.entry?.kind ?? this.kinds()[0]);
+    this.scopes.set(d.scopes?.length ? d.scopes : ['infra', 'app']);
+    this.scope.set(d.entry?.scope ?? this.scopes()[0]);
+    this.name.set(d.entry?.name ?? d.suggestedName ?? '');
+    this.value.set(d.entry?.value ?? '');
+    this.description.set(d.entry?.description ?? '');
+    this.expiresAt.set(d.entry?.expiresAt ?? 0);
+  }
 
   protected readonly keepHint = computed(() =>
     this.editing() && this.kind() === 'secret'
@@ -300,7 +309,7 @@ export class VaultEntryFormComponent {
   protected scopeLabel(scope: string): string {
     if (scope === 'infra') return $localize`:@@Scope_infra:Infra`;
     if (scope === 'app') return $localize`:@@Scope_app:Application`;
-    return this.d.tenantNames?.[scope] ?? scope.replace('tenant:', '');
+    return this.data().tenantNames?.[scope] ?? scope.replace('tenant:', '');
   }
 
   // A date input speaks YYYY-MM-DD; the entry keeps unix seconds. Converted at
@@ -317,7 +326,7 @@ export class VaultEntryFormComponent {
   protected save(): void {
     this.saving.set(true);
     this.error.set('');
-    const stash = this.d.stash;
+    const stash = this.data().stash;
     if (stash?.from) {
       this.api.stashSecret(stash.from, this.name().trim(), this.description().trim()).subscribe({
         next: ({ name, scope }) => {
