@@ -134,13 +134,20 @@ export interface VaultEntryFormData {
       </app-form-field>
 
       @if (!stashing()) {
+        <!-- A stored secret is not in this page, so its box is disabled and its
+             suffix is an EDIT pencil, never an eye that would reveal nothing.
+             Editing opens the box (and then the eye shows what is TYPED); cancel
+             leaves the stored secret untouched (an empty value means keep). -->
         <app-form-field
           i18n-label="@@Value"
           label="Value"
-          [revealable]="kind() === 'secret'"
+          [revealable]="kind() === 'secret' && (!secretHeld() || valueEditing())"
           [masked]="kind() === 'secret'"
           [clearable]="false"
-          [hint]="keepHint()"
+          [actionIcon]="secretHeld() ? (valueEditing() ? 'close' : 'edit') : ''"
+          [actionLabel]="valueEditing() ? cancelEditLabel : editLabel"
+          (action)="toggleValueEdit()"
+          [hint]="valueHint()"
         >
           <textarea
             matInput
@@ -150,6 +157,8 @@ export interface VaultEntryFormData {
             autocapitalize="off"
             autocorrect="off"
             [value]="value()"
+            [disabled]="valueDisabled()"
+            [placeholder]="valueDisabled() ? '********' : ''"
             (input)="value.set($any($event.target).value)"
             (keydown.enter)="$event.preventDefault()"
           ></textarea>
@@ -294,11 +303,26 @@ export class VaultEntryFormComponent implements OnInit {
     this.expiresAt.set(d.entry?.expiresAt ?? 0);
   }
 
-  protected readonly keepHint = computed(() =>
-    this.editing() && this.kind() === 'secret'
-      ? $localize`:@@Secret_keep_hint:Leave empty to keep the stored secret`
-      : '',
-  );
+  // A stored secret being edited: its value is not in the page, so the box is
+  // disabled behind an Edit button until the admin chooses to replace it.
+  protected readonly secretHeld = computed(() => this.editing() && this.kind() === 'secret');
+  protected readonly valueEditing = signal(false);
+  protected readonly valueDisabled = computed(() => this.secretHeld() && !this.valueEditing());
+  protected readonly editLabel = $localize`:@@Edit:Edit`;
+  protected readonly cancelEditLabel = $localize`:@@Cancel_edit:Cancel edit`;
+  protected readonly valueHint = computed(() => {
+    if (!this.secretHeld()) return '';
+    return this.valueEditing()
+      ? $localize`:@@Type_the_new_secret:Type the new secret, or cancel to keep the stored one.`
+      : $localize`:@@Secret_stored_hidden:Stored and hidden. Edit to replace it.`;
+  });
+
+  // Enter edit (blank box, ready for the new secret) or cancel it (back to the
+  // stored one - an empty value on save means keep).
+  protected toggleValueEdit(): void {
+    this.valueEditing.set(!this.valueEditing());
+    this.value.set('');
+  }
 
   protected readonly canSave = computed(
     () =>
