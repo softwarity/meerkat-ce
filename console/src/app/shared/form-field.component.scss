@@ -16,6 +16,23 @@ mat-form-field {
   white-space: nowrap;
 }
 
-/* The info icon is a quiet marker, not an action: dim until pointed at. */
-::ng-deep .info-suffix { opacity: 0.65; }
-::ng-deep .info-suffix:hover { opacity: 1; }
+/* The info icon sits BESIDE the field, not in its suffix: it explains the field
+   rather than acting on the value. A quiet marker, dim until pointed at. */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.row mat-form-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.field-info {
+  flex: none;
+  opacity: 0.6;
+  /* Drop it onto the input line, past the floating label above. */
+  margin-top: 8px;
+}
+.field-info:hover {
+  opacity: 1;
+}
