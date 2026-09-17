@@ -1,0 +1,366 @@
+// Fill the (bounded) section area so the drawer is the height of the screen,
+// not of its content - otherwise the editor grows past the viewport and its
+// actions fall below the fold. The main content scrolls inside the drawer
+// content; the drawer itself is a fixed-width, full-height panel.
+:host {
+  display: block;
+  height: 100%;
+}
+.wrap {
+  height: 100%;
+}
+.wrap ::ng-deep .mat-drawer-content {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+.wrap ::ng-deep .mat-drawer {
+  width: min(480px, 92vw);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px 0;
+}
+.grow {
+  flex: 1 1 auto;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px 32px;
+}
+
+// The bare mat-card carries no content padding; give the portal cards their own.
+.content > mat-card,
+.split > mat-card {
+  padding: 16px 20px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.row .title {
+  font-weight: 500;
+  font-size: 1.15rem;
+  margin: 0 0 2px;
+}
+// Rail mode reuses the toolbar glyph, turned a quarter to the left.
+.rot-left {
+  transform: rotate(-90deg);
+}
+.hint {
+  margin: 4px 0 0;
+  max-width: 60ch;
+}
+
+.arrange {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.opt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opt-label {
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// Two halves: editor and live mock-up.
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ── editor ──────────────────────────────────────────────────────────────────
+.editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.empty {
+  margin: 8px 0;
+}
+.parent {
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  padding-top: 4px;
+}
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+.entry.child {
+  padding-left: 28px;
+}
+.entry .glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+.entry .glyph app-svg-icon {
+  --icon-size: 20px;
+}
+.entry .name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.entry .name .sub {
+  font-size: 0.75rem;
+}
+.entry .acts {
+  display: inline-flex;
+  gap: 0;
+  flex: 0 0 auto;
+}
+.ini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+// ── live mock-up ────────────────────────────────────────────────────────────
+.canvas-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+// Compact device-width picker: icon-only toggles.
+.widths .mat-button-toggle-button {
+  --mat-standard-button-toggle-height: 34px;
+}
+.widths mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+.preview {
+  padding: 8px;
+}
+.preview-frame {
+  display: block;
+  width: 100%;
+  margin-inline: auto; // centered when the width selector narrows it
+  height: 520px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container-low);
+  transition: max-width 0.2s ease;
+}
+.preview-tag {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.preview-note {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+}
+
+.mock {
+  margin-top: 8px;
+  height: 320px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+}
+.mock mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+.mock app-svg-icon {
+  --icon-size: 18px;
+}
+.mock .ini {
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+}
+
+.m-logo {
+  display: inline-flex;
+  align-items: center;
+  color: var(--mat-sys-primary);
+}
+.m-grow {
+  flex: 1 1 auto;
+}
+.m-launch {
+  color: var(--mat-sys-on-surface-variant);
+}
+.m-acct {
+  display: inline-flex;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// header layout
+.m-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 10px;
+  background: var(--mat-sys-surface-container);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.m-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.m-tab.cur {
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+}
+.m-tab.cur .ini {
+  background: var(--mat-sys-on-primary);
+  color: var(--mat-sys-primary);
+}
+.m-below {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+.mock.side-right .m-below {
+  flex-direction: row-reverse;
+}
+.m-rail {
+  width: 150px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--mat-sys-surface);
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+.mock.side-right .m-rail {
+  border-right: 0;
+  border-left: 1px solid var(--mat-sys-outline-variant);
+}
+.m-ritem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.m-ritem.cur {
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+.m-content {
+  flex: 1 1 auto;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--mat-sys-surface),
+    var(--mat-sys-surface) 10px,
+    var(--mat-sys-surface-container-low) 10px,
+    var(--mat-sys-surface-container-low) 20px
+  );
+  opacity: 0.6;
+}
+
+// rail layout
+.m-rowwrap {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+.mock.side-right .m-rowwrap {
+  flex-direction: row-reverse;
+}
+.m-vrail {
+  width: 74px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  background: var(--mat-sys-surface-container);
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+.mock.side-right .m-vrail {
+  border-right: 0;
+  border-left: 1px solid var(--mat-sys-outline-variant);
+}
+.m-vitem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  width: 100%;
+  border-radius: 8px;
+  text-align: center;
+}
+.m-vitem.cur {
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+.m-vitem .vlbl {
+  font-size: 0.6rem;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-vgrow {
+  flex: 1 1 auto;
+}
+.m-col {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.m-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  overflow: hidden;
+}

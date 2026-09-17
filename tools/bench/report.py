@@ -23,7 +23,7 @@ from pathlib import Path
 
 SCHEMA = 1
 GATEWAYS = ["meerkat", "gostd", "kong", "apisix", "traefik"]
-SCENARIOS = ["proxy", "auth", "auth-delegated", "limit"]
+SCENARIOS = ["proxy", "auth", "auth-jwt", "auth-delegated", "limit"]
 MIN_SUCCESS = 0.99
 # The Go benchmarks that go through a socket, and so read against BareProxy.
 # The others (selection, deduction, the rate gate) measure a decision with no
@@ -36,12 +36,16 @@ KIND = {
     "auth": "comparable",
     "limit": "comparable",
     "auth-delegated": "deployed",
+    # Meerkat only: what it usually does in production, which no other gateway
+    # does here. Held to the same 99% as the comparable ones.
+    "auth-jwt": "extra",
 }
 AUTH_HOW = {
-    "meerkat": "personal API token resolved by the gateway, caller forwarded as an ES256-signed JWT",
-    "kong": "key-auth plugin, consumer forwarded as headers",
-    "apisix": "key-auth plugin, consumer forwarded as headers",
-    "traefik": "ForwardAuth: an external service decides on every request",
+    ("meerkat", "auth"): "personal API token resolved by the gateway, caller's name and id forwarded as headers, no roles",
+    ("meerkat", "auth-jwt"): "personal API token resolved by the gateway, caller forwarded as an ES256-signed JWT",
+    ("kong", "auth"): "key-auth plugin, consumer's name and id forwarded as headers, no roles",
+    ("apisix", "auth"): "key-auth plugin, consumer's name forwarded as headers, no roles",
+    ("traefik", "auth-delegated"): "ForwardAuth: an external service decides on every request",
 }
 
 
@@ -163,8 +167,8 @@ def main():
             fixed["overheadP50"] = round(fixed["p50"] - direct_fixed["p50"], 3)
             fixed["overheadP99"] = round(fixed["p99"] - direct_fixed["p99"], 3)
             scenario_entry = {"kind": KIND[scenario], "fixed": fixed, "max": best}
-            if scenario.startswith("auth"):
-                scenario_entry["how"] = AUTH_HOW[gw]
+            if (gw, scenario) in AUTH_HOW:
+                scenario_entry["how"] = AUTH_HOW[(gw, scenario)]
             entry["scenarios"][scenario] = scenario_entry
             mem_file = raw / f"{gw}-{scenario}-mem.txt"
             if mem_file.exists():
@@ -233,14 +237,15 @@ def render(r):
     for scenario in SCENARIOS:
         rows = [(g, g["scenarios"][scenario]) for g in r["gateways"] if scenario in g["scenarios"]]
         if scenario == "auth":
+            rows += [(g, g["scenarios"]["auth-jwt"]) for g in r["gateways"] if "auth-jwt" in g["scenarios"]]
             rows += [(g, g["scenarios"]["auth-delegated"]) for g in r["gateways"] if "auth-delegated" in g["scenarios"]]
-        if scenario == "auth-delegated" or not rows:
+        if scenario in ("auth-delegated", "auth-jwt") or not rows:
             continue
         lines += [f"### {scenario}", "",
                   "| Gateway | p50 ms | p99 ms | added p50 | added p99 | max req/s |",
                   "|---|---:|---:|---:|---:|---:|"]
         for g, s in rows:
-            name = g["name"] + (" (delegated)" if s["kind"] == "deployed" else "")
+            name = g["name"] + {"deployed": " (delegated)", "extra": " (signed JWT)"}.get(s["kind"], "")
             f, x = s["fixed"], s["max"]
             errors = f" ({1 - x['success']:.1%} errors)" if x["success"] < MIN_SUCCESS else ""
             lines.append(f"| {name} | {f['p50']} | {f['p99']} | {f['overheadP50']} | {f['overheadP99']} | {x['rps']:.0f}{errors} |")

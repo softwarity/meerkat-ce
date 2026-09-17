@@ -59,6 +59,9 @@ var agentIgnores = map[string]string{
 		"defines is save_user's business, not this",
 	"live": "the console's websocket: an agent does not hold a socket open to watch a " +
 		"list change, and what it carries is answered by read_traffic on demand",
+	"portal": "the icon picker's search over the embedded Material Symbols catalogue, " +
+		"for the console's portal editor; an agent picks no icons, and the portal " +
+		"itself is a global setting configured through save_settings",
 }
 
 // patternRecorder collects what the API registers. See admin.Mux for why the

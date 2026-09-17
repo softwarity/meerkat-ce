@@ -233,6 +233,9 @@ func (a *API) registerIdentity(mux Mux) {
 	mux.Handle("GET /api/tenants/{id}/members/{userId}/logins", a.tenantScoped(a.memberLogins))
 
 	mux.Handle("GET /api/settings", a.authed(a.getSettings))
+	// The portal's icon picker searches the embedded Material Symbols catalogue
+	// (PORTAL-01); any signed-in admin may read it, it changes nothing.
+	mux.Handle("GET /api/portal/icons", a.authed(a.portalIcons))
 	mux.Handle("PUT /api/settings", a.appAdmin(a.putSettings))
 }
 
@@ -1052,6 +1055,11 @@ type settingsPayload struct {
 	// built-in layout plus, for the two made of halves, which side the brand
 	// takes.
 	PageLayout store.PageLayout `json:"pageLayout"`
+	// Portal is the navigation portal (PORTAL-01): the header-or-rail bar the
+	// proxied applications wear, and the modules it lists. Off until an
+	// operator builds one; the modules bind to UI routes and are filtered per
+	// caller by those routes' access.
+	Portal store.PortalConfig `json:"portal"`
 	// DevMode is the installation-wide developer switch (DEV-01): off, the
 	// served applications carry no developer surface at all, whoever holds the
 	// capability. Free in both editions - developing against a gateway is how
@@ -1116,6 +1124,8 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	_ = a.st.GetSetting(ctx, store.SettingPagesScheme, &p.PagesScheme)
 	p.PageLayout = store.DefaultPageLayout()
 	_ = a.st.GetSetting(ctx, store.SettingPageLayout, &p.PageLayout)
+	p.Portal = store.DefaultPortalConfig()
+	_ = a.st.GetSetting(ctx, store.SettingPortal, &p.Portal)
 	devMode := a.st.DevMode(ctx)
 	p.DevMode = &devMode
 	p.DevModeLocked = store.Production()
@@ -1310,6 +1320,24 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		}
 	}
 	if err := a.st.SetSetting(r.Context(), store.SettingPageLayout, layout); err != nil {
+		a.internal(w, err)
+		return
+	}
+	// The portal (PORTAL-01) is validated against the routes as they are now:
+	// every module must bind to an enabled UI route, and an unknown one is
+	// refused naming what is allowed. A route deleted LATER leaves a dangling
+	// reference the served bar skips - this only guards the write.
+	portal := p.Portal
+	routes, err := a.st.ListRoutes(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if err := a.st.SetSetting(r.Context(), store.SettingPortal, portal); err != nil {
 		a.internal(w, err)
 		return
 	}

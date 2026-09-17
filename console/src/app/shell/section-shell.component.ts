@@ -86,6 +86,9 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
         label: $localize`:@@Built_in_pages:Built-in pages`,
         icon: 'wallpaper',
       },
+      // The navigation portal (PORTAL-01): the header-or-rail bar the proxied
+      // applications wear, in place of their per-route user buttons.
+      { path: 'portal', label: $localize`:@@Portal:Portal`, icon: 'apps' },
       { path: 'security', label: $localize`:@@Security:Security`, icon: 'shield' },
     ],
   },

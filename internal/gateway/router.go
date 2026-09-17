@@ -184,6 +184,12 @@ func (rt *Router) Reload(ctx context.Context) error {
 	// and the user button shows no language submenu.
 	var appLangs []string
 	_ = rt.st.GetSetting(ctx, store.SettingLanguages, &appLangs)
+	// The navigation portal (PORTAL-01), read once here and baked into every
+	// UI route's injection: on, the route wears the portal bar (which carries
+	// the account button) instead of the standalone user button. Changing the
+	// setting reloads the router, exactly as changing the branding does - both
+	// are compiled into the routes below.
+	portalOn := rt.st.Portal(ctx).Enabled
 	// Vault values feed the $name expansion below. A vault that cannot be read
 	// is not a reason to stop serving: routes without references still work,
 	// and the ones with references will report their unresolved names.
@@ -230,7 +236,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 				"route", raw.Name, "names", missing)
 			continue
 		}
-		cr, err := rt.compile(r, appLangs, specs[raw.ID])
+		cr, err := rt.compile(r, appLangs, specs[raw.ID], portalOn)
 		if err != nil {
 			return fmt.Errorf("gateway: route %q: %w", r.Name, err)
 		}
@@ -662,7 +668,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	http.NotFound(w, req)
 }
 
-func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte) (compiledRoute, error) {
+func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, portalOn bool) (compiledRoute, error) {
 	preds, err := routing.CompilePredicates(r.Predicates)
 	if err != nil {
 		return compiledRoute{}, err
@@ -704,7 +710,17 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte) (c
 	// so they run in document order, and the button's element must not upgrade
 	// before window.meerkatPage exists. Two InjectAtBodyStart filters would
 	// each insert right after <body>, putting the second one FIRST.
-	if frag := pageAgentFragment(r, localeCodes) + userButtonFragment(r, localeCodes); frag != "" {
+	//
+	// With a portal configured (PORTAL-01), the standalone user button gives
+	// way to the portal bar, which mounts the same button inside itself: the
+	// navigation and the account menu are one surface, not two corners.
+	frag := pageAgentFragment(r, localeCodes)
+	if portalOn && r.IsUI {
+		frag += portalFragment(r)
+	} else {
+		frag += userButtonFragment(r, localeCodes)
+	}
+	if frag != "" {
 		filters.Response = append(filters.Response, filtering.InjectAtBodyStart(frag))
 	}
 	// Page injections (UIF): the session's effective roles and the user's
@@ -785,7 +801,11 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte) (c
 			handler = rt.withIdentity(handler)
 		}
 	} else {
-		handler, err = buildProxy(r, filters, rt.defaultTimeouts)
+		unavailable := ""
+		if portalOn && r.IsUI {
+			unavailable = unavailablePage(pageAgentFragment(r, localeCodes) + portalFragment(r))
+		}
+		handler, err = buildProxy(r, filters, rt.defaultTimeouts, unavailable)
 		if err != nil {
 			return compiledRoute{}, err
 		}
@@ -2309,6 +2329,41 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 		`<meerkat-user-button` + attrs + `></meerkat-user-button>`
 }
 
+// portalFragment builds the HTML injected at the top of <body> for a UI route
+// when a portal is configured (PORTAL-01): the navigation bar, plus the user
+// button it mounts inside itself. The bar reads everything else - the modules,
+// the theme, the account - from /meerkat/portal.json and /meerkat/user-button.json,
+// so nothing route-specific rides in the markup, and it stays out of a framed
+// page on its own (self !== top).
+//
+// user-button.js loads BEFORE portal.js so the element the bar creates is
+// already defined when the bar mounts it; page.js (from pageAgentFragment)
+// comes first of all, so window.meerkatPage exists before either upgrades.
+func portalFragment(r store.Route) string {
+	if !r.IsUI {
+		return ""
+	}
+	return `<script defer src="/meerkat/user-button.js"></script>` +
+		`<script defer src="/meerkat/portal.js"></script>` +
+		`<meerkat-portal-nav></meerkat-portal-nav>`
+}
+
+// unavailablePage is the HTML served when a UI route's upstream does not answer
+// while a portal is on (PORTAL-01): the SAME injected chrome (page agent + bar)
+// rides on it, so the visitor keeps the menu and can open another application
+// instead of being stranded on a bare 502. The message is deliberately plain -
+// the point is the bar, not the notice.
+func unavailablePage(fragment string) string {
+	return `<!doctype html><html><head><meta charset="utf-8">` +
+		`<meta name="viewport" content="width=device-width,initial-scale=1"><title>Unavailable</title></head>` +
+		`<body>` + fragment +
+		`<div style="max-width:32rem;margin:18vh auto 0;padding:0 24px;text-align:center;` +
+		`font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#5b5f66;">` +
+		`<h1 style="font-size:20px;font-weight:600;margin:0 0 8px;">This application is not responding</h1>` +
+		`<p style="margin:0;font-size:15px;">Use the menu to open another one.</p>` +
+		`</div></body></html>`
+}
+
 // The transports, one per pair of bounds (ROUTE-07).
 //
 // A hung upstream hangs the client forever without them; with them the request
@@ -2426,7 +2481,7 @@ func carriesGatewayInternals(req *http.Request) bool {
 	return simulated
 }
 
-func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteTimeouts) (http.Handler, error) {
+func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteTimeouts, unavailable string) (http.Handler, error) {
 	target, err := url.Parse(r.Upstream)
 	if err != nil {
 		return nil, fmt.Errorf("bad upstream %q: %w", r.Upstream, err)
@@ -2495,6 +2550,18 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 				return
 			}
 			slog.Warn("upstream error", "route", r.Name, "upstream", r.Upstream, "err", err)
+			// On a UI route under a portal, a dead upstream must not strand the
+			// visitor: serve an HTML page that still carries the bar, so they can
+			// open another application. Elsewhere, the plain 502 stands.
+			if unavailable != "" {
+				h := w.Header()
+				h.Set("Content-Type", "text/html; charset=utf-8")
+				h.Set("Cache-Control", "no-store")
+				h.Set("Retry-After", "30")
+				w.WriteHeader(http.StatusBadGateway)
+				_, _ = io.WriteString(w, unavailable)
+				return
+			}
 			http.Error(w, "upstream unavailable", http.StatusBadGateway)
 		},
 	}

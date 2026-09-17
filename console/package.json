@@ -6,7 +6,8 @@
     "ng": "ng",
     "start": "ng serve --port=4200",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development"
+    "watch": "ng build --watch --configuration development",
+    "icons:build": "node scripts/build-icon-bank.mjs"
   },
   "dependencies": {
     "@angular/cdk": "^22.0.0",
@@ -40,6 +41,7 @@
     "@angular/build": "^22.1.7",
     "@angular/cli": "^22.1.7",
     "@angular/compiler-cli": "^22.0.0",
+    "@material-symbols/svg-400": "^0.47.3",
     "@types/luxon": "^3.7.5",
     "typescript": "~6.0.0"
   },

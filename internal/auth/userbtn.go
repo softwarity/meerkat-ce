@@ -427,8 +427,20 @@ const userButtonJS = `(() => {
       const padY = parseInt(this.getAttribute('pad-y'), 10);
       const padX = parseInt(this.getAttribute('pad-x'), 10);
 
+      // Inside the portal bar (PORTAL-01): the button is not a fixed corner of
+      // the page, it is one control in a row the bar lays out - so it sits
+      // static and inline, and the bar's own navigation replaces its
+      // Applications submenu.
+      const inPortal = this.hasAttribute('in-portal');
+
       // Four corners; the menu opens away from the anchored edge.
       const host = { [edge]: (isNaN(padY) ? 12 : padY) + 'px', [align]: (isNaN(padX) ? 12 : padX) + 'px' };
+      // The host positioning: fixed to a corner on a page; inside the bar it is
+      // in flow but RELATIVE, so the menu (absolutely placed by menuPlace) opens
+      // from the button - upward when the button sits at the bottom of a rail.
+      const hostPos = inPortal
+        ? 'position: relative; '
+        : 'position: fixed; z-index: 2147483000; ' + Object.entries(host).map(([k, v]) => k + ':' + v + ';').join('');
       const menuPlace =
         // A tight 3px: on a light page the button's surface blends into the
         // background and any real gap READS twice as large.
@@ -451,7 +463,7 @@ const userButtonJS = `(() => {
         this.shadowRoot.innerHTML =
           '<style>' + (data.themeCss || '') + '</style>' +
           '<style>' +
-          ':host { all: initial; color-scheme: light dark; position: fixed; z-index: 2147483000; ' + Object.entries(host).map(([k, v]) => k + ':' + v + ';').join('') + ' }' +
+          ':host { all: initial; color-scheme: light dark; ' + hostPos + ' }' +
           '* { box-sizing: border-box; }' +
           '.btn { display: inline-flex; align-items: center; gap: .4em; height: ' + h + 'px;' +
           ' padding: 0 ' + (compact ? Math.max(3, Math.round((h - ic) / 2)) + 'px' : '.6em') + ';' +
@@ -508,8 +520,9 @@ const userButtonJS = `(() => {
         items.push('<div class="head-row"><a class="head" href="/profile" title="' + esc(L.profile) + '"><strong>' + esc(data.username) + '</strong>' +
           (data.tenantName ? '<span class="sub-line">' + esc(data.tenantName) + '</span>' : '') + '</a>' + schemeBtn + '</div>');
         // The fronted applications this session may open; the current one is
-        // ticked (matched on its entry path).
-        if ((data.apps || []).length) {
+        // ticked (matched on its entry path). Suppressed inside the portal bar,
+        // whose own navigation IS this list (PORTAL-01).
+        if (!inPortal && (data.apps || []).length) {
           items.push(subMenu(L.applications, data.apps.map(a => {
             const cur = a.href === '/' ? location.pathname === '/'
               : (location.pathname === a.href || location.pathname.startsWith(a.href + '/'));
@@ -576,7 +589,7 @@ const userButtonJS = `(() => {
       this.shadowRoot.innerHTML =
         '<style>' + (data.themeCss || '') + '</style>' +
         '<style>' +
-        ':host { all: initial; color-scheme: light dark; position: fixed; z-index: 2147483000; ' + Object.entries(host).map(([k, v]) => k + ':' + v + ';').join('') + ' }' +
+        ':host { all: initial; color-scheme: light dark; ' + hostPos + ' }' +
         '* { box-sizing: border-box; font-family: system-ui, sans-serif; }' +
         '.btn { display: flex; align-items: center; gap: .45em; height: ' + h + 'px;' +
         ' padding: 0 ' + (namePos === 'after' && auth ? '.55em' : '.15em') + ' 0 ' + (namePos === 'before' && auth ? '.55em' : '.15em') + ';' +

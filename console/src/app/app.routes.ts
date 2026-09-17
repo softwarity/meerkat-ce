@@ -318,6 +318,14 @@ export const routes: Routes = [
       { path: 'theme', redirectTo: 'built-in-pages/theme' },
       { path: 'branding', redirectTo: 'built-in-pages/branding' },
       {
+        // The navigation portal (PORTAL-01): the bar the proxied applications
+        // wear, edited with a live preview beside it.
+        path: 'portal',
+        canActivate: [appOnly],
+        loadComponent: () =>
+          import('./portal/portal-page.component').then((m) => m.PortalPageComponent),
+      },
+      {
         path: 'security',
         canActivate: [appOnly],
         loadComponent: () =>

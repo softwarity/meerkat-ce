@@ -1,0 +1,96 @@
+@if (loading()) {
+  <loading-indicator withContainer />
+} @else {
+  <mat-drawer-container class="wrap" autosize>
+    <mat-drawer position="end" mode="over" [opened]="!!editing()" (closed)="onClosed()">
+      @if (editing(); as ed) {
+        <app-module-editor [data]="ed" (saved)="onSaved($event)" (closed)="onClosed()"
+          (moved)="onMove($event)" (toggledDisabled)="onToggleDisabled($event)"
+          (addedSub)="onAddSub()" (removed)="onDelete()" />
+      }
+    </mat-drawer>
+    <mat-drawer-content>
+  <div class="content">
+    <mat-card appearance="outlined">
+      <div class="row">
+        <mat-icon>apps</mat-icon>
+        <div class="grow">
+          <h2 class="title" i18n="@@Portal">Portal</h2>
+          <p class="hint text-muted" i18n="@@Portal_enable_hint">
+            One bar to move between the applications; each visitor sees only what their access allows.
+          </p>
+        </div>
+        <mat-slide-toggle [checked]="enabled()" (change)="setEnabled($event.checked)" />
+      </div>
+    </mat-card>
+
+    @if (enabled()) {
+      <div class="arrange">
+        <div class="opt">
+          <span class="opt-label" i18n="@@Portal_layout">Primary navigation</span>
+          <mat-button-toggle-group [value]="layout()" (change)="setLayout($event.value)" hideSingleSelectionIndicator>
+            <mat-button-toggle value="header">
+              <mat-icon>toolbar</mat-icon>
+              <span i18n="@@Portal_layout_header">Header mode</span>
+            </mat-button-toggle>
+            <mat-button-toggle value="rail">
+              <mat-icon class="rot-left">toolbar</mat-icon>
+              <span i18n="@@Portal_layout_rail">Rail mode</span>
+            </mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+        <div class="opt">
+          <span class="opt-label" i18n="@@Portal_side">Rail side</span>
+          <mat-button-toggle-group [value]="side()" (change)="setSide($event.value)" hideSingleSelectionIndicator>
+            <mat-button-toggle value="left" i18n="@@Portal_side_left">Left</mat-button-toggle>
+            <mat-button-toggle value="right" i18n="@@Portal_side_right">Right</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+        <div class="opt">
+          <span class="opt-label" i18n="@@Portal_display">Header entries show</span>
+          <mat-button-toggle-group [value]="display()" (change)="setDisplay($event.value)" hideSingleSelectionIndicator>
+            <mat-button-toggle value="both" i18n="@@Portal_display_both">Icon &amp; label</mat-button-toggle>
+            <mat-button-toggle value="icon" i18n="@@Portal_display_icon">Icon</mat-button-toggle>
+            <mat-button-toggle value="label" i18n="@@Portal_display_label">Label</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+        <div class="opt">
+          <span class="opt-label" i18n="@@Portal_appname">App name</span>
+          <mat-slide-toggle [checked]="showAppName()" (change)="setShowAppName($event.checked)"
+            i18n="@@Portal_appname_toggle">Show beside the logo</mat-slide-toggle>
+        </div>
+      </div>
+
+      <!-- The canvas: the REAL bar in edit mode. Click a module to edit it in
+           the drawer; add modules from here. -->
+      <div class="canvas-head">
+        <span class="text-muted" i18n="@@Portal_preview_hint">Click a module to edit it</span>
+        <span class="grow"></span>
+        <mat-button-toggle-group class="widths" [value]="previewWidth()" (change)="setPreviewWidth($event.value)"
+          hideSingleSelectionIndicator aria-label="Preview width" i18n-aria-label="@@Portal_preview_width">
+          <mat-button-toggle [value]="0" matTooltip="Full width - editable" i18n-matTooltip="@@Portal_width_full">
+            <mat-icon>desktop_windows</mat-icon><span i18n="@@Portal_width_edit">Edit</span>
+          </mat-button-toggle>
+          <mat-button-toggle [value]="768" matTooltip="Tablet" i18n-matTooltip="@@Portal_width_tablet">
+            <mat-icon>tablet</mat-icon>
+          </mat-button-toggle>
+          <mat-button-toggle [value]="390" matTooltip="Phone" i18n-matTooltip="@@Portal_width_phone">
+            <mat-icon>smartphone</mat-icon>
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+        <button matButton="filled" (click)="addParent()">
+          <mat-icon>add</mat-icon><span i18n="@@Portal_add_module">Add a module</span>
+        </button>
+      </div>
+      @if (!parents().length) {
+        <p class="empty text-muted" i18n="@@Portal_empty">
+          No module yet. Add one for each application the bar should reach.
+        </p>
+      }
+      <iframe #frame class="preview-frame" [src]="previewUrl" [style.max-width.px]="previewWidth() || null"
+        title="Portal preview" i18n-title="@@Portal_preview"></iframe>
+    }
+  </div>
+    </mat-drawer-content>
+  </mat-drawer-container>
+}

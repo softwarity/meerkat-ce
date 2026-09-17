@@ -45,7 +45,135 @@ Resultat local 1 coeur : proxy ~40 000 req/s, auth ~11 000 (Kong ~39 000 : nginx
 Le cache jetons a aussi un compteur `forgotten` contre la course lecture/revocation.
 Banc Go ajoute : `BenchmarkAuthenticatedToken`. La presentation (meerkat-presentation-fr/en.html
 a la racine, non versionnees) attend les premiers chiffres CI pour sa section performance.
-Avant : 2026-09-12 : **le modele des comptes** - champs maison definis
+Avant : 2026-09-15 : **PORTAL-01 - portail de navigation** (livre, non
+commite, en attente de validation). Une barre injectee dans les pages proxifiees, en
+en-tete OU en rail (axe primaire basculable), qui promeut le sous-menu Applications du
+bouton utilisateur en vraie navigation : parents + enfants, lanceur gaufre, fleches de
+debordement, logo de la marque et bouton utilisateur INTEGRES dans la barre. Reglage
+GLOBAL (`store.SettingPortal`, roule sur le PUT `/api/settings` existant, exporte), edite
+sous **Application > Portal** (`console/src/app/portal/`, maquette live). Composant vanilla
+`meerkat-portal-nav` (const Go `internal/auth/portalnav.go`, shadow DOM, AUCUN backtick),
+servi comme le bouton utilisateur (`/meerkat/portal.js` + `/meerkat/portal.json`,
+`internal/auth/portal.go`), habille du theme data-plane via `chrome()`, jamais dans une
+iframe (self !== top). ITERATION 2 (feedback Francois) : le RAIL est calque sur
+`@softwarity/rail-nav` - reserve sa largeur COLLAPSEE (72px) en padding sur
+`documentElement` (jamais un overlay sur le contenu), s'OUVRE en drawer sur un backdrop via
+un burger, auto-collapse au clic, ancrage gauche/droite qui miroite le burger. Icones (ITERATION 3, revue Francois) :
+banque COTE BACKEND `internal/icons` (3912 Material Symbols, `bank.json` embarque
+go:embed, genere par `console/scripts/build-icon-bank.mjs` = `npm run icons:build` qui lit
+`@material-symbols/svg-400` en devDep - AUCUN fetch reseau, ne garde que viewBox+path).
+`icons.Search`/`Lookup`/`Resolve`/`Sanitize`. Endpoint `GET /api/portal/icons?q=`
+(`internal/admin/portal.go`, section "portal" classee dans mcp_coverage). Au SAVE, le store
+resout un NOM d'icone en SVG (`icons.Resolve` dans `SanitizePortalConfig`) ou sanitize un
+SVG colle ; le module stocke le SVG, rendu en MASK CSS (aucune police sur le data-plane),
+composant `app-svg-icon`. L'edition d'un module est un DRAWER sur la page portail
+(`module-editor.component`, plus de modale), avec le picker d'icones INLINE (grille cherchee
+via l'endpoint) et une bascule vers un textarea pour coller un SVG. Mode d'affichage
+icone/label/les deux (`Display`). `HomeLabel` par parent. Le waffle app-switcher ne
+s'affiche qu'au DEBORDEMENT (regle `[hidden]{display:none!important}` pour battre la regle
+auteur). Retire de l'apercu. Les deux dispositions + drawer + picker + resolution au save
+verifies a l'ecran. ITERATION 4 (retouches Francois) : plus de bouton Save -
+CHAQUE action persiste aussitot (toggle enabled/layout/side/display, add/edit/
+remove/reorder), optimiste avec rollback (`persist()` sur le PUT `/api/settings`,
+patron pushSettings). Rail data-plane : `top:0` (pleine hauteur, le contenu ne
+colle plus en bas) et burger centre a 36px comme les icones (gap:0 collapse pour
+ne pas le decentrer vers le rlogo largeur 0). Le user-button en bas du rail ouvre
+son menu VERS LE HAUT (portalnav passe `position=bottom-<side>`, et `in-portal`
+passe en `position:relative` pour ancrer le menu). Descriptions raccourcies +
+padding sur les cartes (le mat-card nu n'a pas de padding de contenu). Le drawer
+d'edition est borne a la hauteur du viewport (`:host{height:100%}` comme la page
+vault, pas `min-height:100dvh`), grille d'icones qui remplit, actions en bas.
+NOUVEAU : sur un upstream mort, une route UI sous portail ne rend plus un 502
+texte brut mais une PAGE HTML portant la barre (`unavailablePage` +
+`buildProxy(...,unavailable)` dans router.go) - on garde le menu pour naviguer
+ailleurs (test `TestUnavailableUIPageKeepsThePortalBar`). ITERATION 5 (niveau
+portal-ui) : l'editeur est WYSIWYG - l'apercu est le VRAI composant en direct
+(modes `preview`/`edit` sur `meerkat-portal-nav` : pas de fetch, payload par
+postMessage, garde iframe off, user-button remplace par un chip, clic = event
+`mk-portal-select` au lieu de naviguer). Servi same-origin par le plan admin
+(`registerPortalPreview` dans auth : `/meerkat/portal.js` + `/meerkat/portal-preview`,
+la page embarque le theme/brand DATA-plane et relaie le postMessage). La console
+l'iframe (`portal-page`, `buildPreview()` poste le brouillon, ecoute le select ->
+ouvre le drawer). Plus de liste a gauche : on clique un module dans l'apercu pour
+l'editer ; le drawer porte reorder up/down + toggle enabled + add-submodule +
+delete (champ `Disabled` par module, skippe au service). Titre en h2 dans
+l'encadre du toggle, icones toolbar/rotee (Header mode/Rail mode), pas de cadre
+autour de l'iframe. ITERATION 6 (polish, VERIFIEE par banc composant Playwright +
+instance isolee) : (1) padding `.tabs` pour ne plus rogner l'outline du 1er tab ;
+(2) le logo/marque N'EST PLUS un lien (span, pas de `<a href>`) - un href vers "/"
+sortait de l'appli/ramenait a la console ; (3) option `showAppName` (store +
+payload `showName` + toggle console "App name") : nom de la marque a cote du logo ;
+(4) le rail des sous-modules S'AFFICHE (c'etait un faux bug : OK au banc) ; (5) le
+RAIL montre toujours icone+label, l'option `display` n'agit que sur le HEADER
+(`_glyph(entry,force)`, label inconditionnel dans `_railItem`) ; (6) bordure autour
+de l'iframe + sélecteur de largeur (Edit/tablet/phone) dans `canvas-head` ; (7)
+BURGER aligné sur les icones des items collapsed ET expand - la vraie cause etait
+le `padding:6px` UA du `<button.ritem>` (items sans href = boutons) : `padding:0`
+sur `a.ritem,button.ritem` recentre a 36 = centre burger ; rhead expand `padding:0
+24px` ; `.rail.exp` z-index releve pour que le drawer couvre le strip (logo plus
+tronque) ; (8) textarea SVG remplit la hauteur (`.icon-paste flex:1 1 auto` +
+::ng-deep sur `.mat-mdc-text-field-wrapper/-flex/-infix` + textarea) ; (9) en PHONE
+(`window.innerWidth < 560`) le header laisse UNIQUEMENT l'app-selector (tabs+chevrons
+caches) ; en tablet/phone l'edition est coupee (`edit:false` dans le brouillon ->
+`_wireSelect` ne cable rien ; `setPreviewWidth` ferme le drawer hors full) ; bouton
+full libelle "Edit" ; (10) bordure sur `.icon-grid` comme le textarea. PIEGE CACHE
+IMPORTANT : `portal.js` etait `max-age=300` sur LES DEUX plans -> apres rebuild la
+preview console rejouait l'ANCIEN JS jusqu'a 5 min (d'ou "toujours pas aligne" alors
+que la source l'etait). CORRIGE : `portalJS` sert `no-store` quand `h.adminPlane`
+(preview toujours fraiche), `max-age=300` cote data. THEME preview VERIFIE : elle
+adopte bien le theme data-plane global (fond clair rgb230,233,239 en clair, sombre
+rgb42,46,66 en dark, primaire personnalisee visible sur le tab) via `light-dark()`
+resolu au scheme utilisateur ; rien a corriger la. AJOUT : dans la PREVIEW le chip
+user statique est remplace par un vrai selecteur de color-scheme (soleil/lune) - il
+force `style.colorScheme` sur le host ET sur `document.documentElement` de l'iframe
+(bat le `:host/:root{color-scheme:light dark}` du theme), donc `light-dark()` bascule
+et on voit la barre en clair ET en sombre (`_previewScheme`, `_togglePreviewScheme`).
+ITERATION 7 (reproduite + verifiee sur instance isolee) : (a) BUG add-submodule
+SANS EFFET = le PUT settings decode en STRICT (`DisallowUnknownFields`,
+`admin/identity.go` putSettings) et la console envoyait `homeLabel` (champ PARENT
+du `ModuleDraft` partage) AUSSI sur les enfants -> `400 unknown field homeLabel`
+-> tout le PUT rejete -> rollback -> l'enfant disparait. FIX console :
+`childFromDraft()` ne garde que les champs de `ModuleChild` (pas de homeLabel) dans
+addChild/editChild. Verifie : l'enfant persiste et s'affiche (rail en header mode,
+strip en rail mode). (b) BURGER open/close ANIME comme @softwarity/rail-nav : deux
+glyphes superposes (`ic-menu`/`ic-open`) qui crossfade+rotate ; l'expand se fait
+par BASCULE DE CLASSE `.exp` sur le rail (plus de rebuild dans `_setExpanded` :
+sinon aucune transition), donc les CSS `.rail.exp ...` (largeur, pill, labels lblo/
+lbli tous deux montes) s'animent ; selecteurs items passes de `.ritem.exp` a
+`.rail.exp a.ritem`. (c) PHONE : spacer flex entre la marque et l'app-selector
+(quand `.tabs` est masque il ne poussait plus `.act`) -> marque a gauche, waffle a
+droite. (d) CACHE-BUSTER : `portal.js?v=<hash sha256 du JS>` sur la page preview
+(`portalAssetVersion`), + admin `no-store` : une barre reconstruite n'est plus
+masquee par un JS en cache. PIEGE RACINE MAJEUR observe : une instance meerkat
+ORPHELINE (PPID 1, air ne la supervisait plus) tournait 56 min sur un binaire
+d'AVANT les changements -> Francois ne voyait AUCUN correctif ("on bosse sur le
+meme ecran ?"). Diagnostic : `ps -o pid,ppid` ; un gateway a PPID 1 n'est plus
+gere par air. Tuer par PID (jamais `pkill -x meerkat`), puis relancer `make dev`.
+(e) SELECTION PERSISTANTE : `onClosed()` ne remet plus `selected` a null -> le
+dernier module edite reste selectionne (l'apercu ne retombe plus sur le parent 0 a
+chaque fermeture de drawer) ; add selectionne le nouveau, delete deselectionne.
+P3 (drag-and-drop reorder +
+glisser pour changer de niveau) reste a faire. PIEGE : le binaire air `tmp/meerkat` est reconstruit en boucle -
+pour tester la console embarquee, `make ui` puis FIGER le binaire
+(`cp tmp/meerkat /tmp/mk-portal-bin`) et lancer l'instance isolee depuis la copie,
+sinon on tourne sur un dist plus vieux. Injection dans `internal/gateway/router.go` (`portalFragment`, lue
+au Reload via `store.Portal(ctx).Enabled`) : portal ON remplace le bouton par route (il
+migre dans la barre, `in-portal` masque son sous-menu Applications). Filtrage par acces de
+route cote serveur (`portalNav`, generalise `reachableLinks`), le payload ne porte aucune
+regle. Tests : `internal/store/portal_test.go`, `internal/auth/portal_test.go`,
+`internal/gateway/portal_test.go` ; `make fmt lint test` vert, console `ng build` vert.
+**Differe** (documente dans FEATURES) : l'atterrissage sur la premiere appli accessible
+(trop risque a bolter sur `continueAfterStep` multi-branches) ; le canal de badge (champ
+`badge` present, pas la mecanique de push, prevue sur le bus WS) ; l'apercu iframe du vrai
+composant (v1 = maquette Angular) ; **PORTAL-02** = personnalisation par tenant (icone /
+titre / arrangement), ecarte car ce serait le premier override visuel par tenant (thema et
+marque sont GLOBAUX aujourd'hui, table `settings` sans scope). PIEGE dev observe : l'air de
+Francois tourne avec `-console-url http://localhost:4200`, or `:4200` sert **portal-ui
+(understory)**, pas la console meerkat - donc `:9092` proxifiait la mauvaise console ; la
+console embarquee ne se met a jour que par `make ui` (build + copie vers
+`internal/admin/ui/dist`, gitignore) puis rebuild Go. Verifie en lancant un binaire isole
+(`tmp/meerkat -data <copie> -addr :8085 -admin-addr :9095`, sans `-console-url`). Etat
+`SettingPortal` de l'instance dev **remis a desactive** apres test. Avant : 2026-09-12 : **le modele des comptes** - champs maison definis
 dans `Infra > Modele` et transmis comme tout attribut (MODEL-01), fenetre de validite
 verifiee partout ou une session se resout (MODEL-02, reste le resume par e-mail), et
 l'ecran des utilisateurs passe a **un seul tiroir dont le contenu change** (creation =

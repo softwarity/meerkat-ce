@@ -1,0 +1,96 @@
+<div class="head">
+  <h2>{{ data().title }}</h2>
+  <button matIconButton (click)="closed.emit()" matTooltip="Close" i18n-matTooltip="@@Close"><mat-icon>close</mat-icon></button>
+</div>
+
+@if (data().existing) {
+  <div class="quick">
+    <button matIconButton [disabled]="!data().canUp" (click)="moved.emit(-1)" matTooltip="Move up" i18n-matTooltip="@@Move_up"><mat-icon>arrow_upward</mat-icon></button>
+    <button matIconButton [disabled]="!data().canDown" (click)="moved.emit(1)" matTooltip="Move down" i18n-matTooltip="@@Move_down"><mat-icon>arrow_downward</mat-icon></button>
+    @if (data().isParent) {
+      <button matButton (click)="addedSub.emit()">
+        <mat-icon>subdirectory_arrow_right</mat-icon><span i18n="@@Portal_add_submodule">Add a sub-module</span>
+      </button>
+    }
+    <span class="grow"></span>
+    <mat-slide-toggle [checked]="!disabled()" (change)="toggleDisabled(!$event.checked)"
+                      matTooltip="Enabled" i18n-matTooltip="@@Enabled" />
+    <button matIconButton (click)="removed.emit()" matTooltip="Remove" i18n-matTooltip="@@Remove"><mat-icon>delete</mat-icon></button>
+  </div>
+}
+
+<div class="body">
+  <mat-form-field>
+    <mat-label i18n="@@Portal_module_route">Application (route)</mat-label>
+    <mat-select [value]="routeId()" (selectionChange)="routeId.set($event.value)">
+      @for (r of data().routes; track r.id) {
+        <mat-option [value]="r.id">{{ r.name }}</mat-option>
+      }
+    </mat-select>
+    <mat-hint>{{ data().routes.length ? '' : noRoutes }}</mat-hint>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label i18n="@@Portal_module_label">Label</mat-label>
+    <input matInput [value]="label()" (input)="label.set($any($event.target).value)" [placeholder]="routeName()" />
+    <mat-hint i18n="@@Portal_module_label_hint">Empty uses the route's name.</mat-hint>
+  </mat-form-field>
+
+  @if (data().isParent) {
+    <mat-form-field>
+      <mat-label i18n="@@Portal_module_home_label">Home label</mat-label>
+      <input matInput [value]="homeLabel()" (input)="homeLabel.set($any($event.target).value)" [placeholder]="label() || routeName()" />
+      <mat-hint i18n="@@Portal_module_home_hint">The "back to here" row. Empty uses the label.</mat-hint>
+    </mat-form-field>
+  }
+
+  <mat-form-field>
+    <mat-label i18n="@@Portal_module_description">Description (tooltip)</mat-label>
+    <input matInput [value]="description()" (input)="description.set($any($event.target).value)" />
+  </mat-form-field>
+
+  <!-- Icon: current + mode toggle, then the palette (search + grid) or a paste textarea. -->
+  <div class="icon-head">
+    <span class="icon-preview">
+      @if (icon()) { <app-svg-icon [svg]="icon()" /> } @else { <mat-icon>image</mat-icon> }
+    </span>
+    <span class="icon-title" i18n="@@Portal_module_icon">Icon</span>
+    <mat-button-toggle-group [value]="iconMode()" (change)="setMode($event.value)" hideSingleSelectionIndicator>
+      <mat-button-toggle value="search"><mat-icon>search</mat-icon></mat-button-toggle>
+      <mat-button-toggle value="svg">SVG</mat-button-toggle>
+    </mat-button-toggle-group>
+    @if (icon()) {
+      <button matIconButton (click)="icon.set('')" matTooltip="Clear" i18n-matTooltip="@@Portal_clear_icon"><mat-icon>close</mat-icon></button>
+    }
+  </div>
+
+  @if (iconMode() === 'search') {
+    <mat-form-field appearance="outline" class="icon-search">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [value]="query()" (input)="onQuery($any($event.target).value)"
+             placeholder="Search icons" i18n-placeholder="@@Portal_search_icons_ph" autocomplete="off" />
+    </mat-form-field>
+    <div class="icon-grid">
+      @for (i of results(); track i.name) {
+        <button type="button" class="icon-cell" [class.sel]="i.svg === icon()" [matTooltip]="i.name" (click)="pick(i.svg)">
+          <app-svg-icon [svg]="i.svg" />
+        </button>
+      } @empty {
+        <p class="none text-muted" i18n="@@Portal_no_icon_match">No icon matches.</p>
+      }
+    </div>
+  } @else {
+    <p class="hint text-muted" i18n="@@Portal_paste_hint">
+      Paste an SVG. It is trimmed to its shape (viewBox + paths) when saved, so it takes the bar's colour.
+    </p>
+    <mat-form-field appearance="outline" class="icon-paste">
+      <textarea matInput rows="6" [value]="icon()" (input)="icon.set($any($event.target).value)"
+                placeholder="&lt;svg viewBox=&quot;0 0 24 24&quot;&gt;&lt;path d=&quot;...&quot;/&gt;&lt;/svg&gt;"></textarea>
+    </mat-form-field>
+  }
+</div>
+
+<div class="actions">
+  <button matButton (click)="closed.emit()" i18n="@@Cancel">Cancel</button>
+  <button matButton="filled" [disabled]="!routeId()" (click)="save()" i18n="@@Save">Save</button>
+</div>

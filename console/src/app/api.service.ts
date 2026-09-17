@@ -1267,6 +1267,9 @@ export interface Settings {
   // How those pages are ARRANGED (PAGE-02). Colours answer what it looks
   // like, this one answers where everything is.
   pageLayout?: PageLayout;
+  // The navigation portal (PORTAL-01): the header-or-rail bar shown across the
+  // proxied applications, and the modules it lists. Off until built.
+  portal?: PortalConfig;
   // The installation-wide developer switch (DEV-01). Optional on purpose: the
   // server reads its ABSENCE as "leave it alone", so a screen that saves the
   // settings without knowing about this field cannot close the developer
@@ -1287,6 +1290,63 @@ export interface PageLayout {
 // The catalogue, in the order the Layout tab offers it. Mirrors
 // store.PageLayouts on the server, which is what validates a save.
 export const PAGE_LAYOUTS = ['centered', 'split', 'drawer', 'banner', 'bare'] as const;
+
+// The navigation portal (PORTAL-01). `layout` says which surface carries the
+// PARENTS: 'header' puts them in a top strip (children in a rail), 'rail' puts
+// them in a rail (children in a top strip). `side` is which edge the rail
+// takes. Modules bind to UI routes and inherit their access; a caller sees only
+// the ones its rights allow. Mirrors store.PortalConfig.
+export interface PortalConfig {
+  enabled: boolean;
+  layout: 'header' | 'rail';
+  side: 'left' | 'right';
+  // How a HEADER entry renders: the glyph alone, the text alone, or both. The
+  // rail always shows icon and label - a rail with one or the other is cryptic.
+  display: 'icon' | 'label' | 'both';
+  // Write the branding app name next to the data-plane logo (only meaningful
+  // when a logo is set).
+  showAppName?: boolean;
+  parents?: ModuleParent[];
+}
+
+// A top-level module: a full application (a route), which may gather children
+// shown in the secondary surface. label/icon override what the route offers.
+// `icon` is an SVG string (from the icon bank), not a font name.
+export interface ModuleParent {
+  routeId: string;
+  icon?: string;
+  label?: string;
+  // The label of this module's own "home" row when it has children; empty
+  // uses `label`.
+  homeLabel?: string;
+  description?: string;
+  // Reserved: the channel a future notifier writes a count onto (PORTAL-01).
+  badge?: string;
+  // Turned off for everyone but kept in the config (not served).
+  disabled?: boolean;
+  children?: ModuleChild[];
+}
+
+// A sub-module of a parent, shown in the secondary surface.
+export interface ModuleChild {
+  routeId: string;
+  icon?: string;
+  label?: string;
+  description?: string;
+  badge?: string;
+  disabled?: boolean;
+}
+
+export const PORTAL_LAYOUTS = ['header', 'rail'] as const;
+export const PORTAL_DISPLAYS = ['both', 'icon', 'label'] as const;
+
+// One icon as the picker gets it from the backend catalogue: a Material
+// Symbols name and its SVG (viewBox + path). The chosen svg is what gets stored
+// on a module.
+export interface BankIcon {
+  name: string;
+  svg: string;
+}
 
 // Global application identity shown on the flow pages (THEME-02) - one per
 // gateway, whatever theme is active. Logo is a data URI ('' = built-in mark).
@@ -1360,6 +1420,13 @@ export class ApiService {
 
   listRoutes(): Observable<Route[]> {
     return this.http.get<Route[]>('/api/routes');
+  }
+
+  // The portal icon picker's search over the embedded Material Symbols
+  // catalogue (PORTAL-01): the backend filters and returns each match's SVG.
+  searchIcons(q: string, limit = 120): Observable<BankIcon[]> {
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    return this.http.get<BankIcon[]>(`/api/portal/icons?${params.toString()}`);
   }
 
   putRoute(route: Route): Observable<Route> {

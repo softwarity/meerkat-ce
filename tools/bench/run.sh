@@ -33,11 +33,13 @@
 # in the same run - which is what says how much of a gap to nginx-based
 # gateways is Meerkat's own code.
 #
-# Scenarios. /proxy and /limit are the same on all four products. /auth is where they
-# differ, and results.json says how: Meerkat resolves its own token and signs a
-# JWT for the upstream; Kong and APISIX check a key; Traefik's free edition has
-# no token check, so it DELEGATES to an external service on every request - the
-# hop an assembled stack pays, measured against the fastest service there is.
+# Scenarios. /proxy and /limit are the same on all four products. /auth checks a
+# credential in the gateway and forwards the caller as headers: Meerkat resolves
+# its token, Kong and APISIX check a key. Traefik's free edition has no token
+# check, so it DELEGATES to an external service on every request - the hop an
+# assembled stack pays, measured against the fastest service there is. Meerkat
+# alone also runs /auth-jwt, the same call forwarded as a signed JWT with roles,
+# which none of the others does here: shown apart, never in their comparison.
 
 set -euo pipefail
 export LC_ALL=C
@@ -348,6 +350,9 @@ for gw in $ONLY; do
   # no limit to count, which is the point of it.
   if [ -n "$auth_scenario" ]; then
     measure "$gw" "$name" "$port" "$auth_scenario" /auth/bench "$auth_header"
+    if [ "$gw" = meerkat ]; then
+      measure "$gw" "$name" "$port" auth-jwt /auth-jwt/bench "$auth_header"
+    fi
     measure "$gw" "$name" "$port" limit /limit/bench ""
   fi
 

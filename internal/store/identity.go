@@ -435,6 +435,11 @@ const (
 	// PageLayout. Colours answer "what does it look like", this one answers
 	// "where is everything", and they are set on two tabs of one screen.
 	SettingPageLayout = "page_layout"
+	// SettingPortal is the navigation portal (PORTAL-01): the header-or-rail
+	// bar shown across the proxied applications, and the modules it lists. See
+	// PortalConfig. Global, ships OFF - an installation that upgrades keeps its
+	// per-route user buttons until someone builds a portal.
+	SettingPortal = "portal"
 	// SettingTLS is which HTTPS doors are open and whether an authority issues
 	// certificates on its own (certs.Settings). The MATERIAL lives in its own
 	// table - this holds only the switches, so turning HTTPS off never risks
@@ -559,6 +564,10 @@ func (s *Store) seedDefaultSettings() error {
 	if err != nil {
 		return fmt.Errorf("store: seed settings: %w", err)
 	}
+	portal, err := json.Marshal(DefaultPortalConfig())
+	if err != nil {
+		return fmt.Errorf("store: seed settings: %w", err)
+	}
 	pwPolicy, err := json.Marshal(DefaultPasswordPolicy())
 	if err != nil {
 		return fmt.Errorf("store: seed settings: %w", err)
@@ -583,6 +592,9 @@ func (s *Store) seedDefaultSettings() error {
 		// The arrangement every version until now served: an installation that
 		// upgrades must not find its pages redrawn.
 		SettingPageLayout: string(layout),
+		// Off: an installation that upgrades keeps its per-route user buttons
+		// until an operator builds a portal.
+		SettingPortal: string(portal),
 		// Single until someone says otherwise at startup, with a license.
 		SettingTenancy: `"` + TenancySingle + `"`,
 		// On, because the dev CAPABILITY was the only gate until this setting

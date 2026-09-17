@@ -85,14 +85,26 @@ const HOW: Record<string, Record<string, Record<Lang, string>>> = {
   },
   auth: {
     meerkat: {
-      en: 'personal API token resolved by the gateway, caller forwarded as an ES256-signed JWT with roles',
-      fr: "jeton d'API personnel résolu par la gateway, appelant transmis dans un JWT signé ES256 avec ses rôles",
+      en: "personal API token resolved by the gateway, caller's name and id forwarded as headers, no roles",
+      fr: "jeton d'API personnel résolu par la gateway, nom et identifiant de l'appelant transmis en en-têtes, aucun rôle",
     },
-    kong: { en: 'key-auth plugin, consumer forwarded as headers', fr: 'plugin key-auth, consommateur transmis en en-têtes' },
-    apisix: { en: 'key-auth plugin, consumer forwarded as headers', fr: 'plugin key-auth, consommateur transmis en en-têtes' },
+    kong: {
+      en: "key-auth plugin, consumer's name and id forwarded as headers, no roles",
+      fr: 'plugin key-auth, nom et identifiant du consommateur transmis en en-têtes, aucun rôle',
+    },
+    apisix: {
+      en: "key-auth plugin, consumer's name forwarded as headers, no roles",
+      fr: 'plugin key-auth, nom du consommateur transmis en en-têtes, aucun rôle',
+    },
     traefik: {
       en: 'ForwardAuth: an external service decides on every request',
       fr: 'ForwardAuth : un service externe décide à chaque requête',
+    },
+  },
+  'auth-jwt': {
+    meerkat: {
+      en: 'the same token, caller forwarded as an ES256-signed JWT (the bench account holds no role) - Meerkat only, not part of the comparison',
+      fr: 'le même jeton, appelant transmis dans un JWT signé ES256 (le compte du banc ne détient aucun rôle) - Meerkat seul, hors comparaison',
     },
   },
 };
@@ -144,8 +156,12 @@ const T = {
     fr: "Comparable : le proxy, un jeton vérifié par la gateway elle-même, et une limite de débit fixée bien au-dessus de la charge (le coût du comptage, pas un refus).",
   },
   asDeployed: {
-    en: 'As deployed: when authentication is delegated to an external service, as with Traefik here, every request pays a network round trip before reaching the service. The one used here is the fastest possible, so the hop measured is a floor: a real oauth2-proxy, Authelia or identity provider only adds to it. Meerkat decides inside the gateway, with no hop, and does more while at it: it resolves a personal token and forwards the caller as a signed JWT with the roles, where Kong and APISIX check a key and forward headers.',
-    fr: "Tel que déployé : quand l'authentification est déléguée à un service externe, comme avec Traefik ici, chaque requête paie un aller-retour réseau avant d'atteindre le service. Celui utilisé ici est le plus rapide possible, le rebond mesuré est donc un minimum : un vrai oauth2-proxy, Authelia ou fournisseur d'identité ne fait qu'y ajouter. Meerkat décide dans la gateway, sans rebond, et en fait davantage : il résout un jeton personnel et transmet l'appelant dans un JWT signé avec ses rôles, là où Kong et APISIX vérifient une clé et transmettent des en-têtes.",
+    en: 'As deployed: when authentication is delegated to an external service, as with Traefik here, every request pays a network round trip before reaching the service. The one used here is the fastest possible, so the hop measured is a floor: a real oauth2-proxy, Authelia or identity provider only adds to it. Meerkat decides inside the gateway, with no hop.',
+    fr: "Tel que déployé : quand l'authentification est déléguée à un service externe, comme avec Traefik ici, chaque requête paie un aller-retour réseau avant d'atteindre le service. Celui utilisé ici est le plus rapide possible, le rebond mesuré est donc un minimum : un vrai oauth2-proxy, Authelia ou fournisseur d'identité ne fait qu'y ajouter. Meerkat décide dans la gateway, sans rebond.",
+  },
+  sameAsOthers: {
+    en: "In the comparable scenario, Meerkat forwards the caller the way Kong and APISIX do: name and id as headers, and no roles, which their key-auth does not forward either. One more row, set apart, shows what Meerkat usually does in production and the others do not: the caller forwarded as a signed JWT the service can verify on its own.",
+    fr: "Dans le scénario comparable, Meerkat transmet l'appelant comme Kong et APISIX : nom et identifiant en en-têtes, et aucun rôle, que leur key-auth ne transmet pas non plus. Une ligne de plus, mise à part, montre ce que Meerkat fait d'habitude en production et que les autres ne font pas : l'appelant transmis dans un JWT signé que le service peut vérifier seul.",
   },
 
   whyTitle: { en: 'Why Meerkat cannot go much further', fr: 'Pourquoi Meerkat ne peut guère aller plus loin' },
@@ -188,6 +204,7 @@ const T = {
     fr: "En processus, depuis internal/gateway/bench_test.go : à lire par rapport au proxy de la bibliothèque standard mesuré dans la même exécution ; les allocations sont un compte, pas une durée, elles ne bougent donc pas avec la machine.",
   },
   delegated: { en: 'delegated', fr: 'déléguée' },
+  signedJwt: { en: 'signed JWT', fr: 'JWT signé' },
   errors: { en: 'errors', fr: "d'erreurs" },
   gateway: { en: 'Gateway', fr: 'Gateway' },
   added: { en: 'added', fr: 'ajouté' },
@@ -297,6 +314,7 @@ const T = {
       <li>{{ t('othersGo') }}</li>
     </ul>
     <p>{{ t('comparable') }}</p>
+    <p>{{ t('sameAsOthers') }}</p>
     <p>{{ t('asDeployed') }}</p>
 
     <h3>{{ t('whyTitle') }}</h3>
@@ -482,32 +500,40 @@ export class PerformanceComponent {
     (['proxy', 'auth', 'limit'] as const).map((key) => ({
       key,
       rows: GATEWAYS.flatMap((gw) => {
-        const scenario = key === 'auth' && gw === 'traefik' ? 'auth-delegated' : key;
-        const cells = this.runs().map((run): Cell | null => {
-          const s = run.gateways.find((g) => g.name === gw)?.scenarios[scenario];
-          return s
-            ? {
-                added50: s.fixed.overheadP50 ?? 0,
-                added99: s.fixed.overheadP99 ?? 0,
-                rps: Math.round(s.max.rps),
-                errors: 1 - s.max.success,
-              }
-            : null;
-        });
-        if (!cells.some((c) => c)) return [];
-        const delegated = scenario === 'auth-delegated';
-        return [
-          {
-            label: LABELS[gw][this.lang()] + (delegated ? ` (${this.t('delegated')})` : ''),
-            meerkat: gw === 'meerkat',
-            reference: gw === 'gostd',
-            how: HOW[key]?.[gw]?.[this.lang()] ?? '',
-            cells,
-          },
-        ];
+        // The auth table carries, besides the comparable row, Traefik's
+        // delegated one in its place and Meerkat's signed-JWT one below its own.
+        const scenarios =
+          key !== 'auth' ? [key] : gw === 'traefik' ? ['auth-delegated'] : gw === 'meerkat' ? ['auth', 'auth-jwt'] : ['auth'];
+        return scenarios.flatMap((scenario) => this.row(gw, key, scenario));
       }),
     })),
   );
+
+  private row(gw: string, key: string, scenario: string) {
+    const cells = this.runs().map((run): Cell | null => {
+      const s = run.gateways.find((g) => g.name === gw)?.scenarios[scenario];
+      return s
+        ? {
+            added50: s.fixed.overheadP50 ?? 0,
+            added99: s.fixed.overheadP99 ?? 0,
+            rps: Math.round(s.max.rps),
+            errors: 1 - s.max.success,
+          }
+        : null;
+    });
+    if (!cells.some((c) => c)) return [];
+    const suffix =
+      scenario === 'auth-delegated' ? ` (${this.t('delegated')})` : scenario === 'auth-jwt' ? ` (${this.t('signedJwt')})` : '';
+    return [
+      {
+        label: LABELS[gw][this.lang()] + suffix,
+        meerkat: gw === 'meerkat' && scenario !== 'auth-jwt',
+        reference: gw === 'gostd' || scenario === 'auth-jwt',
+        how: HOW[scenario === 'auth-jwt' ? 'auth-jwt' : key]?.[gw]?.[this.lang()] ?? '',
+        cells,
+      },
+    ];
+  }
 
   protected readonly footprint = computed(() =>
     GATEWAYS.flatMap((gw) => {

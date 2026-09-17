@@ -1864,6 +1864,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		mux.HandleFunc("GET /refused", h.showRefused)
 		// The injected <meerkat-user-button> web component (UI routes).
 		h.registerUserButton(mux)
+		// The injected <meerkat-portal-nav> web component (PORTAL-01): the
+		// navigation bar that, when a portal is configured, carries the button.
+		h.registerPortal(mux)
 		// The live channel the served pages listen on (generic, not tied to
 		// any one feature).
 		h.registerEvents(mux)
@@ -1874,6 +1877,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		// Connecting an agent without a copied secret (MCP-07): the control
 		// plane is its own authorisation server.
 		h.registerOAuth(mux)
+		// The portal editor's live preview (PORTAL-01): the console iframes a
+		// page that renders the REAL bar in edit mode, so the SAME component is
+		// the editor. Served here to stay same-origin with the console.
+		h.registerPortalPreview(mux)
 	}
 	// The PROFILE lives on both planes. Whoever administers the gateway is a
 	// user too: they need a passkey, a photo, a second factor and an address,

@@ -1,0 +1,162 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: min(480px, 92vw);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 12px 20px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.head h2 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.quick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.quick .grow {
+  flex: 1 1 auto;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden; // the icon grid (or paste box) is the scroll region
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+// The form fields and the icon head/search keep their height; the palette
+// grows to fill what is left, so the actions sit at the very bottom.
+.body > mat-form-field,
+.icon-head,
+.icon-search,
+.hint {
+  flex: 0 0 auto;
+}
+mat-form-field {
+  width: 100%;
+}
+
+.icon-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.icon-head .icon-title {
+  flex: 1 1 auto;
+  font-weight: 500;
+}
+.icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
+}
+.icon-preview app-svg-icon {
+  --icon-size: 24px;
+}
+
+.icon-search,
+.icon-paste {
+  width: 100%;
+}
+.hint {
+  margin: 4px 0;
+  font-size: 0.8rem;
+}
+
+// The paste box fills the space the icon grid would take in search mode: it
+// grows (overriding the generic .body > mat-form-field which stays fixed), and
+// the Material outline field lets its textarea stretch to the field's height.
+.body > mat-form-field.icon-paste {
+  flex: 1 1 auto;
+  min-height: 140px;
+  display: flex;
+}
+.icon-paste ::ng-deep .mat-mdc-text-field-wrapper {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.icon-paste ::ng-deep .mat-mdc-form-field-flex {
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+.icon-paste ::ng-deep .mat-mdc-form-field-infix {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.icon-paste textarea.mat-mdc-input-element {
+  flex: 1 1 auto;
+  height: auto;
+  resize: none;
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 40px);
+  gap: 4px;
+  justify-content: space-between;
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow: auto;
+  // Same framed look as the paste textarea's outline, so the two icon modes
+  // read as one panel.
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 4px;
+  padding: 8px;
+}
+.icon-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mat-sys-on-surface);
+  cursor: pointer;
+  border-radius: 10px;
+}
+.icon-cell:hover {
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-primary);
+}
+.icon-cell.sel {
+  border-color: var(--mat-sys-primary);
+  color: var(--mat-sys-primary);
+}
+.icon-cell app-svg-icon {
+  --icon-size: 24px;
+}
+.none {
+  grid-column: 1 / -1;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}

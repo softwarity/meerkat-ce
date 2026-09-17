@@ -104,6 +104,7 @@ var ExportedSettings = []string{
 	store.SettingIssuesEnabled,
 	store.SettingPagesScheme,
 	store.SettingPageLayout,
+	store.SettingPortal,
 	// What an account carries beyond what this product invented (MODEL-01),
 	// and the notice about the windows closing (MODEL-02). The definitions
 	// travel because ROUTES travel: a route that forwards `employeeNumber`
