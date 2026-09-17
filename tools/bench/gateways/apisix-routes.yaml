@@ -1,0 +1,40 @@
+# Apache APISIX routes: the same three paths as every gateway of the benchmark.
+#
+#   /proxy  nothing
+#   /auth   key-auth: a key looked up by the gateway
+#   /limit  limit-count, local policy, far above what the run sends
+routes:
+  - id: proxy
+    uri: /proxy/*
+    upstream:
+      type: roundrobin
+      nodes:
+        "upstream:9000": 1
+  - id: auth
+    uri: /auth/*
+    plugins:
+      key-auth: {}
+    upstream:
+      type: roundrobin
+      nodes:
+        "upstream:9000": 1
+  - id: limit
+    uri: /limit/*
+    plugins:
+      limit-count:
+        count: 100000000
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        rejected_code: 429
+        policy: local
+    upstream:
+      type: roundrobin
+      nodes:
+        "upstream:9000": 1
+consumers:
+  - username: bench
+    plugins:
+      key-auth:
+        key: bench-key-0123456789abcdef
+#END

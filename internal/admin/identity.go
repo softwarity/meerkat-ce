@@ -444,6 +444,9 @@ func (a *API) updateUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// Disabled, or given another window: a cached API token of this account
+	// must not keep answering until its entry ages out.
+	a.sm.UserChanged(u.ID)
 	updated, err := a.st.GetUserByID(r.Context(), u.ID)
 	if err != nil {
 		a.internal(w, err)
@@ -624,6 +627,7 @@ func (a *API) deleteUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		a.internal(w, err)
 		return
 	}
+	a.sm.UserChanged(id)
 	if !existed {
 		writeErr(w, http.StatusNotFound, "user not found")
 		return
@@ -1229,6 +1233,8 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		a.internal(w, err)
 		return
 	}
+	// The policy is part of every cached token decision.
+	a.sm.TokenChanged("*")
 	// Nothing about the relay is written here: the address belongs to the relay
 	// an infra admin owns, the display name is the application's own name
 	// (Branding), and GetSMTP resolves vault references - storing what it

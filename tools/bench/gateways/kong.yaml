@@ -1,0 +1,37 @@
+# Kong Gateway OSS, database-less. The same three paths as every gateway of the
+# benchmark, with the plugin the free edition offers for each:
+#
+#   /proxy  nothing
+#   /auth   key-auth: a key looked up by the gateway, the closest free match to
+#           Meerkat's opaque token (Kong then passes the consumer as headers)
+#   /limit  rate-limiting, local policy, far above what the run sends
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: upstream
+    url: http://upstream:9000
+    routes:
+      - name: proxy
+        paths: [/proxy]
+        strip_path: false
+      - name: auth
+        paths: [/auth]
+        strip_path: false
+        plugins:
+          - name: key-auth
+            config:
+              key_names: [apikey]
+      - name: limit
+        paths: [/limit]
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100000000
+              policy: local
+
+consumers:
+  - username: bench
+    keyauth_credentials:
+      - key: bench-key-0123456789abcdef

@@ -1,0 +1,57 @@
+# Meerkat, seeded on first start (-config). Three routes, the same three every
+# gateway of the benchmark carries, in front of the same upstream.
+#
+#   /proxy  anonymous, nothing but the proxy
+#   /auth   a personal API token (Bearer mk_...) resolved by the gateway, and
+#           the caller forwarded to the upstream as a SIGNED JWT - which is what
+#           Meerkat does in production and more than the others do here: they
+#           check a key and pass a header
+#   /limit  anonymous, a rate limit per address set far above what the run
+#           sends, so what is measured is the cost of counting, not a refusal
+version: 1
+routes:
+  - id: proxy
+    name: proxy
+    enabled: true
+    order: 100
+    upstream: http://upstream:9000
+    isUi: false
+    predicates:
+      - type: path
+        args:
+          patterns:
+            - /proxy/**
+  - id: auth
+    name: auth
+    enabled: true
+    order: 110
+    upstream: http://upstream:9000
+    isUi: false
+    access:
+      level: auth
+    identity:
+      mechanism: signed-jwt
+      algorithm: ES256
+      attributes:
+        - field: username
+        - field: roles
+    predicates:
+      - type: path
+        args:
+          patterns:
+            - /auth/**
+  - id: limit
+    name: limit
+    enabled: true
+    order: 120
+    upstream: http://upstream:9000
+    isUi: false
+    limits:
+      - per: ip
+        requests: 100000000
+        window: PT1M
+    predicates:
+      - type: path
+        args:
+          patterns:
+            - /limit/**

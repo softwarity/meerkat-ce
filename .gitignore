@@ -31,3 +31,5 @@ vault.key
 
 # Local load-test credentials (tools/hammer.sh) - never committed.
 tools/hammer.env
+# What a benchmark run leaves behind: the binaries it built and its raw figures.
+tools/bench/out/

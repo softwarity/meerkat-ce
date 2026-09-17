@@ -115,8 +115,7 @@ export interface VaultEntryFormData {
       <app-form-field
         i18n-label="@@Name"
         label="Name"
-        i18n-hint="@@Vault_name_ref_hint"
-        hint="Referenced by $name wherever it is needed"
+        [hint]="nameRefHint()"
         [error]="nameError()"
       >
         <textarea
@@ -333,6 +332,15 @@ export class VaultEntryFormComponent implements OnInit {
     return n && !this.nameOK.test(n)
       ? $localize`:@@Vault_name_rule:A letter, then letters, digits, dot, dash or underscore`
       : '';
+  });
+
+  // Shows the reference the entry will answer to, updating as the name is typed:
+  // "toto" -> "Use it as $toto wherever it is needed". Generic while empty.
+  protected readonly nameRefHint = computed(() => {
+    const n = this.name().trim();
+    return n && this.nameOK.test(n)
+      ? $localize`:@@Vault_name_ref_named:Use it as $${n}:name: wherever it is needed`
+      : $localize`:@@Vault_name_ref_hint:Reference it by $name wherever it is needed`;
   });
 
   protected readonly canSave = computed(

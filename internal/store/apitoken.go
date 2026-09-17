@@ -213,6 +213,10 @@ type ResolvedToken struct {
 	TenantID   string
 	GroupID    string
 	LastUsedAt int64
+	// ExpiresAt travels with the rest (0 = never) because the session layer
+	// keeps a resolved token in memory for a few seconds, and an expiry is a
+	// clock question it must keep answering on every request.
+	ExpiresAt int64
 }
 
 // NewToken is a token about to be recorded. A struct rather than a dozen
@@ -280,6 +284,7 @@ func (s *Store) ResolveAPIToken(ctx context.Context, tokenHash string, now int64
 	if !enabled || (expires != 0 && now >= expires) {
 		return ResolvedToken{}, sql.ErrNoRows
 	}
+	t.ExpiresAt = expires
 	return t, nil
 }
 

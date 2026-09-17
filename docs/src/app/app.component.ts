@@ -27,6 +27,7 @@ export class AppComponent {
     { path: '/dev-mode', label: 'Dev mode', icon: 'terminal' },
     { path: '/deploy', label: 'Deploy', icon: 'rocket_launch' },
     { path: '/roadmap', label: 'Roadmap', icon: 'map' },
+    { path: '/performance', label: 'Performance', icon: 'speed' },
     { path: '/tests', label: 'Test coverage', icon: 'verified' },
   ];
 }

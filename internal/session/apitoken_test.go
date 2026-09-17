@@ -60,15 +60,22 @@ func TestBearerTokenRevokedAndDisabled(t *testing.T) {
 
 	// Disabled -> refused; re-enabled -> works again. (id = tok-alice + "" + t1)
 	const id = "tok-alicet1"
+	// Every write is followed by TokenChanged, as the handlers do: the token
+	// was resolved (and remembered) before each change.
+	if _, err := m.Resolve(ctx, bearer(secret)); err != nil {
+		t.Fatalf("live token should resolve: %v", err)
+	}
 	if _, err := st.SetAPITokenEnabled(ctx, "alice", id, false); err != nil {
 		t.Fatal(err)
 	}
+	m.TokenChanged(id)
 	if _, err := m.Resolve(ctx, bearer(secret)); err == nil {
 		t.Fatalf("a disabled token must not resolve")
 	}
 	if _, err := st.SetAPITokenEnabled(ctx, "alice", id, true); err != nil {
 		t.Fatal(err)
 	}
+	m.TokenChanged(id)
 	if _, err := m.Resolve(ctx, bearer(secret)); err != nil {
 		t.Fatalf("a re-enabled token must resolve: %v", err)
 	}
@@ -76,6 +83,7 @@ func TestBearerTokenRevokedAndDisabled(t *testing.T) {
 	if _, err := st.RevokeAPIToken(ctx, "alice", id); err != nil {
 		t.Fatal(err)
 	}
+	m.TokenChanged(id)
 	if _, err := m.Resolve(ctx, bearer(secret)); err == nil {
 		t.Fatalf("a revoked token must not resolve")
 	}
@@ -133,6 +141,7 @@ func TestBearerTokenExpiredDisabledUserAndPolicy(t *testing.T) {
 	if err := st.UpdateUser(ctx, store.User{ID: "alice", Username: "alice", Enabled: false}); err != nil {
 		t.Fatal(err)
 	}
+	m.UserChanged("alice")
 	if _, err := m.Resolve(ctx, bearer(live)); err == nil {
 		t.Fatalf("a disabled account's token must not resolve")
 	}
@@ -141,9 +150,14 @@ func TestBearerTokenExpiredDisabledUserAndPolicy(t *testing.T) {
 	if err := st.UpdateUser(ctx, store.User{ID: "alice", Username: "alice", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
+	m.UserChanged("alice")
+	if _, err := m.Resolve(ctx, bearer(live)); err != nil {
+		t.Fatalf("re-enabled account's token should resolve: %v", err)
+	}
 	if err := st.SetSetting(ctx, store.SettingAPITokens, false); err != nil {
 		t.Fatal(err)
 	}
+	m.TokenChanged("*")
 	if _, err := m.Resolve(ctx, bearer(live)); err == nil {
 		t.Fatalf("policy off must refuse every token")
 	}
@@ -155,5 +169,72 @@ func TestBearerRejectedOnAdminPlane(t *testing.T) {
 	secret := mintToken(t, st, "alice", "t1", "", 0)
 	if _, err := m.Resolve(context.Background(), bearer(secret)); err == nil {
 		t.Fatalf("the admin plane must never accept a personal API token")
+	}
+}
+
+// A resolved token is served from memory for the cache window, like a cookie
+// session: that is what keeps an API route from paying three queries per
+// request. What makes a revocation immediate is therefore TokenChanged, called
+// by every write - a write that forgot it would wait out the window, and this
+// test is the one that says so.
+func TestBearerTokenIsServedFromMemory(t *testing.T) {
+	now := time.Now()
+	clock := &now
+	m, st := setup(t, WithCacheTTL(5*time.Second), WithClock(func() time.Time { return *clock }))
+	enabledUser(t, st, "alice")
+	secret := mintToken(t, st, "alice", "t1", "", 0)
+	ctx := context.Background()
+
+	if _, err := m.Resolve(ctx, bearer(secret)); err != nil {
+		t.Fatalf("live token should resolve: %v", err)
+	}
+	if _, err := st.RevokeAPIToken(ctx, "alice", "tok-alicet1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Resolve(ctx, bearer(secret)); err != nil {
+		t.Fatalf("within the window, without TokenChanged, the remembered token answers: %v", err)
+	}
+	later := now.Add(6 * time.Second)
+	clock = &later
+	if _, err := m.Resolve(ctx, bearer(secret)); err == nil {
+		t.Fatalf("past the window the database is asked again, and the token is gone")
+	}
+}
+
+// What depends on the clock and on the request is judged EVERY time, cache or
+// not: an expiry passing inside the window, a caller outside the token's
+// ranges.
+func TestBearerTokenClockAndAddressBeatTheCache(t *testing.T) {
+	now := time.Now()
+	clock := &now
+	m, st := setup(t, WithCacheTTL(time.Hour), WithClock(func() time.Time { return *clock }))
+	enabledUser(t, st, "alice")
+	ctx := context.Background()
+
+	expiring := mintToken(t, st, "alice", "t1", "", now.Add(time.Minute).Unix())
+	if _, err := m.Resolve(ctx, bearer(expiring)); err != nil {
+		t.Fatalf("unexpired token should resolve: %v", err)
+	}
+	later := now.Add(2 * time.Minute)
+	clock = &later
+	if _, err := m.Resolve(ctx, bearer(expiring)); err == nil {
+		t.Fatalf("an expiry reached inside the cache window must still refuse")
+	}
+
+	ranged := "mk_ranged-secret-value"
+	if err := st.AddAPIToken(ctx, store.NewToken{
+		ID: "ranged", UserID: "alice", Name: "ci", TokenHash: hashToken(ranged), Prefix: ranged[:10],
+		Plane: store.PlaneData, Scope: store.ScopeFull, FromCIDRs: "192.0.2.0/24",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	inside := bearer(ranged) // httptest's peer is 192.0.2.1
+	if _, err := m.Resolve(ctx, inside); err != nil {
+		t.Fatalf("a caller inside the range should resolve: %v", err)
+	}
+	outside := bearer(ranged)
+	outside.RemoteAddr = "198.51.100.7:4000"
+	if _, err := m.Resolve(ctx, outside); err == nil {
+		t.Fatalf("a remembered token must still refuse a caller outside its ranges")
 	}
 }

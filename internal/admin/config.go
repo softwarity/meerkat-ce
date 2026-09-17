@@ -152,6 +152,9 @@ func (a *API) importConfig(w http.ResponseWriter, r *http.Request, actor store.U
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// A configuration carries the gateway-wide token policy: every cached
+	// token decision is read again.
+	a.sm.TokenChanged("*")
 	a.auditEvent(r.Context(), actor, "config.import", "config", "", "", "", summarise(plan))
 	// Saving IS applying, here as everywhere else. A reload that fails means a
 	// stored route no longer compiles: say so instead of reporting a clean

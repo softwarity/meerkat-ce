@@ -1,6 +1,9 @@
 package gateway
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +14,9 @@ import (
 
 	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
+	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
 // What these measure, and what they do NOT.
@@ -34,7 +39,7 @@ import (
 //     the one thing here that can gate a merge - see TestPerRequestAllocations.
 //
 // Run them:  go test ./internal/gateway/ -bench . -benchmem -run '^$'
-func benchUpstream(b *testing.B) *httptest.Server {
+func benchUpstream(b testing.TB) *httptest.Server {
 	b.Helper()
 	body := []byte(`{"ok":true}`)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -102,6 +107,58 @@ func BenchmarkRouteWithFilters(b *testing.B) {
 		routing.Spec{Type: "security-headers"},
 	))
 	drive(b, rt, "/api/x")
+}
+
+// An authenticated API call, the way one arrives in production: a personal
+// token in the Authorization header, a route that requires a signed-in caller,
+// and the caller forwarded to the upstream as an ES256-signed JWT carrying the
+// username and the roles.
+//
+// It is the path the others leave out, and the one that reads the database:
+// the token (once per cache window, since the session layer remembers it) and
+// the identity the JWT is built from (on every request, for now). On the
+// embedded engine a read is a WAL read lock, a few syscalls, which is why this
+// benchmark is the one to watch when identity work is touched.
+func BenchmarkAuthenticatedToken(b *testing.B) {
+	st, err := store.OpenAt(b.TempDir(), dbtest.URL(b))
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	if err := st.CreateUser(ctx, store.User{ID: "u1", Username: "neo", Enabled: true, PasswordHash: "x"}); err != nil {
+		b.Fatal(err)
+	}
+	const secret = "mk_bench-token-0123456789abcdef"
+	sum := sha256.Sum256([]byte(secret))
+	if err := st.AddAPIToken(ctx, store.NewToken{ID: "t1", UserID: "u1", Name: "bench",
+		TokenHash: hex.EncodeToString(sum[:]), Prefix: secret[:10],
+		Plane: store.PlaneData, Scope: store.ScopeFull}); err != nil {
+		b.Fatal(err)
+	}
+	up := benchUpstream(b)
+	route := pathRoute("r1", "bench", 1, "/**", up.URL)
+	route.Access = store.Access{Level: "auth"}
+	route.Identity = &store.IdentityForward{Mechanism: "signed-jwt", Algorithm: "ES256",
+		Attributes: []store.IdentityAttr{{Field: "username"}, {Field: "roles"}}}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		b.Fatal(err)
+	}
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(ctx); err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/x", nil)
+		req.Header.Set("Authorization", "Bearer "+secret)
+		rt.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			b.Fatalf("status %d", rec.Code)
+		}
+	}
 }
 
 // Route SELECTION, with the socket taken out of the picture.

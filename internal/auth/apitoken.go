@@ -387,11 +387,13 @@ func (h *Handler) doTokens(w http.ResponseWriter, r *http.Request) {
 		for _, t := range h.userTokens(r, sess.UserID) {
 			if t.ID == id {
 				_, _ = h.st.SetAPITokenEnabled(r.Context(), sess.UserID, id, !t.Enabled)
+				h.sm.TokenChanged(id)
 				break
 			}
 		}
 	case "revoke":
 		_, _ = h.st.RevokeAPIToken(r.Context(), sess.UserID, r.PostFormValue("id"))
+		h.sm.TokenChanged(r.PostFormValue("id"))
 	}
 	http.Redirect(w, r, "/profile/tokens", http.StatusSeeOther)
 }

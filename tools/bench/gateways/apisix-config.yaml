@@ -1,0 +1,19 @@
+# Apache APISIX, standalone: routes from a file, no etcd, no Admin API.
+# One nginx worker, because the container gets one CPU - the default would
+# start one per CPU of the HOST and have them fight over the single core.
+# Access log off, as on every gateway of the benchmark: Meerkat writes none by
+# default, and a log line per request is a cost the others would carry alone.
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml
+
+apisix:
+  node_listen: 9080
+  enable_admin: false
+
+nginx_config:
+  worker_processes: 1
+  error_log_level: warn
+  http:
+    enable_access_log: false

@@ -193,6 +193,9 @@ func (a *API) restoreConfigPoint(w http.ResponseWriter, r *http.Request, actor s
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// A configuration carries the gateway-wide token policy: every cached
+	// token decision is read again.
+	a.sm.TokenChanged("*")
 	a.auditEvent(r.Context(), actor, "config.restore", "config", p.ID, pointName(p), "", summarise(plan))
 	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("restored, but the routing table could not be reloaded: %w", err))

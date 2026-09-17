@@ -43,7 +43,7 @@ const (
 // A TOPIC says "something moved, read the table". A SIGNAL carries the thing
 // itself - a token hash, a user id - and has NO table behind it. That is a
 // deliberate weakening, and it is only allowed where losing a message costs
-// exactly what is already accepted: these two drop an entry from a five-second
+// exactly what is already accepted: the cache signals drop an entry from a five-second
 // memory cache, so a lost one means the other node notices five seconds later,
 // which is what happens on a single gateway anyway.
 //
@@ -55,8 +55,19 @@ const (
 	// tenant or the login step it carries has just changed on another node.
 	TopicSession = "session"
 	// TopicSessionUser drops every session of one user, by user id: a password
-	// reset revoked them all.
+	// reset revoked them all. It drops the user's API tokens with them, since
+	// the same writes (disabled, deleted, another validity window) end both.
 	TopicSessionUser = "session-user"
+	// TopicIdentity makes every identity a gateway remembers stale (the
+	// router's identitycache.go): an account, an organisation, a membership,
+	// a group or a role was written on another node. No argument - the epoch
+	// it bumps is all-or-nothing on purpose.
+	TopicIdentity = "identity"
+	// TopicAPIToken drops one API token from the caches, by token ID - the id,
+	// because the writes that change a token (revoke, toggle, renew, perimeter)
+	// know which token they touched, not the hash a caller presents. "*"
+	// drops them all: the gateway-wide token policy just changed.
+	TopicAPIToken = "api-token"
 	// TopicEvent carries a live-channel message to the pages the OTHER nodes
 	// hold open (internal/events). The argument is the hub topic, a space, and
 	// the encoded message.

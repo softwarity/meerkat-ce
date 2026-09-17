@@ -164,6 +164,9 @@ func TestAccessLevelsOverHTTP(t *testing.T) {
 		if err := st.SaveMembership(ctx, store.Membership{UserID: "u-jane", TenantID: "globex", Type: store.MemberUser, Enabled: true}); err != nil {
 			t.Fatalf("SaveMembership: %v", err)
 		}
+		// Straight to the store: through the admin API the write would make the
+		// remembered identity stale by itself (afterWrites, cmd/meerkat).
+		rt.ForgetIdentities()
 		res := get(t, "/globex/x", jane)
 		if res.StatusCode != http.StatusSeeOther {
 			t.Fatalf("jane on globex after joining = %d, want 303", res.StatusCode)
@@ -280,6 +283,10 @@ func TestASwitchIsOfferedOnlyWhereItWouldHelp(t *testing.T) {
 	if err := st.SetMemberGroups(ctx, "globex", "u-alice", []string{"g-ops"}); err != nil {
 		t.Fatal(err)
 	}
+	// These writes went straight to the store. Through the admin API they would
+	// make the identity the router remembers stale by themselves (afterWrites,
+	// cmd/meerkat): a test that skips the API does it by hand.
+	rt.ForgetIdentities()
 	if err := sm.SetTenant(ctx, requestWith(srv.URL, alice), "acme"); err != nil {
 		t.Fatal(err)
 	}

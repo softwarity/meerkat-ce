@@ -9,9 +9,12 @@ import (
 	"encoding/json"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -464,6 +467,57 @@ func TestRoutesWithTheSameBoundsShareAPool(t *testing.T) {
 	}
 	if c := transportFor(2*time.Second, store.DefaultResponseTimeout); c == a {
 		t.Error("a route that asked for something else got the shared pool anyway")
+	}
+}
+
+// Under concurrent load the pool REUSES its connections: rounds of parallel
+// requests after the first must not dial again. With 8 idle connections kept
+// per upstream, every round past the first reopened all but eight - a TCP
+// handshake per request, which capped the gateway at a seventh of what the
+// same core carries and ran out of ports on a long burst (see idlePerUpstream).
+func TestTheUpstreamPoolKeepsWhatABurstOpened(t *testing.T) {
+	var dials atomic.Int64
+	up := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	up.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+		if s == http.StateNew {
+			dials.Add(1)
+		}
+	}
+	up.Start()
+	t.Cleanup(up.Close)
+
+	// Bounds no other test names, so this pool starts empty.
+	rt := transportFor(3*time.Second+7*time.Millisecond, 11*time.Second+3*time.Millisecond)
+	const parallel, rounds = 64, 5
+	for round := 0; round < rounds; round++ {
+		var wg sync.WaitGroup
+		// Every request holds its connection until all of them have one, so
+		// the round really needs `parallel` connections at the same time.
+		gate := make(chan struct{})
+		for i := 0; i < parallel; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req, _ := http.NewRequest(http.MethodGet, up.URL, nil)
+				res, err := rt.RoundTrip(req)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				<-gate
+				_, _ = io.Copy(io.Discard, res.Body)
+				_ = res.Body.Close()
+			}()
+		}
+		time.Sleep(50 * time.Millisecond)
+		close(gate)
+		wg.Wait()
+	}
+	if got := dials.Load(); got > parallel {
+		t.Fatalf("%d rounds of %d parallel requests dialled %d connections, want at most %d: "+
+			"the pool closes what a burst opened and pays a handshake per request", rounds, parallel, got, parallel)
 	}
 }
 
@@ -1006,6 +1060,10 @@ func TestJoiningTakesEffectOnAnOpenSession(t *testing.T) {
 	if err := st.SetMemberGroups(ctx, "t1", "u1", []string{"g1"}); err != nil {
 		t.Fatal(err)
 	}
+	// These writes went straight to the store. Through the admin API they would
+	// make the identity the router remembers stale by themselves (afterWrites,
+	// cmd/meerkat): a test that skips the API does it by hand.
+	rt.ForgetIdentities()
 
 	// Same session, no sign-out.
 	if got := call(); got != "ROLE_A" {

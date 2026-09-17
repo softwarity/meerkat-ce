@@ -51,6 +51,13 @@ type Manager struct {
 
 	mu    sync.Mutex
 	cache map[string]cacheEntry
+	// tokens is the same memory for API tokens, by token hash (resolveToken).
+	tokens map[string]tokenEntry
+	// forgotten counts the drops from tokens. A read notes it before asking
+	// the database and stores its answer only if it has not moved: a revoke
+	// landing while the read was in flight must not see the old answer put
+	// back after it.
+	forgotten uint64
 	// notify tells the other gateways to drop what this node just changed
 	// (invalidate.go). Nil on a single one.
 	notify func(topic, arg string)
@@ -61,6 +68,25 @@ type cacheEntry struct {
 	readAt  time.Time
 	invalid bool // negative cache: known-absent token
 }
+
+// tokenEntry is what the database said about one API token, and about its
+// owner, at readAt. Only a token that EXISTS on this plane is remembered: a
+// refused one is read again next time, so re-enabling a token never waits for
+// an entry nobody could have named by its id.
+type tokenEntry struct {
+	tok store.ResolvedToken
+	// allowed is the gateway-wide personal-token policy (AUTH-16) as it read.
+	allowed bool
+	// owner is the account reduced to what a request is still judged against
+	// (enabled, validity window): the whole row carries an avatar, and there is
+	// one entry per token.
+	owner  store.User
+	readAt time.Time
+}
+
+// maxCachedTokens bounds the token memory: past it, entries older than the
+// cache window are swept before a new one is added.
+const maxCachedTokens = 10000
 
 // Option tweaks a Manager (tests mostly).
 type Option func(*Manager)
@@ -90,6 +116,7 @@ func NewManager(st *store.Store, opts ...Option) *Manager {
 		cookieName: CookieName,
 		plane:      DataPlane,
 		cache:      map[string]cacheEntry{},
+		tokens:     map[string]tokenEntry{},
 	}
 	for _, o := range opts {
 		o(m)
@@ -328,9 +355,21 @@ const apiTokenPrefix = "mk_"
 
 // resolveToken authenticates an "Authorization: Bearer mk_..." request against
 // a live API token, synthesizing the session context the token captured
-// (tenant + group). NOT cached: a revoke or disable takes effect on the very
-// next request. The user is re-checked live so a disabled account's tokens
-// stop at once.
+// (tenant + group).
+//
+// What the database says about a token - that it exists and is enabled, on
+// which plane, for whom, under which policy, and whether its owner is enabled -
+// is read at most once per cache window, like a cookie session. It used to be
+// read on EVERY request: three queries (the token, the policy, the account)
+// that held an API route to 7,500 req/s on one core where Kong's key-auth reads
+// 36,000 (tools/bench). Revocation stays immediate the way it is for sessions:
+// every write that changes a token or its owner drops the entry here and tells
+// the other gateways (invalidate.go), so the window only ever covers a lost
+// message.
+//
+// What depends on the REQUEST or on the CLOCK is still judged every time: the
+// caller's address against the token's ranges, the token's expiry, the
+// owner's validity window.
 func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Session, bool) {
 	auth := r.Header.Get("Authorization")
 	const bearer = "Bearer "
@@ -341,19 +380,19 @@ func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Sess
 	if !strings.HasPrefix(raw, apiTokenPrefix) {
 		return store.Session{}, false
 	}
+	th := hashToken(raw)
 	now := m.now()
-	tok, err := m.st.ResolveAPIToken(ctx, hashToken(raw), now.Unix())
-	if err != nil {
+	e, ok := m.cachedToken(th, now)
+	if !ok {
+		if e, ok = m.readToken(ctx, th, now); !ok {
+			return store.Session{}, false
+		}
+	}
+	tok := e.tok
+	if !e.allowed {
 		return store.Session{}, false
 	}
-	// A token authenticates ONLY on its own plane - this is the isolation
-	// between the data port and the admin port.
-	if tok.Plane != m.plane {
-		return store.Session{}, false
-	}
-	// The gateway-wide personal-token policy (AUTH-16) gates DATA tokens only;
-	// admin (control-plane) tokens are a root capability, not that policy's.
-	if m.plane == DataPlane && !m.st.APITokensAllowed(ctx) {
+	if tok.ExpiresAt != 0 && now.Unix() >= tok.ExpiresAt {
 		return store.Session{}, false
 	}
 	// Where the token may be used from (MCP-02), judged on the TCP PEER: a
@@ -365,17 +404,12 @@ func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Sess
 			"token", tok.Name, "from", r.RemoteAddr, "allowed", tok.FromCIDRs)
 		return store.Session{}, false
 	}
-	u, err := m.st.GetUserByID(ctx, tok.UserID)
 	// A token outlives nothing its owner does not: an account past its window
 	// stops answering, machine-to-machine included.
-	if err != nil || !u.Enabled || !u.ValidAt(now) {
+	if !e.owner.Enabled || !e.owner.ValidAt(now) {
 		return store.Session{}, false
 	}
-	// Last-use stamp, throttled to at most once a minute (avoid a write per
-	// request); best-effort, a failure never blocks the call.
-	if now.Unix()-tok.LastUsedAt >= 60 {
-		_ = m.st.TouchAPIToken(ctx, tok.ID, now.Unix())
-	}
+	m.touchToken(ctx, th, tok.ID, now)
 	return store.Session{
 		UserID: tok.UserID, TenantID: tok.TenantID, GroupID: tok.GroupID,
 		Plane: m.plane, ExpiresAt: now.Add(m.ttl).Unix(),
@@ -384,6 +418,91 @@ func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Sess
 		// (MCP-03) - both would be unanswerable from the account alone.
 		TokenID: tok.ID, TokenName: tok.Name, TokenScope: tok.Scope, TokenDomain: tok.Domain,
 	}, true
+}
+
+// cachedToken returns what was read about a token within the cache window.
+func (m *Manager) cachedToken(tokenHash string, now time.Time) (tokenEntry, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e, hit := m.tokens[tokenHash]
+	if !hit || now.Sub(e.readAt) >= m.cacheTTL {
+		return tokenEntry{}, false
+	}
+	return e, true
+}
+
+// readToken asks the database, and remembers the answer only for a token that
+// exists on this plane. Anything else - absent, disabled, expired, the other
+// plane's - drops whatever was remembered and is asked again next time.
+func (m *Manager) readToken(ctx context.Context, tokenHash string, now time.Time) (tokenEntry, bool) {
+	m.mu.Lock()
+	before := m.forgotten
+	m.mu.Unlock()
+	tok, err := m.st.ResolveAPIToken(ctx, tokenHash, now.Unix())
+	if err != nil {
+		m.forgetTokenHash(tokenHash)
+		return tokenEntry{}, false
+	}
+	// A token authenticates ONLY on its own plane - this is the isolation
+	// between the data port and the admin port.
+	if tok.Plane != m.plane {
+		return tokenEntry{}, false
+	}
+	u, err := m.st.GetUserByID(ctx, tok.UserID)
+	if err != nil {
+		m.forgetTokenHash(tokenHash)
+		return tokenEntry{}, false
+	}
+	e := tokenEntry{
+		tok: tok,
+		// The gateway-wide personal-token policy (AUTH-16) gates DATA tokens
+		// only; admin (control-plane) tokens are a root capability, not that
+		// policy's.
+		allowed: m.plane != DataPlane || m.st.APITokensAllowed(ctx),
+		owner:   store.User{ID: u.ID, Enabled: u.Enabled, ValidFrom: u.ValidFrom, ValidUntil: u.ValidUntil},
+		readAt:  now,
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.forgotten != before {
+		// Something was dropped meanwhile: answer this request, remember nothing.
+		return e, true
+	}
+	if len(m.tokens) >= maxCachedTokens {
+		for th, old := range m.tokens {
+			if now.Sub(old.readAt) >= m.cacheTTL {
+				delete(m.tokens, th)
+			}
+		}
+	}
+	m.tokens[tokenHash] = e
+	return e, true
+}
+
+func (m *Manager) forgetTokenHash(tokenHash string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.tokens, tokenHash)
+	m.forgotten++
+}
+
+// touchToken stamps a token's last use, at most once a minute: a write per
+// request would put back exactly the database round-trip the cache removed.
+// Best-effort - a failure never blocks the call. The stamp is recorded in the
+// cached entry BEFORE the write, so concurrent requests do not all decide the
+// minute is up.
+func (m *Manager) touchToken(ctx context.Context, tokenHash, id string, now time.Time) {
+	m.mu.Lock()
+	e, hit := m.tokens[tokenHash]
+	due := hit && now.Unix()-e.tok.LastUsedAt >= 60
+	if due {
+		e.tok.LastUsedAt = now.Unix()
+		m.tokens[tokenHash] = e
+	}
+	m.mu.Unlock()
+	if due {
+		_ = m.st.TouchAPIToken(ctx, id, now.Unix())
+	}
 }
 
 // Destroy revokes the request's session (if any), evicts it from the cache

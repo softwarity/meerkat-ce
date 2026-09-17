@@ -5,7 +5,47 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-09-12 : **le modele des comptes** - champs maison definis
+_Derniere mise a jour : 2026-09-17 : **banc comparatif** (PERF-05, non commite, en attente de
+validation). `tools/bench/run.sh` (`make bench`) : Meerkat face a Kong 3.9.3 (DB-less),
+APISIX 3.18.0 (standalone) et Traefik v3.7.13, chacun epingle sur UN CPU (`--cpuset-cpus 0`,
+une worker nginx, GOMAXPROCS=1) devant le meme amont Go (`tools/bench/upstream`, qui sert
+aussi `/_auth` pour le ForwardAuth de Traefik), charge `oha` 1.16.0 sur les CPU restants
+(debit fixe 1000 req/s avec `--latency-correction`, puis max), journaux d'acces coupes
+partout. Chaque scenario est VERIFIE avant mesure (200 avec le jeton, 401/403 sans) et
+`report.py` refuse une mesure sous 99 % de 200. Sortie : `out/results.json` (contrat : ajouter
+des champs, ne jamais en renommer) + `summary.md`. CI : jobs `bench` (matrice
+ubuntu-latest / ubuntu-24.04-arm, miroir seulement, push sur main ou dispatch) et
+`bench-publish` (jq -> `latest.json`, branche `bench` REECRITE en un commit force-push :
+Francois ne veut PAS d'historique) ; `bench` ajoute a `branches-ignore`. Reference `gostd`
+(`tools/bench/goproxy`, httputil.ReverseProxy nu, route proxy seule) = plafond de net/http.
+Page doc `/performance` (`docs/src/app/pages/performance.component.ts`) qui FETCH
+`raw.githubusercontent.com/softwarity/meerkat-ce/bench/latest.json` (CORS `*` verifie) et
+explique protocole, config des autres, ratio Meerkat/gostd calcule en direct, runners GitHub.
+Le site de doc n'utilise PAS $localize : bascule EN/FR par signal comme tests.component.ts.
+**Le banc a trouve deux plafonds, corriges avec accord de Francois** : (1)
+`MaxIdleConnsPerHost: 8` vers l'amont (router.go, h2c.go) -> constante `idlePerUpstream = 256`,
+proxy 1 coeur de 4 164 a 28 000 req/s, et les 502 sous charge longue (ports en TIME_WAIT)
+disparaissent ; test `TestTheUpstreamPoolKeepsWhatABurstOpened` (288 connexions a 8, 64 a
+256). (2) jetons API relus en base a chaque requete (jeton + politique + compte) -> cache
+par hash dans `session.Manager.tokens` (fenetre cacheTTL), seules les entrees VALIDES sont
+gardees ; invalidation `TokenChanged(id)` / `TokenChanged("*")` / `UserChanged(userID)`
+branchee sur toutes les ecritures (auth/apitoken.go, auth/oauth.go, admin/apitoken.go,
+admin/identity.go update/delete/politique, import/activation/restauration de config) ;
+nouveau sujet `store.TopicAPIToken` ; main.go oublie LOCALEMENT sur les deux plans avant
+d'envoyer sur le bus (un compte desactive cote admin possede des jetons du plan data).
+Expiration, plages CIDR et fenetre de validite restent jugees a chaque requete.
+(3) identite transmise relue a chaque requete (compte, orga, appartenances, roles ; 6 a 8
+requetes) -> `gateway/identitycache.go` : cache par (user, tenant, group), fenetre 5 s,
+EPOQUE (relevee AVANT la lecture) avancee par `afterWrites` (cmd/meerkat/main.go) apres
+toute ecriture servie hors motif "/" du routeur, relayee par `store.TopicIdentity` ; les tests
+qui ecrivent en base directement appellent `rt.ForgetIdentities()`. (4) `BufferPool`
+(`gateway/buffers.go`, tableaux fixes, test `TestProxyingBorrowsItsCopyBuffer`). (5)
+`carriesGatewayInternals` : pas de clone de requete sans cookie de session ni simulation.
+Resultat local 1 coeur : proxy ~40 000 req/s, auth ~11 000 (Kong ~39 000 : nginx/LuaJIT).
+Le cache jetons a aussi un compteur `forgotten` contre la course lecture/revocation.
+Banc Go ajoute : `BenchmarkAuthenticatedToken`. La presentation (meerkat-presentation-fr/en.html
+a la racine, non versionnees) attend les premiers chiffres CI pour sa section performance.
+Avant : 2026-09-12 : **le modele des comptes** - champs maison definis
 dans `Infra > Modele` et transmis comme tout attribut (MODEL-01), fenetre de validite
 verifiee partout ou une session se resout (MODEL-02, reste le resume par e-mail), et
 l'ecran des utilisateurs passe a **un seul tiroir dont le contenu change** (creation =

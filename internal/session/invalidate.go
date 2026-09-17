@@ -24,7 +24,8 @@ import (
 // here: losing one costs the five seconds a single gateway already accepts.
 
 // Notify is called with what just changed so the other nodes can drop it too:
-// (store.TopicSession, token hash) or (store.TopicSessionUser, user id).
+// (store.TopicSession, token hash), (store.TopicSessionUser, user id) or
+// (store.TopicAPIToken, token id).
 //
 // Wired to the cluster bus by main; nil on a single gateway, where the local
 // drop is the whole job.
@@ -43,10 +44,12 @@ func (m *Manager) Forget(tokenHash string) {
 	delete(m.cache, tokenHash)
 }
 
-// ForgetUser drops every cached session belonging to a user.
+// ForgetUser drops every cached session belonging to a user, and every cached
+// API token they own.
 //
-// The cache is keyed by token hash, so this is a scan - which is fine, because
-// what triggers it is a password reset or a disabled account, not a request.
+// The caches are keyed by token hash, so this is a scan - which is fine,
+// because what triggers it is a password reset or a disabled account, not a
+// request.
 func (m *Manager) ForgetUser(userID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -55,6 +58,12 @@ func (m *Manager) ForgetUser(userID string) {
 			delete(m.cache, th)
 		}
 	}
+	for th, e := range m.tokens {
+		if e.tok.UserID == userID {
+			delete(m.tokens, th)
+		}
+	}
+	m.forgotten++
 }
 
 // Revoked says a user's sessions have just been deleted from the store, so
@@ -65,6 +74,37 @@ func (m *Manager) ForgetUser(userID string) {
 func (m *Manager) Revoked(userID string) {
 	m.ForgetUser(userID)
 	m.tell(store.TopicSessionUser, userID)
+}
+
+// UserChanged says an account just changed in a way a cached session or token
+// must not outlive - disabled, deleted, given another validity window - so
+// every node reads it again on the next request.
+func (m *Manager) UserChanged(userID string) {
+	m.ForgetUser(userID)
+	m.tell(store.TopicSessionUser, userID)
+}
+
+// ForgetToken drops one API token from THIS node's cache, by token id, and
+// says nothing to anyone (the bus calls it). "*" drops every token: the
+// gateway-wide token policy just changed.
+func (m *Manager) ForgetToken(tokenID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for th, e := range m.tokens {
+		if tokenID == "*" || e.tok.ID == tokenID {
+			delete(m.tokens, th)
+		}
+	}
+	m.forgotten++
+}
+
+// TokenChanged is ForgetToken plus the message: every write that changes what
+// a token may do - revoke, toggle, renew, a new perimeter, the policy - ends
+// here, or the token would keep its old powers for the length of the cache
+// window.
+func (m *Manager) TokenChanged(tokenID string) {
+	m.ForgetToken(tokenID)
+	m.tell(store.TopicAPIToken, tokenID)
 }
 
 // dropped is the local half plus the message: every method that CHANGES a

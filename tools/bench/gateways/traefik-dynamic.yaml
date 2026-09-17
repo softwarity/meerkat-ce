@@ -1,0 +1,40 @@
+# Traefik Proxy (open source), routes. The same three paths as every gateway of
+# the benchmark - with one difference that is the point of its /auth:
+#
+#   /proxy  nothing
+#   /auth   the free edition has no token check of its own (JWT, OIDC and API
+#           keys are Traefik Hub), so authentication is DELEGATED: ForwardAuth
+#           calls an external service on every request before the upstream.
+#           That service is the benchmark's own upstream answering /_auth, the
+#           fastest decision there is - so the hop measured here is a floor.
+#   /limit  rateLimit middleware, far above what the run sends
+http:
+  routers:
+    proxy:
+      rule: "PathPrefix(`/proxy`)"
+      entryPoints: [web]
+      service: upstream
+    auth:
+      rule: "PathPrefix(`/auth`)"
+      entryPoints: [web]
+      service: upstream
+      middlewares: [delegated]
+    limit:
+      rule: "PathPrefix(`/limit`)"
+      entryPoints: [web]
+      service: upstream
+      middlewares: [limit]
+  middlewares:
+    delegated:
+      forwardAuth:
+        address: http://upstream:9000/_auth
+    limit:
+      rateLimit:
+        average: 100000000
+        burst: 100000000
+        period: 1m
+  services:
+    upstream:
+      loadBalancer:
+        servers:
+          - url: http://upstream:9000

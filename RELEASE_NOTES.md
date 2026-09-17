@@ -148,6 +148,17 @@ is already established.
   token's own name, beside the account it was minted on. It writes, too - a route it saves is
   live at once - and the net is the one already there: every change on this plane records a
   restore point by itself, so going back is a click.
+- **Measured against the others, in the open.** Every commit is benchmarked by the CI next to
+  Kong, APISIX and Traefik in their free editions, and next to Go's bare standard proxy as a
+  reference - each on one CPU, in front of the same upstream, under the same load, on two
+  machines - and the documentation's Performance page reads the latest run. It says how the
+  others are configured, what is like for like (proxying, a checked credential, a rate limit)
+  and what is shown as deployed (authentication delegated to an outside service, with the
+  network round trip it costs), and why the runners' figures are a floor.
+- **More throughput on one core.** Upstream connections are kept rather than dialled again,
+  the proxy borrows its copy buffers, and who a caller is - token, account, organisation,
+  roles - is read from memory between changes: revoking a token or editing a role still
+  takes effect on the next request.
 
 ### The Enterprise edition
 

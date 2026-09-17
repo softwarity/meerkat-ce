@@ -15,7 +15,11 @@ on:
     # runs twice on the same commit - and the push half publishes an image
     # tagged `dependabot-npm_and_yarn-e2e-e2e-3f52c051c4`, which nobody will
     # ever deploy. Ignored here, they are still fully tested as pull requests.
-    branches-ignore: ["dependabot/**"]
+    #
+    # Nor `bench`: the latest benchmark the doc site reads (tools/bench), which
+    # the Benchmark publication job below pushes to. Testing a branch that holds
+    # one JSON file would fail every job - and re-run the benchmark about itself.
+    branches-ignore: ["dependabot/**", "bench"]
   pull_request:
   workflow_dispatch:
 
@@ -250,6 +254,87 @@ jobs:
       - name: Test, Enterprise
         if: needs.edition.outputs.enterprise == 'true'
         run: go test -race -tags ee ./cmd/... ./ee/...
+
+  # The comparative benchmark (tools/bench): Meerkat and Kong, APISIX and
+  # Traefik in their free editions, plus the Go standard library's bare proxy as
+  # a reference, each pinned to one CPU in front of the same upstream, under the
+  # same load, in the same run.
+  #
+  # The mirror only, and on the two machines it gets for free: public runners
+  # have 4 CPUs and 16 GB on x64 AND on arm64, where this private repository
+  # would be billed for 2. The CPU model is not documented and varies, so the
+  # run records its own (lscpu) beside its figures - a number without its
+  # machine is not a number.
+  #
+  # Main only, or by hand: a point per commit is the evolution, and a pull
+  # request would publish a point for code that may never land.
+  bench:
+    name: Benchmark (${{ matrix.arch }})
+    needs: edition
+    if: >-
+      needs.edition.outputs.enterprise == 'false'
+      && ((github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch')
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Run
+        env:
+          RUNNER_LABEL: ${{ matrix.runner }}
+        run: tools/bench/run.sh
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f tools/bench/out/summary.md ]; then
+            cat tools/bench/out/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bench-${{ matrix.arch }}
+          path: tools/bench/out/results.json
+          if-no-files-found: error
+
+  # Both machines' latest results as ONE file on the `bench` branch, which the
+  # doc site's Performance page fetches on every visit. Only the latest run is
+  # kept - a history nobody reads is a file that grows - so the branch is
+  # rewritten each time as a single commit.
+  bench-publish:
+    name: Benchmark publication
+    needs: bench
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: bench-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bench-*
+          path: runs
+      - name: Publish the latest run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p /tmp/latest
+          jq -s '{schema: 1, runs: .}' runs/*/results.json > /tmp/latest/latest.json
+          cd /tmp/latest
+          git init -q -b bench
+          git add latest.json
+          git -c user.name="softwarity-bot" -c user.email="bot@softwarity.io" \
+            commit -q -m "Benchmark of ${GITHUB_SHA:0:7}"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:bench
 
   # The SAME suite, on the other database (QUAL-01).
   #

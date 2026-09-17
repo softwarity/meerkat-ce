@@ -66,7 +66,7 @@ func h2cTransportFor(connect, response time.Duration) http.RoundTripper {
 		DialContext:           (&net.Dialer{Timeout: connect}).DialContext,
 		ResponseHeaderTimeout: response,
 		Protocols:             &p,
-		MaxIdleConnsPerHost:   8,
+		MaxIdleConnsPerHost:   idlePerUpstream,
 		IdleConnTimeout:       55 * time.Second,
 	}
 	h2cTransports[key] = t

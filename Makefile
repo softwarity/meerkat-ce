@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build build-ee ui dev dev-ce test test-ee test-pg lint fmt vet clean ldap-up ldap-down ldap-test pg-up pg-down
+.PHONY: build build-ee ui dev dev-ce test test-ee test-pg bench lint fmt vet clean ldap-up ldap-down ldap-test pg-up pg-down
 
 # Hot-reload dev loop: rebuilds and restarts the gateway on every .go save.
 # Requires air (once): go install github.com/air-verse/air@latest
@@ -56,6 +56,13 @@ test:
 # image silently, and the publication is what would find out.
 test-ee:
 	go test -race -tags ee ./...
+
+# The comparative benchmark: Meerkat against Kong, APISIX and Traefik, each on
+# one CPU in front of the same upstream (tools/bench/run.sh says how, and what
+# must not drift). Needs Docker with 4 CPUs. The CI runs it on every commit to
+# main, on the community mirror, and the doc site's Performance page reads it.
+bench:
+	tools/bench/run.sh
 
 lint:
 	golangci-lint run

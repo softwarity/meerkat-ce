@@ -417,6 +417,9 @@ func (h *Handler) refreshToken(w http.ResponseWriter, r *http.Request) {
 		oauthError(w, http.StatusBadRequest, "invalid_grant", err.Error())
 		return
 	}
+	// The previous access token must stop with the refresh, not a cache
+	// window later.
+	h.sm.TokenChanged(id)
 	h.issueTokenResponse(w, r, id, access)
 }
 
@@ -449,8 +452,10 @@ func (h *Handler) oauthRevoke(w http.ResponseWriter, r *http.Request) {
 		token := r.PostFormValue("token")
 		if id, err := h.st.TakeRefreshToken(r.Context(), hashTrust(token)); err == nil {
 			_ = h.st.DeleteAPIToken(r.Context(), id)
+			h.sm.TokenChanged(id)
 		} else if tok, err := h.st.ResolveAPIToken(r.Context(), hashTrust(token), time.Now().Unix()); err == nil {
 			_ = h.st.DeleteAPIToken(r.Context(), tok.ID)
+			h.sm.TokenChanged(tok.ID)
 		}
 	}
 	w.WriteHeader(http.StatusOK)

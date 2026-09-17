@@ -133,6 +133,7 @@ func (a *API) renewAdminToken(w http.ResponseWriter, r *http.Request, actor stor
 		a.internal(w, err)
 		return
 	}
+	a.sm.TokenChanged(id)
 	a.auditEvent(r.Context(), actor, "token.renew", "token", id, before.Name, "",
 		"a new secret; the previous one stops working")
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -150,6 +151,7 @@ func (a *API) revokeAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 		a.internal(w, err)
 		return
 	}
+	a.sm.TokenChanged(id)
 	if !existed {
 		writeErr(w, http.StatusNotFound, "token not found")
 		return
@@ -212,6 +214,8 @@ func (a *API) updateAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// A narrower perimeter applies to the very next call.
+	a.sm.TokenChanged(id)
 	if !existed {
 		writeErr(w, http.StatusNotFound, "token not found")
 		return
@@ -249,6 +253,7 @@ func (a *API) toggleAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 		a.internal(w, err)
 		return
 	}
+	a.sm.TokenChanged(id)
 	if !existed {
 		writeErr(w, http.StatusNotFound, "token not found")
 		return

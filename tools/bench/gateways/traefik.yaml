@@ -1,0 +1,12 @@
+# Traefik Proxy (open source), static configuration.
+entryPoints:
+  web:
+    address: ":8000"
+providers:
+  file:
+    filename: /bench/traefik-dynamic.yaml
+log:
+  level: ERROR
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false

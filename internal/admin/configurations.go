@@ -440,6 +440,9 @@ func (a *API) activateConfiguration(w http.ResponseWriter, r *http.Request, acto
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// A configuration carries the gateway-wide token policy: every cached
+	// token decision is read again.
+	a.sm.TokenChanged("*")
 	if err := a.st.MarkConfigurationActive(r.Context(), c.ID); err != nil {
 		a.internal(w, err)
 		return

@@ -122,6 +122,12 @@ type Router struct {
 	tagsMu     sync.Mutex
 	tagsCache  map[string][]string
 	tagsReadAt time.Time
+
+	// identities remembers who a session is (identitycache.go), and identityEpoch
+	// is what makes forgetting it all a single increment.
+	identityMu    sync.Mutex
+	identities    map[identityKey]identityEntry
+	identityEpoch atomic.Uint64
 }
 
 type compiledRoute struct {
@@ -1146,11 +1152,17 @@ type identityData struct {
 	// caller, selected and renamed the same way.
 	Fields map[string]string
 	Roles  []string
+	// Memberships are the organisations this account is an ENABLED member of,
+	// whichever one the session is in: an access rule naming an organisation
+	// admits its members (store.Caller). Read with the rest, so the rule does
+	// not ask the database again on every request.
+	Memberships []string
 }
 
 // sessionIdentity resolves the caller for per-request injections and
 // forwarding; ok is false without a completed session. A simulated identity
-// (simulate.go) replaces the session wholesale.
+// (simulate.go) replaces the session wholesale. Who the session is comes from
+// memory between writes (identitycache.go).
 func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	if d, ok := simulatedIdentity(req.Context()); ok {
 		return d, true
@@ -1159,14 +1171,41 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	if err != nil || sess.Pending != "" {
 		return identityData{}, false
 	}
-	u, err := rt.st.GetUserByID(req.Context(), sess.UserID)
+	now := time.Now()
+	key := identityKey{user: sess.UserID, tenant: sess.TenantID, group: sess.GroupID}
+	e, ok := rt.cachedIdentity(key, now)
+	if !ok {
+		epoch := rt.identityEpoch.Load()
+		if e, ok = rt.readIdentity(req, sess); !ok {
+			return identityData{}, false
+		}
+		rt.rememberIdentity(key, e, epoch, now)
+	}
 	// Outside its validity window counts as disabled, and for the same reason:
-	// the decision was taken in advance rather than on the day (SEC-07).
-	if err != nil || !u.Enabled || !u.ValidAt(time.Now()) {
+	// the decision was taken in advance rather than on the day (SEC-07). A
+	// clock question, so it is asked on every request, remembered or not.
+	if !e.owner.Enabled || !e.owner.ValidAt(now) {
 		return identityData{}, false
+	}
+	return e.data.clone(), true
+}
+
+// readIdentity is what sessionIdentity used to do on every request: the
+// account, the organisation, the roles the session's group mode grants.
+func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityEntry, bool) {
+	u, err := rt.st.GetUserByID(req.Context(), sess.UserID)
+	if err != nil {
+		return identityEntry{}, false
 	}
 	d := identityData{UserID: u.ID, Username: u.Username, Fullname: u.Fullname,
 		Email: u.Email, Timezone: u.Timezone, Locale: u.Locale, Fields: u.Fields}
+	if ms, err := rt.st.ListUserTenants(req.Context(), u.ID); err == nil {
+		for _, m := range ms {
+			if m.Enabled {
+				d.Memberships = append(d.Memberships, m.TenantID)
+			}
+		}
+	}
 	tenantID := sess.TenantID
 	if tenantID == "" {
 		// The session was opened BEFORE this account joined an organisation.
@@ -1177,8 +1216,8 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 		// Roles are held IN an organisation (RBAC-06), so without one the
 		// caller carries none - which is how a group full of roles could look
 		// like it did nothing at all.
-		if only, ok := rt.onlyMembership(req, u.ID); ok {
-			tenantID = only
+		if len(d.Memberships) == 1 {
+			tenantID = d.Memberships[0]
 		}
 	}
 	if tenantID != "" {
@@ -1199,7 +1238,8 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 			d.TagsOfRole = rt.roleTags(req)
 		}
 	}
-	return d, true
+	owner := store.User{ID: u.ID, Enabled: u.Enabled, ValidFrom: u.ValidFrom, ValidUntil: u.ValidUntil}
+	return identityEntry{data: d, owner: owner}, true
 }
 
 // roleTags returns the catalogue as role name -> tags, from a short-lived
@@ -1224,27 +1264,6 @@ func (rt *Router) roleTags(req *http.Request) map[string][]string {
 	}
 	rt.tagsCache, rt.tagsReadAt = byRole, time.Now()
 	return byRole
-}
-
-// onlyMembership returns the organisation a caller belongs to when there is
-// exactly one enabled membership - the same rule sign-in applies. More than
-// one is a choice nobody may make on their behalf, and none is none.
-func (rt *Router) onlyMembership(req *http.Request, userID string) (string, bool) {
-	all, err := rt.st.ListUserTenants(req.Context(), userID)
-	if err != nil {
-		return "", false
-	}
-	found := ""
-	for _, t := range all {
-		if !t.Enabled {
-			continue
-		}
-		if found != "" {
-			return "", false
-		}
-		found = t.TenantID
-	}
-	return found, found != ""
 }
 
 // hasIdentity is the cheap gate for the page stamp: a completed session exists.
@@ -1849,19 +1868,12 @@ func refusalReason(a store.Access, c store.Caller) string {
 // caller assembles what a rule is evaluated against. Memberships are read only
 // when the rule could care (a switch offer), never on the hot path of a public
 // or plain-authenticated route.
-func (rt *Router) caller(req *http.Request, d identityData, ok bool) store.Caller {
+func (rt *Router) caller(_ *http.Request, d identityData, ok bool) store.Caller {
 	if !ok {
 		return store.Caller{}
 	}
-	c := store.Caller{Authenticated: true, Username: d.Username, TenantID: d.TenantID, Roles: d.Roles}
-	if ms, err := rt.st.ListUserTenants(req.Context(), d.UserID); err == nil {
-		for _, m := range ms {
-			if m.Enabled {
-				c.Memberships = append(c.Memberships, m.TenantID)
-			}
-		}
-	}
-	return c
+	return store.Caller{Authenticated: true, Username: d.Username, TenantID: d.TenantID,
+		Roles: d.Roles, Memberships: d.Memberships}
 }
 
 // endpointGuard enforces per-operation security (RBAC-07) inside an API route.
@@ -2315,6 +2327,23 @@ var (
 	transports   = map[[2]time.Duration]http.RoundTripper{}
 )
 
+// idlePerUpstream is how many idle connections a pool KEEPS to one upstream
+// once a burst is over. It is not a cap on how many it opens.
+//
+// It was 8, and that number was the gateway's ceiling. Past eight requests in
+// flight to the same upstream, every connection beyond the eighth was CLOSED
+// when its response ended and dialled again for the next request: a TCP
+// handshake per request, and a socket per request left in TIME_WAIT. On one
+// core the benchmark (tools/bench) read 4,164 req/s where Traefik, Kong and
+// APISIX read 34,000 to 44,000 - and a longer run exhausted the ephemeral ports
+// and answered 502s that looked like a broken upstream. At 256 the same run
+// reads 28,000 req/s with no error. Traefik keeps 200.
+//
+// Keeping them costs nothing that was not already spent: an idle connection
+// exists only because that many were needed a moment ago, and IdleConnTimeout
+// closes it when the burst does not come back.
+const idlePerUpstream = 256
+
 func transportFor(connect, response time.Duration) http.RoundTripper {
 	key := [2]time.Duration{connect, response}
 	transportsMu.Lock()
@@ -2328,7 +2357,7 @@ func transportFor(connect, response time.Duration) http.RoundTripper {
 		TLSHandshakeTimeout:   connect,
 		ResponseHeaderTimeout: response,
 		ForceAttemptHTTP2:     true,
-		MaxIdleConnsPerHost:   8,
+		MaxIdleConnsPerHost:   idlePerUpstream,
 		// Below the common load-balancer keep-alive (AWS ELB: 60s): OUR side
 		// drops an idle connection first, so a request never rides one the
 		// upstream already closed.
@@ -2348,6 +2377,9 @@ func transportFor(connect, response time.Duration) http.RoundTripper {
 type cookieStrippingTransport struct{ base http.RoundTripper }
 
 func (t cookieStrippingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !carriesGatewayInternals(req) {
+		return t.base.RoundTrip(req)
+	}
 	clone := req.Clone(req.Context())
 	stripGatewayCookies(clone)
 	// Same story for the simulation knobs: gateway-internal, already
@@ -2373,6 +2405,27 @@ func (t cookieStrippingTransport) RoundTrip(req *http.Request) (*http.Response, 
 	return res, err
 }
 
+// carriesGatewayInternals says whether RoundTrip has anything to take out:
+// a session cookie, a simulation knob, a test token, a simulation mark to add.
+// A request with none of them - every anonymous call, every API call on a
+// token - goes out as it is, without the clone of its headers that stripping
+// needs. A false positive (a cookie merely containing the name) only takes
+// the careful path.
+func carriesGatewayInternals(req *http.Request) bool {
+	if c := req.Header.Get("Cookie"); c != "" &&
+		(strings.Contains(c, session.CookieName) || strings.Contains(c, session.AdminCookieName)) {
+		return true
+	}
+	if req.Header.Get(SimulateUserHeader) != "" || req.Header.Get(SimulateRolesHeader) != "" {
+		return true
+	}
+	if strings.HasPrefix(req.Header.Get("Authorization"), "Bearer "+SimTokenPrefix) {
+		return true
+	}
+	_, simulated := simulationMeta(req.Context())
+	return simulated
+}
+
 func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteTimeouts) (http.Handler, error) {
 	target, err := url.Parse(r.Upstream)
 	if err != nil {
@@ -2392,7 +2445,8 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 		target = h2cTarget(target)
 	}
 	proxy := &httputil.ReverseProxy{
-		Transport: cookieStrippingTransport{rt},
+		BufferPool: proxyBuffers,
+		Transport:  cookieStrippingTransport{rt},
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetXForwarded()
 			// Whatever the caller sent under this name goes: it tells the

@@ -281,21 +281,44 @@ func run(o options) error {
 	// Both managers forget on every signal: a token hash belongs to exactly
 	// one of the two planes, so telling the other one costs a map lookup and
 	// saves this wiring from having to know which.
+	//
+	// And both forget LOCALLY first, before the message leaves. A change made
+	// through one plane can concern the other: an account disabled on the
+	// control plane owns data-plane API tokens, which the data manager keeps
+	// in its own memory - and a single gateway has no bus to carry that across.
 	planes := []*session.Manager{sessions, adminSessions}
-	tell := func(topic, arg string) { bus.Signal(context.Background(), topic, arg) }
+	forget := func(topic, arg string) {
+		for _, sm := range planes {
+			switch topic {
+			case store.TopicSession:
+				sm.Forget(arg)
+			case store.TopicSessionUser:
+				sm.ForgetUser(arg)
+			case store.TopicAPIToken:
+				sm.ForgetToken(arg)
+			}
+		}
+	}
+	tell := func(topic, arg string) {
+		forget(topic, arg)
+		bus.Signal(context.Background(), topic, arg)
+	}
 	for _, sm := range planes {
 		sm.Notify(tell)
 	}
-	bus.OnSignal(store.TopicSession, func(tokenHash string) {
-		for _, sm := range planes {
-			sm.Forget(tokenHash)
-		}
-	})
-	bus.OnSignal(store.TopicSessionUser, func(userID string) {
-		for _, sm := range planes {
-			sm.ForgetUser(userID)
-		}
-	})
+	for _, topic := range []string{store.TopicSession, store.TopicSessionUser, store.TopicAPIToken} {
+		bus.OnSignal(topic, func(arg string) { forget(topic, arg) })
+	}
+
+	// Who a session IS - the account, its organisation, its roles - is kept by
+	// the router between writes (gateway/identitycache.go), and forgotten as a
+	// whole after any write served outside the proxied traffic: the admin API,
+	// the agent endpoint, the sign-in and profile pages. See afterWrites.
+	identityChanged := func() {
+		router.ForgetIdentities()
+		bus.Signal(context.Background(), store.TopicIdentity, "*")
+	}
+	bus.OnSignal(store.TopicIdentity, func(string) { router.ForgetIdentities() })
 
 	// The live channel. A page is held open by whichever gateway the load
 	// balancer gave it, so a message published on one node reaches a fraction
@@ -434,12 +457,12 @@ func run(o options) error {
 	// deadline that only moved on SOME paths would end sessions at random.
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           sessions.Sliding(mux),
+		Handler:           sessions.Sliding(afterWrites(mux, "/", identityChanged)),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	adminSrv := &http.Server{
 		Addr:              adminAddr,
-		Handler:           adminSessions.Sliding(adminMux),
+		Handler:           adminSessions.Sliding(afterWrites(adminMux, "", identityChanged)),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -546,6 +569,35 @@ func run(o options) error {
 // into a restart of every node at once - each one killed for a fault none of
 // them has and none of them can fix by dying. What belongs to a dependency
 // belongs to readiness, which decides whether to send traffic.
+// afterWrites calls changed once a request that may have written has been
+// served - by anything on mux except the pattern named proxied.
+//
+// It is how the identity the router remembers learns it is stale, and it sits
+// HERE rather than in the handlers on purpose: accounts, organisations,
+// memberships, groups and roles are written from dozens of them, today's and
+// tomorrow's, and a cache dropped one handler at a time is a stale role the day
+// somebody forgets one. The cost is precision - any write forgets everything -
+// and writes are what a gateway sees least.
+//
+// The router's own pattern is left out: a POST proxied to an application is
+// that application's business, and the one kind of write that arrives by the
+// thousand.
+func afterWrites(mux *http.ServeMux, proxied string, changed func()) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.ServeHTTP(w, r)
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			return
+		}
+		if proxied != "" {
+			if _, pattern := mux.Handler(r); pattern == proxied {
+				return
+			}
+		}
+		changed()
+	})
+}
+
 func healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = fmt.Fprintf(w, `{"status":"UP","version":%q}`, version.Version)
