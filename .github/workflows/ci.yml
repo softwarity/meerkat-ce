@@ -472,7 +472,16 @@ jobs:
         # and saying nothing loudly beats a green tick over an empty run.
         if: needs.edition.outputs.enterprise == 'true' || matrix.service == 'dex'
         run: |
-          go test -tags ee ./ee/directories/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
+          if [ "${{ needs.edition.outputs.enterprise }}" = "true" ]; then
+            # Enterprise tree: the LDAP driver lives in ee/directories, run under
+            # the ee tag next to the community OIDC test.
+            go test -tags ee ./ee/directories/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
+          else
+            # Mirror (community): only the OIDC row reaches here, and its driver
+            # is community code. No ee tag - ee/ is gone, and store/external_ee.go
+            # needs ee/pgdriver behind it - and no ee/directories package.
+            go test ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
+          fi
           ran=$(grep -c -- '--- PASS' out.txt)
           echo "$ran of ${{ matrix.expect }} expected tests ran against ${{ matrix.directory }}"
           [ "$ran" -eq ${{ matrix.expect }} ] || { echo "the server was not reached"; exit 1; }
