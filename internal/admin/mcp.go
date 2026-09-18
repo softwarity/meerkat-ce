@@ -323,6 +323,7 @@ func (a *API) tools() []mcp.Tool {
 		},
 	}
 	// The half that changes something, and its own file says how (mcp_write.go).
+	read = append(read, a.lookTools()...)
 	return append(read, a.writeTools()...)
 }
 

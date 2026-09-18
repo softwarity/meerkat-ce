@@ -32,6 +32,9 @@ var agentCovers = map[string][]string{
 	"audit":          {"read_audit"},
 	"edition":        {"describe_gateway"},
 	"config":         {"export_configuration"},
+	"branding":       {"get_branding"},
+	"themes":         {"list_themes"},
+	"settings":       {"get_settings"},
 	"configurations": {"list_configurations", "save_configuration"},
 }
 
@@ -41,15 +44,12 @@ var agentCovers = map[string][]string{
 var agentIgnores = map[string]string{
 	"me":             "who the caller is, for the console's own chrome; an agent is told by describe_gateway",
 	"apidocs":        "the developer documentation pages, served to a browser",
-	"branding":       "pictures and colours: an agent has no eyes, and a base64 image would flood the conversation",
-	"themes":         "same as branding",
 	"backup":         "a snapshot is a file to download; export_configuration is the readable half an agent can reason about",
 	"certificates":   "certificates and private keys, one of the two places this product refuses to be clever",
 	"vault":          "secrets: the vault answers references, never values, and an agent has no business asking",
 	"admin-tokens":   "minting a control-plane token from an agent that holds one is how a perimeter stops meaning anything",
 	"auth-providers": "external identity providers carry client secrets; the check endpoint reaches a third party under our credentials",
 	"identity":       "JWT signing keys",
-	"settings":       "a global setting changes every application at once and reads as one line in a diff: the console shows what it affects, an agent would not",
 	"roles":          "the role catalogue is what every access rule points at; renaming one silently changes who reaches what, and no tool asked for it yet",
 	"issues":         "user-filed reports, with screenshots",
 	"mcp":            "the agent endpoint itself",
@@ -60,8 +60,8 @@ var agentIgnores = map[string]string{
 	"live": "the console's websocket: an agent does not hold a socket open to watch a " +
 		"list change, and what it carries is answered by read_traffic on demand",
 	"portal": "the icon picker's search over the embedded Material Symbols catalogue, " +
-		"for the console's portal editor; an agent picks no icons, and the portal " +
-		"itself is a global setting configured through save_settings",
+		"for the console's portal editor; an agent picks no icons. The portal ITSELF " +
+		"is a global setting, and it is read by get_settings",
 }
 
 // patternRecorder collects what the API registers. See admin.Mux for why the
@@ -249,12 +249,15 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"delete_route",
 		"describe_gateway",
 		"export_configuration",
+		"get_branding",
 		"get_route",
+		"get_settings",
 		"list_configurations",
 		"list_route_bricks",
 		"list_routes",
 		"list_services",
 		"list_tenants",
+		"list_themes",
 		"list_users",
 		"read_audit",
 		"read_traffic",
