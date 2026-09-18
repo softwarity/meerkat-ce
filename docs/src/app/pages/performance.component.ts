@@ -55,6 +55,11 @@ interface Run {
   goBench: { name: string; nsPerOp: number; allocsPerOp: number | null; vsBareProxy: number | null }[];
 }
 
+// Where a value stands among the compared products in its column: the best is
+// a good student, the worst a bad mark, the rest in between. The reference and
+// the signed-JWT row are not graded (they are not part of the comparison).
+type Tier = 'good' | 'medium' | 'bad';
+
 interface Cell {
   added50: number;
   added99: number;
@@ -63,6 +68,14 @@ interface Cell {
   // is ever recorded with one (tools/bench/report.py refuses the others), and
   // a throughput reached with errors must not read as a clean one.
   errors: number;
+  tier: Partial<Record<'added50' | 'added99' | 'rps', Tier>>;
+}
+
+interface FootCell {
+  startupMs: number;
+  idle: number | null;
+  peak: number | null;
+  tier: Partial<Record<'startup' | 'idle' | 'peak', Tier>>;
 }
 
 const GATEWAYS = ['meerkat', 'gostd', 'kong', 'apisix', 'traefik'];
@@ -174,8 +187,8 @@ const T = {
     fr: 'sur {arch}, Meerkat porte {pct} de ce que porte le proxy Go nu.',
   },
   why2: {
-    en: 'What remains between them is what Meerkat does on every request - choosing the route among its predicates, counting per route and per endpoint, checking the session. Going past the reference would mean leaving net/http, and HTTP/2, gRPC and WebSockets with it: not a trade for a gateway whose job is identity. At a normal rate, all of them add well under a millisecond; the ceiling only matters for one saturated core.',
-    fr: "Ce qui reste entre les deux, c'est ce que Meerkat fait à chaque requête : choisir la route parmi ses prédicats, compter par route et par endpoint, vérifier la session. Dépasser la référence voudrait dire quitter net/http, et HTTP/2, gRPC et les WebSockets avec : pas un échange raisonnable pour une gateway dont le métier est l'identité. À débit normal, toutes ajoutent bien moins d'une milliseconde ; le plafond ne compte que pour un cœur saturé.",
+    en: 'What remains between them is what Meerkat does on every request - choosing the route among its predicates, counting per route and per endpoint, checking the session. Going past the reference would mean leaving net/http, and HTTP/2, gRPC and WebSockets with it: not a trade for a gateway whose job is identity. At a normal rate, all of them add well under a millisecond; the ceiling only matters for one saturated core - and Meerkat serves the sign-in pages, the second factor, the organisations, the roles and the audit trail in that same process, which the others do not do at all.',
+    fr: "Ce qui reste entre les deux, c'est ce que Meerkat fait à chaque requête : choisir la route parmi ses prédicats, compter par route et par endpoint, vérifier la session. Dépasser la référence voudrait dire quitter net/http, et HTTP/2, gRPC et les WebSockets avec : pas un échange raisonnable pour une gateway dont le métier est l'identité. À débit normal, toutes ajoutent bien moins d'une milliseconde ; le plafond ne compte que pour un cœur saturé - et Meerkat sert dans ce même processus les pages de connexion, le second facteur, les organisations, les rôles et le journal d'audit, ce que les autres ne font pas du tout.",
   },
 
   whereTitle: { en: 'Where it runs', fr: 'Où ça tourne' },
@@ -208,6 +221,10 @@ const T = {
   errors: { en: 'errors', fr: "d'erreurs" },
   gateway: { en: 'Gateway', fr: 'Gateway' },
   added: { en: 'added', fr: 'ajouté' },
+  legend: {
+    en: 'In each column, of the compared products: best in green, worst in red, the rest amber. The bare-Go reference and the signed-JWT row are not graded.',
+    fr: 'Dans chaque colonne, parmi les produits comparés : le meilleur en vert, le pire en rouge, les autres en ambre. La référence Go nue et la ligne JWT signé ne sont pas notées.',
+  },
   ready: { en: 'ready in', fr: 'prête en' },
   idle: { en: 'idle', fr: 'au repos' },
   peak: { en: 'under load', fr: 'sous charge' },
@@ -286,6 +303,39 @@ const T = {
       .err {
         font-size: 0.8em;
         color: var(--accent-red);
+      }
+      /* Good student / middle / bad mark, per column. A background tint so it
+         reads next to the Meerkat row's own text colour instead of fighting it. */
+      td.num[data-tier='good'] {
+        background: color-mix(in srgb, #1a7f37 16%, transparent);
+      }
+      td.num[data-tier='medium'] {
+        background: color-mix(in srgb, #bf8700 15%, transparent);
+      }
+      td.num[data-tier='bad'] {
+        background: color-mix(in srgb, var(--accent-red, #cf222e) 16%, transparent);
+      }
+      .legend {
+        font-size: 0.82em;
+        color: var(--text-muted);
+        margin: 4px 0 0;
+      }
+      .legend .swatch {
+        display: inline-block;
+        width: 0.8em;
+        height: 0.8em;
+        border-radius: 3px;
+        vertical-align: -1px;
+        margin: 0 3px 0 8px;
+      }
+      .legend .swatch.good {
+        background: color-mix(in srgb, #1a7f37 55%, transparent);
+      }
+      .legend .swatch.medium {
+        background: color-mix(in srgb, #bf8700 55%, transparent);
+      }
+      .legend .swatch.bad {
+        background: color-mix(in srgb, var(--accent-red, #cf222e) 55%, transparent);
       }
       .ratio {
         margin: 6px 0 6px 18px;
@@ -373,9 +423,9 @@ const T = {
                     </td>
                     @for (cell of row.cells; track $index) {
                       @if (cell) {
-                        <td class="num">{{ ms(cell.added50) }}</td>
-                        <td class="num">{{ ms(cell.added99) }}</td>
-                        <td class="num">
+                        <td class="num" [attr.data-tier]="cell.tier.added50">{{ ms(cell.added50) }}</td>
+                        <td class="num" [attr.data-tier]="cell.tier.added99">{{ ms(cell.added99) }}</td>
+                        <td class="num" [attr.data-tier]="cell.tier.rps">
                           {{ cell.rps.toLocaleString(locale()) }}
                           @if (cell.errors >= 0.01) {
                             <div class="err">{{ percent(cell.errors) }} {{ t('errors') }}</div>
@@ -392,6 +442,9 @@ const T = {
               </tbody>
             </table>
           </div>
+          <p class="legend">
+            {{ t('legend') }}
+          </p>
         }
 
         <h3>{{ t('footprint') }}</h3>
@@ -412,15 +465,18 @@ const T = {
                 <tr [class.mk]="row.meerkat" [class.ref]="row.reference">
                   <td>{{ row.label }} <span class="muted mono">{{ row.version }}</span></td>
                   @for (cell of row.cells; track $index) {
-                    <td class="num">{{ cell ? cell.startupMs + ' ms' : '-' }}</td>
-                    <td class="num">{{ cell?.memoryIdleMiB ?? '-' }}</td>
-                    <td class="num">{{ cell?.memoryPeakMiB ?? '-' }}</td>
+                    <td class="num" [attr.data-tier]="cell?.tier?.startup">{{ cell ? cell.startupMs + ' ms' : '-' }}</td>
+                    <td class="num" [attr.data-tier]="cell?.tier?.idle">{{ cell?.idle ?? '-' }}</td>
+                    <td class="num" [attr.data-tier]="cell?.tier?.peak">{{ cell?.peak ?? '-' }}</td>
                   }
                 </tr>
               }
             </tbody>
           </table>
         </div>
+        <p class="legend">
+          {{ t('legend') }}
+        </p>
 
         @if (goBench().length) {
           <h3>{{ t('gobench') }}</h3>
@@ -496,18 +552,47 @@ export class PerformanceComponent {
     }),
   );
 
-  protected readonly scenarioTables = computed(() =>
-    (['proxy', 'auth', 'limit'] as const).map((key) => ({
-      key,
-      rows: GATEWAYS.flatMap((gw) => {
+  protected readonly scenarioTables = computed(() => {
+    const runCount = this.runs().length;
+    return (['proxy', 'auth', 'limit'] as const).map((key) => {
+      const rows = GATEWAYS.flatMap((gw) => {
         // The auth table carries, besides the comparable row, Traefik's
         // delegated one in its place and Meerkat's signed-JWT one below its own.
         const scenarios =
           key !== 'auth' ? [key] : gw === 'traefik' ? ['auth-delegated'] : gw === 'meerkat' ? ['auth', 'auth-jwt'] : ['auth'];
         return scenarios.flatMap((scenario) => this.row(gw, key, scenario));
-      }),
-    })),
-  );
+      });
+      // Grade only the products against each other, per column (per run): the
+      // reference and the signed-JWT row are set apart and stay ungraded.
+      const graded = rows.filter((r) => !r.reference).map((r) => r.cells);
+      for (let ri = 0; ri < runCount; ri++) {
+        const col = graded.map((cells) => cells[ri]);
+        this.tierCells(col, 'added50', true);
+        this.tierCells(col, 'added99', true);
+        this.tierCells(col, 'rps', false);
+      }
+      return { key, rows };
+    });
+  });
+
+  // Mark each product's cell in a column good (best), bad (worst) or medium. A
+  // throughput reached with errors is not a clean number - always a bad mark.
+  private tierCells(cells: (Cell | null)[], metric: 'added50' | 'added99' | 'rps', lowerBetter: boolean): void {
+    const present = cells.filter((c): c is Cell => c !== null);
+    const clean = present.filter((c) => !(metric === 'rps' && c.errors >= 0.01));
+    if (clean.length < 2) return;
+    const vals = clean.map((c) => c[metric]);
+    const best = lowerBetter ? Math.min(...vals) : Math.max(...vals);
+    const worst = lowerBetter ? Math.max(...vals) : Math.min(...vals);
+    for (const c of present) {
+      if (metric === 'rps' && c.errors >= 0.01) {
+        c.tier[metric] = 'bad';
+        continue;
+      }
+      const v = c[metric];
+      c.tier[metric] = best === worst ? 'good' : v === best ? 'good' : v === worst ? 'bad' : 'medium';
+    }
+  }
 
   private row(gw: string, key: string, scenario: string) {
     const cells = this.runs().map((run): Cell | null => {
@@ -518,6 +603,7 @@ export class PerformanceComponent {
             added99: s.fixed.overheadP99 ?? 0,
             rps: Math.round(s.max.rps),
             errors: 1 - s.max.success,
+            tier: {},
           }
         : null;
     });
@@ -535,23 +621,47 @@ export class PerformanceComponent {
     ];
   }
 
-  protected readonly footprint = computed(() =>
-    GATEWAYS.flatMap((gw) => {
-      const cells = this.runs().map((run) => run.gateways.find((g) => g.name === gw) ?? null);
-      const any = cells.find((c) => c);
-      return any
-        ? [
-            {
-              label: LABELS[gw][this.lang()],
-              meerkat: gw === 'meerkat',
-              reference: gw === 'gostd',
-              version: any.version,
-              cells,
-            },
-          ]
-        : [];
-    }),
-  );
+  protected readonly footprint = computed(() => {
+    const runCount = this.runs().length;
+    const rows = GATEWAYS.flatMap((gw) => {
+      const raw = this.runs().map((run) => run.gateways.find((g) => g.name === gw) ?? null);
+      const anyG = raw.find((g) => g);
+      if (!anyG) return [];
+      const cells = raw.map((g): FootCell | null =>
+        g ? { startupMs: g.startupMs, idle: g.memoryIdleMiB, peak: g.memoryPeakMiB, tier: {} } : null,
+      );
+      return [
+        {
+          label: LABELS[gw][this.lang()],
+          meerkat: gw === 'meerkat',
+          reference: gw === 'gostd',
+          version: anyG.version,
+          cells,
+        },
+      ];
+    });
+    // Lower is better for all three (ready-in, idle, peak); grade the products.
+    const graded = rows.filter((r) => !r.reference).map((r) => r.cells);
+    for (let ri = 0; ri < runCount; ri++) {
+      const col = graded.map((cells) => cells[ri]);
+      this.tierFoot(col, 'startup', 'startupMs');
+      this.tierFoot(col, 'idle', 'idle');
+      this.tierFoot(col, 'peak', 'peak');
+    }
+    return rows;
+  });
+
+  private tierFoot(cells: (FootCell | null)[], key: 'startup' | 'idle' | 'peak', field: 'startupMs' | 'idle' | 'peak'): void {
+    const present = cells.filter((c): c is FootCell => c !== null && c[field] != null);
+    if (present.length < 2) return;
+    const vals = present.map((c) => c[field] as number);
+    const best = Math.min(...vals);
+    const worst = Math.max(...vals);
+    for (const c of present) {
+      const v = c[field] as number;
+      c.tier[key] = best === worst ? 'good' : v === best ? 'good' : v === worst ? 'bad' : 'medium';
+    }
+  }
 
   protected readonly goBench = computed(() => {
     const names = [...new Set(this.runs().flatMap((run) => run.goBench.map((b) => b.name)))];
