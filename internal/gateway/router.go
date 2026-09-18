@@ -1050,6 +1050,18 @@ func validateRouteType(r store.Route) error {
 				return fmt.Errorf("scheme value %q is not allowed: letters, digits, - and _ only", v)
 			}
 		}
+		// A storage key is the application's own: the vendors' run to
+		// "vuetify:theme", "ng-app.theme", "nuxt-color-mode". Wider than a
+		// scheme token, and still nothing that could break out of the HTML
+		// attribute it is written into.
+		if s.Storage != "" && !storageKeyOK.MatchString(s.Storage) {
+			return fmt.Errorf("scheme storage key %q is not allowed: letters, digits, and . : - _ / only", s.Storage)
+		}
+		for _, v := range []string{s.StorageLight, s.StorageDark, s.StorageAuto} {
+			if v != "" && !storageKeyOK.MatchString(v) {
+				return fmt.Errorf("scheme stored value %q is not allowed: letters, digits, and . : - _ / only", v)
+			}
+		}
 	}
 	btn := r.UI.UserButton
 	if btn.Position != "" && !slices.Contains(store.UserButtonPositions, btn.Position) {
@@ -1139,6 +1151,11 @@ func validateRouteType(r store.Route) error {
 // schemeTokenOK bounds the attribute/class/value tokens that travel into the
 // injected HTML - validated here, so the fragment never carries free text.
 var schemeTokenOK = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// storageKeyOK is a localStorage key as applications write them - dots, colons
+// and slashes are common in the wild ("vuetify:theme"); quotes and spaces are
+// not, and this lands in an HTML attribute.
+var storageKeyOK = regexp.MustCompile(`^[A-Za-z0-9_.:/-]+$`)
 
 // headerNameOK bounds the upstream header names a route may configure.
 var headerNameOK = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
@@ -2237,9 +2254,19 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 		return ""
 	}
 	attrs := ""
-	if scheme := r.UI.Scheme != nil && r.UI.Scheme.Select; scheme {
-		s := r.UI.Scheme
-		attrs += ` data-scheme="select"`
+	// Two different things, and they used to ride together (see SchemeConfig):
+	//
+	//   - OFFERING the switch is chrome. It belongs to the user button - and
+	//     with a portal there is no per-route button to hang it on.
+	//   - HOW the application consumes a scheme (its mechanism, its tag, its
+	//     stored key) is the ROUTE's, true whoever offers the switch.
+	//
+	// So the mechanism is written whenever the route describes one, and
+	// data-scheme="select" says only whether this route offers the switch.
+	if s := r.UI.Scheme; s != nil && s.Mechanism != store.SchemeNone {
+		if s.Select {
+			attrs += ` data-scheme="select"`
+		}
 		if s.Mechanism != "" {
 			// Tag included, always: the browser half applies the mechanism to
 			// what it names, and defaulting it there rather than here would be
@@ -2248,6 +2275,13 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 				s.Mechanism, orDefault(s.Tag, "html"), s.Light, s.Dark)
 			if store.SchemeSetsAttribute(s.Mechanism) {
 				attrs += fmt.Sprintf(` data-scheme-attribute="%s"`, s.Attribute)
+			}
+		}
+		if s.StorageOverride && s.Storage != "" {
+			attrs += fmt.Sprintf(` data-scheme-storage="%s" data-scheme-storage-light="%s" data-scheme-storage-dark="%s"`,
+				s.Storage, orDefault(s.StorageLight, "light"), orDefault(s.StorageDark, "dark"))
+			if s.StorageAuto != "" {
+				attrs += fmt.Sprintf(` data-scheme-storage-auto="%s"`, s.StorageAuto)
 			}
 		}
 	}
@@ -2268,7 +2302,36 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 			attrs += fmt.Sprintf(` data-locale-param="%s"`, htmlEscape(orDefault(r.Locales.Param, "lg")))
 		}
 	}
-	return `<script defer src="/meerkat/page.js"` + attrs + `></script>`
+	agent := `<script defer src="/meerkat/page.js"` + attrs + `></script>`
+	// The application owns its colour scheme, and the way to work WITH it is to
+	// speak its own storage, not to fight it on the document.
+	//
+	// ng-m3-theme (understory) is the case that taught this: its service keeps
+	// "system | light | dark" under a key, and in system mode it CLEARS
+	// document.documentElement.style.colorScheme on every run. Anything the
+	// gateway set was wiped a tick later - and with nothing stored, its default
+	// IS system. Writing the visitor's choice into that key instead lets the
+	// application apply it the way it already knows how, before its first paint,
+	// and the chrome then simply inherits the document.
+	//
+	// Inline and not deferred, so it lands before the app's own boot script. Only
+	// when a scheme was actually chosen; with none, the app keeps its own memory
+	// and follows the system, which is what "auto" means.
+	if s := r.UI.Scheme; s != nil && s.StorageOverride && s.Storage != "" && s.Mechanism != store.SchemeNone {
+		light, dark := orDefault(s.StorageLight, "light"), orDefault(s.StorageDark, "dark")
+		// An empty value is a choice of its own: remove the entry and let the
+		// application fall back to whatever it does with nothing stored.
+		setAuto := `localStorage.removeItem(k);`
+		if s.StorageAuto != "" {
+			setAuto = `localStorage.setItem(k,'` + s.StorageAuto + `');`
+		}
+		agent = `<script>(function(){try{var k='` + s.Storage + `';` +
+			`var m=document.cookie.match(/(^|;\s*)MEERKAT_SCHEME=(light|dark|auto)/);if(!m)return;` +
+			`if(m[2]==='auto'){` + setAuto + `return;}` +
+			`localStorage.setItem(k,m[2]==='dark'?'` + dark + `':'` + light + `');` +
+			`}catch(e){}})();</script>` + agent
+	}
+	return agent
 }
 
 // userButtonFragment builds the HTML injected at the top of <body> for a UI
@@ -2312,7 +2375,9 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 	}
 	// Whether the menu SHOWS the light/dark switch. What the switch then does
 	// to the page is the agent's, and its configuration travels there.
-	if s := r.UI.Scheme; s != nil && s.Select {
+	// A UI with no colour scheme of its own has nothing to switch between, so
+	// the menu does not draw the switch whatever Select says.
+	if s := r.UI.Scheme; s != nil && s.Select && s.Mechanism != store.SchemeNone {
 		attrs += ` scheme="select"`
 	} else if s != nil && (s.Button == "light" || s.Button == "dark") {
 		// No switch here, so nothing for the button to follow: the route says

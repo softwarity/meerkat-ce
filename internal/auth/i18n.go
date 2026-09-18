@@ -195,7 +195,7 @@ type flowChrome struct {
 	// LangNames maps codes to endonyms for the language menu; SchemeIcon /
 	// SchemeNext drive the single 3-state scheme button (auto->light->dark).
 	LangNames  map[string]string
-	SchemeIcon string
+	SchemeIcon template.HTML
 	SchemeNext string
 	// UntilCookie names the readable session deadline for THIS plane: the two
 	// ports carry different sessions, so a login page reading the other one
@@ -266,9 +266,29 @@ func (h *Handler) flowData(r *http.Request, titleKey string) flowChrome {
 		chrome.SchemeSwitch = false
 	}
 	chrome.LangNames = langNames
-	chrome.SchemeIcon = map[string]string{"auto": "◐", "light": "☀", "dark": "☾"}[chrome.Scheme]
+	chrome.SchemeIcon = schemeIconSVG(chrome.Scheme)
 	chrome.SchemeNext = map[string]string{"auto": "light", "light": "dark", "dark": "auto"}[chrome.Scheme]
 	return chrome
+}
+
+// schemeIconSVG is the glyph the 3-state scheme button wears. Material Symbols
+// rather than the Unicode sun and moon: those are drawn small and off-centre
+// inside their own em box, and by how much depends on the system font - the
+// same button looked right on one machine and shrunken on the next. The three
+// paths are the ones the user button uses (userbtn.go), so the switch is the
+// same picture on a flow page and inside the account menu.
+func schemeIconSVG(scheme string) template.HTML {
+	path, ok := schemePaths[scheme]
+	if !ok {
+		path = schemePaths["auto"]
+	}
+	return template.HTML(`<svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="` + path + `"/></svg>`) //nolint:gosec // built-in constants
+}
+
+var schemePaths = map[string]string{
+	"auto":  `M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm40-83q116-14 198-98.5T800-480q0-134-82-218.5T520-797v634Z`,
+	"light": `M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z`,
+	"dark":  `M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z`,
 }
 
 // The mark, in ONE place. The wording and the address are product identity,

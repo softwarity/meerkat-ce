@@ -154,19 +154,42 @@ func TestBackgroundSanitizeAndCSS(t *testing.T) {
 	if empty.Background != (Background{}) {
 		t.Errorf("a background without an image should be empty, got %+v", empty.Background)
 	}
-	if empty.Background.CSS("/meerkat/background") != "" {
+	if empty.Background.CSS("/meerkat/background", "/meerkat/background-dark") != "" {
 		t.Error("no image must emit no rule at all")
 	}
 
-	css := b.Background.CSS("/meerkat/background")
+	// A single image is "use in both schemes": one rule, no dark URL, no
+	// per-scheme override to drag in.
+	css := b.Background.CSS("/meerkat/background", "/meerkat/background-dark")
 	for _, want := range []string{"body::before", `url("/meerkat/background")`, "background-size: cover", "var(--mk-surface) 100%"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("the rule is missing %q:\n%s", want, css)
 		}
 	}
+	for _, unwanted := range []string{"/meerkat/background-dark", "mk-scheme-dark", "prefers-color-scheme"} {
+		if strings.Contains(css, unwanted) {
+			t.Errorf("a single (both-schemes) image must not emit %q:\n%s", unwanted, css)
+		}
+	}
+
+	// Two pictures: the dark one follows the scheme, by the media query for an
+	// auto page and by the body class the server stamps for an imposed one.
+	two := Background{Image: px, Fit: "cover", ImageDark: px, FitDark: "tile", DimDark: 30}
+	if err := SanitizeBranding(&Branding{AppName: "App", Background: two}); err != nil {
+		t.Fatal(err)
+	}
+	twoCSS := two.CSS("/meerkat/background", "/meerkat/background-dark")
+	for _, want := range []string{
+		`url("/meerkat/background-dark")`, "@media (prefers-color-scheme: dark)",
+		"body.mk-scheme-dark::before", "body.mk-scheme-light::before", "background-repeat: repeat",
+	} {
+		if !strings.Contains(twoCSS, want) {
+			t.Errorf("the two-scheme rule is missing %q:\n%s", want, twoCSS)
+		}
+	}
 
 	tile := Background{Image: px, Fit: "tile"}
-	if css := tile.CSS("/x"); !strings.Contains(css, "background-repeat: repeat") {
+	if css := tile.CSS("/x", "/x-dark"); !strings.Contains(css, "background-repeat: repeat") {
 		t.Errorf("a tiled background must repeat:\n%s", css)
 	}
 }

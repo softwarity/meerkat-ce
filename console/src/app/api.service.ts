@@ -157,12 +157,22 @@ export const USER_BUTTON_POSITIONS = ['top-left', 'top-right', 'bottom-left', 'b
 // light/dark values) or a class pair can be driven.
 export interface SchemeConfig {
   select: boolean;
-  mechanism?: '' | 'attribute' | 'add-attribute' | 'class';
+  // 'none' = this UI has no colour scheme at all (no switch offered).
+  mechanism?: '' | 'none' | 'attribute' | 'add-attribute' | 'class';
   tag?: string;
   attribute?: string;
   light?: string;
   dark?: string;
   button?: '' | 'light' | 'dark';
+  // The localStorage key the application remembers its own theme under; the
+  // gateway clears it so the app cannot restore it over the chosen scheme.
+  // Master switch: without it the gateway leaves the app's storage alone.
+  storageOverride?: boolean;
+  storage?: string;
+  // What to write under that key per scheme (defaults: light / dark).
+  storageLight?: string;
+  storageDark?: string;
+  storageAuto?: string;
 }
 
 // Puts the user's effective role names on the page - as classes (default) or
@@ -1370,9 +1380,16 @@ export interface RespondPreview {
 // surface colour over it, which is what keeps the sign-in card readable on a
 // picture that was never cut for it.
 export interface Background {
+  // The light-scheme picture, and the one shown in both schemes when `both`.
   image?: string;
   fit?: 'cover' | 'contain' | 'tile';
   dim?: number;
+  // `both` reuses the light picture for the dark scheme; the dark fields below
+  // are then ignored. Off means the dark scheme gets its own picture/fit/dim.
+  both?: boolean;
+  imageDark?: string;
+  fitDark?: 'cover' | 'contain' | 'tile';
+  dimDark?: number;
 }
 
 export type LogoSize = '' | 'large' | 'xlarge';

@@ -1,6 +1,7 @@
 import { Component, computed, inject, model, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -29,6 +30,7 @@ const ACCEPTED_ICON = [
   imports: [
     MatButtonModule,
     MatCardModule,
+    MatCheckboxModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -49,11 +51,17 @@ export class BrandingCardComponent {
   readonly background = model.required<string>();
   readonly backgroundFit = model.required<BackgroundFit>();
   readonly backgroundDim = model.required<number>();
+  // Same picture for both schemes, or a dark scheme with its own (THEME-06).
+  readonly backgroundBoth = model.required<boolean>();
+  readonly backgroundDark = model.required<string>();
+  readonly backgroundFitDark = model.required<BackgroundFit>();
+  readonly backgroundDimDark = model.required<number>();
   readonly changed = output<void>();
 
   protected readonly dragging = signal(false);
   protected readonly draggingIcon = signal(false);
   protected readonly draggingBg = signal(false);
+  protected readonly draggingBgDark = signal(false);
   protected readonly fits: { value: BackgroundFit; label: string }[] = [
     { value: 'cover', label: $localize`:@@Fit_cover:Cover` },
     { value: 'contain', label: $localize`:@@Fit_contain:Contain` },
@@ -106,6 +114,27 @@ export class BrandingCardComponent {
       const first = !this.background();
       this.background.set(value);
       if (value && first && this.backgroundDim() === 0) this.backgroundDim.set(35);
+    },
+  };
+
+  // The dark scheme's own picture, same rules as the light one.
+  protected onBackgroundDarkFile(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    this.read(input.files?.[0], ACCEPTED, 1_000_000, 'background', this.bgDarkTarget);
+    input.value = '';
+  }
+
+  protected onBackgroundDarkDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    this.draggingBgDark.set(false);
+    this.read(ev.dataTransfer?.files?.[0], ACCEPTED, 1_000_000, 'background', this.bgDarkTarget);
+  }
+
+  private readonly bgDarkTarget = {
+    set: (value: string) => {
+      const first = !this.backgroundDark();
+      this.backgroundDark.set(value);
+      if (value && first && this.backgroundDimDark() === 0) this.backgroundDimDark.set(35);
     },
   };
 

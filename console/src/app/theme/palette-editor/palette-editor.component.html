@@ -72,6 +72,16 @@
   }
 
   <div class="actions">
+    <button matButton (click)="exportPalette()"
+      matTooltip="Download this palette as a file" i18n-matTooltip="@@Theme_export_hint">
+      <mat-icon>download</mat-icon><span i18n="@@Export">Export</span>
+    </button>
+    <button matButton (click)="fileInput.click()"
+      matTooltip="Load a palette from a file (review, then save)" i18n-matTooltip="@@Theme_import_hint">
+      <mat-icon>upload</mat-icon><span i18n="@@Import">Import</span>
+    </button>
+    <input #fileInput type="file" hidden accept="application/json,.json" (change)="importPalette($event)" />
+    <span class="grow"></span>
     <button matButton="tonal" (click)="save.emit()" [disabled]="saving()" i18n="@@Save">Save</button>
   </div>
 </mat-card>

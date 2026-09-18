@@ -80,9 +80,29 @@ const pageJS = `(() => {
   // color-scheme + data-meerkat-scheme, plus the app's own mechanism - an
   // attribute (light/dark values) or a class pair - as configured on the
   // route. Silent unless the route offers the switch.
+  // Whether this page acts on a scheme at all. The route OFFERING the switch is
+  // one reason; describing how the app consumes a scheme (a mechanism, a stored
+  // key) is another, and it holds when the switch is offered by the portal bar
+  // instead of by this route - see SchemeConfig.
+  const schemeAware = () => cfg.scheme === 'select' || !!cfg.schemeMechanism || !!cfg.schemeStorage;
+
   const applyScheme = (v) => {
-    if (cfg.scheme !== 'select') return;
+    if (!schemeAware()) return;
     lastScheme = v;
+    // The application keeps its own light/dark under a key the route names, and
+    // acts on THAT - ng-m3-theme even clears the document's color-scheme when it
+    // reads "system". So the choice is written in its vocabulary: light or dark
+    // as chosen, and the key dropped on auto, which is its own default.
+    if (cfg.schemeStorage) {
+      try {
+        if (v === 'light' || v === 'dark') {
+          localStorage.setItem(cfg.schemeStorage,
+            v === 'dark' ? (cfg.schemeStorageDark || 'dark') : (cfg.schemeStorageLight || 'light'));
+        }
+        else if (cfg.schemeStorageAuto) localStorage.setItem(cfg.schemeStorage, cfg.schemeStorageAuto);
+        else localStorage.removeItem(cfg.schemeStorage);
+      } catch (e) { /* denied */ }
+    }
     const root = document.documentElement;
     if (v === 'light' || v === 'dark') {
       root.style.colorScheme = v;
@@ -642,7 +662,7 @@ const pageJS = `(() => {
   watchSession();
   watchServed();
 
-  if (cfg.scheme === 'select') {
+  if (schemeAware()) {
     applyScheme(getCookie(COOKIE_SCHEME) || 'auto');
     // Said above: a mechanism aimed at anything but <html> has nothing to
     // write on until the document is parsed.

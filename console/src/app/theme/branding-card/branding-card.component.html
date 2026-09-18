@@ -97,6 +97,19 @@
        it the fix for a bright corner would be to edit the image. -->
   <div class="bg-block">
     <div class="block-title" i18n="@@Page_background">Page background</div>
+    @if (background() || backgroundDark()) {
+      <mat-checkbox
+        class="bg-both"
+        [checked]="backgroundBoth()"
+        (change)="backgroundBoth.set($event.checked); changed.emit()"
+        i18n-matTooltip="@@Bg_both_hint"
+        matTooltip="Off gives the dark scheme its own picture, fit and dim"
+        i18n="@@Bg_same_both"
+      >Same picture in light and dark</mat-checkbox>
+    }
+    @if (!backgroundBoth()) {
+      <div class="scheme-label" i18n="@@Light_scheme">Light scheme</div>
+    }
     <div
       class="dropzone wide"
       [class.dragging]="draggingBg()"
@@ -158,6 +171,72 @@
           <span class="dim-value">{{ backgroundDim() }}%</span>
         </div>
       </div>
+    }
+
+    @if (!backgroundBoth()) {
+      <div class="scheme-label" i18n="@@Dark_scheme">Dark scheme</div>
+      <div
+        class="dropzone wide"
+        [class.dragging]="draggingBgDark()"
+        (click)="bgDarkInput.click()"
+        (dragover)="$event.preventDefault(); draggingBgDark.set(true)"
+        (dragleave)="draggingBgDark.set(false)"
+        (drop)="onBackgroundDarkDrop($event)"
+      >
+        @if (backgroundDark()) {
+          <img class="bg-preview" [src]="backgroundDark()" alt="" />
+          <span class="dz-hint" i18n="@@Drop_or_click_to_replace">Drop or click to replace</span>
+          <button
+            matIconButton
+            class="clear"
+            (click)="$event.stopPropagation(); backgroundDark.set(''); changed.emit()"
+            i18n-matTooltip="@@Remove_the_background"
+            matTooltip="Remove the background"
+            i18n-aria-label="@@Remove_the_background"
+            aria-label="Remove the background"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        } @else {
+          <mat-icon class="bg-empty">wallpaper</mat-icon>
+          <span class="dz-hint" i18n="@@Drop_a_background_here_or_click">Drop a background here, or click</span>
+        }
+        <input #bgDarkInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden (change)="onBackgroundDarkFile($event)" />
+      </div>
+
+      @if (backgroundDark()) {
+        <div class="bg-controls">
+          <mat-form-field class="fit-field">
+            <mat-label i18n="@@Fit">Fit</mat-label>
+            <mat-select
+              [value]="backgroundFitDark()"
+              (selectionChange)="backgroundFitDark.set($event.value); changed.emit()"
+            >
+              @for (f of fits; track f.value) {
+                <mat-option [value]="f.value">{{ f.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <div class="dim">
+            <span
+              class="dim-label"
+              i18n-matTooltip="@@Dim_hint"
+              matTooltip="How much of the surface colour is laid over the picture. Raise it until the card reads easily in both schemes."
+            ><ng-container i18n="@@Dim">Dim</ng-container></span>
+            <mat-slider min="0" max="90" step="5">
+              <input
+                matSliderThumb
+                [value]="backgroundDimDark()"
+                (valueChange)="backgroundDimDark.set($event); changed.emit()"
+                i18n-aria-label="@@Dim"
+                aria-label="Dim"
+              />
+            </mat-slider>
+            <span class="dim-value">{{ backgroundDimDark() }}%</span>
+          </div>
+        </div>
+      }
     }
   </div>
 

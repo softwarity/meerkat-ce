@@ -186,3 +186,16 @@ h3 {
   width: 4ch;
   text-align: end;
 }
+
+// Two-background controls (THEME-06): the "same for both" toggle and the
+// small scheme headings that appear when the dark scheme gets its own picture.
+.bg-both {
+  display: block;
+  margin: 2px 0 6px;
+}
+.scheme-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface-variant);
+  margin: 8px 0 4px;
+}

@@ -1186,11 +1186,45 @@ type SchemeConfig struct {
 	// button otherwise follows the visitor's system and floats light on a dark
 	// page. It dresses the chrome alone; the page is never touched.
 	Button string `json:"button,omitempty"`
+	// Storage is the localStorage key the application remembers ITS OWN choice
+	// under ("theme", "color-mode", "vuetify:theme"...). An application that
+	// keeps one restores it on load, over what the gateway just applied - the
+	// visitor's choice held until the app's script ran, then snapped back. It
+	// is why the same portal looked right in one browser and wrong in another:
+	// what differed was what that browser had in store.
+	//
+	// The entry is REMOVED, never written: the value is the application's own
+	// vocabulary ("dark", "night", "2", a JSON blob) and guessing it would be
+	// writing a dialect we do not speak. With nothing stored, the app falls
+	// back to reading the document - which is what the gateway dresses.
+	// StorageOverride turns the whole thing on: without it the gateway does not
+	// touch the application's storage, whatever the fields below hold.
+	StorageOverride bool   `json:"storageOverride,omitempty"`
+	Storage         string `json:"storage,omitempty"`
+	// What to WRITE under that key for each scheme, in the application's own
+	// words: "light"/"dark" by default, which is what most of them keep (and
+	// what ng-m3-theme reads), but an application is free to say "night" or "1".
+	// Empty falls back to the defaults. On auto the entry is removed instead -
+	// the application's own default is what "follow the system" means to it.
+	StorageLight string `json:"storageLight,omitempty"`
+	StorageDark  string `json:"storageDark,omitempty"`
+	// StorageAuto is what "follow the system" is called in that application -
+	// ng-m3-theme writes "system". Empty REMOVES the entry instead, which for an
+	// application whose default is already the system comes to the same thing.
+	StorageAuto string `json:"storageAuto,omitempty"`
 }
 
 // SchemeMechanisms are the ways an application's own light/dark switch is
 // driven, "" (the CSS color-scheme alone) aside.
-var SchemeMechanisms = []string{"attribute", "add-attribute", "class"}
+var SchemeMechanisms = []string{SchemeNone, "attribute", "add-attribute", "class"}
+
+// SchemeNone says this UI has NO colour scheme of its own: not that it takes
+// the CSS color-scheme and nothing more (that is the empty mechanism), but that
+// light and dark mean nothing to it. The switch is then not offered in the user
+// button, and the agent leaves the document alone. Under a portal the bar still
+// carries the switch - what it offers there is the data plane's own light/dark,
+// which is Theme's business, not this route's.
+const SchemeNone = "none"
 
 // SchemeSetsAttribute says whether a mechanism carries an attribute NAME of
 // its own. The other two spell their two names out in Light and Dark.

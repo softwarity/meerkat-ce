@@ -46,6 +46,10 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
       [(background)]="scope.background"
       [(backgroundFit)]="scope.backgroundFit"
       [(backgroundDim)]="scope.backgroundDim"
+      [(backgroundBoth)]="scope.backgroundBoth"
+      [(backgroundDark)]="scope.backgroundDark"
+      [(backgroundFitDark)]="scope.backgroundFitDark"
+      [(backgroundDimDark)]="scope.backgroundDimDark"
       (changed)="scope.brandingChanged()"
     />
 

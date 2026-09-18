@@ -159,6 +159,7 @@ type Section =
   | "modout"
   | "limits"
   | "identity"
+  | "scheme"
   | "button"
   | "locales"
   | "userinfo"
@@ -176,6 +177,7 @@ const SECTIONS: Section[] = [
   "modin",
   "modout",
   "identity",
+  "scheme",
   "button",
   "locales",
   "userinfo",
@@ -184,7 +186,7 @@ const SECTIONS: Section[] = [
 
 // Sections that only make sense for one route type - they show disabled (not
 // hidden) when the other type is selected.
-const UI_SECTIONS: Section[] = ["button", "userinfo", "inject"];
+const UI_SECTIONS: Section[] = ["scheme", "button", "userinfo", "inject"];
 
 // Sections a route that answers BY ITSELF has no use for. This is not a
 // tidying preference: CompileFilters drops every request filter when the route
@@ -205,6 +207,7 @@ const SECTION_LABEL: Record<Section, string> = {
   modin: $localize`:@@Incoming:Incoming`,
   modout: $localize`:@@Outgoing:Outgoing`,
   identity: $localize`:@@Section_identity:Identity`,
+  scheme: $localize`:@@Section_color_scheme:Color scheme`,
   button: $localize`:@@Section_user_button:User button`,
   locales: $localize`:@@Section_locales:Locales`,
   userinfo: $localize`:@@Section_user_info:User info`,
@@ -354,6 +357,11 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     schemeLight: r?.ui?.scheme?.light ?? "",
     schemeDark: r?.ui?.scheme?.dark ?? "",
     schemeButton: r?.ui?.scheme?.button ?? "",
+    schemeStorageOverride: r?.ui?.scheme?.storageOverride ?? false,
+    schemeStorage: r?.ui?.scheme?.storage ?? "",
+    schemeStorageLight: r?.ui?.scheme?.storageLight ?? "",
+    schemeStorageDark: r?.ui?.scheme?.storageDark ?? "",
+    schemeStorageAuto: r?.ui?.scheme?.storageAuto ?? "",
     rolesEnabled: r?.ui?.roles?.enabled ?? false,
     // ONE mode: an attribute on a tag, classes on a tag, or a meta tag.
     rolesMode: (r?.ui?.roles?.mechanism || "class") as
@@ -1034,10 +1042,24 @@ export class RouteEditorComponent {
   protected readonly error = signal("");
   protected readonly saving = signal(false);
 
+  // Turning the override on fills the three values with the words most
+  // applications use - ng-m3-theme's own are exactly these - so the common case
+  // is a key away from working, and the rare one is edited rather than guessed.
+  protected setStorageOverride(on: boolean): void {
+    this.draft.update((d) => ({
+      ...d,
+      schemeStorageOverride: on,
+      schemeStorageAuto: on ? d.schemeStorageAuto || "system" : d.schemeStorageAuto,
+      schemeStorageDark: on ? d.schemeStorageDark || "dark" : d.schemeStorageDark,
+      schemeStorageLight: on ? d.schemeStorageLight || "light" : d.schemeStorageLight,
+    }));
+  }
+
   protected setFlag(
     flag:
       | "enabled"
       | "schemeSelect"
+      | "schemeStorageOverride"
       | "rolesEnabled"
       | "userInfoEnabled"
       | "btnEnabled"
@@ -1151,7 +1173,7 @@ export class RouteEditorComponent {
       const kept = names(d.schemeMechanism) === names(value);
       return {
         ...d,
-        schemeMechanism: value as "" | "attribute" | "add-attribute" | "class",
+        schemeMechanism: value as "" | "none" | "attribute" | "add-attribute" | "class",
         schemeLight: kept ? d.schemeLight : "",
         schemeDark: kept ? d.schemeDark : "",
       };
@@ -1330,6 +1352,10 @@ export class RouteEditorComponent {
       | "schemeLight"
       | "schemeDark"
       | "schemeButton"
+      | "schemeStorage"
+      | "schemeStorageLight"
+      | "schemeStorageDark"
+      | "schemeStorageAuto"
       | "rolesTag"
       | "rolesAttribute"
       | "userInfoMode"
@@ -1492,8 +1518,13 @@ export class RouteEditorComponent {
       route.ui = {
         scheme: {
           select: d.schemeSelect,
+          storageOverride: d.schemeStorageOverride,
+          storage: d.schemeStorage.trim(),
+          storageLight: d.schemeStorageLight.trim(),
+          storageDark: d.schemeStorageDark.trim(),
+          storageAuto: d.schemeStorageAuto.trim(),
           mechanism: d.schemeMechanism as
-            "" | "attribute" | "add-attribute" | "class",
+            "" | "none" | "attribute" | "add-attribute" | "class",
           tag: d.schemeTag.trim(),
           // Only the mechanism that has an attribute of its own keeps one: a
           // name left over from a previous mode is a value nothing reads and

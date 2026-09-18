@@ -92,9 +92,21 @@ const (
 // unreadable in one scheme or the other, and the fix would be to edit the
 // image. Fit says how it meets a screen it was not cut for.
 type Background struct {
+	// The LIGHT-scheme background, and the one shown in BOTH schemes when Both.
 	Image string `json:"image,omitempty"` // data URI, "" = no background
 	Fit   string `json:"fit,omitempty"`   // cover (default) | contain | tile
 	Dim   int    `json:"dim,omitempty"`   // 0..100, percent of surface laid over
+	// Both uses the light background for the dark scheme too, so a single
+	// picture covers both; the dark fields below are then ignored (and the
+	// console disables their controls). A photograph often reads on one scheme
+	// and not the other, so the dark scheme gets its OWN image, fit and dim
+	// when Both is off.
+	// No omitempty: false is a decision ("each scheme has its own picture"), and
+	// omitting it would let a reader's default - which is true - overrule it.
+	Both      bool   `json:"both"`
+	ImageDark string `json:"imageDark,omitempty"`
+	FitDark   string `json:"fitDark,omitempty"`
+	DimDark   int    `json:"dimDark,omitempty"`
 }
 
 // TabIcon is what a browser tab must show: the favicon when one was set, the
@@ -148,21 +160,63 @@ func SanitizeBranding(b *Branding) error {
 	// A full-screen photograph, so a wider budget than a logo - but it is
 	// fetched by URL, cached, and never inlined in a page (see the background
 	// endpoint), which is what keeps a sign-in page light.
-	if err := checkImageDataURI("background", b.Background.Image, 1_400_000); err != nil {
+	bg := &b.Background
+	if err := checkImageDataURI("background", bg.Image, 1_400_000); err != nil {
 		return err
 	}
-	switch b.Background.Fit {
-	case "", "cover":
-		b.Background.Fit = "cover"
-	case "contain", "tile":
-	default:
-		return fmt.Errorf("branding background fit %q: allowed are cover, contain, tile", b.Background.Fit)
+	if err := checkImageDataURI("dark background", bg.ImageDark, 1_400_000); err != nil {
+		return err
 	}
-	b.Background.Dim = min(100, max(0, b.Background.Dim))
-	if b.Background.Image == "" {
+	fit, err := bgFit(bg.Fit)
+	if err != nil {
+		return err
+	}
+	bg.Fit = fit
+	fitDark, err := bgFit(bg.FitDark)
+	if err != nil {
+		return err
+	}
+	bg.FitDark = fitDark
+	bg.Dim = min(100, max(0, bg.Dim))
+	bg.DimDark = min(100, max(0, bg.DimDark))
+	// One image for both schemes: the dark slot is unused, cleared so it cannot
+	// linger in an export or a diff.
+	if bg.Both {
+		bg.ImageDark, bg.FitDark, bg.DimDark = "", "", 0
+	}
+	// A layer with no image keeps no fit or dim - there is nothing to apply
+	// them to, and the stored shape stays "off" rather than "off with settings".
+	if bg.Image == "" {
+		bg.Fit, bg.Dim = "", 0
+	}
+	if bg.ImageDark == "" {
+		bg.FitDark, bg.DimDark = "", 0
+	}
+	// A single picture, no dark counterpart, means "use it in both schemes":
+	// the intuitive read of one image, and what every background written before
+	// this field said, so an old one keeps showing on a dark page.
+	if bg.Image != "" && bg.ImageDark == "" {
+		bg.Both = true
+	}
+	// No image anywhere: back to the zero background, so "no background" is one
+	// shape whether Both was on or off.
+	if bg.Image == "" && bg.ImageDark == "" {
 		b.Background = Background{}
 	}
 	return nil
+}
+
+// bgFit normalizes a background fit to the three it may take, defaulting the
+// empty one to cover, and names the allowed set when it is none of them.
+func bgFit(fit string) (string, error) {
+	switch fit {
+	case "", "cover":
+		return "cover", nil
+	case "contain", "tile":
+		return fit, nil
+	default:
+		return "", fmt.Errorf("branding background fit %q: allowed are cover, contain, tile", fit)
+	}
 }
 
 // CSS is the page layer that carries the background image: a fixed sheet
@@ -174,29 +228,61 @@ func SanitizeBranding(b *Branding) error {
 // The image is referenced by URL, never inlined: it is the one asset here that
 // can weigh a megabyte, and a data URI would put it in every page of the flow
 // instead of once in the browser's cache.
-func (b Background) CSS(url string) string {
-	if b.Image == "" {
+func (b Background) CSS(lightURL, darkURL string) string {
+	lightSet := b.Image != ""
+	darkImg, darkFit, darkDim, darkU := b.ImageDark, b.FitDark, b.DimDark, darkURL
+	if b.Both {
+		darkImg, darkFit, darkDim, darkU = b.Image, b.Fit, b.Dim, lightURL
+	}
+	darkSet := darkImg != ""
+	if !lightSet && !darkSet {
 		return ""
 	}
+	lu, du := "", ""
+	if lightSet {
+		lu = lightURL
+	}
+	if darkSet {
+		du = darkU
+	}
+	light := bgLayer(lu, b.Fit, b.Dim)
+	dark := bgLayer(du, darkFit, darkDim)
+	const common = "content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; background-position: center;"
+	css := fmt.Sprintf("\n    body::before { %s %s }", common, light)
+	// One picture for both schemes (Both, or the two happen to match): done.
+	if b.Both || dark == light {
+		return css
+	}
+	// light-dark() cannot switch a url(), so the image follows the scheme two
+	// ways: the media query for the system preference (an "auto" page), and a
+	// body class the server stamps when a scheme is imposed - which outranks the
+	// query, so the switcher's choice holds even against the system's.
+	css += fmt.Sprintf("\n    @media (prefers-color-scheme: dark) { body::before { %s } }", dark)
+	css += fmt.Sprintf("\n    body.mk-scheme-dark::before { %s }", dark)
+	css += fmt.Sprintf("\n    body.mk-scheme-light::before { %s }", light)
+	return css
+}
+
+// bgLayer is the background-* declarations for one scheme: the picture behind
+// the optional dim, sized and repeated per its fit. An empty url is "none", so
+// a scheme with no image of its own shows nothing rather than the other's.
+func bgLayer(url, fit string, dim int) string {
+	if url == "" {
+		return "background-image: none;"
+	}
 	size, repeat := "cover", "no-repeat"
-	switch b.Fit {
+	switch fit {
 	case "contain":
 		size = "contain"
 	case "tile":
 		size = "auto"
 		repeat = "repeat"
 	}
-	dim := ""
-	if b.Dim > 0 {
-		dim = fmt.Sprintf(`linear-gradient(color-mix(in srgb, var(--mk-surface) %d%%, transparent),
-                        color-mix(in srgb, var(--mk-surface) %d%%, transparent)), `, b.Dim, b.Dim)
+	over := ""
+	if dim > 0 {
+		over = fmt.Sprintf("linear-gradient(color-mix(in srgb, var(--mk-surface) %d%%, transparent), color-mix(in srgb, var(--mk-surface) %d%%, transparent)), ", dim, dim)
 	}
-	return fmt.Sprintf(`
-    body::before {
-      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background-image: %s url("%s");
-      background-size: %s; background-position: center; background-repeat: %s;
-    }`, dim, url, size, repeat)
+	return fmt.Sprintf(`background-image: %surl("%s"); background-size: %s; background-repeat: %s;`, over, url, size, repeat)
 }
 
 // imageDataURIPrefixes are the only shapes an image field may take. ICO is

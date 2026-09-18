@@ -106,6 +106,7 @@
         (change)="setIsUi($event.checked)"
       >UI</mat-checkbox>
     </div>
+    <mat-list-option value="scheme" [selected]="section() === 'scheme'" [disabled]="!draft().isUi" i18n="@@Section_color_scheme">Color scheme</mat-list-option>
     <mat-list-option value="button" [selected]="section() === 'button'" [disabled]="!draft().isUi" i18n="@@Section_user_button">User button</mat-list-option>
     <mat-list-option value="userinfo" [selected]="section() === 'userinfo'" [disabled]="!draft().isUi" i18n="@@Section_user_info">User info</mat-list-option>
     <mat-list-option value="inject" [selected]="section() === 'inject'" [disabled]="!draft().isUi" i18n="@@Section_injections">Injections</mat-list-option>
@@ -519,6 +520,93 @@
           </div>
         }
       }
+      @case ('scheme') {
+        <h3 class="sub" i18n="@@Color_scheme">Color scheme</h3>
+        <p class="section-hint" i18n="@@Scheme_section_hint">
+          How THIS application takes a light/dark choice - a property of the UI this route serves,
+          whoever offers the switch. The choice always lands on the CSS color-scheme and a
+          data-meerkat-scheme attribute; pick the application's own mechanism on top if it has one.
+          Set attribute names one attribute and gives it two values; add attribute and class take
+          the two names themselves - one bare attribute, or one class - so an empty one means
+          nothing on the tag in that state, the usual shape: nothing in light, dark in dark.
+        </p>
+        <p class="section-hint" i18n="@@Scheme_who_offers">
+          Who offers the switch: with the portal on, its bar carries it on every UI route, and there
+          is nothing to turn on here. Without a portal, it rides in the injected user button - turn
+          that on in User button.
+        </p>
+        @if (imposedScheme(); as imposed) {
+          <p class="section-hint warn" i18n="@@Scheme_switch_unavailable">
+            The built-in pages only offer {{ imposed }}, so there is nothing to switch between.
+            <a routerLink="/application/theme">Change that in Theme</a>.
+          </p>
+        }
+        <!-- How the APPLICATION consumes a scheme. Not tied to the switch being
+             offered here: with a portal, the bar offers it and this route still
+             has to say how its application takes it. -->
+        <div class="btn-row">
+            <mat-form-field class="position-field">
+              <mat-label i18n="@@Mechanism">Mechanism</mat-label>
+              <mat-select [value]="draft().schemeMechanism" (selectionChange)="setSchemeMechanism($event.value)">
+                <mat-option value="none" i18n="@@scheme_no_scheme">none</mat-option>
+                <mat-option value="" i18n="@@scheme_none">color-scheme only</mat-option>
+                <mat-option value="attribute" i18n="@@scheme_attribute">set attribute</mat-option>
+                <mat-option value="add-attribute" i18n="@@scheme_add_attribute">add attribute</mat-option>
+                <mat-option value="class" i18n="@@scheme_class">class</mat-option>
+              </mat-select>
+            </mat-form-field>
+            @if (draft().schemeMechanism) {
+              <app-form-field class="height-field wide" i18n-label="@@Tag_name" label="Tag name">
+                <input matInput placeholder="html" [value]="draft().schemeTag" (input)="patch('schemeTag', $any($event.target).value)" />
+              </app-form-field>
+            }
+            @if (draft().schemeMechanism === 'attribute') {
+              <app-form-field class="height-field wide" i18n-label="@@Attribute" label="Attribute">
+                <input matInput placeholder="data-theme" [value]="draft().schemeAttribute" (input)="patch('schemeAttribute', $any($event.target).value)" />
+              </app-form-field>
+            }
+            @if (draft().schemeMechanism) {
+              <app-form-field class="height-field wide" i18n-label="@@Light_value" label="Light value">
+                <input matInput [placeholder]="draft().schemeMechanism === 'attribute' ? 'light' : 'empty'" [value]="draft().schemeLight" (input)="patch('schemeLight', $any($event.target).value)" />
+              </app-form-field>
+              <app-form-field class="height-field wide" i18n-label="@@Dark_value" label="Dark value">
+                <input matInput [placeholder]="draft().schemeMechanism === 'add-attribute' ? 'dark-theme' : 'dark'" [value]="draft().schemeDark" (input)="patch('schemeDark', $any($event.target).value)" />
+              </app-form-field>
+            }
+        </div>
+
+        <!-- The application's own memory of the choice. It reads this key at
+             boot and dresses itself from it, so writing the visitor's choice
+             here is how a theme that owns its color-scheme follows along. -->
+        <h3 class="sub" i18n="@@Override_localstorage">Override localStorage</h3>
+        <p class="section-hint" i18n="@@Override_localstorage_hint">
+          If the application remembers its theme in localStorage, name the key and what it writes
+          for each mode. Meerkat then stores the visitor's choice in the application's own words,
+          before its scripts run, and the application applies it itself. Clearing a value removes
+          the entry instead, which leaves the application on its own default.
+        </p>
+        <div class="flags">
+          <mat-checkbox [checked]="draft().schemeStorageOverride" (change)="setStorageOverride($event.checked)">
+            <ng-container i18n="@@Override_the_stored_theme">Override the application's stored theme</ng-container>
+          </mat-checkbox>
+        </div>
+        @if (draft().schemeStorageOverride) {
+        <div class="btn-row">
+          <app-form-field class="height-field wide" i18n-label="@@Storage_key" label="Key">
+            <input matInput placeholder="theme" [value]="draft().schemeStorage" (input)="patch('schemeStorage', $any($event.target).value)" />
+          </app-form-field>
+            <app-form-field class="height-field wide" i18n-label="@@Value_system" label="System">
+              <input matInput placeholder="system" [value]="draft().schemeStorageAuto" (input)="patch('schemeStorageAuto', $any($event.target).value)" />
+            </app-form-field>
+            <app-form-field class="height-field wide" i18n-label="@@Value_dark" label="Dark">
+              <input matInput placeholder="dark" [value]="draft().schemeStorageDark" (input)="patch('schemeStorageDark', $any($event.target).value)" />
+            </app-form-field>
+            <app-form-field class="height-field wide" i18n-label="@@Value_light" label="Light">
+              <input matInput placeholder="light" [value]="draft().schemeStorageLight" (input)="patch('schemeStorageLight', $any($event.target).value)" />
+            </app-form-field>
+        </div>
+        }
+      }
       @case ('button') {
         <p class="section-hint" i18n="@@User_button_hint">
           Injects the meerkat-user-button web component into the pages: profile, tenant switch,
@@ -527,6 +615,28 @@
         <mat-checkbox [checked]="draft().btnEnabled" (change)="setFlag('btnEnabled', $event.checked)">
           <ng-container i18n="@@Inject_the_user_button">Inject the user button</ng-container>
         </mat-checkbox>
+        <!-- OFFERING the light/dark switch is chrome, so it lives with the
+             button that draws it. What the switch then does to the page is the
+             route's Color scheme section - and a UI with none has nothing to
+             switch between. -->
+        <div class="flags">
+          <mat-checkbox
+            [checked]="draft().schemeSelect && !imposedScheme() && draft().schemeMechanism !== 'none'"
+            [disabled]="!!imposedScheme() || draft().schemeMechanism === 'none' || !draft().btnEnabled"
+            (change)="setFlag('schemeSelect', $event.checked)"
+          >
+            <ng-container i18n="@@Offer_scheme_switch">
+              Offer the color-scheme switch
+            </ng-container>
+          </mat-checkbox>
+        </div>
+        @if (draft().schemeMechanism === 'none') {
+          <p class="section-hint" i18n="@@Scheme_none_no_switch">
+            This UI declares no colour scheme (Color scheme section), so there is nothing to switch
+            between here. Under a portal, the bar offers whatever light/dark the data plane itself
+            offers.
+          </p>
+        }
         @if (draft().btnEnabled) {
           <!-- A framed page is a portal, and a portal has its own avatar and
                its own way out. The button stays out of it unless the frame
@@ -640,63 +750,8 @@
           </div>
         }
 
-        <h3 class="sub" i18n="@@Color_scheme">Color scheme</h3>
-        <p class="section-hint" i18n="@@Scheme_section_hint">
-          Does the application support a color scheme? The choice is always reflected on the CSS
-          color-scheme and a data-meerkat-scheme attribute; pick the application's own mechanism
-          on top if it has one. Set attribute names one attribute and gives it two values; add
-          attribute and class take the two names themselves - one bare attribute, or one class -
-          so an empty one means nothing on the tag in that state, the usual shape: nothing in
-          light, dark in dark.
-        </p>
-        <div class="flags">
-          <mat-checkbox
-            [checked]="draft().schemeSelect && !imposedScheme()"
-            [disabled]="!!imposedScheme()"
-            (change)="setFlag('schemeSelect', $event.checked)"
-          >
-            <ng-container i18n="@@Offer_scheme_switch">
-              Offer the color-scheme switch (reflected on the page for the application)
-            </ng-container>
-          </mat-checkbox>
-        </div>
-        @if (imposedScheme(); as imposed) {
-          <p class="section-hint warn" i18n="@@Scheme_switch_unavailable">
-            The built-in pages only offer {{ imposed }}, so there is nothing to switch between.
-            <a routerLink="/application/theme">Change that in Theme</a>.
-          </p>
-        }
-        @if (draft().schemeSelect) {
-          <div class="btn-row">
-            <mat-form-field class="position-field">
-              <mat-label i18n="@@Mechanism">Mechanism</mat-label>
-              <mat-select [value]="draft().schemeMechanism" (selectionChange)="setSchemeMechanism($event.value)">
-                <mat-option value="" i18n="@@scheme_none">color-scheme only</mat-option>
-                <mat-option value="attribute" i18n="@@scheme_attribute">set attribute</mat-option>
-                <mat-option value="add-attribute" i18n="@@scheme_add_attribute">add attribute</mat-option>
-                <mat-option value="class" i18n="@@scheme_class">class</mat-option>
-              </mat-select>
-            </mat-form-field>
-            @if (draft().schemeMechanism) {
-              <app-form-field class="height-field wide" i18n-label="@@Tag_name" label="Tag name">
-                <input matInput placeholder="html" [value]="draft().schemeTag" (input)="patch('schemeTag', $any($event.target).value)" />
-              </app-form-field>
-            }
-            @if (draft().schemeMechanism === 'attribute') {
-              <app-form-field class="height-field wide" i18n-label="@@Attribute" label="Attribute">
-                <input matInput placeholder="data-theme" [value]="draft().schemeAttribute" (input)="patch('schemeAttribute', $any($event.target).value)" />
-              </app-form-field>
-            }
-            @if (draft().schemeMechanism) {
-              <app-form-field class="height-field wide" i18n-label="@@Light_value" label="Light value">
-                <input matInput [placeholder]="draft().schemeMechanism === 'attribute' ? 'light' : 'empty'" [value]="draft().schemeLight" (input)="patch('schemeLight', $any($event.target).value)" />
-              </app-form-field>
-              <app-form-field class="height-field wide" i18n-label="@@Dark_value" label="Dark value">
-                <input matInput [placeholder]="draft().schemeMechanism === 'add-attribute' ? 'dark-theme' : 'dark'" [value]="draft().schemeDark" (input)="patch('schemeDark', $any($event.target).value)" />
-              </app-form-field>
-            }
-          </div>
-        } @else {
+
+        @if (!draft().schemeSelect) {
           <p class="section-hint" i18n="@@Button_scheme_hint">
             No switch here, so nothing for the button to follow: it wears whatever the visitor chose
             elsewhere, which on an application that has one look means light chrome floating on a
@@ -713,7 +768,6 @@
             </mat-form-field>
           </div>
         }
-
       }
       @case ('locales') {
         <!-- Two blocks, and only the first one scrolls: with twenty languages

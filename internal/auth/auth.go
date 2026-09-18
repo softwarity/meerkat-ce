@@ -128,22 +128,39 @@ const specimenBody = `    <form onsubmit="return false">
         let st = document.getElementById('mk-bg');
         if (!st) { st = document.createElement('style'); st.id = 'mk-bg'; document.head.append(st); }
         const bg = e.data.background || {};
-        const okImage = typeof bg.image === 'string' &&
-          /^data:image\/(png|jpeg|webp|svg\+xml);base64,[a-zA-Z0-9+/=]+$/.test(bg.image);
-        bgOn = okImage;
-        if (!okImage) {
+        const isImg = (v) => typeof v === 'string' &&
+          /^data:image\/(png|jpeg|webp|svg\+xml);base64,[a-zA-Z0-9+/=]+$/.test(v);
+        // One scheme's background-* declarations, or "none" when it has no image.
+        const layer = (img, fit, dim) => {
+          if (!isImg(img)) return 'background-image: none;';
+          const size = fit === 'contain' ? 'contain' : (fit === 'tile' ? 'auto' : 'cover');
+          const repeat = fit === 'tile' ? 'repeat' : 'no-repeat';
+          const d = Math.max(0, Math.min(100, Number(dim) || 0));
+          const over = d
+            ? 'linear-gradient(color-mix(in srgb, var(--mk-surface) ' + d + '%, transparent),' +
+              'color-mix(in srgb, var(--mk-surface) ' + d + '%, transparent)), '
+            : '';
+          return 'background-image: ' + over + 'url("' + img + '"); background-size: ' + size +
+            '; background-repeat: ' + repeat + ';';
+        };
+        const darkImg = bg.both ? bg.image : bg.imageDark;
+        bgOn = isImg(bg.image) || isImg(darkImg);
+        if (!bgOn) {
           st.textContent = 'body::before { content: none; }';
         } else {
-          const size = bg.fit === 'contain' ? 'contain' : (bg.fit === 'tile' ? 'auto' : 'cover');
-          const repeat = bg.fit === 'tile' ? 'repeat' : 'no-repeat';
-          const dim = Math.max(0, Math.min(100, Number(bg.dim) || 0));
-          const over = dim
-            ? 'linear-gradient(color-mix(in srgb, var(--mk-surface) ' + dim + '%, transparent),' +
-              'color-mix(in srgb, var(--mk-surface) ' + dim + '%, transparent)),'
-            : '';
-          st.textContent = 'body::before { content: ""; position: fixed; inset: 0; z-index: 0;' +
-            'pointer-events: none; background-image: ' + over + 'url("' + bg.image + '");' +
-            'background-size: ' + size + '; background-position: center; background-repeat: ' + repeat + '; }';
+          const common = "content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; background-position: center;";
+          const light = layer(bg.image, bg.fit, bg.dim);
+          const dark = bg.both ? light : layer(bg.imageDark, bg.fitDark, bg.dimDark);
+          // Same picture for both schemes: one rule. Otherwise the scheme picks
+          // the image - the preview panes carry a mk-scheme class, so the class
+          // rules below select; a served auto page falls to the media query.
+          let css = 'body::before { ' + common + ' ' + light + ' }';
+          if (dark !== light) {
+            css += '@media (prefers-color-scheme: dark) { body::before { ' + dark + ' } }' +
+              'body.mk-scheme-dark::before { ' + dark + ' }' +
+              'body.mk-scheme-light::before { ' + light + ' }';
+          }
+          st.textContent = css;
         }
       }
       // The arrangement, live: this page carries every layout's CSS, so
@@ -631,6 +648,11 @@ const flowTop = `<!doctype html>
     /* language icon-menu + the single 3-state scheme button */
     .langbox { position: relative; display: inline-flex; }
     .lang-toggle svg { display: block; }
+    /* The scheme button holds one icon, not a word: a square box with the glyph
+       centred, so the three states are the same shape whatever they draw. */
+    .prefs button.scheme-cycle { display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; padding: 0; }
+    .scheme-cycle svg { display: block; width: 17px; height: 17px; }
     /* Twenty languages is a tall menu, and it opens UPWARDS from a control at
        the foot of the page: on a short window it ran off the top and the first
        half of the alphabet was unreachable. It is bounded and it scrolls -
@@ -664,7 +686,7 @@ const flowTop = `<!doctype html>
     {{.LayoutCSS}}
   </style>
 </head>
-<body class="{{if .List}}list {{end}}mk-{{.Layout.Name}}{{if .Layout.Side}} side-{{.Layout.Side}}{{end}}{{if .Brand.HasBackground}} has-bg{{end}}">
+<body class="{{if .List}}list {{end}}mk-{{.Layout.Name}}{{if .Layout.Side}} side-{{.Layout.Side}}{{end}}{{if .Brand.HasBackground}} has-bg{{end}}{{if ne .Scheme "auto"}} mk-scheme-{{.Scheme}}{{end}}">
   <main class="watch">
     <div class="brand">
     <div class="mark{{if .Brand.Meerkat}} pulse{{end}}" aria-hidden="true">
@@ -1567,11 +1589,28 @@ func (h *Handler) favicon(w http.ResponseWriter, _ *http.Request) {
 // the HTML of every sign-in.
 func (h *Handler) background(w http.ResponseWriter, r *http.Request) {
 	b := store.DefaultBranding()
-	if err := h.st.GetSetting(r.Context(), store.SettingBranding, &b); err != nil || b.Background.Image == "" {
+	_ = h.st.GetSetting(r.Context(), store.SettingBranding, &b)
+	h.serveBackground(w, r, b.Background.Image)
+}
+
+// backgroundDark serves the dark scheme's own picture; with Both on there is
+// none of its own, so it answers the light one, which is what the CSS asks for.
+func (h *Handler) backgroundDark(w http.ResponseWriter, r *http.Request) {
+	b := store.DefaultBranding()
+	_ = h.st.GetSetting(r.Context(), store.SettingBranding, &b)
+	image := b.Background.ImageDark
+	if b.Background.Both {
+		image = b.Background.Image
+	}
+	h.serveBackground(w, r, image)
+}
+
+func (h *Handler) serveBackground(w http.ResponseWriter, r *http.Request, image string) {
+	if image == "" {
 		http.NotFound(w, r)
 		return
 	}
-	mediaType, raw, ok := decodeImageDataURI(b.Background.Image)
+	mediaType, raw, ok := decodeImageDataURI(image)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -1732,7 +1771,11 @@ type brandView struct {
 // backgroundPath is where the flow pages fetch the branding background. Both
 // planes answer it: the DATA plane because its pages wear it, the ADMIN plane
 // because the console's theme preview iframes the specimen from there.
-const backgroundPath = "/meerkat/background"
+// backgroundDarkPath is the same for the dark scheme's own picture (THEME-06).
+const (
+	backgroundPath     = "/meerkat/background"
+	backgroundDarkPath = "/meerkat/background-dark"
+)
 
 func toBrandView(b store.Branding) brandView {
 	return brandView{
@@ -1740,8 +1783,8 @@ func toBrandView(b store.Branding) brandView {
 		Tagline:       b.Tagline,
 		LogoURL:       template.URL(b.Logo), //nolint:gosec // sanitized data URI
 		LogoSize:      b.LogoSize,
-		BackgroundCSS: template.CSS(b.Background.CSS(backgroundPath)), //nolint:gosec // store-sanitized enum + fixed URL
-		HasBackground: b.Background.Image != "",
+		BackgroundCSS: template.CSS(b.Background.CSS(backgroundPath, backgroundDarkPath)), //nolint:gosec // store-sanitized enum + fixed URLs
+		HasBackground: b.Background.Image != "" || b.Background.ImageDark != "",
 		icon:          b.TabIcon(),
 	}
 }
@@ -1794,15 +1837,25 @@ func (h *Handler) chrome() (template.CSS, brandView, store.PageLayout) {
 	return h.themeCache, h.brandCache, h.layoutCache
 }
 
+// previewScheme keeps the two schemes a preview pane may force, and calls
+// anything else "auto" - the specimen then follows the viewer's own preference,
+// as it did before a scheme could be asked for.
+func previewScheme(scheme string) string {
+	if scheme == "dark" || scheme == "light" {
+		return scheme
+	}
+	return "auto"
+}
+
 // WriteThemePreview renders the flow-page SPECIMEN (every element of the flow
 // design system) with an arbitrary theme, one scheme forced - the console's
 // theme editor iframes it twice, dark and light side by side. No session, no
 // side effect.
 func WriteThemePreview(w http.ResponseWriter, t store.Theme, b store.Branding, scheme string, l store.PageLayout) {
+	// The forced scheme rides on Scheme below: the template emits the
+	// color-scheme rule AND the body class from it, so adding the rule here too
+	// would write it twice.
 	css := t.CSS()
-	if scheme == "dark" || scheme == "light" {
-		css += "\n    :root { color-scheme: " + scheme + "; }"
-	}
 	// A layout the caller asked for is shown even if it was never saved -
 	// that is what choosing one in the console means. An unknown name falls
 	// back rather than rendering a body class nothing dresses.
@@ -1827,7 +1880,10 @@ func WriteThemePreview(w http.ResponseWriter, t store.Theme, b store.Branding, s
 		Title:     "Theme preview - Meerkat",
 		Lang:      "en",
 		Langs:     []string{"en"},
-		Scheme:    "auto",
+		// The pane IS a scheme: pass the forced one through, so the body wears
+		// the mk-scheme class a served page would - which is what picks the
+		// per-scheme background. "auto" here left both panes on the light one.
+		Scheme: previewScheme(scheme),
 		// The preview shows what a visitor gets, mark included: a branding
 		// screen that hid it would be showing a page nobody is served. Both
 		// conditions, same as the real pages.
@@ -1936,6 +1992,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	// The old path, kept because pages cached in a browser still ask for it.
 	mux.HandleFunc("GET /meerkat/favicon.svg", h.favicon)
 	mux.HandleFunc("GET "+backgroundPath, h.background)
+	mux.HandleFunc("GET "+backgroundDarkPath, h.backgroundDark)
 	mux.HandleFunc("GET /login", h.showLogin)
 	mux.HandleFunc("POST /login", h.doLogin)
 	mux.HandleFunc("POST /logout", h.doLogout)

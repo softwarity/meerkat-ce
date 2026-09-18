@@ -48,11 +48,20 @@ export class BuiltInPagesScope {
   readonly background = signal('');
   readonly backgroundFit = signal<Fit>('cover');
   readonly backgroundDim = signal(0);
+  // The dark scheme's own picture, used when backgroundBoth is off (THEME-06).
+  readonly backgroundBoth = signal(true);
+  readonly backgroundDark = signal('');
+  readonly backgroundFitDark = signal<Fit>('cover');
+  readonly backgroundDimDark = signal(0);
   readonly hideMark = signal(false);
   readonly bg = computed<Background>(() => ({
     image: this.background(),
     fit: this.backgroundFit(),
     dim: this.backgroundDim(),
+    both: this.backgroundBoth(),
+    imageDark: this.backgroundDark(),
+    fitDark: this.backgroundFitDark(),
+    dimDark: this.backgroundDimDark(),
   }));
 
   // ── the pages' own settings ───────────────────────────────────────────────
@@ -84,6 +93,11 @@ export class BuiltInPagesScope {
         this.background.set(b.background?.image ?? '');
         this.backgroundFit.set(b.background?.fit ?? 'cover');
         this.backgroundDim.set(b.background?.dim ?? 0);
+        // Default to "both" so a single stored picture shows on a dark page too.
+        this.backgroundBoth.set(b.background?.both ?? true);
+        this.backgroundDark.set(b.background?.imageDark ?? '');
+        this.backgroundFitDark.set(b.background?.fitDark ?? 'cover');
+        this.backgroundDimDark.set(b.background?.dimDark ?? 0);
         this.hideMark.set(b.hideMark ?? false);
       },
     });
@@ -221,6 +235,7 @@ export class BuiltInPagesScope {
 
   private saveBranding(): void {
     const image = this.background();
+    const imageDark = this.backgroundDark();
     this.api
       .saveBranding({
         appName: this.appName().trim(),
@@ -229,8 +244,20 @@ export class BuiltInPagesScope {
         logoSize: this.logoSize(),
         favicon: this.favicon(),
         // No picture, no framing: the settings that described it would be
-        // exported as decisions about something that is not there.
-        background: image ? { image, fit: this.backgroundFit(), dim: this.backgroundDim() } : {},
+        // exported as decisions about something that is not there. The server
+        // normalizes the rest (clears the dark slot under "both", etc.).
+        background:
+          image || imageDark
+            ? {
+                image,
+                fit: this.backgroundFit(),
+                dim: this.backgroundDim(),
+                both: this.backgroundBoth(),
+                imageDark,
+                fitDark: this.backgroundFitDark(),
+                dimDark: this.backgroundDimDark(),
+              }
+            : {},
         hideMark: this.hideMark(),
       })
       .subscribe({

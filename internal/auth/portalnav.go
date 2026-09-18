@@ -22,6 +22,9 @@ const portalNavJS = `(function () {
 
   var SRC = '/meerkat/portal.json';
   var RAIL_W = 72, RAIL_EXP = 280, HEADER_H = 56, STRIP_H = 48;
+  // The account button's height inside the bar: the same 40px box the launcher
+  // and the chevrons use, so the row reads as one line of controls.
+  var BTN_H = 40;
   // Below this viewport width the header drops its tabs and keeps only the app
   // selector (the waffle): a phone has no room for a tab strip.
   var NARROW = 560;
@@ -286,6 +289,10 @@ const portalNavJS = `(function () {
       try {
         var s = document.documentElement.style;
         s.paddingTop = ''; s.paddingLeft = ''; s.paddingRight = '';
+        s.boxSizing = ''; s.height = '';
+        s.removeProperty('--meerkat-top');
+        s.removeProperty('--meerkat-left');
+        s.removeProperty('--meerkat-right');
       } catch (e) {}
     }
 
@@ -377,6 +384,10 @@ const portalNavJS = `(function () {
       }
       var d = this._data, b = document.createElement('meerkat-user-button');
       b.setAttribute('in-portal', '');
+      // The button's own default (24px) is a discreet corner badge; in the bar
+      // it is one control among the tabs, and it has to read at their scale -
+      // sized off the surface it sits in (a 56px header, a 72px rail).
+      b.setAttribute('height', String(BTN_H));
       // position's first word is the anchored edge and decides which way the
       // menu opens: at the bottom of a rail it must open UPWARD, not down.
       b.setAttribute('position', position || 'top-right');
@@ -640,13 +651,31 @@ const portalNavJS = `(function () {
         var s = document.documentElement.style;
         s.paddingTop = ''; s.paddingLeft = ''; s.paddingRight = '';
         var padSide = side === 'right' ? 'paddingRight' : 'paddingLeft';
+        var top = 0, left = 0, right = 0;
         if (layout === 'header') {
-          s.paddingTop = HEADER_H + 'px';
-          if (hasSecondary) s[padSide] = RAIL_W + 'px';
+          top = HEADER_H;
+          if (hasSecondary) { if (side === 'right') right = RAIL_W; else left = RAIL_W; }
         } else {
-          s[padSide] = RAIL_W + 'px';
-          if (hasSecondary) s.paddingTop = STRIP_H + 'px';
+          if (side === 'right') right = RAIL_W; else left = RAIL_W;
+          if (hasSecondary) top = STRIP_H;
         }
+        if (top) s.paddingTop = top + 'px';
+        if (left) s.paddingLeft = left + 'px';
+        if (right) s.paddingRight = right + 'px';
+        // The padding alone left the page too TALL: height:100% resolves against
+        // the container's CONTENT box, which is still the whole viewport, so an
+        // element filling the page ran 56px past the bottom and raised a scroll
+        // bar over nothing. Pinning <html> to the viewport and counting the
+        // padding inside it (border-box) makes 100% mean "what is left".
+        s.boxSizing = 'border-box';
+        s.height = '100dvh';
+        // What the bar takes, for the rules CSS cannot fix from here: 100vh is
+        // the VIEWPORT whatever we do to <html>, so an application that asks for
+        // it slides under the bar. It can subtract these instead:
+        //   height: calc(100dvh - var(--meerkat-top, 0px))
+        s.setProperty('--meerkat-top', top + 'px');
+        s.setProperty('--meerkat-left', left + 'px');
+        s.setProperty('--meerkat-right', right + 'px');
       } catch (e) {}
     }
   }
