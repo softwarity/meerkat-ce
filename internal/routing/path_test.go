@@ -126,3 +126,30 @@ func TestStripSegmentsDoesNotAllocate(t *testing.T) {
 		t.Errorf("StripSegments allocated %v times per run, want 0", n)
 	}
 }
+
+// A lone * is a LITERAL segment, not a wildcard - the one thing about these
+// patterns that everyone assumes wrongly, because every other tool spells it
+// the other way. The catalogue's own help text said "is one segment" for
+// years, which read as "matches any one segment": an admin wrote /orders/*
+// and got a route that matched nothing at all.
+//
+// {id} is the wildcard for one segment. ** is the one for everything below.
+func TestALoneStarIsLiteralNotAWildcard(t *testing.T) {
+	for _, tc := range []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"/orders/*", "/orders/42", false},
+		{"/orders/*", "/orders/*", true},
+		{"/orders/{id}", "/orders/42", true},
+		{"/orders/**", "/orders/42/lines", true},
+	} {
+		p, err := compilePathPattern(tc.pattern)
+		if err != nil {
+			t.Fatalf("compiling %q: %v", tc.pattern, err)
+		}
+		if got := p.match(tc.path); got != tc.want {
+			t.Errorf("%q against %q = %v, want %v", tc.pattern, tc.path, got, tc.want)
+		}
+	}
+}

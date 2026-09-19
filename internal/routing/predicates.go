@@ -189,7 +189,7 @@ func init() {
 	registerPredicate(predicateDef{
 		Type:    "path",
 		Doc:     "Matches the request path against one or more patterns.",
-		Details: "Patterns match path segments: /orders/* is one segment, /orders/** is everything below, {id} captures one segment. Several patterns act as OR.",
+		Details: "Patterns match path segments: {id} stands for any one segment, /orders/** is everything below, and every other segment is literal - a lone * matches a path that really contains a star, it is not a wildcard. Several patterns act as OR.",
 		Params: []Param{
 			{Name: "patterns", Kind: KindStringList, Required: true, Doc: "e.g. /api/users/{id}, /static/**"},
 		},
@@ -425,7 +425,7 @@ func init() {
 				Doc: "where the version is read from"},
 			{Name: "name", Kind: KindString, Default: "X-API-Version", Doc: "the header or parameter carrying the version; unused on path"},
 			{Name: "pattern", Kind: KindString, Required: true, Literal: true, Initial: `v?(\d+(?:\.\d+)*)`,
-				Doc: `extracts the version, e.g. /v?(\\d+(?:\\.\\d+)*)`},
+				Doc: `extracts the version, e.g. v?(\d+(?:\.\d+)*)`},
 			{Name: "from", Kind: KindString, Doc: "lowest version accepted, inclusive - e.g. 2.0"},
 			{Name: "to", Kind: KindString, Doc: "first version REFUSED, exclusive - e.g. 3.0"},
 		},

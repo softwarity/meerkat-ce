@@ -16,7 +16,7 @@ type Reference struct {
 type CatalogEntry struct {
 	Kind  string `json:"kind"`            // "predicate" | "filter"
 	Type  string `json:"type"`            // e.g. "path", "strip-prefix"
-	Phase string `json:"phase,omitempty"` // filters: request | response | terminal
+	Phase string `json:"phase,omitempty"` // filters: gate | request | response | terminal
 	Doc   string `json:"doc"`
 	// Details is what the console shows on the brick ONCE IT IS POSED: the
 	// short Doc is what one reads to pick a brick from a list, this is what one

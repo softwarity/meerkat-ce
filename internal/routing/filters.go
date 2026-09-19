@@ -897,7 +897,7 @@ func init() {
 	registerFilter(filterDef{
 		Type: "rewrite-response-header", Phase: phaseResponse,
 		Doc:     "Rewrites a response header's value with a regexp replacement.",
-		Details: "Takes an internal name out of what the service says about itself: ^[^.]+\\\\.internal replaced by service turns billing-3.internal:8080 into service:8080.",
+		Details: "Takes an internal name out of what the service says about itself: ^[^.]+\\.internal replaced by service turns billing-3.internal:8080 into service:8080.",
 		Params: []Param{
 			{Name: "name", Kind: KindString, Required: true},
 			{Name: "pattern", Kind: KindString, Required: true},
