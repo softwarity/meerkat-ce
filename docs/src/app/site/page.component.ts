@@ -43,7 +43,8 @@ export class PageComponent {
   protected readonly words = computed(() => WORDS[this.lang()]);
   protected readonly slug = computed(() => {
     const path = this.url().split('?')[0].split('#')[0];
-    return path.split('/').slice(2).join('/') || 'index';
+    // See the shell: /en/ and /en are the same page, and Pages serves the first.
+    return path.split('/').slice(2).join('/').replace(/\/$/, '') || 'index';
   });
 
   protected readonly page = signal<Page | null>(null);

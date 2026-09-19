@@ -44,7 +44,10 @@ for (const lang of LANGS) {
     const slug = page.slug;
     const path = slug === 'index' ? `${lang}` : `${lang}/${slug}`;
     const title = slug === 'index' ? `${page.title} | Softwarity` : `${page.title} | meerkat`;
-    const url = `${ORIGIN}${base}${path}`;
+    // With the trailing slash Pages itself serves: every page is a directory,
+    // so /en answers a 301 to /en/, and a canonical that redirects is one
+    // nobody should have written.
+    const url = `${ORIGIN}${base}${path}/`;
     const html = `<!doctype html>
 <html lang="${lang}">
 <head>

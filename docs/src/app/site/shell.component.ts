@@ -69,7 +69,9 @@ export class ShellComponent {
 
   protected readonly slug = computed(() => {
     const path = this.url().split('?')[0].split('#')[0];
-    const rest = path.split('/').slice(2).join('/');
+    // The trailing slash is GitHub Pages': it answers /en with a 301 to /en/,
+    // because every page of this site is a directory holding an index.html.
+    const rest = path.split('/').slice(2).join('/').replace(/\/$/, '');
     return rest || 'index';
   });
 
