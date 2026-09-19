@@ -324,7 +324,8 @@ func (a *API) tools() []mcp.Tool {
 	}
 	// The half that changes something, and its own file says how (mcp_write.go).
 	read = append(read, a.lookTools()...)
-	return append(read, a.writeTools()...)
+	read = append(read, a.writeTools()...)
+	return append(read, a.lookWriteTools()...)
 }
 
 // routeLine is a route as an agent needs it in a list: enough to choose one,

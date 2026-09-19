@@ -32,9 +32,9 @@ var agentCovers = map[string][]string{
 	"audit":          {"read_audit"},
 	"edition":        {"describe_gateway"},
 	"config":         {"export_configuration"},
-	"branding":       {"get_branding"},
+	"branding":       {"get_branding", "save_branding"},
 	"themes":         {"list_themes"},
-	"settings":       {"get_settings"},
+	"settings":       {"get_settings", "save_portal"},
 	"configurations": {"list_configurations", "save_configuration"},
 }
 
@@ -261,7 +261,9 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"list_users",
 		"read_audit",
 		"read_traffic",
+		"save_branding",
 		"save_configuration",
+		"save_portal",
 		"save_route",
 		"test_routing",
 	}
