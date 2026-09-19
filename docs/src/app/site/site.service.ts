@@ -59,11 +59,10 @@ export type Scheme = 'system' | 'light' | 'dark';
 
 @Injectable({ providedIn: 'root' })
 export class SiteService {
-  // The language is READ FROM THE URL, not kept here as the truth: an address
-  // sent to someone else has to open in the language it was written in. This
-  // signal only follows the router, and the remembered choice decides where a
-  // reader who typed no language lands.
-  readonly lang = signal<Lang>('en');
+  // The language is READ FROM THE URL and kept nowhere else: an address sent to
+  // someone else has to open in the language it was written in. What IS kept is
+  // the choice a reader made in the menu, and it decides one thing only - where
+  // an address with no language in it lands.
   readonly scheme = signal<Scheme>(this.storedScheme());
 
   private readonly navs = new Map<Lang, Promise<Nav>>();
@@ -83,12 +82,14 @@ export class SiteService {
     return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
   }
 
+  // Called when a reader PICKS a language, and at no other moment. Writing it
+  // on every navigation would mean that opening one English link someone sent
+  // you silently makes English your default - a visit is not a decision.
   rememberLang(lang: Lang): void {
-    this.lang.set(lang);
     try {
       localStorage.setItem(LANG_KEY, lang);
     } catch {
-      // The choice holds for this page and no further.
+      // Private browsing: the choice holds for this page and no further.
     }
   }
 

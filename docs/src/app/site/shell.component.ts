@@ -108,7 +108,6 @@ export class ShellComponent {
     iconRegistry.setDefaultFontSetClass('material-symbols-outlined');
     effect(() => {
       const lang = this.lang();
-      this.site.rememberLang(lang);
       document.documentElement.lang = lang;
       void this.site.nav(lang).then((nav) => this.nav.set(nav));
     });
