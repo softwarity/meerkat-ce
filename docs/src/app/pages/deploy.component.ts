@@ -112,6 +112,14 @@ volumes:
     </div>
 
     <h3>Kubernetes, with Helm</h3>
+    <p>
+      One gateway on its own volume - the shape below. Several gateways serving one
+      installation is a different set of objects (no volume, a shared database, three
+      replicas), and it has its own page:
+      <a routerLink="/cluster">deploying a cluster on Kubernetes</a>, in English and in French,
+      with the manifests and with the part nobody writes down - how not to turn the entry point
+      into a single point of failure.
+    </p>
     <pre><code>helm install meerkat ./deploy/helm/meerkat \\
   --set admin.password='your-first-password'
 

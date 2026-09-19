@@ -69,6 +69,14 @@ func (s *Store) Snapshot(ctx context.Context, dest string) (int64, error) {
 	if _, err := os.Stat(dest); err == nil {
 		return 0, fmt.Errorf("store: %s already exists: a snapshot never overwrites", dest)
 	}
+	// VACUUM INTO below is SQLite's, and it is the whole mechanism: there is no
+	// dialectal equivalent to fall back on. An external database is backed up by
+	// the tools that own it, so say that rather than let a syntax error from the
+	// server be the answer someone reads.
+	if s.db.dialect != dialectSQLite {
+		return 0, fmt.Errorf(
+			"store: a hot snapshot is for the embedded database; this gateway runs on an external one - back it up with its own tools (pg_dump, or point-in-time recovery) and keep the vault master key separately")
+	}
 	if _, err := s.db.ExecContext(ctx, `VACUUM INTO ?`, dest); err != nil {
 		return 0, fmt.Errorf("store: snapshot to %s: %w", dest, err)
 	}

@@ -6,5 +6,8 @@
 # generated at build by scripts/gen-version.mjs and sync-scenarios.mjs
 /src/assets/version.json
 /src/assets/scenarios.json
+# generated at build by scripts/build-docs.mjs from content/ - the Markdown is
+# the source, these are its output
+/src/assets/docs/
 *.log
 .DS_Store
