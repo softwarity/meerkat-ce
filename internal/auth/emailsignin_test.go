@@ -193,3 +193,25 @@ func TestEmailSigninIsNotOnTheControlPlane(t *testing.T) {
 		}
 	}
 }
+
+// The ask counter is its own: a morning of sign-ups must not close the
+// sign-in door. Registration burns its five, the code still goes out.
+func TestEmailSigninDoesNotShareTheRegistrationBudget(t *testing.T) {
+	mux, st, sent := otpSetup(t)
+	signinOn(t, st)
+
+	// Spend the registration budget (5 per quarter of an hour) from this
+	// address, the way the integration suite does by running the sign-up and
+	// reset flows before this one.
+	for i := 0; i < 6; i++ {
+		do(t, mux, "POST", "/forgot-password", url.Values{"email": {"nobody@example.com"}}, nil)
+	}
+	cookie := askCode(t, mux, "admin@example.com")
+	if len(*sent) != 1 {
+		t.Fatalf("no code was mailed after the registration budget was spent: %d mails", len(*sent))
+	}
+	code := digitsOf(t, (*sent)[0].Text)
+	if rec := do(t, mux, "POST", "/login/code/verify", url.Values{"code": {code}}, cookie); rec.Code != http.StatusSeeOther {
+		t.Fatalf("the code did not sign in: %d", rec.Code)
+	}
+}

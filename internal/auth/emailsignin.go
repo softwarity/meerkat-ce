@@ -47,7 +47,19 @@ const (
 	// machine is the ten minutes. This stops a person guessing over someone's
 	// shoulder.
 	signinMaxTries = 5
-	signinCookie   = "MEERKAT_SIGNIN"
+	// How many addresses one source may ask about in a window. This is
+	// anti-SPRAY, not anti-brute-force: the ten minutes and the six digits
+	// answer guessing, this answers someone walking a list of addresses.
+	//
+	// It is deliberately NOT the registration counter, which the first
+	// version borrowed. That budget is five per quarter of an hour and is
+	// shared with sign-up and password reset, so a morning of sign-ups would
+	// have silently closed the sign-in door - two different doors spending one
+	// budget. The integration suite found it by running the three flows in a
+	// row from one address, which is exactly what an office does.
+	signinAskPerIP  = 20
+	signinAskWindow = 15 * time.Minute
+	signinCookie    = "MEERKAT_SIGNIN"
 )
 
 var (
@@ -134,7 +146,7 @@ func (h *Handler) doEmailSignin(w http.ResponseWriter, r *http.Request) {
 		}, http.StatusUnprocessableEntity)
 		return
 	}
-	if !h.registerAllow(r.Context(), clientIP(r)) {
+	if !h.regLimit.allow(r.Context(), "signinask|"+clientIP(r), signinAskPerIP, signinAskWindow) {
 		writeFlow(w, signinCodePage, signinCodeData{
 			flowChrome: h.flowData(r, "titleSigninCode"), Next: next, Error: h.tr(r, "errTooManyAttempts"),
 		}, http.StatusTooManyRequests)
