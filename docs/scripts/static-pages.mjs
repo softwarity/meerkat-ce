@@ -19,7 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const OUT = join(here, '..', 'dist', 'doc-site', 'browser');
 const SITE = join(OUT, 'assets', 'site');
 const LANGS = ['en', 'fr'];
-const ORIGIN = 'https://softwarity.github.io';
+const ORIGIN = 'https://www.softwarity.io';
 
 const index = await readFile(join(OUT, 'index.html'), 'utf8');
 await writeFile(join(OUT, '404.html'), index);

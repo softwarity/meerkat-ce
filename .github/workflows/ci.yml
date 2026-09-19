@@ -128,7 +128,7 @@ jobs:
       - working-directory: docs
         run: npm ci
       - working-directory: docs
-        run: npm run build -- --base-href /meerkat/
+        run: npm run build -- --base-href /
 
   # The unit tests, split by the area they cover so a red check names it:
   # "Routing" rather than "Test (ubuntu-latest)". Ubuntu only - this is about
