@@ -46,6 +46,8 @@ Les étiquettes sont un classement libre - une par microservice, par exemple - e
 elles voyagent avec le rôle là où les expressions peuvent les lire. Elles n'ont
 aucun effet sur les décisions d'accès.
 
+![Le catalogue des rôles : une hiérarchie, et ce que chaque rôle ouvre](img/console/roles.webp)
+
 ## Les groupes
 
 **Un groupe appartient à une organisation** et porte un ensemble de rôles du
@@ -59,6 +61,8 @@ hors d'une organisation :
 > Une session **sans organisation active ne détient aucun rôle**. Pas les rôles
 > d'une autre organisation, pas un sous-ensemble : aucun. Toute règle qui demande un
 > rôle exige donc aussi une organisation active, même quand la règle n'en parle pas.
+
+![Les groupes d'une organisation, chacun accordant un jeu de rôles à ses membres](img/console/groups.webp)
 
 ## Un groupe à la fois, ou tous
 

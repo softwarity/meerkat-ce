@@ -8,9 +8,8 @@ summary: Softwarity builds the tools enterprise IT teams use every day, and the 
 # Softwarity
 
 Softwarity builds software for the people who build software inside companies.
-Not consumer applications, not public APIs: the **internal applications** an IT
-department carries - the ones with real users, real data, real access rules,
-and a small team behind them.
+Our ground is the **internal applications** an IT department carries: the ones
+with real users, real data, real access rules, and a small team behind them.
 
 Those teams all end up writing the same things. A login page. A role model. A
 user table. An audit trail somebody asked for after an incident. A gateway

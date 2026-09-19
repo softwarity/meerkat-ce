@@ -1248,6 +1248,8 @@ export interface Settings {
   // one-time code by e-mail. Needs a relay; shows only for accounts with an
   // address that already set up an authenticator.
   mfaEmailOtp: boolean;
+  /** Sign in with a code mailed to the address, instead of a password (AUTH-16). */
+  emailSignin: boolean;
   // Gateway-wide passkey policy (AUTH-15) - global, the login precedes the tenant.
   passkeysAllowed: boolean;
   // Personal API tokens allowed (AUTH-16).

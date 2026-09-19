@@ -1,10 +1,7 @@
 ---
 title: L'app-gateway de vos applications internes
-section: Le produit
-order: 0
-layout: wide
-hideNav: true
 summary: Une porte devant vos applications internes. Elle prend en charge l'authentification, les règles d'accès, le routage, les quotas et l'audit, pour que vos services restent légers.
+layout: wide
 ---
 
 ::: hero
@@ -18,13 +15,35 @@ audit. Un binaire, zéro dépendance.
 - [Démarrer](/docs/start/quick-start)
 - [Voir](/showcase/index)
 - [Ce qu'elle fait](/product/features)
+
+::: figure meerkat
 :::
+:::
+
+::: stats
+### 1 binaire
+à déployer
+### 22 Mo
+de mémoire au repos
+### 0
+dépendance requise
+:::
+
+Mémoire mesurée par la CI de ce projet sur un runner x64. Ce qu'elle coûte à une
+requête est mesuré aussi, à côté de Kong, APISIX et Traefik sur la même machine
+dans la même exécution : [les chiffres](/product/performance), recalculés à
+chaque commit.
 
 ::: lead
 Vos services reçoivent des requêtes déjà authentifiées, porteuses d'un jeton
 signé avec une identité, des rôles et une organisation. Ils arrêtent d'embarquer
 une page de connexion, un modèle de rôles et une table d'utilisateurs, et
 redeviennent ce que vous vendez vraiment.
+
+Vous la pesez face à ce qu'il faudrait assembler autrement ?
+[Le dossier Meerkat](/product/the-case) fait l'arithmétique : huit produits ou
+un, trente-huit pods ou un, et ce que le même socle coûte en licences et en
+jours d'ingénierie.
 :::
 
 ::: cards

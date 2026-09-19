@@ -8,10 +8,9 @@ summary: Softwarity construit les outils que les équipes IT utilisent tous les 
 # Softwarity
 
 Softwarity écrit du logiciel pour ceux qui écrivent du logiciel dans les
-entreprises. Pas des applications grand public, pas des API publiques : les
-**applications internes** qu'une DSI porte - celles qui ont de vrais
-utilisateurs, de vraies données, de vraies règles d'accès, et une petite équipe
-derrière.
+entreprises. Notre terrain, ce sont les **applications internes** qu'une DSI
+porte : celles qui ont de vrais utilisateurs, de vraies données, de vraies
+règles d'accès, et une petite équipe derrière.
 
 Ces équipes finissent toutes par écrire les mêmes choses. Une page de connexion.
 Un modèle de rôles. Une table d'utilisateurs. Un journal d'audit que quelqu'un a

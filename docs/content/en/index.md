@@ -1,10 +1,7 @@
 ---
 title: The app-gateway for your internal applications
-section: The product
-order: 0
-layout: wide
-hideNav: true
 summary: One door in front of your internal applications. It takes care of authentication, access rules, routing, quotas and audit, so your services stay lean.
+layout: wide
 ---
 
 ::: hero
@@ -18,13 +15,35 @@ quotas, audit. One binary, zero dependency.
 - [Get started](/docs/start/quick-start)
 - [See it](/showcase/index)
 - [What it does](/product/features)
+
+::: figure meerkat
 :::
+:::
+
+::: stats
+### 1 binary
+to deploy
+### 22 MB
+idle memory
+### 0
+dependencies required
+:::
+
+Memory measured by this project's own CI on an x64 runner. What it costs a
+request is measured too, next to Kong, APISIX and Traefik on the same machine
+in the same run: [the figures](/product/performance), recomputed on every
+commit.
 
 ::: lead
 Your services receive requests that are already authenticated, carrying a
 signed token with an identity, roles and an organisation. They stop shipping a
 login page, a role model and a user table, and go back to being the thing you
 actually sell.
+
+Weighing it against what you would otherwise assemble?
+[The case for Meerkat](/product/the-case) does the arithmetic: eight products
+or one, thirty-eight pods or one, and what the same foundation costs in
+licences and in engineering days.
 :::
 
 ::: cards

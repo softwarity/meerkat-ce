@@ -55,6 +55,8 @@ where there is one and a second cannot be created, the badge would grant nothing
 The last enabled root cannot be demoted or disabled. The gateway keeps one door
 open for itself.
 
+![An account and the capabilities it carries, on the Users screen](img/console/users.webp)
+
 ## Screens that belong to no plane
 
 Some sections are open to several capabilities, with the **content** scoped

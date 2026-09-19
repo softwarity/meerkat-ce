@@ -8,8 +8,9 @@
 // appends them to the end of the line, where the last command would get them,
 // and every asset would be served from the wrong root.
 //
-// Steps: the release tag, the generated pages, the content, the bundle, and
-// one HTML file per page so GitHub Pages answers real paths with real titles.
+// Steps: the release tag, the generated pages, the deployment files, the
+// content, the bundle, and one HTML file per page so GitHub Pages answers real
+// paths with real titles.
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,9 @@ function run(command, args) {
 
 run('node', ['scripts/gen-version.mjs']);
 run('node', ['scripts/gen-tests.mjs']);
+// Before the content: the deployment page links to these files, and the
+// content build refuses a download with nothing behind it.
+run('node', ['scripts/gen-deploy.mjs']);
 run('node', ['scripts/build-site.mjs', '--strict']);
 run('npx', ['ng', 'build', ...passthrough]);
 run('node', ['scripts/static-pages.mjs']);

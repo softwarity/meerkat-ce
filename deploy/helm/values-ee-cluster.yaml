@@ -1,0 +1,52 @@
+# Meerkat, Enterprise edition, three gateways serving ONE installation.
+#
+#   kubectl create secret generic meerkat-state \
+#     --from-literal=database-url='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require' \
+#     --from-literal=vault-key="$(openssl rand -hex 32)"
+#   helm install meerkat ./meerkat -f values-ee-cluster.yaml \
+#     --set admin.password='choose-one'
+#
+# What makes three pods ONE gateway is the shared database, and nothing else:
+# the nodes never address each other. One writes a route, bumps a version and
+# sends a NOTIFY; the others hear it on the connection they already hold. So
+# no StatefulSet, no headless Service, no volume, no sidecar, no Redis.
+#
+# Sessions live in the database too, so no session affinity is needed at the
+# load balancer and a rolling update takes nobody's session with it.
+image:
+  repository: ghcr.io/softwarity/meerkat-ee
+  tag: ""
+  pullSecrets:
+    - ghcr
+
+# Three is the usual answer: it survives a node and a rolling update at once.
+replicaCount: 3
+
+# The Secret created above, holding BOTH keys. Give it here rather than
+# putting a URL and a master key in a file that goes into git.
+database:
+  existingSecret: meerkat-state
+  existingSecretKey: database-url
+
+vault:
+  existingSecret: meerkat-state
+  existingSecretKey: vault-key
+
+admin:
+  password: ""
+
+# Ignored when clustered, and said out loud rather than left to surprise: the
+# state is rows, the pod's directory holds nothing worth keeping, and a
+# ReadWriteOnce volume could not follow a pod between machines anyway.
+persistence:
+  enabled: false
+
+service:
+  type: ClusterIP
+  appPort: 8080
+  adminPort: 9090
+
+# A cluster is a production gateway. This closes the developer surface for
+# good, whatever the database says - and unlike the stored switch, it does not
+# travel in a backup or a configuration export.
+production: true

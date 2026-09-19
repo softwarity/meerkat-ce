@@ -46,6 +46,8 @@ Tags are free classification - one per microservice, say - and they travel with
 the role where expressions can read them. They have no effect on access
 decisions.
 
+![The role catalogue: a hierarchy, and what each role opens](img/console/roles.webp)
+
 ## Groups
 
 **A group belongs to one organisation** and holds a set of roles from the
@@ -61,6 +63,8 @@ an organisation:
 > of another organisation, not a subset - none. Any rule asking for a role
 > therefore also requires an active organisation, even when the rule does not
 > mention one.
+
+![Groups of an organisation, each granting a set of roles to its members](img/console/groups.webp)
 
 ## One group at a time, or all of them
 

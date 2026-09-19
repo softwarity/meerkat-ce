@@ -1,7 +1,7 @@
 ---
 title: Performance
 section: Le produit
-order: 6
+order: 8
 widget: benchmark
 summary: Ce que la passerelle coûte à une requête, mesurée à côté de Kong, APISIX et Traefik sur la même machine, dans la même exécution, lu en direct depuis le dernier benchmark de la CI.
 ---

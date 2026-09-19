@@ -1,14 +1,27 @@
+{{- if and (gt (int .Values.replicaCount) 1) (not (include "meerkat.clustered" .)) }}
+{{- fail "replicaCount above 1 needs the shared database: set database.url or database.existingSecret (Enterprise image), or leave replicaCount at 1 on its own volume - several pods on the embedded store are several gateways, not one" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "meerkat.fullname" . }}
   labels: {{- include "meerkat.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   strategy:
+    {{- if include "meerkat.clustered" . }}
+    # The state is in the database and sessions live there too, so a pod that
+    # leaves takes nobody's session with it: replace them one at a time,
+    # without ever going below the count asked for.
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+    {{- else }}
     # The store is a file on a ReadWriteOnce volume, so two gateways cannot
     # hold it at once: the old pod goes before the new one arrives.
     type: Recreate
+    {{- end }}
   selector:
     matchLabels: {{- include "meerkat.selectorLabels" . | nindent 6 }}
   template:
@@ -34,6 +47,23 @@ spec:
               containerPort: {{ .Values.plug.port }}
             {{- end }}
           env:
+            {{- if include "meerkat.clustered" . }}
+            # The shared state. This line is what makes several pods ONE
+            # gateway instead of several.
+            - name: MEERKAT_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meerkat.stateSecretName" . }}
+                  key: {{ .Values.database.existingSecretKey }}
+            {{- end }}
+            {{- if or .Values.vault.key .Values.vault.existingSecret }}
+            # The vault's master key, THE SAME on every pod.
+            - name: MEERKAT_VAULT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meerkat.vaultSecretName" . }}
+                  key: {{ .Values.vault.existingSecretKey }}
+            {{- end }}
             {{- if or .Values.admin.password .Values.admin.existingSecret }}
             - name: MEERKAT_ADMIN_PASSWORD
               valueFrom:
@@ -62,9 +92,13 @@ spec:
           {{- end }}
       volumes:
         - name: data
-          {{- if .Values.persistence.enabled }}
+          {{- if and .Values.persistence.enabled (not (include "meerkat.clustered" .)) }}
           persistentVolumeClaim:
             claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "meerkat.fullname" .)) }}
+          {{- else if include "meerkat.clustered" . }}
+          # Clustered: what the gateway knows is in the database, and this
+          # directory holds nothing that outlives the pod.
+          emptyDir: {}
           {{- else }}
           # No volume asked for: everything the gateway learns dies with the
           # pod. Fine for a demo, never for anything else.
@@ -76,6 +110,18 @@ spec:
       {{- with .Values.tolerations }}
       tolerations: {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
-      affinity: {{- toYaml . | nindent 8 }}
+      {{- if .Values.affinity }}
+      affinity: {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else if gt (int .Values.replicaCount) 1 }}
+      # Spread them: three pods on one node answer a node's failure the same
+      # way one pod does. A preference, not a demand - a cluster smaller than
+      # the count asked for must still schedule.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {{- include "meerkat.selectorLabels" . | nindent 20 }}
       {{- end }}

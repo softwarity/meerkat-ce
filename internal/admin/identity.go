@@ -1021,10 +1021,13 @@ func (a *API) deleteMember(w http.ResponseWriter, r *http.Request, actor store.U
 // and membership overrides fall back to (TENANT-04/05). The "/" trap is NOT a
 // setting: it is an ordinary catch-all route ordered last (ROUTE-10).
 type settingsPayload struct {
-	BusinessAccess  store.BusinessAccess       `json:"businessAccess"`
-	SessionTTL      string                     `json:"sessionTTL"`
-	MFARequired     bool                       `json:"mfaRequired"`     // gateway-wide second-factor policy (MFA-04)
-	MFAEmailOTP     bool                       `json:"mfaEmailOtp"`     // second-factor-by-mail fallback (MFA-02)
+	BusinessAccess store.BusinessAccess `json:"businessAccess"`
+	SessionTTL     string               `json:"sessionTTL"`
+	MFARequired    bool                 `json:"mfaRequired"` // gateway-wide second-factor policy (MFA-04)
+	MFAEmailOTP    bool                 `json:"mfaEmailOtp"` // second-factor-by-mail fallback (MFA-02)
+	// EmailSignin opens signing in with a mailed code INSTEAD of a password
+	// (AUTH-16). Data plane only, and the second factor still runs behind it.
+	EmailSignin     bool                       `json:"emailSignin"`
 	PasskeysAllowed bool                       `json:"passkeysAllowed"` // gateway-wide passkey policy (AUTH-15)
 	APITokens       bool                       `json:"apiTokens"`       // personal API tokens allowed (AUTH-16)
 	TrustedBrowser  store.TrustedBrowserPolicy `json:"trustedBrowser"`  // remember-this-browser policy (MFA-03)
@@ -1111,6 +1114,7 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 		return p, err
 	}
 	p.MFAEmailOTP = a.st.MFAEmailOTPEnabled(ctx)
+	p.EmailSignin = a.st.EmailSigninEnabled(ctx)
 	p.PasswordPolicy = a.st.GetPasswordPolicy(ctx)
 	tb, err := a.st.GetTrustedBrowserPolicy(ctx)
 	if err != nil {
@@ -1221,6 +1225,10 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	if err := a.st.SetSetting(r.Context(), store.SettingMFAEmailOTP, p.MFAEmailOTP); err != nil {
+		a.internal(w, err)
+		return
+	}
+	if err := a.st.SetSetting(r.Context(), store.SettingEmailSignin, p.EmailSignin); err != nil {
 		a.internal(w, err)
 		return
 	}

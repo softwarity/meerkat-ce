@@ -57,6 +57,8 @@ rien.
 Le dernier root actif ne peut être ni rétrogradé ni désactivé. La gateway se garde
 une porte ouverte.
 
+![Un compte et les capacités qu'il porte, sur l'écran Utilisateurs](img/console/users.webp)
+
 ## Des écrans qui n'appartiennent à aucun plan
 
 Certaines sections sont ouvertes à plusieurs capacités, le **contenu** étant filtré

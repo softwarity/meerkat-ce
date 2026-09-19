@@ -58,7 +58,7 @@ coffre plutôt que la valeur elle-même.
 
 ## L'ordre d'une connexion
 
-1. **Le premier facteur.** Un mot de passe tapé dans le formulaire, une redirection vers un fournisseur, ou une passkey. Pour un mot de passe tapé, les comptes locaux sont interrogés d'abord ; s'ils refusent, chaque annuaire actif est interrogé à son tour, dans l'ordre de l'écran. Un mauvais mot de passe, un identifiant inconnu et un compte désactivé répondent la même phrase.
+1. **Le premier facteur.** Un mot de passe tapé dans le formulaire, une redirection vers un fournisseur, une passkey, ou un [code reçu par e-mail](/docs/auth/email-code). Pour un mot de passe tapé, les comptes locaux sont interrogés d'abord ; s'ils refusent, chaque annuaire actif est interrogé à son tour, dans l'ordre de l'écran. Un mauvais mot de passe, un identifiant inconnu et un compte désactivé répondent la même phrase.
 2. **Un mot de passe à changer** - temporaire, ou expiré selon la politique. La session existe mais reste bloquée sur cette étape, et toute navigation y ramène.
 3. **Le second facteur**, si le compte en doit un.
 4. **L'organisation.** Aucune, et la personne attend dans `/account-pending`. Une seule, et elle est posée silencieusement sur la session. Plusieurs, et elle choisit.
@@ -90,6 +90,6 @@ annuaire à la fois, et qui s'est inscrit localement garde tout en passant au SS
 |---|---|
 | **Infra > Authentication** | les autorités, leurs paramètres et leurs politiques, et le défaut d'auto-inscription |
 | **Infra > Mail relay** | le relais par lequel partent les courriels de confirmation, de réinitialisation et de second facteur |
-| **Application > Security** | la politique de mot de passe, l'étranglement des tentatives, le second facteur, les navigateurs de confiance, les passkeys, les jetons d'API personnels, la durée de session |
+| **Application > Security** | la politique de mot de passe, l'étranglement des tentatives, le second facteur, la connexion par code e-mail, les navigateurs de confiance, les passkeys, les jetons d'API personnels, la durée de session |
 | **Application > Built-in pages** | l'allure des pages de connexion |
 | **Application > Users** | les comptes eux-mêmes, et leurs surcharges individuelles |

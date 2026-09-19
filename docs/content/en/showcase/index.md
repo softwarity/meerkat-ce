@@ -15,6 +15,9 @@ wearing your colours. On the other, the console an operator lives in.
 
 - [Get started](/docs/start/quick-start)
 - [What it does](/product/features)
+
+::: figure meerkat
+:::
 :::
 
 ## What your users meet

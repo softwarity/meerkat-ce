@@ -1,0 +1,31 @@
+<svg class="dg" viewBox="0 0 700 176" role="img" aria-label="Jours-homme estimés : pile libre auto-hébergée de 83 à 165, pile SaaS de 48 à 101, Meerkat de 5,5 à 12.">
+            <line x1="170" y1="8" x2="170" y2="138" class="grid"/>
+            <line x1="250" y1="8" x2="250" y2="138" class="grid"/>
+            <line x1="330" y1="8" x2="330" y2="138" class="grid"/>
+            <line x1="410" y1="8" x2="410" y2="138" class="grid"/>
+            <line x1="490" y1="8" x2="490" y2="138" class="grid"/>
+            <line x1="570" y1="8" x2="570" y2="138" class="grid"/>
+            <line x1="650" y1="8" x2="650" y2="138" class="grid"/>
+
+            <text x="158" y="35" text-anchor="end">Pile libre</text>
+            <rect x="391" y="20" width="219" height="22" class="bar"/>
+            <text x="618" y="35" class="t-mono">83 à 165</text>
+
+            <text x="158" y="77" text-anchor="end">Pile SaaS</text>
+            <rect x="298" y="62" width="141" height="22" class="bar-soft"/>
+            <text x="447" y="77" class="t-mono">48 à 101</text>
+
+            <text x="158" y="119" text-anchor="end" class="t-mk" font-weight="600">Meerkat</text>
+            <rect x="185" y="104" width="17" height="22" class="bar-mk"/>
+            <text x="210" y="119" class="t-mono t-mk">5,5 à 12</text>
+
+            <line x1="170" y1="138" x2="650" y2="138" class="axis"/>
+            <text x="170" y="156" text-anchor="middle" class="t-mono">0</text>
+            <text x="250" y="156" text-anchor="middle" class="t-mono">30</text>
+            <text x="330" y="156" text-anchor="middle" class="t-mono">60</text>
+            <text x="410" y="156" text-anchor="middle" class="t-mono">90</text>
+            <text x="490" y="156" text-anchor="middle" class="t-mono">120</text>
+            <text x="570" y="156" text-anchor="middle" class="t-mono">150</text>
+            <text x="650" y="156" text-anchor="middle" class="t-mono">180</text>
+            <text x="410" y="173" text-anchor="middle" class="t-sub">jours-homme, de la fourchette basse à la haute</text>
+          </svg>

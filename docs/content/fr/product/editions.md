@@ -1,7 +1,7 @@
 ---
 title: Éditions
 section: Le produit
-order: 3
+order: 5
 summary: Ce que fait l'édition gratuite, ce qu'ajoute Enterprise, et les trois questions qui disent laquelle il vous faut.
 ---
 
@@ -46,6 +46,7 @@ agent. En production, en entreprise, commercialement, gratuitement.
 | **Configurations enregistrées** | Trois à la fois, et la console dit où vous en êtes avant d'atteindre le plafond | Autant que vous voulez : une par client, une par environnement. |
 | **Pages intégrées** | Vos couleurs, votre logo, votre nom, la disposition centrée | Les dispositions split, tiroir, bandeau et nue en plus, et la marque Meerkat retirée des pages que vous servez. |
 | **Tunnel de développement** | plug tourne à côté de la passerelle, ce qui est son mode par défaut | Le tunnel dans la passerelle, et chaque substitution attribuée au développeur qui l'a posée. Voir [Mode développement](/product/dev-mode). |
+| **Support** | Le dépôt : une issue est lue, et la réponse reste là où elle servira au suivant | Fait partie de l'accord : vous joignez ceux qui ont écrit la passerelle, pas un palier. |
 
 Annoncés et pas encore construits : SAML 2.0, Kerberos, et l'export du journal
 d'audit vers des formats analytiques. La [feuille de route](/project/roadmap)

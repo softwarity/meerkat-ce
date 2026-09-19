@@ -12,7 +12,7 @@ export type Lang = (typeof LANGS)[number];
 
 export const LANG_NAMES: Record<Lang, string> = {
   en: 'English',
-  fr: 'Francais',
+  fr: 'Français',
 };
 
 interface Words {
@@ -32,11 +32,14 @@ interface Words {
   goCurrent: string;
   notFound: string;
   backHome: string;
-  allSections: string;
   madeBy: string;
   menu: string;
   close: string;
   inSection: string;
+  print: string;
+  previousImage: string;
+  nextImage: string;
+  imageOf: string;
 }
 
 export const WORDS: Record<Lang, Words> = {
@@ -57,33 +60,39 @@ export const WORDS: Record<Lang, Words> = {
     goCurrent: 'Read the current version',
     notFound: 'There is no page here.',
     backHome: 'Back to the home page',
-    allSections: 'All sections',
     madeBy: 'Made by',
     menu: 'Menu',
     close: 'Close',
     inSection: 'in',
+    print: 'Print',
+    previousImage: 'Previous image',
+    nextImage: 'Next image',
+    imageOf: 'of',
   },
   fr: {
     search: 'Rechercher',
     searchHint: 'Rechercher dans le site',
-    noResult: 'Aucun resultat',
+    noResult: 'Aucun résultat',
     onThisPage: 'Sur cette page',
     language: 'Langue',
     appearance: 'Apparence',
-    system: 'Systeme',
+    system: 'Système',
     light: 'Clair',
     dark: 'Sombre',
     version: 'Version',
-    versionNext: 'next (non publiee)',
+    versionNext: 'next (non publiée)',
     readingOld: 'Vous lisez la documentation de la version',
-    readingNext: "Vous lisez la documentation de la prochaine version, qui n'est pas encore publiee.",
+    readingNext: "Vous lisez la documentation de la prochaine version, qui n'est pas encore publiée.",
     goCurrent: 'Lire la version courante',
     notFound: "Il n'y a pas de page ici.",
-    backHome: "Revenir a l'accueil",
-    allSections: 'Toutes les sections',
-    madeBy: 'Realise par',
+    backHome: "Revenir à l'accueil",
+    madeBy: 'Réalisé par',
     menu: 'Menu',
     close: 'Fermer',
     inSection: 'dans',
+    print: 'Imprimer',
+    previousImage: 'Image précédente',
+    nextImage: 'Image suivante',
+    imageOf: 'sur',
   },
 };

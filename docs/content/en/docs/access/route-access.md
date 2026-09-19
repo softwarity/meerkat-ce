@@ -34,6 +34,8 @@ refuse.
 a waiting-room page, or a self-service profile, reachable by somebody who has
 just been recognised and granted nothing.
 
+![A route's own rule: a level, the roles it accepts, and the users it lets through anyway](img/console/route-editor-security.webp)
+
 ## Roles
 
 Pick any number; **any one of them grants access**. They are read in the *active*

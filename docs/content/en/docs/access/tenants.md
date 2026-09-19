@@ -39,6 +39,8 @@ its group rules, resetting a member's password, reading a member's sign-in
 history. It grants nothing outside that organisation, and in particular not the
 global role catalogue.
 
+![The members of an organisation, and what each one is in it](img/console/members.webp)
+
 ## The choice at sign-in
 
 Once the first factor and the second factor are done:

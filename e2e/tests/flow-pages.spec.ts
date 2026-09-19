@@ -307,3 +307,72 @@ test.describe.serial('flow-passkey-policy', () => {
     }
   });
 });
+
+// flow-email-signin: signing in with a one-time code mailed to the address
+// (AUTH-16), through the same SMTP sink as the reset loop. Mutates a GLOBAL
+// setting, so it is serial and restores it whatever happens.
+//
+// The second half is the point of the feature: the same code, pasted into
+// another browser, is refused - the code is bound to the request that asked
+// for it, not to the account.
+test.describe.serial('flow-email-signin', () => {
+  test('a mailed code signs in, and only in the browser that asked', async ({ page, browser }) => {
+    const mailDir = join(__dirname, '..', '.tmp', 'mail');
+    const s = seeded();
+    const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
+    const settings = await (await root.get('/api/settings')).json();
+    const user = s.users['user'];
+    const before = await (await root.get(`/api/users/${user.id}`)).json();
+    const address = 'code-user@e2e.test';
+    try {
+      const relay = await root.put('/api/settings/mail-relay', {
+        data: { host: '127.0.0.1', port: 12525, security: 'none', username: '', password: '', from: 'no-reply@e2e.test' },
+      });
+      expect(relay.ok(), await relay.text()).toBeTruthy();
+      const addr = await root.put(`/api/users/${user.id}`, { data: { ...before, email: address, emailVerified: true } });
+      expect(addr.ok(), await addr.text()).toBeTruthy();
+      const on = await root.put('/api/settings', { data: { ...settings, emailSignin: true } });
+      expect(on.ok(), await on.text()).toBeTruthy();
+
+      // The door shows on the sign-in page only once it is open.
+      await page.goto(DATA_URL + '/login');
+      await page.click('a[href^="/login/code"]');
+      await page.fill('input[name=email]', address);
+      await page.click('button[type=submit]');
+      await expect(page.locator('p.lead').first()).toContainText(/inbox|boîte/i);
+
+      const findCode = (): string | null => {
+        if (!existsSync(mailDir)) return null;
+        for (const f of readdirSync(mailDir)) {
+          const m = JSON.parse(readFileSync(join(mailDir, f), 'utf8')) as { to: string[]; data: string };
+          if (!m.to.some((t) => t.includes(address))) continue;
+          const hit = m.data.match(/\b(\d{6})\b/);
+          if (hit) return hit[1];
+        }
+        return null;
+      };
+      await expect.poll(findCode, { timeout: 10_000 }).toBeTruthy();
+      const code = findCode()!;
+
+      // Another browser holds no request: the same code opens nothing there.
+      const other = await browser.newContext();
+      const stranger = await other.newPage();
+      await stranger.goto(DATA_URL + '/login/code');
+      await stranger.fill('input[name=email]', 'someone-else@e2e.test');
+      await stranger.click('button[type=submit]');
+      await stranger.fill('input[name=code]', code);
+      await stranger.click('button[type=submit]');
+      await expect(stranger.locator('p.error').first()).toBeVisible();
+      await other.close();
+
+      // The browser that asked signs in with it.
+      await page.fill('input[name=code]', code);
+      await page.click('button[type=submit]');
+      await expect(page).not.toHaveURL(/\/login/);
+    } finally {
+      await root.put('/api/settings', { data: settings });
+      await root.put(`/api/users/${user.id}`, { data: before });
+      await root.dispose();
+    }
+  });
+});

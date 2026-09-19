@@ -17,6 +17,31 @@ different jobs served by two different ports.
 | Serves | your applications, and the pages the gateway serves itself | the admin API and the console |
 | Belongs on | the network your users reach | an internal network, never the public one |
 
+## Where it sits
+
+One binary in front of the services your application is made of. What reaches
+it is a browser or an API client; what it forwards is a request that has
+already been decided on.
+
+::: figure mesh
+The same gateway in front of both halves of an application: the interfaces
+your users open, and the APIs everything else calls.
+:::
+
+The line down the middle of the services is the one that matters. A **UI
+route** is a page a person looks at, so the gateway dresses it: the navigation
+portal, the account button, the theme, the light and dark scheme, all injected
+into the HTML on the way out. The application ships no library for any of it
+and does not know it is being dressed.
+
+An **API route** is called by a program, so there is nothing to dress. What it
+gets instead is a signed token in a header - who is calling, their roles, their
+organisation - and it authenticates nobody. That is the whole point: your
+services stop carrying a login page and a user table.
+
+A service can be both, and often is: the same application serving its pages and
+its own API behind two routes.
+
 ## Why they are separate
 
 Because a mistake on one must not be a mistake on the other.

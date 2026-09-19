@@ -20,6 +20,39 @@
   min-width: 0;
 }
 
+// Only on paper.
+.paper-source {
+  display: none;
+}
+
+.print {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 20px;
+  max-width: 190px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  mat-icon {
+    font-size: 17px;
+    width: 17px;
+    height: 17px;
+  }
+}
+
 .beside,
 .onpage {
   position: sticky;
@@ -54,19 +87,30 @@
   }
 }
 
+// A section name is a link to its first page, and the one being read is the
+// only one that unfolds.
 .beside-head {
-  font-size: 0.72rem;
+  display: flex !important;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin: 6px 0 6px 10px;
+  letter-spacing: 0.07em;
+  color: var(--muted) !important;
+
+  &.open {
+    color: var(--text) !important;
+    font-weight: 600;
+  }
 }
 
-.beside-all {
-  margin-top: 12px;
-  border-top: 1px solid var(--line-soft);
-  padding-top: 12px !important;
-  color: var(--muted) !important;
+.beside-count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .version {
@@ -186,5 +230,37 @@
   .beside-head,
   .beside-all {
     width: 100%;
+  }
+}
+
+// ---- on paper ------------------------------------------------------------
+//
+// A decision document gets forwarded, and it gets printed. What goes is the
+// chrome: the rail, the bar, the two navigation columns, the button itself.
+// What stays is the argument, full width, with its address at the top so the
+// page can be found again.
+@media print {
+  :host {
+    padding: 0;
+  }
+
+  .layout {
+    display: block;
+    padding: 0;
+  }
+
+  .beside,
+  .onpage,
+  .stale {
+    display: none !important;
+  }
+
+  .paper-source {
+    display: block;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ccc;
+    font-size: 10pt;
+    color: #555;
   }
 }

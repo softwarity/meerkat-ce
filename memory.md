@@ -1988,9 +1988,13 @@ en lecture seule et désactiver la migration, au lieu de laisser croire à un su
   détecter un trou après reconnexion, **autorisation par topic** comme les endpoints.
   Le testeur de routes n'en a pas besoin (calcul sub-milliseconde, animation côté
   client à partir de la réponse unique).
-- **Logo** : `meerkat-logo.svg` à la racine (pieds, bouche et doigts retirés, quatre
-  couches, pourtour recolorable par `--meerkat-outline`). Aperçu dans `logo-preview/`
-  (dossier de travail, supprimable). Script de reconversion dans le dossier de job.
+- **Logo** : vit dans le site, `docs/content/figures/{en,fr}/meerkat.svg` (pieds,
+  bouche et doigts retirés, quatre couches, pourtour recolorable par
+  `--meerkat-outline`). Inliné dans la page par le bloc `::: figure meerkat`, donc
+  il suit le thème clair/sombre. Le glyphe de la console (`console/public/meerkat.svg`)
+  est l'icône du rail. Les copies de la racine (`meerkat-logo.svg`, `meerkat.svg`) et
+  le dossier de travail `logo-preview/` ont été retirés le 2026-09-19 : ils étaient
+  publiés dans le miroir public sans servir à rien. Git en garde l'historique.
   Réserves dites à François : trait irrégulier hérité du PNG génératif (redessin à la
   main si ça devient la marque), et à moins de 64 px il faut une marque réduite.
 

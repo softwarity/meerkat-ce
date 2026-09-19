@@ -193,6 +193,15 @@ func (s *Store) MFAEmailOTPEnabled(ctx context.Context) bool {
 	return on
 }
 
+// EmailSigninEnabled reports whether signing in with a mailed code is open
+// (AUTH-16). Unsaved and unreadable look the same to the login flow - both
+// mean off, which is the safe answer for a door that replaces a password.
+func (s *Store) EmailSigninEnabled(ctx context.Context) bool {
+	var on bool
+	_ = s.GetSetting(ctx, SettingEmailSignin, &on)
+	return on
+}
+
 // ClearEmailTokens drops every live token of a purpose for one user - called
 // before a fresh MFA code is mailed, so a pile of old codes cannot accumulate
 // and only the latest one works.

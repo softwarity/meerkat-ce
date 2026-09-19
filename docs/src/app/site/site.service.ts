@@ -1,9 +1,20 @@
 import { Injectable, signal } from '@angular/core';
+import { SafeHtml } from '@angular/platform-browser';
 import { Lang, LANGS } from './i18n';
 
 // What the site reads at runtime, written by scripts/build-site.mjs. The
 // shapes are that script's output: change one and the other has to move with
 // it.
+
+// One picture the reader can open: a screenshot, or one of the drawings the
+// build inlines as SVG. A drawing has no address - it lives in the page's
+// HTML - so it travels as markup.
+export interface Shot {
+  src: string;
+  svg: SafeHtml | null;
+  alt: string;
+  caption: string;
+}
 
 export interface NavPage {
   slug: string;
@@ -20,6 +31,8 @@ export interface NavArea {
   short: string;
   icon: string;
   home: string;
+  prefixes: string[];
+  hidden: boolean;
   versioned: boolean;
   sections: NavSection[];
 }
@@ -39,6 +52,7 @@ export interface Page {
   summary: string;
   layout: string;
   widget: string;
+  printable: boolean;
   headings: { id: string; text: string }[];
   html: string;
 }
@@ -64,6 +78,38 @@ export class SiteService {
   // the choice a reader made in the menu, and it decides one thing only - where
   // an address with no language in it lands.
   readonly scheme = signal<Scheme>(this.storedScheme());
+
+  // ---- the picture viewer --------------------------------------------------
+  // The page being read finds its pictures; the shell shows the open one. They
+  // meet here because the two live in different stacking contexts, and only
+  // the shell's root can cover the bar.
+  readonly shots = signal<Shot[]>([]);
+  readonly at = signal(-1);
+
+  setShots(shots: Shot[]): void {
+    this.shots.set(shots);
+    this.closeShot();
+  }
+
+  openShot(index: number): void {
+    if (index < 0 || index >= this.shots().length) return;
+    this.at.set(index);
+    // The page behind must not scroll under the viewer.
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeShot(): void {
+    this.at.set(-1);
+    document.body.style.overflow = '';
+  }
+
+  // Walking wraps: after the last picture comes the first. A reader going
+  // round in circles knows they have seen them all.
+  stepShot(by: number): void {
+    const count = this.shots().length;
+    if (count < 2) return;
+    this.at.set((this.at() + by + count) % count);
+  }
 
   private readonly navs = new Map<Lang, Promise<Nav>>();
   private readonly pages = new Map<string, Promise<Page>>();

@@ -1,0 +1,88 @@
+# Meerkat on Docker Swarm - three gateways serving ONE installation.
+#
+#   export MEERKAT_DATABASE_URL='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require'
+#   export MEERKAT_VAULT_KEY="$(openssl rand -hex 32)"   # once, then keep it
+#   export MEERKAT_ADMIN_PASSWORD='choose-one'
+#   docker stack deploy -c stack.swarm.yml meerkat
+#
+# Swarm interpolates those at deploy time, from the shell that deploys: they
+# never sit in this file, and this file goes into git.
+#
+# What makes three tasks ONE gateway is the shared database, and nothing else.
+# The nodes never address each other: one writes a route, bumps a version and
+# sends a NOTIFY, and the others hear it on the connection they already hold.
+# So there is no volume here, no Redis, no broker, and no sticky session to
+# ask of the routing mesh - sessions are rows, and a task that leaves takes
+# nobody's session with it.
+#
+# For ONE gateway on one node, use docker-compose.yml (community) or
+# docker-compose.ee.yml (Enterprise, with the developer tunnel): a single
+# instance on its own volume needs no database at all.
+services:
+  meerkat:
+    # The external database is an Enterprise capability: the community image
+    # links no PostgreSQL driver, and says so in a sentence rather than
+    # failing on one. Pin a release rather than following latest on what holds
+    # your front door.
+    image: ghcr.io/softwarity/meerkat-ee:latest
+    ports:
+      # Published on the routing mesh: any node answers, whichever task runs.
+      - target: 8080
+        published: 8080
+        mode: ingress
+      # The control plane. Publishing it at all is a choice - keep it on an
+      # internal network, or drop these three lines and reach the console
+      # through an overlay network or an SSH tunnel.
+      - target: 9090
+        published: 9090
+        mode: ingress
+    environment:
+      # The shared state. This line is what makes three tasks one gateway.
+      MEERKAT_DATABASE_URL: ${MEERKAT_DATABASE_URL:?point it at a PostgreSQL every node can reach}
+      # The vault's master key, THE SAME on every task. It seals what is IN
+      # the database, so it is not kept there. Generate it once and keep it:
+      # losing it loses every secret in the vault.
+      MEERKAT_VAULT_KEY: ${MEERKAT_VAULT_KEY:?generate one with openssl rand -hex 32, then keep it}
+      # Read once, on the FIRST start, to create the admin account: the task
+      # that arrives first creates it, the others find it already there.
+      MEERKAT_ADMIN_PASSWORD: ${MEERKAT_ADMIN_PASSWORD:?set a password for the first admin}
+      # A cluster is a production gateway: the whole developer surface stays
+      # closed here, whatever the database says.
+      MEERKAT_PRODUCTION: "1"
+    networks:
+      - meerkat
+    deploy:
+      replicas: 3
+      placement:
+        # One task per node, or three tasks on one node answer that node's
+        # failure exactly as one task would.
+        max_replicas_per_node: 1
+      update_config:
+        # The new task is up before the old one goes: the state is shared, so
+        # both can serve at once.
+        order: start-first
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: any
+    healthcheck:
+      # READINESS, not liveness: it pings the store and checks the routing
+      # table is compiled. A task that accepted connections before compiling
+      # its table answers 404 to everything, and a rolling update would read
+      # that as a healthy instance.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+# The developer tunnel is not here on purpose. It plugs one machine into the
+# cluster by taking a service name, which means acting on the orchestrator:
+# that is a grant (the Docker socket) and it belongs on the node that holds
+# it, not spread over three. Open it on a single-gateway stack -
+# docker-compose.ee.yml - or on a one-node Swarm.
+
+networks:
+  meerkat:
+    driver: overlay
+    attachable: true

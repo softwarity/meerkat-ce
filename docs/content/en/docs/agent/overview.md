@@ -1,7 +1,7 @@
 ---
 title: The agent endpoint
-section: Automation
-order: 280
+section: Operations
+order: 230
 summary: Meerkat speaks MCP, so an assistant can read and change the gateway with tools rather than by guessing REST calls.
 ---
 

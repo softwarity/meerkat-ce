@@ -147,6 +147,14 @@ func (a *API) putAuthProvider(w http.ResponseWriter, r *http.Request, actor stor
 		writeErr(w, http.StatusUnprocessableEntity, "a provider needs a name: it is what the login page shows")
 		return
 	}
+	// A name the sign-in flow already answers at would leave the authority
+	// unreachable, silently. Refused here, where it can be said.
+	if store.ProviderIDReserved(p.ID) {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"the id "+p.ID+" is reserved by the sign-in flow (reserved: "+
+				strings.Join(store.ReservedProviderIDs, ", ")+"): give this authority another id")
+		return
+	}
 	if !store.ValidProviderKind(p.Kind) {
 		writeErr(w, http.StatusUnprocessableEntity, "unknown provider kind "+p.Kind+
 			" (allowed: "+store.ProviderOIDC+", "+store.ProviderLDAP+", "+store.ProviderSAML+")")

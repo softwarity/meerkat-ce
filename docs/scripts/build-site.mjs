@@ -66,6 +66,11 @@ function inline(text) {
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, href) => {
     if (/^https?:/.test(href)) return `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
     if (href.startsWith('#')) return `<a href="${href}" data-at="${href.slice(1)}">${label}</a>`;
+    // A FILE the site serves - a chart, a compose file - rather than a page.
+    // It stays a plain relative href, like an image: the document carries a
+    // <base href>, so it resolves whatever route the reader is on. The check
+    // below refuses one with no file behind it.
+    if (FILE_LINK.test(href)) return `<a href="${href}" download>${label}</a>`;
     // An internal link names a PAGE, not a URL: the reader's language and the
     // documentation version they are on decide the address, and only the
     // runtime knows both. See the page component, which fills the href in.
@@ -76,6 +81,10 @@ function inline(text) {
   out = out.replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
   return out.replace(/\u0000(\d+)\u0000/g, (_, i) => code[Number(i)]);
 }
+
+// What counts as a file rather than a page: the extensions this site actually
+// serves out of public/. Anything else with a dot in it is still a page.
+const FILE_LINK = /\.(ya?ml|tgz|zip|json|txt|pdf|sh)$/i;
 
 const slugify = (s) =>
   s
@@ -97,17 +106,35 @@ const slugify = (s) =>
 // `cards` and `grid` cut their body at each `###` and wrap the pieces;
 // `gallery` turns images into captioned figures; everything else is a div with
 // the block's name, rendered normally inside.
-const BLOCKS = new Set(['hero', 'cards', 'grid', 'gallery', 'steps', 'cta', 'lead', 'split', 'quote']);
+const BLOCKS = new Set(['hero', 'cards', 'grid', 'gallery', 'steps', 'cta', 'lead', 'split', 'quote', 'figure', 'stats']);
 
-function renderBlock(name, body, file) {
+function renderBlock(name, body, file, lang, arg) {
   if (name === 'cards' || name === 'grid') {
     const parts = body.split(/^### /m).filter((p) => p.trim());
     const cards = parts.map((part) => {
       const [head, ...rest] = part.split('\n');
-      const inner = render(rest.join('\n'), file).html;
+      const inner = render(rest.join('\n'), file, lang).html;
       return `<article class="mk-card"><h3>${inline(head.trim())}</h3>${inner}</article>`;
     });
     return `<div class="mk-${name}">${cards.join('')}</div>`;
+  }
+  if (name === 'figure') {
+    const svg = figures[lang]?.[arg];
+    if (!svg) throw new Error(`${file}: no figure named "${arg}" for ${lang} - add content/figures/${lang}/${arg}.svg`);
+    const caption = body.trim();
+    return (
+      `<figure class="mk-figure mk-figure-${arg}">${svg}` +
+      (caption ? `<figcaption>${inline(caption)}</figcaption>` : '') +
+      '</figure>'
+    );
+  }
+  if (name === 'stats') {
+    const parts = body.split(/^### /m).filter((p) => p.trim());
+    const cells = parts.map((part) => {
+      const [value, ...rest] = part.split('\n');
+      return `<div class="mk-stat"><b>${inline(value.trim())}</b><span>${inline(rest.join(' ').trim())}</span></div>`;
+    });
+    return `<div class="mk-stats">${cells.join('')}</div>`;
   }
   if (name === 'gallery') {
     const figures = [];
@@ -123,10 +150,10 @@ function renderBlock(name, body, file) {
     if (!figures.length) throw new Error(`${file}: a gallery block holds no image`);
     return `<div class="mk-gallery">${figures.join('')}</div>`;
   }
-  return `<div class="mk-${name}">${render(body, file).html}</div>`;
+  return `<div class="mk-${name}">${render(body, file, lang).html}</div>`;
 }
 
-function render(md, file) {
+function render(md, file, lang) {
   const lines = md.split('\n');
   const html = [];
   const headings = [];
@@ -141,22 +168,31 @@ function render(md, file) {
     const line = lines[i];
 
     // A layout block. Nesting one inside another is not supported and says so.
-    const block = line.match(/^:::\s*([a-z-]+)\s*$/);
+    const block = line.match(/^:::\s*([a-z-]+)(?:\s+([a-z0-9-]+))?\s*$/);
     if (block) {
       const name = block[1];
+      const arg = block[2] || '';
       if (!BLOCKS.has(name)) {
         throw new Error(`${file}: unknown block "${name}" - known blocks are ${[...BLOCKS].join(', ')}`);
       }
+      // A block may hold another - a hero with a mark in it, a card with a
+      // figure - so the body is collected by DEPTH rather than by the first
+      // closing line, which used to belong to the inner one.
       const body = [];
+      let depth = 1;
       i++;
-      while (i < lines.length && !/^:::\s*$/.test(lines[i])) {
-        if (/^:::\s*[a-z-]+\s*$/.test(lines[i])) throw new Error(`${file}: a block opened inside a block`);
+      while (i < lines.length) {
+        if (/^:::\s*[a-z-]+(\s+[a-z0-9-]+)?\s*$/.test(lines[i])) depth++;
+        else if (/^:::\s*$/.test(lines[i])) {
+          depth--;
+          if (depth === 0) break;
+        }
         body.push(lines[i++]);
       }
       if (i >= lines.length) throw new Error(`${file}: the "${name}" block is never closed`);
       i++;
       closeList(listStack);
-      html.push(renderBlock(name, body.join('\n'), file));
+      html.push(renderBlock(name, body.join('\n'), file, lang, arg));
       continue;
     }
 
@@ -371,6 +407,24 @@ const exists = (p) =>
 
 // ---- the build -------------------------------------------------------------
 
+// The figures, read once and INLINED into the pages that ask for them. Inlined
+// rather than linked, because an <img> to an SVG is a document of its own: it
+// cannot see the page's colours, so it could not follow the light and dark
+// scheme. Inside the page it is drawn with the reader's own palette - see the
+// .mk-figure block in styles.scss, which maps the classes these files use.
+const FIGURES = join(CONTENT, 'figures');
+const figures = {};
+for (const lang of LANGS) {
+  figures[lang] = {};
+  try {
+    for (const file of await readdir(join(FIGURES, lang))) {
+      if (file.endsWith('.svg')) figures[lang][file.replace(/\.svg$/, '')] = await readFile(join(FIGURES, lang, file), 'utf8');
+    }
+  } catch {
+    // A language with no figures yet.
+  }
+}
+
 const areas = JSON.parse(await readFile(join(CONTENT, 'areas.json'), 'utf8'));
 const versionsFile = JSON.parse(await readFile(join(CONTENT, 'versions.json'), 'utf8'));
 const frozen = versionsFile.versions || [];
@@ -405,9 +459,23 @@ const areaOf = (slug) => {
   return null;
 };
 
+// The rail lights ONE entry, and the library lights a second one on its own:
+// its items carry routerLinkActive, which matches on a prefix. An entry whose
+// home sits outside its own area - the home page under the product, as it was -
+// is then a prefix of the whole site and stays lit everywhere. Keep each home
+// inside its area and the library's verdict can only ever be a subset of ours.
+for (const a of areas) {
+  if (areaOf(a.home) !== a.id) {
+    throw new Error(
+      `content/areas.json: area "${a.id}" opens on "${a.home}", which belongs to ` +
+        `"${areaOf(a.home) || 'no area'}" - an entry must open on a page of its own area`,
+    );
+  }
+}
+
 // Read one markdown tree into pages. `slugBase` is what the URL says; `root` is
 // where the files are - the two differ for a frozen version.
-async function readTree(root, slugBase, sink) {
+async function readTree(root, slugBase, sink, lang) {
   for await (const file of markdownFiles(root)) {
     const shown = relative(CONTENT, file);
     const raw = await readFile(file, 'utf8');
@@ -417,7 +485,7 @@ async function readTree(root, slugBase, sink) {
     const slug = slugBase ? `${slugBase}/${tail}` : tail;
     const area = areaOf(slug);
     if (!area) throw new Error(`${shown}: no area owns "${slug}" - declare its prefix in content/areas.json`);
-    const { html, headings } = render(body, shown);
+    const { html, headings } = render(body, shown, lang);
     sink.push({
       file: shown,
       raw,
@@ -428,8 +496,10 @@ async function readTree(root, slugBase, sink) {
       summary: meta.summary || '',
       order: Number(meta.order || 999),
       hideNav: meta.hideNav === 'true',
+      navTitle: meta.navTitle || '',
       layout: meta.layout || '',
       widget: meta.widget || '',
+      printable: meta.printable === 'true',
       headings,
       html,
     });
@@ -446,7 +516,7 @@ for (const lang of LANGS) {
   const unversioned = [];
   for (const entry of await readdir(join(CONTENT, lang), { withFileTypes: true })) {
     if (entry.name === 'docs') continue;
-    if (entry.isDirectory()) await readTree(join(CONTENT, lang, entry.name), entry.name, unversioned);
+    if (entry.isDirectory()) await readTree(join(CONTENT, lang, entry.name), entry.name, unversioned, lang);
   }
   for (const entry of await readdir(join(CONTENT, lang), { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
@@ -457,7 +527,7 @@ for (const lang of LANGS) {
     const slug = entry.name.replace(/\.md$/, '');
     const area = areaOf(slug);
     if (!area) throw new Error(`${shown}: no area owns "${slug}" - declare its prefix in content/areas.json`);
-    const { html, headings } = render(body, shown);
+    const { html, headings } = render(body, shown, lang);
     unversioned.push({
       file: shown,
       raw,
@@ -468,8 +538,10 @@ for (const lang of LANGS) {
       summary: meta.summary || '',
       order: Number(meta.order || 999),
       hideNav: meta.hideNav === 'true',
+      navTitle: meta.navTitle || '',
       layout: meta.layout || '',
       widget: meta.widget || '',
+      printable: meta.printable === 'true',
       headings,
       html,
     });
@@ -478,7 +550,7 @@ for (const lang of LANGS) {
   const perVersion = {};
   for (const tree of docTrees) {
     const pages = [];
-    await readTree(tree.root(lang), tree.prefix ? `docs/${tree.prefix}` : 'docs', pages);
+    await readTree(tree.root(lang), tree.prefix ? `docs/${tree.prefix}` : 'docs', pages, lang);
     perVersion[tree.id] = pages;
   }
 
@@ -497,7 +569,7 @@ for (const lang of LANGS) {
       const name = page.section || '';
       let group = sections.find((s) => s.name === name);
       if (!group) sections.push((group = { name, pages: [] }));
-      group.pages.push({ slug: page.slug, title: page.title, summary: page.summary });
+      group.pages.push({ slug: page.slug, title: page.navTitle || page.title, summary: page.summary });
     }
     return sections;
   };
@@ -505,6 +577,11 @@ for (const lang of LANGS) {
   const navAreas = areas.map((a) => ({
     id: a.id,
     label: a.label[lang] || a.label.en,
+    // Which addresses belong to this entry, and whether it shows in the rail.
+    // The home page has an area of its own and no rail entry: it is reached by
+    // the Meerkat button in the bar, and no entry of the rail is lit on it.
+    prefixes: a.prefixes,
+    hidden: !!a.hidden,
     // The rail is 96px wide, so its entries carry a SHORT name; the drawer
     // that opens off them carries the full one.
     short: (a.short || a.label)[lang] || (a.short || a.label).en,
@@ -589,12 +666,25 @@ for (const lang of LANGS) {
       ? page.slug.slice(0, page.slug.indexOf('/', 5))
       : '';
     for (const [, href] of page.raw.matchAll(/\]\((\/[^)\s#]+)/g)) {
+      if (FILE_LINK.test(href)) continue;
       const target = href.replace(/^\//, '').replace(/\/$/, '');
       const candidates = [target];
       if (versionPrefix && target.startsWith('docs/')) {
         candidates.push(target.replace(/^docs\//, `${versionPrefix}/`));
       }
       if (!candidates.some((c) => known.has(c))) problems.push(`${page.file} -> ${href}`);
+    }
+  }
+}
+
+// A download that points at no file. Same rule as an image: the reader is the
+// one who finds it, and they find it by clicking.
+for (const lang of LANGS) {
+  for (const page of built[lang]) {
+    for (const [, href] of page.raw.matchAll(/\]\(([^)\s]+)\)/g)) {
+      if (/^https?:/.test(href) || !FILE_LINK.test(href)) continue;
+      const file = href.replace(/^\//, '');
+      if (!(await exists(join(PUBLIC, file)))) problems.push(`${page.file} -> missing file ${href}`);
     }
   }
 }

@@ -57,7 +57,7 @@ value itself.
 
 ## The order a sign-in runs in
 
-1. **The first factor.** A password typed into the form, a redirect to a provider, or a passkey. For a typed password, the local accounts are asked first; if they say no, each enabled directory is asked in turn, in the order on the screen. A wrong password, an unknown username and a disabled account all answer the same sentence.
+1. **The first factor.** A password typed into the form, a redirect to a provider, a passkey, or a [code received by e-mail](/docs/auth/email-code). For a typed password, the local accounts are asked first; if they say no, each enabled directory is asked in turn, in the order on the screen. A wrong password, an unknown username and a disabled account all answer the same sentence.
 2. **A password that must change** - temporary, or expired under the policy. The session exists but is stuck on that step, and every navigation lands back on it.
 3. **The second factor**, if the account owes one.
 4. **The organisation.** None, and the person waits in `/account-pending`. One, and it is stamped on the session silently. Several, and they choose.
@@ -89,6 +89,6 @@ signed up locally keeps everything when they move to SSO.
 |---|---|
 | **Infra > Authentication** | the authorities, their connection details and their policies, and the self-registration default |
 | **Infra > Mail relay** | the relay that confirmation, reset and second-factor mails go through |
-| **Application > Security** | the password policy, the sign-in throttle, two-factor, trusted browsers, passkeys, personal API tokens, the session lifetime |
+| **Application > Security** | the password policy, the sign-in throttle, two-factor, signing in by e-mail code, trusted browsers, passkeys, personal API tokens, the session lifetime |
 | **Application > Built-in pages** | how the sign-in pages look |
 | **Application > Users** | the accounts themselves, and their per-account overrides |

@@ -1,7 +1,7 @@
 ---
 title: Editions
 section: The product
-order: 3
+order: 5
 summary: What the free edition does, what Enterprise adds, and the three questions that tell you which one you need.
 ---
 
@@ -44,6 +44,7 @@ and the agent endpoint. In production, in a company, commercially, for free.
 | **Saved configurations** | Three at a time, and the console says which one you are on before you hit the cap | As many as you like - one per customer, one per environment. |
 | **Built-in pages** | Your colours, your logo, your name, the centred arrangement | The split, drawer, banner and bare arrangements too, and the Meerkat mark off the pages you serve. |
 | **Developer tunnel** | plug runs beside the gateway, which is plug's own default | The tunnel inside the gateway, and every substitution attributed to the developer who posed it. See [Dev mode](/product/dev-mode). |
+| **Support** | The repository: an issue is read, and the answer stays where it helps the next person | Part of the agreement - you reach the people who wrote the gateway, not a tier. |
 
 Announced and not built yet: SAML 2.0, Kerberos, and exporting the audit trail
 to analytical formats. The [roadmap](/project/roadmap) says where each stands.

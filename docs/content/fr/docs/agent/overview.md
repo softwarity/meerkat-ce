@@ -1,7 +1,7 @@
 ---
 title: Le point d'entrée agent
-section: Automatisation
-order: 280
+section: Exploitation
+order: 230
 summary: Meerkat parle MCP, pour qu'un assistant lise et modifie la gateway avec des outils plutôt qu'en devinant des appels REST.
 ---
 

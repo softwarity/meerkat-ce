@@ -2,92 +2,68 @@
 
 > The sentinel at your application's door.
 
-**Meerkat** is an **app-gateway**: the single entry point for enterprise internal
-applications. Unlike a classic API gateway, it is built to *serve an application* - it takes
-care of everything that is common to all your services and none of your team's core business:
+**Meerkat** is an **app-gateway**: one door in front of the applications your
+teams build, which takes charge of everything that is not their core business -
+authentication, access rules, organisations, routing, quotas and audit. Your
+services receive requests that are already authenticated, carrying a signed JWT
+with identity, roles and organisation. One binary, zero dependency.
 
-- **Authentication** - login pages served by the gateway, passwordless first (passkeys,
-  TOTP, email OTP), enterprise methods (OIDC, LDAP, SAML) limited to authentication only
-- **Authorization** - roles, role groups, per-route and per-endpoint access control
-- **Multi-tenancy** - organizations, members, groups, tenant switching
-- **Routing** - dynamic routes over a service catalog discovered in your cluster, hot reload,
-  versioned configurations (duplicate, diff, switch, rollback)
-- **Built-in, no extra tooling** - API quotas, audit log, observability dashboards: in the
-  console, not in a YAML file, with no Prometheus/Grafana required
-- **Dev mode** - with [`softwarity/plug`](https://github.com/softwarity/plug), a developer's
-  workstation joins the cluster: their local service substitutes the deployed one for their
-  own traffic, and testers can opt in to try a dev's variant
-- **Zero dependency** - a single binary with embedded storage; an external database only if
-  you want a HA cluster
+```bash
+docker run -p 8080:8080 -p 9090:9090 \
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
+```
 
-Your services stay lean: they receive requests already authenticated, carrying a signed JWT
-with identity, roles and tenant.
+8080 is what your users reach, 9090 is the admin console.
 
-Meerkat is the successor of [Archway](https://github.com/softwarity/archway), rebuilt from
-the ground up, and is edited by **[Softwarity](https://softwarity.io)**.
+**[www.softwarity.io](https://www.softwarity.io/)** is where the product is
+explained: what it does capability by capability, the documentation, what it
+replaces and what that costs, the editions and the price. This file is for
+people working ON it.
 
 ## Status
 
-🚧 **Under construction, and running.** What the gateway does today, what is half-built and
-what is not started are one table in [FEATURES.md](./FEATURES.md) (French), with the state
-read from the code rather than from a plan.
-
-## Why "Meerkat"?
-
-The meerkat is nature's sentinel: it stands guard at the burrow entrance and raises the
-alert, so the rest of the colony can work without worrying about anything. That is exactly
-what this gateway does for your services. Even the `plug` tunnel fits the picture - it is how
-a developer's machine digs its way into the burrow. And since a group of meerkats is called a
-*mob*, you already know what to call a cluster of Meerkat nodes.
+🚧 **Under construction, and running.** What the gateway does today, what is
+half-built and what is not started are one table in
+[FEATURES.md](./FEATURES.md) (French), with the state read from the code rather
+than from a plan. Shipping something means ticking its box in the same commit.
 
 ## Development
 
-Two terminals. Node version is pinned by `.node-version` (fnm/nvm switch automatically);
-Go toolchain resolves from `go.mod`.
+Two terminals. Node is pinned by `.node-version` (fnm/nvm switch on their own);
+the Go toolchain resolves from `go.mod`.
 
 ```bash
 # terminal 1 - the console (:4200)
-cd console
-npm install            # once, and after every pull that touches console/package.json
-npm start              # ng serve
+cd console && npm install && npm start
 
-# terminal 2 - the gateway, hot-reloaded on every .go save (air)
+# terminal 2 - the gateway, rebuilt on every .go save
 MEERKAT_ADDR=:8082 \
 MEERKAT_ADMIN_ADDR=:9092 \
 MEERKAT_CONSOLE_URL=http://localhost:4200 \
 MEERKAT_ADMIN_PASSWORD=test1234 \
-make dev               # requires air: go install github.com/air-verse/air@latest
+make dev               # needs air: go install github.com/air-verse/air@latest
 ```
 
-`make dev` builds the **Enterprise image** (the `ee` build tag, set in
-`.air.toml`): what is being built lives under `ee/` too, and a feature nobody can
-see is a feature nobody tests. The startup line says which edition came up. Use
-**`make dev-ce`** for the same loop as a community install sees it: no
-multi-organisation, no directories, no page arrangements - that code is not in
-the binary at all.
+Then browse **http://localhost:9092**, the admin port: the gateway serves its
+API and its login there and proxies everything else to the console dev server,
+HMR included. `MEERKAT_CONSOLE_URL` is what makes that proxying happen - without
+it the admin port answers a JSON status page.
 
-Then browse **http://localhost:9092** (the admin port): the gateway serves its API and
-login there and proxies everything else to the console dev server, HMR included. Pick
-any free ports; if a bind fails (port already in use) the process exits - the `fatal`
-line at the top of the log tells you which one.
-
-The console is **English only** - it is an operator's tool, and its vocabulary is the
-API's. The pages the application's own users meet (sign-in, MFA, the user button) are
-the translated ones, and that pool is the integrator's to declare.
-
-`make build && ./bin/meerkat --help` lists every flag; each has a `MEERKAT_*` env
-equivalent. First start seeds the `admin` account (password printed once unless
-`MEERKAT_ADMIN_PASSWORD` is set) - wipe `data/` to start fresh.
-
-A release build ships the console **inside the binary**: `make ui && make build`.
-The binary then serves the console itself on the admin port (`/` redirects to your
-browser's language, `/en/...`, `/fr/...`) - no Node at runtime, which is also how the
-Docker image is built. `--console-url` stays the dev override and always wins over
-the embedded build; without either, the admin port answers a JSON status page.
+`make dev` builds the **Enterprise** binary, `make dev-ce` the community one -
+and the difference is what the linker put in, not a flag. The ports, the
+disposable instances, the demo data, the integration suite and the traps worth
+knowing are in **[DEV.md](./DEV.md)**; the repository layout, the conventions
+and what to run before pushing are in
+**[CONTRIBUTING.md](./CONTRIBUTING.md)**.
 
 ## License
 
-[FSL-1.1-Apache-2.0](./LICENSE.md) (Functional Source License): free to use, copy, modify and
-redistribute for any purpose except building a competing product or service - internal and
-production use in your company is explicitly permitted. Each release automatically becomes
-**Apache 2.0 two years** after its publication.
+[FSL-1.1-Apache-2.0](./LICENSE.md) (Functional Source License): free to use,
+copy, modify and redistribute for any purpose except building a competing
+product or service - internal and production use in your company is explicitly
+permitted. Each release automatically becomes **Apache 2.0 two years** after
+its publication. The Enterprise code under `ee/` is source-visible and usable
+only under a Softwarity commercial agreement; see
+[the editions](https://www.softwarity.io/en/product/editions).
+
+Edited by **[Softwarity](https://www.softwarity.io/)**.

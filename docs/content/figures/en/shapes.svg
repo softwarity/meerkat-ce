@@ -1,0 +1,47 @@
+<svg class="dg" viewBox="0 0 1000 400" role="img" aria-label="Three deployment shapes side by side: a community gateway on its volume, an Enterprise gateway on its volume with the developer tunnel, and three Enterprise gateways sharing one PostgreSQL.">
+  <rect class="divider" fill="none" x="20" y="14" width="306" height="366" rx="14"/>
+  <text class="t-title" x="173" y="46" text-anchor="middle">One gateway</text>
+  <text class="t-sub" x="173" y="66" text-anchor="middle">community</text>
+  <rect class="box-mk" x="103" y="88" width="140" height="52" rx="10"/>
+  <text class="t-head t-mk" x="173" y="120" text-anchor="middle">meerkat</text>
+  <path class="edge" d="M173 140 L173 168"/>
+  <rect class="box" x="117" y="168" width="112" height="40" rx="10"/>
+  <text class="t-sub" x="173" y="193" text-anchor="middle">its volume</text>
+  <text class="t-sub" x="46" y="240">+ one pod, one volume</text>
+  <text class="t-sub" x="46" y="262">+ no database beside it</text>
+  <text class="t-sub" x="46" y="284">+ one organisation</text>
+  <text class="t-mono" x="46" y="324">docker-compose.yml</text>
+  <text class="t-mono" x="46" y="344">values-ce-one-node.yaml</text>
+  <rect class="divider" fill="none" x="347" y="14" width="306" height="366" rx="14"/>
+  <text class="t-title" x="500" y="46" text-anchor="middle">One gateway</text>
+  <text class="t-sub" x="500" y="66" text-anchor="middle">Enterprise</text>
+  <rect class="box-mk" x="430" y="88" width="140" height="52" rx="10"/>
+  <text class="t-head t-mk" x="500" y="120" text-anchor="middle">meerkat</text>
+  <path class="edge" d="M500 140 L500 168"/>
+  <rect class="box" x="444" y="168" width="112" height="40" rx="10"/>
+  <text class="t-sub" x="500" y="193" text-anchor="middle">its volume</text>
+  <text class="t-sub" x="373" y="240">+ one pod, one volume</text>
+  <text class="t-sub" x="373" y="262">+ several organisations</text>
+  <text class="t-sub" x="373" y="284">+ directories, dev tunnel</text>
+  <text class="t-mono" x="373" y="324">docker-compose.ee.yml</text>
+  <text class="t-mono" x="373" y="344">values-ee-one-node.yaml</text>
+  <rect class="divider" fill="none" x="674" y="14" width="306" height="366" rx="14"/>
+  <text class="t-title" x="827" y="46" text-anchor="middle">Three gateways</text>
+  <text class="t-sub" x="827" y="66" text-anchor="middle">Enterprise</text>
+  <rect class="box-mk" x="692" y="88" width="84" height="52" rx="10"/>
+  <text class="t-head t-mk" x="734" y="119" text-anchor="middle">meerkat</text>
+  <path class="edge-dash" d="M734 140 L734 168"/>
+  <rect class="box-mk" x="786" y="88" width="84" height="52" rx="10"/>
+  <text class="t-head t-mk" x="828" y="119" text-anchor="middle">meerkat</text>
+  <path class="edge-dash" d="M828 140 L828 168"/>
+  <rect class="box-mk" x="880" y="88" width="84" height="52" rx="10"/>
+  <text class="t-head t-mk" x="922" y="119" text-anchor="middle">meerkat</text>
+  <path class="edge-dash" d="M922 140 L922 168"/>
+  <rect class="box-other" x="692" y="168" width="272" height="40" rx="10"/>
+  <text class="t-sub" x="827" y="193" text-anchor="middle">PostgreSQL</text>
+  <text class="t-sub" x="700" y="240">+ three pods, no volume</text>
+  <text class="t-sub" x="700" y="262">+ one shared PostgreSQL</text>
+  <text class="t-sub" x="700" y="284">+ no-downtime updates</text>
+  <text class="t-mono" x="700" y="324">stack.swarm.yml</text>
+  <text class="t-mono" x="700" y="344">values-ee-cluster.yaml</text>
+</svg>

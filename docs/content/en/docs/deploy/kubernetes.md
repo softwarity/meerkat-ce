@@ -27,7 +27,7 @@ Sessions live in the database, not in a pod. Each node keeps a five-second cache
 
 The brute-force counter is in the database too, one row per failed attempt, and that matters more than it looks. A limit of five attempts used to be five PER GATEWAY: an attacker spraying the load balancer got the limit multiplied by the very thing that was supposed to make the service sturdier. Five attempts are now five for the installation wherever they land, and a successful sign-in forgives on every node. A test says exactly that, and it is the reason nothing here asks your load balancer for sticky sessions.
 
-What is relayed rather than shared: a live message published on one node reaches the pages held open by the others, so nobody sees half an announcement. What stays per node, and is worth knowing before you set a number: rate limits count in memory, per node, so N nodes allow up to N times the bound. The console says so where the number is typed.
+What is relayed rather than shared: a live message published on one node reaches the pages held open by the others, so nobody sees half an announcement. What stays per node, and is worth knowing before you set a number: rate limits count in memory, per node, so N nodes allow up to N times the bound - the console says so where the number is typed. Two developer tools are per process for the same reason: the UI test mode and the tokens the embedded Swagger uses live in the node that issued them, so a simulated identity can jump from one request to the next across several nodes. That is said rather than fixed: it is a tool for one operator looking at one screen, and making it cluster-wide would be machinery for nobody.
 
 ## The prerequisite: one PostgreSQL they share
 

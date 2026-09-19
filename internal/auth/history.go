@@ -26,11 +26,14 @@ const (
 	loginMethodPassword = "password"
 	loginMethodTOTP     = "totp" // password + code (challenge or forced enrolment)
 	loginMethodPasskey  = "passkey"
+	// A code mailed to the address, instead of a password (AUTH-16).
+	loginMethodEmailCode = "email-code"
 	// The same first factors, once a second one was answered too. Kept as
 	// distinct values rather than a flag: the history shows ONE label per
 	// sign-in, and "authority + code" is a different sentence from either.
-	loginMethodExternalTOTP = "external-totp"
-	loginMethodPasskeyTOTP  = "passkey-totp"
+	loginMethodExternalTOTP  = "external-totp"
+	loginMethodPasskeyTOTP   = "passkey-totp"
+	loginMethodEmailCodeTOTP = "email-code-totp"
 )
 
 func browserTokenOf(r *http.Request) string {
@@ -217,6 +220,10 @@ func methodKey(method string) string {
 		return "methodExternal"
 	case loginMethodExternalTOTP:
 		return "methodExternalTotp"
+	case loginMethodEmailCode:
+		return "methodEmailCode"
+	case loginMethodEmailCodeTOTP:
+		return "methodEmailCodeTotp"
 	default:
 		return "methodPassword"
 	}
@@ -230,6 +237,8 @@ func withSecondFactor(first string) string {
 		return loginMethodExternalTOTP
 	case loginMethodPasskey:
 		return loginMethodPasskeyTOTP
+	case loginMethodEmailCode:
+		return loginMethodEmailCodeTOTP
 	default:
 		return loginMethodTOTP
 	}

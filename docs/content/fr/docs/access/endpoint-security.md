@@ -19,6 +19,40 @@ La spec est soit **publiée par votre service**, et c'est alors une référence 
 relue à chaque ouverture de l'écran, soit un **fichier déposé ici**, et c'est alors
 un instantané qui ne change que si vous en déposez un autre. L'écran le dit.
 
+## Les deux situations pour lesquelles il existe
+
+**Vous ne pouvez pas modifier l'application.** Un produit acheté, un service
+qu'une autre équipe possède, un binaire dont vous n'avez pas les sources. Son
+autorisation est celle que son auteur a décidée, et vous n'avez aucun moyen d'y
+ajouter une règle. La règle se pose devant : Meerkat refuse l'appel avant même
+que le service soit atteint, donc l'application n'a pas besoin de savoir
+qu'elle est protégée.
+
+**Vous découvrez un trou en production.** Une opération qui n'aurait jamais dû
+être ouverte - une réindexation, une purge, un export - répond à quiconque
+connaît son chemin, parce que le backend n'a rien vérifié. Vous ne déployez
+pas. Vous ouvrez cet écran, vous posez la règle, et elle tient à la requête
+suivante.
+
+![Les opérations d'une route, chacune avec la règle qui la gouverne](img/console/endpoint-security.webp)
+
+La liste vient directement de la description OpenAPI de la route : méthode,
+chemin, résumé et étiquettes, exactement comme le service les déclare. Le badge
+à gauche est la règle en vigueur, et les icônes à côté disent si des rôles, des
+utilisateurs nommés ou des limites de débit y sont attachés.
+
+Ici, deux opérations portent leur propre règle. `DELETE /orders/{id}` est
+restreinte à un rôle dont le backend ne sait rien : ce sont des rôles
+prototypés devant un service plutôt que câblés dedans. Et
+`POST /admin/reindex` est fermée à tout le monde, à une exception près.
+
+![Fermer une opération, avec une exception nommée](img/console/endpoint-rule.webp)
+
+C'est le trou de production, bouché : **Personne** ne peut l'appeler, refusée
+avant que le service soit appelé, sauf le seul exploitant qui doit encore la
+lancer. Aucun déploiement, aucun ticket à l'équipe qui possède le backend,
+aucun changement dans l'application.
+
 ## Ce qu'est une règle
 
 La même règle que celle d'une route - niveau, organisations, rôles, comptes nommés -

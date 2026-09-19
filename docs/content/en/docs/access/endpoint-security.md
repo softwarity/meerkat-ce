@@ -20,6 +20,38 @@ reference re-read whenever the screen is opened, or a **file deposited here**, i
 which case it is a snapshot that changes only when you deposit another. The
 screen says which.
 
+## The two situations it exists for
+
+**You cannot change the application.** A bought product, a service another team
+owns, a binary whose sources you do not have. Its authorisation is whatever its
+author decided, and you have no way to add a rule inside it. The rule goes in
+front of it instead: Meerkat refuses the call before the service is ever
+reached, so the application does not need to know it is protected.
+
+**You found a hole in production.** An operation that should never have been
+open - a reindex, a purge, an export - answers anyone who knows its path,
+because the backend never checked. You do not deploy. You open this screen,
+pose the rule, and it holds on the next request.
+
+![The operations of a route, each with the rule that governs it](img/console/endpoint-security.webp)
+
+The list comes straight from the route's OpenAPI description: method, path,
+summary and tags, exactly as the service declares them. The badge on the left
+is the rule in force, and the icons next to it say whether roles, named users
+or rate limits are attached.
+
+Here, two operations carry a rule of their own. `DELETE /orders/{id}` is
+restricted to a role the backend knows nothing about - that is roles being
+prototyped in front of a service rather than wired into it. And
+`POST /admin/reindex` is closed to everybody, with one exception.
+
+![Closing one operation, with a named exception](img/console/endpoint-rule.webp)
+
+That is the production hole, shut: **Nobody** may call it, refused before the
+service is called, except the one operator who still has to run it. No
+deployment, no ticket to the team that owns the backend, no change in the
+application at all.
+
 ## What a rule is
 
 The same rule as a route's - level, organisations, roles, named users - plus a

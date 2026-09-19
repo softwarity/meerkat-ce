@@ -1,7 +1,7 @@
 ---
 title: Tarifs
 section: Le produit
-order: 4
+order: 6
 summary: Une édition est gratuite et le reste. L'autre se facture par instance de production, et commence par une conversation.
 ---
 
@@ -33,8 +33,12 @@ docker run -p 8080:8080 -p 9090:9090 \
 Tout ce qui précède, plus ce dont une installation a besoin quand elle
 grandit : plusieurs organisations, LDAP et Active Directory, les rôles accordés
 par votre annuaire, plusieurs passerelles derrière une seule entrée,
-l'exposition Prometheus, le tunnel de développement, et les pages intégrées
-sans notre marque.
+l'exposition Prometheus, le tunnel de développement, les pages intégrées sans
+notre marque - et le support.
+
+**Le support fait partie de l'accord** : vous joignez ceux qui ont écrit la
+passerelle, pas un palier. Ce qu'il couvre et en combien de temps est en cours
+d'écriture et sera sur cette page.
 
 Facturée **par instance de production**. Pas par utilisateur, pas par requête,
 pas par route.
@@ -84,13 +88,13 @@ ce qui est déjà en place continue d'être servi.
 
 **Vendez-vous du support sur l'édition gratuite ?** Demandez-nous. L'image
 communautaire est soutenue par le dépôt : une issue sur
-[softwarity/meerkat](https://github.com/softwarity/meerkat/issues) est lue.
+[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) est lue.
 
 ::: cta
 ### Parlons-en
 
 Le canal de contact commercial est en cours de mise en place et son adresse
 sera ici. D'ici là, ouvrez une issue sur
-[softwarity/meerkat](https://github.com/softwarity/meerkat/issues) en disant ce
+[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) en disant ce
 que vous construisez et à quelle taille, et nous prendrons le relais.
 :::

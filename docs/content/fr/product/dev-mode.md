@@ -1,7 +1,7 @@
 ---
 title: Mode développement
 section: Le produit
-order: 5
+order: 7
 summary: Le poste d'un développeur rejoint le cluster et remplace un service déployé, et tous ceux qui regardent l'application savent lequel, et par qui.
 ---
 
@@ -35,41 +35,37 @@ plug -p cluster --service user-mng-service npm run start
 - **Cela vit le temps de la session** : la substitution disparaît quand le
   processus s'arrête, et un redémarrage de la passerelle emporte les deux bouts.
 
-## Une clé, pas un certificat
+## Retirer un accès
 
-Une autorité de certification a été étudiée puis écartée. Un certificat porte sa
-propre validité : une fois émis, il est accepté jusqu'à son expiration, donc le
-reprendre demande d'attendre ou de monter une machinerie de révocation. Une
-passerelle est debout par définition : elle peut répondre *cette clé est-elle
-toujours autorisée* à chaque connexion. Donc **révoquer, c'est supprimer la
-ligne**, et quelqu'un qui part cesse de pouvoir tunneler en quelques secondes.
-La page de profil montre l'empreinte SHA256 qu'OpenSSH affiche lui-même, et
-aucune date d'expiration : l'absence est le choix.
+La clé vit sur le compte du développeur, et la passerelle la vérifie à chaque
+connexion. La retirer, ou retirer le mode dev, ferme le tunnel en quelques
+secondes : rien n'a été émis qui survivrait au retrait, donc il n'y a ni
+expiration à attendre ni révocation à propager ailleurs. La page de profil
+montre l'empreinte SHA256, celle qu'OpenSSH affiche.
 
-## Personne ne choisit une variante, tout le monde est prévenu
+## Tout le monde voit qui sert quoi
 
-Il n'y a pas de menu de développeurs parmi lesquels choisir, et pas de rôle
-testeur. Une substitution change ce que l'application devant vous *est*, donc
-c'est une nouvelle pour tous ceux qui la regardent : le travail de Meerkat est
-de rendre l'état courant **visible et attribué** - "checkout, par Alice" plutôt
-que "checkout, par quelqu'un" - et non d'offrir un choix que personne ne peut
-faire correctement.
+Une substitution change ce que l'application devant vous *est*. Ce n'est donc
+pas une préférence de développeur, c'est une information pour tous ceux qui la
+regardent, et elle est nommée : "checkout, par Alice" plutôt que "checkout, par
+quelqu'un".
 
-Cette attribution est ce qu'ajoute l'édition Enterprise. plug seul embarque une
-clé unique dans le binaire publié : une connexion prouve alors que l'appelant
-*a* plug, pas qui il est, ce qui est honnête et suffisant pour les clusters de
-confiance qu'il vise.
+- **À la connexion**, une page nomme ce qui est substitué et par qui, avant de
+  rendre la main sur l'application.
+- **Pendant le travail**, un bandeau escamotable le redit sur chaque page, et
+  suit en direct les substitutions qui apparaissent et disparaissent.
 
 > [!NOTE]
-> Le tunnel embarqué dans la passerelle est Enterprise. plug reste un produit à
-> part entière : l'image communautaire le fait tourner en agent autonome à côté
-> de la passerelle, ce qui est son mode par défaut et ne demande rien à Meerkat.
-> Voir [Une passerelle](/docs/deploy/one-gateway) pour le fichier compose et les
-> valeurs Helm qui l'ouvrent.
+> Le tunnel embarqué dans la passerelle est Enterprise, et c'est lui qui apporte
+> cette attribution : chaque développeur dépose sa propre clé, donc une
+> connexion dit qui. L'image communautaire fait tourner plug en agent autonome à
+> côté de la passerelle, avec une clé partagée : la connexion prouve alors qu'on
+> *a* plug, pas qui on est. Voir [Une passerelle](/docs/deploy/one-gateway) pour
+> le fichier compose et les valeurs Helm qui l'ouvrent.
 
 ## Ce qui reste à venir
 
-L'état est servi mais pas encore montré : une page après connexion nommant ce
-qui est substitué, un bandeau qui reste vrai pendant qu'on travaille, un écran
-de console listant les sessions en cours, et le journal d'audit de chaque clé
-déposée et de chaque substitution posée.
+La **portée** d'une substitution : elle vaut aujourd'hui pour tout le trafic, et
+rien ne permet encore de la limiter à ceux qui la demandent. Côté exploitation,
+il manque l'écran de console listant les sessions en cours, et l'entrée au
+journal d'audit pour chaque clé déposée et chaque substitution posée.

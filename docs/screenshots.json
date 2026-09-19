@@ -1,0 +1,436 @@
+{
+  "_why": "Where every screenshot on this site comes from, so a screen that moved can be retaken instead of guessed at. The loop is in scripts/screenshots.mjs.",
+  "instance": {
+    "build": "CGO_ENABLED=0 go build -tags ee -o /tmp/meerkat-doc ./cmd/meerkat",
+    "console": "the binary must EMBED the console, or the admin port answers a JSON status page: make ui first, or stage console/dist/console/browser into internal/admin/ui/dist",
+    "run": "MEERKAT_TENANCY=multi MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr 127.0.0.1:8086 -admin-addr 127.0.0.1:9096 -data /tmp/docdata",
+    "ports": "8086 and 9096 on purpose: this repository's own dev instance runs on 8082 and 9092 and must never be disturbed",
+    "admin": "http://127.0.0.1:9096",
+    "data": "http://127.0.0.1:8086",
+    "signIn": "admin / test1234",
+    "dataset": "Acme Corp: five routes, a role hierarchy with tags, four users, three groups, a vault with three entries, a portal, two certificates. orders-api carries a deposited OpenAPI spec of 14 operations and three endpoint rules - that is what the endpoint-security captures show.",
+    "upstream": "two routes point at a local Node upstream on 127.0.0.1:8099, so the traffic screen shows answers rather than 502s"
+  },
+  "convert": "cwebp -quiet -q 82 -resize 1600 0 <shot>.png -o public/<file>",
+  "shots": [
+    {
+      "file": "img/app/maintenance.webp",
+      "plane": "data",
+      "path": "/inventory/stock  (route carrying the maintenance filter)",
+      "viewport": [
+        1440,
+        900
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/app/portal-dark.webp",
+      "plane": "data",
+      "path": "/docs/  signed in, dark, clip 1440x640",
+      "viewport": [
+        1440,
+        900
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/app/portal-light.webp",
+      "plane": "data",
+      "path": "/docs/  signed in, clip 1440x640",
+      "viewport": [
+        1440,
+        900
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/app/signin-dark.webp",
+      "plane": "data",
+      "path": "/login  (colorScheme dark)",
+      "viewport": [
+        1440,
+        900
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/app/signin-light.webp",
+      "plane": "data",
+      "path": "/login",
+      "viewport": [
+        1440,
+        900
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/app/user-button.webp",
+      "plane": "data",
+      "path": "/docs/  account button open, clip 880,0 560x390",
+      "viewport": [
+        1440,
+        900
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/access-tokens.webp",
+      "plane": "admin",
+      "path": "/infra/access-tokens",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/access-and-agents",
+        "docs/operations/metrics",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/audit.webp",
+      "plane": "admin",
+      "path": "/audit",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/audit-and-issues",
+        "docs/operations/audit",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/auth-providers.webp",
+      "plane": "admin",
+      "path": "/infra/authentication",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/authentication",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/built-in-pages-branding.webp",
+      "plane": "admin",
+      "path": "/application/built-in-pages  (Branding)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/built-in-pages",
+        "docs/customise/branding",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/built-in-pages-theme.webp",
+      "plane": "admin",
+      "path": "/application/built-in-pages  (Theme)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/built-in-pages",
+        "docs/customise/theme",
+        "index",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/configuration.webp",
+      "plane": "admin",
+      "path": "/infra/configuration",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/configuration",
+        "docs/operations/backup-restore",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/endpoint-rule.webp",
+      "plane": "admin",
+      "path": "/infra/endpoint-security?route=orders-api  (click POST /admin/reindex)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/access/endpoint-security"
+      ]
+    },
+    {
+      "file": "img/console/endpoint-security.webp",
+      "plane": "admin",
+      "path": "/infra/endpoint-security?route=orders-api",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/access/endpoint-security"
+      ]
+    },
+    {
+      "file": "img/console/general.webp",
+      "plane": "admin",
+      "path": "/application/general",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/application",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/groups.webp",
+      "plane": "admin",
+      "path": "/application/groups",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/access/roles",
+        "docs/console/organisation",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/mcp.webp",
+      "plane": "admin",
+      "path": "/infra/mcp",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/access-and-agents",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/members.webp",
+      "plane": "admin",
+      "path": "/application/members",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/access/tenants",
+        "docs/console/organisation",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/metrics.webp",
+      "plane": "admin",
+      "path": "/traffic  (Metrics)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/traffic",
+        "docs/operations/traffic",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/portal.webp",
+      "plane": "admin",
+      "path": "/application/portal",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/portal",
+        "docs/customise/portal",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/roles.webp",
+      "plane": "admin",
+      "path": "/application/roles",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/access/roles",
+        "docs/console/roles",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/route-editor-color-scheme.webp",
+      "plane": "admin",
+      "path": "/infra/routes  (open a UI route, Colour scheme)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/routes",
+        "docs/customise/color-scheme"
+      ]
+    },
+    {
+      "file": "img/console/route-editor-filters.webp",
+      "plane": "admin",
+      "path": "/infra/routes  (open a route, Filters)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/routes",
+        "docs/start/first-route",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/route-editor-predicates.webp",
+      "plane": "admin",
+      "path": "/infra/routes  (open a route, Predicates)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/routes",
+        "docs/start/first-route",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/route-editor-security.webp",
+      "plane": "admin",
+      "path": "/infra/routes  (open a route, Security)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/access/route-access",
+        "docs/console/endpoints",
+        "docs/start/first-route",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/route-editor-target.webp",
+      "plane": "admin",
+      "path": "/infra/routes  (open a route, Target)",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/routes",
+        "docs/start/first-route",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/routes-list.webp",
+      "plane": "admin",
+      "path": "/infra/routes",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/concepts/routes",
+        "docs/console/routes",
+        "index",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/tls.webp",
+      "plane": "admin",
+      "path": "/infra/tls",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/tls",
+        "docs/operations/tls",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/traffic.webp",
+      "plane": "admin",
+      "path": "/traffic",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/traffic",
+        "docs/operations/traffic",
+        "index",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/users.webp",
+      "plane": "admin",
+      "path": "/application/users",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/access/capabilities",
+        "docs/console/overview",
+        "docs/console/users",
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/vault.webp",
+      "plane": "admin",
+      "path": "/vault",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/vault",
+        "docs/operations/vault",
+        "showcase/index"
+      ]
+    }
+  ]
+}

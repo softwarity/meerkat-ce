@@ -16,6 +16,9 @@ vit un exploitant.
 
 - [Démarrer](/docs/start/quick-start)
 - [Ce qu'elle fait](/product/features)
+
+::: figure meerkat
+:::
 :::
 
 ## Ce que rencontrent vos utilisateurs

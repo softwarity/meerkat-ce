@@ -14,7 +14,7 @@ summary: Who builds all this, and how to reach us.
 ## Reaching us
 
 The fastest way in, today, is the repository: an issue on
-[softwarity/meerkat](https://github.com/softwarity/meerkat/issues) is read, and
+[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) is read, and
 a discussion there stays where the answer will be useful to somebody else.
 
 ::: grid

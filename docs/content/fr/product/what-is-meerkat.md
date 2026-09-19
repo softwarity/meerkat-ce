@@ -34,3 +34,18 @@ une session. Meerkat est l'endroit où ces questions sont tranchées une fois.
 La gateway est un unique binaire Go sans dépendance : elle sert le plan de
 données sur un port et sa console d'administration sur un autre. Rien d'autre
 n'a besoin d'être installé pour la faire tourner.
+
+## Pourquoi ce nom
+
+::: figure meerkat
+Le suricate, en sentinelle.
+:::
+
+
+Le suricate est la sentinelle de la nature : il monte la garde à l'entrée du
+terrier et donne l'alerte, pour que le reste de la colonie travaille sans avoir
+à s'inquiéter de rien. C'est exactement ce que cette passerelle fait pour vos
+services. Même le tunnel [plug](https://github.com/softwarity/plug) entre dans
+l'image : c'est par lui que la machine d'un développeur se creuse un chemin
+jusqu'au terrier. Et comme un groupe de suricates s'appelle une *mob*, vous
+savez déjà comment nommer un cluster de nœuds Meerkat.

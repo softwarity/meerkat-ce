@@ -29,6 +29,17 @@ html {
 
   // The contextual drawer renders in a body-level overlay, so its surface has
   // to be set here rather than on the rail.
+  // The product's mark punches its eye mask to the surface behind it, and the
+  // illustrated version needs an outline that survives a dark page.
+  --meerkat-eye: light-dark(#f6f6fb, #0f1118);
+  // The outline is what separates the animal from the page, so it flips with
+  // the page. The face is drawn ON the cream muzzle and never touches the
+  // background: flipping it too turned the eyes white on white.
+  --meerkat-outline: light-dark(#2e2c2a, #e7e9f2);
+  --meerkat-face: #2e2c2a;
+  --meerkat-body: #cb6b4a;
+  --meerkat-belly: light-dark(#eddcbf, #f0e2cb);
+
   --rail-nav-drawer-surface: var(--surface-2);
   // Wide enough for "Softwarity" to be a word rather than an ellipsis. The
   // library sizes its label for a 72px rail, so the label follows the width.
@@ -53,6 +64,12 @@ rail-nav-item .rail-item:not(.expanded) {
   .label-below {
     width: 100%;
   }
+}
+
+// What opens says so. The rule is global because these elements are written
+// by the build into the page's HTML, not by a template.
+.zoomable {
+  cursor: zoom-in;
 }
 
 .mk-shot img {
@@ -250,6 +267,37 @@ a {
 
 // ---- the layout blocks a landing page is written with ----------------------
 
+// A hero that carries the mark becomes two columns on a wide screen: the words
+// keep the left, the animal stands on the right. Below that width it stacks,
+// because a 160px drawing beside a paragraph is neither.
+.mk-hero:has(.mk-figure) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  // Rows sized by their content, not by the drawing beside them: without
+  // this the title, the sentence and the buttons spread over the animal's
+  // height and the hero reads as three disconnected blocks.
+  grid-auto-rows: min-content;
+  align-content: start;
+  column-gap: 44px;
+
+  > * {
+    grid-column: 1;
+  }
+
+  > .mk-figure {
+    grid-column: 2;
+    grid-row: 1 / span 99;
+    align-self: center;
+    margin: 0;
+  }
+}
+
+@media (max-width: 860px) {
+  .mk-hero:has(.mk-figure) {
+    display: block;
+  }
+}
+
 .mk-hero {
   padding: 40px 0 12px;
 
@@ -423,4 +471,170 @@ a {
   gap: 26px;
   align-items: start;
   margin-bottom: 24px;
+}
+
+// ---- the figures --------------------------------------------------------
+//
+// They come from the product's own presentation: class-driven SVG, drawn with
+// CSS variables rather than baked fills. The build INLINES them in the page
+// (see the `::: figure` block), so they take the values below - and the same
+// drawing follows the reader's light or dark scheme instead of being a picture
+// of one of them.
+
+.mk-figure {
+  margin: 26px 0 30px;
+
+  --ink: var(--text);
+  --ink-2: var(--text-2);
+  --ink-3: var(--muted);
+  --rule: var(--line-soft);
+  --rule-strong: var(--line);
+  --slate: light-dark(#5b6478, #8b93a8);
+  --slate-soft: light-dark(#edeff6, #252a38);
+  --sand: var(--warn);
+  --sand-soft: color-mix(in srgb, var(--warn) 14%, transparent);
+  --accent-ink: var(--accent);
+  --bar-muted: color-mix(in srgb, light-dark(#5b6478, #8b93a8) 35%, transparent);
+  --body: inherit;
+  --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --display: inherit;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  figcaption {
+    margin-top: 10px;
+    font-size: 0.88em;
+    color: var(--muted);
+  }
+
+  .dg text { fill: var(--ink); font-family: var(--body); font-size: 13px; }
+  .dg .t-sub { font-size: 12px; fill: var(--ink-2); }
+  .dg .t-mono { font-family: var(--mono); font-size: 11.5px; fill: var(--ink-2); }
+  .dg .t-title { font-family: var(--display); font-size: 17px; font-weight: 700; }
+  .dg .t-head { font-weight: 500; }
+  .dg .t-count { font-family: var(--display); font-size: 15px; font-weight: 600; }
+  .dg .t-edge { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }
+  .dg .t-mk { fill: var(--accent-ink); }
+  .dg .t-build { fill: var(--sand); font-weight: 500; }
+  .dg .box { fill: var(--surface); stroke: var(--rule-strong); stroke-width: 1.2; }
+  .dg .box-other { fill: var(--slate-soft); stroke: var(--slate); stroke-width: 1.2; }
+  .dg .box-mk { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.8; }
+  .dg .box-build { fill: var(--sand-soft); stroke: var(--sand); stroke-width: 1.2; stroke-dasharray: 5 4; }
+  .dg .edge { stroke: var(--ink-2); stroke-width: 1.4; fill: none; }
+  .dg .edge-dash { stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 4 4; fill: none; }
+  .dg .edge-mk { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+  .dg .ah { fill: var(--ink-2); }
+  .dg .ah-mk { fill: var(--accent); }
+  .dg .divider { stroke: var(--rule-strong); stroke-width: 1; stroke-dasharray: 2 5; }
+  .dg .grid { stroke: var(--rule); stroke-width: 1; }
+  .dg .axis { stroke: var(--rule-strong); stroke-width: 1; }
+  .dg .bar { fill: var(--slate); }
+  .dg .bar-mk { fill: var(--accent); }
+  .dg .bar-soft { fill: var(--slate-soft); stroke: var(--slate); stroke-width: 1; }
+  .dg .bar-muted { fill: var(--bar-muted); }
+  .dg .bar-ref { fill: none; stroke: var(--slate); stroke-width: 1.5; stroke-dasharray: 4 3; }
+}
+
+// The illustrated mark is a portrait, not a diagram: it keeps its own size and
+// sits in the middle rather than spanning the column.
+.mk-figure-meerkat {
+  svg {
+    width: auto;
+    max-width: 160px;
+    max-height: 300px;
+    margin: 0 auto;
+  }
+
+  figcaption {
+    text-align: center;
+  }
+}
+
+// A strip of figures: what the product is, in five numbers.
+.mk-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 36px;
+  margin: 26px 0 8px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mk-stat {
+  display: flex;
+  flex-direction: column;
+
+  b {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  span {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+}
+
+// On paper, ink is the cost: a light page whatever the reader was using, and
+// the links that leave the site carry their address, because a printed link
+// nobody can type is not a link.
+@media print {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .body {
+    a[target='_blank']::after {
+      content: ' (' attr(href) ')';
+      font-size: 0.85em;
+      color: #555;
+      word-break: break-all;
+    }
+
+    h2 {
+      break-after: avoid;
+    }
+
+    // A long table may cross pages - what must not be cut is a ROW, and the
+    // header repeats on each page so the columns keep their names. Refusing to
+    // break the table itself left half a page empty before every big one.
+    table {
+      break-inside: auto;
+    }
+
+    thead {
+      display: table-header-group;
+    }
+
+    tr {
+      break-inside: avoid;
+    }
+
+    .mk-figure,
+    .callout,
+    pre {
+      break-inside: avoid;
+    }
+
+    img {
+      box-shadow: none;
+    }
+  }
+
+  .mk-stats {
+    break-inside: avoid;
+  }
 }

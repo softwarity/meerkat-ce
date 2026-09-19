@@ -82,6 +82,24 @@ type AuthProvider struct {
 // exists, it is seeded at startup and it is never deleted - only turned off.
 const LocalProviderID = "local"
 
+// ReservedProviderIDs are the names an authority may not take, because the
+// sign-in flow already serves a page at that address: an authority called
+// "code" would sit behind /login/code, which is the mailed-code sign-in
+// (AUTH-16), and Go's router prefers the literal - so the authority would
+// simply never open, with nothing anywhere saying why.
+var ReservedProviderIDs = []string{"code"}
+
+// ProviderIDReserved reports whether id belongs to the flow rather than to an
+// authority.
+func ProviderIDReserved(id string) bool {
+	for _, r := range ReservedProviderIDs {
+		if id == r {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidProviderKind reports whether kind is one we know how to drive.
 func ValidProviderKind(kind string) bool {
 	switch kind {

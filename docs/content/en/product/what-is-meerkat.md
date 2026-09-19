@@ -34,3 +34,18 @@ questions are answered once.
 The gateway is a single Go binary with no dependency: it serves the data plane
 on one port and its administration console on another. Nothing else has to be
 installed for it to run.
+
+## Why the name
+
+::: figure meerkat
+Meerkat, standing guard.
+:::
+
+
+The meerkat is nature's sentinel: it stands guard at the burrow entrance and
+raises the alert, so the rest of the colony can work without worrying about
+anything. That is exactly what this gateway does for your services. Even the
+[plug](https://github.com/softwarity/plug) tunnel fits the picture - it is how
+a developer's machine digs its way into the burrow. And since a group of
+meerkats is called a *mob*, you already know what to call a cluster of Meerkat
+nodes.

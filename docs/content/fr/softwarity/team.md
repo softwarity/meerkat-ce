@@ -15,7 +15,7 @@ summary: Qui construit tout cela, et comment nous joindre.
 ## Nous joindre
 
 Le chemin le plus rapide, aujourd'hui, c'est le dépôt : une issue sur
-[softwarity/meerkat](https://github.com/softwarity/meerkat/issues) est lue, et
+[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) est lue, et
 une discussion y reste là où la réponse servira à quelqu'un d'autre.
 
 ::: grid

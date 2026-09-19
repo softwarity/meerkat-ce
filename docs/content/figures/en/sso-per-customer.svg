@@ -1,0 +1,41 @@
+<svg class="dg" viewBox="0 0 700 244" role="img" aria-label="Monthly price of one additional SSO connection: WorkOS 125 dollars, Stytch 125 dollars, Auth0 from 100 dollars, Clerk 75 dollars, Descope 50 dollars, Meerkat 0.">
+            <line x1="150" y1="8" x2="150" y2="202" class="grid"/>
+            <line x1="242" y1="8" x2="242" y2="202" class="grid"/>
+            <line x1="334" y1="8" x2="334" y2="202" class="grid"/>
+            <line x1="426" y1="8" x2="426" y2="202" class="grid"/>
+            <line x1="518" y1="8" x2="518" y2="202" class="grid"/>
+            <line x1="610" y1="8" x2="610" y2="202" class="grid"/>
+
+            <text x="138" y="30" text-anchor="end">WorkOS</text>
+            <rect x="150" y="16" width="460" height="20" class="bar"/>
+            <text x="618" y="30" class="t-mono">$125</text>
+
+            <text x="138" y="62" text-anchor="end">Stytch</text>
+            <rect x="150" y="48" width="460" height="20" class="bar"/>
+            <text x="618" y="62" class="t-mono">$125</text>
+
+            <text x="138" y="94" text-anchor="end">Auth0</text>
+            <rect x="150" y="80" width="368" height="20" class="bar"/>
+            <text x="526" y="94" class="t-mono">from $100</text>
+
+            <text x="138" y="126" text-anchor="end">Clerk</text>
+            <rect x="150" y="112" width="276" height="20" class="bar"/>
+            <text x="434" y="126" class="t-mono">$75</text>
+
+            <text x="138" y="158" text-anchor="end">Descope</text>
+            <rect x="150" y="144" width="184" height="20" class="bar"/>
+            <text x="342" y="158" class="t-mono">$50</text>
+
+            <text x="138" y="190" text-anchor="end" class="t-mk" font-weight="600">Meerkat</text>
+            <rect x="150" y="176" width="3" height="20" class="bar-mk"/>
+            <text x="162" y="190" class="t-mono t-mk">$0, one line of configuration</text>
+
+            <line x1="150" y1="202" x2="610" y2="202" class="axis"/>
+            <text x="150" y="222" text-anchor="middle" class="t-mono">0</text>
+            <text x="242" y="222" text-anchor="middle" class="t-mono">25</text>
+            <text x="334" y="222" text-anchor="middle" class="t-mono">50</text>
+            <text x="426" y="222" text-anchor="middle" class="t-mono">75</text>
+            <text x="518" y="222" text-anchor="middle" class="t-mono">100</text>
+            <text x="610" y="222" text-anchor="middle" class="t-mono">125</text>
+            <text x="380" y="240" text-anchor="middle" class="t-sub">dollars per month, per SSO connection beyond the included quota</text>
+          </svg>

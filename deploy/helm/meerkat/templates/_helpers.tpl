@@ -29,3 +29,26 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-admin" (include "meerkat.fullname" .) -}}
 {{- end -}}
 {{- end -}}
+
+{{/* A gateway is CLUSTERED as soon as it has a shared database: that is what
+     turns several pods into one installation, and what makes the local
+     directory disposable. */}}
+{{- define "meerkat.clustered" -}}
+{{- if or .Values.database.url .Values.database.existingSecret -}}yes{{- end -}}
+{{- end -}}
+
+{{- define "meerkat.stateSecretName" -}}
+{{- if .Values.database.existingSecret -}}
+{{- .Values.database.existingSecret -}}
+{{- else -}}
+{{- printf "%s-state" (include "meerkat.fullname" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "meerkat.vaultSecretName" -}}
+{{- if .Values.vault.existingSecret -}}
+{{- .Values.vault.existingSecret -}}
+{{- else -}}
+{{- printf "%s-state" (include "meerkat.fullname" .) -}}
+{{- end -}}
+{{- end -}}

@@ -516,6 +516,13 @@ const (
 	// app, so turning it on is a decision, not a default. It does nothing
 	// unless a relay is configured and the account carries an address.
 	SettingMFAEmailOTP = "mfa_email_otp"
+	// SettingEmailSignin opens signing in with a code mailed to the address
+	// (AUTH-16), INSTEAD of a password. Ships OFF, and for a reason worth
+	// writing where the key is declared: it makes the mailbox the credential.
+	// It is a first factor only - the second factor still runs behind it - and
+	// it is never mounted on the control plane, so no mailbox opens the
+	// console.
+	SettingEmailSignin = "email_signin"
 	// One-time guard: the theme presets have been topped up into an existing
 	// install (THEME-04). Prevents resurrecting a preset the admin deleted.
 	SettingThemePresetsSeeded = "theme_presets_seeded"
@@ -579,6 +586,7 @@ func (s *Store) seedDefaultSettings() error {
 		SettingMFARequired:    `false`,
 		SettingPasskeys:       `true`,
 		SettingMFAEmailOTP:    `false`,
+		SettingEmailSignin:    `false`,
 		SettingTrustedBrowser: string(trusted),
 		// AUTH-10: the eight characters the code used to demand in four
 		// places, now in one, and raisable.

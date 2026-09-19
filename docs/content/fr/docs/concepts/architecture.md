@@ -17,6 +17,32 @@ métiers différents servis par deux ports différents.
 | Sert | vos applications, et les pages que la gateway sert elle-même | l'API d'administration et la console |
 | A sa place sur | le réseau que vos utilisateurs atteignent | un réseau interne, jamais le réseau public |
 
+## Où elle se place
+
+Un binaire devant les services dont votre application est faite. Ce qui l'atteint
+est un navigateur ou un client d'API ; ce qu'elle transmet est une requête sur
+laquelle on a déjà tranché.
+
+::: figure mesh
+La même passerelle devant les deux moitiés d'une application : les interfaces
+que vos utilisateurs ouvrent, et les API que tout le reste appelle.
+:::
+
+La ligne au milieu des services est celle qui compte. Une **route UI** est une
+page qu'une personne regarde, alors la passerelle l'habille : le portail de
+navigation, le bouton de compte, le thème, le mode clair et sombre, tout cela
+injecté dans le HTML au passage. L'application n'embarque aucune bibliothèque
+pour ça et ne sait pas qu'on l'habille.
+
+Une **route API** est appelée par un programme, il n'y a donc rien à habiller.
+Ce qu'elle reçoit à la place est un jeton signé dans un en-tête - qui appelle,
+ses rôles, son organisation - et elle n'authentifie personne. C'est tout
+l'intérêt : vos services cessent de porter une page de connexion et une table
+d'utilisateurs.
+
+Un service peut être les deux, et l'est souvent : la même application servant
+ses pages et sa propre API derrière deux routes.
+
 ## Pourquoi ils sont séparés
 
 Parce qu'une erreur sur l'un ne doit pas être une erreur sur l'autre.

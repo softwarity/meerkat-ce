@@ -40,6 +40,8 @@ membres, ses groupes, ses règles de groupe, réinitialiser le mot de passe d'un
 membre, lire l'historique de connexion d'un membre. Cela n'accorde rien en dehors de
 cette organisation, et en particulier pas le catalogue global de rôles.
 
+![Les membres d'une organisation, et ce que chacun y est](img/console/members.webp)
+
 ## Le choix à la connexion
 
 Une fois le premier facteur et le second facteur faits :

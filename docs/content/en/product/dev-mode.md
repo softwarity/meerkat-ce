@@ -1,7 +1,7 @@
 ---
 title: Dev mode
 section: The product
-order: 5
+order: 7
 summary: A developer's workstation joins the cluster and stands in for a deployed service, and everyone looking at the application is told which one, and by whom.
 ---
 
@@ -33,39 +33,36 @@ plug -p cluster --service user-mng-service npm run start
 - **It lives as long as the session**: the substitution vanishes when the process
   stops, and a gateway restart takes both ends with it.
 
-## A key, not a certificate
+## Taking an access back
 
-A certificate authority was examined and dropped. A certificate carries its own
-validity: once issued it is accepted until it expires, so taking it back means
-waiting or standing up revocation machinery. A gateway is up by definition - it
-can answer *is this key still allowed* at every single connection. So
-**revoking is deleting the line**, and someone who leaves stops being able to
-tunnel within seconds. The profile page shows the SHA256 fingerprint OpenSSH
-itself prints, and no expiry date: the absence is the design.
+The key lives on the developer's account, and the gateway checks it at every
+connection. Removing it, or removing dev mode, closes the tunnel within
+seconds: nothing was issued that would outlive the removal, so there is no
+expiry to wait for and no revocation to propagate anywhere else. The profile
+page shows the SHA256 fingerprint OpenSSH itself prints.
 
-## Nobody picks a variant, everybody is told
+## Everybody sees who is serving what
 
-There is no menu of developers to choose from, and no tester role. A
-substitution changes what the application in front of you *is*, so it is news
-for everyone looking at it: Meerkat's job is to make the current state
-**visible and attributed** - "checkout, by Alice" rather than "checkout, by
-somebody" - not to offer a choice nobody can make correctly.
+A substitution changes what the application in front of you *is*. So it is not
+a developer's preference, it is news for everyone looking at it, and it is
+named: "checkout, by Alice" rather than "checkout, by somebody".
 
-That attribution is what the Enterprise edition adds. Standalone plug holds one
-key baked into the published binary, so a connection proves the caller *has*
-plug, not who they are - which is honest, and enough for the trusted clusters
-it targets.
+- **At sign-in**, a page names what is substituted and by whom, before handing
+  the application over.
+- **While you work**, a collapsible strip says it again on every page, and
+  follows substitutions live as they appear and disappear.
 
 > [!NOTE]
-> The tunnel embedded in the gateway is Enterprise. plug itself stays a product
-> of its own: the community image runs it as a standalone agent beside the
-> gateway, which is plug's own default and needs nothing from Meerkat. See
-> [One gateway](/docs/deploy/one-gateway) for the compose file and the Helm
-> values that open it.
+> The tunnel embedded in the gateway is Enterprise, and it is what brings that
+> attribution: every developer deposits their own key, so a connection says
+> who. The community image runs plug as a standalone agent beside the gateway,
+> with a shared key: a connection then proves the caller *has* plug, not who
+> they are. See [One gateway](/docs/deploy/one-gateway) for the compose file
+> and the Helm values that open it.
 
 ## Still to come
 
-The state is served but not yet shown: a page after login naming what is
-substituted, a strip that stays true while you work, a console screen listing
-the live sessions, and the audit trail of every key deposited and every
-substitution posed.
+The **scope** of a substitution: today it holds for all traffic, and nothing
+yet limits it to the people who asked for it. On the operations side, what is
+missing is the console screen listing the live sessions, and the audit entry
+for every key deposited and every substitution posed.

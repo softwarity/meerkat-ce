@@ -1147,6 +1147,23 @@
       }
     },
     {
+      "id": "flow-email-signin",
+      "domain": "dataplane",
+      "kind": "flow",
+      "spec": "flow-pages",
+      "allowed": [
+        "user"
+      ],
+      "title": {
+        "en": "A mailed code signs in, and only in the browser that asked",
+        "fr": "Un code par e-mail connecte, et seulement dans le navigateur qui l'a demandé"
+      },
+      "description": {
+        "en": "Sign-in by one-time code (AUTH-16), switched on for the run: the sign-in page offers it, the code arrives through the SMTP sink, it opens the session - and the same code pasted into a second browser is refused, which is what the request-id cookie is for.",
+        "fr": "Connexion par code à usage unique (AUTH-16), activée pour l'exécution : la page de connexion l'offre, le code arrive par le collecteur SMTP, il ouvre la session - et le même code collé dans un second navigateur est refusé, ce qui est la raison d'être du cookie d'identifiant de requête."
+      }
+    },
+    {
       "id": "flow-select-group",
       "domain": "tenant",
       "kind": "flow",

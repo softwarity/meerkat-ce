@@ -1,0 +1,49 @@
+# Meerkat, Enterprise edition, one gateway, with the developer tunnel open.
+#
+#   kubectl create secret docker-registry ghcr \
+#     --docker-server=ghcr.io --docker-username=USER --docker-password=TOKEN
+#   helm install meerkat ./meerkat -f values-ee-one-node.yaml \
+#     --set admin.password='choose-one'
+#
+# Same shape as the community one - a single pod on its volume - with the
+# Enterprise image: several organisations, the directories, and the tunnel
+# that plugs a developer's machine into this cluster.
+image:
+  repository: ghcr.io/softwarity/meerkat-ee
+  tag: ""
+  # The Enterprise image is on a private registry: name the pull secret you
+  # created for it.
+  pullSecrets:
+    - ghcr
+
+replicaCount: 1
+
+admin:
+  password: ""
+
+# The vault's master key. Optional on a single gateway - left alone it keeps
+# one in its data directory, which is enough while there is one pod and one
+# volume. Set it the day you go clustered, and keep it: losing it loses every
+# secret in the vault.
+vault:
+  key: ""
+
+persistence:
+  enabled: true
+  size: 2Gi
+  storageClass: ""
+
+# The developer tunnel. It opens only where developer mode is on AND the
+# gateway can reach the orchestrator - the chart's RBAC is that grant. Each
+# developer deposits their own public key in their profile, so a connection
+# says who rather than proving somebody has the client.
+plug:
+  enabled: true
+  port: 22222
+  service:
+    # ClusterIP keeps it inside; NodePort or LoadBalancer is how developers
+    # reach it from their machines. Your network, your call.
+    type: ClusterIP
+    nodePort: ""
+
+production: false

@@ -8,7 +8,7 @@ summary: Ce qui est construit, ce qui est en cours d'achèvement, et ce qui n'es
 # Feuille de route
 
 L'autorité sur l'état, c'est
-[FEATURES.md](https://github.com/softwarity/meerkat/blob/main/FEATURES.md) dans
+[FEATURES.md](https://github.com/softwarity/meerkat-ce/blob/main/FEATURES.md) dans
 le dépôt : une ligne par fonctionnalité, l'état lu dans le code, et une case
 cochée dans le commit qui livre la chose. Cette page est ce tableau lu à voix
 haute.
@@ -50,30 +50,36 @@ ensuite.
 Ces sujets marchent et ne sont pas finis. Le tableau du dépôt dit, ligne par
 ligne, ce qui manque à chacun.
 
-- **Configurations versionnées** : dupliquer, éditer en brouillon, comparer,
-  basculer atomiquement, revenir en arrière. Le stockage est là ; les écrans
-  sont à moitié construits.
-- **Quotas** : par consommateur, avec un mode calibration qui ne fait que
-  journaliser. Les limites de débit sont livrées ; les quotas non.
-- **Mode développement** : le tunnel marche. Ce qui manque, c'est ce qui le
-  montre : la page qui nomme ce qui est substitué, et l'écran de console qui
-  liste les sessions en cours.
-- **Notifications** : le relais de messagerie est livré. Les gabarits d'e-mail
-  multilingues, et le digest quotidien, ne le sont pas.
-- **Identité vers l'amont** : le jeton signé est émis. Un endpoint d'échange
-  rendant un couple access/refresh n'est pas écrit.
+- **Configurations versionnées** : plusieurs configurations coexistent, une
+  seule est active, l'export et l'import ferment la boucle, et la passerelle
+  pose un point de reprise à chaque changement qui déplace l'empreinte. Ce qui
+  manque est de comparer deux configurations enregistrées sans passer par
+  l'état courant.
+- **Quotas** : ils se posent par route, par endpoint et par consommateur -
+  utilisateur, jeton, organisation, adresse - et un dépassement répond 429 avec
+  les en-têtes standards. Ce qui manque est l'écran qui montre la consommation,
+  le ralentissement plutôt que le refus, et des compteurs justes en cluster.
+- **Mode développement** : le tunnel marche, la connexion s'arrête sur une page
+  qui nomme ce qui est substitué et par qui, et un bandeau le redit pendant
+  qu'on travaille. Ce qui manque est la portée d'une substitution - elle vaut
+  aujourd'hui pour tout le trafic - puis l'écran de console qui liste les
+  sessions en cours, et l'audit.
+- **Notifications** : le relais SMTP est livré, avec un gabarit unique aux
+  couleurs du thème, et le résumé quotidien des accès qui se ferment part tout
+  seul. Ce qui manque est un gabarit par événement, et traduit.
+- **Identité vers l'amont** : le jeton signé est émis, avec son JWKS publié et
+  la rotation des clés. Ce qui manque est un endpoint d'échange rendant un
+  couple access/refresh, et les modes qui portent un secret vers l'amont :
+  BASIC, FORM, JWT tiers.
 - **Passkeys** : utilisables comme facteur. Récupérer un compte dont l'unique
   passkey est perdue n'est pas encore écrit.
-- **Codes à usage unique par e-mail** : rien n'est écrit ; SMTP est le prérequis
-  et il est en place.
+- **Codes à usage unique par e-mail** : se connecter avec un code à la place
+  du mot de passe est livré, éteint par défaut, lié au navigateur qui l'a
+  demandé et jamais ouvert sur la console. Ce qui manque est le lien magique,
+  et pouvoir fermer cette porte compte par compte.
 
 ## Ensuite
 
-- **Un portail par organisation** : la barre de navigation est globale
-  aujourd'hui. Laisser une organisation porter son icône, son titre et son
-  arrangement serait le premier remplacement visuel par organisation du produit,
-  et cela attend que la décision soit prise correctement plutôt que par
-  accident.
 - **Un assistant de découverte** : la passerelle sait déjà lire le socket Docker
   et un namespace Kubernetes. Transformer cela en « scanner, choisir un
   conteneur, obtenir une route » est l'écran qui manque.

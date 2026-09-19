@@ -26,6 +26,19 @@
     </mat-card>
 
     <mat-card appearance="outlined">
+      <h3 i18n="@@Sign_in_by_email">Sign in by e-mail</h3>
+      <p class="hint text-muted" i18n="@@Email_signin_hint">
+        Let a user sign in with a one-time code mailed to their address, INSTEAD of a password.
+        It needs a mail relay (Infra, Mail relay). The code lasts ten minutes, works only in the
+        browser that asked for it, and replaces the password alone: a second factor, where one is
+        required, is still asked for. The admin console is never openable this way.
+      </p>
+      <mat-slide-toggle [checked]="emailSignin()" (change)="emailSignin.set($event.checked)">
+        <ng-container i18n="@@Allow_email_signin">Allow signing in with an e-mailed code</ng-container>
+      </mat-slide-toggle>
+    </mat-card>
+
+    <mat-card appearance="outlined">
       <h3 i18n="@@Session_TTL">Session TTL</h3>
       <p class="hint text-muted" i18n="@@Session_TTL_hint">
         How long a session lives before the user must sign in again.

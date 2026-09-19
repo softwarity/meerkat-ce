@@ -1,7 +1,7 @@
 ---
 title: Performance
 section: The product
-order: 6
+order: 8
 widget: benchmark
 summary: What the gateway costs a request, measured next to Kong, APISIX and Traefik on the same machine, in the same run, read live from the latest benchmark the CI made.
 ---

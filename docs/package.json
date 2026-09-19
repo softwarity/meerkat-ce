@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "node scripts/gen-version.mjs && node scripts/gen-tests.mjs && node scripts/build-site.mjs && ng serve",
+    "start": "node scripts/gen-version.mjs && node scripts/gen-tests.mjs && node scripts/gen-deploy.mjs && node scripts/build-site.mjs && ng serve",
     "build": "node scripts/build.mjs",
-    "content": "node scripts/gen-tests.mjs && node scripts/build-site.mjs",
+    "content": "node scripts/gen-tests.mjs && node scripts/gen-deploy.mjs && node scripts/build-site.mjs",
     "docs:freeze": "node scripts/freeze-docs.mjs",
-    "watch": "ng build --watch --configuration development"
+    "watch": "ng build --watch --configuration development",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@angular/cdk": "^22.0.0",
@@ -19,7 +20,7 @@
     "@angular/material": "^22.1.5",
     "@angular/platform-browser": "^22.0.0",
     "@angular/router": "^22.1.5",
-    "@softwarity/rail-nav": "^1.2.0",
+    "@softwarity/rail-nav": "^1.2.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.8.1"
   },

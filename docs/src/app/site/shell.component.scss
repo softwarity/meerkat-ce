@@ -57,6 +57,40 @@
   }
 }
 
+// The product, beside the company that makes it.
+.product {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 4px;
+  padding: 5px 12px 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: none;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  // The rail lights the part of the site being read; the home page is not one
+  // of them, so this button carries its own mark.
+  &.on {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  mat-icon {
+    width: 15px;
+    height: 20px;
+  }
+}
+
 .grow {
   flex: 1 1 auto;
 }
@@ -341,5 +375,158 @@ rail-nav-content {
 
   .page-holder {
     padding: 0 16px;
+  }
+}
+
+@media print {
+  .topbar,
+  .site-footer,
+  .search-veil {
+    display: none !important;
+  }
+
+  .frame {
+    display: block;
+    height: auto;
+  }
+
+  rail-nav-container,
+  rail-nav-content {
+    height: auto;
+    overflow: visible;
+  }
+
+  // The rail is a MatSidenav: hiding the element is not enough, the content
+  // keeps the margin it left for it.
+  rail-nav {
+    display: none !important;
+  }
+
+  rail-nav-content {
+    margin: 0 !important;
+  }
+
+  .page-holder {
+    padding: 0;
+    max-width: none;
+  }
+}
+
+// The picture viewer, drawn at the shell's root so it covers the bar and the
+// rail as well as the page. What it shows is the page's own set of pictures,
+// handed over by the page component through the service.
+.lightbox {
+  position: fixed;
+  inset: 0;
+  // Above the bar (30) and above the search panel (60): it is the one thing
+  // in front of everything while it is open.
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 3vh 5vw;
+  background: rgba(8, 8, 14, 0.92);
+  // A backdrop that appears instantly reads as a page change; a short fade
+  // says the page is still there, underneath.
+  animation: lb-in 0.14s ease-out;
+}
+
+@keyframes lb-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.lb-frame {
+  margin: 0;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  img {
+    max-width: 90vw;
+    max-height: 82vh;
+    width: auto;
+    margin: 0;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  figcaption {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.9rem;
+    text-align: center;
+  }
+}
+
+// A drawing is vector: it takes the width it is given, on a ground of its own
+// so the page's colours still mean something against the dark backdrop.
+.lb-draw {
+  width: min(92vw, 1200px);
+  max-height: 82vh;
+  overflow: auto;
+  padding: 18px 20px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.lb-count {
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
+.lb-btn {
+  position: fixed;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.24);
+  }
+
+  mat-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 26px;
+  }
+}
+
+.lb-close {
+  top: 18px;
+  right: 20px;
+}
+
+.lb-prev {
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lb-next {
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+@media (max-width: 700px) {
+  .lb-prev {
+    left: 8px;
+  }
+
+  .lb-next {
+    right: 8px;
   }
 }

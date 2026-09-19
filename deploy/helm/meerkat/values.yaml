@@ -7,6 +7,38 @@ image:
   pullPolicy: IfNotPresent
   pullSecrets: []
 
+# How many gateways serve this installation. One is the default shape: a pod
+# on its own volume, holding everything it knows. More than one is a CLUSTER,
+# and a cluster needs the shared database below - three pods on three volumes
+# are three gateways, not one, and nothing would look broken while they
+# disagreed.
+replicaCount: 1
+
+# The shared state: routes, accounts, sessions, the audit trail and the sealed
+# vault become rows, and that is what makes several pods ONE gateway. It is
+# also the whole coordination - PostgreSQL's own notifications are the bus, so
+# there is no Redis, no broker and no etcd to run beside it.
+#
+# Enterprise: the community image links no PostgreSQL driver, so a URL given
+# to it answers with a sentence naming what IS available rather than a driver
+# error. Either give the URL here, or name a Secret you manage yourself.
+database:
+  url: ""
+  existingSecret: ""
+  existingSecretKey: database-url
+
+# The vault's master key. It seals what is IN the database, so it is not kept
+# there. Left to itself each pod generates its own, in its own directory - and
+# then a secret sealed by one pod is unreadable by the others, which shows up
+# as an upstream password that works on one replica in three.
+#
+# Generate it once (openssl rand -hex 32), give every pod the same, and keep
+# it where you keep your keys: losing it loses every secret in the vault.
+vault:
+  key: ""
+  existingSecret: ""
+  existingSecretKey: vault-key
+
 # The FIRST admin account, created on the first start and never read again.
 # Either give a password here (the chart makes a Secret) or name a Secret you
 # manage yourself - never both.
@@ -43,6 +75,10 @@ persistence:
   # Everything the gateway knows lives here: routes, accounts, the sealed
   # vault, the certificates. Without a volume, a restarted pod is a new
   # installation.
+  #
+  # Ignored once `database` is set: the state is then rows, the directory
+  # holds nothing worth keeping, and a ReadWriteOnce volume cannot follow a
+  # pod from one machine to another anyway.
   enabled: true
   size: 2Gi
   storageClass: ""

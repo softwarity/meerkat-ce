@@ -1,0 +1,104 @@
+<svg class="dg" viewBox="0 0 1000 540" role="img" aria-label="On the left, the assembled stack: a request crosses Kong then oauth2-proxy, which redirects to Keycloak, while six more products run alongside, about 38 pods and 5 storage engines. On the right, a request crosses a single Meerkat before reaching the services.">
+            <defs>
+              <marker id="ah-c" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="ahmk-c" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-mk" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+
+            <text x="0" y="22" class="t-title">Assembled stack</text>
+            <text x="0" y="42" class="t-sub">self-hosted, highly available, 8 products</text>
+
+            <rect x="0" y="70" width="200" height="40" rx="4" class="box"/>
+            <text x="100" y="95" text-anchor="middle">Browser or API client</text>
+            <line x1="100" y1="110" x2="100" y2="149" class="edge" marker-end="url(#ah-c)"/>
+            <text x="108" y="134" class="t-edge">HTTPS</text>
+
+            <rect x="0" y="150" width="200" height="64" rx="4" class="box-other"/>
+            <text x="14" y="173" class="t-head">API gateway</text>
+            <text x="14" y="192" class="t-mono">Kong OSS x3</text>
+            <text x="14" y="207" class="t-mono">+ Redis</text>
+            <line x1="100" y1="214" x2="100" y2="241" class="edge" marker-end="url(#ah-c)"/>
+            <text x="108" y="233" class="t-edge">route</text>
+
+            <rect x="0" y="242" width="200" height="64" rx="4" class="box-other"/>
+            <text x="14" y="265" class="t-head">Authentication proxy</text>
+            <text x="14" y="284" class="t-mono">oauth2-proxy x2</text>
+            <text x="14" y="299" class="t-mono">sessions in Redis</text>
+            <line x1="100" y1="306" x2="100" y2="419" class="edge" marker-end="url(#ah-c)"/>
+            <text x="108" y="366" class="t-edge">identity</text>
+            <text x="108" y="380" class="t-edge">headers</text>
+
+            <rect x="0" y="420" width="200" height="44" rx="4" class="box"/>
+            <text x="100" y="447" text-anchor="middle">Your services</text>
+
+            <line x1="200" y1="274" x2="259" y2="274" class="edge" marker-end="url(#ah-c)"/>
+            <text x="230" y="266" text-anchor="middle" class="t-edge">OIDC</text>
+            <line x1="260" y1="182" x2="201" y2="182" class="edge-dash" marker-end="url(#ah-c)"/>
+            <text x="230" y="174" text-anchor="middle" class="t-edge">TLS</text>
+
+            <rect x="260" y="150" width="162" height="64" rx="4" class="box-other"/>
+            <text x="274" y="173" class="t-head">Certificates</text>
+            <text x="274" y="192" class="t-mono">cert-manager</text>
+            <text x="274" y="207" class="t-mono">7 pods</text>
+
+            <rect x="438" y="150" width="162" height="64" rx="4" class="box-other"/>
+            <text x="452" y="173" class="t-head">Secrets vault</text>
+            <text x="452" y="192" class="t-mono">OpenBao or Vault</text>
+            <text x="452" y="207" class="t-mono">5 Raft nodes</text>
+
+            <rect x="260" y="242" width="162" height="64" rx="4" class="box-other"/>
+            <text x="274" y="265" class="t-head">Identity</text>
+            <text x="274" y="284" class="t-mono">Keycloak x3</text>
+            <text x="274" y="299" class="t-mono">+ PostgreSQL</text>
+
+            <rect x="438" y="242" width="162" height="64" rx="4" class="box-other"/>
+            <text x="452" y="265" class="t-head">Monitoring</text>
+            <text x="452" y="284" class="t-mono">Prometheus, Grafana</text>
+            <text x="452" y="299" class="t-mono">8 pods</text>
+
+            <rect x="260" y="334" width="162" height="64" rx="4" class="box-other"/>
+            <text x="274" y="357" class="t-head">Audit</text>
+            <text x="274" y="376" class="t-mono">Retraced x5</text>
+            <text x="274" y="391" class="t-mono">+ Postgres, Elastic</text>
+
+            <rect x="438" y="334" width="162" height="64" rx="4" class="box-other"/>
+            <text x="452" y="357" class="t-head">Workstation to cluster</text>
+            <text x="452" y="376" class="t-mono">mirrord Operator</text>
+            <text x="452" y="391" class="t-mono">+ 1 job per session</text>
+
+            <rect x="260" y="420" width="340" height="44" rx="4" class="box-build"/>
+            <text x="274" y="438" class="t-build">Build it yourself</text>
+            <text x="274" y="455" class="t-sub">menu, portal, organization screens, audit</text>
+
+            <text x="0" y="502" class="t-count">About 38 pods to operate</text>
+            <text x="0" y="524" class="t-sub">5 storage engines: PostgreSQL, Redis, Raft, Elasticsearch, Prometheus</text>
+
+            <line x1="640" y1="10" x2="640" y2="530" class="divider"/>
+
+            <text x="680" y="22" class="t-title">With Meerkat</text>
+            <text x="680" y="42" class="t-sub">1 product</text>
+
+            <rect x="740" y="70" width="200" height="40" rx="4" class="box"/>
+            <text x="840" y="95" text-anchor="middle">Browser or API client</text>
+            <line x1="840" y1="110" x2="840" y2="149" class="edge-mk" marker-end="url(#ahmk-c)"/>
+            <text x="848" y="134" class="t-edge">HTTPS</text>
+
+            <rect x="680" y="150" width="320" height="236" rx="4" class="box-mk"/>
+            <use href="#meerkat" x="960" y="162" width="24" height="42"/>
+            <text x="700" y="180" class="t-title">Meerkat</text>
+            <text x="700" y="200" class="t-mono">x1, or x3 + PostgreSQL</text>
+            <text x="700" y="232">sign-in, MFA, passkeys, SSO</text>
+            <text x="700" y="253">access, organizations, API tokens</text>
+            <text x="700" y="274">routing, rate limits, quotas, breaker</text>
+            <text x="700" y="295">TLS and ACME, secrets vault</text>
+            <text x="700" y="316">audit, dashboards</text>
+            <text x="700" y="337">user menu, portal, issue reports</text>
+            <text x="700" y="358">developer mode, MCP server</text>
+            <line x1="840" y1="386" x2="840" y2="419" class="edge-mk" marker-end="url(#ahmk-c)"/>
+            <text x="848" y="407" class="t-edge">signed JWT</text>
+
+            <rect x="740" y="420" width="200" height="44" rx="4" class="box"/>
+            <text x="840" y="447" text-anchor="middle">Your services</text>
+
+            <text x="680" y="502" class="t-count t-mk">1 pod, 22 MB idle (CI)</text>
+            <text x="680" y="524" class="t-sub">3 pods + PostgreSQL for high availability</text>
+          </svg>

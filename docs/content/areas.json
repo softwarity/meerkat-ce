@@ -1,19 +1,35 @@
 [
   {
-    "id": "meerkat",
-    "icon": "shield_person",
+    "id": "home",
+    "icon": "home",
     "home": "index",
     "prefixes": [
-      "index",
+      "index"
+    ],
+    "hidden": true,
+    "label": {
+      "en": "Home",
+      "fr": "Accueil"
+    },
+    "short": {
+      "en": "Home",
+      "fr": "Accueil"
+    }
+  },
+  {
+    "id": "meerkat",
+    "icon": "svg:meerkat",
+    "home": "product/what-is-meerkat",
+    "prefixes": [
       "product"
     ],
     "label": {
-      "en": "Meerkat",
-      "fr": "Meerkat"
+      "en": "The product",
+      "fr": "Le produit"
     },
     "short": {
-      "en": "Meerkat",
-      "fr": "Meerkat"
+      "en": "Product",
+      "fr": "Produit"
     }
   },
   {

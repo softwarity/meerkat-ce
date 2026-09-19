@@ -8,7 +8,7 @@ summary: What is built, what is being finished, and what is deliberately not on 
 # Roadmap
 
 The authority on state is
-[FEATURES.md](https://github.com/softwarity/meerkat/blob/main/FEATURES.md) in
+[FEATURES.md](https://github.com/softwarity/meerkat-ce/blob/main/FEATURES.md) in
 the repository: one line per feature, the state read from the code, and a box
 that is ticked in the commit that ships the thing. This page is that table read
 out loud.
@@ -47,27 +47,35 @@ transform it, an access rule decides, and what happened is visible afterwards.
 These work and are not finished. The table in the repository says, line by
 line, what is missing from each.
 
-- **Versioned configurations** - duplicate, edit as a draft, diff, switch
-  atomically, roll back. The storage is there; the screens are half-built.
-- **Quotas** - per consumer, with a calibration mode that only logs. Rate
-  limits are shipped; quotas are not.
-- **Dev mode** - the tunnel works. What is missing is what shows it: the page
-  that names what is substituted, and the console screen listing live sessions.
-- **Notifications** - the mail relay is shipped. The multilingual mail
-  templates, and the daily digest, are not.
-- **Identity to upstreams** - the signed token is emitted. An exchange endpoint
-  handing back an access and refresh pair is not written.
+- **Versioned configurations** - several configurations coexist, one is
+  active, export and import close the loop, and the gateway drops a checkpoint
+  on every change that moves the configuration's fingerprint. What is missing
+  is comparing two SAVED configurations without going through the current
+  state.
+- **Quotas** - they are posed per route, per endpoint and per consumer - user,
+  token, organisation, address - and going over answers 429 with the standard
+  headers. What is missing is the screen that shows consumption, throttling
+  rather than refusing, and counters that stay right across a cluster.
+- **Dev mode** - the tunnel works, sign-in halts on a page naming what is
+  substituted and by whom, and a strip says it again while you work. What is
+  missing is the scope of a substitution - today it holds for all traffic -
+  then the console screen listing live sessions, and the audit.
+- **Notifications** - the SMTP relay is shipped, with one template in the
+  theme's colours, and the daily summary of closing accesses goes out on its
+  own. What is missing is a template per event, and translated.
+- **Identity to upstreams** - the signed token is emitted, with its published
+  JWKS and key rotation. What is missing is an exchange endpoint handing back
+  an access and refresh pair, and the modes that carry a secret to the
+  upstream: BASIC, FORM, third-party JWT.
 - **Passkeys** - usable as a factor. Recovering an account whose only passkey
   is lost is not written yet.
-- **One-time codes by email** - nothing is written; SMTP is the prerequisite
-  and it is in place.
+- **One-time codes by email** - signing in with a code instead of the
+  password is shipped, off by default, bound to the browser that asked and
+  never open on the console. What is missing is the magic link, and being able
+  to close that door account by account.
 
 ## Next
 
-- **A per-tenant portal**: the navigation bar is global today. Letting an
-  organisation carry its own icon, title and arrangement would be the first
-  per-tenant visual override in the product, and it waits for that decision to
-  be made properly rather than by accident.
 - **A discovery wizard**: the gateway can already read the Docker socket and a
   Kubernetes namespace. Turning that into "scan, pick a container, get a route"
   is the screen that is missing.

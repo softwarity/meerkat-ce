@@ -55,6 +55,7 @@ export class SecurityPageComponent {
 
   protected readonly mfaRequired = signal(false);
   protected readonly mfaEmailOtp = signal(false);
+  protected readonly emailSignin = signal(false);
   protected readonly rlLogin = signal(10);
   protected readonly rlTotp = signal(5);
   protected readonly rlWindow = signal('PT15M');
@@ -116,6 +117,7 @@ export class SecurityPageComponent {
         this.settings.set(s);
         this.mfaRequired.set(s.mfaRequired);
         this.mfaEmailOtp.set(s.mfaEmailOtp);
+        this.emailSignin.set(s.emailSignin);
         this.rlLogin.set(s.rateLimit?.loginAttempts ?? 10);
         this.rlTotp.set(s.rateLimit?.totpAttempts ?? 5);
         this.rlWindow.set(s.rateLimit?.loginWindow || 'PT15M');
@@ -173,6 +175,7 @@ export class SecurityPageComponent {
         ...s,
         mfaRequired: this.mfaRequired(),
         mfaEmailOtp: this.mfaEmailOtp(),
+        emailSignin: this.emailSignin(),
         rateLimit: { loginAttempts: this.rlLogin(), loginWindow: this.rlWindow(), totpAttempts: this.rlTotp() },
         passkeysAllowed: this.passkeysAllowed(),
         apiTokens: this.apiTokens(),

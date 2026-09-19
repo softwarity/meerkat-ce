@@ -1,7 +1,7 @@
 ---
 title: Pricing
 section: The product
-order: 4
+order: 6
 summary: One edition is free and stays free. The other is priced per production instance, and starts with a conversation.
 ---
 
@@ -31,7 +31,11 @@ docker run -p 8080:8080 -p 9090:9090 \
 Everything above, plus what an installation needs once it grows: several
 organisations, LDAP and Active Directory, roles granted by your directory,
 several gateways behind one entry point, the Prometheus exposition, the
-developer tunnel, and the built-in pages without our mark.
+developer tunnel, the built-in pages without our mark - and support.
+
+**Support is part of the agreement**: you reach the people who wrote the
+gateway, not a tier. What it covers and how fast is being written and will be
+on this page.
 
 Priced **per production instance**. Not per user, not per request, not per
 route.
@@ -78,13 +82,13 @@ keeps being served.
 
 **Do you sell support for the free edition?** Ask us. The community image is
 supported by the repository - an issue on
-[softwarity/meerkat](https://github.com/softwarity/meerkat/issues) is read.
+[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) is read.
 
 ::: cta
 ### Talk to us
 
 The commercial contact channel is being set up and its address will be here.
 Until then, open an issue on
-[softwarity/meerkat](https://github.com/softwarity/meerkat/issues) saying what
+[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) saying what
 you are building and how big it is, and we will take it from there.
 :::

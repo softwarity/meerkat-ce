@@ -1,0 +1,39 @@
+# Meerkat, community edition, one gateway on its own volume.
+#
+#   helm install meerkat ./meerkat -f values-ce-one-node.yaml \
+#     --set admin.password='choose-one'
+#
+# This IS the default shape, written out so it can be read: one pod, the
+# embedded store on a ReadWriteOnce volume, no database to run beside it. It
+# carries a whole application - routing, accounts, roles, the built-in pages,
+# TLS, the vault, the audit trail - for one organisation.
+#
+# What it does not do is survive the loss of its node, because a volume does
+# not follow a pod from one machine to another. When that matters, go to
+# values-ee-cluster.yaml.
+image:
+  repository: docker.io/softwarity/meerkat
+  # Pin a release rather than following latest on what holds your front door.
+  tag: ""
+
+replicaCount: 1
+
+# Set it on the command line instead of here: a password in a file is a
+# password in git. Read once, on the first start, to create the first admin.
+admin:
+  password: ""
+
+persistence:
+  enabled: true
+  size: 2Gi
+  # Name your class, or let the cluster's default answer.
+  storageClass: ""
+
+service:
+  type: ClusterIP
+  appPort: 8080
+  adminPort: 9090
+
+# Declare it a production gateway and the whole developer surface stays closed
+# here, whatever the database says.
+production: false

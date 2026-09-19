@@ -43,7 +43,10 @@ for (const lang of LANGS) {
     const page = JSON.parse(await readFile(join(dir, file), 'utf8'));
     const slug = page.slug;
     const path = slug === 'index' ? `${lang}` : `${lang}/${slug}`;
-    const title = slug === 'index' ? `${page.title} | Softwarity` : `${page.title} | meerkat`;
+    // Same rule as the runtime: the company is the brand, Meerkat is the
+    // product, and the tab says which of the two the page is about.
+    const house = page.area === 'softwarity' || page.area === 'project' ? 'Softwarity' : 'Meerkat';
+    const title = slug === 'index' ? `${page.title} | Softwarity` : `${page.title} | ${house}`;
     // With the trailing slash Pages itself serves: every page is a directory,
     // so /en answers a 301 to /en/, and a canonical that redirects is one
     // nobody should have written.

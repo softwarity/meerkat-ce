@@ -14,3 +14,10 @@
 # Generated content: the test-coverage page is read from e2e/scenarios.json.
 /content/en/project/tests.md
 /content/fr/project/tests.md
+
+# scratch PNGs from scripts/screenshots.mjs, before conversion
+/.screenshots/
+
+# copied from deploy/ at build by scripts/gen-deploy.mjs - the repository's
+# files are the source, these are the download
+/public/deploy/

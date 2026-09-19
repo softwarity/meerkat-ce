@@ -35,6 +35,8 @@ Que *Signed in* laisse passer un compte sans organisation est délibéré : c'es
 rend atteignable une page de salle d'attente, ou un profil en self-service, pour
 quelqu'un qui vient d'être reconnu et à qui rien n'a été accordé.
 
+![La règle propre d'une route : un niveau, les rôles acceptés, et les utilisateurs qui passent malgré tout](img/console/route-editor-security.webp)
+
 ## Les rôles
 
 Choisissez-en autant que vous voulez ; **n'importe lequel suffit**. Ils sont lus dans

@@ -918,6 +918,7 @@ const loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
     <p class="sep">{{.T.orSignInWith}}</p>
     {{range .Providers}}<a class="choice" href="/login/{{.ID}}?next={{$.Next}}">{{.Name}}</a>{{end}}
     {{end}}
+    {{if .SigninCode}}<p class="back"><a href="/login/code?next={{.Next}}">{{.T.signinCodeLink}}</a></p>{{end}}
     {{if .Forgot}}<p class="back"><a href="/forgot-password">{{.T.forgotLink}}</a></p>{{end}}
     {{if .Register}}<p class="back"><a href="/register">{{.T.createAccount}}</a></p>{{end}}
     {{if .Passkeys}}
@@ -1970,6 +1971,16 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /login/passkey/start", h.passkeyLoginStart)
 	mux.HandleFunc("POST /login/passkey/finish", h.passkeyLoginFinish)
 	// External authentication (AUTH-19): one pair per redirect authority.
+	// Signing in with a mailed code (AUTH-16). Mounted on BOTH planes though
+	// only the data plane ever opens it: the handlers refuse the control plane
+	// themselves, and a path left unmounted here would be claimed by the
+	// provider wildcard below - which would answer "unknown provider" to a
+	// reader who asked for a page that does not exist. `code` is a reserved
+	// authority id for the same reason (store.ReservedProviderIDs).
+	mux.HandleFunc("GET /login/code", h.showEmailSignin)
+	mux.HandleFunc("POST /login/code", h.doEmailSignin)
+	mux.HandleFunc("POST /login/code/verify", h.doEmailSigninVerify)
+
 	mux.HandleFunc("GET /login/{provider}", h.startExternal)
 	mux.HandleFunc("GET /login/{provider}/callback", h.finishExternal)
 
@@ -2131,6 +2142,14 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.continueAfterCredential(w, r, user, next, loginMethodPassword)
+}
+
+// continueAfterCredential runs the login flow once a credential has been
+// proved - a password here, a mailed code in emailsignin.go. The steps are
+// shared rather than copied: a door added later cannot forget the forced
+// password change, the second factor, or the organisation.
+func (h *Handler) continueAfterCredential(w http.ResponseWriter, r *http.Request, user store.User, next, method string) {
 	// The destination is validated ONCE here (safeNext); it then rides on the
 	// session, immutable by the client, through the rest of the flow.
 	dest := safeNext(next)
@@ -2139,12 +2158,16 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 	// anything else - the session is issued with the step pending, and every
 	// navigation is redirected to it until done (gateway + flow pages enforce).
 	if user.MustChangePassword || h.passwordExpired(r.Context(), user) {
-		h.issueAndGoPending(w, r, user, stepUpdatePassword, dest, loginMethodPassword)
+		h.issueAndGoPending(w, r, user, stepUpdatePassword, dest, method)
 		return
 	}
 
 	// AUTH-05 step 2: the second factor. A fresh login issues the session stuck
 	// on the MFA step; it is cleared once the code (or forced enrolment) passes.
+	//
+	// A mailed sign-in code does NOT stand in for it: the code and a password
+	// reset travel the same channel, so skipping the factor here would hand
+	// both halves to whoever holds the mailbox.
 	step, err := h.nextStepAfterPassword(r.Context(), user.ID, trustTokenOf(r))
 	if err != nil {
 		slog.Error("MFA step decision failed", "err", err)
@@ -2152,11 +2175,11 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if step != "" {
-		h.issueAndGoPending(w, r, user, step, dest, loginMethodPassword)
+		h.issueAndGoPending(w, r, user, step, dest, method)
 		return
 	}
 
-	h.resolveTenantAndGo(w, r, user, dest, next, loginMethodPassword)
+	h.resolveTenantAndGo(w, r, user, dest, next, method)
 }
 
 // resolveTenantAndGo issues the final session once the flow's earlier steps are
@@ -3176,6 +3199,8 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, next, errMsg st
 		Passkeys bool // the gateway-wide policy shows/hides the passkey sign-in
 		Register bool // self-registration open (policy on + SMTP ready)
 		Forgot   bool // password reset available (SMTP ready)
+		// SigninCode offers the mailed code instead of a password (AUTH-16).
+		SigninCode bool
 		// Providers are the redirect authorities (AUTH-19), one button each.
 		// A directory needs no button: it answers the ordinary form.
 		Providers []externalProvider
@@ -3193,6 +3218,7 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, next, errMsg st
 		// it opens nothing, so it is not offered.
 		Passkeys: h.passkeysOffered(r.Context()) && h.anyAuthorityEnabled(r.Context()),
 		Register: h.selfRegisterOpen(r.Context()), Forgot: h.forgotOpen(r),
+		SigninCode:  h.emailSigninOpen(r),
 		Providers:   h.redirectProviders(r.Context()),
 		Credentials: h.credentialFormOpen(r.Context()),
 		Shut:        !h.anyWayIn(r.Context())}, status)
