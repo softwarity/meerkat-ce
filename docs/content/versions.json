@@ -1,0 +1,5 @@
+{
+  "_comment": "Frozen documentation versions. `current` is the one served at /{lang}/docs/... with no version segment; it is null while nothing has been frozen, and the working tree (next) is served there instead. Freeze a version with `npm run docs:freeze -- 1.0`.",
+  "current": null,
+  "versions": []
+}

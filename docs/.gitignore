@@ -3,11 +3,14 @@
 /dist
 /out-tsc
 /.angular
-# generated at build by scripts/gen-version.mjs and sync-scenarios.mjs
+# generated at build by scripts/gen-version.mjs
 /src/assets/version.json
-/src/assets/scenarios.json
-# generated at build by scripts/build-docs.mjs from content/ - the Markdown is
+# generated at build by scripts/build-site.mjs from content/ - the Markdown is
 # the source, these are its output
-/src/assets/docs/
+/src/assets/site/
 *.log
 .DS_Store
+
+# Generated content: the test-coverage page is read from e2e/scenarios.json.
+/content/en/project/tests.md
+/content/fr/project/tests.md

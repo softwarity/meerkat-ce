@@ -5,7 +5,8 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-09-17 : **banc comparatif** (PERF-05, non commite, en attente de
+_Derniere mise a jour : 2026-09-19 : **le site GitHub Pages refait en entier** - voir la
+section « Session 2026-09-19 » plus bas. Avant cela, 2026-09-17 : **banc comparatif** (PERF-05, non commite, en attente de
 validation). `tools/bench/run.sh` (`make bench`) : Meerkat face a Kong 3.9.3 (DB-less),
 APISIX 3.18.0 (standalone) et Traefik v3.7.13, chacun epingle sur UN CPU (`--cpuset-cpus 0`,
 une worker nginx, GOMAXPROCS=1) devant le meme amont Go (`tools/bench/upstream`, qui sert
@@ -272,6 +273,67 @@ B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste
 repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+
+## Session 2026-09-19 - le site refait en entier (bigbang)
+
+### Ce qui a ete livre (commit `7dd899c`, PAS pousse)
+
+Le site `docs/` n'est plus un site de documentation, c'est le site de Softwarity et de
+Meerkat. Demande de Francois : « bigbang du site, pas un rajout ».
+
+- **Tout est du Markdown** sous `docs/content/<lang>/`, y compris l'accueil, la galerie, les
+  pages societe et la feuille de route. Les blocs de mise en page d'une landing page
+  s'ecrivent `::: hero`, `::: cards`, `::: gallery`, `::: steps`, `::: cta`, `::: lead`,
+  `::: grid`, `::: quote`, `::: split` (moteur : `scripts/build-site.mjs`). Le front matter
+  porte `title/section/order/summary` + `layout: wide` (ni colonne ni sommaire) et
+  `widget: <nom>` (voir plus bas).
+- **Une seule chose n'est pas de la prose** : le tableau de benchmark, devenu
+  `src/app/site/widgets/benchmark.component.ts`, monte par la page qui declare
+  `widget: benchmark` dans son front matter. C'est le seul composant de contenu.
+- **La langue est un segment d'URL** : `/en/...`, `/fr/...`. UNE seule compilation sert les
+  deux (pas de `$localize`) ; le shell a un dictionnaire de vingt mots dans
+  `src/app/site/i18n.ts`. Ajouter une langue = un dossier + une entree.
+- **La documentation est versionnee, et elle seule.** `/docs/...` = version courante (ses
+  adresses ne bougent JAMAIS), `/docs/1.3/...` = version gelee, `/docs/next/...` = l'arbre
+  de travail. `content/versions.json` (`current: null` aujourd'hui) et
+  `npm run docs:freeze -- 1.0` : copie l'arbre dans `content/versions/1.0/`, recopie les
+  captures qu'il reference dans `public/img/v/1.0/` et reecrit les references. Verifie en
+  le faisant tourner (gel d'une 1.0, bandeau sur `next`, lien de prose qui reste dans sa
+  version, retour a la courante), puis defait.
+- **Navigation** : `@softwarity/rail-nav` a gauche (5 aires declarees dans
+  `content/areas.json` : Meerkat, Showcase, Documentation, Softwarity, Le projet) avec
+  tiroir contextuel. Une aire de plus de 3 sections est listee PAR SECTION dans le tiroir
+  (sinon 124 entrees). Dans la page : la section courante a gauche, les titres a droite.
+- **Vrais chemins, pas de hash**, et `scripts/static-pages.mjs` ecrit UN FICHIER HTML PAR
+  PAGE (248) avec son `<title>`, sa description et ses balises Open Graph : un lien profond
+  repond 200 et non le 404 d'un repli SPA. Le corps reste charge par l'application.
+- **Galerie** : 29 captures, 6 nouvelles prises sur une instance neuve (page de connexion
+  claire et sombre, barre de portail sur une vraie appli, menu de compte, route en
+  maintenance) dans `public/img/app/`.
+- **Softwarity** a ses pages : qui nous sommes, expertise, experience developpeur, open
+  source, ce en quoi nous croyons, equipe (emplacement reserve). Le site doit pouvoir
+  remplacer `softwarity.io`, qui pointe encore sur Archway.
+
+### Pieges rencontres
+
+- **npm 12 n'execute plus les hooks `prebuild`/`postbuild`.** Verifie : ils ne tournent pas.
+  D'ou `scripts/build.mjs`, un seul script qui enchaine les etapes ET transmet les
+  arguments a `ng build` - indispensable parce que les workflows appellent
+  `npm run build -- --base-href /meerkat/` et que npm colle ces arguments A LA FIN de la
+  ligne (dans une chaine `&&`, ils atterrissent sur la derniere commande).
+- Le label d'un `rail-nav-item` est **fige a 48px** dans la lib (`.label-below`), quelle que
+  soit la largeur du rail : surcharge globale a 80px dans `styles.scss`, plus un nom court
+  par aire (`short` dans `areas.json`).
+- Les captures d'une galerie sont en `object-fit: contain` et non `cover` : un recadrage
+  coupait le logo a gauche des captures larges, c'est-a-dire ce dont parle la legende.
+
+### A signaler / reste a faire
+
+- **`e2e/scenarios.json` est ecrit en francais SANS accents et SANS apostrophes** (« qu un
+  jeton », « perimetre »). Ce fichier est rendu tel quel par la page Couverture de tests du
+  site public. Environ 60 descriptions a reprendre : non fait, hors perimetre de cette
+  session.
+- Le commit n'est PAS pousse (regle : Francois valide avant les minutes de CI).
 
 ## Session 2026-09-12 - gabarits d'e-mail (NOTIF-01) et OTP par mail (MFA-02)
 

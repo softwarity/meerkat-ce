@@ -1,0 +1,84 @@
+[
+  {
+    "id": "meerkat",
+    "icon": "shield_person",
+    "home": "index",
+    "prefixes": [
+      "index",
+      "product"
+    ],
+    "label": {
+      "en": "Meerkat",
+      "fr": "Meerkat"
+    },
+    "short": {
+      "en": "Meerkat",
+      "fr": "Meerkat"
+    }
+  },
+  {
+    "id": "showcase",
+    "icon": "gallery_thumbnail",
+    "home": "showcase/index",
+    "prefixes": [
+      "showcase"
+    ],
+    "label": {
+      "en": "Showcase",
+      "fr": "Galerie"
+    },
+    "short": {
+      "en": "Showcase",
+      "fr": "Galerie"
+    }
+  },
+  {
+    "id": "docs",
+    "icon": "menu_book",
+    "home": "docs/index",
+    "prefixes": [
+      "docs"
+    ],
+    "versioned": true,
+    "label": {
+      "en": "Documentation",
+      "fr": "Documentation"
+    },
+    "short": {
+      "en": "Docs",
+      "fr": "Doc"
+    }
+  },
+  {
+    "id": "softwarity",
+    "icon": "diversity_3",
+    "home": "softwarity/index",
+    "prefixes": [
+      "softwarity"
+    ],
+    "label": {
+      "en": "Softwarity",
+      "fr": "Softwarity"
+    },
+    "short": {
+      "en": "Softwarity",
+      "fr": "Softwarity"
+    }
+  },
+  {
+    "id": "project",
+    "icon": "flag",
+    "home": "project/roadmap",
+    "prefixes": [
+      "project"
+    ],
+    "label": {
+      "en": "The project",
+      "fr": "Le projet"
+    },
+    "short": {
+      "en": "Project",
+      "fr": "Projet"
+    }
+  }
+]

@@ -1,37 +1,12 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
-interface DocLink {
-  path: string;
-  label: string;
-  icon: string;
-}
-
+// The application is one outlet: the shell under a language, and a page under
+// the shell. Everything the reader sees comes from content/ - see
+// site/shell.component.ts.
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule],
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.scss',
+  imports: [RouterOutlet],
+  template: '<router-outlet />',
 })
-export class AppComponent {
-  constructor(iconRegistry: MatIconRegistry) {
-    // Use Material Symbols (loaded in index.html) as the default glyph set for every <mat-icon>.
-    iconRegistry.setDefaultFontSetClass('material-symbols-outlined');
-  }
-
-  protected readonly links: DocLink[] = [
-    { path: '/', label: 'About', icon: 'visibility' },
-    // The documentation proper - its own shell, its own language switch and
-    // search, so it is one entry here rather than thirty.
-    { path: '/docs', label: 'Documentation', icon: 'menu_book' },
-    { path: '/requirements', label: 'Requirements', icon: 'checklist' },
-    { path: '/dev-mode', label: 'Dev mode', icon: 'terminal' },
-    { path: '/deploy', label: 'Deploy', icon: 'rocket_launch' },
-    { path: '/cluster', label: 'Kubernetes cluster', icon: 'hub' },
-    { path: '/roadmap', label: 'Roadmap', icon: 'map' },
-    { path: '/performance', label: 'Performance', icon: 'speed' },
-    { path: '/tests', label: 'Test coverage', icon: 'verified' },
-  ];
-}
+export class AppComponent {}

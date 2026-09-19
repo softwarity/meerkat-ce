@@ -1,53 +1,38 @@
-import { Routes } from '@angular/router';
+import { Routes, UrlMatcher, UrlSegment } from '@angular/router';
+import { LANGS } from './site/i18n';
+
+// The language is a PATH SEGMENT, not a setting: /en/docs/... and
+// /fr/docs/... are two addresses, both real, both sendable. A reader who
+// arrives with no language is sent to the one they asked their browser for.
+//
+// The version of the documentation is a path segment too, but further in -
+// /en/docs/1.3/filters/respond - and only the documentation has one. The
+// current version wears no segment at all, so its addresses never move when a
+// release ships. Neither is a route here: everything after the language is one
+// slug, resolved against the content the build wrote.
+
+const lang: UrlMatcher = (segments: UrlSegment[]) => {
+  const first = segments[0]?.path;
+  if (first && (LANGS as readonly string[]).includes(first)) {
+    return { consumed: [segments[0]], posParams: { lang: segments[0] } };
+  }
+  return null;
+};
 
 export const routes: Routes = [
   {
-    path: '',
-    pathMatch: 'full',
-    loadComponent: () => import('./pages/about.component').then((m) => m.AboutComponent),
-  },
-  {
-    path: 'requirements',
-    loadComponent: () =>
-      import('./pages/requirements.component').then((m) => m.RequirementsComponent),
-  },
-  {
-    path: 'dev-mode',
-    loadComponent: () => import('./pages/dev-mode.component').then((m) => m.DevModeComponent),
-  },
-  {
-    path: 'deploy',
-    loadComponent: () => import('./pages/deploy.component').then((m) => m.DeployComponent),
-  },
-  {
-    path: 'cluster',
-    loadComponent: () => import('./pages/cluster.component').then((m) => m.ClusterComponent),
-  },
-  {
-    path: 'roadmap',
-    loadComponent: () => import('./pages/roadmap.component').then((m) => m.RoadmapComponent),
-  },
-  {
-    path: 'performance',
-    loadComponent: () =>
-      import('./pages/performance.component').then((m) => m.PerformanceComponent),
-  },
-  {
-    path: 'tests',
-    loadComponent: () => import('./pages/tests.component').then((m) => m.TestsComponent),
-  },
-  // The documentation proper. One shell, and every page under it is the same
-  // component reading the JSON the build produced - so a page added under
-  // docs/content needs no route of its own.
-  {
-    path: 'docs',
-    loadComponent: () => import('./docs/docs-shell.component').then((m) => m.DocsShellComponent),
+    matcher: lang,
+    loadComponent: () => import('./site/shell.component').then((m) => m.ShellComponent),
     children: [
       {
         path: '**',
-        loadComponent: () => import('./docs/docs-page.component').then((m) => m.DocsPageComponent),
+        loadComponent: () => import('./site/page.component').then((m) => m.PageComponent),
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  // No language in the address: keep the path, prepend the reader's own.
+  {
+    path: '**',
+    loadComponent: () => import('./site/enter.component').then((m) => m.EnterComponent),
+  },
 ];

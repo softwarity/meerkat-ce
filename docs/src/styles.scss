@@ -1,33 +1,87 @@
 @use '@angular/material' as mat;
 
-// Material 3 Theme — violet palette to match Softwarity look
+// The site's colours, once. Every surface below is built out of these tokens,
+// and light-dark() is what makes one palette serve both schemes: the reader
+// picks system, light or dark in the top bar and nothing else in the sheet has
+// to know which one won.
 html {
-  @include mat.theme((color: mat.$violet-palette));
-  color-scheme: light;
+  @include mat.theme((color: mat.$violet-palette, typography: Roboto));
+  color-scheme: light dark;
 
-  & body.dark-mode {
-    color-scheme: dark;
+  --bg: light-dark(#f6f6fb, #0f1118);
+  --bg-far: light-dark(#eceef7, #0a0c12);
+  --surface: light-dark(#ffffff, #171a24);
+  --surface-2: light-dark(#f2f3f9, #1f2330);
+  --surface-3: light-dark(#e9ebf4, #262b3a);
+  --text: light-dark(#191a21, #e7e9f2);
+  --text-2: light-dark(#474a59, #b7bccd);
+  --muted: light-dark(#6d7183, #8a90a3);
+  --line: light-dark(#e0e2ee, #2a2f3e);
+  --line-soft: light-dark(#eef0f7, #212636);
+  --accent: light-dark(#6338c8, #b9a0ff);
+  --accent-soft: light-dark(#f0eaff, #241c3d);
+  --info: light-dark(#0d6f96, #63c9ec);
+  --warn: light-dark(#8a5300, #ffb454);
+  --danger: light-dark(#b3261e, #ff9087);
+  --ok: light-dark(#136c3a, #57d68c);
+  --shadow: light-dark(0 10px 30px rgba(20, 20, 60, 0.08), 0 10px 30px rgba(0, 0, 0, 0.45));
+  --radius: 12px;
+
+  // The contextual drawer renders in a body-level overlay, so its surface has
+  // to be set here rather than on the rail.
+  --rail-nav-drawer-surface: var(--surface-2);
+  // Wide enough for "Softwarity" to be a word rather than an ellipsis. The
+  // library sizes its label for a 72px rail, so the label follows the width.
+  --rail-nav-collapsed-width: 96px;
+  --rail-nav-drawer-width: 264px;
+  --rail-nav-drawer-radius: 0 14px 14px 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// The rail is wider here than the library's default, and the library lines the
+// label up with the icon by giving both the same width - 48px, which is what a
+// 72px rail affords. Widening the label ALONE breaks that: it is laid out from
+// the left like the icon, so it ends up off-centre. So the collapsed item
+// centres its column instead, and the label takes the item's full width.
+// "Softwarity" is a name, not a word to cut in half.
+rail-nav-item .rail-item:not(.expanded) {
+  align-items: center;
+
+  .label-below {
+    width: 100%;
   }
 }
 
-:root {
-  --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  --bg-primary: #161b22;
-  --bg-secondary: #21262d;
-  --text-primary: #e6edf3;
-  --text-secondary: #c9d1d9;
-  --text-muted: #8b949e;
-  --accent-blue: #58a6ff;
-  --accent-green: #238636;
-  --accent-purple: #a371f7;
-  --accent-red: #f85149;
-  --accent-yellow: #d29922;
-  --border-color: #30363d;
+.mk-shot img {
+  // One shape per row, whatever the capture was: a gallery whose captions sit
+  // at six different heights reads as a mistake. Fitted rather than cropped -
+  // a crop takes the logo off the left of a wide screenshot, which is the part
+  // the caption is about.
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  background: var(--surface-2);
 }
 
-// Material Symbols glyph class (the Google css2 stylesheet ships only the @font-face, not this
-// helper). mat-icon gets this class via MatIconRegistry.setDefaultFontSetClass(...). Sizing is left
-// to mat-icon / the per-context overrides.
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', Ubuntu, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+// Material Symbols glyph class (the Google css2 stylesheet ships only the
+// @font-face, not this helper). mat-icon gets it via MatIconRegistry.
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -42,27 +96,8 @@ html {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: var(--bg-gradient);
-  background-attachment: fixed;
-  color: var(--text-primary);
-  line-height: 1.6;
-  min-height: 100vh;
-}
-
 a {
-  color: var(--accent-blue);
+  color: var(--accent);
   text-decoration: none;
 
   &:hover {
@@ -70,97 +105,322 @@ a {
   }
 }
 
-// Inline `code` (not inside a <pre>) — keep the original GitHub-dark style
-:not(pre) > code:not([class*='language-']) {
-  font-family: 'Courier New', Consolas, monospace;
-  background-color: var(--bg-secondary);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.9em;
-  color: var(--accent-blue);
-}
+// ---------------------------------------------------------------------------
+// What a page is made of. The build turns Markdown into this HTML, so the
+// selectors below ARE the site's typography - there is no per-page styling.
+// ---------------------------------------------------------------------------
 
-h2 {
-  font-size: 1.3rem;
-  font-weight: 600;
-  margin: 0 0 24px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-primary);
-}
+.body {
+  min-width: 0;
 
-h3 {
-  font-size: 1.05rem;
-  font-weight: 600;
-  margin: 24px 0 12px 0;
-  color: var(--text-primary);
-}
-
-p {
-  margin: 0 0 16px 0;
-  color: var(--text-secondary);
-}
-
-ul {
-  padding-left: 24px;
-  color: var(--text-secondary);
-
-  li {
-    margin-bottom: 6px;
-  }
-}
-
-.callout {
-  border-left: 4px solid var(--accent-blue);
-  background-color: rgba(88, 166, 255, 0.08);
-  padding: 12px 16px;
-  margin: 16px 0;
-  border-radius: 0 6px 6px 0;
-  color: var(--text-secondary);
-
-  &.warn {
-    border-left-color: var(--accent-yellow);
-    background-color: rgba(210, 153, 34, 0.08);
+  h1 {
+    font-size: 2rem;
+    line-height: 1.2;
+    font-weight: 600;
+    margin: 0 0 14px;
+    letter-spacing: -0.02em;
   }
 
-  &.danger {
-    border-left-color: var(--accent-red);
-    background-color: rgba(248, 81, 73, 0.08);
+  h2 {
+    font-size: 1.32rem;
+    font-weight: 600;
+    margin: 40px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: 76px;
+  }
+
+  h3 {
+    font-size: 1.06rem;
+    font-weight: 600;
+    margin: 26px 0 10px;
+    scroll-margin-top: 76px;
+  }
+
+  h4 {
+    font-size: 0.96rem;
+    font-weight: 600;
+    margin: 20px 0 8px;
+    color: var(--text-2);
+  }
+
+  p {
+    margin: 0 0 15px;
+    color: var(--text-2);
+  }
+
+  ul,
+  ol {
+    margin: 0 0 16px;
+    padding-left: 22px;
+    color: var(--text-2);
+
+    li {
+      margin-bottom: 6px;
+    }
   }
 
   strong {
-    color: var(--text-primary);
+    color: var(--text);
+    font-weight: 600;
   }
-}
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 16px 0;
-  font-size: 0.92em;
+  img {
+    max-width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: block;
+    margin: 18px 0;
+    box-shadow: var(--shadow);
+  }
 
-  th, td {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border-color);
+  :not(pre) > code {
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    padding: 0 4px;
+    border-radius: 5px;
+    font-size: 0.86em;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 0 0 18px;
+
+    code {
+      font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+      font-size: 0.84em;
+      color: var(--text);
+      line-height: 1.55;
+    }
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    margin: 0 0 20px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+  }
+
+  th,
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
     text-align: left;
     vertical-align: top;
   }
 
   th {
-    color: var(--text-primary);
     font-weight: 600;
-    background-color: var(--bg-secondary);
+    background: var(--surface-2);
+    white-space: nowrap;
   }
 
   td {
-    color: var(--text-secondary);
+    color: var(--text-2);
+  }
 
-    code {
-      white-space: nowrap;
+  .callout {
+    border-left: 3px solid var(--info);
+    background: var(--surface-2);
+    padding: 12px 16px;
+    border-radius: 0 10px 10px 0;
+    margin: 0 0 18px;
+    color: var(--text-2);
+
+    &.warning {
+      border-left-color: var(--warn);
+    }
+
+    &.tip {
+      border-left-color: var(--ok);
     }
   }
+}
 
-  tbody tr:hover {
-    background-color: rgba(88, 166, 255, 0.04);
+// ---- the layout blocks a landing page is written with ----------------------
+
+.mk-hero {
+  padding: 40px 0 12px;
+
+  h1 {
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
   }
+
+  p {
+    font-size: 1.12rem;
+    max-width: 62ch;
+    color: var(--text-2);
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 22px;
+
+    li {
+      margin: 0;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 500;
+
+      &:hover {
+        text-decoration: none;
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+    }
+
+    li:first-child a {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: light-dark(#ffffff, #1a1330);
+
+      &:hover {
+        filter: brightness(1.08);
+        color: light-dark(#ffffff, #1a1330);
+      }
+    }
+  }
+}
+
+.mk-lead p {
+  font-size: 1.08rem;
+  color: var(--text-2);
+  max-width: 68ch;
+}
+
+.mk-cards,
+.mk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin: 8px 0 26px;
+}
+
+.mk-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 20px;
+
+  h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  img {
+    margin: 0 0 12px;
+    box-shadow: none;
+  }
+}
+
+.mk-grid .mk-card {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.mk-steps {
+  counter-reset: step;
+
+  h3 {
+    counter-increment: step;
+
+    &::before {
+      content: counter(step);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      margin-right: 10px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+  }
+}
+
+.mk-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 22px;
+  margin: 18px 0 30px;
+}
+
+.mk-shot {
+  margin: 0;
+
+  img {
+    margin: 0;
+    width: 100%;
+  }
+
+  figcaption {
+    margin-top: 8px;
+    font-size: 0.88em;
+    color: var(--muted);
+  }
+}
+
+.mk-cta {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface));
+  padding: 24px 26px;
+  margin: 26px 0;
+
+  h3 {
+    margin-top: 0;
+  }
+}
+
+.mk-quote {
+  border-left: 3px solid var(--accent);
+  padding-left: 18px;
+  margin: 24px 0;
+
+  p {
+    font-size: 1.08rem;
+    font-style: italic;
+  }
+}
+
+.mk-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 26px;
+  align-items: start;
+  margin-bottom: 24px;
 }

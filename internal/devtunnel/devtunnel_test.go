@@ -148,8 +148,21 @@ func TestTheTunnelIsAskedBeforeItIsAnnounced(t *testing.T) {
 	})
 
 	ctx, stop := context.WithCancel(context.Background())
-	defer stop()
-	go Supervise(ctx, Deps{Store: st, Registry: NewRegistry(events.NewHub()), Addr: ":0"})
+	supervised := make(chan struct{})
+	go func() {
+		defer close(supervised)
+		Supervise(ctx, Deps{Store: st, Registry: NewRegistry(events.NewHub()), Addr: ":0"})
+	}()
+	// Registered LAST so it runs FIRST - cleanups are LIFO. Cancelling the
+	// context only ASKS the supervisor to stop; it is still in its loop reading
+	// pollEvery and hooks for a moment afterwards, and the cleanup above puts
+	// those back. Waiting for the goroutine to be gone is what makes the two
+	// ordered rather than racing, which the detector catches on a loaded runner
+	// and nowhere else.
+	t.Cleanup(func() {
+		stop()
+		<-supervised
+	})
 
 	time.Sleep(3 * pollEvery)
 	if ran.Load() {

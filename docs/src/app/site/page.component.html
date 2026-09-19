@@ -1,0 +1,75 @@
+@if (stale()) {
+  <div class="stale">
+    <mat-icon>history</mat-icon>
+    <span>
+      @if (version() === 'next') {
+        {{ words().readingNext }}
+      } @else {
+        {{ words().readingOld }} {{ version() }}.
+      }
+    </span>
+    <button type="button" (click)="goVersion(current())">{{ words().goCurrent }}</button>
+  </div>
+}
+
+@if (page(); as p) {
+  <div class="layout" [class.wide]="wide()">
+    @if (!wide()) {
+      <nav class="beside">
+        @if (isDocs() && versions().length > 1) {
+          <button class="version" type="button" [matMenuTriggerFor]="versionMenu">
+            <mat-icon>history</mat-icon>
+            <span>{{ words().version }} {{ label(version()) }}</span>
+            <mat-icon class="caret">arrow_drop_down</mat-icon>
+          </button>
+          <mat-menu #versionMenu>
+            @for (v of versions(); track v.id) {
+              <button mat-menu-item type="button" (click)="goVersion(v.id)">{{ label(v.id) }}</button>
+            }
+          </mat-menu>
+        }
+        @for (section of siblings(); track section.name) {
+          @if (section.name) {
+            <div class="beside-head">{{ section.name }}</div>
+          }
+          @for (item of section.pages; track item.slug) {
+            <a [routerLink]="path(item.slug)" [class.on]="item.slug === p.slug">{{ item.title }}</a>
+          }
+        }
+        @if (isDocs()) {
+          <a class="beside-all" [routerLink]="path(version() === current() ? 'docs/index' : 'docs/' + version() + '/index')">
+            {{ words().allSections }}
+          </a>
+        }
+      </nav>
+    }
+
+    <div class="stack">
+      <article #body class="body" [innerHTML]="html()"></article>
+      <!-- A page that carries live figures asks for them by name. There is one
+           such page, and it is the only thing on the site that is not prose. -->
+      @if (p.widget === 'benchmark') {
+        <div class="body">
+          <app-benchmark [lang]="lang()" />
+        </div>
+      }
+    </div>
+
+    @if (!wide() && p.headings.length > 1) {
+      <nav class="onpage">
+        <div class="onpage-head">{{ words().onThisPage }}</div>
+        @for (h of p.headings; track h.id) {
+          <button type="button" (click)="jump(h.id)">{{ h.text }}</button>
+        }
+      </nav>
+    }
+  </div>
+} @else if (missing()) {
+  <div class="layout wide">
+    <article class="body">
+      <h1>404</h1>
+      <p>{{ words().notFound }}</p>
+      <p><a [routerLink]="homePath()">{{ words().backHome }}</a></p>
+    </article>
+  </div>
+}
