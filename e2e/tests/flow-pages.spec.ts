@@ -322,7 +322,11 @@ test.describe.serial('flow-email-signin', () => {
     const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
     const settings = await (await root.get('/api/settings')).json();
     const user = s.users['user'];
-    const before = await (await root.get(`/api/users/${user.id}`)).json();
+    // There is no GET for ONE user: the list is the read side, as it is for
+    // the authorities above.
+    const all = (await (await root.get('/api/users')).json()) as { id: string }[];
+    const before = all.find((u) => u.id === user.id);
+    expect(before, 'the seeded user must be listed').toBeTruthy();
     const address = 'code-user@e2e.test';
     try {
       const relay = await root.put('/api/settings/mail-relay', {
