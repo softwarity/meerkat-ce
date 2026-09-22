@@ -27,7 +27,7 @@
     "@codemirror/search": "^6.7.2",
     "@softwarity/livewire": "^0.4.0",
     "@softwarity/loading-indicator": "^3.0.2",
-    "@softwarity/rail-nav": "^1.1.5",
+    "@softwarity/rail-nav": "^1.2.1",
     "@softwarity/row-actions": "^3.1.2",
     "@softwarity/store": "^1.19.2",
     "@softwarity/timezone-select": "^2.0.0",
@@ -41,7 +41,7 @@
     "@angular/build": "^22.1.7",
     "@angular/cli": "^22.1.7",
     "@angular/compiler-cli": "^22.0.0",
-    "@material-symbols/svg-400": "^0.47.3",
+    "@material-symbols/svg-400": "^0.47.4",
     "@types/luxon": "^3.7.5",
     "typescript": "~6.0.0"
   },
