@@ -215,6 +215,9 @@ func (a *API) putAuthProvider(w http.ResponseWriter, r *http.Request, actor stor
 		}
 	}
 	if err := a.st.SaveAuthProvider(r.Context(), p); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}

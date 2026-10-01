@@ -1,9 +1,12 @@
 package admin
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/softwarity/meerkat/internal/config"
 	"github.com/softwarity/meerkat/internal/store"
@@ -147,23 +150,42 @@ func (a *API) importConfig(w http.ResponseWriter, r *http.Request, actor store.U
 	if !ok {
 		return
 	}
-	plan, err := config.Apply(r.Context(), a.st, doc, prune(r))
+	plan, err := a.applyDocument(r.Context(), doc, prune(r), actor)
 	if err != nil {
+		if errors.Is(err, errReload) {
+			a.internal(w, err)
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	// A configuration carries the gateway-wide token policy: every cached
-	// token decision is read again.
-	a.sm.TokenChanged("*")
-	a.auditEvent(r.Context(), actor, "config.import", "config", "", "", "", summarise(plan))
-	// Saving IS applying, here as everywhere else. A reload that fails means a
-	// stored route no longer compiles: say so instead of reporting a clean
-	// import - the previous snapshot keeps serving in the meantime.
-	if err := a.reloadRouting(r.Context()); err != nil {
-		a.internal(w, fmt.Errorf("imported, but the routing table could not be reloaded: %w", err))
-		return
-	}
 	writeJSON(w, http.StatusOK, plan)
+}
+
+// errReload separates "this document is not acceptable" from "it was applied
+// and the table would not compile": the first is the caller's to fix, the
+// second is this gateway's, and they are not the same answer.
+var errReload = errors.New("applied, but the routing table could not be reloaded")
+
+// applyDocument is the ONE place an imported document becomes the running one.
+//
+// Shared by the console's endpoint and by the agent's tool, because the three
+// things that follow an import are what make it an import rather than a write:
+// the token policy travels in a configuration, so every cached decision is read
+// again; the trail records it; and saving IS applying, so the table is
+// recompiled and a document that no longer compiles says so rather than
+// reporting a clean import - the previous plan keeps serving in the meantime.
+func (a *API) applyDocument(ctx context.Context, doc *config.Document, prune bool, actor store.User) (*config.Plan, error) {
+	plan, err := config.Apply(ctx, a.st, doc, prune)
+	if err != nil {
+		return nil, err
+	}
+	a.sm.TokenChanged("*")
+	a.auditEvent(ctx, actor, "config.import", "config", "", "", "", summarise(plan))
+	if err := a.reloadRouting(ctx); err != nil {
+		return nil, fmt.Errorf("%w: %w", errReload, err)
+	}
+	return plan, nil
 }
 
 // readDocument reads the request body as a configuration file. YAML or JSON,
@@ -198,11 +220,23 @@ func (a *API) readDocument(w http.ResponseWriter, r *http.Request) (*config.Docu
 // means merge, which is the answer that cannot destroy anything.
 func prune(r *http.Request) bool { return r.URL.Query().Get("prune") == "true" }
 
-// summarise turns a plan into the one line the audit trail keeps.
+// summarise turns a plan into what the audit trail keeps: the counts, then
+// WHICH objects were added, updated and removed - with, for a setting, the
+// fields that moved. The counts alone left an import's effect to be deduced:
+// "8 updated" does not say that one of them was the TLS names.
 func summarise(plan *config.Plan) string {
 	counts := map[string]int{}
+	named := map[string][]string{}
 	for _, c := range plan.Changes {
 		counts[c.Action]++
+		if c.Action == config.ActionSame {
+			continue
+		}
+		item := c.Kind + " " + c.Label
+		if len(c.Fields) > 0 {
+			item += " (" + strings.Join(c.Fields, ", ") + ")"
+		}
+		named[c.Action] = append(named[c.Action], item)
 	}
 	line := fmt.Sprintf("%d added, %d updated, %d removed, %d unchanged",
 		counts[config.ActionAdd], counts[config.ActionUpdate],
@@ -210,5 +244,36 @@ func summarise(plan *config.Plan) string {
 	if n := len(plan.Missing); n > 0 {
 		line += fmt.Sprintf("; %d vault entries reserved empty", n)
 	}
+	// Bounded: a whole installation imported onto an empty gateway is
+	// hundreds of objects, and the trail is a record, not a dump.
+	const most = 80
+	listed := 0
+	for _, action := range []string{config.ActionAdd, config.ActionUpdate, config.ActionRemove} {
+		items := named[action]
+		if len(items) == 0 {
+			continue
+		}
+		if room := most - listed; len(items) > room {
+			if room <= 0 {
+				line += fmt.Sprintf("\n%s: %d more", verbOf(action), len(items))
+				continue
+			}
+			line += fmt.Sprintf("\n%s: %s, and %d more", verbOf(action), strings.Join(items[:room], ", "), len(items)-room)
+			listed = most
+			continue
+		}
+		line += "\n" + verbOf(action) + ": " + strings.Join(items, ", ")
+		listed += len(items)
+	}
 	return line
+}
+
+func verbOf(action string) string {
+	switch action {
+	case config.ActionAdd:
+		return "added"
+	case config.ActionUpdate:
+		return "updated"
+	}
+	return "removed"
 }

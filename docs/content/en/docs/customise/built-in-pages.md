@@ -9,7 +9,7 @@ summary: Which pages the gateway serves itself, how they are arranged, and in ho
 
 These are the pages Meerkat answers with itself, in front of your applications. They are plain
 server-rendered HTML - no framework, no bundle, nothing fetched from a CDN - and they read the
-theme's tokens, so they follow your palette without a rebuild (PAGE-01).
+theme's tokens, so they follow your palette without a rebuild.
 
 | Page | Where it appears |
 |---|---|
@@ -36,7 +36,7 @@ The tabs are real URLs, so a bookmark on the layout gallery comes back to the la
 
 ## The arrangement
 
-A closed catalogue of layouts, each a block of CSS shipped with the product (PAGE-02):
+A closed catalogue of layouts, each a block of CSS shipped with the product:
 
 | Layout | What it looks like |
 |---|---|
@@ -63,7 +63,7 @@ layout it cannot leave.
 
 ## Light, dark, or the visitor's choice
 
-The integrator decides first, by unticking a scheme on the preview (THEME-05):
+The integrator decides first, by unticking a scheme on the preview:
 
 | Setting | What the pages do |
 |---|---|
@@ -83,24 +83,25 @@ it is put back on a browser that has never seen them - exactly like their langua
 
 Twenty catalogues are embedded in the binary, one JSON file per language: Arabic, German, English,
 Spanish, French, Hebrew, Hindi, Indonesian, Italian, Japanese, Korean, Dutch, Polish, Portuguese,
-Russian, Thai, Turkish, Ukrainian, Vietnamese and simplified Chinese (I18N-01).
+Russian, Thai, Turkish, Ukrainian, Vietnamese and simplified Chinese.
 
 English is the reference: every other catalogue is compared to it at startup, and a key a
 catalogue does not carry falls back to English rather than showing a blank. Backend error messages
-are localised the same way (I18N-02).
+are localised the same way.
 
 The language comes from the visitor's choice - a cookie and their account - and otherwise from what
-their browser asks for. Which languages are *offered* is set under **Application > Locales**, and a
-UI route declares which of that reserve it serves.
+their browser asks for. Which languages are *offered* is the union of what the UI routes
+declare they are written in (**Routes > a route > Locales**): there is no reserve to widen, a
+route brings its own.
 
 > [!WARNING]
-> The console itself is **English only**, and that is a decision rather than a gap (I18N-03): it is
+> The console itself is **English only**, and that is a decision rather than a gap: it is
 > an operator's tool. The pages above are the ones your users see, and those are translated.
 
 ## What is missing
 
 - **Your own HTML.** The arrangement is a catalogue; replacing a page's markup with your own
-  template is the other half of PAGE-02 and is not built.
-- **Overridable catalogues** (PAGE-03): adding a language is still a rebuild.
-- The developer's variant-selection page (DEV-06), which only means something once per-developer
-  override scoping exists.
+ template is not built.
+- **Overridable catalogues**: adding a language is still a rebuild.
+- The developer's variant-selection page, which only means something once per-developer
+ override scoping exists.

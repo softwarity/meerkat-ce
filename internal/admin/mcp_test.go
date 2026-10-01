@@ -357,69 +357,6 @@ func TestAnAgentChangesTheGatewayForReal(t *testing.T) {
 	}
 }
 
-// The domain is the second axis of the perimeter (MCP-02), and it works by
-// MASKING what its owner holds rather than by a second rights model: a gateway
-// token minted by root runs the routing plane and nothing else. That is what
-// makes handing one to a deployment agent a smaller decision than handing over
-// root.
-func TestATokenIsConfinedToItsDomain(t *testing.T) {
-	f := setupBare(t)
-	if code, body := f.call(t, "PUT", "/api/settings/agent", `{"enabled":true}`, f.rootC); code != http.StatusOK {
-		t.Fatalf("switching on: %d %s", code, body)
-	}
-	gw := f.mintWith(t, `{"name":"deploy","scope":"full","domain":"gateway"}`, "full")
-	app := f.mintWith(t, `{"name":"hr","scope":"full","domain":"app"}`, "full")
-
-	// The routing plane answers the gateway token and refuses the other.
-	if code, _ := f.withToken(t, "GET", "/api/routes", "", gw); code != http.StatusOK {
-		t.Errorf("a gateway token cannot read the routes: %d", code)
-	}
-	if code, _ := f.withToken(t, "GET", "/api/routes", "", app); code != http.StatusForbidden {
-		t.Errorf("an app token reached the routing plane: %d", code)
-	}
-	// And the accounts, the other way round.
-	if code, _ := f.withToken(t, "GET", "/api/users", "", app); code != http.StatusOK {
-		t.Errorf("an app token cannot read the accounts: %d", code)
-	}
-	if code, _ := f.withToken(t, "GET", "/api/users", "", gw); code != http.StatusForbidden {
-		t.Errorf("a gateway token reached the accounts: %d", code)
-	}
-	// Root-only screens are nobody's: a domain that left root standing would
-	// confine nothing.
-	if code, _ := f.withToken(t, "GET", "/api/admin-tokens", "", gw); code != http.StatusForbidden {
-		t.Errorf("a confined token kept root: %d", code)
-	}
-
-	// The agent's catalogue narrows with it, so the agent plans with what it
-	// actually has.
-	tools := func(token string) map[string]bool {
-		t.Helper()
-		code, raw := f.withToken(t, "POST", "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`, token)
-		if code != http.StatusOK {
-			t.Fatalf("tools/list: %d %s", code, raw)
-		}
-		var out struct {
-			Result struct {
-				Tools []struct{ Name string } `json:"tools"`
-			} `json:"result"`
-		}
-		if err := json.Unmarshal([]byte(raw), &out); err != nil {
-			t.Fatal(err)
-		}
-		names := map[string]bool{}
-		for _, tool := range out.Result.Tools {
-			names[tool.Name] = true
-		}
-		return names
-	}
-	if got := tools(gw); !got["list_routes"] || got["list_users"] || got["export_configuration"] {
-		t.Errorf("the gateway token is offered %v", got)
-	}
-	if got := tools(app); !got["list_users"] || got["list_routes"] {
-		t.Errorf("the app token is offered %v", got)
-	}
-}
-
 // Where a token may be used from, judged on the TCP peer - a forwarding header
 // is written by whoever sends it.
 func TestATokenCanBeTiedToAnAddress(t *testing.T) {

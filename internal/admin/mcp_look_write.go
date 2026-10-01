@@ -120,8 +120,9 @@ func (a *API) toolSavePortal(ctx context.Context, args json.RawMessage) (any, er
 	if err != nil {
 		return nil, err
 	}
-	// The same guard the console gets: every module binds to an enabled UI
-	// route, and an icon NAME becomes the stored drawing (icons.Resolve).
+	// The same guard the console gets: every catalogue entry binds to an
+	// enabled UI route, and an icon NAME becomes the stored drawing
+	// (icons.Resolve).
 	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
 		return nil, err
 	}
@@ -136,8 +137,8 @@ func (a *API) toolSavePortal(ctx context.Context, args json.RawMessage) (any, er
 	a.auditUpdate(ctx, mcpActor(ctx), "settings.update", "settings", "", "portal", "", before, portal)
 	return map[string]any{
 		"saved":   true,
-		"enabled": portal.Enabled,
-		"modules": len(portal.Parents),
+		"mode":    portal.Mode,
+		"entries": len(portal.Entries),
 	}, nil
 }
 

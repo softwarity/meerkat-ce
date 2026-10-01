@@ -2,7 +2,7 @@
 title: Metrics
 section: La console
 order: 182
-summary: Ce que la passerelle a réellement servi - quatre chiffres, deux courbes, et un classement des routes jusqu'à leurs endpoints.
+summary: Ce que la passerelle a réellement servi - cinq chiffres, deux courbes, et un classement des routes jusqu'à leurs endpoints.
 ---
 
 # Metrics
@@ -17,15 +17,18 @@ une carte de l'installation.
 
 ![L'écran Metrics : quatre chiffres sur la dernière minute, les courbes de trafic et de latence, et le classement des routes](img/console/traffic.webp)
 
-Requêtes par seconde, part de refusé ou échoué, réponse moyenne et vol en cours ; en
+Requêtes par seconde, part de refusé ou échoué, réponse moyenne, p95 et vol en cours ; en
 dessous les deux courbes, et le classement avec ses trois onglets - celui des échecs
 portant son compteur.
 
 ## Ce qu'il y a sur la page
 
 - **Over the last minute** : requêtes par seconde, part refusée ou échouée, réponse
-  moyenne, et combien de requêtes sont en vol.
-- **Traffic** et **How long an answer takes** : deux courbes, alimentées par la passerelle
+  moyenne, le **p95** - le temps sous lequel sont passées 95 % des réponses, que la moyenne
+  cache : quatre-vingt-dix réponses rapides et dix de trois secondes donnent une moyenne que
+  personne n'a attendue - et combien de requêtes sont en vol.
+- **Traffic** et **How long an answer takes** : deux courbes, la seconde traçant la moyenne et
+  le p95 côte à côte, alimentées par la passerelle
   qui pousse un intervalle toutes les cinq secondes. Rien n'est interrogé en boucle.
 - **Routes**, classées sur l'un de trois axes - **slowest**, **failing**, **costliest** -
   sur la fenêtre que couvrent les échantillons. L'onglet des échecs porte son compte, pour
@@ -54,26 +57,18 @@ réponses que le lecteur doit pouvoir distinguer.
 > échantillons sont sommés sur tous les noeuds, et un endpoint est compté sur celui qui a
 > répondu - l'écran le dit là où cela compte.
 
-## Prometheus
+## Metrics endpoint
 
-Le bouton dans l'en-tête ouvre l'autre moitié de la fonctionnalité, et son état est sur son
-visage : personne n'a besoin d'ouvrir le tiroir pour savoir si quelque chose scrape.
-
-Dedans : l'interrupteur qui expose `/metrics`, et les fichiers à écrire - un seul
-`prometheus.yml` portant les deux styles de découverte (un par plateforme, celui que vous
-téléchargez revient avec son bloc décommenté), la source de données Grafana et un tableau de
-bord provisionné, un compose Docker Swarm, et un ServiceMonitor Kubernetes. Ils portent le
-port d'écoute réel et le nom de réseau réel de cette installation, pas l'adresse par laquelle
-vous avez joint la console.
-
-`/metrics` répond sur le port de la console et exige un jeton frappé avec le périmètre
-**metrics**, qui n'ouvre que ce chemin. Voir
-[Access tokens](/docs/console/access-and-agents).
+Le bouton dans l'en-tête porte l'état de l'endpoint de scrape sur son visage - exposé ou non - et
+mène là où il se configure : **Infra, Metrics endpoint**, à côté d'OpenTelemetry. L'interrupteur,
+le port, le jeton optionnel et les fichiers à écrire y sont, et les mêmes compteurs peuvent aussi
+être poussés en OTLP depuis **Infra, OpenTelemetry**. Voir [les métriques](/docs/operations/metrics).
 
 > [!NOTE]
-> Edition Enterprise : exposer `/metrics`. Les compteurs et cet écran sont dans les deux
-> éditions - des courbes sans rien installer est ce que promet l'image communautaire ; ce
-> qui se vend, c'est de les externaliser dans une stack que vous exploitez déjà.
+> Edition Enterprise : sortir les compteurs, scrapés ou poussés. Les compteurs et cet écran sont
+> dans les deux éditions - des courbes sans rien installer est ce que promet l'image
+> communautaire ; ce qui se vend, c'est de les externaliser dans une stack que vous exploitez
+> déjà.
 
 ## Pièges
 

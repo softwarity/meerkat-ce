@@ -61,8 +61,8 @@ func TestPortalBarReplacesTheUserButton(t *testing.T) {
 
 	// Portal ON: the bar is injected, the standalone button gives way to it.
 	on := routerWithPortal(t,
-		store.PortalConfig{Enabled: true, Layout: store.PortalHeader, Side: "left",
-			Parents: []store.ModuleParent{{RouteID: "r1"}}},
+		store.PortalConfig{Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
+			Entries: []store.PortalEntry{{RouteID: "r1"}}},
 		uiRoute())
 	_, body := get(t, on, "/demo/page")
 	if !strings.Contains(body, "<meerkat-portal-nav>") {
@@ -98,8 +98,8 @@ func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
 	}
 
 	on := routerWithPortal(t,
-		store.PortalConfig{Enabled: true, Layout: store.PortalHeader, Side: "left",
-			Parents: []store.ModuleParent{{RouteID: "r1"}}},
+		store.PortalConfig{Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
+			Entries: []store.PortalEntry{{RouteID: "r1"}}},
 		uiRoute())
 	res, body := get(t, on, "/demo/x")
 	if res.StatusCode != http.StatusBadGateway {
@@ -126,11 +126,11 @@ func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
 // TestPortalFragmentOnlyForUIRoutes: a service route wears no portal bar - the
 // bar is a UI-only injection, like the button it replaces.
 func TestPortalFragmentOnlyForUIRoutes(t *testing.T) {
-	if f := portalFragment(store.Route{IsUI: true}); !strings.Contains(f, "<meerkat-portal-nav>") ||
+	if f := portalFragment(store.Route{IsUI: true}, nil); !strings.Contains(f, "<meerkat-portal-nav>") ||
 		!strings.Contains(f, "/meerkat/portal.js") || !strings.Contains(f, "/meerkat/user-button.js") {
 		t.Errorf("a UI route should get the full portal fragment, got %q", f)
 	}
-	if f := portalFragment(store.Route{IsUI: false}); f != "" {
+	if f := portalFragment(store.Route{IsUI: false}, nil); f != "" {
 		t.Errorf("a non-UI route should get no portal fragment, got %q", f)
 	}
 }

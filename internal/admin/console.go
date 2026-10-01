@@ -250,6 +250,11 @@ func consoleBodyAttrs(r *http.Request, st *store.Store, sm *session.Manager) str
 		{"username", user.Username},
 		{"fullname", user.Fullname},
 		{"email", user.Email},
+		// The zone the console renders this operator's dates in - the
+		// scheduler's hours, and whatever reads them next. Stamped like the
+		// rest: the screens that show a time must show the right one on the
+		// first paint, not after a round trip.
+		{"timezone", user.Timezone},
 		{"primary-tenant", primary},
 	} {
 		if kv[1] == "" {

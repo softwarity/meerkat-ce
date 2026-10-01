@@ -9,7 +9,7 @@ summary: Dix jetons de couleur, une palette claire et une sombre, et comment por
 
 Un thème est une palette, et rien d'autre. Il colore les pages que la passerelle sert elle-même - le
 flux de connexion, le choix d'organisation, les pages de mot de passe, la page d'indisponibilité - et
-les petites pièces qu'elle injecte dans les applications proxifiées (THEME-03, THEME-04).
+les petites pièces qu'elle injecte dans les applications proxifiées.
 
 Il s'édite sous **Application > Built-in pages**, onglet **Theme**, avec la vraie page en aperçu à
 côté.
@@ -89,6 +89,6 @@ la main ou venu d'ailleurs ne peut rien faire passer en fraude.
 ## Ce qui manque
 
 - **Générer une palette depuis des couleurs sources** à la façon de Material Design, une palette
-  secondaire, et les élévations (THEME-04).
+ secondaire, et les élévations.
 - **La console ne consomme pas cette palette.** Elle vit sur ses propres jetons Material, donc la
-  console garde l'aspect Softwarity quoi que vous choisissiez ici (THEME-03).
+ console garde l'aspect Softwarity quoi que vous choisissiez ici.

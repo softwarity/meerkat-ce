@@ -8,8 +8,7 @@ summary: Name, logo, favicon and the page background - including a different pic
 # Branding
 
 The branding is the application's identity on the pages the gateway serves: the name a visitor
-reads above the sign-in card, the mark in the browser tab, the picture behind it all (THEME-02,
-THEME-06).
+reads above the sign-in card, the mark in the browser tab, the picture behind it all.
 
 It is **global** - one identity per gateway, whatever theme is active. Themes are colour trials;
 the identity does not fork with them. It is edited on the **Branding** tab of
@@ -70,7 +69,7 @@ image, its own fit and its own dim.
 One switch decides which way it works:
 
 - **one picture for both** - the light image is used in dark too, and the dark fields are ignored
-  (the console disables them);
+ (the console disables them);
 - **one picture each** - two images, two fits, two dims.
 
 Uploading a light image and no dark one means "use it in both", which is the intuitive reading of a
@@ -98,4 +97,4 @@ Arranging the pages is sold with the same key - see
 ## What is missing
 
 The logo's own background colour was dropped rather than built: the background image replaced the
-need for it (THEME-02).
+need for it.

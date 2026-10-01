@@ -1,0 +1,126 @@
+@use '@angular/material' as mat;
+
+mat-card {
+  padding: 16px 20px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.head .grow {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.head .scope {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The count that sends somebody here in the first place. */
+.holes {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  line-height: 1.5rem;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+.head .mat-mdc-icon-button {
+  @include mat.icon-button-density(-3);
+}
+
+.menu-why {
+  max-width: 250px;
+  padding: 4px 16px 10px;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.line {
+  display: block;
+}
+
+.val {
+  width: 100%;
+  @include mat.form-field-density(-4);
+}
+
+.line .mat-mdc-icon-button {
+  @include mat.icon-button-density(-4);
+}
+
+/* There but not shown: the slot stays, so the field keeps its width. The
+   selector names the icon button AND the share badge - a rule written for one
+   of them left the other on screen showing "1", which is a badge that says
+   nothing on every line that has nothing to say. */
+.line .mat-mdc-icon-button.gone,
+.line .shared.gone {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Changed here: the field is marked so a screenful of wordings says at a
+   glance which ones are the installation's own. */
+.line.over .val {
+  --mdc-outlined-text-field-outline-color: var(--mat-sys-primary);
+}
+
+/* No wording of its own - the page shows the English wording there. */
+.line.gap .val {
+  --mdc-outlined-text-field-outline-color: var(--mat-sys-error);
+}
+
+.shipped {
+  margin: -0.55rem 0 0.4rem 0.9rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.actions .grow {
+  flex: 1;
+}
+
+/* The kind of the strings under it. Small, quiet, and not a card of its own:
+   it separates runs in one column, it does not start a new section. */
+.kind {
+  margin: 1.1rem 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kind:first-of-type {
+  margin-top: 0.2rem;
+}
+
+/* How many screens share this wording. Quiet: it is a caution, not a count
+   anybody is chasing - and it sits inside the field, where the wording is. */
+.shared {
+  min-width: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  line-height: 1.15rem;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+  background: var(--mat-sys-surface-container-highest);
+  cursor: default;
+}

@@ -9,7 +9,7 @@ summary: Comment une borne s'écrit, ce qu'un refus porte, et pourquoi le chiffr
 
 Le mot est **par**, pas **pour**. Personne n'écrit une limite *pour* alice : une liste de noms est une
 liste que personne ne maintient, et elle répond à la mauvaise question. Une règle dit sur quoi le
-compteur est **clé**, et les budgets se fabriquent tout seuls - un par appelant (ROUTE-08).
+compteur est **clé**, et les budgets se fabriquent tout seuls - un par appelant.
 
 ## Les deux moitiés d'une règle
 
@@ -112,7 +112,7 @@ C'est une décision plutôt qu'un oubli : un compteur exact et partagé coûte u
 à chaque requête, ce qui n'est pas un prix qu'une passerelle peut payer sur le chemin de tout le trafic.
 Ceci est la moitié **protectrice** - approximative, gratuite, et suffisante contre l'abus.
 
-Un compteur *est* en base et il est exact : le **compteur anti-force brute** des connexions (AUTH-11).
+Un compteur *est* en base et il est exact : le **compteur anti-force brute** des connexions.
 Cinq essais veut dire cinq pour l'installation, pas cinq par noeud, et un redémarrage ne laisse plus
 rentrer un attaquant qu'on venait de freiner.
 
@@ -120,7 +120,7 @@ rentrer un attaquant qu'on venait de freiner.
 
 - **Le ralentissement.** Dépasser une borne bloque ; ça ne ralentit pas (QUOTA-02).
 - **Les compteurs facturables.** La moitié qui se facture ou se montre à un client est un autre
-  mécanisme, écrit par lots, et il n'existe pas encore (QUOTA-03) - avec lui, l'écran de consommation
-  et ses seuils d'alerte.
+ mécanisme, écrit par lots, et il n'existe pas encore (QUOTA-03) - avec lui, l'écran de consommation
+ et ses seuils d'alerte.
 - **Les compteurs partagés.** Un comptage correct en cluster attend les compteurs facturables
-  (QUOTA-04). Le chemin est tracé : le compteur de connexions est exactement cette forme.
+ (QUOTA-04). Le chemin est tracé : le compteur de connexions est exactement cette forme.

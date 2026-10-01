@@ -22,7 +22,7 @@ language picker without anyone opening its source.
 |---|---|---|
 | Page agent | `/meerkat/page.js`, which installs `window.meerkatPage` | the route being a UI route |
 | User button | a `meerkat-user-button` Web Component: who you are, organisation, language, sign out | a switch on the route |
-| Navigation portal | a `meerkat-portal-nav` bar listing the applications this person may open | a global switch; it replaces the standalone button |
+| Navigation portal | a `meerkat-portal-nav` bar listing the applications this person may open | the global catalogue in `portal` mode; it replaces the standalone button |
 | Identity stamp | roles and user fields written into the page's own markup, server-side | a switch on the route, per field |
 | Custom CSS and JS | whatever you wrote in the route's Injections section | non-empty |
 | Locale hook | a function the gateway calls when the visitor changes language | a route whose locales travel by script |
@@ -119,6 +119,11 @@ about when it does. Nothing is injected when:
 A skipped injection is silent: no error, no header, no log line. If the button is
 missing from a page, one of the conditions above is the first place to look.
 
-A rewritten response also loses its `ETag`, since the bytes are no longer the
-ones the upstream hashed, and a response carrying an identity is marked
-`no-store, private` so no shared cache can hand one person's page to another.
+A rewritten response loses the upstream's `ETag`, since the bytes are no longer
+the ones the upstream hashed, and goes out as `no-cache`: the browser asks before
+reusing it, so a configuration change is seen at the next load. Asking costs
+nothing when nothing changed: the page gets an `ETag` of its own, a hash of the
+bytes actually sent, and the gateway answers a matching `If-None-Match` with an
+empty `304`. Change something in the console and the bytes, so the hash, change
+with it. A response carrying an identity is marked `no-store, private` instead,
+with no validator, so no shared cache can hand one person's page to another.

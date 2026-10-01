@@ -2,6 +2,8 @@ package session
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -237,4 +239,47 @@ func TestBearerTokenClockAndAddressBeatTheCache(t *testing.T) {
 	if _, err := m.Resolve(ctx, outside); err == nil {
 		t.Fatalf("a remembered token must still refuse a caller outside its ranges")
 	}
+}
+
+// Turning personal API tokens off is a decision about what PEOPLE may mint for
+// themselves. A scheduled call's own credential is the gateway's plumbing, and
+// it has to keep working - otherwise tightening one policy silently stops
+// every night job, with a 401 nobody can trace back to this switch.
+func TestThePolicyDoesNotStopScheduledRuns(t *testing.T) {
+	m, st := setup(t)
+	enabledUser(t, st, "alice")
+	ctx := context.Background()
+
+	personal := mintToken(t, st, "alice", "t1", "", 0)
+	secret, hash, prefix := "mk_run_secret_value", sha256hex("mk_run_secret_value"), "mk_run_secre"
+	if err := st.AddAPIToken(ctx, store.NewToken{
+		ID: store.RunCredentialID("abc123"), UserID: "alice", Name: "scheduled call: nightly",
+		TokenHash: hash, Prefix: prefix, Plane: store.PlaneData, Scope: store.ScopeFull,
+		ExpiresAt: time.Now().Add(time.Hour).Unix(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSetting(ctx, store.SettingAPITokens, false); err != nil {
+		t.Fatal(err)
+	}
+	m.TokenChanged("*")
+	if _, err := m.Resolve(ctx, bearer(personal)); err == nil {
+		t.Fatal("policy off must refuse a personal token")
+	}
+	if _, err := m.Resolve(ctx, bearer(secret)); err != nil {
+		t.Fatalf("policy off stopped a scheduled run: %v", err)
+	}
+	// Everything else still applies to it, starting with its owner.
+	if err := st.UpdateUser(ctx, store.User{ID: "alice", Username: "alice", Enabled: false}); err != nil {
+		t.Fatal(err)
+	}
+	m.UserChanged("alice")
+	if _, err := m.Resolve(ctx, bearer(secret)); err == nil {
+		t.Fatal("a disabled account still ran its schedules")
+	}
+}
+
+func sha256hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }

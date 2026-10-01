@@ -128,10 +128,8 @@ func TestAdminSignInIsEnglishOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	// The application declares French and German for ITS users.
-	if err := st.SetSetting(context.Background(), store.SettingLanguages, []string{"fr", "de"}); err != nil {
-		t.Fatal(err)
-	}
+	// A route declares French and German for ITS users.
+	speaks(t, st, "fr", "de")
 
 	mux := http.NewServeMux()
 	NewAdmin(st, session.NewManager(st)).Register(mux)

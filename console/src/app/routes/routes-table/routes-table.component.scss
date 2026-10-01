@@ -118,3 +118,12 @@ mat-row.clickable:hover {
 .trouble.open {
   color: var(--mat-sys-error);
 }
+
+/* A route the gateway refused to load. Error colour, because nothing about this
+   one is serving. */
+.broken {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--mat-sys-error);
+}

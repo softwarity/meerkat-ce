@@ -25,7 +25,7 @@ func (a *API) registerAPIDocs(mux Mux) {
 	mux.HandleFunc("GET /apidocs/assets/{file}", apidocsAsset)
 	mux.Handle("GET /apidocs/specs.json", a.authed(a.apidocsSpecs))
 	mux.Handle("GET /apidocs/specs/meerkat-admin.json", a.authed(a.apidocsAdminSpec))
-	mux.Handle("POST /api/apidocs/token", a.authed(a.mintTestToken))
+	mux.Handle("POST /api/apidocs/token", a.devOrInfra(a.mintTestToken))
 }
 
 // apidocsPage serves the shell. A browser without a live session is sent to
@@ -99,11 +99,6 @@ type testTokenRequest struct {
 // it carries the whole authorization - the same capabilities that may
 // simulate by header may mint.
 func (a *API) mintTestToken(w http.ResponseWriter, r *http.Request, actor store.User) {
-	mayMint := actor.Root || actor.InfraAdmin || actor.Dev
-	if !mayMint {
-		writeErr(w, http.StatusForbidden, "minting test tokens requires the root, infra-admin or dev capability")
-		return
-	}
 	var body testTokenRequest
 	if err := decodeStrict(r, &body); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())

@@ -60,7 +60,15 @@ test('flow-access-levels: a pending account passes "signed in" and is sent to th
   expect(created.status(), await created.text()).toBe(201);
   const body = (await created.json()) as { user: { id: string }; password: string };
 
-  const data = await request.newContext({ baseURL: DATA_URL });
+  // Shaped like the browser this test speaks for. A refusal on a UI route
+  // only becomes a page for a NAVIGATION (since SCHED-01: a scheduled call
+  // or any other machine is answered the 403 itself rather than redirected
+  // to a page it cannot read), and an API context's default `Accept: */*`
+  // is a machine. `text/html` is what a browser asks for.
+  const data = await request.newContext({
+    baseURL: DATA_URL,
+    extraHTTPHeaders: { Accept: 'text/html' },
+  });
   const signIn = await data.post('/login', {
     form: { username: 'e2e-newcomer', password: body.password },
     maxRedirects: 0,
@@ -86,7 +94,10 @@ test('flow-access-levels: a pending account passes "signed in" and is sent to th
     expect((await root.delete(`/api/routes/${id}`)).ok()).toBeTruthy();
   }
   expect((await root.delete(`/api/users/${body.user.id}`)).ok()).toBeTruthy();
-  const back = await root.put('/api/routes/trap', { data: { ...trap, enabled: true } });
+  // Read again before putting it back: parking it raised its revision, and a
+  // write carrying the revision read before that is refused as stale.
+  const parkedTrap = await (await root.get('/api/routes/trap')).json();
+  const back = await root.put('/api/routes/trap', { data: { ...parkedTrap, enabled: true } });
   expect(back.ok(), await back.text()).toBeTruthy();
   await root.dispose();
 });
@@ -151,7 +162,8 @@ test('flow-api-token: Bearer token authenticates API calls, revoke closes it', a
 
   // Only now: every assertion above needs the catch-all absent, the last one
   // included - a revoked token is refused by /secure, and /** would serve it.
-  expect((await root.put('/api/routes/trap', { data: { ...trap, enabled: true } })).ok()).toBeTruthy();
+  const parkedTrap = await (await root.get('/api/routes/trap')).json();
+  expect((await root.put('/api/routes/trap', { data: { ...parkedTrap, enabled: true } })).ok()).toBeTruthy();
   await root.dispose();
   await api.dispose();
   await context.close();

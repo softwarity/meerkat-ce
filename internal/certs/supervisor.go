@@ -32,8 +32,36 @@ type Settings struct {
 	AppNames []string `json:"appNames"`
 	// Redirect forces the application's plain port over to HTTPS (SSL-06).
 	// The console's plain port is never redirected - see redirect.go.
-	Redirect bool         `json:"redirect"`
-	ACME     ACMESettings `json:"acme"`
+	Redirect bool `json:"redirect"`
+	// HSTSMaxAge is how long browsers are told to use HTTPS only, in seconds
+	// (SSL-06). It FOLLOWS the redirect rather than being a switch of its own:
+	// forcing HTTPS is already the commitment - a 301 is remembered by the
+	// browser too - and HSTS closes what the redirect cannot, the first request
+	// that leaves in clear before being redirected. 0 means DefaultHSTS.
+	HSTSMaxAge int          `json:"hstsMaxAge,omitempty"`
+	ACME       ACMESettings `json:"acme"`
+}
+
+// MaxHSTS is the longest HSTS promise the console lets an installation make:
+// two years, what the browsers' preload lists ask for. Past it a typo becomes
+// a decade.
+const MaxHSTS = 2 * 365 * 24 * 3600
+
+// DefaultHSTS is the promise made when nobody chose one: a day. A browser
+// keeps it for its whole length even if the certificates go away, so the
+// first setting is the one that is cheap to be wrong about.
+const DefaultHSTS = 24 * 3600
+
+// HSTS is the lifetime actually sent: none unless the plain port is forced
+// over to HTTPS, the default when no length was chosen.
+func (s Settings) HSTS(redirecting bool) int {
+	if !redirecting {
+		return 0
+	}
+	if s.HSTSMaxAge > 0 {
+		return s.HSTSMaxAge
+	}
+	return DefaultHSTS
 }
 
 // Names returns every declared name, console first.
@@ -234,6 +262,10 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 			"every application certificate has expired: the plain port keeps answering rather than sending callers to a door none of them will open")
 	}
 	s.redirect.Set(redirect, s.appLn.Addr)
+	// HSTS stands with the redirect, down included: when every certificate
+	// has expired and the redirect retreats, telling browsers to insist on
+	// HTTPS would be the one thing left locking them out.
+	s.redirect.SetHSTS(cfg.HSTS(redirect))
 
 	s.mu.Lock()
 	s.state.Console, s.state.App = s.adminLn.Running(), s.appLn.Running()

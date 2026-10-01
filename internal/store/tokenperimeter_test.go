@@ -70,24 +70,6 @@ func TestAllowsAddress(t *testing.T) {
 
 // The domain is a restriction someone adds, so its empty value is the WIDE
 // one - unlike the scope, whose empty value is the safe one.
-func TestSanitizeTokenDomain(t *testing.T) {
-	for in, want := range map[string]string{"": DomainAll, "all": DomainAll, "GATEWAY": DomainGateway, "app": DomainApp} {
-		got, err := SanitizeTokenDomain(in)
-		if err != nil || got != want {
-			t.Errorf("%q -> %q, %v; want %q", in, got, err, want)
-		}
-	}
-	if _, err := SanitizeTokenDomain("routes"); err == nil {
-		t.Error("an invented domain was accepted")
-	}
-}
-
-// Editing a token changes what it MAY DO and never the token.
-//
-// That is the whole basis for allowing it: the secret is a hash in a column
-// and encodes no perimeter, no domain, no address, no expiry and no name - so
-// whoever holds the key keeps holding the same key, and a narrowing costs
-// nobody a redeployment.
 func TestEditingATokenLeavesTheSecretAlone(t *testing.T) {
 	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
@@ -107,7 +89,7 @@ func TestEditingATokenLeavesTheSecretAlone(t *testing.T) {
 	}
 
 	ok, err := st.UpdateAPIToken(ctx, "u1", "t1", TokenEdit{
-		Name: "prometheus (scraper)", Scope: ScopeMetrics, Domain: DomainGateway,
+		Name: "prometheus (scraper)", Scope: ScopeMetrics,
 		FromCIDRs: "10.0.0.7", ExpiresAt: 0,
 	})
 	if err != nil || !ok {
@@ -121,9 +103,6 @@ func TestEditingATokenLeavesTheSecretAlone(t *testing.T) {
 	}
 	if got.Scope != ScopeMetrics {
 		t.Errorf("perimeter is %q, want %q", got.Scope, ScopeMetrics)
-	}
-	if got.Domain != DomainGateway {
-		t.Errorf("domain is %q, want %q", got.Domain, DomainGateway)
 	}
 	if got.Name != "prometheus (scraper)" {
 		t.Errorf("name is %q, want the edited one", got.Name)

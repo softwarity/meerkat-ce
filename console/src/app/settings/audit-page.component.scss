@@ -140,7 +140,48 @@
 .change .arrow {
   color: var(--mat-sys-on-surface-variant);
 }
+/* The security half wears its own accent, and a door that stayed shut the
+   error colour: scrolling a trail for an attack, the refusals are what the
+   eye has to find without reading. */
+.event.security::before {
+  background: var(--mat-sys-tertiary);
+}
+.event.refused::before {
+  background: var(--mat-sys-error);
+  opacity: 1;
+}
+.event.refused .action {
+  color: var(--mat-sys-error);
+}
+.target .reason {
+  margin-left: 8px;
+  font-family: monospace;
+}
+/* The organisation a line belongs to: who, beyond root, reads it. */
+.org {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+  margin-top: 2px;
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+  }
+}
+.ip {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+  margin-top: 2px;
+}
+/* pre-line: an import's detail is a line of counts, then one line per action
+   naming what it touched. */
 .detail {
+  white-space: pre-line;
   font-size: 0.85rem;
   color: var(--mat-sys-on-surface-variant);
   font-style: italic;

@@ -21,6 +21,7 @@ import {
 } from '../group-dialog.component';
 import { LoginHistoryDialogComponent } from '../login-history-dialog.component';
 import { PasswordDialogComponent } from '../password-dialog.component';
+import { LiveChangesService } from '../../shared/live-changes.service';
 
 interface UserRow {
   id: string;
@@ -103,14 +104,21 @@ export class MembersMatrixComponent {
   protected readonly bulkColumns = computed(() => this.displayedColumns().map((c) => `${c}-all`));
 
   constructor() {
+    // Somebody else's write (CONSOLE-13): a group created, a membership given
+    // or taken away shows up here without a click. Quietly, and the whole
+    // matrix rather than one cell - a cell here is a pair, and what moved may
+    // be the row, the column or the crossing.
+    inject(LiveChangesService).on('membership', () => this.load(true));
+    inject(LiveChangesService).on('group', () => this.load(true));
+    inject(LiveChangesService).on('user', () => this.load(true));
     effect(() => {
       this.tenantId();
       this.load();
     });
   }
 
-  private load(): void {
-    this.loading.set(true);
+  private load(quiet = false): void {
+    if (!quiet) this.loading.set(true);
     forkJoin({
       // listUsers is root-only; a tenant admin falls back to the members list.
       users: this.api.listUsers().pipe(catchError(() => of<User[]>([]))),

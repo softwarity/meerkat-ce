@@ -60,7 +60,7 @@ func (a *API) pointFailed(err error) {
 // there is nothing to borrow - the point still exists, it is simply unlabelled.
 func (a *API) lastAuditLabel(ctx context.Context, actor store.User) string {
 	events, err := a.st.ListAuditEvents(ctx, store.AuditFilter{
-		ActorID: actor.ID, Since: time.Now().Add(-time.Minute).Unix(), Limit: 1,
+		ActorID: actor.ID, Kind: store.AuditKindAdmin, Since: time.Now().Add(-time.Minute).Unix(), Limit: 1,
 	})
 	if err != nil || len(events) == 0 {
 		return ""

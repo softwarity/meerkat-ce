@@ -1,4 +1,5 @@
-<div class="duo" #duo>
+<div class="duo" [class.solo]="!darkUrl()" #duo>
+  @if (darkUrl()) {
   <div class="pane" [class.off]="!darkOffered()" [style.height.px]="paneHeight()" [style.width.px]="paneWidth()">
     @if (darkUrl(); as url) {
       <iframe
@@ -9,6 +10,7 @@
       ></iframe>
     }
   </div>
+  }
   <div class="pane" [class.off]="!lightOffered()" [style.height.px]="paneHeight()" [style.width.px]="paneWidth()">
     @if (lightUrl(); as url) {
       <iframe

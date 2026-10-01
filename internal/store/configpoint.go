@@ -109,7 +109,7 @@ func (s *Store) AddConfigPoint(ctx context.Context, p ConfigPoint) error {
 		return err
 	}
 	if p.ID == "" {
-		p.ID = newEventID()
+		p.ID = NewEventID()
 	}
 	if _, err := s.db.ExecContext(ctx,
 		`INSERT INTO config_points (id, at, actor_id, label, digest, document)

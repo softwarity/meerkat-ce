@@ -380,44 +380,60 @@ func TestDevKeyRoundtrip(t *testing.T) {
 	}
 	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer))) + " neo@laptop"
 
-	if err := s.SetUserDevKey(ctx, "d1", line); err != nil {
-		t.Fatalf("SetUserDevKey: %v", err)
+	first, err := s.AddDevKey(ctx, "d1", line)
+	if err != nil {
+		t.Fatalf("AddDevKey: %v", err)
 	}
-	got, err := s.GetUserDevKey(ctx, "d1")
-	if err != nil || got != line {
-		t.Fatalf("roundtrip failed: %v %q", err, got)
+	// A second workstation is a second key, and both are listed.
+	pub2, _, _ := ed25519.GenerateKey(rand.Reader)
+	signer2, _ := ssh.NewPublicKey(pub2)
+	line2 := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer2))) + " neo@desktop"
+	if _, err := s.AddDevKey(ctx, "d1", line2); err != nil {
+		t.Fatalf("a second key: %v", err)
+	}
+	keys, err := s.ListDevKeys(ctx, "d1")
+	if err != nil || len(keys) != 2 || keys[0].Line != line || !strings.HasPrefix(keys[0].Fingerprint, "SHA256:") {
+		t.Fatalf("keys = %+v (%v)", keys, err)
 	}
 	// A PRIVATE key is the mistake worth catching: it is the file next to the
 	// one they meant, and pasting it here would publish it.
-	if err := s.SetUserDevKey(ctx, "d1", "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----"); err == nil {
+	if _, err := s.AddDevKey(ctx, "d1", "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----"); err == nil {
 		t.Fatal("a private key was accepted")
 	}
-	if err := s.SetUserDevKey(ctx, "d1", "not a key"); err == nil {
+	if _, err := s.AddDevKey(ctx, "d1", "not a key"); err == nil {
 		t.Fatal("garbage key accepted")
 	}
 
-	// The admission list: only an enabled dev who deposited something.
+	// The admission list: one line per key of an enabled dev.
 	owners, err := s.DevKeyOwners(ctx)
-	if err != nil || len(owners) != 1 || owners[0].Username != "neo" {
+	if err != nil || len(owners) != 2 || owners[0].Username != "neo" {
 		t.Fatalf("owners = %+v (%v)", owners, err)
 	}
 	if err := s.CreateUser(ctx, User{ID: "d2", Username: "trinity", PasswordHash: "x", Dev: true, Enabled: false}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetUserDevKey(ctx, "d2", line); err != nil {
+	// The same key on a second account would make a connection name two
+	// people: refused.
+	if _, err := s.AddDevKey(ctx, "d2", line); !errors.Is(err, ErrDevKeyTaken) {
+		t.Fatalf("a key taken by another account: %v", err)
+	}
+	pub3, _, _ := ed25519.GenerateKey(rand.Reader)
+	signer3, _ := ssh.NewPublicKey(pub3)
+	if _, err := s.AddDevKey(ctx, "d2", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer3)))); err != nil {
 		t.Fatal(err)
 	}
-	if owners, _ := s.DevKeyOwners(ctx); len(owners) != 1 {
+	if owners, _ := s.DevKeyOwners(ctx); len(owners) != 2 {
 		t.Fatalf("a disabled account is still admitted: %+v", owners)
 	}
 
-	if err := s.SetUserDevKey(ctx, "d1", ""); err != nil {
-		t.Fatalf("clear: %v", err)
+	// Removing one key closes that machine alone - and only the owner can.
+	if _, ok, _ := s.DeleteDevKey(ctx, "d2", first.ID); ok {
+		t.Fatal("another account removed neo's key")
 	}
-	if got, _ := s.GetUserDevKey(ctx, "d1"); got != "" {
-		t.Fatalf("not cleared: %q", got)
+	if k, ok, err := s.DeleteDevKey(ctx, "d1", first.ID); err != nil || !ok || k.Fingerprint != first.Fingerprint {
+		t.Fatalf("remove: %+v %v %v", k, ok, err)
 	}
-	if owners, _ := s.DevKeyOwners(ctx); len(owners) != 0 {
-		t.Fatalf("a cleared key still admits: %+v", owners)
+	if owners, _ := s.DevKeyOwners(ctx); len(owners) != 1 || owners[0].Key != line2 {
+		t.Fatalf("after removing one key: %+v", owners)
 	}
 }

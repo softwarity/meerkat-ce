@@ -32,7 +32,8 @@ curl -fsSLO https://www.softwarity.io/deploy/docker-compose.yml
 MEERKAT_ADMIN_PASSWORD='choose-one' docker compose up -d
 
 # Kubernetes
-helm install meerkat ./meerkat-chart.tgz -f values-ce-one-node.yaml \
+helm repo add meerkat https://www.softwarity.io/deploy
+helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ce-one-node.yaml \
   --set admin.password='choose-one'
 ```
 
@@ -51,7 +52,7 @@ The Enterprise image lives on a private registry, hence a pull secret:
 kubectl create secret docker-registry ghcr \
   --docker-server=ghcr.io --docker-username=YOU --docker-password=TOKEN
 
-helm install meerkat ./meerkat-chart.tgz -f values-ee-one-node.yaml \
+helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-one-node.yaml \
   --set admin.password='choose-one'
 ```
 
@@ -71,7 +72,7 @@ kubectl create secret generic meerkat-state \
   --from-literal=database-url='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require' \
   --from-literal=vault-key="$(openssl rand -hex 32)"
 
-helm install meerkat ./meerkat-chart.tgz -f values-ee-cluster.yaml \
+helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-cluster.yaml \
   --set admin.password='choose-one'
 ```
 
@@ -98,10 +99,21 @@ what you download is what the released version deploys.
 
 | File | For |
 |---|---|
+| [index.yaml](/deploy/index.yaml) | The Helm repository: `helm repo add meerkat https://www.softwarity.io/deploy` |
 | [meerkat-chart.tgz](/deploy/meerkat-chart.tgz) | The Helm chart, installed as it is |
 | [values-ce-one-node.yaml](/deploy/values-ce-one-node.yaml) | One community gateway on its volume |
 | [values-ee-one-node.yaml](/deploy/values-ee-one-node.yaml) | One Enterprise gateway, developer tunnel open |
 | [values-ee-cluster.yaml](/deploy/values-ee-cluster.yaml) | Three Enterprise gateways on a shared PostgreSQL |
+
+The repository distributes the **chart**, not the images: the cluster pulls
+those itself, from the registry the values name. There is one chart for both
+editions, and the edition is the image:
+
+- **Community**: `docker.io/softwarity/meerkat`, public - the chart's default,
+  nothing to add.
+- **Enterprise**: `ghcr.io/softwarity/meerkat`, private - a pull secret holding
+  the access you were given, named in `image.pullSecrets`. The `values-ee-*`
+  files set both; that is the whole difference at install time.
 | [docker-compose.yml](/deploy/docker-compose.yml) | One community gateway, one command |
 | [docker-compose.ee.yml](/deploy/docker-compose.ee.yml) | One Enterprise gateway with the tunnel |
 | [stack.swarm.yml](/deploy/stack.swarm.yml) | Three gateways on Docker Swarm |

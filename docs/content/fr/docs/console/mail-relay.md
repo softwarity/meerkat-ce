@@ -45,8 +45,11 @@ C'est le moyen le plus rapide d'apprendre qu'un port est fermé ou un expéditeu
 ## Daily digest
 
 Une fois par jour, les administrateurs qui portent une adresse apprennent quels
-comptes vont perdre l'accès, lesquels viennent de le perdre, et quelles entrées du
-coffre approchent de leur date de rappel.
+comptes vont perdre l'accès, lesquels viennent de le perdre, quelles entrées du
+coffre approchent de leur date de rappel - et, en premier, quels **certificats** vont
+expirer ou ont expiré. Un certificat émis automatiquement (ACME) est renouvelé des
+semaines avant sa fin : celui qui apparaît ici est donc un certificat dont le
+renouvellement échoue, et la ligne le dit.
 
 - **Hour** - lue sur l'horloge de la passerelle, que le champ imprime en dessous
   (heure et zone).

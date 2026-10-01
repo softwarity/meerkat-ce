@@ -10,7 +10,7 @@ summary: Ce que la passerelle compte, et comment l'aspirer dans la stack de supe
 Les compteurs sont dans les deux éditions, et les courbes de la console aussi : c'est la promesse
 zéro dépendance, une passerelle qu'on voit sans rien installer. Ce qui se vend est
 l'**externalisation**, vers la stack qui porte déjà votre rétention, vos alertes et vos tableaux de
-bord (OBS-05).
+bord.
 
 > [!NOTE] Enterprise edition
 > L'exposition `/metrics` est Enterprise. L'image communautaire ne se contente pas de refuser : le
@@ -33,7 +33,7 @@ Par endpoint, où l'unité est le gabarit et jamais un chemin brut :
 |---|---|
 | `meerkat_endpoint_requests_total` | les requêtes répondues par cette opération |
 | `meerkat_endpoint_errors_total` | les `4xx` et `5xx` parmi elles |
-| `meerkat_endpoint_duration_seconds_sum` | les secondes passées à y répondre |
+| `meerkat_endpoint_duration_seconds_total` | les secondes passées à y répondre |
 
 Il n'y a pas d'histogramme par endpoint, et c'est délibéré : une spec qui déclare deux cents
 opérations transformerait douze seaux en deux mille quatre cents séries pour une seule route. La
@@ -54,18 +54,36 @@ statut, un seau, un gabarit d'opération, et un `source` qui dit si ce gabarit �
 
 ## L'endpoint
 
-`/metrics` est sur le **plan de contrôle** : aucun port à ouvrir, c'est là où est déjà la console.
+`/metrics` a son **propre port**, comme les exporteurs de PostgreSQL (9187) ou de RabbitMQ (15692).
+On le choisit dans la console, **Infra, Metrics endpoint**, au moment d'allumer l'exposition :
+**9091** par défaut, et un autre si la plateforme l'utilise déjà. La passerelle ouvre ce port sur
+chaque noeud tant que l'interrupteur est allumé, le déplace quand on en change, et le referme quand
+on l'éteint. Il sert `/metrics` et rien d'autre : ni la console, ni l'API.
+
+Un port que ce noeud ne peut pas ouvrir, déjà pris ou réservé, est refusé avec la raison, et rien
+n'est enregistré. Les ports sur lesquels écoutent les deux plans de cette gateway (8080 et 9090 par défaut) sont refusés d'office.
+
 Trois choses le gardent, et le refus dit laquelle manque :
 
 1. l'image Enterprise ;
-2. un interrupteur livré **éteint**, dans le tiroir Prometheus de l'écran Metrics ;
-3. la capacité gateway-admin, ou un jeton dont la portée est `metrics`.
+2. un interrupteur livré **éteint** ;
+3. le réseau, et au choix un jeton.
 
-La garde n'est pas une formalité. Les compteurs nomment chaque route et chaque gabarit d'endpoint :
-c'est une carte de l'installation, pas une page publique. Un jeton `metrics` n'ouvre que ce chemin et
-rien d'autre - une crédentiale de scraper vit dans la configuration d'une stack de supervision,
-souvent le dépôt d'une autre équipe, l'endroit où un jeton a le plus de chances de fuiter et le moins
-d'être tourné.
+Par défaut, ce port **ne demande pas de jeton**. C'est le réseau qui ferme : on ne le publie
+jamais, et on ne met ni route ni ingress devant. Un scrape sans crédentiale, c'est une configuration
+de supervision sans secret à faire tourner.
+
+Un second interrupteur, **Require a token**, sert quand d'autres charges du cluster peuvent joindre ce
+port et ne doivent pas le lire. Les compteurs nomment chaque route et chaque gabarit d'endpoint :
+c'est une carte de l'installation, pas une page publique. Le jeton est alors vérifié par le même
+entonnoir que le plan de contrôle. Il se frappe avec la portée `metrics`, qui n'ouvre que ce chemin.
+
+`/metrics` répond aussi sur le plan de contrôle, **toujours** avec un jeton. C'est la porte d'une
+installation dont le Prometheus ne joint la passerelle que par l'adresse de la console.
+
+En Kubernetes, le Service doit déclarer le port pour qu'un `ServiceMonitor` le trouve. Le chart le
+fait avec la valeur `metrics.port`, sur un Service `-metrics` toujours en ClusterIP, et cette valeur
+doit reprendre le port choisi dans la console.
 
 ![Les jetons d'accès, là où se frappe la crédentiale du scraper](img/console/access-tokens.webp)
 
@@ -73,14 +91,28 @@ Le format est le texte Prometheus, `version=0.0.4`, annoncé dans le type de con
 font que monter et Prometheus fait sa propre différence ; la fenêtre de la console est dérivée des
 mêmes compteurs, et non l'inverse.
 
+## Poussées en OTLP
+
+L'endpoint est une sortie, celle où un scraper vient chercher. L'autre est d'**envoyer** les mêmes
+compteurs à un collecteur OpenTelemetry, ce que veut une stack qui reçoit plutôt qu'elle ne scrape.
+Cela s'allume dans **Infra, OpenTelemetry**, à côté des traces, et part vers le même collecteur avec
+la même crédentiale : toutes les 30 secondes, des totaux cumulés depuis le démarrage de la
+passerelle, une ressource par noeud (`service.instance.id`).
+
+Les noms sont ceux d'OpenTelemetry (`meerkat.requests`, `meerkat.request.duration` en secondes...),
+choisis pour qu'un collecteur qui les retraduit en Prometheus retombe sur **les mêmes séries** que
+l'endpoint. Un tableau de bord écrit sur une porte lit l'autre.
+
+Il faut un collecteur qui reçoit des métriques. Jaeger ne prend que des traces : mettez un
+OpenTelemetry Collector devant. Le bouton Test de cette page le dit.
+
 ## Les fichiers à écrire
 
-Le tiroir Prometheus porte de vraies ressources, servies par la passerelle sous `/monitoring/` sur le
+La page Metrics endpoint porte de vraies ressources, servies par la passerelle sous `/monitoring/` sur le
 plan de contrôle : un `prometheus.yml`, un fichier compose pour Swarm, un `ServiceMonitor` pour
 Kubernetes, et pour Grafana sa source de données, son provisionnement de tableaux de bord et un
-tableau de bord prêt. Ils sont copiables et téléchargeables, et ils portent le port d'écoute de
-**cette** installation - pas le port par lequel la console a été joint, puisqu'une publication de port
-ou un ingress s'intercale et que le scrape, lui, adresse le conteneur.
+tableau de bord prêt. Ils sont copiables et téléchargeables, et ils portent le port de métriques de
+**cette** installation. Le bloc du jeton n'y apparaît que si le port en exige un.
 
 Il y a un seul `prometheus.yml` et non un par plateforme : le scrape ne change pas de Swarm à
 Kubernetes, seule la découverte de la cible change. Le fichier porte les deux, et un bouton par
@@ -103,8 +135,11 @@ dégradée.
 ## Ce qui manque
 
 - Aucune courbe de p95 dans la console. L'histogramme est collecté et exposé ; Grafana la trace, et la
-  requête est dans le tiroir.
-- Aucun `traceparent` propagé vers les amonts (OBS-04).
+ requête est sur la page Metrics endpoint.
+- Rien sur une requête en particulier : c'est l'autre moitié, et elle a sa page
+ ([les traces](/docs/operations/tracing)). Un compteur détecte et délimite, une trace explique un
+ cas.
 - `grpc-status` n'est pas lu, donc tout appel gRPC compte en `2xx` et le taux d'échec d'une route gRPC
-  lit zéro (ROUTE-20).
-- Les journaux n'ont pas de niveau réglable et il n'y a pas de journal des requêtes (OBS-03).
+ lit zéro.
+- Rien sur QUI a appelé : aucune étiquette n'est jamais un utilisateur, et c'est ce qui borne la
+ cardinalité. Cette question-là se répond dans le [journal d'accès](/docs/operations/logs).

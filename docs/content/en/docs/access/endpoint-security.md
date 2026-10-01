@@ -77,17 +77,16 @@ the access rule - a flood is refused without a session being looked up.
 ranking. A rule for `*` on `/**` placed first would swallow everything under it,
 so put the general rules last.
 
-An operation matched by **no** rule falls back to the **route's own rule**.
+An operation matched by **no** rule falls back to the **route's own rule** -
+unless **Only listed operations are reachable** is on, at the foot of the
+screen. Then it is refused to everyone, and the table shows *Nobody* on it.
 
 > [!WARNING]
-> There is **no deny-by-default switch**. An operation you forgot is not closed:
-> it is governed by the route's rule, which may be delegated. Leaving an
-> incomplete list of endpoint rules on a delegated route protects nothing.
-
-If you want an inventory where only what you listed is reachable, write the
-refusal yourself, as the **last** rule: method `*`, path `/**`, level *Nobody*.
-Everything not matched earlier lands on it. That is today's answer to
-deny-by-default, and FEATURES.md still lists the switch as missing.
+> Without that switch, an operation you forgot is not closed: it is governed by
+> the route's rule, which may be delegated - and so is an endpoint the service
+> ships next week. Leaving an incomplete list of endpoint rules on a delegated
+> route protects nothing. Turn the switch on when the list is meant to be the
+> whole contract.
 
 ## Rules can open as well as close
 

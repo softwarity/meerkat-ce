@@ -39,6 +39,13 @@ its group rules, resetting a member's password, reading a member's sign-in
 history. It grants nothing outside that organisation, and in particular not the
 global role catalogue.
 
+A person can also **leave** the organisation they are in, from their profile:
+*Leave this organisation*, beside its name, then a confirmation saying that only
+an administrator can add them back. The membership goes, the session stops
+carrying the organisation at once, and the line `member.leave` lands in the
+organisation's [audit trail](/docs/operations/audit). Multi-organisation
+installations only: a single one has nothing to leave.
+
 ![The members of an organisation, and what each one is in it](img/console/members.webp)
 
 ## The choice at sign-in

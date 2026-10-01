@@ -9,7 +9,8 @@
 // archive is a gzipped tar holding one directory named after the chart, which
 // is what tar makes here: no helm on the runner, and nothing to install to
 // publish a page.
-import { readFile, mkdir, copyFile, rm, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, rm, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,4 +75,38 @@ if (tar.status !== 0) throw new Error(`packaging the chart failed: ${tar.stderr 
 // hand. So the build writes the name it produced, and the page reads it.
 await copyFile(join(out, archive), join(out, 'meerkat-chart.tgz'));
 
-console.log(`[gen-deploy] ${plain.length} file(s) + ${archive} (also as meerkat-chart.tgz)`);
+// And the index that makes /deploy a Helm REPOSITORY (DEPLOY-07):
+//
+//   helm repo add meerkat https://www.softwarity.io/deploy
+//   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ce-one-node.yaml
+//
+// Written here rather than by `helm repo index`, so building the site needs no
+// helm on the machine. The format is small and fixed: one entry per chart
+// version, its digest, and a URL RELATIVE to the index - helm resolves it
+// against the repository's address, so the same index works on the preview
+// server and on the published site.
+const field = (name) => /^(?:"?)(.*?)(?:"?)$/.exec((new RegExp(`^${name}:\\s*(.+)$`, 'm').exec(chart)?.[1] ?? '').trim())?.[1] ?? '';
+const digest = createHash('sha256').update(await readFile(join(out, archive))).digest('hex');
+const now = new Date().toISOString();
+const q = (s) => JSON.stringify(s);
+const index = [
+  'apiVersion: v1',
+  'entries:',
+  '  meerkat:',
+  `  - apiVersion: ${field('apiVersion')}`,
+  `    appVersion: ${q(field('appVersion'))}`,
+  `    created: ${q(now)}`,
+  `    description: ${q(field('description'))}`,
+  `    digest: ${digest}`,
+  `    home: ${q(field('home'))}`,
+  '    name: meerkat',
+  `    type: ${field('type') || 'application'}`,
+  '    urls:',
+  `    - ${archive}`,
+  `    version: ${q(version)}`,
+  `generated: ${q(now)}`,
+  '',
+].join('\n');
+await writeFile(join(out, 'index.yaml'), index);
+
+console.log(`[gen-deploy] ${plain.length} file(s) + ${archive} (also as meerkat-chart.tgz) + index.yaml`);

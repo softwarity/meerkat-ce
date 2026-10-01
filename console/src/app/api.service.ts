@@ -7,6 +7,11 @@ import { Observable } from 'rxjs';
 // decides it, and an example a reader pastes has to carry the real one.
 export interface MetricsSetting {
   enabled: boolean;
+  // Whether the metrics port asks a scraper for a token. Off by default: the
+  // port is never published, so the network is the lock.
+  requireToken: boolean;
+  // The port the gateway opens for scrapers while the exposition is on.
+  metricsPort: number;
   enterprise: boolean;
   path: string;
   // The port the gateway listens on, which is not the one the console was
@@ -15,6 +20,71 @@ export interface MetricsSetting {
   // Where the data plane answers: the two monitoring UIs are served through a
   // route, and neither can guess the public URL it lives under.
   dataOrigin: string;
+}
+
+// The developer tunnel (DEV-11), Infra, Plug. Mirrors admin.plugAnswer.
+export interface PlugSetting {
+  enabled: boolean;
+  // What a developer types: the PUBLISHED address, which the gateway cannot
+  // see through a NodePort, a LoadBalancer or a published port.
+  host?: string;
+  port?: number;
+}
+
+export interface PlugState extends PlugSetting {
+  enterprise: boolean;
+  // The other switch, the application administrator's: read-only here.
+  devMode: boolean;
+  production: boolean;
+  status: { state: 'off' | 'unavailable' | 'running' | 'absent'; why?: string; port?: string };
+  version?: string;
+  defaultPort: number;
+  dataOrigin: string;
+  // One per workstation: plug keeps a key pair per profile.
+  developers: { username: string; fullname?: string; keys: { fingerprint: string; comment?: string }[] }[];
+}
+
+// Where this gateway's traces and pushed counters go (OBS-04, OBS-05).
+// Mirrors store.TelemetryConfig.
+export interface TelemetryConfig {
+  // Anything leaves for the collector at all; WHAT leaves is the two below.
+  enabled: boolean;
+  // The spans. Which routes produce any is each route's own answer.
+  traces: boolean;
+  // The counters /metrics exposes, pushed over OTLP to the same collector.
+  metrics?: boolean;
+  // The collector's BASE address; the /v1/traces path is added by the
+  // exporter, so pasting a vendor's full endpoint is not a second one.
+  endpoint: string;
+  // Values may be vault references (`$name`): a collector's api key reaches it
+  // without ever being stored here, returned by this API or drawn on a screen.
+  headers?: Record<string, string>;
+  // The share of journeys THIS GATEWAY OPENS that get recorded. A journey a
+  // caller already decided about is not ours to decide again.
+  sample: number;
+  // The ceiling on journeys recorded per second, whoever decided. It is the
+  // budget, and the only thing that bounds a caller who sets the sampling flag
+  // on every request. 0 means no ceiling.
+  maxPerSecond: number;
+  // The gateway's OWN steps in the traces it records - the identity handed to
+  // an upstream, each query to the store. Off by default: it never adds a
+  // trace, but it deepens every recorded one.
+  gatewayDetail?: boolean;
+}
+
+export interface TelemetrySetting extends TelemetryConfig {
+  // A LITERAL header value is stored: something authenticates to the collector
+  // that this payload does not carry. A reference travels, so it does not
+  // raise this - the field tells the two states apart by it (VAULT-05).
+  headerSet?: boolean;
+  // Read-only: which image is running is decided by what was deployed.
+  enterprise: boolean;
+  // Whether spans are actually leaving RIGHT NOW, which is not the same
+  // question as whether somebody ticked the box: an address that was refused
+  // leaves the setting on and the pipe shut.
+  exporting: boolean;
+  // The same question for the counters.
+  pushingMetrics: boolean;
 }
 
 // One shape everywhere: these mirror the Go types (routing.Spec, store.Route,
@@ -102,6 +172,8 @@ export interface EndpointPolicy extends Access {
 // whole-route default is the route's own Access (Route.access), not here.
 export interface EndpointSecurity {
   endpoints?: EndpointPolicy[];
+  // Only the listed operations are reachable; the others refuse everyone.
+  denyUnlisted?: boolean;
 }
 
 // The endpoint-security screen's save body: the route's base Access (the "whole
@@ -109,6 +181,7 @@ export interface EndpointSecurity {
 export interface RouteSecurity {
   access: Access;
   endpoints: EndpointPolicy[];
+  denyUnlisted?: boolean;
 }
 
 // One operation projected from the route's OpenAPI spec (Swagger 2.0 or 3.x),
@@ -127,6 +200,11 @@ export interface RouteOperations {
   title?: string;
   version?: string;
   format: string;
+  // What every operation path below starts with: the part of the route's own
+  // prefix a request still carries. It is IN those paths - they are the
+  // coordinate the gateway compares - and it is the same on every one, so a
+  // screen says it once rather than in every row.
+  prefix?: string;
   // The route's base Access (the "whole route" default).
   access: Access;
   operations: OpenAPIOperation[];
@@ -158,7 +236,7 @@ export const USER_BUTTON_POSITIONS = ['top-left', 'top-right', 'bottom-left', 'b
 export interface SchemeConfig {
   select: boolean;
   // 'none' = this UI has no colour scheme at all (no switch offered).
-  mechanism?: '' | 'none' | 'attribute' | 'add-attribute' | 'class';
+  mechanism?: '' | 'none' | 'attribute' | 'add-attribute' | 'class' | 'script';
   tag?: string;
   attribute?: string;
   light?: string;
@@ -173,6 +251,13 @@ export interface SchemeConfig {
   storageLight?: string;
   storageDark?: string;
   storageAuto?: string;
+  // This application knows light and dark and nothing else: the visitor's auto
+  // is resolved before it reaches it, and the switch offers two positions.
+  noAuto?: boolean;
+  // The body of function(colorScheme) the agent calls on every change, for the
+  // application whose switch is none of the shapes above. Read only when
+  // mechanism is 'script'.
+  script?: string;
 }
 
 // Puts the user's effective role names on the page - as classes (default) or
@@ -186,7 +271,16 @@ export interface RolesConfig {
 
 // The user facts a UI route may stamp on its pages; each one's attribute or
 // meta name is configurable (data-<field> / meerkat-<field> by default).
-export const PAGE_USER_FIELDS = ['username', 'userid', 'fullname', 'email', 'tenant', 'tenantid', 'timezone', 'locale'] as const;
+export const PAGE_USER_FIELDS = [
+  'username',
+  'userid',
+  'fullname',
+  'email',
+  'tenant',
+  'tenantid',
+  'timezone',
+  'locale',
+] as const;
 
 // Exposes the signed-in user's identity to the page - the SELECTED fields
 // land as attributes on a chosen tag (default body) or as <meta> tags.
@@ -214,8 +308,10 @@ export interface LocalesConfig {
   mechanism?: LocaleMechanism;
   header?: string;
   param?: string;
-  // Application locales THIS route's UI does not support (excluded).
-  disabled?: string[];
+  // The languages THIS route's UI is written in - the only place a language
+  // is declared. The gateway's own offer (the sign-in page, the account menu)
+  // is the union of what its routes say here.
+  speaks?: string[];
   // The "script" mechanism's body: JavaScript run with the person's language
   // in `locale`, whenever it changes and once when a page loads. It applies
   // the language IN PLACE - reloading is not allowed.
@@ -232,14 +328,22 @@ export interface RouteUIOptions {
   customCss?: string;
   customJs?: string;
   // The app's menu label: when set, the route shows in the user's apps menu
-  // (subject to access), under this name. Empty = reachable but unlisted.
-  link?: string;
 }
 
 // The signed-in user's facts a route may forward to its upstream service;
 // each header name is configurable, the field name itself is the default.
 // Remote-User always carries the username besides (cross-server standard).
-export const IDENTITY_FIELDS = ['username', 'userid', 'fullname', 'tenant', 'tenantid', 'email', 'timezone', 'locale', 'roles'] as const;
+export const IDENTITY_FIELDS = [
+  'username',
+  'userid',
+  'fullname',
+  'tenant',
+  'tenantid',
+  'email',
+  'timezone',
+  'locale',
+  'roles',
+] as const;
 
 // One caller fact forwarded to the upstream, optionally renamed (as = the
 // target header/claim name). asJson only bears on the multi-valued 'roles':
@@ -351,10 +455,12 @@ export interface BackupInfo {
 
 // One object an import would touch.
 export interface ConfigChange {
-  kind: 'route' | 'role' | 'authProvider' | 'theme' | 'setting' | 'mailRelay';
+  kind: 'route' | 'role' | 'authProvider' | 'theme' | 'setting' | 'mailRelay' | 'tenant' | 'group';
   id?: string;
   label: string;
   action: 'add' | 'update' | 'same' | 'remove';
+  // What moved inside an updated object (a comparison, an import's setting).
+  fields?: string[];
 }
 
 // A $name the file points at that this vault does not hold. The import creates
@@ -403,6 +509,12 @@ export interface SigningKeys {
 export interface Route {
   id: string;
   name: string;
+  // The revision this route was READ at. Sent back on save so the server can
+  // refuse a write built on a version somebody else has replaced - a screen
+  // opened five minutes ago carries over the blocks it does not edit, and
+  // without this it carries over the copy it loaded, over whatever was written
+  // since. Absent on a route being created.
+  rev?: number;
   order: number;
   enabled: boolean;
   // The route's base security (RBAC-06): unified rule (authenticated + users +
@@ -411,6 +523,18 @@ export interface Route {
   access: Access;
   // A route is always a service; isUi unlocks the UI extras on top.
   isUi: boolean;
+  // Whether this gateway reports on what this route answers (OBS-04). Three
+  // states: absent is "not said", which reads as traced; false takes the route
+  // out of the telemetry altogether.
+  telemetry?: boolean;
+  // The journey starts IN THE PAGE rather than at the gateway: the
+  // OpenTelemetry bundle is injected into this route's pages. UI routes only,
+  // and off unless somebody asked - it injects code into an application.
+  telemetryUi?: boolean;
+  // Why the RUNNING gateway is not serving it, or absent. Read-only, filled by
+  // the server: a route that does not compile is left out rather than taking
+  // the whole table down, and this is where it says so.
+  problem?: string;
   upstream: string;
   predicates: Spec[];
   filters: Spec[];
@@ -765,6 +889,8 @@ export interface Edition {
   hiddenTenants: number;
   tenancyLocked: boolean;
   tenancyLockWhy?: string;
+  // How many saved configurations this image keeps, 0 for no limit.
+  configurationCap: number;
 }
 
 // One field's before/after inside an audit event (from/to are the decoded JSON
@@ -791,12 +917,39 @@ export interface AuditEvent {
   targetId?: string;
   targetName?: string;
   tenantId?: string;
+  // The organisation's current name, joined on read.
+  tenantName?: string;
   changes?: AuditChange[];
   detail?: string;
+  // The address the gateway resolved, on the security half (a sign-in, a
+  // refusal, a factor added). Absent on a change.
+  ip?: string;
+}
+
+// The two halves of the trail: what was changed, and who got in and how.
+export type AuditKind = 'admin' | 'security';
+
+// One live session, as the Sessions screen lists it (CONSOLE-08).
+export interface LiveSession {
+  id: string;
+  userId: string;
+  username: string;
+  plane: 'data' | 'admin';
+  tenantId?: string;
+  tenantName?: string;
+  createdAt: number;
+  expiresAt: number;
+  ip?: string;
+  agent?: string;
+  label?: string;
+  pending?: string;
+  // The caller's own console session: it is signed out from the menu, not here.
+  current?: boolean;
 }
 
 // Filters for the audit trail (all optional). since/until are unix seconds.
 export interface AuditQuery {
+  kind?: AuditKind;
   actor?: string;
   target?: string;
   targetId?: string;
@@ -858,19 +1011,16 @@ export interface Issue {
 // `metrics` opens /metrics and nothing else: a scraper's credential sits in a
 // monitoring stack's configuration, often another team's repository, and a
 // read-only token there would hand whoever finds it the whole configuration.
-export type TokenScope = 'metrics' | 'readonly' | 'full';
+export type TokenScope = 'metrics' | 'schedules' | 'readonly' | 'full';
 
 // The second axis: what a token may act ON. It MASKS its owner's capabilities
 // rather than adding a rights model of its own - a gateway token minted by
-// root runs the routing plane and nothing else, root-only screens included.
-export type TokenDomain = '' | 'gateway' | 'app';
 
 export interface AdminToken {
   id: string;
   name: string;
   prefix: string;
   scope: TokenScope;
-  domain: TokenDomain;
   // Comma-separated CIDR ranges, empty for anywhere. Judged on the TCP peer,
   // so it only means something when agents reach the port directly.
   fromCidrs?: string;
@@ -885,6 +1035,24 @@ export interface AdminToken {
   lastUsedAt: number;
 }
 
+// An account's token for the APPLICATIONS (AUTH-09), as the Access tokens
+// screen lists everyone's to an application administrator.
+export interface DataToken {
+  id: string;
+  name: string;
+  prefix: string;
+  scope: TokenScope;
+  fromCidrs?: string;
+  tenantName?: string;
+  groupName?: string;
+  enabled: boolean;
+  createdAt: number;
+  expiresAt: number;
+  lastUsedAt: number;
+  ownerId: string;
+  ownerName: string;
+}
+
 // The one-time creation response: the clear token travels exactly once.
 export interface AdminTokenCreated {
   id: string;
@@ -892,7 +1060,6 @@ export interface AdminTokenCreated {
   prefix: string;
   token: string; // mk_... shown once
   scope: TokenScope;
-  domain: TokenDomain;
   fromCidrs?: string;
   expiresAt: number;
 }
@@ -1000,6 +1167,9 @@ export interface TlsSettings {
   // Force the application's plain port over to HTTPS. The console's plain port
   // is never redirected: it is what a broken certificate gets repaired from.
   redirect: boolean;
+  // Strict-Transport-Security on every HTTPS answer of the application plane,
+  // in seconds; absent or 0 sends nothing.
+  hstsMaxAge?: number;
   acme: AcmeSettings;
   eabSecretSet: boolean;
   state: TlsState;
@@ -1094,7 +1264,7 @@ export interface UserIdentities {
 // itself. The console sends a NAME, never a value: this is the one path that
 // works for a literal it never received (bootstrap file, earlier save).
 export interface SecretLocation {
-  holder: 'authprovider' | 'mailrelay' | 'tls';
+  holder: 'authprovider' | 'mailrelay' | 'tls' | 'telemetry';
   id: string;
   field: string;
 }
@@ -1256,7 +1426,14 @@ export interface Settings {
   apiTokens: boolean;
   trustedBrowser: TrustedBrowserPolicy;
   // Throttling of the credential endpoints (SEC-10); 0 attempts disables.
-  rateLimit: { loginAttempts: number; loginWindow: string; totpAttempts: number };
+  rateLimit: {
+    loginAttempts: number;
+    loginWindow: string;
+    totpAttempts: number;
+    // Password-reset requests per address and window, a counter of its own;
+    // never off (0 reads as the default, 5).
+    resetAttempts?: number;
+  };
   // What a NEW password must satisfy (AUTH-10). Zero means the rule is not
   // asked for, and a rule that is not asked for is not shown either: the
   // checklist on the sign-up, reset and profile pages is drawn from this.
@@ -1265,14 +1442,16 @@ export interface Settings {
   smtp: SMTPSettings;
   // /register open for local accounts (requires a configured SMTP).
   selfRegistration: boolean;
+  // How long a mailed confirmation link lives - a sign-up's and a new
+  // address's: 24, 48 or 168 hours.
+  confirmHours: number;
   // The built-in anti-robot check on /register (default on).
   selfRegisterCaptcha: boolean;
   // Read-only: how many authorities are enabled, the local accounts included
   // (AUTH-24). Zero means nobody can sign in to the data plane.
   authoritiesEnabled?: number;
   // The APPLICATION's locale pool: routes pick from it, the flow pages speak
-  // its intersection with Meerkat's embedded languages. May be empty.
-  languages: string[];
+
   // The flow pages' look: '' lets the visitor decide (their system, then a
   // button that remembers), 'light' or 'dark' imposes one.
   pagesScheme?: '' | 'light' | 'dark';
@@ -1308,8 +1487,75 @@ export const PAGE_LAYOUTS = ['centered', 'split', 'drawer', 'banner', 'bare'] as
 // them in a rail (children in a top strip). `side` is which edge the rail
 // takes. Modules bind to UI routes and inherit their access; a caller sees only
 // the ones its rights allow. Mirrors store.PortalConfig.
+export interface PreviewTemplate {
+  key: string;
+  label: string;
+  // "mail" renders in ONE pane: a message is built from light colours only.
+  kind: 'page' | 'mail';
+  // Which filter toggle shows or hides it.
+  category: string;
+}
+
+// One filter toggle above the preview. Served with the templates so the console
+// draws the groups it is told about rather than a copy that can drift.
+export interface PreviewCategory {
+  key: string;
+  label: string;
+  icon: string;
+}
+
+export interface PreviewCatalogue {
+  templates: PreviewTemplate[];
+  categories: PreviewCategory[];
+}
+
+// One editable string of a built-in page (I18N-05).
+export interface LocaleString {
+  key: string;
+  // What is rendered today: the override if there is one, the shipped wording
+  // otherwise.
+  value: string;
+  // What the product ships IN THIS LANGUAGE - shown beside an edited value so
+  // a reset can be judged before it is done. Empty when the language ships no
+  // wording of its own for this key.
+  embedded: string;
+  // The English wording. A key name is not a sentence, so this is what a
+  // translator fills against, and what the field shows as a placeholder.
+  reference: string;
+  overridden: boolean;
+  // No wording in this language, ours or theirs: the page shows the English
+  // one there. Left to translate, not broken.
+  missing: boolean;
+  // What KIND of string this is - title, message, label, hint, error. The
+  // server sorts by it; the screen puts a heading on each run.
+  group: string;
+  // How many screens render this string. More than one means correcting it
+  // here corrects it there: the catalogue holds one copy and the screens
+  // share it.
+  screens: number;
+}
+
+export interface LocaleStrings {
+  code: string;
+  // Which template these belong to, or "all".
+  scope: string;
+  strings: LocaleString[];
+}
+
+export interface LocaleView {
+  code: string;
+  // The language's own name, never translated.
+  name: string;
+  embedded: boolean;
+  edited: boolean;
+  holes: number;
+}
+
 export interface PortalConfig {
-  enabled: boolean;
+  // What the catalogue is drawn as: nothing, a flat menu, or the bar. The list
+  // below survives a change of mode - moving from a menu to a bar is a
+  // rendering decision, not a reason to retype the applications.
+  mode: 'none' | 'links' | 'portal';
   layout: 'header' | 'rail';
   side: 'left' | 'right';
   // How a HEADER entry renders: the glyph alone, the text alone, or both. The
@@ -1318,13 +1564,17 @@ export interface PortalConfig {
   // Write the branding app name next to the data-plane logo (only meaningful
   // when a logo is set).
   showAppName?: boolean;
-  parents?: ModuleParent[];
+  // Takes the branding logo OUT of the bar - it is drawn by default.
+  hideLogo?: boolean;
+  // 0 (as drawn) to 50 (circle), in percent of the logo's box.
+  logoRadius?: number;
+  entries?: PortalEntry[];
 }
 
 // A top-level module: a full application (a route), which may gather children
 // shown in the secondary surface. label/icon override what the route offers.
 // `icon` is an SVG string (from the icon bank), not a font name.
-export interface ModuleParent {
+export interface PortalEntry {
   routeId: string;
   icon?: string;
   label?: string;
@@ -1336,11 +1586,11 @@ export interface ModuleParent {
   badge?: string;
   // Turned off for everyone but kept in the config (not served).
   disabled?: boolean;
-  children?: ModuleChild[];
+  children?: PortalSubEntry[];
 }
 
 // A sub-module of a parent, shown in the secondary surface.
-export interface ModuleChild {
+export interface PortalSubEntry {
   routeId: string;
   icon?: string;
   label?: string;
@@ -1441,6 +1691,14 @@ export class ApiService {
     return this.http.get<Route[]>('/api/routes');
   }
 
+  // ONE route, as the gateway has it now. What a screen asks for when the live
+  // channel says that route moved (CONSOLE-13): reloading the whole list to
+  // learn about one line is what a list of two hundred makes expensive, and the
+  // write names which line it touched.
+  getRoute(id: string): Observable<Route> {
+    return this.http.get<Route>(`/api/routes/${encodeURIComponent(id)}`);
+  }
+
   // The portal icon picker's search over the embedded Material Symbols
   // catalogue (PORTAL-01): the backend filters and returns each match's SVG.
   searchIcons(q: string, limit = 120): Observable<BankIcon[]> {
@@ -1464,11 +1722,16 @@ export class ApiService {
   // lookarounds JavaScript allows, so working it out here would promise a match
   // the gateway turns down at save.
   versionPreview(args: Record<string, unknown>, sample: string): Observable<VersionPreview> {
-    return this.http.post<VersionPreview>('/api/routes/version-preview', { args, sample });
+    return this.http.post<VersionPreview>('/api/routes/version-preview', {
+      args,
+      sample,
+    });
   }
 
   respondPreview(body: string): Observable<RespondPreview> {
-    return this.http.post<RespondPreview>('/api/routes/respond-preview', { body });
+    return this.http.post<RespondPreview>('/api/routes/respond-preview', {
+      body,
+    });
   }
 
   deleteRoute(id: string): Observable<void> {
@@ -1478,7 +1741,10 @@ export class ApiService {
   // Replay a fictional request through the live matcher (ROUTE-15): every
   // route's verdict in order, and the one that would take it.
   probeRoutes(request: RouteProbeRequest, as?: RouteProbeAs): Observable<RouteProbeResult> {
-    return this.http.post<RouteProbeResult>('/api/routes/probe', { request, as });
+    return this.http.post<RouteProbeResult>('/api/routes/probe', {
+      request,
+      as,
+    });
   }
 
   // The Endpoints screen (RBAC-07, QUOTA-05): the spec is fetched and parsed server-side,
@@ -1494,7 +1760,9 @@ export class ApiService {
   // route to that file in the same move.
   depositRouteSpec(id: string, file: File, path: string): Observable<SpecDeposit> {
     const params = new HttpParams().set('filename', file.name).set('path', path);
-    return this.http.put<SpecDeposit>(`/api/routes/${encodeURIComponent(id)}/spec`, file, { params });
+    return this.http.put<SpecDeposit>(`/api/routes/${encodeURIComponent(id)}/spec`, file, {
+      params,
+    });
   }
 
   // Drops the deposited file AND the declaration naming it: a route left
@@ -1560,7 +1828,9 @@ export class ApiService {
   }
 
   saveIssuesSetting(enabled: boolean): Observable<{ enabled: boolean }> {
-    return this.http.put<{ enabled: boolean }>('/api/settings/issues', { enabled });
+    return this.http.put<{ enabled: boolean }>('/api/settings/issues', {
+      enabled,
+    });
   }
 
   // What bounds the gateway's own appetite while it proxies (PERF-02). Its own
@@ -1637,7 +1907,12 @@ export class ApiService {
     kind = '',
     locale = '',
   ): Observable<{ sent: string }> {
-    return this.http.post<{ sent: string }>('/api/settings/mail-relay/test', { ...relay, to, kind, locale });
+    return this.http.post<{ sent: string }>('/api/settings/mail-relay/test', {
+      ...relay,
+      to,
+      kind,
+      locale,
+    });
   }
 
   // ── the configuration as a file ────────────────────────────────────────────
@@ -1651,7 +1926,9 @@ export class ApiService {
   // The same configuration as a package: the YAML with its images beside it
   // rather than inline. A Blob, because a zip read as text would be corrupted.
   exportConfigBundle(): Observable<Blob> {
-    return this.http.get('/api/config/export?format=zip', { responseType: 'blob' });
+    return this.http.get('/api/config/export?format=zip', {
+      responseType: 'blob',
+    });
   }
 
   // What that file will NOT carry (literal secrets) and what it expects the
@@ -1720,7 +1997,10 @@ export class ApiService {
 
   // Saves the state the gateway is running RIGHT NOW under a name.
   captureConfiguration(name: string, description = ''): Observable<SavedConfiguration> {
-    return this.http.post<SavedConfiguration>('/api/configurations', { name, description });
+    return this.http.post<SavedConfiguration>('/api/configurations', {
+      name,
+      description,
+    });
   }
 
   // Refreshes an existing one from the running gateway: activate, change
@@ -1730,7 +2010,10 @@ export class ApiService {
   }
 
   renameConfiguration(id: string, name: string, description = ''): Observable<SavedConfiguration> {
-    return this.http.put<SavedConfiguration>(`/api/configurations/${id}`, { name, description });
+    return this.http.put<SavedConfiguration>(`/api/configurations/${id}`, {
+      name,
+      description,
+    });
   }
 
   duplicateConfiguration(id: string, name: string): Observable<SavedConfiguration> {
@@ -1742,6 +2025,13 @@ export class ApiService {
   }
 
   // What switching to it would change, writing nothing.
+  // Two saved configurations against each other, what runs left out (CFG-04).
+  compareConfigurations(id: string, other: string): Observable<ConfigPlan> {
+    return this.http.get<ConfigPlan>(
+      `/api/configurations/${encodeURIComponent(id)}/compare/${encodeURIComponent(other)}`,
+    );
+  }
+
   configurationPlan(id: string): Observable<ConfigPlan> {
     return this.http.get<ConfigPlan>(`/api/configurations/${id}/plan`);
   }
@@ -1772,7 +2062,9 @@ export class ApiService {
   // taken out. Not the export - that one has to stand on its own elsewhere, so
   // it carries everything.
   configurationDocument(id: string): Observable<string> {
-    return this.http.get(`/api/configurations/${id}/document`, { responseType: 'text' });
+    return this.http.get(`/api/configurations/${id}/document`, {
+      responseType: 'text',
+    });
   }
 
   currentDocument(): Observable<string> {
@@ -1781,11 +2073,15 @@ export class ApiService {
 
   // The same configuration as a package: the YAML with its images beside it.
   exportConfigurationBundle(id: string): Observable<Blob> {
-    return this.http.get(`/api/configurations/${id}/export?format=zip`, { responseType: 'blob' });
+    return this.http.get(`/api/configurations/${id}/export?format=zip`, {
+      responseType: 'blob',
+    });
   }
 
   exportConfiguration(id: string): Observable<string> {
-    return this.http.get(`/api/configurations/${id}/export`, { responseType: 'text' });
+    return this.http.get(`/api/configurations/${id}/export`, {
+      responseType: 'text',
+    });
   }
 
   // ── snapshots (STORE-05) ───────────────────────────────────────────────────
@@ -1808,7 +2104,9 @@ export class ApiService {
 
   // Creates or replaces an entry. On an existing SECRET, an empty value keeps
   // the stored one (the console never receives it, so it cannot resend it).
-  saveVaultEntry(entry: Partial<VaultEntry> & { name: string; scope: string }): Observable<VaultEntry> {
+  saveVaultEntry(
+    entry: Partial<VaultEntry> & { name: string; scope: string },
+  ): Observable<VaultEntry> {
     const { name, scope, ...body } = entry;
     return this.http.put<VaultEntry>(
       `/api/vault/${encodeURIComponent(scope)}/${encodeURIComponent(name)}`,
@@ -1857,7 +2155,10 @@ export class ApiService {
   // Previews an identity config WITHOUT saving it (the editor's draft). The
   // caller values are the server's fixed sample: only the shape is ours.
   previewIdentity(routeName: string, identity: IdentityForward): Observable<IdentityPreview> {
-    return this.http.post<IdentityPreview>('/api/identity/preview', { routeName, identity });
+    return this.http.post<IdentityPreview>('/api/identity/preview', {
+      routeName,
+      identity,
+    });
   }
 
   logout(): Observable<unknown> {
@@ -1878,7 +2179,9 @@ export class ApiService {
   }
 
   saveUserFields(fields: UserFieldDef[]): Observable<{ fields: UserFieldDef[] }> {
-    return this.http.put<{ fields: UserFieldDef[] }>('/api/model/user-fields', { fields });
+    return this.http.put<{ fields: UserFieldDef[] }>('/api/model/user-fields', {
+      fields,
+    });
   }
 
   edition(): Observable<Edition> {
@@ -1915,14 +2218,17 @@ export class ApiService {
     return this.http.post<{ users: number }>(`/api/users/${id}/must-change-password`, null);
   }
 
-  // Every local account at once, minus the caller (root only): the answer to a
+  // Every local account at once, minus the caller (app-admin): the answer to a
   // leak, where the question is not which account but all of them.
   mustChangePasswordForAll(): Observable<{ users: number }> {
     return this.http.post<{ users: number }>('/api/users/must-change-password', null);
   }
 
   resetPassword(id: string): Observable<{ password: string }> {
-    return this.http.post<{ password: string }>(`/api/users/${encodeURIComponent(id)}/reset-password`, null);
+    return this.http.post<{ password: string }>(
+      `/api/users/${encodeURIComponent(id)}/reset-password`,
+      null,
+    );
   }
 
   // A user's sign-in history (root scope), newest first.
@@ -2091,6 +2397,44 @@ export class ApiService {
     return this.http.get<Theme[]>('/api/themes/presets');
   }
 
+  // What the theme editor's preview can render beside a palette: the flow-page
+  // specimen, and one entry per mailed message. Served rather than listed in
+  // the console so that adding a template is a change in one place.
+  previewTemplates(): Observable<PreviewCatalogue> {
+    return this.http.get<PreviewCatalogue>('/api/themes/templates');
+  }
+
+  // Every language this gateway can render, and how complete each one is.
+  locales(): Observable<LocaleView[]> {
+    return this.http.get<LocaleView[]>('/api/locales');
+  }
+
+  // One language's strings: a screen's worth when a template is named, the
+  // whole catalogue otherwise (which is what an export carries).
+  localeStrings(code: string, template?: string): Observable<LocaleStrings> {
+    const q = template ? `?template=${encodeURIComponent(template)}` : '';
+    return this.http.get<LocaleStrings>(`/api/locales/${encodeURIComponent(code)}${q}`);
+  }
+
+  // Save corrections. `full` replaces the language's whole layer, which is
+  // what an import does: a file is the complete picture of what it carries.
+  saveLocale(
+    code: string,
+    entries: Record<string, string>,
+    opts: { full?: boolean; template?: string } = {},
+  ): Observable<LocaleStrings> {
+    const q = opts.template ? `?template=${encodeURIComponent(opts.template)}` : '';
+    return this.http.put<LocaleStrings>(`/api/locales/${encodeURIComponent(code)}${q}`, {
+      entries,
+      full: !!opts.full,
+    });
+  }
+
+  // Put a language back to what the product ships, whole.
+  resetLocale(code: string): Observable<void> {
+    return this.http.delete<void>(`/api/locales/${encodeURIComponent(code)}`);
+  }
+
   createTheme(theme: Partial<Theme>): Observable<Theme> {
     return this.http.post<Theme>('/api/themes', theme);
   }
@@ -2118,11 +2462,65 @@ export class ApiService {
   // Sends one test message through the STORED SMTP config (save first).
   // Empty recipient: the server falls back to the caller's account email.
   testSmtp(to: string): Observable<{ sent: string }> {
-    return this.http.post<{ sent: string }>('/api/settings/mail-relay/test', { to });
+    return this.http.post<{ sent: string }>('/api/settings/mail-relay/test', {
+      to,
+    });
   }
 
   // The audit trail, scoped server-side to the caller (root/app-admin see all,
   // a tenant admin only their tenants'). Filters ride as query params.
+  // How long the trail keeps an event (AUD-02), root only.
+  auditSettings(): Observable<{ retentionDays: number; choices: number[] }> {
+    return this.http.get<{ retentionDays: number; choices: number[] }>('/api/settings/audit');
+  }
+
+  setAuditRetention(days: number): Observable<{ retentionDays: number; choices: number[] }> {
+    return this.http.put<{ retentionDays: number; choices: number[] }>('/api/settings/audit', {
+      retentionDays: days,
+      choices: [],
+    });
+  }
+
+  // How long a finished delayed action is kept before the sweep (SCHED-02),
+  // root only - the same shape as the trail's retention above.
+  scheduleSettings(): Observable<{ retentionDays: number; choices: number[] }> {
+    return this.http.get<{ retentionDays: number; choices: number[] }>('/api/settings/schedules');
+  }
+
+  setScheduleRetention(days: number): Observable<{ retentionDays: number; choices: number[] }> {
+    return this.http.put<{ retentionDays: number; choices: number[] }>('/api/settings/schedules', {
+      retentionDays: days,
+      choices: [],
+    });
+  }
+
+  // The trail as a CSV file (STORE-06): the same filters, the same perimeter.
+  auditExportUrl(q: AuditQuery = {}): string {
+    let params = new HttpParams();
+    for (const [k, v] of Object.entries(q)) {
+      if (v !== undefined && v !== null && v !== '') params = params.set(k, String(v));
+    }
+    const qs = params.toString();
+    return '/api/audit/export' + (qs ? '?' + qs : '');
+  }
+
+  // Who is signed in where (CONSOLE-08): root reads both planes, an
+  // application administrator the applications' only.
+  listSessions(q: { q?: string; plane?: string; limit?: number; offset?: number }): Observable<{
+    sessions: LiveSession[];
+    total: number;
+  }> {
+    let params = new HttpParams();
+    for (const [k, v] of Object.entries(q)) {
+      if (v !== undefined && v !== null && v !== '') params = params.set(k, String(v));
+    }
+    return this.http.get<{ sessions: LiveSession[]; total: number }>('/api/sessions', { params });
+  }
+
+  revokeSession(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/sessions/${encodeURIComponent(id)}`);
+  }
+
   listAudit(q: AuditQuery = {}): Observable<AuditEvent[]> {
     let params = new HttpParams();
     for (const [k, v] of Object.entries(q)) {
@@ -2141,7 +2539,9 @@ export class ApiService {
   }
 
   setAgentEndpoint(enabled: boolean): Observable<{ enabled: boolean }> {
-    return this.http.put<{ enabled: boolean }>('/api/settings/agent', { enabled });
+    return this.http.put<{ enabled: boolean }>('/api/settings/agent', {
+      enabled,
+    });
   }
 
   // Whether this gateway exposes /metrics for a monitoring stack to scrape
@@ -2152,22 +2552,75 @@ export class ApiService {
     return this.http.get<MetricsSetting>('/api/settings/metrics');
   }
 
-  setMetricsSetting(enabled: boolean): Observable<MetricsSetting> {
-    return this.http.put<MetricsSetting>('/api/settings/metrics', { enabled });
+  setMetricsSetting(cfg: {
+    enabled: boolean;
+    requireToken: boolean;
+    metricsPort: number;
+  }): Observable<MetricsSetting> {
+    return this.http.put<MetricsSetting>('/api/settings/metrics', cfg);
+  }
+
+  // Where this gateway's traces go (OBS-04). Same shape as the Prometheus
+  // switch, and the same read-only `enterprise`. What comes back is RAW: a
+  // header value of `$otlp-token` is the reference as written, never the
+  // secret behind it - the exporter resolves it at the moment of the call.
+  telemetrySetting(): Observable<TelemetrySetting> {
+    return this.http.get<TelemetrySetting>('/api/settings/telemetry');
+  }
+
+  setTelemetrySetting(cfg: TelemetryConfig): Observable<TelemetrySetting> {
+    return this.http.put<TelemetrySetting>('/api/settings/telemetry', cfg);
+  }
+
+  plugSetting(): Observable<PlugState> {
+    return this.http.get<PlugState>('/api/settings/plug');
+  }
+
+  setPlugSetting(cfg: PlugSetting): Observable<PlugState> {
+    return this.http.put<PlugState>('/api/settings/plug', cfg);
+  }
+
+  // Asks the address ON SCREEN whether anything answers, before saving it. The
+  // gateway posts an empty OTLP batch, so nothing is recorded anywhere.
+  testTelemetry(probe: {
+    endpoint: string;
+    headers?: Record<string, string>;
+    // Asks the metrics path too: a backend may take traces and nothing else.
+    metrics?: boolean;
+  }): Observable<{ status: number; ms: number }> {
+    return this.http.post<{ status: number; ms: number }>('/api/settings/telemetry/test', probe);
+  }
+
+  // Every account's application tokens (AUTH-09): seen and revoked by an
+  // application administrator, never minted here.
+  listDataTokens(q = ''): Observable<DataToken[]> {
+    return this.http.get<DataToken[]>('/api/data-tokens', { params: q ? { q } : {} });
+  }
+
+  revokeDataToken(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/data-tokens/${encodeURIComponent(id)}`);
   }
 
   listAdminTokens(): Observable<AdminToken[]> {
     return this.http.get<AdminToken[]>('/api/admin-tokens');
   }
 
+  // `user` is the account the token ACTS AS, for a service's own credential
+  // (SCHED-01): a scheduled call runs as the token's account, so a backend's
+  // token is minted for the service account, not for the operator minting it.
+  // Empty is the caller, which is what an operator's own token is.
   createAdminToken(
     name: string,
     days: number,
     scope: TokenScope,
-    domain: TokenDomain,
     from: string,
   ): Observable<AdminTokenCreated> {
-    return this.http.post<AdminTokenCreated>('/api/admin-tokens', { name, days, scope, domain, from });
+    return this.http.post<AdminTokenCreated>('/api/admin-tokens', {
+      name,
+      days,
+      scope,
+      from,
+    });
   }
 
   // What a token may do, changed without touching the token: the secret is a
@@ -2178,14 +2631,12 @@ export class ApiService {
     name: string,
     days: number,
     scope: TokenScope,
-    domain: TokenDomain,
     from: string,
   ): Observable<AdminToken> {
     return this.http.put<AdminToken>(`/api/admin-tokens/${encodeURIComponent(id)}`, {
       name,
       days,
       scope,
-      domain,
       from,
     });
   }
@@ -2264,6 +2715,7 @@ export class ApiService {
     consoleName: string;
     appNames: string[];
     redirect: boolean;
+    hstsMaxAge: number;
     acme: AcmeSettings;
   }): Observable<TlsSettings> {
     return this.http.put<TlsSettings>('/api/settings/tls', body);

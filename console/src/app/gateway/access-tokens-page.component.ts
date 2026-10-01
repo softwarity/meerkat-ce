@@ -1,5 +1,8 @@
-import { Component, inject, LOCALE_ID, signal } from '@angular/core';
+import { Component, computed, inject, LOCALE_ID, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatTableModule } from '@angular/material/table';
 import {
   MAT_DIALOG_DATA,
   MatDialog,
@@ -16,17 +19,39 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { DateTime } from 'luxon';
 import { firstValueFrom } from 'rxjs';
-import { AdminToken, ApiService, TokenDomain, TokenScope } from '../api.service';
+import { AdminToken, ApiService, DataToken, TokenScope } from '../api.service';
+import { MeService } from '../me.service';
 import { DialogsService } from '../shared/dialogs.service';
+import { LiveChangesService } from '../shared/live-changes.service';
 
-// Control-plane access tokens (root only, Gateway perimeter): headless access
-// to the admin port. These are the FOUNDATION for a future CLI and MCP server
-// driving Meerkat (PLANNED - the tooling that consumes them comes later). A
-// token is minted here, shown once, and authenticates on the admin port via
-// `Authorization: Bearer mk_...` with the same powers as its owner (root).
+// One row of the common table: a control-plane token of the caller's, or an
+// application token of anyone's.
+type TokenRow = (AdminToken | DataToken) & {
+  plane: 'admin' | 'data';
+  ownerName?: string;
+  tenantName?: string;
+  groupName?: string;
+};
+
+// Access tokens, both planes in one table (AUTH-09). The CONTROL plane's are
+// the caller's own - minted here, shown once, acting with their owner's powers
+// narrowed by a perimeter. The APPLICATIONS' are everyone's, shown to whoever
+// administers the applications: seen and revoked here, and minted only by
+// their owner, on the profile - a credential is never created in somebody
+// else's name. Details and actions live in the drawer, like every other list.
 @Component({
   selector: 'app-access-tokens-page',
-  imports: [MatButtonModule, MatIconModule, MatSlideToggleModule, MatTooltipModule, LoadingIndicatorComponent],
+  imports: [
+    MatButtonModule,
+    MatButtonToggleModule,
+    MatIconModule,
+    MatInputModule,
+    MatSidenavModule,
+    MatSlideToggleModule,
+    MatTableModule,
+    MatTooltipModule,
+    LoadingIndicatorComponent,
+  ],
   styleUrl: './access-tokens-page.component.scss',
   templateUrl: './access-tokens-page.component.html',
 })
@@ -37,13 +62,37 @@ export class AccessTokensPageComponent {
   private readonly dialogs = inject(DialogsService);
   private readonly locale = inject(LOCALE_ID);
 
+  protected readonly me = inject(MeService);
   protected readonly loading = signal(true);
   protected readonly tokens = signal<AdminToken[]>([]);
+  // Every account's application tokens (AUTH-09), for those who administer
+  // the applications: seen and revoked here, minted by their owner only.
+  protected readonly dataTokens = signal<DataToken[]>([]);
+  protected readonly view = signal<'' | 'admin' | 'data'>('');
+  protected readonly query = signal('');
+  protected readonly columns = ['name', 'owner', 'plane', 'scope', 'used'];
+  protected readonly rows = computed<TokenRow[]>(() => {
+    const q = this.query().trim().toLowerCase();
+    const view = this.view();
+    const mine: TokenRow[] = view === 'data' ? [] : this.tokens().map((t) => ({ ...t, plane: 'admin' as const }));
+    const theirs: TokenRow[] = view === 'admin' ? [] : this.dataTokens().map((t) => ({ ...t, plane: 'data' as const }));
+    return [...mine, ...theirs].filter(
+      (t) => !q || t.name.toLowerCase().includes(q) || (t.ownerName ?? '').toLowerCase().includes(q),
+    );
+  });
+  protected readonly selected = signal<TokenRow | null>(null);
   constructor() {
     this.load();
+    // Somebody else's write (CONSOLE-13): this list follows what other
+    // operators do, quietly - a spinner replacing a list nobody asked to
+    // reload takes the screen away from whoever is reading it.
+    inject(LiveChangesService).on('token', () => this.load());
   }
 
   private load(): void {
+    if (this.me.isAppAdmin()) {
+      this.api.listDataTokens().subscribe({ next: (list) => this.dataTokens.set(list) });
+    }
     this.api.listAdminTokens().subscribe({
       next: (tokens) => {
         // A token belonging to a registered agent is a CONNECTION, and it is
@@ -65,12 +114,12 @@ export class AccessTokensPageComponent {
         .open<
           TokenCreateDialogComponent,
           void,
-          { name: string; days: number; scope: TokenScope; domain: TokenDomain; from: string } | undefined
+          { name: string; days: number; scope: TokenScope; from: string } | undefined
         >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true })
         .afterClosed(),
     );
     if (!res) return;
-    this.api.createAdminToken(res.name, res.days, res.scope, res.domain, res.from).subscribe({
+    this.api.createAdminToken(res.name, res.days, res.scope, res.from).subscribe({
       next: (created) => {
         this.dialog.open(TokenRevealDialogComponent, { data: { token: created.token }, width: '560px' });
         this.load();
@@ -90,12 +139,12 @@ export class AccessTokensPageComponent {
         .open<
           TokenCreateDialogComponent,
           AdminToken,
-          { name: string; days: number; scope: TokenScope; domain: TokenDomain; from: string } | undefined
+          { name: string; days: number; scope: TokenScope; from: string } | undefined
         >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true, data: t })
         .afterClosed(),
     );
     if (!res) return;
-    this.api.updateAdminToken(t.id, res.name, res.days, res.scope, res.domain, res.from).subscribe({
+    this.api.updateAdminToken(t.id, res.name, res.days, res.scope, res.from).subscribe({
       // No reveal dialog and no new secret: nothing was minted.
       next: () => this.load(),
       error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
@@ -104,7 +153,11 @@ export class AccessTokensPageComponent {
 
   protected toggle(t: AdminToken, enabled: boolean): void {
     this.api.toggleAdminToken(t.id, enabled).subscribe({
-      next: () => this.tokens.update((list) => list.map((x) => (x.id === t.id ? { ...x, enabled } : x))),
+      next: () => {
+        this.tokens.update((list) => list.map((x) => (x.id === t.id ? { ...x, enabled } : x)));
+        const open = this.selected();
+        if (open?.id === t.id) this.selected.set({ ...open, enabled });
+      },
       error: (err) => {
         this.snack.open(errMsg(err), undefined, { duration: 4000 });
         this.load();
@@ -134,6 +187,33 @@ export class AccessTokensPageComponent {
     });
   }
 
+  protected open(t: TokenRow): void {
+    this.selected.set(t);
+  }
+
+  protected close(): void {
+    this.selected.set(null);
+  }
+
+  // An application token, ended by an administrator: the owner's script is
+  // refused at its next call, and the trail says who did it.
+  protected async revokeData(t: TokenRow): Promise<void> {
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Revoke_token_NAME:Revoke token "${t.name}:NAME:"?`,
+      message: $localize`:@@Revoke_data_token_warning:It belongs to ${t.ownerName}:OWNER:. Whatever uses it is refused from its next call; only its owner can mint another.`,
+      confirmLabel: $localize`:@@Revoke:Revoke`,
+      danger: true,
+    });
+    if (!ok) return;
+    this.api.revokeDataToken(t.id).subscribe({
+      next: () => {
+        this.dataTokens.update((list) => list.filter((x) => x.id !== t.id));
+        this.close();
+      },
+      error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
+    });
+  }
+
   protected async revoke(t: AdminToken): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Revoke_token_NAME:Revoke token "${t.name}:NAME:"?`,
@@ -142,9 +222,31 @@ export class AccessTokensPageComponent {
     });
     if (!ok) return;
     this.api.revokeAdminToken(t.id).subscribe({
-      next: () => this.tokens.update((list) => list.filter((x) => x.id !== t.id)),
+      next: () => {
+        this.tokens.update((list) => list.filter((x) => x.id !== t.id));
+        this.close();
+      },
       error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
     });
+  }
+
+  protected scopeLabel(t: TokenRow): string {
+    switch (t.scope) {
+      case 'metrics':
+        return $localize`:@@Metrics_only:Metrics only`;
+      case 'schedules':
+        return $localize`:@@Scheduled_calls_only:Scheduled calls only`;
+      case 'readonly':
+        return $localize`:@@Read_only:Read only`;
+      default:
+        return $localize`:@@Full_access:Full access`;
+    }
+  }
+
+  protected readonly neverLabel = $localize`:@@Never:Never`;
+
+  protected relative(ts: number): string {
+    return DateTime.fromSeconds(ts).reconfigure({ locale: this.locale }).toRelative() ?? '';
   }
 
   protected day(ts: number): string {
@@ -177,6 +279,13 @@ export class AccessTokensPageComponent {
       mat-form-field {
         width: 100%;
       }
+      /* Which plane this key opens, said once at the top: the other kind is
+         minted from an account's own profile, on the other port. */
+      .plane {
+        margin: -4px 0 16px;
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.82rem;
+      }
     `,
   ],
   template: `
@@ -198,10 +307,14 @@ export class AccessTokensPageComponent {
           cdkFocusInitial
         />
       </mat-form-field></p>
+      <p class="plane" i18n="@@Token_for_the_control_plane">
+        For the control plane, on this port.
+      </p>
       <p><mat-form-field>
         <mat-label i18n="@@Perimeter">Perimeter</mat-label>
         <mat-select [value]="scope()" (selectionChange)="scope.set($event.value)">
           <mat-option value="metrics" i18n="@@Metrics_only">Metrics only</mat-option>
+          <mat-option value="schedules" i18n="@@Scheduled_calls_only">Scheduled calls only</mat-option>
           <mat-option value="readonly" i18n="@@Read_only">Read only</mat-option>
           <mat-option value="full" i18n="@@Full_access">Full access</mat-option>
         </mat-select>
@@ -210,6 +323,11 @@ export class AccessTokensPageComponent {
             @case ('metrics') {
               <ng-container i18n="@@Perimeter_metrics_hint">
                 Opens /metrics and nothing else.
+              </ng-container>
+            }
+            @case ('schedules') {
+              <ng-container i18n="@@Perimeter_schedules_hint">
+                Opens /api/schedules and nothing else. A backend service's credential.
               </ng-container>
             }
             @case ('readonly') {
@@ -224,15 +342,6 @@ export class AccessTokensPageComponent {
             }
           }
         </mat-hint>
-      </mat-form-field></p>
-      <p><mat-form-field>
-        <mat-label i18n="@@Acts_on">Acts on</mat-label>
-        <mat-select [value]="domain()" (selectionChange)="domain.set($event.value)">
-          <mat-option value="gateway" i18n="@@The_routing_plane">The routing plane</mat-option>
-          <mat-option value="app" i18n="@@The_applications_identity">The application's identity</mat-option>
-          <mat-option value="" i18n="@@Everything_you_can_do">Everything you can do</mat-option>
-        </mat-select>
-        <mat-hint i18n="@@Acts_on_hint">A perimeter only takes away: at most what you are.</mat-hint>
       </mat-form-field></p>
       <p><mat-form-field>
         <mat-label i18n="@@Used_from">Used from</mat-label>
@@ -281,7 +390,6 @@ export class TokenCreateDialogComponent {
   // common case, and the safe answer should be the one nobody has to think
   // about. When editing, what the token already is.
   protected readonly scope = signal<TokenScope>(this.editing?.scope ?? 'readonly');
-  protected readonly domain = signal<TokenDomain>(this.editing?.domain ?? '');
   protected readonly from = signal(this.editing?.fromCidrs ?? '');
 
   protected confirm(): void {
@@ -291,7 +399,6 @@ export class TokenCreateDialogComponent {
         name,
         days: this.days(),
         scope: this.scope(),
-        domain: this.domain(),
         from: this.from().trim(),
       });
     }

@@ -24,6 +24,7 @@ et `20`.
 
 ## Exemple
 
+::: details La configuration complète
 ```yaml
 routes:
   - id: checkout
@@ -55,6 +56,7 @@ routes:
           group: checkout
           weight: 2
 ```
+:::
 
 Une requête sur cinq part vers la nouvelle version.
 

@@ -249,3 +249,61 @@ func TestFetch(t *testing.T) {
 		t.Error("expected an error on a 404 spec fetch")
 	}
 }
+
+// TestRelativeServerIsPartOfTheAddress: an operation's coordinate is what a
+// client CALLS, and a relative server says the document's paths answer under a
+// prefix on the host that served it - so the prefix belongs to every operation.
+// This is what made a rule written against /api/v1/products match nothing on a
+// route published at /otel-demo: the gateway compares the request path (minus
+// what the route strips), and the spec was handing out paths with the prefix
+// missing.
+//
+// An ABSOLUTE server is the other case and must NOT be folded in: its path
+// belongs to the service's own address, which the route's upstream carries.
+func TestRelativeServerIsPartOfTheAddress(t *testing.T) {
+	const relative = `{
+	  "openapi": "3.0.3",
+	  "info": {"title": "Demo", "version": "1.0"},
+	  "servers": [{"url": "/otel-demo"}],
+	  "paths": {"/api/v1/products": {"get": {"operationId": "list"}}}
+	}`
+	spec, err := Parse([]byte(relative))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Base != "/otel-demo" {
+		t.Errorf("base = %q, want /otel-demo", spec.Base)
+	}
+	if hasOp(spec.Operations, "GET", "/otel-demo/api/v1/products") == nil {
+		t.Errorf("the operation does not carry the prefix a client calls: %+v", spec.Operations)
+	}
+
+	// Swagger 2.0 says the same thing with basePath, and only when no host
+	// makes the pair an address of its own.
+	const v2 = `{
+	  "swagger": "2.0",
+	  "info": {"title": "Demo", "version": "1.0"},
+	  "basePath": "/otel-demo",
+	  "paths": {"/api/v1/products": {"get": {"operationId": "list"}}}
+	}`
+	spec, err = Parse([]byte(v2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasOp(spec.Operations, "GET", "/otel-demo/api/v1/products") == nil {
+		t.Errorf("2.0 basePath was dropped: %+v", spec.Operations)
+	}
+	const v2Host = `{
+	  "swagger": "2.0",
+	  "info": {"title": "Demo", "version": "1.0"},
+	  "host": "api.example.com", "basePath": "/v1",
+	  "paths": {"/orders": {"get": {"operationId": "list"}}}
+	}`
+	spec, err = Parse([]byte(v2Host))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasOp(spec.Operations, "GET", "/orders") == nil {
+		t.Errorf("a host+basePath pair is the service's own address, not the caller's: %+v", spec.Operations)
+	}
+}

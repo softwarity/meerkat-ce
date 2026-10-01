@@ -157,10 +157,13 @@ func TestConsoleProfileLeadsBack(t *testing.T) {
 	if strings.Contains(body, `href="/profile/dev"`) {
 		t.Errorf("the console offered the developer page it does not serve:\n%.600s", body)
 	}
-	// Nor the timezone: it is what an APPLICATION renders this person's dates
-	// in, and the console renders its own the browser's way.
-	if strings.Contains(body, `action="/profile/timezone"`) {
-		t.Errorf("the console offered a timezone it does not use:\n%.600s", body)
+	// The timezone IS offered here, and it used not to be: the console read
+	// every date the browser's way, so the control had no visible effect on the
+	// screen offering it. The scheduler changed that - it shows the hour of a
+	// run in this zone, or in UTC, on a switch - and an operator who can only
+	// set their zone on the other plane would be setting it blind.
+	if !strings.Contains(body, `action="/profile/timezone"`) {
+		t.Errorf("the console must offer the timezone its screens render in:\n%.600s", body)
 	}
 }
 

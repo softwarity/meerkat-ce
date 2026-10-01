@@ -67,6 +67,7 @@ Les deux sondes existent sur les deux ports, et elles ne sont pas interchangeabl
 
 La règle qui en découle : ce qui envoie du trafic sonde /readyz, jamais /healthz.
 
+::: details Le Deployment complet
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -106,7 +107,7 @@ spec:
           # communautaire ne lie aucun pilote PostgreSQL. Figez une version
           # plutôt que de suivre "latest" sur ce qui tient votre porte
           # d'entrée.
-          image: ghcr.io/softwarity/meerkat-ee:latest
+          image: ghcr.io/softwarity/meerkat:latest
           ports:
             - name: app
               containerPort: 8080
@@ -180,11 +181,13 @@ spec:
         - name: data
           emptyDir: {}
 ```
+:::
 
 ## Deux Services, parce qu'il y a deux plans
 
 Le port 8080 est le plan de données : vos applications, les pages de connexion, le canal live. Le port 9090 est le plan de contrôle : la console d'administration, l'API admin et l'endpoint MCP auquel parle un agent. Seul le premier a sa place sur internet, et ce sont deux Services pour exactement cette raison : un Ingress placé devant vos applications ne doit pas pouvoir atteindre la console par accident, et un Service unique à deux ports en est à une annotation près.
 
+::: details Les deux Services
 ```yaml
 # Le plan de données : ce que vos utilisateurs atteignent.
 apiVersion: v1
@@ -216,6 +219,7 @@ spec:
       port: 9090
       targetPort: admin
 ```
+:::
 
 Comment un opérateur atteint alors la console, par ordre de préférence : kubectl port-forward service/meerkat-admin 9090:9090 pour un travail occasionnel ; un second Ingress sur un controller interne, ou sur le même restreint par adresse source et certificat client, quand une équipe en a besoin tous les jours. Ce qu'il ne faut pas faire, c'est la poser sur le même hôte public que les applications.
 
@@ -225,6 +229,7 @@ Deux choses qu'un Ingress par défaut rate avec cette gateway. Elle proxifie des
 
 Et le schéma. Meerkat sait terminer TLS elle-même (-tls-addr, -admin-tls-addr, avec une émission ACME sérialisée par un verrou consultatif pour que N nœuds demandent un certificat et non N, la matière et le défi étant des lignes auxquelles n'importe quel nœud peut répondre). En Kubernetes on termine plutôt à l'Ingress, et les deux marchent. Mais ce qui termine devant doit envoyer X-Forwarded-Proto : la gateway lit le schéma là autant que sur la connexion, et sans lui trois choses se cassent d'un coup - les cookies de session perdent leur attribut Secure, la console annonce des URL en http://, et la redirection vers HTTPS boucle indéfiniment. nginx et Traefik l'envoient par défaut ; tout montage maison placé devant doit être vérifié.
 
+::: details L'Ingress complet
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -256,37 +261,31 @@ spec:
                   name: app
 # Rien ici ne pointe vers meerkat-admin, et c'est tout l'intérêt.
 ```
+:::
 
-## Ce qui est devant, et comment ne pas en faire le point unique de défaillance
+## Ce qui est devant
 
-Un Service ClusterIP n'est joignable que depuis l'intérieur du cluster. Quelque chose devant doit donc porter l'adresse que vos utilisateurs tapent - et cette adresse est désormais ce qui peut faire tomber toute l'installation. Trois répliques derrière un nom qui résout vers une seule machine, c'est un cluster d'une machine avec des étapes en plus, et c'est la partie d'un déploiement Kubernetes qui est vraiment une décision plutôt qu'un manifeste.
+Un Service ClusterIP n'est joignable que depuis l'intérieur du cluster : quelque
+chose devant doit porter l'adresse que vos utilisateurs tapent. Cette adresse
+devient alors ce qui peut faire tomber l'installation - trois répliques
+derrière un nom qui résout vers une seule machine, c'est un cluster d'une
+machine avec des étapes en plus.
 
-Sur un cluster managé (EKS, GKE, AKS), il n'y a rien à résoudre : donnez au Service du plan de données type: LoadBalancer et le fournisseur vous rend une adresse stable, portée par son propre répartiteur hautement disponible, sondé et réparti entre zones. C'est la bonne réponse partout où elle existe, et le compromis est que le chemin d'entrée est le leur, facturé à l'heure, et réglé par des annotations plutôt que par vous.
+Sur un cluster managé (EKS, GKE, AKS) : `type: LoadBalancer` sur le Service du
+plan de données, et le fournisseur rend une adresse stable et répartie.
 
-Sur du matériel nu, ce fournisseur n'existe pas : type: LoadBalancer reste en attente indéfiniment si rien n'implémente ce rôle. Trois réponses habituelles, et elles ne sont pas équivalentes.
+Sur du matériel nu, ce fournisseur n'existe pas et `type: LoadBalancer` reste
+en attente. MetalLB (en L2 ou en BGP) ou une VIP keepalived devant un Ingress
+controller répondent à ce besoin. C'est une décision d'infrastructure, pas un
+réglage de Meerkat : la passerelle est joignable de la même façon quelle que
+soit la réponse retenue.
 
-- MetalLB en mode L2 prend une adresse libre sur le réseau des nœuds et fait répondre un seul nœud aux requêtes ARP la concernant. Quand ce nœud meurt, un autre reprend l'adresse et émet un ARP gratuit pour que les commutateurs réapprennent. C'est un vrai basculement, en quelques secondes - mais ce n'est pas de la répartition : chaque paquet entre par une machine, ce qui est un plafond de bande passante et une machine dont la panne se voit, brièvement, de tous.
-- MetalLB en mode BGP fait annoncer la même adresse par tous les nœuds à votre routeur, qui installe plusieurs chemins de coût égal et répartit les flux entre eux. C'est du basculement ET de la répartition, et c'est la réponse honnête pour un cluster sur matériel nu qui doit tenir une charge. Le prix n'est pas technique : il faut une session BGP sur le routeur, donc l'équipe réseau est dans la boucle, et le hachage du routeur décide sur quel nœud tombe un flux - un changement de topologie peut déplacer des flux déjà ouverts.
-- keepalived, ou toute implémentation de VRRP, devant un Ingress controller en DaemonSet avec hostNetwork : le controller répond sur chaque machine, et une adresse virtuelle flotte entre elles par VRRP. Même compromis que MetalLB en L2 - basculement oui, une machine à la fois - avec une chose de plus à faire tourner hors de Kubernetes, et c'est la réponse là où MetalLB ne peut pas être installé ou là où une paire VRRP existe déjà.
-
-Le DNS en tourniquet - plusieurs enregistrements A pour un nom - est souvent proposé comme la version économique, et seul, ce n'est pas un mécanisme de basculement : un enregistrement continue d'être servi alors que la machine derrière est tombée, le temps du TTL et des résolveurs qui l'ignorent. Ce qui le sauve, ce sont les clients : les navigateurs et les clients HTTP modernes essaient l'adresse suivante quand une connexion est refusée. Il répartit donc les sessions acceptablement et bascule imparfaitement, et il se pose par-dessus une des lignes ci-dessus - plusieurs enregistrements, chacun vers une adresse qui peut elle-même bouger - plutôt que seul.
-
-| Devant | Bascule | Répartit la charge | Demande |
-| --- | --- | --- | --- |
-| Service LoadBalancer du fournisseur (EKS, GKE, AKS) | Oui, c'est le fournisseur qui le porte | Oui, entre zones | Une ligne dans le manifeste, et une facture horaire |
-| MetalLB, mode L2 | Oui, quelques secondes le temps que les caches ARP réapprennent | Non, un nœud porte tout le trafic | Une adresse libre sur le réseau des nœuds |
-| MetalLB, mode BGP | Oui, le routeur retire la route morte | Oui, ECMP entre les nœuds | Une session BGP sur le routeur : l'équipe réseau est dans la boucle |
-| keepalived (VRRP) devant un Ingress controller en DaemonSet | Oui, la VIP passe sur une autre machine | Non, la VIP est sur une machine à la fois | keepalived sur les machines, hors de Kubernetes |
-| DNS en tourniquet | En partie, et seulement parce que les clients réessaient sur une autre adresse | Grossièrement, au gré des caches des résolveurs | Plusieurs enregistrements A, et une des lignes ci-dessus derrière chacun |
-
-### On utilise Traefik. Ça ne règle pas la question ?
-
-La moitié, et il vaut la peine d'être précis parce que les deux choses portent le même nom. Traefik - comme nginx, HAProxy ou Envoy - EST un Ingress controller : c'est lui qui lit l'objet Ingress ci-dessus et fait le routage, la terminaison TLS et le travail sur les en-têtes. À ce titre il remplace entièrement la couche Ingress de ces manifestes, et vous écririez un IngressRoute à la place. Très bien.
-
-Ce qu'il ne remplace pas, c'est ce qui se tient DEVANT lui, parce que Traefik tourne aussi sur des machines. Ses pods sont des pods : ils sont planifiés quelque part, et l'adresse que vos utilisateurs résolvent doit les atteindre. Sur un cluster managé, cette adresse est le Service LoadBalancer devant Traefik, et le fournisseur la rend hautement disponible. Sur du matériel nu, rien ne le fait tout seul : Traefik a besoin exactement de la même adresse MetalLB ou VRRP que l'Ingress ci-dessus. Déployer deux répliques de Traefik ne donne pas deux adresses d'entrée ; cela donne deux backends derrière l'adresse unique que vous n'avez pas encore construite.
-
-> [!NOTE]
-> En bref : l'objet Ingress et l'Ingress controller sont deux choses différentes, et un controller ne supprime que le besoin de la première.
+> [!NOTE] Traefik ne remplace que la moitié
+> Traefik - comme nginx, HAProxy ou Envoy - **est** un Ingress controller : il
+> remplace l'objet Ingress ci-dessus, et vous écririez un IngressRoute à la
+> place. Mais ses pods sont des pods : sur matériel nu, il a besoin exactement
+> de la même adresse d'entrée hautement disponible. Deux répliques de Traefik
+> ne donnent pas deux adresses d'entrée.
 
 ## Le point fragile, c'est la base
 
@@ -294,12 +293,15 @@ Les répliques font survivre la gateway à la perte d'une machine. Elles ne font
 
 Ce qui se passe quand elle tombe est au moins honnête. /readyz répond 503 avec la raison - le stockage ne répond pas - donc Kubernetes retire ces pods des endpoints du Service, tandis que /healthz continue de dire UP et que rien n'est redémarré. La gateway cesse de servir plutôt que de servir des réponses fausses, et elle revient d'elle-même quand la base revient : pas de redémarrage, pas de geste manuel, rien à débloquer.
 
-Donc : un PostgreSQL managé avec basculement automatique, ou un opérateur de la classe Patroni avec une réplique synchrone, et MEERKAT_DATABASE_URL pointant vers le nom qui suit le primaire plutôt que vers un hôte. Mesurez ensuite la fenêtre de basculement, parce que cette fenêtre est celle où aucun nœud n'est prêt - et testez la restauration, seule manière de savoir qu'une sauvegarde existe.
+Pointez donc `MEERKAT_DATABASE_URL` vers un nom qui suit le primaire plutôt que
+vers un hôte, et mesurez la fenêtre de basculement de votre base : c'est la
+fenêtre pendant laquelle aucun nœud n'est prêt.
 
 ## Optionnel : laisser l'éditeur de routes voir le namespace
 
-La gateway sait lister les Services de SON namespace et les proposer au moment où l'on crée une route : un amont devient un choix plutôt qu'une URL tapée. Il n'y a pas d'interrupteur : ce qui l'ouvre est ce que le déploiement accorde. Le ServiceAccount a besoin de list sur services dans son propre namespace et de rien d'autre - aucun secret, aucun pod, aucun autre namespace - et sans ce droit la console dit lequel lui manque, la saisie libre restant telle quelle.
+La gateway sait lister les Services de SON namespace et les proposer au moment où l'on crée une route : un amont devient un choix plutôt qu'une URL tapée. Il n'y a pas d'interrupteur : ce qui l'ouvre est ce que le déploiement accorde. Le ServiceAccount a besoin de list sur services dans son propre namespace et de rien d'autre - aucun secret, aucun pod, aucun autre namespace - et sans ce droit la console dit lequel lui manque, la saisie libre restant telle quelle. Le tunnel de développement, lui, en demande davantage, et ce qu'il accorde est détaillé sur [Une passerelle](/docs/deploy/one-gateway).
 
+::: details Le Role et son binding
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -331,6 +333,7 @@ subjects:
 # Puis nommez-le dans le pod :
 #   serviceAccountName: meerkat
 ```
+:::
 
 ## Avant de dire que c'est fini
 

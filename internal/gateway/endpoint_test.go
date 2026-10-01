@@ -175,3 +175,61 @@ func TestEndpointSecurityFallThrough(t *testing.T) {
 		}
 	}
 }
+
+// Deny-unlisted (RBAC-07): only the operations a rule lists are reachable. An
+// operation nobody wrote a rule for is refused even to a signed-in caller the
+// route itself would let in - the endpoint the service ships tomorrow is
+// closed until somebody decides otherwise.
+func TestDenyUnlistedClosesWhatNoRuleLists(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "up:"+r.URL.Path)
+	}))
+	t.Cleanup(upstream.Close)
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	if err := st.CreateUser(ctx, store.User{ID: "u1", Username: "neo", PasswordHash: "x", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	route := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,
+		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
+	route.Access = store.Access{Level: store.AccessAuth}
+	route.API = &store.RouteAPI{Security: &store.EndpointSecurity{
+		DenyUnlisted: true,
+		Endpoints:    []store.EndpointPolicy{{Method: "GET", Path: "/listed", Access: store.Access{Level: store.AccessAuth}}},
+	}}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+	sm := session.NewManager(st)
+	rt := New(st, sm)
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+	rec := httptest.NewRecorder()
+	if _, err := sm.Issue(ctx, rec, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
+		t.Fatal(err)
+	}
+	cookie := rec.Result().Cookies()[0]
+	call := func(path string) int {
+		req, _ := http.NewRequest("GET", srv.URL+path, nil)
+		req.AddCookie(cookie)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		return res.StatusCode
+	}
+	if got := call("/demo/listed"); got != http.StatusOK {
+		t.Fatalf("a listed operation: %d", got)
+	}
+	if got := call("/demo/unlisted"); got != http.StatusForbidden {
+		t.Fatalf("an unlisted operation, signed in: %d, want 403", got)
+	}
+}

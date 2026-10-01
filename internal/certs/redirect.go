@@ -3,6 +3,7 @@ package certs
 import (
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -29,6 +30,16 @@ type Redirect struct {
 	// to is the HTTPS listen address the caller is sent to. The port has to be
 	// swapped, not kept: the request arrived on the plain one.
 	to string
+	// hsts is the Strict-Transport-Security max-age stamped on HTTPS answers,
+	// 0 for none.
+	hsts int
+}
+
+// SetHSTS says how long browsers are told to use HTTPS only, 0 for not at all.
+func (d *Redirect) SetHSTS(seconds int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.hsts = seconds
 }
 
 // NewRedirect builds an inactive redirector.
@@ -57,7 +68,20 @@ func (d *Redirect) state() (bool, string) {
 func (d *Redirect) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		on, to := d.state()
-		if !on || filters.Secure(r) || exemptFromRedirect(r.URL.Path) {
+		if filters.Secure(r) {
+			// Over HTTPS: served, and told to stay here (SSL-06). Never on
+			// plain HTTP - a browser ignores it there, and a proxy that
+			// believed it would be believing a request anyone could forge.
+			d.mu.RLock()
+			hsts := d.hsts
+			d.mu.RUnlock()
+			if hsts > 0 && hstsHost(r.Host) {
+				w = &hstsWriter{ResponseWriter: w, value: "max-age=" + strconv.Itoa(hsts)}
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !on || exemptFromRedirect(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -100,3 +124,63 @@ func secureHost(asked, tlsAddr string) string {
 // would make an orchestrator read a 308 as "not ready" and take the node out
 // of rotation for having TLS on.
 func exemptFromRedirect(path string) bool { return path == "/healthz" || path == "/readyz" }
+
+// hstsWriter stamps Strict-Transport-Security as the answer leaves, and only
+// when nobody set it first. A service that sends its own - or a route's
+// security-headers filter - knows its application better than a gateway-wide
+// default, and two of the header is a promise the browser reads the first of.
+//
+// It forwards Flush, and Unwrap for http.ResponseController: a wrapper that
+// swallowed either would turn server-sent events into silence and a websocket
+// upgrade into a 500.
+type hstsWriter struct {
+	http.ResponseWriter
+	value   string
+	stamped bool
+}
+
+func (w *hstsWriter) stamp() {
+	if w.stamped {
+		return
+	}
+	w.stamped = true
+	if w.Header().Get("Strict-Transport-Security") == "" {
+		w.Header().Set("Strict-Transport-Security", w.value)
+	}
+}
+
+func (w *hstsWriter) WriteHeader(code int) {
+	w.stamp()
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *hstsWriter) Write(b []byte) (int, error) {
+	w.stamp()
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *hstsWriter) Flush() {
+	w.stamp()
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *hstsWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// hstsHost says whether a host may be sent HSTS. Never localhost: the promise
+// is per host name and ALL its ports, so a development gateway on
+// localhost:8443 would force HTTPS on every other application its developer
+// runs on localhost - and they would stop answering. Never an IP address:
+// browsers ignore it there anyway.
+func hstsHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	host = strings.ToLower(strings.TrimSuffix(strings.Trim(host, "[]"), "."))
+	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return false
+	}
+	return net.ParseIP(host) == nil
+}

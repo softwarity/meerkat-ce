@@ -9,7 +9,7 @@ summary: How a bound is written, what a refusal carries, and why the number on t
 
 The word is **per**, not **for**. Nobody writes a limit *for* alice: a list of names
 is a list nobody maintains, and it answers the wrong question. A rule says what the
-counter is **keyed on**, and the budgets make themselves - one per caller (ROUTE-08).
+counter is **keyed on**, and the budgets make themselves - one per caller.
 
 ## The two halves of a rule
 
@@ -114,15 +114,14 @@ That is a decision rather than an omission: an exact shared counter costs a roun
 the database on every request, which is not a price a gateway can pay on the path of all
 traffic. This is the **protective** half - approximate, free, and enough against abuse.
 
-One counter *is* in the database and is exact: the **brute-force counter** on sign-ins
-(AUTH-11). Five attempts means five for the installation, not five per node, and a restart
+One counter *is* in the database and is exact: the **brute-force counter** on sign-ins. Five attempts means five for the installation, not five per node, and a restart
 no longer lets a throttled attacker back in.
 
 ## What is missing
 
 - **Throttling.** Exceeding a bound blocks; it does not slow down (QUOTA-02).
 - **Billable counters.** The half that gets invoiced or shown to a customer is a
-  different mechanism, written in batches, and it does not exist yet (QUOTA-03) - with it,
-  the consumption screen and its alert thresholds.
+ different mechanism, written in batches, and it does not exist yet (QUOTA-03) - with it,
+ the consumption screen and its alert thresholds.
 - **Shared counters.** Correct counting across a cluster waits on the billable counters
-  (QUOTA-04). The path is traced: the sign-in counter is exactly that shape.
+ (QUOTA-04). The path is traced: the sign-in counter is exactly that shape.

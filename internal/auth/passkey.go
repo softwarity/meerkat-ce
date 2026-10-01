@@ -235,6 +235,7 @@ func (h *Handler) passkeyRegisterFinish(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.security(r, secPasskeyAdd, u, browserLabel(r))
 	setPasskeyCookie(w, r, rowID)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -253,6 +254,7 @@ func (h *Handler) passkeyDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.securityOf(r, secPasskeyRemove, sess.UserID, "")
 	http.Redirect(w, r, "/profile/security", http.StatusSeeOther)
 }
 
@@ -328,6 +330,7 @@ func (h *Handler) passkeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return webauthnUser{u: u, creds: creds}, nil
 	}, session, parsed)
 	if err != nil {
+		h.security(r, secSigninRefused, matched, "passkey")
 		http.Error(w, "the passkey could not be verified", http.StatusUnauthorized)
 		return
 	}
@@ -338,6 +341,7 @@ func (h *Handler) passkeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 	if ok, why := h.stillRecognised(r.Context(), matched); !ok {
 		slog.Info("passkey refused: the authority no longer recognises the account",
 			"user", matched.Username, "reason", why)
+		h.security(r, secSigninRefused, matched, "not-recognised")
 		http.Error(w, why, http.StatusForbidden)
 		return
 	}

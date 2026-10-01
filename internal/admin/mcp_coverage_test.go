@@ -23,19 +23,40 @@ import (
 
 // agentCovers maps a control-plane section to the tools that speak for it.
 var agentCovers = map[string][]string{
-	"routes":         {"list_routes", "get_route", "test_routing", "save_route", "delete_route"},
-	"catalog":        {"list_route_bricks"},
-	"services":       {"list_services"},
-	"metrics":        {"read_traffic"},
-	"users":          {"list_users"},
-	"tenants":        {"list_tenants"},
-	"audit":          {"read_audit"},
-	"edition":        {"describe_gateway"},
-	"config":         {"export_configuration"},
-	"branding":       {"get_branding", "save_branding"},
-	"themes":         {"list_themes"},
-	"settings":       {"get_settings", "save_portal"},
-	"configurations": {"list_configurations", "save_configuration"},
+	"routes":   {"list_routes", "get_route", "test_routing", "save_route", "delete_route"},
+	"catalog":  {"list_route_bricks"},
+	"services": {"list_services"},
+	"metrics":  {"read_traffic"},
+	// The granting chain (mcp_grants.go). A group in an organisation names
+	// roles, a person is a member of that organisation, that member holds
+	// groups - three links, none of which was reachable, so an application
+	// could arrive with its roles and nobody could be given them. "Who gets
+	// what is a decision" confused deciding with typing it in four screens.
+	"users":    {"list_users"},
+	"tenants":  {"list_tenants", "list_groups", "save_group", "delete_group", "list_members", "save_member"},
+	"audit":    {"read_audit"},
+	"edition":  {"describe_gateway"},
+	"config":   {"export_configuration", "import_configuration"},
+	"branding": {"get_branding", "save_branding"},
+	"themes":   {"list_themes"},
+	"settings": {"get_settings", "save_portal"},
+	// Correcting ONE wording is a judgement about a sentence, made against the
+	// screen it appears on - which is what the console's editor is for, and why
+	// this was out of an agent's reach at first. A WHOLE LANGUAGE is the
+	// opposite kind of work: nobody writes two hundred and seventy strings by
+	// hand, and the editor is then where a person who speaks it reviews what
+	// was written. So the tools are coarse on purpose - a language at a time,
+	// never a string.
+	"locales":        {"list_languages", "read_language", "write_language"},
+	"configurations": {"list_configurations", "save_configuration", "activate_configuration"},
+	"schedules":      {"list_schedules", "list_schedule_runs", "pause_schedule", "run_schedule"},
+	// The catalogue was out of reach on the grounds that renaming a role
+	// silently changes who reaches what - every access rule names roles by
+	// name. The observation was right and the answer was wrong: the console
+	// renames with the same consequence, so what was missing was not a closed
+	// door but a rename that FOLLOWS its references (roleref.go) and a deletion
+	// that says what still names the role. Both paths share that code now.
+	"roles": {"list_roles", "list_role_references", "save_role", "delete_role"},
 }
 
 // agentIgnores says why a section is out of an agent's reach, and each reason
@@ -43,6 +64,8 @@ var agentCovers = map[string][]string{
 // it.
 var agentIgnores = map[string]string{
 	"me":             "who the caller is, for the console's own chrome; an agent is told by describe_gateway",
+	"data-tokens":    "every account's application tokens: an agent holding one token has no business listing or revoking other people's",
+	"sessions":       "who is signed in where, and ending a person's session: a decision about a human in front of a screen, taken by a human in front of the console",
 	"apidocs":        "the developer documentation pages, served to a browser",
 	"backup":         "a snapshot is a file to download; export_configuration is the readable half an agent can reason about",
 	"certificates":   "certificates and private keys, one of the two places this product refuses to be clever",
@@ -50,7 +73,6 @@ var agentIgnores = map[string]string{
 	"admin-tokens":   "minting a control-plane token from an agent that holds one is how a perimeter stops meaning anything",
 	"auth-providers": "external identity providers carry client secrets; the check endpoint reaches a third party under our credentials",
 	"identity":       "JWT signing keys",
-	"roles":          "the role catalogue is what every access rule points at; renaming one silently changes who reaches what, and no tool asked for it yet",
 	"issues":         "user-filed reports, with screenshots",
 	"mcp":            "the agent endpoint itself",
 	"model": "the shape of an account, not its contents: a field added or removed changes " +
@@ -163,7 +185,19 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"DELETE /api/certificates/{id}": true,
 		"POST /api/config/import":       true, "POST /api/config/history/{id}/restore": true,
 		"POST /api/config/history/{id}/save": true,
-		"POST /api/configurations":           true, "POST /api/configurations/import": true,
+		// The scheduled calls: pausing one stops it firing, running one brings
+		// its turn forward, and deleting one is deleting one. None of them
+		// computes an answer.
+		"POST /api/schedules/{id}/pause": true, "POST /api/schedules/{id}/resume": true,
+		"POST /api/schedules/{id}/run": true, "DELETE /api/schedules/{id}": true,
+		// Written by the service that owns them: the schedule itself, and the
+		// progress of the run it is working on.
+		"POST /api/schedules": true, "PUT /api/schedules/{id}": true,
+		"PATCH /api/schedules/{id}/run": true,
+		// How long a finished delayed action is kept before the sweep: a
+		// number stored, like the trail's own retention beside it.
+		"PUT /api/settings/schedules": true,
+		"POST /api/configurations":    true, "POST /api/configurations/import": true,
 		"POST /api/configurations/{id}/activate": true, "POST /api/configurations/{id}/capture": true,
 		"POST /api/configurations/{id}/duplicate": true, "PUT /api/configurations/{id}": true,
 		"PUT /api/configurations/{id}/document": true, "DELETE /api/configurations/{id}": true,
@@ -177,6 +211,11 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"PUT /api/routes/{id}/spec": true, "DELETE /api/routes/{id}/spec": true,
 		"PUT /api/settings": true, "PUT /api/settings/agent": true, "PUT /api/settings/issues": true,
 		"PUT /api/settings/metrics":     true,
+		"PUT /api/settings/telemetry":   true,
+		"PUT /api/settings/plug":        true,
+		"PUT /api/settings/audit":       true,
+		"DELETE /api/sessions/{id}":     true,
+		"DELETE /api/data-tokens/{id}":  true,
 		"PUT /api/settings/proxy":       true,
 		"PUT /api/settings/maintenance": true,
 		"PUT /api/settings/mail-relay":  true, "PUT /api/settings/tenancy": true,
@@ -191,7 +230,8 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"POST /api/tenants/{id}/members/{userId}/reset-password": true,
 		"DELETE /api/tenants/{id}/members/{userId}":              true,
 		"POST /api/tenants/{id}/owner":                           true,
-		"POST /api/themes":                                       true, "PUT /api/themes/{id}": true,
+		"PUT /api/locales/{code}":                                true, "DELETE /api/locales/{code}": true,
+		"POST /api/themes": true, "PUT /api/themes/{id}": true,
 		"POST /api/themes/{id}/activate": true, "DELETE /api/themes/{id}": true,
 		"PUT /api/branding": true, "PUT /api/model/user-fields": true,
 		"POST /api/users": true, "PUT /api/users/{id}": true, "DELETE /api/users/{id}": true,
@@ -246,26 +286,45 @@ that list, not by the verb: half the testers in this API are POSTs.`,
 // support question.
 func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 	want := []string{
+		"activate_configuration",
+		"delete_group",
+		"delete_role",
 		"delete_route",
 		"describe_gateway",
 		"export_configuration",
 		"get_branding",
 		"get_route",
 		"get_settings",
+		"import_configuration",
 		"list_configurations",
+		"list_groups",
+		"list_languages",
+		"list_members",
+		"list_role_references",
+		"list_roles",
 		"list_route_bricks",
 		"list_routes",
+		"list_schedule_runs",
+		"list_schedules",
 		"list_services",
 		"list_tenants",
 		"list_themes",
 		"list_users",
+		"pause_schedule",
 		"read_audit",
+		"read_language",
 		"read_traffic",
+		"run_schedule",
 		"save_branding",
 		"save_configuration",
+		"save_group",
+		"save_member",
 		"save_portal",
+		"save_role",
 		"save_route",
+		"save_user",
 		"test_routing",
+		"write_language",
 	}
 	var got []string
 	for _, tool := range (&API{}).tools() {

@@ -95,14 +95,14 @@ configuration que quelqu'un devrait voir.
 
 ## L'attrape-tout
 
-Une installation neuve a une route nommée `trap` : un prédicat de chemin `/**`
-ordonné en dernier. C'est une route ordinaire, sans privilège - elle est
+Un attrape-tout n'est pas un réglage : c'est une route ordinaire dont le prédicat
+de chemin est `/**`, ordonnée en dernier. Elle n'a aucun privilège - elle est
 simplement essayée après toutes les autres, donc elle attrape ce qui n'a pas été
 reconnu, `/` compris.
 
-C'est ce qui fait qu'une gateway neuve répond quelque chose sur tous les chemins.
-Supprimez-la, ou faites-la pointer sur votre propre page d'accueil, quand vous
-aurez vos routes.
+Une installation neuve n'en a pas : un chemin non reconnu répond 404. Ajoutez-en
+une quand vous voulez que ces chemins mènent quelque part - votre propre page
+d'accueil, par exemple.
 
 > [!TIP]
 > Une route nouvellement créée reçoit l'ordre `0`, ce qui la place **en haut** de

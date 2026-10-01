@@ -16,7 +16,7 @@ Trois mécanismes répondent à ça, et ils sont séparés exprès : une **borne
 
 ## Combien de temps une route attend
 
-Deux bornes, chacune héritée séparément, à trois niveaux (ROUTE-07) :
+Deux bornes, chacune héritée séparément, à trois niveaux :
 
 1. ce que dit la route ;
 2. sinon l'installation, dans **Routes > Global** ;
@@ -46,12 +46,12 @@ passerelle de lui envoyer mille requêtes de plus qui attendront chacune leur pr
 ainsi qu'un service simplement tombé emporte la capacité de la passerelle avec lui, et qu'il est
 accueilli par une ruée à l'instant où il revient.
 
-Donc, par route et **éteint par défaut** (ROUTE-09) :
+Donc, par route et **éteint par défaut** :
 
 - après N échecs **consécutifs**, la route cesse d'appeler et sert immédiatement la page
-  d'indisponibilité ;
+ d'indisponibilité ;
 - après un délai de refroidissement, **une seule** requête passe. Si elle marche, le circuit se
-  referme ; si elle échoue, le refroidissement repart.
+ referme ; si elle échoue, le refroidissement repart.
 
 | Réglage | Défaut | Plage |
 |---|---|---|
@@ -73,7 +73,7 @@ rencontrer ça parce que quelqu'un l'a choisi.
 
 ## Ce que la console montre
 
-La liste des routes marque celles qui ne répondent plus et dit **pourquoi** (SVC-04, ROUTE-11). Ça ne
+La liste des routes marque celles qui ne répondent plus et dit **pourquoi**. Ça ne
 coûte rien à collecter : le disjoncteur regarde déjà chaque réponse réelle, donc ceci rapporte ce
 qu'il sait plutôt que de sonder de son côté.
 
@@ -82,7 +82,7 @@ d'un chemin que les vraies requêtes n'empruntent peut-être même pas. Le coût
 personne n'a encore appelée n'a rien à dire - ce qui est honnête, et qui est exactement ce que la
 passerelle sait.
 
-Pas encore là (ROUTE-11, SVC-04) : la **sonde active**, qui seule peut parler d'une route que personne
+Pas encore là : la **sonde active**, qui seule peut parler d'une route que personne
 n'appelle ; et un second niveau, le `/health` propre à un service.
 
 ## En cluster

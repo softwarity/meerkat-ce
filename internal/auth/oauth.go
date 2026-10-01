@@ -159,7 +159,6 @@ type consentData struct {
 	ClientName string
 	Query      template.URL // the request, carried through the form untouched
 	Scopes     []consentChoice
-	Domains    []consentChoice
 }
 
 type consentChoice struct {
@@ -206,20 +205,16 @@ func (h *Handler) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 	data := consentData{
 		// The wide form: this page is two sets of choices with their
 		// explanations, not a login box.
-		flowChrome: h.flowData(r, "titleConnectAgent"),
+		flowChrome: h.flowData(r, ""),
 		ClientName: client.Name,
 		Query:      template.URL(r.URL.RawQuery), //nolint:gosec // re-parsed, never dereferenced
 		Scopes: []consentChoice{
-			{Value: store.ScopeReadOnly, Label: h.tr(r, "consentReadOnly"), Detail: h.tr(r, "consentReadOnlyDetail"), Checked: true},
-			{Value: store.ScopeFull, Label: h.tr(r, "consentFull"), Detail: h.tr(r, "consentFullDetail")},
-		},
-		Domains: []consentChoice{
-			{Value: store.DomainAll, Label: h.tr(r, "consentEverything"), Checked: true},
-			{Value: store.DomainGateway, Label: h.tr(r, "consentGateway")},
-			{Value: store.DomainApp, Label: h.tr(r, "consentApp")},
+			{Value: store.ScopeReadOnly, Label: "Read only", Detail: "Look at the gateway and run the testers. Change nothing.", Checked: true},
+			{Value: store.ScopeFull, Label: "Read and change", Detail: "Everything you can do. Each change is recorded and can be undone."},
 		},
 	}
 	data.List = true
+	data.Title = "Connect an agent - Meerkat"
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = consentPage.Execute(w, data)
 }
@@ -263,11 +258,6 @@ func (h *Handler) oauthApprove(w http.ResponseWriter, r *http.Request) {
 		redirectError(w, r, redirect, state, "invalid_scope", err.Error())
 		return
 	}
-	domain, err := store.SanitizeTokenDomain(r.PostFormValue("domain"))
-	if err != nil {
-		redirectError(w, r, redirect, state, "invalid_scope", err.Error())
-		return
-	}
 	code, err := randToken()
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -276,7 +266,7 @@ func (h *Handler) oauthApprove(w http.ResponseWriter, r *http.Request) {
 	if err := h.st.SaveOAuthCode(r.Context(), store.OAuthCode{
 		Hash: hashTrust(code), ClientID: client.ID, UserID: user.ID,
 		RedirectURI: redirect, Challenge: asked.Get("code_challenge"),
-		Scope: scope, Domain: domain, Resource: asked.Get("resource"),
+		Scope: scope, Resource: asked.Get("resource"),
 	}); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -390,7 +380,7 @@ func (h *Handler) exchangeCode(w http.ResponseWriter, r *http.Request) {
 	id := randomID()
 	if err := h.st.AddAPIToken(r.Context(), store.NewToken{
 		ID: id, UserID: code.UserID, Name: client.Name, TokenHash: hash, Prefix: prefix,
-		Plane: store.PlaneAdmin, Scope: code.Scope, Domain: code.Domain, ClientID: client.ID,
+		Plane: store.PlaneAdmin, Scope: code.Scope, ClientID: client.ID,
 		ExpiresAt: time.Now().Add(accessTokenLife).Unix(),
 	}); err != nil {
 		oauthError(w, http.StatusInternalServerError, "server_error", "could not issue a token")
@@ -518,13 +508,20 @@ func writeJSONResponse(w http.ResponseWriter, status int, v any) {
 // consentBody is the approval page: who is asking, and the two questions that
 // decide what it may do.
 const consentBody = `
-<form method="post" action="/oauth/authorize" class="watch consent">
+<!-- NOT class="watch": the shared chrome already opens a <main class="watch">
+     and this form sits inside its pane, like every other page's body. Carrying
+     the class itself made a SECOND watch, and every layout rule written for
+     one applied to both - in split that is a two-column grid, so the title
+     landed in the left column and the buttons in the right, with the radios
+     squeezed into a strip. A leftover from before the chrome wrapped the two
+     halves. -->
+<form method="post" action="/oauth/authorize" class="consent">
   <input type="hidden" name="request" value="{{.Query}}">
-  <h1>{{.T.titleConnectAgent}}</h1>
-  <p class="lead">{{.T.consentIntro}} <strong>{{.ClientName}}</strong></p>
+  <h1>Connect an agent</h1>
+  <p class="lead">This agent asks to act on the gateway as you: <strong>{{.ClientName}}</strong></p>
 
   <fieldset>
-    <legend>{{.T.consentWhatMay}}</legend>
+    <legend>What may it do?</legend>
     {{range .Scopes}}
     <label class="choice">
       <input type="radio" name="scope" value="{{.Value}}"{{if .Checked}} checked{{end}}>
@@ -533,20 +530,10 @@ const consentBody = `
     {{end}}
   </fieldset>
 
-  <fieldset>
-    <legend>{{.T.consentOverWhat}}</legend>
-    {{range .Domains}}
-    <label class="choice">
-      <input type="radio" name="domain" value="{{.Value}}"{{if .Checked}} checked{{end}}>
-      <span><strong>{{.Label}}</strong></span>
-    </label>
-    {{end}}
-  </fieldset>
-
   <div class="actions">
-    <button type="submit" name="approve" value="no" class="ghost">{{.T.consentDeny}}</button>
-    <button type="submit" name="approve" value="yes">{{.T.consentApprove}}</button>
+    <button type="submit" name="approve" value="no" class="ghost">Cancel</button>
+    <button type="submit" name="approve" value="yes">Connect</button>
   </div>
-  <p class="note">{{.T.consentRevoke}}</p>
+  <p class="note">You can revoke this connection at any time from the console.</p>
 </form>
 `

@@ -59,6 +59,14 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		return nil, nil, err
 	}
 	sort.Slice(roles, func(i, j int) bool { return roles[i].ID < roles[j].ID })
+	// The revision is this installation's bookkeeping - which write each row is
+	// on - and it means nothing in a document that travels. Carried, it would
+	// also turn every import into a STALE write against rows that do not exist
+	// on the other side. Zeroed here, once per kind, rather than trusted to
+	// each writer downstream.
+	for i := range roles {
+		roles[i].Rev = 0
+	}
 	doc.Roles = roles
 
 	// Organisations and their groups: who may do what is configuration, and it
@@ -69,6 +77,9 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		return nil, nil, err
 	}
 	sort.Slice(tenants, func(i, j int) bool { return tenants[i].ID < tenants[j].ID })
+	for i := range tenants {
+		tenants[i].Rev = 0
+	}
 	doc.Tenants = tenants
 	for _, t := range tenants {
 		groups, err := st.ListGroups(ctx, t.ID)
@@ -76,6 +87,9 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 			return nil, nil, err
 		}
 		sort.Slice(groups, func(i, j int) bool { return groups[i].ID < groups[j].ID })
+		for i := range groups {
+			groups[i].Rev = 0
+		}
 		doc.Groups = append(doc.Groups, groups...)
 	}
 
@@ -89,6 +103,9 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		}
 		return providers[i].ID < providers[j].ID
 	})
+	for i := range providers {
+		providers[i].Rev = 0
+	}
 	doc.AuthProviders = providers
 
 	// The ACTIVE theme, and it alone. The others are colour trials kept on the
@@ -108,6 +125,7 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		if presetLike(t) {
 			t.Dark, t.Light = nil, nil
 		}
+		t.Rev = 0
 		doc.Themes = []store.Theme{t}
 		break
 	}
@@ -146,6 +164,11 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 // height 24 set on purpose reads the same as height 24 never touched, and that
 // is precisely why it does not matter which one it was.
 func trimRoute(r *store.Route) {
+	// The revision is this installation's own bookkeeping - which write this
+	// row is on - and it means nothing in a document that travels to another
+	// one. Carried, it would also make an import a STALE write against a route
+	// that does not exist there yet.
+	r.Rev = 0
 	if r.UI != nil {
 		trimUI(r.UI)
 		if isZeroUI(r.UI) {
@@ -202,7 +225,7 @@ func trimUI(ui *store.RouteUI) {
 // isZeroUI reports whether a ui block holds nothing anyone asked for.
 func isZeroUI(ui *store.RouteUI) bool {
 	return !ui.UserButton.Enabled && ui.Scheme == nil && ui.Roles == nil &&
-		ui.UserInfo == nil && ui.CustomCSS == "" && ui.CustomJS == "" && ui.Link == ""
+		ui.UserInfo == nil && ui.CustomCSS == "" && ui.CustomJS == ""
 }
 
 // stripSecrets empties every declared secret field that does not hold a
@@ -227,6 +250,7 @@ func stripSecrets(doc *Document) []Literal {
 			})
 		}
 	}
+	found = append(found, stripSettingSecrets(doc)...)
 	if r := doc.MailRelay; r != nil {
 		for _, f := range []struct {
 			name  string
@@ -243,6 +267,109 @@ func stripSecrets(doc *Document) []Literal {
 		}
 	}
 	return found
+}
+
+// settingSecrets are the secret fields of the settings a document carries, by
+// the path they sit at inside the setting's own JSON.
+//
+// TWO SETTINGS SAID THEIR CREDENTIAL WOULD NOT TRAVEL and nothing made it so:
+// the telemetry's auth header (OBS-04) and the ACME external-account key
+// (TLS). Both carry a $name in the ordinary case, which is exactly why the
+// hole stayed invisible - a literal only arrives through the API or a
+// bootstrap file, and then it left with the document.
+var settingSecrets = []struct {
+	setting string
+	// path walks the setting's decoded JSON to the object holding the field;
+	// empty means the setting itself.
+	path []string
+	// field is the key to empty, or "" to empty EVERY string value of the
+	// object at path (the telemetry's headers are named by whoever set them).
+	field string
+	label string
+}{
+	{setting: store.SettingTelemetry, path: []string{"headers"}, label: "OpenTelemetry"},
+	{setting: store.SettingTLS, path: []string{"acme"}, field: "eabHmacKey", label: "TLS"},
+}
+
+// stripSettingSecrets empties a literal wherever settingSecrets says one can
+// sit, and reports it like any other - so the import side offers to put it
+// back, and the export side stays true to what it promises.
+func stripSettingSecrets(doc *Document) []Literal {
+	var found []Literal
+	for _, decl := range settingSecrets {
+		raw, ok := doc.Settings[decl.setting]
+		if !ok {
+			continue
+		}
+		var whole map[string]any
+		if err := json.Unmarshal(raw, &whole); err != nil {
+			continue
+		}
+		holder := whole
+		for _, step := range decl.path {
+			next, ok := holder[step].(map[string]any)
+			if !ok {
+				holder = nil
+				break
+			}
+			holder = next
+		}
+		if holder == nil {
+			continue
+		}
+		changed := false
+		for key, value := range holder {
+			if decl.field != "" && key != decl.field {
+				continue
+			}
+			text, ok := value.(string)
+			if !ok || text == "" || vault.IsRef(text) {
+				continue
+			}
+			holder[key] = ""
+			changed = true
+			found = append(found, Literal{Holder: decl.setting, Label: decl.label, Field: key})
+		}
+		if !changed {
+			continue
+		}
+		if encoded, err := json.Marshal(whole); err == nil {
+			doc.Settings[decl.setting] = encoded
+		}
+	}
+	return found
+}
+
+// settingSecretRefs collects the references sitting in those same fields, so
+// they are carried as SECRETS rather than as plain values.
+func settingSecretRefs(doc *Document, add func(string)) {
+	for _, decl := range settingSecrets {
+		raw, ok := doc.Settings[decl.setting]
+		if !ok {
+			continue
+		}
+		var whole map[string]any
+		if err := json.Unmarshal(raw, &whole); err != nil {
+			continue
+		}
+		holder := whole
+		for _, step := range decl.path {
+			next, ok := holder[step].(map[string]any)
+			if !ok {
+				holder = nil
+				break
+			}
+			holder = next
+		}
+		for key, value := range holder {
+			if decl.field != "" && key != decl.field {
+				continue
+			}
+			if text, ok := value.(string); ok {
+				add(text)
+			}
+		}
+	}
 }
 
 // presetLike reports whether t is one of the built-in palettes, unmodified.
@@ -440,5 +567,6 @@ func SecretRefs(doc *Document) map[string]bool {
 		add(r.Password)
 		add(r.OAuth2.ClientSecret)
 	}
+	settingSecretRefs(doc, add)
 	return out
 }

@@ -1,7 +1,7 @@
 ---
 title: GitHub
 section: Authentication
-order: 108
+order: 109
 summary: Sign in with a GitHub account, restricted to the organisations you name.
 ---
 

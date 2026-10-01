@@ -24,15 +24,23 @@ import (
 type MailSampleKind struct {
 	Key   string
 	Label string // English label for the console's combo
+	// Operator marks a message addressed to whoever RUNS the gateway rather
+	// than to a visitor. It wears the console's own fixed colours and the
+	// Meerkat mark - never the tenant's theme - so the theme editor has
+	// nothing to show for it: whatever palette is on screen, this message
+	// will not wear it.
+	Operator bool
 }
 
 // MailSampleKinds is the closed list the console offers and SampleMail accepts.
 var MailSampleKinds = []MailSampleKind{
-	{"confirm", "Account confirmation"},
-	{"reset", "Password reset"},
-	{"password-changed", "Password changed"},
-	{"otp", "Sign-in code"},
-	{"digest", "Expiring accounts"},
+	{"confirm", "Account confirmation", false},
+	{"reset", "Password reset", false},
+	{"password-changed", "Password changed", false},
+	{"email-change", "New address confirmation", false},
+	{"email-changing", "Address change notice", false},
+	{"otp", "Sign-in code", false},
+	{"digest", "Expiring accounts", true},
 }
 
 // SampleMail renders a themed sample of one kind in one language. base is the
@@ -43,8 +51,28 @@ var MailSampleKinds = []MailSampleKind{
 // goes to administrators - wears the console's own (Meerkat), so the test shows
 // the true thing and not a data-plane-coloured lookalike.
 func SampleMail(ctx context.Context, st *store.Store, kind, locale, base string) (mail.Message, bool) {
+	return SampleMailWith(ctx, st, kind, locale, base, nil)
+}
+
+// SampleMailWith is SampleMail against an ARBITRARY light palette, which is
+// what the theme editor's preview needs: it shows a palette that is being
+// edited and has not been saved, let alone activated. Nil means "the active
+// theme", which is what a relay test wants - it is checking what really goes
+// out.
+//
+// The palette is the LIGHT one and always will be: a mail is built from light
+// colours inline on a table, because an e-mail client second-guesses a dark
+// background (see internal/mail). One pane, and it is the truth rather than a
+// degraded preview.
+func SampleMailWith(
+	ctx context.Context, st *store.Store, kind, locale, base string, light map[string]string,
+) (mail.Message, bool) {
 	t := messagesFor(locale)
-	brand, palette := sampleBrand(ctx, st), samplePalette(ctx, st)
+	brand := sampleBrand(ctx, st)
+	palette := light
+	if len(palette) == 0 {
+		palette = samplePalette(ctx, st)
+	}
 	if kind == "digest" {
 		brand = mail.Brand{AppName: store.MeerkatBranding().AppName, Meerkat: true}
 		palette = mail.ConsolePalette()
@@ -76,7 +104,7 @@ func sampleSpec(kind string, t map[string]string, app, base string) (mail.Spec, 
 			Subject:   fmt.Sprintf(t["mailConfirmSubject"], app),
 			Preheader: fmt.Sprintf(t["mailConfirmHeading"], app),
 			Heading:   fmt.Sprintf(t["mailConfirmHeading"], app),
-			Intro:     []string{t["mailConfirmIntro"]},
+			Intro:     []string{t["mailConfirmIntro"], linkValidity(t, store.DefaultConfirmHours)},
 			Button:    &mail.Button{Label: t["mailConfirmCta"], URL: base + "/confirm?token=SAMPLE"},
 			Outro:     []string{t["mailConfirmOutro"]},
 		}, true
@@ -88,6 +116,23 @@ func sampleSpec(kind string, t map[string]string, app, base string) (mail.Spec, 
 			Intro:     []string{fmt.Sprintf(t["mailResetIntro"], app)},
 			Button:    &mail.Button{Label: t["mailResetCta"], URL: base + "/reset-password?token=SAMPLE"},
 			Outro:     []string{t["mailResetOutro"]},
+		}, true
+	case "email-change":
+		return mail.Spec{
+			Subject:   fmt.Sprintf(t["mailEmailChangeSubject"], app),
+			Preheader: t["mailEmailChangeHeading"],
+			Heading:   t["mailEmailChangeHeading"],
+			Intro:     []string{fmt.Sprintf(t["mailEmailChangeIntro"], app), linkValidity(t, 48)},
+			Button:    &mail.Button{Label: t["mailEmailChangeCta"], URL: base + "/confirm-email?token=SAMPLE"},
+			Outro:     []string{t["mailEmailChangeOutro"]},
+		}, true
+	case "email-changing":
+		return mail.Spec{
+			Subject:   fmt.Sprintf(t["mailEmailChangingSubject"], app),
+			Preheader: fmt.Sprintf(t["mailEmailChangingSubject"], app),
+			Heading:   fmt.Sprintf(t["mailEmailChangingSubject"], app),
+			Intro:     []string{fmt.Sprintf(t["mailEmailChangingIntro"], app, "new.address@example.com")},
+			Outro:     []string{t["mailEmailChangingOutro"]},
 		}, true
 	case "password-changed":
 		return mail.Spec{

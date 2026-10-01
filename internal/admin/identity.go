@@ -9,14 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
-
-	"golang.org/x/text/language"
 
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
@@ -68,6 +67,14 @@ func (a *API) authed(next userHandler) http.Handler {
 				"this token opens "+expositionPath+" and nothing else: it is a scraper's credential, not an operator's")
 			return
 		}
+		// And a service's token opens its own scheduled calls, the same way
+		// (SCHED-01): it lives in a deployment manifest, so what it can reach
+		// when it leaks is one API and one account's schedules.
+		if sess.TokenScope == store.ScopeSchedules && !strings.HasPrefix(r.URL.Path, schedulesPath) {
+			writeErr(w, http.StatusForbidden,
+				"this token opens "+schedulesPath+" and nothing else: it is a service's credential, not an operator's")
+			return
+		}
 		// A browser session (no token) that writes must prove it came from the
 		// console itself (SEC-01): the cookie rides every request to this
 		// origin, a token does not ride cross-site at all, so only the cookie
@@ -77,11 +84,16 @@ func (a *API) authed(next userHandler) http.Handler {
 				"cross-site write refused: this endpoint answers the admin console on its own origin")
 			return
 		}
-		// From here on, the audit knows WHICH token acted (MCP-03), and the
-		// actor is narrowed to the token's domain: what follows sees a user
-		// who simply does not hold what the token gave up.
+		// From here on, the audit knows WHICH token acted (MCP-03).
 		r = r.WithContext(withActorToken(r.Context(), sess))
-		actor = narrowTo(actor, sess.TokenDomain)
+		// A write hands back the identifiers of the events it produced, so the
+		// screen that made it can tell its own save from somebody else's when
+		// the live channel reports both (see changeid.go).
+		if isWrite(r) {
+			ctx, ids := withChangeIDs(r.Context())
+			r = r.WithContext(ctx)
+			w = &changeIDWriter{ResponseWriter: w, ids: ids}
+		}
 		// Every write goes through here, which is the only reason the tape can
 		// be complete: an endpoint added next month is recorded without anyone
 		// remembering to record it.
@@ -169,6 +181,51 @@ func (a *API) appAdmin(next userHandler) http.Handler {
 	})
 }
 
+// domainAdmin restricts a handler to anybody who administers a DOMAIN of the
+// installation: root, the infra-admin capability or the app-admin one. For
+// what is personal rather than domain-specific - a control-plane token acts
+// with its owner's capabilities, read again on every request, so minting one
+// never hands out more than the person already holds.
+func (a *API) domainAdmin(next userHandler) http.Handler {
+	return a.authed(func(w http.ResponseWriter, r *http.Request, actor store.User) {
+		if !actor.Root && !actor.InfraAdmin && !actor.AppAdmin {
+			writeErr(w, http.StatusForbidden,
+				"this needs an administration capability: root, infra-admin or app-admin")
+			return
+		}
+		next(w, r, actor)
+	})
+}
+
+// tenantCreator restricts a handler to root or the tenant-creator capability:
+// founding a new organisation, which is a different act from administering an
+// existing one. It used to be checked inside the handler, which made it
+// invisible to anybody reading the guards - including the rights matrix, which
+// then listed "any account" for an endpoint that refused almost everybody.
+func (a *API) tenantCreator(next userHandler) http.Handler {
+	return a.authed(func(w http.ResponseWriter, r *http.Request, actor store.User) {
+		if !actor.Root && !actor.TenantCreator {
+			writeErr(w, http.StatusForbidden, "creating tenants requires root or the tenant-creator capability")
+			return
+		}
+		next(w, r, actor)
+	})
+}
+
+// devOrInfra restricts a handler to root, the infra-admin capability or the dev
+// one: the developer surface that sits on the control plane (a test token for
+// the API docs). Same reason as tenantCreator for being a guard rather than a
+// line inside a handler.
+func (a *API) devOrInfra(next userHandler) http.Handler {
+	return a.authed(func(w http.ResponseWriter, r *http.Request, actor store.User) {
+		if !actor.Root && !actor.InfraAdmin && !actor.Dev {
+			writeErr(w, http.StatusForbidden, "this needs the root, infra-admin or dev capability")
+			return
+		}
+		next(w, r, actor)
+	})
+}
+
 // tenantScoped restricts a handler to root, the tenant's OWNER (Tenant.OwnerID
 // - ownership is decoupled from membership), or an ADMIN member of the tenant
 // named by the {id} path value.
@@ -185,12 +242,6 @@ func (a *API) tenantScoped(next userHandler) http.Handler {
 // administersTenant reports whether the user administers the tenant: its OWNER
 // (owner_id, member or not) or an enabled ADMIN member. Root bypasses this.
 func (a *API) administersTenant(ctx context.Context, userID, tenantID string) bool {
-	// A token confined to the routing plane administers no organisation: the
-	// capability booleans are masked, but tenant administration is a
-	// membership and would survive the mask.
-	if tokenDomain(ctx) == store.DomainGateway {
-		return false
-	}
 	if t, err := a.st.GetTenant(ctx, tenantID); err == nil && t.OwnerID == userID {
 		return true
 	}
@@ -213,13 +264,13 @@ func (a *API) registerIdentity(mux Mux) {
 	// Force a change at the next sign-in, keeping the password in place: one
 	// account, or every local one (root only - it reaches everybody at once).
 	mux.Handle("POST /api/users/{id}/must-change-password", a.appAdmin(a.putMustChangePassword))
-	mux.Handle("POST /api/users/must-change-password", a.rootOnly(a.postMustChangePasswordAll))
+	mux.Handle("POST /api/users/must-change-password", a.appAdmin(a.postMustChangePasswordAll))
 	mux.Handle("GET /api/users/{id}/logins", a.appAdmin(a.userLogins))
 	mux.Handle("GET /api/users/{id}/identities", a.appAdmin(a.userIdentities))
 	mux.Handle("DELETE /api/users/{id}", a.appAdmin(a.deleteUser))
 
 	mux.Handle("GET /api/tenants", a.authed(a.listTenants))
-	mux.Handle("POST /api/tenants", a.authed(a.createTenant))
+	mux.Handle("POST /api/tenants", a.tenantCreator(a.createTenant))
 	mux.Handle("GET /api/tenants/{id}", a.tenantScoped(a.getTenant))
 	mux.Handle("PUT /api/tenants/{id}", a.tenantScoped(a.updateTenant))
 	mux.Handle("DELETE /api/tenants/{id}", a.tenantScoped(a.deleteTenant))
@@ -444,12 +495,26 @@ func (a *API) updateUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		return
 	}
 	if err := a.st.UpdateUser(r.Context(), u); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	// Disabled, or given another window: a cached API token of this account
 	// must not keep answering until its entry ages out.
 	a.sm.UserChanged(u.ID)
+	// Disabled: its sessions END, on both planes (SEC-07). Every gate already
+	// re-read the account and refused it, but the gateway's own pages - the
+	// profile, the user button - kept answering an open session until it
+	// expired; a person switched off mid-afternoon was still "signed in".
+	if !u.Enabled {
+		if n, err := a.st.DeleteSessionsForUser(r.Context(), u.ID); err != nil {
+			slog.Warn("sessions of a disabled account not ended", "user", u.Username, "err", err)
+		} else if n > 0 {
+			a.sm.Revoked(u.ID)
+		}
+	}
 	updated, err := a.st.GetUserByID(r.Context(), u.ID)
 	if err != nil {
 		a.internal(w, err)
@@ -706,10 +771,6 @@ func (a *API) listTenants(w http.ResponseWriter, r *http.Request, actor store.Us
 }
 
 func (a *API) createTenant(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if !actor.Root && !actor.TenantCreator {
-		writeErr(w, http.StatusForbidden, "creating tenants requires root or the tenant-creator superpower")
-		return
-	}
 	// A SECOND organisation is what the licence covers - every installation
 	// owns one from its first boot, and single-tenant mode never names it.
 	if n, err := a.st.CountTenants(r.Context()); err == nil && n >= 1 {
@@ -754,6 +815,9 @@ func (a *API) createTenant(w http.ResponseWriter, r *http.Request, actor store.U
 		t.BusinessAccess = store.BusinessAccess{Inherited: true}
 	}
 	if err := a.st.SaveTenant(r.Context(), t); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -832,6 +896,9 @@ func (a *API) updateTenant(w http.ResponseWriter, r *http.Request, actor store.U
 		return
 	}
 	if err := a.st.SaveTenant(r.Context(), t); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -988,7 +1055,7 @@ func (a *API) transferOwner(w http.ResponseWriter, r *http.Request, actor store.
 		saved.OwnerName = u.Username
 	}
 	a.audit(r.Context(), store.AuditEvent{
-		At: time.Now().Unix(), ActorID: actor.ID, Action: "tenant.transfer-owner",
+		At: time.Now().Unix(), ActorID: actor.ID, ActorName: actor.Username, Action: "tenant.transfer-owner",
 		Target: "tenant", TargetID: tenantID, TargetName: saved.Name, TenantID: tenantID,
 		Changes: []store.FieldChange{{Field: "owner", From: oldOwnerName, To: saved.OwnerName}},
 	})
@@ -1036,6 +1103,9 @@ type settingsPayload struct {
 	// arrival creates no account anywhere. Which doors may create one is each
 	// authority's own AutoCreate (Gateway, Authorities).
 	SelfRegistration bool `json:"selfRegistration"`
+	// ConfirmHours is how long a mailed confirmation link lives - a sign-up's
+	// and a new address's (AUTH-22): 24, 48 or 168.
+	ConfirmHours int `json:"confirmHours"`
 	// AuthoritiesEnabled is read-only, and travels because this screen needs
 	// it: self-registration mints a LOCAL account, so it says nothing useful
 	// when no authority can answer at all. The authorities themselves are an
@@ -1048,9 +1118,6 @@ type settingsPayload struct {
 	// how many characters of each kind. Enforced where a password is TYPED -
 	// sign-up, the forced change at first login, the profile, a reset link.
 	PasswordPolicy store.PasswordPolicy `json:"passwordPolicy"`
-	// Languages is the APPLICATION's locale pool (free BCP 47). The flow pages
-	// speak its intersection with Meerkat's embedded languages (fallback en).
-	Languages []string `json:"languages"`
 	// PagesScheme imposes the flow pages' look: "" (the visitor decides),
 	// "light" or "dark" (THEME-05).
 	PagesScheme string `json:"pagesScheme"`
@@ -1063,6 +1130,10 @@ type settingsPayload struct {
 	// operator builds one; the modules bind to UI routes and are filtered per
 	// caller by those routes' access.
 	Portal store.PortalConfig `json:"portal"`
+	// Telemetry is read-only here: the screen that writes it is its own
+	// endpoint (PUT /api/settings/telemetry), because turning an export on is
+	// an Enterprise decision with its own refusal.
+	Telemetry store.TelemetryConfig `json:"telemetry"`
 	// DevMode is the installation-wide developer switch (DEV-01): off, the
 	// served applications carry no developer surface at all, whoever holds the
 	// capability. Free in both editions - developing against a gateway is how
@@ -1123,13 +1194,18 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	p.TrustedBrowser = tb
 	p.PasskeysAllowed = a.st.PasskeysAllowed(ctx)
 	p.APITokens = a.st.APITokensAllowed(ctx)
-	// The application locale pool may legitimately be empty.
-	_ = a.st.GetSetting(ctx, store.SettingLanguages, &p.Languages)
 	_ = a.st.GetSetting(ctx, store.SettingPagesScheme, &p.PagesScheme)
 	p.PageLayout = store.DefaultPageLayout()
 	_ = a.st.GetSetting(ctx, store.SettingPageLayout, &p.PageLayout)
 	p.Portal = store.DefaultPortalConfig()
 	_ = a.st.GetSetting(ctx, store.SettingPortal, &p.Portal)
+	// Where traces go, RAW - references as references (OBS-04). Readable so
+	// that "why am I seeing no traces" has an answer without a shell; not
+	// writable by an agent, which is decided at the tool rather than here:
+	// turning an export on points every span this gateway produces - route
+	// names, endpoint templates, status codes, an operational map - at an
+	// address in the request. That is a destination somebody decides.
+	p.Telemetry = a.st.RawTelemetry(ctx)
 	devMode := a.st.DevMode(ctx)
 	p.DevMode = &devMode
 	p.DevModeLocked = store.Production()
@@ -1138,7 +1214,9 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 		FromName: smtp.FromName, RelayHost: smtp.Host, RelayFrom: smtp.Address(),
 		Sender: smtp.Sender(), RelayConfigured: smtp.Configured(),
 	}
-	p.SelfRegistration = a.st.GetRegistrationPolicy(ctx).Enabled
+	reg := a.st.GetRegistrationPolicy(ctx)
+	p.SelfRegistration = reg.Enabled
+	p.ConfirmHours = reg.ConfirmHours
 
 	if n, err := a.enabledAuthorities(ctx); err == nil {
 		p.AuthoritiesEnabled = n
@@ -1181,6 +1259,12 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		writeErr(w, http.StatusBadRequest, "malformed settings: "+err.Error())
 		return
 	}
+	// Checked before anything is written: a refusal must not leave half of
+	// this screen saved.
+	if err := store.SanitizeRegistration(&store.RegistrationPolicy{ConfirmHours: p.ConfirmHours}); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	// A trusted-browser TTL, when set, must be a valid ISO-8601 duration.
 	if p.TrustedBrowser.TTL != "" {
 		if _, err := store.ParseISODuration(p.TrustedBrowser.TTL); err != nil {
@@ -1190,19 +1274,6 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 	} else if p.TrustedBrowser.Allowed {
 		writeErr(w, http.StatusUnprocessableEntity, "trusted-browser duration is required when trusted browsers are allowed")
 		return
-	}
-	// The application locale pool: free BCP 47 tags (fr, fr-FR, pt-BR...),
-	// canonicalized here. It may be empty. The flow pages will speak the
-	// subset Meerkat embeds; the rest still feed the user button and the
-	// upstream forwarding.
-	for i, l := range p.Languages {
-		tag, err := language.Parse(l)
-		if err != nil {
-			writeErr(w, http.StatusUnprocessableEntity,
-				"language "+l+" is not a valid ISO code (like fr or fr-FR)")
-			return
-		}
-		p.Languages[i] = tag.String()
 	}
 	// Working hours (TENANT-04) are internal control rather than security - no
 	// attacker is stopped by opening hours - which is why they are sold while
@@ -1257,8 +1328,8 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 	// an infra admin owns, the display name is the application's own name
 	// (Branding), and GetSMTP resolves vault references - storing what it
 	// returns would replace "$smtp-password" with the secret itself.
-	if err := a.st.SetSetting(r.Context(), store.SettingRegistration,
-		store.RegistrationPolicy{Enabled: p.SelfRegistration}); err != nil {
+	reg := store.RegistrationPolicy{Enabled: p.SelfRegistration, ConfirmHours: p.ConfirmHours}
+	if err := a.st.SetSetting(r.Context(), store.SettingRegistration, reg); err != nil {
 		a.internal(w, err)
 		return
 	}
@@ -1284,10 +1355,6 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 	p.SMTP = smtpPayload{
 		FromName: smtp.FromName, RelayHost: smtp.Host, RelayFrom: smtp.Address(),
 		Sender: smtp.Sender(), RelayConfigured: smtp.Configured(),
-	}
-	if err := a.st.SetSetting(r.Context(), store.SettingLanguages, p.Languages); err != nil {
-		a.internal(w, err)
-		return
 	}
 	switch p.PagesScheme {
 	case "", "light", "dark":

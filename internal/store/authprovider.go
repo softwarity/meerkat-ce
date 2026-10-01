@@ -76,6 +76,10 @@ type AuthProvider struct {
 	Captcha   bool  `json:"captcha"`
 	CreatedAt int64 `json:"createdAt"`
 	UpdatedAt int64 `json:"updatedAt"`
+	// Rev is the revision this row was READ at, carried back by a save so a
+	// write built on a version somebody has replaced is refused. Zero means "I
+	// read no version" and still wins - see rev.go.
+	Rev int64 `json:"rev,omitempty"`
 }
 
 // LocalProviderID is the fixed id of the local-accounts authority: exactly one
@@ -165,6 +169,10 @@ func ValidPolicy(p string) bool {
 
 // SaveAuthProvider inserts or updates one authority.
 func (s *Store) SaveAuthProvider(ctx context.Context, p AuthProvider) error {
+	// See rev.go: a write built on a version somebody has replaced is refused.
+	if err := s.checkRev(ctx, "auth_providers", "authentication provider", p.ID, p.Rev); err != nil {
+		return err
+	}
 	p.Name = strings.TrimSpace(p.Name)
 	if p.ID == "" || p.Name == "" {
 		return fmt.Errorf("store: an auth provider needs an id and a name")
@@ -183,13 +191,14 @@ func (s *Store) SaveAuthProvider(ctx context.Context, p AuthProvider) error {
 	}
 	now := time.Now().Unix()
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO auth_providers (id, kind, name, enabled, ord, config, mfa_required, passkeys, auto_create, captcha, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO auth_providers (id, kind, name, enabled, ord, config, mfa_required, passkeys, auto_create, captcha, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   kind = excluded.kind, name = excluded.name, enabled = excluded.enabled,
 		   ord = excluded.ord, config = excluded.config, mfa_required = excluded.mfa_required,
 		   passkeys = excluded.passkeys, auto_create = excluded.auto_create,
-		   captcha = excluded.captcha, updated_at = excluded.updated_at`,
+		   captcha = excluded.captcha, updated_at = excluded.updated_at,
+		   rev = auth_providers.rev + 1`,
 		p.ID, p.Kind, p.Name, p.Enabled, p.Order, string(cfg),
 		p.MFARequired, p.Passkeys, p.AutoCreate, p.Captcha, now, now)
 	if err != nil {
@@ -198,13 +207,13 @@ func (s *Store) SaveAuthProvider(ctx context.Context, p AuthProvider) error {
 	return nil
 }
 
-const providerCols = `id, kind, name, enabled, ord, config, mfa_required, passkeys, auto_create, captcha, created_at, updated_at`
+const providerCols = `id, kind, name, enabled, ord, config, mfa_required, passkeys, auto_create, captcha, created_at, updated_at, rev`
 
 func scanProvider(sc scanner) (AuthProvider, error) {
 	var p AuthProvider
 	var cfg string
 	if err := sc.Scan(&p.ID, &p.Kind, &p.Name, &p.Enabled, &p.Order, &cfg,
-		&p.MFARequired, &p.Passkeys, &p.AutoCreate, &p.Captcha, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		&p.MFARequired, &p.Passkeys, &p.AutoCreate, &p.Captcha, &p.CreatedAt, &p.UpdatedAt, &p.Rev); err != nil {
 		return p, err
 	}
 	if cfg != "" {

@@ -12,6 +12,9 @@ spec:
     - name: app
       port: {{ .Values.service.appPort }}
       targetPort: app
+      {{- with .Values.service.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -19,12 +22,38 @@ metadata:
   name: {{ include "meerkat.fullname" . }}-admin
   labels: {{- include "meerkat.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  # ClusterIP unless an installation says otherwise. The console is not a thing
+  # to publish by accident - hence a separate setting rather than the one above,
+  # which an Ingress in front of the application plane would drag along with it.
+  # But it is not the chart's business to forbid it either: reaching it through
+  # a port-forward ties a tunnel to ONE pod, so every rollout breaks it, and an
+  # operator ends up relaunching a command instead of opening a bookmark.
+  type: {{ .Values.service.adminType | default "ClusterIP" }}
   selector: {{- include "meerkat.selectorLabels" . | nindent 4 }}
   ports:
     - name: admin
       port: {{ .Values.service.adminPort }}
       targetPort: admin
+      {{- with .Values.service.adminNodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+---
+# Where a Prometheus scrapes. ClusterIP and NOTHING ELSE, whatever the other
+# two say: this port answers without a token by default, and it can because
+# nothing outside the cluster reaches it. Its own Service so that publishing
+# the console never drags it along.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meerkat.fullname" . }}-metrics
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "meerkat.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      port: {{ .Values.metrics.port }}
+      targetPort: metrics
 {{- if .Values.plug.enabled }}
 ---
 # The developer tunnel. How your developers reach it is a network decision, so

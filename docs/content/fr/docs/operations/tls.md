@@ -64,7 +64,26 @@ tous les visiteurs.
 Sur le **plan de données uniquement**, le port en clair peut rediriger vers celui en HTTPS (SSL-06). Les
 deux sondes de santé sont exemptées : un `308` se lit comme « pas prêt ».
 
-`HSTS` existe comme en-tête de réponse par route (SEC-03) ; il n'y a pas encore de réglage global.
+Avec la redirection, chaque réponse HTTPS du plan de données porte aussi **HSTS**
+(`Strict-Transport-Security: max-age=...`). La redirection ne peut pas protéger la requête qu'elle
+redirige : cette première-là part en clair, et qui est sur le réseau - un Wi-Fi public, un proxy
+compromis - peut y répondre lui-même sans jamais transmettre la redirection, gardant le visiteur en
+HTTP pendant qu'il parle HTTPS à la passerelle (SSL stripping). Avec HSTS le navigateur se souvient,
+et réécrit lui-même `http://` en `https://` avant d'envoyer quoi que ce soit.
+
+Il suit la redirection plutôt que d'être un interrupteur à part : forcer HTTPS est déjà
+l'engagement - un `301` est lui aussi mémorisé par les navigateurs. Seule la **durée** se choisit, un
+jour par défaut, jusqu'à deux ans. Il se retire avec la redirection quand tous les certificats ont
+expiré. Jamais envoyé à `localhost` (la promesse vaut pour tous les ports d'un nom d'hôte, donc une
+passerelle de développement forcerait HTTPS sur toutes les applications locales de son développeur)
+ni à une adresse IP (les navigateurs l'y ignorent), jamais par-dessus la valeur qu'un service ou le
+filtre [security-headers](/docs/filters/security-headers) d'une route a posée, et sans
+`includeSubDomains`.
+
+> [!WARNING]
+> Un navigateur tient la promesse pendant toute la durée, même si les certificats disparaissent, et
+> ne propose plus de passer outre un mauvais certificat. Commencez par un jour ; allongez une fois le
+> HTTPS installé.
 
 ## ACME n'est pas Let's Encrypt
 
@@ -113,9 +132,14 @@ la base pour éviter un événement qui arrive deux fois par an.
 
 Un certificat écrit sur un noeud est rechargé par les autres via le bus de changement.
 
+## Avant qu'un certificat expire
+
+La console montre le compte à rebours de chaque certificat, et le
+[digest quotidien](/docs/console/mail-relay) l'envoie par courriel aux administrateurs :
+les certificats qui expirent dans son horizon, puis ceux qui ont expiré. Un certificat
+automatique qui entre dans cette fenêtre est un certificat dont le renouvellement échoue.
+
 ## Ce qui manque
 
-- **L'alerte d'expiration** (SSL-04). La console montre le compte à rebours ; rien ne vous écrit.
-- **Un réglage HSTS global** (SSL-06) : l'en-tête n'existe que par route.
 - **HTTP/3** (SSL-07) : il faudrait une dépendance QUIC hors bibliothèque standard, une écoute UDP et
-  `Alt-Svc`.
+ `Alt-Svc`.

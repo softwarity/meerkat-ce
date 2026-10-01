@@ -22,6 +22,12 @@ free image, and always will be. Selling safety to the people least able to pay
 for it is not a business model we want.
 :::
 
+The rule, as it was settled on **8 August 2026**, is two sentences: **what
+costs the growing organisation is paid for; what protects the user is not.**
+Its consequence reads in the opposite column: where identity products bill
+single sign-on and two-factor at the next tier up, Meerkat never pushes anybody
+to deploy something less safe in order to pay less.
+
 ## What the free edition already does
 
 Everything the [features page](/product/features) describes, minus the rows in
@@ -40,7 +46,7 @@ and the agent endpoint. In production, in a company, commercially, for free.
 | **Roles from the directory** | Granted in Meerkat | Group rules: an LDAP group, a GitHub team or an OIDC claim becomes a membership and its roles, at each sign-in. |
 | **Business hours** | - | Access windows: time ranges, week days, time zone. Partial - see the [roadmap](/project/roadmap). |
 | **Several gateways** | One gateway on its embedded storage | Active/active on one shared PostgreSQL: change bus, shared certificates, no session affinity to ask for. See [the cluster page](/docs/deploy/kubernetes). |
-| **Monitoring** | Traffic and metrics screens, built in, nothing to install | The same screens, plus a Prometheus exposition so the stack you already run can scrape them. |
+| **Monitoring** | Traffic and metrics screens, built in, nothing to install | The same screens, plus a Prometheus exposition so the stack you already run can scrape them, and the same counters pushed over OTLP to your collector. |
 | **Saved configurations** | Three at a time, and the console says which one you are on before you hit the cap | As many as you like - one per customer, one per environment. |
 | **Built-in pages** | Your colours, your logo, your name, the centred arrangement | The split, drawer, banner and bare arrangements too, and the Meerkat mark off the pages you serve. |
 | **Developer tunnel** | plug runs beside the gateway, which is plug's own default | The tunnel inside the gateway, and every substitution attributed to the developer who posed it. See [Dev mode](/product/dev-mode). |

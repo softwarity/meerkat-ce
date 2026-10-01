@@ -45,14 +45,22 @@ func groupSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store) {
 	must(st.SetMemberGroups(ctx, "t2", "u1", []string{"g-lone"}))
 	for _, rt := range []store.Route{
 		{ID: "opsapp", Name: "opsapp", Order: 1, Enabled: true, IsUI: true,
-			Access: store.Access{Roles: []string{"ops"}}, UI: &store.RouteUI{Link: "opsapp"}, Upstream: "http://up.test",
+			Access: store.Access{Roles: []string{"ops"}}, Upstream: "http://up.test",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/opsapp/**"}}}}},
 		{ID: "salesapp", Name: "salesapp", Order: 2, Enabled: true, IsUI: true,
-			Access: store.Access{Roles: []string{"sales"}}, UI: &store.RouteUI{Link: "salesapp"}, Upstream: "http://up.test",
+			Access: store.Access{Roles: []string{"sales"}}, Upstream: "http://up.test",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/salesapp/**"}}}}},
 	} {
 		must(st.SaveRoute(ctx, rt))
 	}
+	// Both applications are ALWAYS in the catalogue; what makes one appear or
+	// vanish for a given visitor is the route's access (PORTAL-03).
+	portal := store.PortalConfig{Mode: store.PortalModeLinks,
+		Entries: []store.PortalEntry{{RouteID: "opsapp", Label: "opsapp"}, {RouteID: "salesapp", Label: "salesapp"}}}
+	routes, err := st.ListRoutes(ctx)
+	must(err)
+	must(store.SanitizePortalConfig(&portal, routes))
+	must(st.SetSetting(ctx, store.SettingPortal, portal))
 	return mux, sm, st
 }
 

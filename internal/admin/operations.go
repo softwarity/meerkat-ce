@@ -97,14 +97,22 @@ func (a *API) upstreamOperations(ctx context.Context, route store.Route) ([]gate
 	if err != nil {
 		return nil, err
 	}
-	// The spec's own coordinates, unchanged. That is the same convention the
-	// endpoint guard reads paths in (it strips what strip-prefix removes and
-	// compares against spec paths), and the console's endpoint editor writes
-	// in - one set of coordinates for the three, or the screens disagree about
-	// what "/orders/{id}" means.
+	// The coordinate the GATEWAY compares against, which is the request path
+	// minus what the route strips - so the part of the route's own prefix it
+	// does NOT strip belongs to it.
+	//
+	// The spec's paths alone were taken for that coordinate, and they are it
+	// only when the route strips its whole prefix. An application published at
+	// /otel-demo and mounted there itself strips nothing, so a rule written
+	// "/api/v1/products" named a path no request ever has: the console listed
+	// it, saved it, and the guard never matched one - while a rule written by
+	// hand with the real path matched no LISTED operation and was filed as an
+	// extra nobody could see. Two spellings of one operation, and both screens
+	// convinced the other was wrong.
+	kept := gateway.KeptPrefix(route)
 	ops := make([]gateway.Operation, 0, len(spec.Operations))
 	for _, op := range spec.Operations {
-		ops = append(ops, gateway.Operation{Method: op.Method, Path: op.Path})
+		ops = append(ops, gateway.Operation{Method: op.Method, Path: kept + op.Path})
 	}
 	return ops, nil
 }

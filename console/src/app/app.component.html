@@ -50,18 +50,6 @@
     >
       <mat-icon>key</mat-icon>
     </rail-nav-item>
-    <!-- What passed through, below the vault and above the audit: the three are
-         transverse - they belong to no plane - and this one is read the way the
-         audit is, after the fact and across everything. -->
-    <rail-nav-item
-      i18n-label="@@Metrics"
-      label="Metrics"
-      routerLink="/traffic"
-      [active]="inMetrics()"
-      any-role="root infra-admin"
-    >
-      <mat-icon>monitoring</mat-icon>
-    </rail-nav-item>
     <rail-nav-item
       i18n-label="@@Audit"
       label="Audit"
@@ -70,6 +58,29 @@
       any-role="root infra-admin app-admin tenant-admin"
     >
       <mat-icon>history_edu</mat-icon>
+    </rail-nav-item>
+    <rail-nav-separator />
+    <!-- Below the line: what is about the APPLICATION rather than about
+         Meerkat. The vault and the audit above say what this gateway holds and
+         what was done to it; these three say what the thing it serves is
+         doing. -->
+    <rail-nav-item
+      i18n-label="@@Scheduler"
+      label="Scheduler"
+      routerLink="/scheduler"
+      [active]="inScheduler()"
+      any-role="root app-admin"
+    >
+      <mat-icon>schedule</mat-icon>
+    </rail-nav-item>
+    <rail-nav-item
+      i18n-label="@@Metrics"
+      label="Metrics"
+      routerLink="/traffic"
+      [active]="inMetrics()"
+      any-role="root infra-admin"
+    >
+      <mat-icon>monitoring</mat-icon>
     </rail-nav-item>
     <rail-nav-item
       i18n-label="@@Issues"
@@ -81,6 +92,18 @@
       <mat-icon>bug_report</mat-icon>
     </rail-nav-item>
     <rail-nav-spacer />
+    <!-- Whether the socket this tab watches everything on is up (CONSOLE-13).
+         ONE indicator, here and not per screen, because there is one socket:
+         it says the screens are following what other people do, and clicking it
+         reconnects now instead of waiting out the delay. It is also why no
+         screen carries a Refresh button any more - a control offering to fetch
+         the list again implies that the rest of the time you are looking at
+         something stale. -->
+    <lw-live-indicator
+      class="rail-live"
+      i18n-title="@@Live_channel_title"
+      title="Live channel: the screens follow what other people change. Click to reconnect."
+    />
     <app-user-menu />
   </rail-nav>
   <rail-nav-content>

@@ -44,6 +44,35 @@ async function organisation(root: APIRequestContext): Promise<string> {
   return primary;
 }
 
+const HTTPBIN = 'http://localhost:18099';
+
+async function seedRoutes(root: APIRequestContext): Promise<void> {
+  const path = (p: string) => [{ type: 'path', args: { patterns: [p] } }];
+  const strip = [{ type: 'strip-prefix', args: { parts: 1 } }];
+  const routes = [
+    { id: 'demo', name: 'demo', order: 100, enabled: true, isUi: true, upstream: HTTPBIN,
+      predicates: path('/demo/**'), filters: strip, access: {} },
+    { id: 'demo-secure', name: 'demo-secure', order: 101, enabled: true, isUi: true, upstream: HTTPBIN,
+      predicates: path('/secure/**'), filters: strip, access: { level: 'auth' } },
+    { id: 'trap', name: 'trap', order: 900, enabled: true, upstream: HTTPBIN,
+      predicates: path('/**'), filters: [], access: {} },
+  ];
+  for (const r of routes) {
+    const res = await root.put(`/api/routes/${r.id}`, { data: r });
+    expect(res.ok(), `route ${r.id}: ${await res.text()}`).toBeTruthy();
+  }
+  // And the portal that offers the two applications (PORTAL-03): the apps
+  // menu of the built-in pages lists them.
+  const settings = await (await root.get('/api/settings')).json();
+  settings.portal = {
+    ...(settings.portal ?? {}),
+    mode: 'links',
+    entries: [{ routeId: 'demo', label: 'Demo' }, { routeId: 'demo-secure', label: 'Demo (secure)' }],
+  };
+  const saved = await root.put('/api/settings', { data: settings });
+  expect(saved.ok(), `portal: ${await saved.text()}`).toBeTruthy();
+}
+
 setup('seed profiles and tenant', async () => {
   mkdirSync(AUTH_DIR, { recursive: true });
 
@@ -71,6 +100,13 @@ setup('seed profiles and tenant', async () => {
   if (ENTERPRISE) {
     expect((await root.put('/api/settings/metrics', { data: { enabled: true } })).ok()).toBeTruthy();
   }
+
+  // The routes the tests exercise. A gateway starts EMPTY - demonstration
+  // routes were ours, not an operator's - so the suite lays down its own,
+  // through the API an administrator would use: a public UI at /demo, an
+  // authenticated one at /secure, and the /** catch-all ("trap") ordered last.
+  // All of them answer from the local httpbin the suite runs.
+  await seedRoutes(root);
 
   const create = async (user: Record<string, unknown>) => {
     const res = await root.post('/api/users', { data: user });

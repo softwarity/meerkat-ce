@@ -69,32 +69,6 @@ mat-button-toggle-group {
   border-radius: 10px;
 }
 
-.row {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-pre {
-  flex: 1;
-  min-width: 0;
-  // A command WRAPS rather than scrolls: this one is meant to be read as much
-  // as copied, and a line cut off at "--header \"Authori" hides exactly the
-  // half somebody wants to check. pre-wrap breaks the display, never the text,
-  // so the copy button still hands over the original.
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  margin: 0;
-  padding: 12px 16px;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 10px;
-  background: var(--mat-sys-surface-container-highest);
-  font-family: var(--mk-mono);
-  font-size: 0.82rem;
-  line-height: 1.5;
-  user-select: all;
-}
-
 .hint {
   margin: 0;
   color: var(--mat-sys-on-surface-variant);

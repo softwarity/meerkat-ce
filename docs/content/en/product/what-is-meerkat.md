@@ -35,6 +35,17 @@ The gateway is a single Go binary with no dependency: it serves the data plane
 on one port and its administration console on another. Nothing else has to be
 installed for it to run.
 
+In figures: the Community image weighs **70 MB** - under 20 MB to download,
+once the layers are compressed - and the binary depends on **twelve direct
+libraries**, in pure Go: no CGO, so nothing to install on the host and nothing
+that compiles differently from one machine to the next. That is what makes the
+"1 pod" line of [the case](/product/the-case) something other than theory.
+
+The Enterprise image weighs **190 MB**, and the difference is not the gateway:
+it is the **[plug](/product/dev-mode) clients** it hands out itself, one signed
+binary per operating system and architecture - 80 MB a developer fetches from
+the gateway rather than from a download site.
+
 ## Why the name
 
 ::: figure meerkat

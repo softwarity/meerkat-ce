@@ -66,28 +66,21 @@ intégrées, portail).
 
 ## Voir passer du trafic
 
-Une gateway sans route répond 404 à tout : une installation neuve est donc
-amorcée avec trois routes de démonstration qui pointent vers `httpbin.org`.
+Une gateway neuve démarre **vide** : aucune route, donc chaque chemin du plan de
+données répond 404 tant que vous n'avez pas dit ce qu'elle sert. Les pages de
+connexion sont déjà là (`http://localhost:8080/login`) : elles appartiennent à la
+gateway, pas à une route.
 
-| Route | Ce qu'elle prend | Accès |
-|---|---|---|
-| `demo` | `/demo/**` | ouverte à tous |
-| `demo-secure` | `/secure/**` | tout compte connecté |
-| `trap` | `/**` | ouverte, ordonnée en dernier - attrape ce que rien d'autre n'a pris |
+Ajoutez-en une dans la console, **Infra, Routes**, ou par l'API - pointer vers un
+service de test public suffit pour voir passer un appel :
 
 ```bash
 curl -i http://localhost:8080/demo/get
 ```
 
-Le préfixe `/demo` est retiré avant l'appel : ce qui répond est donc
-`https://httpbin.org/get`. Demandez `/secure/get` dans un navigateur et vous
-atterrissez sur la page de connexion que la gateway sert elle-même.
-
-> [!TIP]
-> Ces trois routes sont des routes ordinaires, stockées comme les autres.
-> Supprimez-les quand vous aurez les vôtres, en commençant par l'attrape-tout -
-> c'est lui qui fait qu'une gateway neuve répond quelque chose sur tous les
-> chemins.
+avec une route qui prend `/demo/**`, retire un segment, et vise
+`https://httpbin.org`. [Votre première route](/docs/start/first-route) le fait pas
+à pas.
 
 ## Ensuite
 

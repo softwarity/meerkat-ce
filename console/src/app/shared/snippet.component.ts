@@ -1,6 +1,9 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, effect, inject, input, viewChild } from '@angular/core';
+import { json } from '@codemirror/lang-json';
+import { StreamLanguage } from '@codemirror/language';
+import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { yaml } from '@codemirror/lang-yaml';
-import { EditorState, RangeSetBuilder } from '@codemirror/state';
+import { Compartment, EditorState, RangeSetBuilder } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { catppuccin, editorSurface } from './catppuccin';
 import { MatButtonModule } from '@angular/material/button';
@@ -36,7 +39,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
       >
         <mat-icon>content_copy</mat-icon>
       </button>
-      @if (variants().length === 0) {
+      @if (downloadable() && variants().length === 0) {
         <button
           matIconButton
           type="button"
@@ -48,7 +51,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
         >
           <mat-icon>download</mat-icon>
         </button>
-      } @else {
+      } @else if (downloadable()) {
         @for (v of variants(); track v.label) {
           <button matButton type="button" (click)="save(v.content, v.filename)">
             <mat-icon>download</mat-icon>
@@ -97,6 +100,8 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
   // that says what it is - and saved as something that will not collide with
   // the one already in the directory it lands in.
   readonly downloadAs = input('');
+  // A command to paste is not a file to keep: no download button.
+  readonly downloadable = input(true);
   readonly content = input.required<string>();
   // The file is one thing to read and several to save.
   //
@@ -119,7 +124,15 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
       const text = this.content();
       this.view?.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: text } });
     });
+    // And the language with the name: one panel may show a shell command for
+    // one client and a JSON file for the next (the MCP page does).
+    effect(() => {
+      this.filename();
+      this.view?.dispatch({ effects: this.lang.reconfigure(this.language()) });
+    });
   }
+
+  private readonly lang = new Compartment();
 
   ngAfterViewInit(): void {
     this.view = new EditorView({
@@ -132,7 +145,7 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
         // makes for its own.
         catppuccin,
         editorSurface,
-        ...this.language(),
+        this.lang.of(this.language()),
         // Read-only, and no basicSetup: this is a thing to copy, not a thing
         // to edit. Line numbers, a gutter and an active-line highlight would
         // be an editor's furniture around a paragraph.
@@ -156,11 +169,18 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
     this.view?.destroy();
   }
 
-  // By extension. Only YAML has a grammar installed: the rest - shell, PromQL,
-  // the dashboard's JSON - is read rather than edited, and a parser apiece
-  // would be three dependencies for colour nothing depends on.
+  // By extension. YAML and JSON have grammars: they are the two shapes a
+  // reader has to get RIGHT - a payload to post, a file to mount - and a
+  // misread bracket in either is a support question. Shell too, now that
+  // commands are handed out to be pasted into a terminal (the plug page): a
+  // pipe, a flag and an argument read apart at a glance. The rest - PromQL,
+  // an HTTP exchange - keeps its comments coloured and nothing more.
   private language() {
-    return /\.ya?ml$/.test(this.filename()) ? [yaml()] : [hashComments];
+    const name = this.filename();
+    if (/\.ya?ml$/.test(name)) return [yaml()];
+    if (/\.jsonc?$/.test(name)) return [json()];
+    if (/\.sh$/.test(name)) return [shellLanguage];
+    return [hashComments];
   }
 
   protected copy(): void {
@@ -188,6 +208,10 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
 // Regex and not a parser, deliberately - the same call template-highlight.ts
 // makes, and for the same reason: this is colour, and nothing depends on it.
 const comment = Decoration.mark({ class: 'cm-comment' });
+
+// CodeMirror's own shell mode, from its legacy-modes package: a stream
+// tokenizer rather than a grammar, which is all a command line needs.
+const shellLanguage = StreamLanguage.define(shell);
 
 const hashComments = ViewPlugin.fromClass(
   class {

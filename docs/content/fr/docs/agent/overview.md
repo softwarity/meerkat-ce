@@ -51,6 +51,9 @@ davantage en passant par un assistant plutôt que par un clic.
 | `save_route`, `delete_route` | Écrire une route et l'appliquer aussitôt. |
 | `list_route_bricks` | Le catalogue des prédicats et des filtres, avec leurs paramètres. |
 | `list_users`, `list_tenants` | Les comptes et les organisations. |
+| `list_services` | Ce que la passerelle voit tourner autour d'elle. |
+| `list_schedules` | Les appels planifiés : ce qui tourne la nuit, à quelle cadence, sous quel compte, et comment le dernier tour s'est terminé. |
+| `pause_schedule`, `run_schedule` | Suspendre un appel planifié, le reprendre, ou avancer son prochain tour à maintenant. |
 | `read_traffic` | Ce qui passe en ce moment. |
 | `read_audit` | Le journal d'audit, dans le périmètre de l'appelant. |
 | `get_settings`, `save_portal` | Les réglages globaux, et le portail de navigation. |

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/softwarity/meerkat/internal/mail"
+	"github.com/softwarity/meerkat/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -114,7 +115,7 @@ func (h *Handler) doForgot(w http.ResponseWriter, r *http.Request) {
 		}, http.StatusUnprocessableEntity)
 		return
 	}
-	if !h.registerAllow(r.Context(), clientIP(r)) {
+	if !h.forgotAllow(r) {
 		writeFlow(w, forgotPage, forgotData{
 			flowChrome: h.flowData(r, "titleForgot"), Error: h.tr(r, "errTooManyAttempts"),
 		}, http.StatusTooManyRequests)
@@ -122,12 +123,17 @@ func (h *Handler) doForgot(w http.ResponseWriter, r *http.Request) {
 	}
 	// Whatever happens next, the SAME outcome page: no address enumeration.
 	if userID, err := h.st.UserIDByEmail(r.Context(), email); err == nil {
+		// An account born at an authority (OIDC, LDAP, GitHub) has no local
+		// password: a link to set one would open a second door the authority
+		// knows nothing about, which is what a federated account is meant not
+		// to have. Same outcome page all the same - nothing is enumerated.
 		if u, err := h.st.GetUserByID(r.Context(), userID); err == nil &&
-			u.Enabled && (!u.SelfRegistered || u.EmailVerified) &&
+			u.Enabled && (!u.SelfRegistered || u.EmailVerified) && u.PasswordHash != "" &&
 			h.localPasswordAllowed(r.Context()) {
 			if err := h.sendReset(r, u.ID, u.Email, u.Locale); err != nil {
 				slog.Error("reset e-mail failed", "user", u.Username, "err", err)
 			}
+			h.security(r, secPasswordForgot, u, "")
 		}
 	}
 	writeFlow(w, forgotSentPage, struct{ flowChrome }{h.flowData(r, "titleForgot")}, http.StatusOK)
@@ -213,7 +219,7 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 		renderErr("errPwReused", http.StatusUnprocessableEntity)
 		return
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -232,10 +238,25 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	// The rows go, and then the caches: Resolve answers from memory for a few
 	// seconds, so without this the intruder keeps their page for that long -
 	// on every gateway, including the ones that heard nothing.
+	h.securityOf(r, secPasswordReset, userID, "")
 	if _, err := h.st.DeleteSessionsForUser(r.Context(), userID); err != nil {
 		slog.Warn("session revocation after reset failed", "err", err)
 	}
 	h.sm.Revoked(userID)
+	// And every OTHER way back in that the old password could have minted: the
+	// remembered browsers, which skip the second factor, and the API tokens,
+	// which outlive any password. A reset is often the answer to "somebody else
+	// had it", and a door they opened with it must close with it.
+	if err := h.st.RevokeAllTrustedBrowsers(r.Context(), userID); err != nil {
+		slog.Warn("trusted browsers not revoked after reset", "err", err)
+	}
+	if ids, err := h.st.RevokeAllAPITokens(r.Context(), userID); err != nil {
+		slog.Warn("tokens not revoked after reset", "err", err)
+	} else {
+		for _, id := range ids {
+			h.sm.TokenChanged(id)
+		}
+	}
 	// Tell the owner (best-effort): an unexpected reset is worth an alarm.
 	if u, err := h.st.GetUserByID(r.Context(), userID); err == nil && u.Email != "" {
 		t := messagesFor(u.Locale)
@@ -250,4 +271,16 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeFlow(w, resetDonePage, struct{ flowChrome }{h.flowData(r, "titleReset")}, http.StatusOK)
+}
+
+// forgotAllow bounds reset requests per address, on a counter of their own
+// (AUTH-21) - no longer the registration's: a busy sign-up page used to
+// throttle resets, and a flood of reset requests closed registration.
+func (h *Handler) forgotAllow(r *http.Request) bool {
+	pol := h.st.GetRateLimitPolicy(r.Context())
+	window := 15 * time.Minute
+	if d, err := store.ParseISODuration(pol.LoginWindow); err == nil && d > 0 {
+		window = d
+	}
+	return h.regLimit.allow(r.Context(), "forgot|"+clientIP(r), pol.ResetAttempts, window)
 }

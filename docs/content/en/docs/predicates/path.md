@@ -30,7 +30,10 @@ predicates:
 
 ## Notes
 
-A pattern must start with `/` and is matched **segment by segment**:
+The notation is the **Ant-style** path pattern of the Spring family
+([PathPattern](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/util/pattern/PathPattern.html)),
+in a strict subset: no `?`, no `*` wildcard, no `{*name}`. A pattern must start
+with `/` and is matched **segment by segment**:
 
 - `{name}` takes exactly one segment, whatever it holds: `/orders/{id}` matches `/orders/8814` and not `/orders/8814/lines`.
 - `**` matches the rest of the path, and is allowed as the **last segment only**. `/orders/**` matches `/orders`, `/orders/8814` and `/orders/8814/lines`.
@@ -47,3 +50,17 @@ are the same route.
 `{name}` matches a segment but captures nothing usable elsewhere: no filter can
 read it back. Use [rewrite-path](/docs/filters/rewrite-path) when the value has
 to be moved around.
+
+## Excluding a path
+
+There is no "everything but" in a pattern, and no regular expression either:
+the gateway reads the prefix of a path pattern in several places (the
+per-endpoint security that maps a request back to its OpenAPI operation, the
+portal's link to an application, the language redirect, the endpoint metrics),
+and a regular expression has no prefix to read.
+
+To keep a path out, give it a **route of its own**, ordered above the others,
+that always refuses - access *Nobody*, or a fixed 404. It covers every route
+that would have caught that path, the catch-all included, where an exclusion
+written inside one route would have to be repeated in each of them, and would
+be forgotten in the next one.

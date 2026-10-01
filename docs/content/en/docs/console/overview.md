@@ -96,7 +96,7 @@ Learn these five and the console stops surprising you.
 
 ### Application
 
-- **[General, Locales and Security](/docs/console/application)** - what this installation is, and its policies.
+- **[General and Security](/docs/console/application)** - what this installation is, and its policies.
 - **[Roles](/docs/console/roles)** - the global role catalogue.
 - **[Users](/docs/console/users)** - accounts, capabilities, and their fields.
 - **[Groups, Members and Group rules](/docs/console/organisation)** - who is in which group.

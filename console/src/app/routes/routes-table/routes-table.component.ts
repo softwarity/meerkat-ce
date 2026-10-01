@@ -39,6 +39,10 @@ export class RoutesTableComponent {
   // loaded, and an empty one hides the open button rather than aiming it at
   // the console's own origin - which is the one address that is always wrong.
   readonly dataOrigin = input('');
+  // Whether the installation exports traces at all. A route can only be
+  // "traced" when something leaves: without this, the mark would claim a trace
+  // on every route of an installation that sends nothing anywhere.
+  readonly tracingOn = input(false);
   readonly edit = output<Route>();
   readonly remove = output<Route>();
   readonly duplicate = output<Route>();

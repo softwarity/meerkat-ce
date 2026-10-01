@@ -71,7 +71,7 @@ func TestCommunityEditionRefusesWhatItDoesNotSell(t *testing.T) {
 	t.Run("changing the working hours, while the rest of the settings save", func(t *testing.T) {
 		f := communityFixture(t)
 		hours := `{"businessAccess":{"inherited":false,"timezone":"Europe/Paris","days":[{"day":1,"from":"09:00","to":"18:00"}]},` +
-			`"sessionTTL":"PT30M","mfaRequired":false,"passkeysAllowed":true,"languages":[]}`
+			`"sessionTTL":"PT30M","mfaRequired":false,"passkeysAllowed":true}`
 		if code, body := f.call(t, "PUT", "/api/settings", hours, f.rootC); code != http.StatusForbidden {
 			t.Fatalf("set hours = %d %s, want 403", code, body)
 		}
@@ -83,7 +83,7 @@ func TestCommunityEditionRefusesWhatItDoesNotSell(t *testing.T) {
 			open += `,{"day":` + strconv.Itoa(d) + `,"from":"00:00","to":"23:59"}`
 		}
 		same := `{"businessAccess":{"timezone":"UTC","days":[` + open + `]},` +
-			`"sessionTTL":"PT45M","mfaRequired":false,"passkeysAllowed":true,"languages":[]}`
+			`"sessionTTL":"PT45M","mfaRequired":false,"passkeysAllowed":true}`
 		if code, body := f.call(t, "PUT", "/api/settings", same, f.rootC); code != http.StatusOK {
 			t.Fatalf("save without touching the hours = %d %s, want 200", code, body)
 		}
@@ -105,6 +105,8 @@ func TestEditionReportsWhatThisInstallationIs(t *testing.T) {
 		`"tenancyLocked":true`,
 		`"primaryTenant":"` + store.DefaultTenantID + `"`,
 		"Enterprise edition", // the roster of what exists, unlocked or not
+		// The shelf's size, said before it is reached (CFG-01).
+		`"configurationCap":3`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("edition body misses %q: %s", want, body)

@@ -13,10 +13,11 @@ passe le plus de temps.
 
 ![L'écran Routes : cinq routes dans l'ordre, avec leurs pastilles d'accès, ce qu'elles filtrent et leur amont](img/console/routes-list.webp)
 
-Cinq routes dans l'ordre où elles sont lues. *Billing* et *Docs portal* portent la
-marque UI, *Orders API* montre un amont qui échoue, *Inventory* est en
-maintenance, et *Catch-all* sur `path: /**` est en dernier - un attrape-tout
-ailleurs répondrait pour tout ce qui est en dessous.
+Cinq routes dans l'ordre où elles sont lues. *Billing*, *Docs portal* et
+*Inventory* portent la marque UI, *Billing* et *Orders API* exigent une session
+(`AUTH`), *Inventory* répond elle-même en maintenance, et *Catch-all* sur
+`path: /**` est en dernier - un attrape-tout ailleurs répondrait pour tout ce
+qui est en dessous.
 
 ## La liste
 
@@ -79,11 +80,17 @@ Le nom est dans l'en-tête. La colonne de gauche liste les sections, groupées :
 
 | Groupe | Sections |
 |---|---|
-| - | **Target** |
+| - | **Target**, **Identity** |
 | Filters | Security, Predicates, Gates, Rate limits |
 | Modifiers | Incoming, Outgoing |
-| Forwarders | Identity, Locales |
-| UI | Color scheme, User button, User info, Injections |
+| Forwarders | Auth forward |
+| UI | Locales, Color scheme, User button, User info, Tracing, Custom |
+
+**Identity** est à côté de Target plutôt que dans un groupe : ce qu'une route sait
+du caller n'est ni un filtre, ni un modificateur, ni un forwarder - c'est ce qu'il
+y a À transmettre, et deux sections le dépensent. **Auth forward** l'envoie au
+service (en-têtes ou JWT) ; **User info** le dépose sur la page. Les faits et leurs
+noms se règlent une fois, dans Identity.
 
 ### Lire les marques
 
@@ -101,7 +108,7 @@ Le nom est dans l'en-tête. La colonne de gauche liste les sections, groupées :
 
 Save reste désactivé jusqu'à ce que la route soit valide **et** que quelque chose
 ait changé. A côté, un bouton rouge **N to fix** liste chaque manque : chaque ligne
-nomme la section et y saute. Personne ne fouille onze sections à la recherche du
+nomme la section et y saute. Personne ne fouille quatorze sections à la recherche du
 champ voulu.
 
 Enregistrer garde le tiroir ouvert et applique la route aussitôt. Fermer avec des
@@ -117,7 +124,7 @@ l'extérieur ne ferme pas le tiroir.
 Une section UI une fois la case cochée : ici Color scheme, qui dit comment
 l'application servie prend un choix clair ou sombre.
 
-- **Incoming** et **Identity** sont désactivées quand la route répond d'elle-même
+- **Incoming**, **Identity** et **Auth forward** sont désactivées quand la route répond d'elle-même
   (redirect, maintenance, respond). Ce n'est pas du rangement : la passerelle jette
   tous les filtres de requête sur une telle route, donc les éditer écrirait des
   réglages qu'elle jette.
@@ -179,7 +186,7 @@ chaque carte le déplacent vers le haut ou le bas.
   volontairement.
 - **Deux routes qui matchent les mêmes chemins.** Parfaitement légal, et la raison
   d'être de l'ordre. Utilisez Routing test plutôt que de raisonner dessus.
-- **Editer Incoming ou Identity sur une redirection.** Les sections sont
+- **Editer Incoming, Identity ou Auth forward sur une redirection.** Les sections sont
   désactivées ; ce que vous cherchez est probablement Outgoing, qui s'applique à
   tous les modes.
 - **Chercher des règles par endpoint sans spec.** Déclarez d'abord la spec OpenAPI

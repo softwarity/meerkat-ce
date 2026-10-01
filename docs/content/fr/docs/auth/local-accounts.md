@@ -120,9 +120,21 @@ Quatre conditions doivent toutes tenir pour que cette page existe :
 Ce qu'une inscription produit est délibérément inutile : le compte existe, il
 est inutilisable jusqu'à la confirmation de l'adresse, et il n'atteint rien
 jusqu'à ce qu'un administrateur le place dans une organisation et lui accorde
-des rôles. Le lien de confirmation est un jeton à usage unique valable
-vingt-quatre heures. Qui se connecte avant d'avoir confirmé reçoit le lien à
+des rôles. Le lien de confirmation est un jeton à usage unique valable 24 heures,
+48 heures ou 7 jours - **Confirmation links valid for**, à côté de l'interrupteur
+d'auto-inscription. Qui se connecte avant d'avoir confirmé reçoit le lien à
 nouveau plutôt qu'une explication.
+
+## Changer son adresse
+
+L'adresse est là où arrive une réinitialisation de mot de passe : c'est donc une porte
+du compte. Quand un relais de messagerie est configuré, la changer depuis le profil ne
+la change **pas** encore : un lien part vers la **nouvelle** adresse, et le changement
+se fait quand ce lien revient - valable aussi longtemps que celui d'une inscription.
+L'**ancienne** adresse est prévenue aussitôt, ce qui est l'alarme du titulaire quand ce
+n'était pas lui. Une session dont quelqu'un d'autre s'est emparé ne suffit donc plus à
+diriger la récupération du compte vers sa propre boîte. Sans relais, rien ne pourrait
+porter de confirmation, et l'adresse change aussitôt, comme avant.
 
 Un identifiant ou une adresse déjà pris atterrissent sur la **même** page
 qu'une inscription réussie, et rien n'est créé : le formulaire ne dit pas à un
@@ -130,15 +142,20 @@ inconnu qui possède déjà un compte ici. Le code en image est actif par défau
 et se désactive par autorité ; il est consommé que la réponse soit juste ou
 fausse, donc un second essai veut dire une nouvelle image.
 
-Les points d'écriture auxquels personne n'est encore connecté - `/register` et
-`/forgot-password` - portent leur propre étranglement figé : cinq essais par
-adresse cliente par quinze minutes, qu'aucun écran ne change.
+Les points d'écriture auxquels personne n'est encore connecté ont un étranglement
+par adresse cliente : `/register` cinq essais par quinze minutes, figé ;
+`/forgot-password` son propre compteur, **Reset requests** dans les limites de débit
+(cinq par défaut, sur la fenêtre de connexion, jamais éteint). Les deux ne partagent
+plus le même : une page d'inscription chargée freinait les réinitialisations, et un
+afflux de réinitialisations fermait l'inscription.
 
 ## Un mot de passe oublié
 
 `/forgot-password` existe dès qu'un relais de messagerie est configuré et que
 les mots de passe locaux sont acceptés ; il n'attend pas que l'auto-inscription
-soit ouverte. La page de sortie est la même que l'adresse soit connue ou non.
+soit ouverte. La page de sortie est la même que l'adresse soit connue ou non. Un
+compte né chez une autorité (OIDC, LDAP, GitHub) n'a pas de mot de passe local et ne
+reçoit aucun lien : il ouvrirait une seconde porte que l'autorité ignore.
 
 Le lien vaut une heure et est consommé à l'usage. Le nouveau mot de passe est
 vérifié contre la politique, règle de non-réutilisation comprise, et le
@@ -146,5 +163,7 @@ changement **détruit toutes les sessions vivantes du compte** sur toutes les
 passerelles : quiconque en tenait une, intrus compris, se reconnecte ou reste
 dehors. Le propriétaire est averti par courriel que son mot de passe a changé.
 
-Deux choses qu'une réinitialisation ne fait pas encore : elle ne révoque pas
-les jetons d'API du compte, et elle n'oublie pas ses navigateurs de confiance.
+Elle ferme aussi les autres portes que l'ancien mot de passe a pu ouvrir : les
+**jetons d'API** du compte sont révoqués et ses **navigateurs de confiance** oubliés.
+Une réinitialisation répond souvent à « quelqu'un d'autre avait mon mot de passe », et
+ce quelqu'un a pu frapper un jeton avec.

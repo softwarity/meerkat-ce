@@ -43,50 +43,19 @@ const (
 	// configuration: every route, every upstream, every rule. This one hands
 	// over counters.
 	ScopeMetrics = "metrics"
+	// ScopeSchedules: the scheduled calls (SCHED-01) and NOTHING else.
+	//
+	// The credential a BACKEND SERVICE holds, and as narrow as the scraper's
+	// for the same reason: it lives in a deployment manifest, often in another
+	// team's repository, and it is the one nobody remembers to rotate. What it
+	// opens is /api/schedules - not the gateway's configuration, not the
+	// accounts, not the applications in front of it.
+	ScopeSchedules = "schedules"
 )
 
 // TokenScopes are the allowed perimeters, in the order a form should offer
 // them (the narrowest first).
-var TokenScopes = []string{ScopeMetrics, ScopeReadOnly, ScopeFull}
-
-// The token's DOMAIN, the second axis of the perimeter (MCP-02). Scope says
-// how far a token may go; domain says over what.
-//
-// It composes with the capabilities rather than duplicating them: a domain
-// MASKS what its owner holds, so a token is at most its owner and often less.
-// A gateway token minted by root administers the routing plane and nothing
-// else - not the accounts, not the organisations, and not the root-only
-// screens - which is what makes handing one to a deployment agent a smaller
-// decision than handing over root.
-const (
-	// DomainAll: everything the owner may do.
-	DomainAll = ""
-	// DomainGateway: the routing plane only (the gateway-admin capability).
-	DomainGateway = "gateway"
-	// DomainApp: the application's identity only (the app-admin capability,
-	// and the organisations its owner administers).
-	DomainApp = "app"
-)
-
-// TokenDomains are the allowed domains, widest last: a form offers the
-// narrowest first for the same reason the scope does.
-var TokenDomains = []string{DomainGateway, DomainApp, DomainAll}
-
-// SanitizeTokenDomain normalizes a domain and names what is allowed. Unlike
-// the scope, an empty value is the WIDE one: a domain is a restriction someone
-// adds, and "the whole control plane" is what a token without one has always
-// meant.
-func SanitizeTokenDomain(domain string) (string, error) {
-	switch d := strings.ToLower(strings.TrimSpace(domain)); d {
-	case DomainAll, "all":
-		return DomainAll, nil
-	case DomainGateway, DomainApp:
-		return d, nil
-	default:
-		return "", fmt.Errorf("token domain %q: allowed are %s, %s, or none for the whole control plane",
-			domain, DomainGateway, DomainApp)
-	}
-}
+var TokenScopes = []string{ScopeMetrics, ScopeSchedules, ScopeReadOnly, ScopeFull}
 
 // SanitizeTokenCIDRs normalizes the addresses a token may be used from
 // (MCP-02), and refuses what does not parse - a typo here would silently allow
@@ -157,11 +126,11 @@ func SanitizeTokenScope(scope string) (string, error) {
 	switch s := strings.ToLower(strings.TrimSpace(scope)); s {
 	case "":
 		return ScopeReadOnly, nil
-	case ScopeFull, ScopeReadOnly, ScopeMetrics:
+	case ScopeFull, ScopeReadOnly, ScopeMetrics, ScopeSchedules:
 		return s, nil
 	default:
-		return "", fmt.Errorf("token perimeter %q: allowed are %s, %s and %s",
-			scope, ScopeMetrics, ScopeReadOnly, ScopeFull)
+		return "", fmt.Errorf("token perimeter %q: allowed are %s, %s, %s and %s",
+			scope, ScopeMetrics, ScopeSchedules, ScopeReadOnly, ScopeFull)
 	}
 }
 
@@ -182,7 +151,6 @@ type APIToken struct {
 	Prefix    string `json:"prefix"` // first clear chars, to recognise it
 	Plane     string `json:"plane"`  // data | admin (control plane)
 	Scope     string `json:"scope"`  // full | readonly (MCP-02)
-	Domain    string `json:"domain"` // "" | gateway | app (MCP-02)
 	FromCIDRs string `json:"fromCidrs,omitempty"`
 	// ClientID names the registered agent this token was issued to (MCP-07),
 	// empty for one minted by hand. A token with one is a CONNECTION, not a
@@ -197,6 +165,10 @@ type APIToken struct {
 	CreatedAt  int64  `json:"createdAt"`
 	ExpiresAt  int64  `json:"expiresAt"` // 0 = never
 	LastUsedAt int64  `json:"lastUsedAt"`
+	// OwnerID and OwnerName say whose token it is, on the lists that show
+	// several people's (AUTH-09); empty on one's own list.
+	OwnerID   string `json:"ownerId,omitempty"`
+	OwnerName string `json:"ownerName,omitempty"`
 }
 
 // ResolvedToken is the context a valid token authenticates as.
@@ -208,7 +180,6 @@ type ResolvedToken struct {
 	UserID     string
 	Plane      string // the plane this token is valid on (data | admin)
 	Scope      string // full | readonly (MCP-02)
-	Domain     string // "" | gateway | app (MCP-02)
 	FromCIDRs  string // comma-separated ranges, empty = anywhere
 	TenantID   string
 	GroupID    string
@@ -231,7 +202,6 @@ type NewToken struct {
 	Prefix    string
 	Plane     string // data | admin, defaults to data
 	Scope     string // full | readonly, defaults to the safe one
-	Domain    string // "" | gateway | app
 	FromCIDRs string // comma-separated ranges, empty = anywhere
 	ClientID  string // the registered agent, empty when minted by hand
 	TenantID  string // captured session context, empty on the control plane
@@ -248,10 +218,6 @@ func (s *Store) AddAPIToken(ctx context.Context, t NewToken) error {
 	if err != nil {
 		return err
 	}
-	domain, err := SanitizeTokenDomain(t.Domain)
-	if err != nil {
-		return err
-	}
 	cidrs, err := SanitizeTokenCIDRs(t.FromCIDRs)
 	if err != nil {
 		return err
@@ -259,7 +225,7 @@ func (s *Store) AddAPIToken(ctx context.Context, t NewToken) error {
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO api_tokens (id, user_id, name, token_hash, prefix, plane, scope, domain, from_cidrs, client_id, tenant_id, group_id, enabled, created_at, expires_at, last_used_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-		t.ID, t.UserID, t.Name, t.TokenHash, t.Prefix, t.Plane, scope, domain, cidrs, t.ClientID,
+		t.ID, t.UserID, t.Name, t.TokenHash, t.Prefix, t.Plane, scope, "", cidrs, t.ClientID,
 		t.TenantID, t.GroupID, true, time.Now().Unix(), t.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("store: add api token for %q: %w", t.UserID, err)
@@ -275,8 +241,8 @@ func (s *Store) ResolveAPIToken(ctx context.Context, tokenHash string, now int64
 	var enabled bool
 	var expires int64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, user_id, plane, scope, domain, from_cidrs, tenant_id, group_id, enabled, expires_at, last_used_at FROM api_tokens WHERE token_hash = ?`,
-		tokenHash).Scan(&t.ID, &t.Name, &t.UserID, &t.Plane, &t.Scope, &t.Domain, &t.FromCIDRs,
+		`SELECT id, name, user_id, plane, scope, from_cidrs, tenant_id, group_id, enabled, expires_at, last_used_at FROM api_tokens WHERE token_hash = ?`,
+		tokenHash).Scan(&t.ID, &t.Name, &t.UserID, &t.Plane, &t.Scope, &t.FromCIDRs,
 		&t.TenantID, &t.GroupID, &enabled, &expires, &t.LastUsedAt)
 	if err != nil {
 		return ResolvedToken{}, err // sql.ErrNoRows is the "no token" signal
@@ -302,7 +268,7 @@ func (s *Store) ListAPITokens(ctx context.Context, userID, plane string) ([]APIT
 		plane = PlaneData
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT a.id, a.name, a.prefix, a.plane, a.scope, a.domain, a.from_cidrs,
+		`SELECT a.id, a.name, a.prefix, a.plane, a.scope, a.from_cidrs,
 		        a.client_id, COALESCE(c.name, ''),
 		        a.tenant_id, COALESCE(t.name, ''), a.group_id, COALESCE(g.name, ''),
 		        a.enabled, a.created_at, a.expires_at, a.last_used_at
@@ -318,7 +284,7 @@ func (s *Store) ListAPITokens(ctx context.Context, userID, plane string) ([]APIT
 	var out []APIToken
 	for rows.Next() {
 		var a APIToken
-		if err := rows.Scan(&a.ID, &a.Name, &a.Prefix, &a.Plane, &a.Scope, &a.Domain, &a.FromCIDRs,
+		if err := rows.Scan(&a.ID, &a.Name, &a.Prefix, &a.Plane, &a.Scope, &a.FromCIDRs,
 			&a.ClientID, &a.ClientName,
 			&a.TenantID, &a.TenantName, &a.GroupID, &a.GroupName,
 			&a.Enabled, &a.CreatedAt, &a.ExpiresAt, &a.LastUsedAt); err != nil {
@@ -344,7 +310,7 @@ func (s *Store) SetAPITokenEnabled(ctx context.Context, userID, id string, enabl
 // TokenEdit is what may be changed about a token after it is minted.
 //
 // EVERYTHING EXCEPT THE TOKEN. The secret is a hash in a column: it encodes no
-// perimeter, no domain, no address, no expiry and no name, so none of them has
+// perimeter, no address, no expiry and no name, so none of them has
 // to be reissued to be changed. What cannot be edited is what IS the token -
 // the secret itself, and who it acts as.
 //
@@ -355,7 +321,6 @@ func (s *Store) SetAPITokenEnabled(ctx context.Context, userID, id string, enabl
 type TokenEdit struct {
 	Name      string
 	Scope     string
-	Domain    string
 	FromCIDRs string
 	ExpiresAt int64 // 0 = never
 }
@@ -368,20 +333,14 @@ func (s *Store) UpdateAPIToken(ctx context.Context, userID, id string, e TokenEd
 	if err != nil {
 		return false, err
 	}
-	domain := ""
-	if e.Domain != "" {
-		if domain, err = SanitizeTokenDomain(e.Domain); err != nil {
-			return false, err
-		}
-	}
 	cidrs, err := SanitizeTokenCIDRs(e.FromCIDRs)
 	if err != nil {
 		return false, err
 	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE api_tokens SET name = ?, scope = ?, domain = ?, from_cidrs = ?, expires_at = ?
+		`UPDATE api_tokens SET name = ?, scope = ?, from_cidrs = ?, expires_at = ?
 		 WHERE id = ? AND user_id = ?`,
-		e.Name, scope, domain, cidrs, e.ExpiresAt, id, userID)
+		e.Name, scope, cidrs, e.ExpiresAt, id, userID)
 	if err != nil {
 		return false, fmt.Errorf("store: update api token %q: %w", id, err)
 	}
@@ -398,6 +357,32 @@ func (s *Store) RevokeAPIToken(ctx context.Context, userID, id string) (bool, er
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// RevokeAllAPITokens drops every token an account minted, on both planes, and
+// returns their ids so the caller can drop them from the caches too. What a
+// password reset does (AUTH-21): a reset is often the answer to "somebody else
+// had my password", and that somebody may have minted a token with it - a
+// credential that outlives the password it was minted under.
+func (s *Store) RevokeAllAPITokens(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id FROM api_tokens WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("store: tokens of %q: %w", userID, err)
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("store: tokens of %q: %w", userID, err)
+		}
+		ids = append(ids, id)
+	}
+	_ = rows.Close()
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM api_tokens WHERE user_id = ?`, userID); err != nil {
+		return nil, fmt.Errorf("store: revoke tokens of %q: %w", userID, err)
+	}
+	return ids, nil
 }
 
 // DeleteAPIToken drops one token by id, whoever owns it. Used by the OAuth
@@ -420,4 +405,54 @@ func (s *Store) PurgeExpiredAPITokens(ctx context.Context, now int64) (int64, er
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// ListDataTokens lists every account's DATA-plane tokens, newest first, with
+// their owner (AUTH-09): what an application administrator needs to find the
+// token a script still carries, or the one that leaked. Search matches the
+// token's name or its owner's username. Bounded: a list, not an export.
+func (s *Store) ListDataTokens(ctx context.Context, search string) ([]APIToken, error) {
+	args := []any{PlaneData}
+	where := ""
+	if q := strings.ToLower(strings.TrimSpace(search)); q != "" {
+		where = ` AND (LOWER(a.name) LIKE ? OR LOWER(u.username) LIKE ?)`
+		args = append(args, "%"+q+"%", "%"+q+"%")
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT a.id, a.name, a.prefix, a.plane, a.scope, a.from_cidrs,
+		        a.client_id, COALESCE(c.name, ''),
+		        a.tenant_id, COALESCE(t.name, ''), a.group_id, COALESCE(g.name, ''),
+		        a.enabled, a.created_at, a.expires_at, a.last_used_at, a.user_id, u.username
+		 FROM api_tokens a
+		 JOIN users u ON u.id = a.user_id
+		 LEFT JOIN tenants t ON t.id = a.tenant_id
+		 LEFT JOIN groups g ON g.id = a.group_id
+		 LEFT JOIN oauth_clients c ON c.id = a.client_id
+		 WHERE a.plane = ?`+where+` ORDER BY a.created_at DESC LIMIT 1000`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("store: list data tokens: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []APIToken
+	for rows.Next() {
+		var a APIToken
+		if err := rows.Scan(&a.ID, &a.Name, &a.Prefix, &a.Plane, &a.Scope, &a.FromCIDRs,
+			&a.ClientID, &a.ClientName,
+			&a.TenantID, &a.TenantName, &a.GroupID, &a.GroupName,
+			&a.Enabled, &a.CreatedAt, &a.ExpiresAt, &a.LastUsedAt, &a.OwnerID, &a.OwnerName); err != nil {
+			return nil, fmt.Errorf("store: scan data token: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// DataTokenOwner says whose data-plane token an id is, and its name.
+func (s *Store) DataTokenOwner(ctx context.Context, id string) (userID, name string, err error) {
+	err = s.db.QueryRowContext(ctx,
+		`SELECT user_id, name FROM api_tokens WHERE id = ? AND plane = ?`, id, PlaneData).Scan(&userID, &name)
+	if err != nil {
+		return "", "", fmt.Errorf("store: data token %q: %w", id, err)
+	}
+	return userID, name, nil
 }

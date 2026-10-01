@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/softwarity/meerkat/internal/tracing"
 	"github.com/softwarity/meerkat/internal/vault"
 )
 
@@ -19,7 +21,11 @@ import (
 // one wrong, on a change no test would notice until that query ran.
 //
 // Nothing else is added: no query builder, no logging, no retry. It is a
-// translation and a pass-through, and it should stay that.
+// translation and a pass-through, and it should stay that - with one exception
+// that belongs here for the same reason: it is the ONE place every query goes
+// through, so it is where a query becomes a step of the gateway's own work in
+// a trace (tracing.Step). That costs an atomic load unless the installation
+// asked for the gateway's detail and the request is being recorded.
 
 type database struct {
 	*sql.DB
@@ -27,15 +33,75 @@ type database struct {
 }
 
 func (d *database) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return d.DB.ExecContext(ctx, rebind(d.dialect, query), args...)
+	ctx, end := d.step(ctx, query)
+	res, err := d.DB.ExecContext(ctx, rebind(d.dialect, query), args...)
+	end(err)
+	return res, err
 }
 
+// QueryContext measures up to the first row being ready: iterating the rest is
+// the caller's loop, and a step that stayed open for it would time the caller.
 func (d *database) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	return d.DB.QueryContext(ctx, rebind(d.dialect, query), args...)
+	ctx, end := d.step(ctx, query)
+	rows, err := d.DB.QueryContext(ctx, rebind(d.dialect, query), args...)
+	end(err)
+	return rows, err
 }
 
 func (d *database) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	return d.DB.QueryRowContext(ctx, rebind(d.dialect, query), args...)
+	ctx, end := d.step(ctx, query)
+	row := d.DB.QueryRowContext(ctx, rebind(d.dialect, query), args...)
+	end(row.Err())
+	return row
+}
+
+// step names a query the way OpenTelemetry names a database call - the
+// operation and the table, "SELECT users" - with the statement itself as an
+// attribute. The statement carries placeholders, never the values, so it says
+// what was asked without saying about whom.
+func (d *database) step(ctx context.Context, query string) (context.Context, func(error, ...tracing.Attr)) {
+	if !tracing.Detail() {
+		return ctx, func(error, ...tracing.Attr) {}
+	}
+	stmt := strings.TrimSpace(query)
+	if len(stmt) > 512 {
+		stmt = stmt[:512]
+	}
+	return tracing.Step(ctx, querySummary(stmt),
+		tracing.String("db.system.name", dbSystem(d.dialect)),
+		tracing.String("db.query.text", stmt))
+}
+
+// dbSystem is the dialect in OpenTelemetry's vocabulary.
+func dbSystem(dialect string) string {
+	if dialect == dialectPostgres {
+		return "postgresql"
+	}
+	return "sqlite"
+}
+
+// querySummary is the operation and the table a statement reads or writes:
+// SELECT users, INSERT INTO audit_events -> INSERT audit_events. The first word
+// is the operation; the table is the word after FROM, INTO or UPDATE.
+func querySummary(stmt string) string {
+	words := strings.Fields(stmt)
+	if len(words) == 0 {
+		return "query"
+	}
+	op := strings.ToUpper(words[0])
+	for i, w := range words {
+		switch strings.ToUpper(w) {
+		case "FROM", "INTO":
+			if i+1 < len(words) {
+				return op + " " + strings.Trim(words[i+1], "(`\"")
+			}
+		case "UPDATE":
+			if i == 0 && len(words) > 1 {
+				return op + " " + strings.Trim(words[1], "(`\"")
+			}
+		}
+	}
+	return op
 }
 
 func (d *database) Exec(query string, args ...any) (sql.Result, error) {

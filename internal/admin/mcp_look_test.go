@@ -108,11 +108,11 @@ func TestTheSettingsCarryThePortalButNotItsDrawings(t *testing.T) {
 	ctx := context.Background()
 
 	if err := f.api.st.SetSetting(ctx, store.SettingPortal, store.PortalConfig{
-		Enabled: true, Layout: store.PortalRail, Side: "right", Display: store.PortalDisplayIcon,
-		Parents: []store.ModuleParent{{
+		Mode: store.PortalModePortal, Layout: store.PortalRail, Side: "right", Display: store.PortalDisplayIcon,
+		Entries: []store.PortalEntry{{
 			RouteID: "sales", Label: "Sales",
 			Icon:     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M840-519v339q0 24-18 42t-42 18H179Z"/></svg>`,
-			Children: []store.ModuleChild{{RouteID: "orders", Label: "Orders", Icon: `<svg viewBox="0 -960 960 960"><path d="M240-80Z"/></svg>`}},
+			Children: []store.PortalSubEntry{{RouteID: "orders", Label: "Orders", Icon: `<svg viewBox="0 -960 960 960"><path d="M240-80Z"/></svg>`}},
 		}},
 	}); err != nil {
 		t.Fatalf("put portal: %v", err)
@@ -128,7 +128,7 @@ func TestTheSettingsCarryThePortalButNotItsDrawings(t *testing.T) {
 		t.Errorf("the icons came back as drawings:\n%s", body)
 	}
 	for _, want := range []string{
-		`"enabled":true`, `"layout":"rail"`, `"side":"right"`, `"display":"icon"`,
+		`"mode":"portal"`, `"layout":"rail"`, `"side":"right"`, `"display":"icon"`,
 		`"routeId":"sales"`, `"label":"Sales"`, `"routeId":"orders"`, `"icon":"<svg,`,
 	} {
 		if !strings.Contains(body, want) {

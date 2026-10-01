@@ -1,0 +1,261 @@
+<div class="banner">
+  <h1 i18n="@@OpenTelemetry">OpenTelemetry</h1>
+</div>
+
+<div class="content">
+<p class="lead" i18n="@@Tracing_lead">
+  A trace is the story of <b>one</b> request, step by step, with the time spent in each. The
+  counters on the Metrics screen say something is wrong and how often; a trace says where the
+  seconds went. Meerkat is the only component that can measure its own share of them.
+</p>
+
+<!-- The switch first, because it is what somebody came for, and it APPLIES ON
+     CLICK - like the Prometheus one next door. A toggle that needs a second
+     button is a toggle somebody leaves half-set. When the gateway refuses (no
+     address yet) it springs back: a switch that stays where the click left it
+     after a refusal is a switch that lies about the state of the product. -->
+<div class="row">
+  <mat-slide-toggle
+    [checked]="enabled()"
+    [disabled]="!enterprise() || saving()"
+    (change)="toggleExport($event.checked)"
+  >
+    <ng-container i18n="@@Tracing_export_any">Export to an OpenTelemetry collector</ng-container>
+  </mat-slide-toggle>
+  <app-ee-lock
+    feature="OBS-04"
+    i18n-why="@@Tracing_ee_why"
+    why="Send this gateway's own spans to the tracing stack you already run. The trace context travels in both editions - what is sold is putting Meerkat on the trace."
+  />
+</div>
+
+<p class="hint" i18n="@@Tracing_ce_note_signals">
+  In both editions, a <code>traceparent</code> travels to your services and its identifier is in the
+  access log - which is what joins a line of ours to your own audit. Turning this on sends what you
+  choose below: <b>Meerkat's own spans</b> - the time it spent choosing a route and checking access,
+  which is a gap in the trace otherwise - and its <b>counters</b>.
+</p>
+
+@if (enabled()) {
+  <!-- Where. We speak a protocol, not a product, so this is one address and no
+       choice of backend. -->
+  <app-form-field
+    class="wide"
+    icon="lan"
+    i18n-label="@@Tracing_endpoint"
+    label="Collector address"
+    i18n-info="@@Tracing_endpoint_info"
+    info="An OpenTelemetry Collector, Tempo, Jaeger or a vendor's endpoint - we speak OTLP and do not care which. The base address only: the /v1/traces path is added for you."
+  >
+    <input
+      matInput
+      [value]="endpoint()"
+      (change)="endpoint.set($any($event.target).value); touched()"
+      placeholder="http://otel-collector:4318"
+    />
+  </app-form-field>
+
+  <!-- The credential, and the rule about it. A literal key here would be a key
+       in the export, the backup and the audit. -->
+  <div class="pair">
+    <app-form-field
+      icon="key"
+      i18n-label="@@Tracing_header_name"
+      label="Auth header"
+      i18n-info="@@Tracing_header_name_info"
+      info="Only needed by a hosted collector. A collector inside your own cluster usually needs none."
+    >
+      <input
+        matInput
+        [value]="headerName()"
+        (change)="headerName.set($any($event.target).value); touched()"
+        placeholder="Authorization"
+      />
+    </app-form-field>
+    <!-- A secret field, not a text one: the rule used to live in a tooltip -
+         "write a reference, never the key" - and nothing made it so. This is
+         the field every other credential in the product uses, and it is what
+         offers to put a pasted key in the vault (VAULT-05). -->
+    <app-secret-field
+      i18n-label="@@Tracing_header_value"
+      label="Its value"
+      i18n-info="@@Tracing_header_value_info"
+      info="A secret: typed here, it is moved into the vault before the setting can be saved, and what stays in the configuration is the reference. The exporter resolves it at the moment of the call, so it is not in the export, not in a backup and not on this screen."
+      [(value)]="headerValue"
+      [held]="headerSet()"
+      [at]="headerAt()"
+      scope="infra"
+      (moved)="reload()"
+      placeholder="Bearer $otlp-token"
+    />
+  </div>
+
+  <!-- WHAT leaves, now that one collector takes two signals. Each applies on
+       click, like the switch above; the traces' two numbers only mean
+       something while traces leave, so they follow their switch. -->
+  <h3 class="group" i18n="@@Tracing_group_signals">What is sent</h3>
+  <div class="row">
+    <mat-slide-toggle
+      [checked]="traces()"
+      [disabled]="saving()"
+      (change)="toggleTraces($event.checked)"
+    >
+      <ng-container i18n="@@Tracing_signal_traces">Traces</ng-container>
+    </mat-slide-toggle>
+  </div>
+  @if (traces()) {
+    <!-- Two numbers that answer two different questions, which is why they are
+         not one dial. The unit is in the LABEL: app-form-field projects a single
+         root, so a matTextSuffix beside the input lands UNDER it rather than in
+         the field's suffix row - which is exactly what it did. And no clear
+         button: emptying a rate is not a value, it is a field nobody can read. -->
+    <div class="pair">
+      <app-form-field
+        icon="percent"
+        i18n-label="@@Tracing_sample"
+        label="Journeys recorded (%)"
+        [clearable]="false"
+        i18n-info="@@Tracing_sample_info"
+        info="The share of journeys OPENED HERE - at the front door for a call that arrives undecided, in the page for a click when the browser half is on. A caller who already decided is respected rather than overruled: deciding twice is how a trace ends up with a parent nobody reported."
+      >
+        <input
+          matInput
+          type="number"
+          min="0"
+          max="100"
+          [value]="samplePercent()"
+          (change)="setPercent($any($event.target).value)"
+        />
+      </app-form-field>
+      <app-form-field
+        icon="speed"
+        i18n-label="@@Tracing_ceiling"
+        label="Ceiling (per second)"
+        [clearable]="false"
+        i18n-info="@@Tracing_ceiling_info"
+        info="At most this many journeys recorded per second, whoever decided. It is your budget, and the only thing that bounds a caller who sets the sampling flag on every request - that flag is a byte anybody can send. 0 removes the ceiling."
+      >
+        <input
+          matInput
+          type="number"
+          min="0"
+          [value]="maxPerSecond()"
+          (change)="setCeiling($any($event.target).value)"
+        />
+      </app-form-field>
+    </div>
+  }
+
+  <div class="row">
+    <mat-slide-toggle
+      [checked]="metrics()"
+      [disabled]="saving()"
+      (change)="toggleMetrics($event.checked)"
+    >
+      <ng-container i18n="@@Tracing_signal_metrics">Metrics</ng-container>
+    </mat-slide-toggle>
+  </div>
+  <!-- The other door, said on this one - the metrics endpoint page says the
+       same about this switch: two places configure metrics, and neither may
+       read as the only one. -->
+  <p class="hint" i18n="@@Tracing_signal_metrics_note">
+    The counters behind the Metrics screen, pushed every 30 seconds - running totals, one series
+    per gateway node. It needs a collector that <b>receives metrics</b>: Jaeger alone takes traces
+    and nothing else, so put an OpenTelemetry Collector in front of it, and use Test to check.
+    Rather have them scraped? That is the <a routerLink="/infra/metrics-endpoint">Metrics endpoint</a>.
+  </p>
+
+  <div class="actions">
+    <button matButton="filled" type="button" [disabled]="saving() || !loaded()" (click)="save()">
+      <mat-icon>check</mat-icon>
+      <ng-container i18n="@@Save">Save</ng-container>
+    </button>
+    <!-- Before saving, not after: an address is tried, corrected, tried again.
+         The gateway posts an EMPTY batch, so asking costs nobody a trace. -->
+    <button
+      matButton="tonal"
+      type="button"
+      [disabled]="probing() || !endpoint().trim()"
+      (click)="test()"
+    >
+      <mat-icon>{{ probing() ? 'hourglass_empty' : 'network_ping' }}</mat-icon>
+      <ng-container i18n="@@Tracing_test">Test</ng-container>
+    </button>
+    @if (probeOk()) {
+      <span class="ok">
+        <mat-icon inline>check_circle</mat-icon>
+        {{ probeOk() }}
+      </span>
+    }
+    @if (probeFailed()) {
+      <span class="warn">
+        <mat-icon inline>warning</mat-icon>
+        {{ probeFailed() }}
+      </span>
+    }
+    @if (justSaved() && stalled()) {
+      <!-- The setting stuck and the pipe did not. Said here rather than left
+           for somebody to discover in an empty Jaeger three days later. -->
+      <span class="warn" i18n="@@Tracing_not_exporting">
+        <mat-icon inline>warning</mat-icon>
+        Saved, but nothing is leaving. Check the address and the gateway's log.
+      </span>
+    }
+  </div>
+
+  @if (traces()) {
+    <!-- The gateway's own detail. After the pipe and before the routes: it is
+         about this gateway, not about what it serves, and it is off unless
+         somebody is looking at where the gateway's time goes. -->
+    <div class="row">
+      <mat-slide-toggle
+        [checked]="gatewayDetail()"
+        [disabled]="saving()"
+        (change)="toggleDetail($event.checked)"
+      >
+        <ng-container i18n="@@Tracing_gateway_detail">Detail the gateway's own work</ng-container>
+      </mat-slide-toggle>
+    </div>
+    <p class="hint" i18n="@@Tracing_gateway_detail_note">
+      Adds what Meerkat does inside each crossing to the traces it records: the identity handed to
+      your service - who the caller is, and its signature - and every query to its store. Off, a
+      crossing is two spans and the gateway's own time is one number; on, you see where it goes.
+      It never adds a trace, only depth to the ones already sampled - each weighs more in your
+      collector, which is why it stays off unless somebody is looking.
+    </p>
+  }
+
+  <p class="hint" i18n="@@Tracing_per_route_note">
+    <b>Which routes are traced is decided on the routes</b>, in their OpenTelemetry section. Each
+    one answers two questions: whether this gateway reports on it at all, and - for an
+    application with pages - whether the journey <b>starts in the browser</b>, where you also see
+    the network before us, the queueing, the rendering, and the calls that never reach us at all.
+    That second answer injects the OpenTelemetry bundle, served by Meerkat and never by a CDN,
+    into that application's pages.
+  </p>
+}
+
+@if (error()) {
+  <p class="failed">{{ error() }}</p>
+}
+
+<h3 class="group" i18n="@@Tracing_group_collector">No collector yet</h3>
+<p class="hint" i18n="@@Tracing_collector_hint">
+  A collector and somewhere to read traces, per platform. Meerkat speaks OTLP, so any of these - or
+  Tempo, or a vendor's endpoint - works the same way: deploy one, point the address above at it, and
+  nothing else here changes. Give its UI a <b>route on this gateway</b> rather than an ingress of
+  its own, and reading your traces means passing the sign-in you already have.
+</p>
+<mat-accordion class="how">
+  @for (p of platforms; track p.key) {
+    <mat-expansion-panel (opened)="opened.set(p.key)" (closed)="opened.set('')">
+      <mat-expansion-panel-header>
+        <mat-panel-title>{{ p.label }}</mat-panel-title>
+      </mat-expansion-panel-header>
+      <ng-template matExpansionPanelContent>
+        <app-snippet [filename]="p.name" [content]="fileOf(p.key)" />
+      </ng-template>
+    </mat-expansion-panel>
+  }
+</mat-accordion>
+</div>

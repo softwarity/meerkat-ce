@@ -4,6 +4,7 @@ import {
   apiDocsAccess,
   appOnly,
   auditAccess,
+  schedulerAccess,
   issuesAccess,
   multiTenantOnly,
   singleTenantOnly,
@@ -104,6 +105,36 @@ export const routes: Routes = [
           import('./routes/routes-page/routes-page.component').then((m) => m.RoutesPageComponent),
       },
       {
+        // Where this gateway's traces go (OBS-04). Infra, with the other
+        // systems this installation is wired to - and NOT on the Metrics
+        // screen, which is where it used to hide: which routes are traced is
+        // decided on the routes themselves.
+        path: 'opentelemetry',
+        canActivate: [infraOnly],
+        loadComponent: () =>
+          import('./otel/otel-page.component').then((m) => m.OtelPageComponent),
+      },
+      {
+        // Where a scraper reads the counters (OBS-05), beside OpenTelemetry:
+        // wired once, like the collector. It used to be a drawer of the
+        // Metrics screen, which is read every day for its curves.
+        path: 'metrics-endpoint',
+        canActivate: [infraOnly],
+        loadComponent: () =>
+          import('./metrics-endpoint/metrics-endpoint-page.component').then(
+            (m) => m.MetricsEndpointPageComponent,
+          ),
+      },
+      {
+        // The developer tunnel (DEV-11): a port into the cluster, so Infra.
+        // Developer mode stays in Application, General - a configuration of
+        // what the installation offers its developers - and is the other
+        // condition the tunnel needs.
+        path: 'plug',
+        canActivate: [infraOnly],
+        loadComponent: () => import('./plug/plug-page.component').then((m) => m.PlugPageComponent),
+      },
+      {
         // The SHAPE of what this installation keeps, starting with the
         // account. Infra and not beside the accounts: defining a field and
         // filling it are two acts by two people.
@@ -167,8 +198,9 @@ export const routes: Routes = [
         loadComponent: () => import('./gateway/tls/tls-page.component').then((m) => m.TlsPageComponent),
       },
       {
+        // Anybody who administers this plane, for their own tokens.
         path: 'access-tokens',
-        canActivate: [rootOnly],
+        canActivate: [infraOnly],
         loadComponent: () =>
           import('./gateway/access-tokens-page.component').then((m) => m.AccessTokensPageComponent),
       },
@@ -178,7 +210,7 @@ export const routes: Routes = [
         // different question from "give me a key for the REST API", and the
         // OAuth flow answers the first one without producing a key at all.
         path: 'mcp',
-        canActivate: [rootOnly],
+        canActivate: [infraOnly],
         loadComponent: () => import('./gateway/mcp-page.component').then((m) => m.McpPageComponent),
       },
       {
@@ -240,11 +272,6 @@ export const routes: Routes = [
         path: 'general',
         canActivate: [appOnly],
         loadComponent: () => import('./settings/general-page.component').then((m) => m.GeneralPageComponent),
-      },
-      {
-        path: 'locales',
-        canActivate: [appOnly],
-        loadComponent: () => import('./settings/locales-page.component').then((m) => m.LocalesPageComponent),
       },
       {
         // Groups, Members and the rules administer the SERVED organisation -
@@ -311,6 +338,11 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./theme/built-in-pages/branding-tab.component').then((m) => m.BrandingTabComponent),
           },
+          {
+            path: 'locale',
+            loadComponent: () =>
+              import('./theme/built-in-pages/locale-tab.component').then((m) => m.LocaleTabComponent),
+          },
         ],
       },
       // They were two screens of their own until they became two tabs: the
@@ -326,10 +358,24 @@ export const routes: Routes = [
           import('./portal/portal-page.component').then((m) => m.PortalPageComponent),
       },
       {
+        path: 'sessions',
+        canActivate: [appOnly],
+        loadComponent: () =>
+          import('./identity/sessions-page/sessions-page.component').then((m) => m.SessionsPageComponent),
+      },
+      {
         path: 'security',
         canActivate: [appOnly],
         loadComponent: () =>
           import('./settings/security-page.component').then((m) => m.SecurityPageComponent),
+      },
+      {
+        // The same screen the infra plane has: tokens are personal, and an app
+        // admin's agent needs one as much as an infra admin's does.
+        path: 'access-tokens',
+        canActivate: [appOnly],
+        loadComponent: () =>
+          import('./gateway/access-tokens-page.component').then((m) => m.AccessTokensPageComponent),
       },
     ],
   },
@@ -401,6 +447,15 @@ export const routes: Routes = [
     canActivate: [metricsAccess],
     loadComponent: () =>
       import('./metrics/metrics-page.component').then((m) => m.MetricsPageComponent),
+  },
+  // The scheduled calls (SCHED-01): transverse like the traffic and the audit,
+  // and on the APPLICATION side of that group - it says what the thing this
+  // gateway serves is doing, not what the gateway holds.
+  {
+    path: 'scheduler',
+    canActivate: [schedulerAccess],
+    loadComponent: () =>
+      import('./scheduler/scheduler-page.component').then((m) => m.SchedulerPageComponent),
   },
   {
     path: 'audit',

@@ -2,7 +2,7 @@
 title: Metrics
 section: The console
 order: 182
-summary: What the gateway has actually served - four figures, two curves, and a ranking of routes down to their endpoints.
+summary: What the gateway has actually served - five figures, two curves, and a ranking of routes down to their endpoints.
 ---
 
 # Metrics
@@ -17,15 +17,18 @@ is a map of the installation.
 
 ![The Metrics screen: four figures over the last minute, the traffic and latency curves, and the ranking of routes](img/console/traffic.webp)
 
-Requests per second, the refused-or-failed share, the mean answer and what is in
-flight; under them the two curves, and the ranking with its three tabs - the
+Requests per second, the refused-or-failed share, the mean answer, the p95 and
+what is in flight; under them the two curves, and the ranking with its three tabs - the
 failing one carrying its count.
 
 ## What is on the page
 
 - **Over the last minute**: requests per second, the share refused or failed, the
-  mean answer, and how many requests are in flight.
-- **Traffic** and **How long an answer takes**: two curves, fed by the gateway
+  mean answer, the **p95** - the time 95% of the answers came under, which the
+  mean hides: ninety fast answers and ten of three seconds average out to
+  something nobody waited for - and how many requests are in flight.
+- **Traffic** and **How long an answer takes**: two curves, the second drawing
+  the mean and the p95 side by side, fed by the gateway
   pushing an interval every five seconds. Nothing is polled.
 - **Routes**, ranked on one of three axes - **slowest**, **failing**, **costliest**
   - over the window the samples cover. The failing tab carries its count, so an eye
@@ -54,26 +57,19 @@ are two answers a reader has to be able to tell apart.
 > cluster, samples are summed over every node, and an endpoint is counted on the
 > node that answered - the screen says so where it matters.
 
-## Prometheus
+## Metrics endpoint
 
-The button in the header opens the other half of the feature, and its state is on
-its face: nobody has to open the drawer to find out whether anything is scraping.
-
-Inside: the switch that exposes `/metrics`, and the files to write - a single
-`prometheus.yml` carrying both discovery styles (one per platform, the one you
-download comes back with its block uncommented), the Grafana datasource and a
-provisioned dashboard, a Docker Swarm compose file, and a Kubernetes
-ServiceMonitor. They carry this installation's real listening port and network
-name, not the address you reached the console by.
-
-`/metrics` answers on the console's port and needs a token minted with the
-**metrics** perimeter, which opens that one path and nothing else. See
-[Access tokens](/docs/console/access-and-agents).
+The button in the header carries the state of the scrape endpoint on its face -
+exposed or not - and leads to where it is configured: **Infra, Metrics
+endpoint**, beside OpenTelemetry. The switch, the port, the optional token and
+the files to write are there, and the same counters can also be pushed over OTLP
+from **Infra, OpenTelemetry**. See [metrics](/docs/operations/metrics).
 
 > [!NOTE]
-> Enterprise edition: exposing `/metrics`. The counters and this screen are in
-> both editions - curves with nothing to install is what the community image
-> promises; what is sold is externalising them into a stack you already run.
+> Enterprise edition: getting the counters out, scraped or pushed. The counters
+> and this screen are in both editions - curves with nothing to install is what
+> the community image promises; what is sold is externalising them into a stack
+> you already run.
 
 ## Traps
 

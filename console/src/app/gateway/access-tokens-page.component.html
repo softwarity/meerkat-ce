@@ -1,71 +1,188 @@
-<div class="banner">
-  <h1 i18n="@@Access_tokens">Access tokens</h1>
-  <button matButton="filled" (click)="create()">
-    <mat-icon>add</mat-icon>
-    <ng-container i18n="@@New_token">New token</ng-container>
-  </button>
-</div>
+<mat-drawer-container (backdropClick)="close()">
+  <mat-drawer-content>
+    <div class="banner">
+      <h1 i18n="@@Access_tokens">Access tokens</h1>
+      <span class="spacer"></span>
+      <button matButton="filled" (click)="create()">
+        <mat-icon>add</mat-icon>
+        <ng-container i18n="@@New_console_token">New console token</ng-container>
+      </button>
+    </div>
 
-<div class="content">
-  <div class="planned">
-    <mat-icon>key</mat-icon>
-    <span i18n="@@Access_tokens_rest">
-      Admin tokens open the console's own API without a browser, for a script or a pipeline. A
-      token acts with your own powers, narrowed by its perimeter. To connect an assistant, use the
-      MCP section instead: it needs no token at all.
-    </span>
-  </div>
+    <p class="hint" i18n="@@Access_tokens_both_planes">
+      Console tokens open this console's API without a browser - a script, a pipeline, a backend
+      managing its scheduled calls - with your own powers, narrowed by a perimeter; they are created
+      here. Application tokens call the applications' APIs: each person creates their own, on their
+      profile on the applications, and those who administer the applications see and revoke them here.
+      To connect an assistant, use the MCP section: it needs no token.
+    </p>
 
-  @if (loading()) {
-    <loading-indicator withContainer />
-  } @else {
-    @for (t of tokens(); track t.id) {
-      <div class="token" [class.off]="!t.enabled">
-        <span class="name">{{ t.name }}</span>
-        <mat-slide-toggle
-          [checked]="t.enabled"
-          (change)="toggle(t, $event.checked)"
-          [matTooltip]="t.enabled ? disableTip : enableTip"
+    <div class="toolbar">
+      @if (me.isAppAdmin()) {
+        <mat-button-toggle-group
+          [value]="view()"
+          (change)="view.set($event.value)"
+          hideSingleSelectionIndicator
+          i18n-aria-label="@@Which_tokens"
+          aria-label="Which tokens"
+        >
+          <mat-button-toggle value="" i18n="@@All">All</mat-button-toggle>
+          <mat-button-toggle value="admin" i18n="@@Console">Console</mat-button-toggle>
+          <mat-button-toggle value="data" i18n="@@Applications">Applications</mat-button-toggle>
+        </mat-button-toggle-group>
+      }
+      <mat-form-field class="filter" subscriptSizing="dynamic">
+        <mat-icon matPrefix>search</mat-icon>
+        <input
+          matInput
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
+          i18n-placeholder="@@Search_name_or_owner"
+          placeholder="Name or owner"
         />
-        <button matIconButton (click)="edit(t)" i18n-matTooltip="@@Edit" matTooltip="Edit">
-          <mat-icon>edit</mat-icon>
-        </button>
-        <button matIconButton (click)="renew(t)" i18n-matTooltip="@@Renew" matTooltip="New secret">
-          <mat-icon>autorenew</mat-icon>
-        </button>
-        <button matIconButton (click)="revoke(t)" i18n-matTooltip="@@Revoke" matTooltip="Revoke">
-          <mat-icon>delete</mat-icon>
-        </button>
-        <span class="meta">
-          <span class="scope" [class.ro]="t.scope !== 'full'">
-            @if (t.scope === 'metrics') {
-              <ng-container i18n="@@Metrics_only">Metrics only</ng-container>
-            } @else if (t.scope === 'readonly') {
-              <ng-container i18n="@@Read_only">Read only</ng-container>
+      </mat-form-field>
+    </div>
+
+    <div class="content">
+      @if (loading()) {
+        <loading-indicator withContainer />
+      } @else if (rows().length === 0) {
+        <p class="empty" i18n="@@No_access_tokens">No access token yet.</p>
+      } @else {
+        <div class="table-wrap">
+          <mat-table [dataSource]="rows()">
+            <ng-container matColumnDef="name">
+              <mat-header-cell *matHeaderCellDef i18n="@@Name">Name</mat-header-cell>
+              <mat-cell *matCellDef="let t" [class.off]="!t.enabled">
+                <span class="id">
+                  <span>{{ t.name }}</span>
+                  <code class="muted">{{ t.prefix }}...</code>
+                </span>
+              </mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="owner">
+              <mat-header-cell *matHeaderCellDef i18n="@@Owner">Owner</mat-header-cell>
+              <mat-cell *matCellDef="let t" [class.off]="!t.enabled">
+                @if (t.plane === 'data') {
+                  <span class="id">
+                    <span>{{ t.ownerName }}</span>
+                    @if (t.tenantName) {
+                      <span class="muted">{{ t.tenantName }}{{ t.groupName ? ' - ' + t.groupName : '' }}</span>
+                    }
+                  </span>
+                } @else {
+                  <span class="muted" i18n="@@You">You</span>
+                }
+              </mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="plane">
+              <mat-header-cell *matHeaderCellDef i18n="@@Plane">Plane</mat-header-cell>
+              <mat-cell *matCellDef="let t" [class.off]="!t.enabled">
+                <span class="plane">
+                  @if (t.plane === 'admin') {
+                    <ng-container i18n="@@Console">Console</ng-container>
+                  } @else {
+                    <ng-container i18n="@@Applications">Applications</ng-container>
+                  }
+                </span>
+              </mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="scope">
+              <mat-header-cell *matHeaderCellDef i18n="@@Perimeter">Perimeter</mat-header-cell>
+              <mat-cell *matCellDef="let t" [class.off]="!t.enabled">{{ scopeLabel(t) }}</mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="used">
+              <mat-header-cell *matHeaderCellDef i18n="@@Last_used">Last used</mat-header-cell>
+              <mat-cell *matCellDef="let t" [class.off]="!t.enabled">
+                <span class="muted">{{ t.lastUsedAt ? relative(t.lastUsedAt) : neverLabel }}</span>
+              </mat-cell>
+            </ng-container>
+            <mat-header-row *matHeaderRowDef="columns"></mat-header-row>
+            <mat-row
+              *matRowDef="let row; columns: columns"
+              class="clickable"
+              [class.selected]="selected()?.id === row.id"
+              (click)="open(row)"
+            ></mat-row>
+          </mat-table>
+        </div>
+      }
+    </div>
+  </mat-drawer-content>
+
+  <mat-drawer position="end" mode="over" [opened]="selected() !== null">
+    @if (selected(); as t) {
+      <div class="drawer">
+        <header>
+          <h2>{{ t.name }}</h2>
+          <button matIconButton (click)="close()" i18n-aria-label="@@Close" aria-label="Close">
+            <mat-icon>close</mat-icon>
+          </button>
+        </header>
+        <dl>
+          <dt i18n="@@Plane">Plane</dt>
+          <dd>
+            @if (t.plane === 'admin') {
+              <ng-container i18n="@@Console_api">This console's API</ng-container>
             } @else {
-              <ng-container i18n="@@Full_access">Full access</ng-container>
+              <ng-container i18n="@@Applications_apis">The applications' APIs</ng-container>
             }
-          </span>
-          @if (t.domain) {
-            <span class="scope domain">
-              @if (t.domain === 'gateway') {
-                <ng-container i18n="@@The_routing_plane">The routing plane</ng-container>
-              } @else {
-                <ng-container i18n="@@The_applications_identity">The application's identity</ng-container>
-              }
-            </span>
+          </dd>
+          @if (t.plane === 'data') {
+            <dt i18n="@@Owner">Owner</dt>
+            <dd>{{ t.ownerName }}</dd>
+            @if (t.tenantName) {
+              <dt i18n="@@Organisation">Organisation</dt>
+              <dd>{{ t.tenantName }}{{ t.groupName ? ' - ' + t.groupName : '' }}</dd>
+            }
           }
+          <dt i18n="@@Perimeter">Perimeter</dt>
+          <dd>{{ scopeLabel(t) }}</dd>
           @if (t.fromCidrs) {
-            <span class="scope domain"><code>{{ t.fromCidrs }}</code></span>
+            <dt i18n="@@From">From</dt>
+            <dd><code>{{ t.fromCidrs }}</code></dd>
           }
-          &nbsp;-&nbsp;<code class="prefix">{{ t.prefix }}...</code>
-          &nbsp;-&nbsp;<ng-container i18n="@@Created_on">Created on</ng-container> {{ day(t.createdAt) }}
-          &nbsp;-&nbsp;{{ expiryLabel(t.expiresAt) }}
-          &nbsp;-&nbsp;{{ lastUsedLabel(t.lastUsedAt) }}
-        </span>
+          <dt i18n="@@Starts_with">Starts with</dt>
+          <dd><code>{{ t.prefix }}...</code></dd>
+          <dt i18n="@@Created">Created</dt>
+          <dd>{{ day(t.createdAt) }}</dd>
+          <dt i18n="@@Expires">Expires</dt>
+          <dd>{{ t.expiresAt ? day(t.expiresAt) : neverLabel }}</dd>
+          <dt i18n="@@Last_used">Last used</dt>
+          <dd>{{ t.lastUsedAt ? relative(t.lastUsedAt) : neverLabel }}</dd>
+        </dl>
+
+        @if (t.plane === 'admin') {
+          <mat-slide-toggle [checked]="t.enabled" (change)="toggle(t, $event.checked)">
+            <ng-container i18n="@@Token_enabled">Enabled</ng-container>
+          </mat-slide-toggle>
+          <div class="actions">
+            <button matButton="outlined" (click)="edit(t)">
+              <mat-icon>edit</mat-icon>
+              <ng-container i18n="@@Edit">Edit</ng-container>
+            </button>
+            <button matButton="outlined" (click)="renew(t)">
+              <mat-icon>autorenew</mat-icon>
+              <ng-container i18n="@@Renew">New secret</ng-container>
+            </button>
+            <button matButton="outlined" class="danger" (click)="revoke(t)">
+              <mat-icon>delete</mat-icon>
+              <ng-container i18n="@@Revoke">Revoke</ng-container>
+            </button>
+          </div>
+        } @else {
+          <p class="note" i18n="@@Data_token_note">
+            Created by its owner on their profile, on the applications: only they can create another.
+            Revoking it refuses whatever uses it from its next call.
+          </p>
+          <div class="actions">
+            <button matButton="outlined" class="danger" (click)="revokeData(t)">
+              <mat-icon>delete</mat-icon>
+              <ng-container i18n="@@Revoke">Revoke</ng-container>
+            </button>
+          </div>
+        }
       </div>
-    } @empty {
-      <p class="empty" i18n="@@No_access_tokens">No access token yet.</p>
     }
-  }
-</div>
+  </mat-drawer>
+</mat-drawer-container>

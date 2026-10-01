@@ -33,6 +33,10 @@ type Change struct {
 	ID     string `json:"id,omitempty"`
 	Label  string `json:"label"`
 	Action string `json:"action"`
+	// Fields names what moved inside a setting that is updated: a setting is
+	// one object holding many things (the TLS one holds every declared name),
+	// and "tls updated" in a trail says nothing about which of them.
+	Fields []string `json:"fields,omitempty"`
 }
 
 // MissingRef is a $name the document points at that the vault does not hold.
@@ -734,7 +738,11 @@ func importSettings(ctx context.Context, st *store.Store, doc *Document, plan *P
 		case had:
 			action = ActionUpdate
 		}
-		plan.Changes = append(plan.Changes, Change{Kind: "setting", ID: key, Label: key, Action: action})
+		change := Change{Kind: "setting", ID: key, Label: key, Action: action}
+		if action == ActionUpdate {
+			change.Fields = changedFields(before, value)
+		}
+		plan.Changes = append(plan.Changes, change)
 		if commit && action != ActionSame {
 			// Decoded first: SetSetting re-encodes, and passing the raw bytes
 			// through would store a quoted string instead of the value.
@@ -927,5 +935,29 @@ func byDepth(roles []store.Role) []store.Role {
 	out := make([]store.Role, len(roles))
 	copy(out, roles)
 	sort.SliceStable(out, func(i, j int) bool { return depth(out[i]) < depth(out[j]) })
+	return out
+}
+
+// changedFields lists the top-level fields that differ between two encodings
+// of one setting, sorted. A setting that is not an object has none to name.
+func changedFields(before, after json.RawMessage) []string {
+	var a, b map[string]json.RawMessage
+	if json.Unmarshal(before, &a) != nil || json.Unmarshal(after, &b) != nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for k, v := range b {
+		seen[k] = true
+		if old, ok := a[k]; !ok || !sameJSON(old, v) {
+			out = append(out, k)
+		}
+	}
+	for k := range a {
+		if !seen[k] {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
 	return out
 }

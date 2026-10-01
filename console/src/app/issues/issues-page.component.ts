@@ -16,6 +16,7 @@ import { DateTime } from 'luxon';
 import { ApiService, Issue, IssueStatus } from '../api.service';
 import { MeService } from '../me.service';
 import { DialogsService } from '../shared/dialogs.service';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 // The embedded issue tracker (ISSUE-03): the reports users file from the
 // injected user-button panel, with their screenshot and captured context.
@@ -84,6 +85,10 @@ export class IssuesPageComponent {
 
   constructor() {
     this.reload();
+    // Somebody else's write (CONSOLE-13): this list follows what other
+    // operators do, quietly - a spinner replacing a list nobody asked to
+    // reload takes the screen away from whoever is reading it.
+    inject(LiveChangesService).on('issue', () => this.reload(true));
     if (this.canSwitch()) {
       this.api.issuesSetting().subscribe({ next: (s) => this.collecting.set(s.enabled), error: () => {} });
     }
@@ -109,8 +114,8 @@ export class IssuesPageComponent {
     });
   }
 
-  protected reload(): void {
-    this.loading.set(true);
+  protected reload(quiet = false): void {
+    if (!quiet) this.loading.set(true);
     this.api.listIssues(this.view.$status()).subscribe({
       next: (issues) => {
         this.issues.set(issues);

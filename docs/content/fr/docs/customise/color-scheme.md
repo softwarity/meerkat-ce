@@ -10,7 +10,7 @@ summary: Comment dire à la passerelle ce que votre application sait faire d'un 
 Un visiteur choisit clair ou sombre une fois, dans le bouton utilisateur, et il s'attend à ce que tout
 suive : les pages de Meerkat **et** l'application derrière. Les pages sont à nous de peindre.
 L'application est à vous, et aucune ne lit un schéma de la même façon - c'est pourquoi le mécanisme se
-déclare **sur la route** au lieu d'être deviné (UIF-03).
+déclare **sur la route** au lieu d'être deviné.
 
 Cette page est écrite pour la personne qui intègre une application. Pour les pages que Meerkat sert
 lui-même, voir [les pages intégrées](/docs/customise/built-in-pages).
@@ -30,9 +30,9 @@ Sur une route UI dont le schéma n'est pas `none`, la passerelle injecte un peti
 est choisi, il pose sur `<html>` :
 
 - la propriété CSS `color-scheme`, pour que les contrôles de formulaire, les barres de défilement et le
-  fond par défaut suivent ;
+ fond par défaut suivent ;
 - `data-meerkat-scheme="light"` ou `"dark"`, pour une application qui préfère lire un attribut qu'un
-  style calculé.
+ style calculé.
 
 Sur `auto` les deux sont retirés, et le navigateur revient à suivre le système.
 
@@ -56,10 +56,10 @@ Quatre réponses, et l'une d'elles est « il n'y a rien à basculer ».
 Deux champs de plus le façonnent :
 
 - **la balise**, `html` sauf indication contraire. Une application qui lit son thème sur `<body>` ne l'a
-  jamais vu sur `<html>`, et c'est de loin la première raison pour laquelle une bascule a l'air de ne
-  rien faire.
+ jamais vu sur `<html>`, et c'est de loin la première raison pour laquelle une bascule a l'air de ne
+ rien faire.
 - **la valeur claire et la valeur sombre.** Pour `attribute` ce sont les deux valeurs de l'attribut ;
-  pour les deux autres ce sont les noms eux-mêmes.
+ pour les deux autres ce sont les noms eux-mêmes.
 
 D'où le fait qu'une **valeur vide veut dire quelque chose** dans les deux derniers : rien sur la balise
 dans cet état. C'est la forme la plus répandue qui existe - rien en clair, `dark` en sombre :
@@ -88,10 +88,10 @@ La bascule n'est alors pas offerte dans le bouton utilisateur, et l'agent laisse
 Deux choses qui voyageaient ensemble et qui sont maintenant séparées :
 
 - **offrir la bascule** est de l'habillage. Ça appartient au bouton utilisateur, et une route peut
-  l'offrir ou non.
+ l'offrir ou non.
 - **comment l'application consomme un schéma** appartient à la route, et reste vrai quel que soit celui
-  qui offre la bascule - y compris une barre de [portail](/docs/customise/portal), où il n'y a pas de
-  bouton par route auquel l'accrocher.
+ qui offre la bascule - y compris une barre de [portail](/docs/customise/portal), où il n'y a pas de
+ bouton par route auquel l'accrocher.
 
 Quand une route n'offre **pas** la bascule, elle dit à la place ce que le bouton injecté porte lui-même :
 clair, sombre, ou le choix de la personne. Ça existe pour l'application qui n'a qu'un seul aspect et pas
@@ -141,15 +141,15 @@ ce que la passerelle croit avoir reçu :
 
 ```html
 <script defer src="/meerkat/page.js"
-        data-scheme="select"
-        data-scheme-mechanism="class"
-        data-scheme-tag="body"
-        data-scheme-light=""
-        data-scheme-dark="dark"
-        data-scheme-storage="theme"
-        data-scheme-storage-light="light"
-        data-scheme-storage-dark="dark"
-        data-scheme-storage-auto="system"></script>
+ data-scheme="select"
+ data-scheme-mechanism="class"
+ data-scheme-tag="body"
+ data-scheme-light=""
+ data-scheme-dark="dark"
+ data-scheme-storage="theme"
+ data-scheme-storage-light="light"
+ data-scheme-storage-dark="dark"
+ data-scheme-storage-auto="system"></script>
 ```
 
 Si un champ que vous avez rempli est absent là, la route ne l'a pas enregistré. S'il est présent et que

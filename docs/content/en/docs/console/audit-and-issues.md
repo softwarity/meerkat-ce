@@ -2,7 +2,7 @@
 title: Audit and Issues
 section: The console
 order: 184
-summary: The two screens read after the fact - who changed what, and what your users reported.
+summary: The two screens read after the fact - who changed what, who signed in, and what your users reported.
 ---
 
 # Audit and Issues
@@ -15,7 +15,9 @@ organisations.
 ## Audit
 
 Every administrative change, with **the exact fields that moved and their before
-and after**. Read-only.
+and after**, and the security of the accounts: every sign-in, every refused one
+with its real reason and address, every factor, passkey, password or token
+changed by its owner. Read-only.
 
 ![The Audit screen: a list of events, each with its actor and the fields that moved](img/console/audit.webp)
 
@@ -28,9 +30,22 @@ diff underneath. Where an agent or a script acted, the token's name appears besi
 the account's: *admin, via claude-desktop* rather than *admin*. That difference is
 the whole point of naming it.
 
-Three filters: the **target** kind (`tenant`, `user`, `membership`, `group`,
-`role`, `settings`, `route`, `theme`), the **period** (24 hours, 7 days, 30 days,
-all time), and a free-text box that narrows what is already loaded.
+A security line reads the same way, with its plane (**data plane** for the
+applications' accounts, **console** for this console) and the reason or the
+method beside it, and the address under it. A
+refused sign-in wears the error colour: scrolling for an attack, those are the
+lines to find without reading. The full list of actions and reasons is in
+[the audit trail](/docs/operations/audit).
+
+The toggle picks the part of the trail: **All**, **Changes**, **Data plane
+sign-ins** (the applications' accounts) or **Console sign-ins**. Under
+**Changes**, a **target** kind narrows further. Then the **period** (24 hours,
+7 days, 30 days, all time), and a free-text box that narrows what is already
+loaded, reasons and addresses included.
+
+At the top, **Export CSV** (Enterprise) downloads what the filters select, and -
+for root alone - **Keep events for** sets how long the trail keeps an event. See
+[the audit trail](/docs/operations/audit).
 
 - Secrets are redacted: the trail records that a field changed, not to what.
 - A deleted account leaves an anonymised trace rather than a hole.
@@ -64,8 +79,10 @@ There is no connector to GitHub, GitLab or Jira: a report lives here.
 
 ## Traps
 
-- **Audit is not a log of requests.** It records administrative changes. What
-  passed through the gateway is [Metrics](/docs/console/traffic).
+- **Audit is not a log of requests.** It records administrative changes and the
+  ways into the accounts. What passed through the gateway is
+  [Metrics](/docs/console/traffic), and each request is a line of the
+  [access log](/docs/operations/logs).
 - **You see your own perimeter.** Two administrators can read the same screen and
   count a different number of events; that is the scoping, not a bug.
 - **An empty Issues list may mean collection is off.** Check the switch before

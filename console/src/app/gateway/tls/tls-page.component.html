@@ -51,25 +51,57 @@
       }
 
 
-      @if (state()?.app) {
-        <div class="plane-head">
-          <mat-slide-toggle
-            [checked]="tls()!.redirect"
-            [disabled]="saving()"
-            (change)="toggleRedirect($event.checked)"
-          >
-            <span i18n="@@Force_https">Force HTTPS</span>
-          </mat-slide-toggle>
-          @if (tls()!.redirect && !state()?.redirecting) {
-            <span class="lamp" i18n="@@Standing_down">Standing down</span>
-          }
-        </div>
+      <!-- Always drawn, greyed until it can act: a setting that appears only
+           once a certificate exists is a setting people go looking for. Its
+           place never moves, and when it cannot act it says why. -->
+      <div class="plane-head">
+        <mat-slide-toggle
+          [checked]="tls()!.redirect"
+          [disabled]="saving() || !state()?.app"
+          (change)="toggleRedirect($event.checked)"
+        >
+          <span i18n="@@Force_https">Force HTTPS</span>
+        </mat-slide-toggle>
+        @if (state()?.app && tls()!.redirect && !state()?.redirecting) {
+          <span class="lamp" i18n="@@Standing_down">Standing down</span>
+        }
+      </div>
+      @if (!state()?.app) {
+        <p class="note" i18n="@@Force_https_no_door">
+          The applications' HTTPS door is not open: no application name above has a certificate
+          yet. Give one a certificate, and HTTPS can be forced.
+        </p>
+      } @else {
         <p class="note" i18n="@@Force_https_note">
           Callers arriving on the plain port are sent to HTTPS. The console is never forced, and
           neither is the liveness probe - and if every certificate expires this stands itself down
           rather than sending callers to a door none of them will open.
         </p>
       }
+      <!-- HSTS follows the redirect: forcing HTTPS is already the commitment,
+           and HSTS closes what a redirect cannot - the first request, sent in
+           clear before it is redirected. Only its length is a choice. -->
+      <div class="plane-head">
+        <mat-form-field class="hsts" subscriptSizing="dynamic">
+          <mat-label i18n="@@Hsts_duration">HSTS duration</mat-label>
+          <mat-select
+            [value]="hstsSeconds()"
+            [disabled]="saving() || !state()?.app || !tls()!.redirect"
+            (selectionChange)="setHsts($event.value)"
+          >
+            @for (d of hstsDurations; track d.seconds) {
+              <mat-option [value]="d.seconds">{{ d.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <p class="note" i18n="@@Hsts_note">
+        With HTTPS forced, every HTTPS answer of the applications also carries HSTS
+        (Strict-Transport-Security): the browser remembers to use HTTPS only, and stops sending
+        even the first request in clear - the one a redirect cannot protect. It keeps that promise
+        for the whole duration, even if the certificates go, so start short. Never sent to
+        localhost or an IP address; a route or a service that sets its own value keeps it.
+      </p>
     </section>
 
     @for (p of problems(); track p) {

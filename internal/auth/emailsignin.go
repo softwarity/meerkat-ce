@@ -9,6 +9,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/mail"
+	"github.com/softwarity/meerkat/internal/store"
 )
 
 // Signing in with a code mailed to the address (AUTH-16): no password typed,
@@ -247,11 +248,14 @@ func (h *Handler) doEmailSigninVerify(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.st.TakeEmailToken(r.Context(), hashTrust(c.Value+":"+code), signinPurpose, time.Now().Unix())
 	if err != nil || userID == "" {
 		h.regLimit.hit(r.Context(), tries)
+		// Nobody is named: a wrong code does not say whose it was meant to be.
+		h.security(r, secSigninRefused, store.User{}, refusedCode)
 		h.renderSigninSent(w, r, next, h.tr(r, "errSigninCode"), http.StatusUnauthorized)
 		return
 	}
 	user, err := h.st.GetUserByID(r.Context(), userID)
 	if err != nil || !user.Enabled {
+		h.security(r, secSigninRefused, user, refusedDisabled)
 		h.renderSigninSent(w, r, next, h.tr(r, "errSigninCode"), http.StatusUnauthorized)
 		return
 	}

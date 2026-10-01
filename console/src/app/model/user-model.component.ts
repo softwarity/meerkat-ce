@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService, UserFieldDef, UserFieldKind } from '../api.service';
 import { FormFieldComponent } from '../shared/form-field.component';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 // Infra > Model: the SHAPE of the objects this installation keeps, starting
 // with the account.
@@ -207,6 +208,16 @@ export class UserModelComponent {
   protected readonly dirty = computed(() => JSON.stringify(this.fields()) !== this.saved());
 
   constructor() {
+    this.load();
+    // Somebody else's write (CONSOLE-13). OFFERED and not applied: this screen
+    // is a form, and reloading it under somebody typing would throw their work
+    // away for news they did not ask for. The same bargain the 409 does from
+    // the other end - see stale.interceptor.ts.
+    const live = inject(LiveChangesService);
+    live.on('settings', (change) => live.offer(change, () => this.load()));
+  }
+
+  private load(): void {
     this.api.userFields().subscribe({
       next: (r) => {
         this.fields.set(r.fields ?? []);

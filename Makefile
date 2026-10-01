@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build build-ee ui dev dev-ce test test-ee test-pg bench lint fmt vet clean ldap-up ldap-down ldap-test pg-up pg-down
+.PHONY: build build-ee ui telemetry dev dev-ce test test-ee test-pg bench lint fmt vet clean ldap-up ldap-down ldap-test pg-up pg-down capture-docs
 
 # Hot-reload dev loop: rebuilds and restarts the gateway on every .go save.
 # Requires air (once): go install github.com/air-verse/air@latest
@@ -47,6 +47,25 @@ ui:
 	mkdir -p internal/admin/ui/dist
 	cp -R console/dist/console/browser/. internal/admin/ui/dist/
 	touch internal/admin/ui/dist/.gitkeep
+
+# Retake the console screenshots the doc site publishes (docs/public/img/console).
+# Builds the gateway from the tree, runs it on a disposable database with the
+# fixture the captions describe, and drives a browser at the frame every
+# published image already has. Needs console/node_modules staged into
+# internal/admin/ui/dist first (`make ui`), e2e/node_modules, and cwebp.
+capture-docs:
+	cd e2e && node scripts/capture-docs.mjs
+
+# Build the OpenTelemetry browser bundle (OBS-04) and stage it for go:embed.
+# Enterprise only: the community binary never serves it, so it does not carry
+# it either. Skip this and `make build-ee` still works - the injection stays
+# off and says why. Requires telemetry/node_modules (once: cd telemetry && npm install).
+telemetry:
+	cd telemetry && npm run build && npm run check
+	rm -rf ee/telemetry/dist
+	mkdir -p ee/telemetry/dist
+	cp telemetry/dist/telemetry.js ee/telemetry/dist/
+	touch ee/telemetry/dist/.gitkeep
 
 test:
 	go test -race ./...

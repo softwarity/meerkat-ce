@@ -1,3 +1,5 @@
+@use '@angular/material' as mat;
+
 mat-card {
   padding: 16px 20px;
 }
@@ -103,4 +105,85 @@ input[type='color'] {
    its box brings them back, but plainly out of play. */
 .cell.dimmed {
   opacity: 0.45;
+}
+
+/* The theme's name where the column header used to read "Token" (THEME-06).
+   It must NOT inherit .head's typography: that row is styled as a column
+   header - 0.75rem, uppercase, letter-spaced - which is right for DARK and
+   LIGHT and wrong for a name, where it both clipped the text and left it
+   sitting off the icons' centre line. The 28px line-height is what actually
+   aligns the word with the two 28px buttons beside it. */
+.theme-name {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.9rem;
+  line-height: 28px;
+  color: var(--mat-sys-on-surface);
+}
+
+/* The name takes what it needs, the buttons go to the END of the column - so
+   they sit on a fixed vertical line, flush with the label column below them,
+   instead of floating wherever this particular name happens to stop. */
+.theme-name b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: auto;
+}
+
+/* Material's own density, not a width and a height: shrinking the box by hand
+   left the state layer sized for the 40px button, so hovering the pencil drew
+   a grey disc off to one side of it. The mixin moves the ripple, the target
+   and the icon together. */
+.theme-name .mat-mdc-icon-button {
+  @include mat.icon-button-density(-3);
+}
+
+.theme-name .lock {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* Said in words, not only in a disabled button: a greyed Save explains
+   nothing to somebody who did not notice they had changed anything. */
+.theme-name .dirty {
+  margin-left: 0.25rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  line-height: 1.4rem;
+  background: var(--mat-sys-tertiary-container, var(--mat-sys-secondary-container));
+  color: var(--mat-sys-on-tertiary-container, var(--mat-sys-on-secondary-container));
+}
+
+.rename {
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: inherit;
+  background: var(--mat-sys-surface-container-high);
+  border: 1px solid var(--mat-sys-primary);
+  border-radius: 6px;
+  padding: 0.1rem 0.35rem;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Why an item above is out of reach. A disabled mat-menu-item swallows pointer
+   events, so it cannot carry a tooltip of its own - and a greyed control that
+   explains nothing sends the reader looking for a bug. */
+.menu-why {
+  max-width: 240px;
+  padding: 4px 16px 10px;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: var(--mat-sys-on-surface-variant);
 }

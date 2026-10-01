@@ -27,9 +27,16 @@ to deploy
 idle memory
 ### 0
 dependencies required
+### 114
+features delivered
+### 20
+languages served
 :::
 
-Memory measured by this project's own CI on an x64 runner. What it costs a
+Memory measured by this project's own CI on an x64 runner: 22 MB at rest, and
+**37 MB at the peak of the load**. The 114 features are the ones ticked in
+[the product's inventory](/product/features), whose state is read from the
+code; 87 more are delivered in part there and 21 are still to come. What it costs a
 request is measured too, next to Kong, APISIX and Traefik on the same machine
 in the same run: [the figures](/product/performance), recomputed on every
 commit.

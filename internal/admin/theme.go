@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -23,6 +25,7 @@ func (a *API) registerThemes(mux Mux) {
 	mux.Handle("DELETE /api/themes/{id}", a.appAdmin(a.deleteTheme))
 	mux.Handle("POST /api/themes/{id}/activate", a.appAdmin(a.activateTheme))
 	mux.Handle("GET /api/themes/{id}/preview", a.appAdmin(a.previewTheme))
+	mux.Handle("GET /api/themes/templates", a.appAdmin(a.listTemplates))
 	mux.Handle("GET /api/branding", a.appAdmin(a.getBranding))
 	mux.Handle("PUT /api/branding", a.appAdmin(a.putBranding))
 }
@@ -100,6 +103,9 @@ func (a *API) createTheme(w http.ResponseWriter, r *http.Request, actor store.Us
 		t.Dark, t.Light = base.Dark, base.Light
 	}
 	if err := a.st.SaveTheme(r.Context(), t); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -131,6 +137,9 @@ func (a *API) updateTheme(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	if err := a.st.SaveTheme(r.Context(), t); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -180,9 +189,9 @@ func (a *API) activateTheme(w http.ResponseWriter, r *http.Request, actor store.
 // previewTheme renders the flow-page specimen in the given theme, one scheme
 // forced (?scheme=dark|light) - the console's editor iframes it twice.
 func (a *API) previewTheme(w http.ResponseWriter, r *http.Request, _ store.User) {
-	t, err := a.st.GetTheme(r.Context(), r.PathValue("id"))
+	t, err := a.previewSubject(r.Context(), r.PathValue("id"))
 	if err != nil {
-		writeErr(w, http.StatusNotFound, "theme not found")
+		writeErr(w, http.StatusNotFound, err.Error())
 		return
 	}
 	b := store.DefaultBranding()
@@ -199,5 +208,160 @@ func (a *API) previewTheme(w http.ResponseWriter, r *http.Request, _ store.User)
 	if q := r.URL.Query().Get("layout"); q != "" {
 		l = store.PageLayout{Name: q, Side: r.URL.Query().Get("side")}
 	}
-	auth.WriteThemePreview(w, t, b, r.URL.Query().Get("scheme"), l)
+	// The language every template below speaks. One parameter for the pages and
+	// the mails alike: a preview is of ONE language, chosen outside the frame,
+	// the same way each pane is of one scheme.
+	locale := r.URL.Query().Get("locale")
+	if locale == "" {
+		locale = "en"
+	}
+	// A TEMPLATE other than the flow specimen: a mailed message, rendered with
+	// the palette on screen rather than the one in force. The editor is looking
+	// at a theme that may be neither saved nor active, and a preview of the
+	// active theme would answer a question nobody asked.
+	//
+	// What is rendered is the SAMPLE - fake values, real rendering - never the
+	// real message: previewing "account confirmation" must not mint a token,
+	// and previewing a list must not read anybody's data.
+	if kind, ok := strings.CutPrefix(r.URL.Query().Get("template"), "mail:"); ok {
+		msg, found := auth.SampleMailWith(r.Context(), a.st, kind, locale, originOf(r), t.Light)
+		if !found {
+			writeErr(w, http.StatusNotFound, "unknown mail template "+kind+
+				" (known: "+strings.Join(mailTemplateKeys(), ", ")+")")
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(msg.HTML))
+		return
+	}
+	// The portal bar. Not a page and not a message: the REAL component, in the
+	// preview mode the portal editor already drives it with, against made-up
+	// applications - never this installation's catalogue, which would put it in
+	// a palette screenshot.
+	if key := r.URL.Query().Get("template"); strings.HasPrefix(key, auth.PortalPreviewPrefix) {
+		if auth.WritePortalPreview(w, key, t, b, r.URL.Query().Get("scheme"), locale) {
+			return
+		}
+		writeErr(w, http.StatusNotFound, "unknown portal template "+key)
+		return
+	}
+	// A named flow page rather than the specimen. Same rule as the mails: the
+	// TEMPLATE against a fixture, never the handler.
+	if key := r.URL.Query().Get("template"); key != "" && key != "specimen" {
+		// errors=all stacks every refusal the page can give. The Locale tab asks
+		// for it, because the wordings are what it is about; the other tabs get
+		// one, so the error colour is on the page without four red boxes
+		// standing in front of the arrangement.
+		allErrors := r.URL.Query().Get("errors") == "all"
+		if auth.WritePagePreview(w, key, t, b, r.URL.Query().Get("scheme"), l, locale, allErrors) {
+			return
+		}
+		writeErr(w, http.StatusNotFound, "unknown template "+key)
+		return
+	}
+	auth.WriteThemePreview(w, t, b, r.URL.Query().Get("scheme"), l, locale)
+}
+
+// previewSubject resolves what a preview is OF: a stored theme, or one of the
+// built-in palettes the console's picker also offers.
+//
+// The picker hands those over under a namespaced id ("preset:<id>") because a
+// copy inherits its source's id and the two must stay two pills - which means
+// the id arriving here is not always a row. Resolved rather than refused: a
+// built-in is a palette one looks at and copies, and looking at it is the
+// point of a preview.
+func (a *API) previewSubject(ctx context.Context, id string) (store.Theme, error) {
+	if key, ok := strings.CutPrefix(id, presetIDPrefix); ok {
+		for _, p := range store.PresetThemes() {
+			if p.ID == key {
+				return p, nil
+			}
+		}
+		return store.Theme{}, fmt.Errorf("no built-in palette %q", key)
+	}
+	t, err := a.st.GetTheme(ctx, id)
+	if err != nil {
+		return store.Theme{}, errors.New("theme not found")
+	}
+	return t, nil
+}
+
+// presetIDPrefix mirrors the console's PRESET_PREFIX: the two ends of one
+// contract, and a preview that did not know it answered 404 on every built-in.
+const presetIDPrefix = "preset:"
+
+// previewTemplate is one thing the theme editor can render beside a palette.
+// Kind tells the console whether to show the pair of panes or a single one: a
+// mail has no dark half to show (see SampleMailWith).
+type previewTemplate struct {
+	Key      string `json:"key"`
+	Label    string `json:"label"`
+	Kind     string `json:"kind"`     // "page" | "mail"
+	Category string `json:"category"` // the picker's filter groups
+}
+
+// previewCategory is one filter toggle: a key, what it is called, and the
+// glyph that stands for it.
+type previewCategory struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Icon  string `json:"icon"`
+}
+
+func mailTemplateKeys() []string {
+	out := make([]string, 0, len(auth.MailSampleKinds))
+	for _, k := range auth.MailSampleKinds {
+		out = append(out, k.Key)
+	}
+	return out
+}
+
+// listTemplates is the catalogue the preview's picker walks. It is served
+// rather than hard-coded in the console so that adding a template is a change
+// in one place - the day a flow page joins it, the picker grows on its own.
+func (a *API) listTemplates(w http.ResponseWriter, _ *http.Request, _ store.User) {
+	// The flow-page SPECIMEN is not offered. It was a composite of every
+	// element the design system has, and it earned its place while it was the
+	// only thing the editor could show; with thirty real pages, it teaches
+	// nothing they do not, and it is not a page anybody is ever served.
+	out := make([]previewTemplate, 0,
+		len(auth.PreviewPages)+len(auth.PortalPreviewKinds)+len(auth.MailSampleKinds))
+	for _, p := range auth.PreviewPages {
+		out = append(out, previewTemplate{Key: p.Key, Label: p.Label, Kind: "page", Category: p.Category})
+	}
+	// The bar, before the mails: it is the surface a visitor sees on every
+	// screen of every application, and it has a dark half a message does not.
+	for _, k := range auth.PortalPreviewKinds {
+		out = append(out, previewTemplate{
+			Key: k.Key, Label: k.Label, Kind: "page", Category: auth.CategoryPortal,
+		})
+	}
+	for _, k := range auth.MailSampleKinds {
+		// An operator's message is out: it wears the console's fixed colours
+		// and the Meerkat mark whatever theme is being edited, so previewing it
+		// beside a palette would show something that palette never touches.
+		// The relay test still sends it - there, the question is whether it
+		// arrives, not what it looks like.
+		if k.Operator {
+			continue
+		}
+		out = append(out, previewTemplate{
+			Key: "mail:" + k.Key, Label: k.Label, Kind: "mail", Category: auth.CategoryMessages,
+		})
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Templates  []previewTemplate `json:"templates"`
+		Categories []previewCategory `json:"categories"`
+	}{out, previewCategories()})
+}
+
+// previewCategories mirrors the catalogue's own list, so the console draws the
+// toggles it is told about rather than a copy that can drift.
+func previewCategories() []previewCategory {
+	out := make([]previewCategory, 0, len(auth.PreviewCategories))
+	for _, c := range auth.PreviewCategories {
+		out = append(out, previewCategory{Key: c.Key, Label: c.Label, Icon: c.Icon})
+	}
+	return out
 }

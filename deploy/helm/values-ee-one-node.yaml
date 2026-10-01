@@ -2,14 +2,15 @@
 #
 #   kubectl create secret docker-registry ghcr \
 #     --docker-server=ghcr.io --docker-username=USER --docker-password=TOKEN
-#   helm install meerkat ./meerkat -f values-ee-one-node.yaml \
+#   helm repo add meerkat https://www.softwarity.io/deploy
+#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-one-node.yaml \
 #     --set admin.password='choose-one'
 #
 # Same shape as the community one - a single pod on its volume - with the
 # Enterprise image: several organisations, the directories, and the tunnel
 # that plugs a developer's machine into this cluster.
 image:
-  repository: ghcr.io/softwarity/meerkat-ee
+  repository: ghcr.io/softwarity/meerkat
   tag: ""
   # The Enterprise image is on a private registry: name the pull secret you
   # created for it.

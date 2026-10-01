@@ -4,6 +4,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService, BackupInfo } from '../../api.service';
+import { SnippetComponent } from '../../shared/snippet.component';
 
 // The full snapshot (STORE-05): a coherent copy of the whole database, taken
 // while the gateway runs.
@@ -21,20 +22,8 @@ import { ApiService, BackupInfo } from '../../api.service';
 // paths.
 @Component({
   selector: 'app-configuration-snapshot',
-  imports: [MatButtonModule, MatCardModule, MatIconModule],
+  imports: [MatButtonModule, MatCardModule, MatIconModule, SnippetComponent],
   styleUrl: './configuration-cards.scss',
-  styles: [
-    `
-      pre {
-        background: var(--mat-sys-surface-container);
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-family: var(--mk-mono);
-        font-size: 0.8rem;
-        overflow-x: auto;
-      }
-    `,
-  ],
   template: `
   <mat-card appearance="outlined">
     <h2 i18n="@@Full_snapshot">Full snapshot</h2>
@@ -72,7 +61,7 @@ import { ApiService, BackupInfo } from '../../api.service';
           request doing it would depend on. Keep the old file until the new one has proven
           itself.
         </p>
-        <pre>{{ restoreProcedure(b) }}</pre>
+        <app-snippet filename="restore.sh" [downloadable]="false" [content]="restoreProcedure(b)" />
         @if (b.keyFromEnv) {
           <p class="hint" i18n="@@Key_from_env_note">
             The master key of this gateway comes from MEERKAT_VAULT_KEY, so it is not in that

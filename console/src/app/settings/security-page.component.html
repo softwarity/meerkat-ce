@@ -129,9 +129,10 @@
 
     <mat-card appearance="outlined">
       <h3 i18n="@@Rate_limiting">Rate limiting</h3>
-      <p class="hint text-muted" i18n="@@Rate_limiting_hint">
+      <p class="hint text-muted" i18n="@@Rate_limiting_hint_reset">
         Throttles brute-force attempts: failed sign-ins per address and account within the
-        window, and wrong two-factor codes per account. Zero disables a limiter.
+        window, and wrong two-factor codes per account. Zero disables those two. Reset requests
+        are counted per address on their own, and always limited.
       </p>
       <div class="rl-row">
         <mat-form-field class="rl-num">
@@ -141,6 +142,10 @@
         <mat-form-field class="rl-num">
           <mat-label i18n="@@Wrong_codes">Wrong 2FA codes</mat-label>
           <input matInput type="number" min="0" max="100" [value]="rlTotp()" (input)="rlTotp.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Reset_requests">Reset requests</mat-label>
+          <input matInput type="number" min="1" max="100" [value]="rlReset()" (input)="rlReset.set(+$any($event.target).value)" />
         </mat-form-field>
         <mat-form-field class="ttl">
           <mat-label i18n="@@Within">Within</mat-label>

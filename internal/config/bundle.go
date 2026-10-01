@@ -54,6 +54,13 @@ var imageFields = []struct {
 }{
 	{[]string{"logo"}, "logo"},
 	{[]string{"background", "image"}, "background"},
+	// The dark scheme's OWN picture (THEME-06). It was missing from this list,
+	// and the list is what decides both directions: the plain document dropped
+	// the other three and left this one inline, so a file meant to be read and
+	// diffed carried 60 KiB of base64 - and an installation copied through one
+	// arrived with a dark background and no logo, which is exactly how the
+	// omission was found.
+	{[]string{"background", "imageDark"}, "background-dark"},
 	{[]string{"favicon"}, "favicon"},
 }
 

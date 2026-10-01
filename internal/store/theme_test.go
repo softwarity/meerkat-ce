@@ -56,8 +56,10 @@ func TestPresetThemes(t *testing.T) {
 	}
 }
 
-// A fresh store seeds every preset with exactly one active.
-func TestSeedThemesInstallsPresets(t *testing.T) {
+// A fresh store holds ONE theme, active: the default. The other presets are
+// code the console offers read-only, so copying them here would have created
+// editable near-duplicates of things that already exist.
+func TestSeedThemesInstallsTheDefaultAlone(t *testing.T) {
 	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
@@ -67,17 +69,14 @@ func TestSeedThemesInstallsPresets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list themes: %v", err)
 	}
-	if len(themes) != len(PresetThemes()) {
-		t.Fatalf("want %d seeded themes, got %d", len(PresetThemes()), len(themes))
+	if len(themes) != 1 {
+		t.Fatalf("want a single seeded theme, got %d", len(themes))
 	}
-	active := 0
-	for _, th := range themes {
-		if th.Active {
-			active++
-		}
+	if !themes[0].Active {
+		t.Fatalf("the only theme must be the active one: %+v", themes[0])
 	}
-	if active != 1 {
-		t.Fatalf("want exactly one active theme, got %d", active)
+	if themes[0].ID != DefaultTheme().ID {
+		t.Fatalf("seeded %q, want the default %q", themes[0].ID, DefaultTheme().ID)
 	}
 }
 

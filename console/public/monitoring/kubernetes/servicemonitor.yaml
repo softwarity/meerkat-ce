@@ -1,8 +1,6 @@
 # With the Prometheus Operator this object IS the configuration: no scrape file
-# to write, and the token is taken as a secret reference and nothing else.
-#
-#   kubectl create secret generic meerkat-metrics -n monitoring \
-#     --from-literal=token='mk_paste_the_token_here'
+# to write. It reads the METRICS port, which the chart declares when
+# metrics.port is set - to the port chosen in the console.
 
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -21,11 +19,15 @@ spec:
       app.kubernetes.io/name: meerkat
   endpoints:
     # The port's NAME on the Service, not its number.
-    - port: admin
+    - port: metrics
       path: /metrics
       interval: 15s
-      authorization:
-        type: Bearer
-        credentials:
-          name: meerkat-metrics
-          key: token
+#token       # Only if the console asks for a token on that port, taken as a
+#token       # secret reference and nothing else:
+#token       #   kubectl create secret generic meerkat-metrics -n monitoring \
+#token       #     --from-literal=token='mk_paste_the_token_here'
+#token       authorization:
+#token         type: Bearer
+#token         credentials:
+#token           name: meerkat-metrics
+#token           key: token

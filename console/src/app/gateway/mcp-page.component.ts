@@ -11,6 +11,8 @@ import { DateTime } from 'luxon';
 import { RouterLink } from '@angular/router';
 import { AdminToken, ApiService } from '../api.service';
 import { DialogsService } from '../shared/dialogs.service';
+import { SnippetComponent } from '../shared/snippet.component';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 // One client's instructions. The commands differ enough between agents that a
 // single JSON block would be a riddle: three of these take the same flags and
@@ -92,6 +94,7 @@ const CLIENTS: AgentClient[] = [
     MatTooltipModule,
     LoadingIndicatorComponent,
     RouterLink,
+    SnippetComponent,
   ],
   styleUrl: './mcp-page.component.scss',
   templateUrl: './mcp-page.component.html',
@@ -105,7 +108,6 @@ export class McpPageComponent {
   protected readonly loading = signal(true);
   protected readonly enabled = signal(false);
   protected readonly agents = signal<AdminToken[]>([]);
-  protected readonly copied = signal('');
 
   protected readonly clients = CLIENTS;
   protected readonly client = signal(CLIENTS[0]);
@@ -123,6 +125,9 @@ export class McpPageComponent {
       error: () => undefined,
     });
     this.load();
+    // Somebody else's write (CONSOLE-13): an agent that connected, renewed or
+    // was cut off elsewhere. A list, so it reloads quietly.
+    inject(LiveChangesService).on('token', () => this.load());
   }
 
   private load(): void {
@@ -149,11 +154,6 @@ export class McpPageComponent {
 
   protected pick(client: AgentClient): void {
     this.client.set(client);
-    this.copied.set('');
-  }
-
-  protected copy(text: string, what: string): void {
-    void navigator.clipboard.writeText(text).then(() => this.copied.set(what));
   }
 
   protected async revoke(t: AdminToken): Promise<void> {
@@ -170,18 +170,9 @@ export class McpPageComponent {
   }
 
   protected perimeter(t: AdminToken): string {
-    const what =
-      t.scope === 'readonly'
-        ? $localize`:@@Read_only:Read only`
-        : $localize`:@@Read_and_change:Read and change`;
-    switch (t.domain) {
-      case 'gateway':
-        return what + ' - ' + $localize`:@@The_routing_plane:The routing plane`;
-      case 'app':
-        return what + ' - ' + $localize`:@@The_applications_identity:The application's identity`;
-      default:
-        return what;
-    }
+    return t.scope === 'readonly'
+      ? $localize`:@@Read_only:Read only`
+      : $localize`:@@Read_and_change:Read and change`;
   }
 
   protected lastUsed(ts: number): string {

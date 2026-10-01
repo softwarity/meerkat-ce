@@ -13,12 +13,13 @@ option, pas un prérequis.
 
 ## Image Docker
 
-Deux images, construites depuis le même commit :
+Deux images, construites depuis le même commit, portant le même nom : c'est
+le **registre** qui dit l'édition.
 
 | Image | Édition |
 |---|---|
-| `docker.io/softwarity/meerkat:latest` | communautaire |
-| `ghcr.io/softwarity/meerkat-ee:latest` | Enterprise (registre privé) |
+| `docker.io/softwarity/meerkat:latest` | communautaire, publique |
+| `ghcr.io/softwarity/meerkat:latest` | Enterprise, registre privé |
 
 ```yaml
 services:
@@ -103,13 +104,13 @@ adresse coûte une porte, pas l'installation.
 | Variable | Quoi |
 |---|---|
 | `MEERKAT_ADMIN_PASSWORD` | le mot de passe du premier administrateur, lu seulement tant qu'aucun compte n'existe |
-| `MEERKAT_CONFIG_FILE` (`-config`) | une configuration YAML ou JSON qui amorce une gateway **vide** ; une gateway configurée l'ignore |
+| `MEERKAT_CONFIG_FILE` (`-config`) | une configuration YAML ou JSON qui amorce une gateway **vide**. Une gateway configurée ne l'applique pas : quand le fichier diffère de ce qui tourne, il est rangé comme **configuration enregistrée** (nommée d'après le fichier), à comparer et à rendre courante depuis l'écran Configuration |
 | `MEERKAT_VAULT_FILE` (`-vault`) | un fichier de coffre chiffré, ingéré une seule fois |
 | `MEERKAT_VAULT_PASSPHRASE`, `MEERKAT_VAULT_PASSPHRASE_FILE` | la phrase secrète de ce fichier |
 | `MEERKAT_TENANCY` (`-tenancy`) | `single` ou `multi`, tranché au premier démarrage ; ensuite la console est maîtresse du mode |
 
-Une gateway amorcée depuis un fichier de configuration ne reçoit pas les routes
-de démonstration : l'opérateur a dit ce que cette gateway sert.
+Sans fichier de configuration, la gateway démarre vide - aucune route - et le
+compte administrateur est la seule chose qu'elle crée.
 
 `-tenancy` est fait pour l'amorçage - un premier démarrage, une installation
 livrée avec sa configuration, du GitOps. Une fois le mode choisi, le drapeau est
@@ -131,6 +132,27 @@ pour une raison : le réglage stocké voyage. Un export de configuration, une
 sauvegarde restaurée ou une base copiée depuis la recette peuvent chacun
 emporter le mode développeur en production, et personne ne s'en aperçoit avant
 qu'il y ait un port de tunnel devant des clients.
+
+### Journaux et traces
+
+| Drapeau | Variable | Défaut | Quoi |
+|---|---|---|---|
+| `-log-level` | `MEERKAT_LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` ; une faute de frappe retombe sur `info` plutôt que d'empêcher le démarrage |
+| `-log-format` | `MEERKAT_LOG_FORMAT` | vide | `json` ou `text` ; vide choisit JSON sur une gateway de production et texte ailleurs |
+| `-access-log` | `MEERKAT_ACCESS_LOG` | éteint | une ligne par requête franchissant la porte d'entrée, sur la sortie standard - voir [Journaux](/docs/operations/logs) |
+| `-otlp-endpoint` | `MEERKAT_OTLP_ENDPOINT` | vide | un collecteur vers lequel exporter les traces dès la première seconde, par exemple `http://otel-collector:4318` (Enterprise) |
+| `-otlp-sample` | `MEERKAT_OTLP_SAMPLE` | `0.1` | la part des parcours ouverts par cette gateway qui sont enregistrés, de 0 à 1 |
+
+Le niveau est fixé au démarrage ; le changer demande un redémarrage.
+
+Les deux réglages `otlp` servent à une gateway qui doit tracer avant que
+quiconque ait ouvert la console - une image lancée par une chaîne de
+déploiement, par exemple. Sinon c'est le réglage de la console (**Infra,
+OpenTelemetry**) qu'il faut prendre : il ajoute les métriques, la crédentiale au
+coffre, le choix route par route et le bouton Test. Tant qu'il n'a jamais été allumé,
+l'exportateur du démarrage tourne ; une fois allumé, il prend la main, et
+l'éteindre de nouveau arrête l'export jusqu'au prochain démarrage. Voir
+[Traces](/docs/operations/tracing).
 
 ## Sondes
 

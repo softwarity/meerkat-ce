@@ -19,15 +19,15 @@ rail, and it needs root or the gateway-admin capability.
 ## What it shows
 
 - Two curves over the last hour, one point every `5s`: what was answered and what
-  failed.
-- Four numbers over the **last minute**. Averaging an hour would keep a
-  five-minute incident in the headline long after it ended, so the period is
-  written on the screen rather than assumed.
+ failed.
+- Five numbers over the **last minute**, the p95 among them. Averaging an hour would keep a
+ five-minute incident in the headline long after it ended, so the period is
+ written on the screen rather than assumed.
 - A ranking of routes on three axes: the slowest, the ones failing, and the ones
-  spending the most time overall.
+ spending the most time overall.
 - Opening a route lists **its endpoints**, over the same period the table draws.
-  Two clocks on one screen is a screen whose lines do not add up to the row above
-  them.
+ Two clocks on one screen is a screen whose lines do not add up to the row above
+ them.
 
 ![The same screen, scrolled to the per-route ranking](img/console/metrics.webp)
 
@@ -44,28 +44,27 @@ through its own instrument.
 A template comes from one of two places, and the screen says which:
 
 - **declared** - an OpenAPI spec deposited on the route, the per-endpoint rules
-  somebody wrote, or a spec the control plane resolved from the service itself.
-  Somebody wrote it down, so it is exact.
+ somebody wrote, or a spec the control plane resolved from the service itself.
+ Somebody wrote it down, so it is exact.
 - **deduced** - the shape of a path this gateway saw, with segments that look like
-  identifiers folded into `{id}`. It is sometimes wrong: the year in
-  `/files/2024/report` is not an id. Those lines are marked **deduced** everywhere
-  they appear.
+ identifiers folded into `{id}`. It is sometimes wrong: the year in
+ `/files/2024/report` is not an id. Those lines are marked **deduced** everywhere
+ they appear.
 
 Deduction is bounded twice: by the fold, and by a budget of two hundred templates
 per route, everything past it sharing a single bucket.
 
 ## What it does not show
 
-- **Individual requests.** The counters are aggregates; nothing records one call
-  (OBS-03).
-- **Percentiles.** The latency histogram is collected and exposed, but no p95
-  curve is drawn here.
-- **Traces.** `traceparent` is not propagated to upstreams (OBS-04).
+- **Individual requests.** The counters are aggregates. A line per call is the
+ [access log](/docs/operations/logs), and it ships off.
+- **Traces.** The counters are aggregates: to find out where the seconds of ONE request went, you
+ want [traces](/docs/operations/tracing).
 - **Who called.** No label is ever a user, an address or a raw path. That is what
-  keeps the cardinality bounded.
+ keeps the cardinality bounded.
 - **gRPC outcomes.** A gRPC call always answers `200` and puts its verdict in
-  `grpc-status`, which the counters do not read - so a failing gRPC route reads as
-  healthy here (ROUTE-20).
+ `grpc-status`, which the counters do not read - so a failing gRPC route reads as
+ healthy here.
 
 ## Retention
 

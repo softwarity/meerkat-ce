@@ -164,6 +164,7 @@ func (h *Handler) finishExternal(w http.ResponseWriter, r *http.Request) {
 		// The authority's own words are worth showing an admin, never a
 		// visitor: they routinely name accounts and policies.
 		slog.Warn("external sign-in refused", "provider", id, "err", err)
+		h.security(r, secSigninRefused, store.User{}, "provider:"+id)
 		h.render(w, r, st.Next, h.tr(r, "errInvalidCreds"), http.StatusUnauthorized)
 		return
 	}
@@ -182,6 +183,7 @@ func (h *Handler) completeExternal(w http.ResponseWriter, r *http.Request,
 		if errors.Is(err, errNoAutoCreate) {
 			// The authority says who they are, this installation has not
 			// invited them: say so plainly, there is nothing to enumerate.
+			h.security(r, secSigninRefused, store.User{Username: identity.Username}, "not-invited")
 			h.render(w, r, next, h.tr(r, "errNotInvited"), http.StatusForbidden)
 			return
 		}
@@ -190,6 +192,7 @@ func (h *Handler) completeExternal(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	if !user.Enabled {
+		h.security(r, secSigninRefused, user, refusedDisabled)
 		h.render(w, r, next, h.tr(r, "errInvalidCreds"), http.StatusUnauthorized)
 		return
 	}

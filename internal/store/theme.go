@@ -29,6 +29,10 @@ type Theme struct {
 	Light     map[string]string `json:"light"`
 	CreatedAt int64             `json:"createdAt"`
 	UpdatedAt int64             `json:"updatedAt"`
+	// Rev is the revision this row was READ at, carried back by a save so a
+	// write built on a version somebody has replaced is refused. Zero means "I
+	// read no version" and still wins - see rev.go.
+	Rev int64 `json:"rev,omitempty"`
 }
 
 // themeTokens are the editable color tokens, in emission order. The CSS var is
@@ -462,40 +466,36 @@ func isHexColor(v string) bool {
 // the first one active. An already-populated table is topped up ONCE with any
 // preset it is missing (so upgrades gain the new palettes) - guarded by a
 // setting so a preset the admin later deletes is never resurrected.
+// seedThemes puts ONE theme in the database: the default, active.
+//
+// The others are not copied any more. A preset is code (PresetThemes), the
+// console offers the whole set in its picker read-only, and duplicating one is
+// how a palette of your own begins. Copying all eight at install time made
+// eight editable, deletable near-duplicates of things that already existed -
+// and then needed a "+" menu whose only job was to put back a preset somebody
+// had deleted. Nothing to put back now: they were never removable.
 func (s *Store) seedThemes() error {
 	ctx := context.Background()
 	var n int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM themes`).Scan(&n); err != nil {
 		return fmt.Errorf("store: count themes: %w", err)
 	}
-	presets := PresetThemes()
-	if n == 0 {
-		for _, t := range presets {
-			t.Active = false
-			if err := s.SaveTheme(ctx, t); err != nil {
-				return fmt.Errorf("store: seed theme %q: %w", t.Name, err)
-			}
-		}
-		return s.ActivateTheme(ctx, presets[0].ID)
-	}
-	var seeded bool
-	if err := s.GetSetting(ctx, SettingThemePresetsSeeded, &seeded); err == nil && seeded {
+	if n > 0 {
 		return nil
 	}
-	for _, t := range presets {
-		if _, err := s.GetTheme(ctx, t.ID); err == nil {
-			continue // already present - leave it (and its active flag) alone
-		}
-		t.Active = false
-		if err := s.SaveTheme(ctx, t); err != nil {
-			return fmt.Errorf("store: top up theme %q: %w", t.Name, err)
-		}
+	t := DefaultTheme()
+	if err := s.SaveTheme(ctx, t); err != nil {
+		return fmt.Errorf("store: seed theme %q: %w", t.Name, err)
 	}
-	return s.SetSetting(ctx, SettingThemePresetsSeeded, true)
+	return s.ActivateTheme(ctx, t.ID)
 }
 
 // SaveTheme inserts or replaces a theme by ID after sanitizing its palettes.
 func (s *Store) SaveTheme(ctx context.Context, t Theme) error {
+	// See rev.go: a write built on a version somebody has replaced is refused.
+	if err := s.checkRev(ctx, "themes", "theme", t.ID, t.Rev); err != nil {
+		return err
+	}
 	dark, err := sanitizeThemeColors(t.Dark)
 	if err != nil {
 		return fmt.Errorf("store: theme %q: %w", t.Name, err)
@@ -515,11 +515,11 @@ func (s *Store) SaveTheme(ctx context.Context, t Theme) error {
 		created = now
 	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO themes (id, name, active, flat, dark, light, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO themes (id, name, active, flat, dark, light, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, flat = excluded.flat, dark = excluded.dark, light = excluded.light,
-		   updated_at = excluded.updated_at`,
+		   updated_at = excluded.updated_at, rev = themes.rev + 1`,
 		t.ID, t.Name, t.Active, t.Flat, string(dj), string(lj), created, now)
 	if err != nil {
 		return fmt.Errorf("store: save theme %q: %w", t.Name, err)
@@ -553,13 +553,13 @@ func (s *Store) ActivateTheme(ctx context.Context, id string) error {
 
 // GetTheme returns one theme, or an error wrapping sql.ErrNoRows.
 func (s *Store) GetTheme(ctx context.Context, id string) (Theme, error) {
-	return s.themeRow(ctx, `SELECT id, name, active, flat, dark, light, created_at, updated_at
+	return s.themeRow(ctx, `SELECT id, name, active, flat, dark, light, created_at, updated_at, rev
 		 FROM themes WHERE id = ?`, id)
 }
 
 // GetActiveTheme returns the active theme (there is always exactly one).
 func (s *Store) GetActiveTheme(ctx context.Context) (Theme, error) {
-	return s.themeRow(ctx, `SELECT id, name, active, flat, dark, light, created_at, updated_at
+	return s.themeRow(ctx, `SELECT id, name, active, flat, dark, light, created_at, updated_at, rev
 		 FROM themes WHERE active = ?`, true)
 }
 
@@ -589,7 +589,7 @@ func (s *Store) themeRow(ctx context.Context, query string, args ...any) (Theme,
 	var t Theme
 	var dark, light string
 	err := s.db.QueryRowContext(ctx, query, args...).
-		Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &dark, &light, &t.CreatedAt, &t.UpdatedAt)
+		Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &dark, &light, &t.CreatedAt, &t.UpdatedAt, &t.Rev)
 	if err != nil {
 		return Theme{}, fmt.Errorf("store: get theme: %w", err)
 	}
@@ -607,7 +607,7 @@ func (s *Store) themeRow(ctx context.Context, query string, args ...any) (Theme,
 // that does NOT depend on which one is active.
 func (s *Store) ListThemes(ctx context.Context) ([]Theme, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, active, flat, dark, light, created_at, updated_at FROM themes`)
+		`SELECT id, name, active, flat, dark, light, created_at, updated_at, rev FROM themes`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list themes: %w", err)
 	}
@@ -616,7 +616,7 @@ func (s *Store) ListThemes(ctx context.Context) ([]Theme, error) {
 	for rows.Next() {
 		var t Theme
 		var dark, light string
-		if err := rows.Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &dark, &light, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &dark, &light, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan theme: %w", err)
 		}
 		if err := json.Unmarshal([]byte(dark), &t.Dark); err != nil {

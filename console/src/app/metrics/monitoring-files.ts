@@ -83,12 +83,13 @@ export const monitoringUrl = (name: string) => `/monitoring/${name}`;
 export interface Installation {
   // The exposition's path, sent by the gateway rather than assembled here.
   path: string;
-  // The port the gateway LISTENS on - not the one the console was reached at.
-  // These scrapes address the container on a shared network, so a published
-  // mapping (9092 onto 9090) and an ingress answering on 443 are both beside
-  // the point; the browser's own port was right in development and nowhere
-  // else.
+  // The METRICS port, chosen in the console with the switch - not the one the
+  // console was reached at. These scrapes address the container on a shared
+  // network, and that port is never published anyway.
   port: string;
+  // Whether that port asks for a token: the `#token` lines come back
+  // uncommented, or go.
+  token: boolean;
   // The network Prometheus has to join to reach this gateway, as the runtime
   // named it (GET /api/services, `reach`). Empty when nothing answered.
   network: string;
@@ -120,9 +121,22 @@ export function gatewayNetwork(reach: readonly string[]): string {
 // these files, so the substitution survives them being reindented,
 // recommented or reordered.
 export function stamp(text: string, i: Installation): string {
-  const stamped = text
+  const stamped = withToken(text, i.token)
     .replaceAll('/metrics', i.path)
-    .replaceAll('port: 9090', `port: ${i.port}`);
+    .replaceAll('port: 9091', `port: ${i.port}`);
   const withNetwork = i.network ? stamped.replaceAll('meerkat_default', i.network) : stamped;
   return i.dataOrigin ? withNetwork.replaceAll('http://localhost:8080', i.dataOrigin) : withNetwork;
+}
+
+// The credential, which the files carry commented out under a `#token `
+// marker: the metrics port asks for none unless the console says so, and a
+// file fetched as it stands has to work for the default. Same marker rule as
+// the platforms - the marker carries the indentation.
+function withToken(text: string, keep: boolean): string {
+  const marker = '#token ';
+  return text
+    .split('\n')
+    .filter((line) => keep || !line.startsWith(marker))
+    .map((line) => (line.startsWith(marker) ? line.slice(marker.length) : line))
+    .join('\n');
 }

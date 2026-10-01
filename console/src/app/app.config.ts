@@ -7,6 +7,8 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideStore } from '@softwarity/store';
 import { routes } from './app.routes';
 import { authInterceptor } from './auth.interceptor';
+import { staleInterceptor } from './stale.interceptor';
+import { ownWritesInterceptor } from './own-writes.interceptor';
 
 // No animations provider: since v20.2 the animations package is deprecated -
 // Material animates natively (animate.enter/animate.leave, plain CSS).
@@ -18,7 +20,7 @@ export const appConfig: ApplicationConfig = {
     // Root-relative, so it goes out on the origin the console was served from
     // and carries the session cookie that authorises it.
     provideLivewire({ path: '/api/live' }),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, staleInterceptor, ownWritesInterceptor])),
     // Persist UI table preferences (sort, filters) in browser storage.
     provideStore(),
     // Every mat-form-field is outline by default (no per-field appearance).

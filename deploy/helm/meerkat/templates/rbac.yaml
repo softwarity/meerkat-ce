@@ -1,8 +1,48 @@
-{{- if .Values.plug.enabled }}
-# The developer tunnel needs one right: manage Services in this namespace, so a
-# session can point a cluster name at somebody's machine and put it back. That
-# grant IS the switch - without it the tunnel does not run, the gateway says so
-# once and serves as usual.
+{{- if and .Values.plug.enabled (not .Values.production) }}
+# The rights the plug agent needs, one per feature it grew. The grant IS the
+# switch - without it the tunnel does not run, the gateway says so once and
+# serves as usual. `plug doctor` names whichever one is missing.
+#
+#   services      point a cluster name at somebody's machine, and put it back
+#   endpoints     the net under that: when a Service's selector cannot be
+#                 repointed, the agent writes the Endpoints itself. Without it
+#                 it falls back to an `app: plug` selector that Argo CD
+#                 overwrites, and a parked Service stays dead after a session
+#                 is killed (plug 2.12)
+#   deployments   `plug update`, and the periodic sweep that restores a parked
+#                 Service without restarting the agent (plug 2.15)
+#   pods, exec    the plugged process inherits the environment of the workload
+#                 it replaces, read with `exec cat /proc/1/environ` in the
+#                 parked pod - the same trick as mirrord. The pod has already
+#                 resolved its secrets, so this asks for no `get secrets`
+#                 (plug 2.16)
+#   pods again    creating and removing one: the live mount runs a helper pod
+#                 beside the workload, with its volumes, for the session
+#   claims        reading one, to refuse a ReadWriteOncePod volume with a
+#                 reason instead of a helper that never starts
+#
+# The list is plug's own (deploy/plug-k8s.yaml in that repository, and the same
+# file on its documentation site). Anything the agent grew since is a right it
+# will ask for at the moment somebody uses the feature, which is the worst
+# place to discover a missing grant - so this file is compared to that one
+# rather than guessed at.
+#
+# pods/exec is the widest of these: in this namespace it amounts to running
+# code in the pods, and reading an environment a pod has already resolved is
+# reading the secrets it resolved. It is scoped to a Role rather than a
+# ClusterRole, and it follows the TUNNEL rather than a switch of its own:
+#
+#   production: true   the developer surface is closed, the gateway opens no
+#                      tunnel, and nothing here is granted - a right nobody
+#                      exercises is surface for nothing.
+#   otherwise          the gateway opens the tunnel (developer mode ships on),
+#                      so the deployment grants what it is about to use. The
+#                      earlier default granted nothing while the tunnel opened
+#                      anyway, which is the one combination that cannot work:
+#                      an agent that cannot do its job, saying so every minute.
+#
+# plug.enabled: false still refuses it outright, for an installation that wants
+# the developer surface without the tunnel.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -12,6 +52,42 @@ rules:
   - apiGroups: [""]
     resources: ["services"]
     verbs: ["get", "list", "create", "delete", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "create", "update", "delete"]
+  # A Service with a NAMED port (a Helm chart, typically) keeps the
+  # EndpointSlice Kubernetes built for the deployed pod once it is parked, and
+  # kube-proxy then sends one request in two to that pod instead of plug. The
+  # agent deletes that slice at park, and repairs a doubled name at each sweep.
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["list", "deletecollection"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch"]
+  # create/delete beside get/list: the live mount starts a HELPER POD next to
+  # the workload - the agent's own image, with the workload's claim mounted,
+  # serving it over SMB for the session - and removes it when the session ends
+  # (or when the sweep finds it outlived one). Without these two the mount
+  # fails at the moment somebody uses it, which is the worst place to find out.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "delete"]
+  # Reading the claim is how a ReadWriteOncePod volume is REFUSED with a reason
+  # rather than with a helper pod that stays Pending for ever.
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get"]
+  # BOTH verbs, as Kubernetes' own `edit` role grants them: the API server
+  # evaluates a WebSocket upgrade (a GET) as `get` and a SPDY exec (a POST) as
+  # `create`. `create` alone was tried on a real cluster and answered 403, and
+  # the agent then fell back to the pod's spec - where a variable that comes
+  # from a Secret is a name with no value, so a plugged service started with an
+  # empty password. A right that is half granted fails quietly, which is worse
+  # than one that is refused.
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -93,6 +93,28 @@ func (a *API) secretHolders() map[string]secretHolder {
 				return a.st.SetSetting(ctx, store.SettingSMTP, cfg)
 			},
 		},
+		// The collector's auth header (OBS-04). The FIELD is the header's own
+		// name, because that is what identifies it: this holder carries a map
+		// somebody named, not a fixed list of fields like the two above.
+		"telemetry": {
+			scope: vault.ScopeInfra,
+			load: func(ctx context.Context, _ string) (string, map[string]string, error) {
+				cfg := a.st.RawTelemetry(ctx)
+				secrets := map[string]string{}
+				for name, value := range cfg.Headers {
+					secrets[name] = value
+				}
+				return "OpenTelemetry", secrets, nil
+			},
+			stash: func(ctx context.Context, _, field, value string) error {
+				cfg := a.st.RawTelemetry(ctx)
+				if _, ok := cfg.Headers[field]; !ok {
+					return fmt.Errorf("the telemetry setting carries no header named %q", field)
+				}
+				cfg.Headers[field] = value
+				return a.st.SetSetting(ctx, store.SettingTelemetry, cfg)
+			},
+		},
 		"tls": {
 			scope: vault.ScopeInfra,
 			load: func(ctx context.Context, _ string) (string, map[string]string, error) {

@@ -8,7 +8,7 @@ summary: Encrypted secrets and plain values under one namespace, the $name refer
 # The vault
 
 The vault is the one place the rest of the configuration points at instead of carrying a
-value inline (VAULT-01). It holds two kinds of entry under **one namespace**:
+value inline. It holds two kinds of entry under **one namespace**:
 
 | Kind | At rest | Read back |
 |---|---|---|
@@ -34,11 +34,11 @@ password: "$smtp-password"
 ```
 
 - `$name` and `${name}` are the same reference; the braces let it sit flush against what
-  follows.
+ follows.
 - `$$` is a literal `$`.
 - A name that does not resolve is left **verbatim** and reported, so a typo shows up as
-  itself. Turning it silently into an empty string would produce an empty upstream or an
-  empty password, which fail in far more confusing ways.
+ itself. Turning it silently into an empty string would produce an empty upstream or an
+ empty password, which fail in far more confusing ways.
 
 For a **secret** there is one extra rule: only a value that is *entirely* one reference
 counts as a reference. An upstream is built around its references, so a fragment is normal
@@ -66,7 +66,7 @@ own under the same name.
 ## A sensitive field always goes through the vault
 
 A field that holds a secret has four states in the console, and typing a value blocks the
-save until it has been filed (VAULT-05). A literal inherited from a bootstrap file or an
+save until it has been filed. A literal inherited from a bootstrap file or an
 older save is moved **server-side**: the browser sends a name, not a value - it never
 received that literal and could not file it itself.
 
@@ -97,7 +97,7 @@ key** go through it too.
 
 ## The vault as a file
 
-The exact opposite of a configuration export, in every way (VAULT-03). It holds the values
+The exact opposite of a configuration export, in every way. It holds the values
 themselves, it is encrypted with a passphrase the gateway never stores, and it is **not**
 something to version: it exists to bootstrap an environment or to move a gateway, then to be
 deleted.
@@ -114,7 +114,7 @@ or `MEERKAT_VAULT_PASSPHRASE_FILE`.
 ## Reminder dates
 
 An entry can carry a **reminder date**: the day its secret is known to lapse at its source - a
-token, a certificate (VAULT-06).
+token, a certificate.
 
 It is purely a reminder and changes nothing. The gateway cannot tell whether a token was renewed
 at the provider, so the `$name` reference goes on resolving. The date only feeds the daily digest,
@@ -122,9 +122,9 @@ which lists what is coming and what has just passed, never the value.
 
 ## What is missing
 
-- **Rotating the master key** (VAULT-02): there is no global re-encryption, so there is no
-  rotation.
-- **An external backend** (VAULT-04): no HashiCorp Vault, no Kubernetes or Docker secrets as an
-  alternative source.
-- **TOTP secrets are not encrypted at rest** (SEC-06). They do not go through the vault; that is
-  written down as a known gap, not a detail.
+- **Rotating the master key**: there is no global re-encryption, so there is no
+ rotation.
+- **An external backend**: no HashiCorp Vault, no Kubernetes or Docker secrets as an
+ alternative source.
+- **TOTP secrets are not encrypted at rest**. They do not go through the vault; that is
+ written down as a known gap, not a detail.

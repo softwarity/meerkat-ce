@@ -1,0 +1,897 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/admin-tokens",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin-tokens",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admin-tokens/{id}",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin-tokens/{id}",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin-tokens/{id}/renew",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin-tokens/{id}/toggle",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/apidocs/token",
+    "guard": "devOrInfra"
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/export",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth-providers",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth-providers/callback-base",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth-providers/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth-providers/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth-providers/{id}/check",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/backup",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/backup/info",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/branding",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/branding",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/catalog",
+    "guard": "gw"
+  },
+  {
+    "method": "GET",
+    "path": "/api/certificates",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/certificates/import",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/certificates/self-signed",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/certificates/signing-request",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/certificates/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/certificates/{id}/adopt",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/certificates/{id}/pem",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/certificates/{id}/signing-request",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/config/document",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/config/export",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/config/history",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/config/history/{id}",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/config/history/{id}/plan",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/config/history/{id}/restore",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/config/history/{id}/save",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/config/import",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/config/preview",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/config/report",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/configurations",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/configurations/current",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/import",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/configurations/{id}",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/configurations/{id}",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/configurations/{id}",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/{id}/activate",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/{id}/capture",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/configurations/{id}/compare/{other}",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/configurations/{id}/document",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/configurations/{id}/document",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/{id}/duplicate",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/configurations/{id}/export",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/configurations/{id}/plan",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/data-tokens",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/data-tokens/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/edition",
+    "guard": "authed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/identity/preview",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/identity/signing-keys",
+    "guard": "gw"
+  },
+  {
+    "method": "POST",
+    "path": "/api/identity/signing-keys/renew",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/issues",
+    "guard": "authed"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/issues/{id}",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/issues/{id}",
+    "guard": "authed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/issues/{id}/comments",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/issues/{id}/screenshot",
+    "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/issues/{id}/status",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/live",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/locales",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/locales/{code}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/locales/{code}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/locales/{code}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/me",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/me/avatar",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/model/user-fields",
+    "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/model/user-fields",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/icons",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/roles",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/roles",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/roles/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/roles/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/routes",
+    "guard": "gw"
+  },
+  {
+    "method": "GET",
+    "path": "/api/routes/health",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/routes/probe",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/routes/reorder",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/routes/respond-preview",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/routes/version-preview",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/routes/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/routes/{id}",
+    "guard": "gw"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/routes/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/routes/{id}/operations",
+    "guard": "gw"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/routes/{id}/security",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/routes/{id}/spec",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/routes/{id}/spec",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/schedules",
+    "guard": "schedules"
+  },
+  {
+    "method": "POST",
+    "path": "/api/schedules",
+    "guard": "schedules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/schedules/{id}",
+    "guard": "schedules"
+  },
+  {
+    "method": "GET",
+    "path": "/api/schedules/{id}",
+    "guard": "schedules"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/schedules/{id}",
+    "guard": "schedules"
+  },
+  {
+    "method": "POST",
+    "path": "/api/schedules/{id}/pause",
+    "guard": "schedules"
+  },
+  {
+    "method": "POST",
+    "path": "/api/schedules/{id}/resume",
+    "guard": "schedules"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/schedules/{id}/run",
+    "guard": "schedules"
+  },
+  {
+    "method": "POST",
+    "path": "/api/schedules/{id}/run",
+    "guard": "schedules"
+  },
+  {
+    "method": "GET",
+    "path": "/api/schedules/{id}/runs",
+    "guard": "schedules"
+  },
+  {
+    "method": "GET",
+    "path": "/api/services",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/sessions",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/sessions/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings",
+    "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/agent",
+    "guard": "gw"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/agent",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/audit",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/audit",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/issues",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/issues",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/mail-relay",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/mail-relay",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/settings/mail-relay/test",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/maintenance",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/maintenance",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/metrics",
+    "guard": "gw"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/metrics",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/plug",
+    "guard": "gw"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/plug",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/proxy",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/proxy",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/schedules",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/schedules",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/telemetry",
+    "guard": "gw"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/telemetry",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/settings/telemetry/test",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/tenancy",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/tls",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/tls",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants",
+    "guard": "authed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/tenants",
+    "guard": "tenantCreator"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/tenants/{id}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/tenants/{id}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/group-rules",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "POST",
+    "path": "/api/tenants/{id}/group-rules",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/group-rules/reported",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/tenants/{id}/group-rules/{ruleId}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/tenants/{id}/group-rules/{ruleId}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/groups",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "POST",
+    "path": "/api/tenants/{id}/groups",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/tenants/{id}/groups/{groupId}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/tenants/{id}/groups/{groupId}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/members",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/tenants/{id}/members/{userId}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/tenants/{id}/members/{userId}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/members/{userId}/groups",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/tenants/{id}/members/{userId}/groups",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/members/{userId}/logins",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "POST",
+    "path": "/api/tenants/{id}/members/{userId}/reset-password",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "POST",
+    "path": "/api/tenants/{id}/owner",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/themes",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/themes",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/themes/presets",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/themes/templates",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/themes/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/themes/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/themes/{id}/activate",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/themes/{id}/preview",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/users",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/users",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/lookup",
+    "guard": "authed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/must-change-password",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/users/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/users/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/{id}/identities",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/{id}/logins",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/{id}/must-change-password",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/{id}/reset-password",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/vault",
+    "guard": "authed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/vault/export",
+    "guard": "authed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/vault/import",
+    "guard": "authed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/vault/stash",
+    "guard": "authed"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/vault/{scope}/{name}",
+    "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/vault/{scope}/{name}",
+    "guard": "authed"
+  },
+  {
+    "method": "*",
+    "path": "/mcp",
+    "guard": "agentDoor"
+  }
+]

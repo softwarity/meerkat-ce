@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -12,6 +14,7 @@ import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, AuthProvider, Settings } from '../../api.service';
 import { AuthProviderEditorComponent } from './auth-provider-editor.component';
 import { LocalProviderEditorComponent } from './local-provider-editor.component';
+import { LiveChangesService } from '../../shared/live-changes.service';
 
 // External authentication (AUTH-19), infra plane: the authorities people may
 // sign in through. A directory or an identity provider is a third-party
@@ -22,6 +25,8 @@ import { LocalProviderEditorComponent } from './local-provider-editor.component'
   selector: 'app-auth-providers-page',
   imports: [
     MatButtonModule,
+    MatFormFieldModule,
+    MatSelectModule,
     MatIconModule,
     MatSidenavModule,
     MatSlideToggleModule,
@@ -72,15 +77,41 @@ export class AuthProvidersPageComponent {
   // The master switch over every authority (AUTH-20): it lives here because
   // this is the list of doors, and it is the one that closes all of them.
   protected readonly signUpOpen = signal(false);
+  // How long a mailed confirmation link lives (AUTH-22): three choices, each
+  // with its own sentence in every language of the mail.
+  protected readonly confirmHours = signal(24);
+  protected readonly confirmChoices = [
+    { hours: 24, label: $localize`:@@Confirm_24h:24 hours` },
+    { hours: 48, label: $localize`:@@Confirm_48h:48 hours` },
+    { hours: 168, label: $localize`:@@Confirm_7d:7 days` },
+  ];
   protected readonly savingSignUp = signal(false);
   private settings: Settings | null = null;
 
   constructor() {
     this.load();
+    // Somebody else's write (CONSOLE-13): this list follows what other
+    // operators do, quietly - a spinner replacing a list nobody asked to
+    // reload takes the screen away from whoever is reading it.
+    inject(LiveChangesService).on('authprovider', () => this.load(true));
     this.api.settings().subscribe({
       next: (s) => {
         this.settings = s;
         this.signUpOpen.set(s.selfRegistration);
+        this.confirmHours.set(s.confirmHours || 24);
+      },
+    });
+  }
+
+  protected setConfirmHours(hours: number): void {
+    const s = this.settings;
+    if (!s) return;
+    this.confirmHours.set(hours);
+    this.api.saveSettings({ ...s, confirmHours: hours }).subscribe({
+      next: (saved) => (this.settings = saved),
+      error: () => {
+        this.confirmHours.set(s.confirmHours || 24);
+        this.snack.open($localize`:@@Save_failed:Save failed`, undefined, { duration: 4000 });
       },
     });
   }
@@ -109,8 +140,8 @@ export class AuthProvidersPageComponent {
     });
   }
 
-  load(): void {
-    this.loading.set(true);
+  load(quiet = false): void {
+    if (!quiet) this.loading.set(true);
     this.api.authProviders().subscribe({
       next: (list) => {
         this.providers.set(list);

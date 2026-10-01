@@ -18,6 +18,7 @@ import { AcmeSettings, ApiService, Certificate, TlsSettings } from '../../api.se
 import { DialogsService } from '../../shared/dialogs.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { SecretFieldComponent } from '../../shared/secret-field.component';
+import { LiveChangesService } from '../../shared/live-changes.service';
 import {
   CertificateDialogComponent,
   CertificateDialogData,
@@ -130,6 +131,17 @@ export class TlsPageComponent {
 
   constructor() {
     this.load();
+    // Somebody else's write (CONSOLE-13), and only the CERTIFICATES: the rest
+    // of this screen is a form, and re-applying the settings under somebody
+    // typing in it would throw their work away for news they did not ask for.
+    inject(LiveChangesService).on('certificate', () => this.loadCertificates());
+  }
+
+  private loadCertificates(): void {
+    this.api.listCertificates().subscribe({
+      next: (list) => this.certificates.set(list),
+      error: () => this.certificates.set([]),
+    });
   }
 
   private load(): void {
@@ -201,6 +213,24 @@ export class TlsPageComponent {
     this.save({ redirect: on });
   }
 
+  // HSTS (SSL-06) follows Force HTTPS; only its length is chosen, a DAY until
+  // somebody says otherwise: a browser keeps the promise for the whole
+  // duration even if the certificates are taken away, so the first setting is
+  // the one that is cheap to be wrong about.
+  protected readonly hstsSeconds = computed(() => this.tls()?.hstsMaxAge || 86400);
+  protected readonly hstsDurations = [
+    { seconds: 86400, label: $localize`:@@Hsts_day:1 day` },
+    { seconds: 7 * 86400, label: $localize`:@@Hsts_week:1 week` },
+    { seconds: 30 * 86400, label: $localize`:@@Hsts_month:1 month` },
+    { seconds: 182 * 86400, label: $localize`:@@Hsts_six_months:6 months` },
+    { seconds: 365 * 86400, label: $localize`:@@Hsts_year:1 year` },
+    { seconds: 730 * 86400, label: $localize`:@@Hsts_two_years:2 years` },
+  ];
+
+  protected setHsts(seconds: number): void {
+    this.save({ hstsMaxAge: seconds });
+  }
+
   // A name is automatic when it is in the authority's closed list. The tick
   // box IS that membership - there is no separate list to keep in step.
   protected toggleAutomatic(host: string, on: boolean): void {
@@ -214,7 +244,7 @@ export class TlsPageComponent {
     this.save();
   }
 
-  protected save(patch: { redirect?: boolean } = {}): void {
+  protected save(patch: { redirect?: boolean; hstsMaxAge?: number } = {}): void {
     const t = this.tls();
     if (!t) return;
     const acme = { ...this.acme() };
@@ -225,6 +255,7 @@ export class TlsPageComponent {
         consoleName: this.consoleName(),
         appNames: this.appNames(),
         redirect: patch.redirect ?? t.redirect,
+        hstsMaxAge: patch.hstsMaxAge ?? t.hstsMaxAge ?? 0,
         acme,
       })
       .subscribe({

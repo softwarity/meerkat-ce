@@ -133,6 +133,9 @@ export class EndpointSecurityComponent {
 
   // The route-wide default rule (applies to every operation with no override).
   protected readonly routeAccess = signal<AccessState>(emptyAccess());
+  // Only what a rule lists is reachable (RBAC-07): an operation with no rule
+  // of its own is then closed to everyone rather than gated by the route.
+  protected readonly denyUnlisted = signal(false);
 
   // Per-operation edits, keyed by opKey.
   private readonly state = signal<Record<string, OpState>>({});
@@ -221,12 +224,40 @@ export class EndpointSecurityComponent {
     return ops;
   });
 
-  // Operations whose EFFECTIVE access gates something, plus the preserved extras.
+  // Operations whose EFFECTIVE access gates something. The preserved extras -
+  // saved rules matching no operation of the spec - used to be ADDED to this,
+  // which is how a route with 14 operations read "24 secured": two different
+  // sets, one total. They are reported on their own line instead, because a
+  // rule nothing matches is not a secured operation, it is a rule to look at.
   protected readonly securedCount = computed(() => {
-    let n = this.extras().length;
+    let n = 0;
     for (const o of this.operations()) if (!isEmpty(this.effective(o))) n++;
     return n;
   });
+
+  // Of those, the ones gated by a rule of THEIR OWN. The table shows the route's
+  // rule repeated on every line - which is the truth about what gates each
+  // operation, and reads as if somebody had set fifteen rules. So the footer
+  // tells the two apart: what the route gates, and what was decided per
+  // endpoint.
+  //
+  // Not overrideCount: that one adds the stray rules, because the badges need
+  // "gated somewhere" - and a stray rule is already a line of its own down
+  // here. Counting it twice is how "14 operations" once read "24 secured".
+  protected readonly overriddenCount = computed(
+    () => this.operations().filter((o) => this.stateOf(o).override).length,
+  );
+
+  // And what the ROUTE's own rule gates: every operation that did not take one
+  // of its own, when the route has a rule at all.
+  protected readonly byRouteCount = computed(() =>
+    isEmpty(this.routeAccess()) ? 0 : this.operations().length - this.overriddenCount(),
+  );
+
+  // Saved rules that match no operation this spec declares. Kept on save (never
+  // silently dropped) and now SAID: they are invisible on this screen otherwise,
+  // and what they usually mean is that the spec moved under them.
+  protected readonly strayCount = computed(() => this.extras().length);
 
   constructor() {
     const preselect = inject(ActivatedRoute).snapshot.queryParamMap.get('route') ?? '';
@@ -299,19 +330,29 @@ export class EndpointSecurityComponent {
     // The "whole route" default is the route's own Access now; overrides come
     // from the endpoint-security block.
     this.routeAccess.set(fromWire(ops.access));
+    this.denyUnlisted.set(!!ops.security?.denyUnlisted);
     const saved = new Map<string, EndpointPolicy>();
     for (const e of ops.security?.endpoints ?? []) saved.set(opKey(e.method, e.path), e);
+    // A rule may name "*" - every verb on that path, which is how one writes
+    // "nobody but an admin touches /admin/loggers" without listing four verbs.
+    // It matches each operation of that path, and matching is what decides
+    // whether the screen can show it: read as a method of its own, such a rule
+    // matched nothing and was filed among the strays, invisible.
+    const anyVerb = new Map<string, EndpointPolicy>();
+    for (const e of ops.security?.endpoints ?? []) {
+      if (e.method === '*') anyVerb.set(e.path, e);
+    }
 
     const st: Record<string, OpState> = {};
     const matched = new Set<string>();
     for (const o of ops.operations) {
       const k = opKey(o.method, o.path);
-      const p = saved.get(k);
+      const p = saved.get(k) ?? anyVerb.get(o.path);
       if (p) {
         // An entry saved for its BOUND alone carries no access fields, and
         // must not read back as an override of nothing.
         st[k] = { override: !isEmpty(fromWire(p)), access: fromWire(p), limits: p.limits ?? [] };
-        matched.add(k);
+        matched.add(opKey(p.method, p.path));
       } else {
         st[k] = { override: false, access: emptyAccess(), limits: [] };
       }
@@ -380,14 +421,32 @@ export class EndpointSecurityComponent {
   protected readonly isEmptyRule = isEmpty;
 
   // The rule actually in force for an operation: its override, or the route default.
+  // What the route puts in front of every operation, shown once beside the
+  // spec's name rather than repeated down the column.
+  protected readonly prefix = computed(() => this.data()?.prefix ?? '');
+
+  // A path as the column shows it: without the prefix every line shares. What
+  // is STORED and what the gateway compares is always the whole path - this is
+  // the display and nothing else.
+  protected shortPath(path: string): string {
+    const p = this.prefix();
+    return p && path.startsWith(p) ? path.slice(p.length) || '/' : path;
+  }
+
   protected effective(o: OpenAPIOperation): AccessState {
     const s = this.stateOf(o);
-    return s.override ? s.access : this.routeAccess();
+    if (s.override) return s.access;
+    return this.denyUnlisted() ? { ...emptyAccess(), level: 'deny' } : this.routeAccess();
   }
 
   protected setOpAccess(o: OpenAPIOperation, access: AccessState): void {
     const k = opKey(o.method, o.path);
     this.state.update((s) => ({ ...s, [k]: { ...this.stateOf(o), override: true, access } }));
+    this.scheduleSave();
+  }
+
+  protected setDenyUnlisted(on: boolean): void {
+    this.denyUnlisted.set(on);
     this.scheduleSave();
   }
 
@@ -428,6 +487,7 @@ export class EndpointSecurityComponent {
         ...(ra.users.length ? { users: ra.users } : {}),
       },
       endpoints,
+      ...(this.denyUnlisted() ? { denyUnlisted: true } : {}),
     };
 
     this.saveState.set('saving');

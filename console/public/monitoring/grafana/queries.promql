@@ -17,12 +17,12 @@ histogram_quantile(0.95,
 # or folded from the paths seen - a deduced one can be read wrong, so it is
 # carried rather than filtered out.
 topk(10,
-  sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_sum[5m]))
+  sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_total[5m]))
     / sum by (name, endpoint, source) (rate(meerkat_endpoint_requests_total[5m])))
 
 # Endpoints costing the most overall - neither the slowest nor the busiest,
 # and usually what to fix first
-topk(10, sum by (name, endpoint) (rate(meerkat_endpoint_duration_seconds_sum[5m])))
+topk(10, sum by (name, endpoint) (rate(meerkat_endpoint_duration_seconds_total[5m])))
 
 # Services not answering, by kind of failure
 sum by (name, kind) (rate(meerkat_upstream_failures_total[5m]))

@@ -1,6 +1,58 @@
 <mat-card appearance="outlined">
   <div class="head">
-    <span i18n="@@Token">Token</span>
+    <!-- The theme's NAME where the column header used to say "Token": every
+         row below is a token, so the word said nothing, and a palette with no
+         name on it cannot be referred to out loud. -->
+    @if (renaming()) {
+      <input
+        class="rename"
+        [value]="name()"
+        (blur)="name.set($any($event.target).value.trim() || name()); renaming.set(false)"
+        (keydown.enter)="$any($event.target).blur()"
+        (keydown.escape)="renaming.set(false)"
+        autofocus
+      />
+    } @else {
+      <span class="theme-name">
+        <b>{{ name() }}</b>
+        @if (readOnly()) {
+          <mat-icon class="lock" matTooltip="Built-in palette: duplicate it to make it yours"
+            i18n-matTooltip="@@Theme_builtin_hint">lock</mat-icon>
+        } @else {
+          <button matIconButton (click)="startRename()"
+            matTooltip="Rename" i18n-matTooltip="@@Rename" aria-label="Rename" i18n-aria-label="@@Rename">
+            <mat-icon>edit</mat-icon>
+          </button>
+        }
+        <button matIconButton [matMenuTriggerFor]="moreMenu"
+          matTooltip="More" i18n-matTooltip="@@More" aria-label="More" i18n-aria-label="@@More">
+          <mat-icon>more_vert</mat-icon>
+        </button>
+        @if (dirty()) {
+          <span class="dirty" matTooltip="Unsaved changes - moving to another theme discards them"
+            i18n-matTooltip="@@Theme_dirty_hint" i18n="@@Unsaved">unsaved</span>
+        }
+      </span>
+      <mat-menu #moreMenu="matMenu">
+        <button mat-menu-item (click)="duplicate.emit()">
+          <mat-icon>content_copy</mat-icon>
+          <span i18n="@@Duplicate">Duplicate</span>
+        </button>
+        <button mat-menu-item (click)="remove.emit()" [disabled]="!canDelete()">
+          <mat-icon>delete</mat-icon>
+          <span i18n="@@Delete">Delete</span>
+        </button>
+        @if (active()) {
+          <div class="menu-why" i18n="@@Theme_active_undeletable">
+            The live theme cannot be deleted. Activate another one first.
+          </div>
+        } @else if (readOnly()) {
+          <div class="menu-why" i18n="@@Theme_builtin_undeletable">
+            A built-in palette is part of the product. Duplicate it to make it yours.
+          </div>
+        }
+      </mat-menu>
+    }
     <mat-checkbox
       [checked]="darkOffered()"
       [disabled]="darkOffered() && !lightOffered()"
@@ -30,7 +82,7 @@
           <mat-checkbox
             class="label glow-toggle"
             [checked]="!flat()"
-            (change)="flat.set(!$event.checked)"
+            (change)="readOnly() || flat.set(!$event.checked)"
             (mouseenter)="hoverToken.emit(tok.key)"
             (mouseleave)="hoverToken.emit('')"
             i18n-matTooltip="@@Glow_hint"
@@ -43,13 +95,13 @@
           <input
             type="color"
             [value]="dark()[tok.key] || '#000000'"
-            [disabled]="glowOff || !darkOffered()"
+            [disabled]="readOnly() || glowOff || !darkOffered()"
             (input)="setColor('dark', tok.key, $any($event.target).value)"
           />
           <input
             class="hex"
             [value]="dark()[tok.key] || ''"
-            [disabled]="glowOff || !darkOffered()"
+            [disabled]="readOnly() || glowOff || !darkOffered()"
             (change)="setColor('dark', tok.key, $any($event.target).value)"
           />
         </span>
@@ -57,13 +109,13 @@
           <input
             type="color"
             [value]="light()[tok.key] || '#ffffff'"
-            [disabled]="glowOff || !lightOffered()"
+            [disabled]="readOnly() || glowOff || !lightOffered()"
             (input)="setColor('light', tok.key, $any($event.target).value)"
           />
           <input
             class="hex"
             [value]="light()[tok.key] || ''"
-            [disabled]="glowOff || !lightOffered()"
+            [disabled]="readOnly() || glowOff || !lightOffered()"
             (change)="setColor('light', tok.key, $any($event.target).value)"
           />
         </span>
@@ -76,12 +128,14 @@
       matTooltip="Download this palette as a file" i18n-matTooltip="@@Theme_export_hint">
       <mat-icon>download</mat-icon><span i18n="@@Export">Export</span>
     </button>
-    <button matButton (click)="fileInput.click()"
+    <button matButton (click)="fileInput.click()" [disabled]="readOnly()"
       matTooltip="Load a palette from a file (review, then save)" i18n-matTooltip="@@Theme_import_hint">
       <mat-icon>upload</mat-icon><span i18n="@@Import">Import</span>
     </button>
     <input #fileInput type="file" hidden accept="application/json,.json" (change)="importPalette($event)" />
     <span class="grow"></span>
-    <button matButton="tonal" (click)="save.emit()" [disabled]="saving()" i18n="@@Save">Save</button>
+    <button matButton="tonal" (click)="save.emit()" [disabled]="saving() || readOnly() || !dirty()"
+      [matTooltip]="readOnly() ? tipReadOnly : (dirty() ? '' : tipClean)"
+      i18n="@@Save">Save</button>
   </div>
 </mat-card>

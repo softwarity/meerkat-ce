@@ -91,12 +91,12 @@ somebody should see.
 
 ## The catch-all
 
-A fresh installation has a route named `trap`: a `/**` path predicate ordered
-last. It is an ordinary route with no privilege - it just happens to be tried
-after everything else, so it catches whatever was not matched, `/` included.
+A catch-all is not a setting: it is an ordinary route whose path predicate is
+`/**`, ordered last. It has no privilege - it just happens to be tried after
+everything else, so it catches whatever was not matched, `/` included.
 
-That is what makes a new gateway answer something on every path. Delete it, or
-point it at your own landing page, once you have your own routes.
+A fresh installation has none: an unmatched path answers 404. Add one when you
+want those paths to land somewhere - your own landing page, say.
 
 > [!TIP]
 > A new route is created with order `0`, which puts it at the **top** of the

@@ -8,7 +8,7 @@ summary: What the gateway already injects into a proxied page, and where your ow
 # CSS and JavaScript per route
 
 Meerkat rewrites the HTML of the UI routes it proxies, to add the little of itself the visitor needs -
-and to add whatever you write on the route (UIF-02, UIF-06, SAUTH-03).
+and to add whatever you write on the route.
 
 Only HTML answers are touched, and only on **UI** routes. An API route's JSON is never rewritten.
 
@@ -81,9 +81,9 @@ The role stamping is gated on a cheap session check, so anonymous requests never
 
 ## What is missing
 
-- **Rewriting `<base href>`** to match a stripped prefix (UIF-01): nothing rewrites it, which is why
-  the injection is careful never to close the head.
-- **A post-authentication hook** and presets for common tools (SAUTH-03): the JavaScript block is
-  there, the hook that would run at sign-in is not.
-- **Rewriting OpenAPI specs in proxied answers** (UIF-07): only the developer documentation portal
-  rewrites the spec it serves.
+- **Rewriting `<base href>`** to match a stripped prefix: nothing rewrites it, which is why
+ the injection is careful never to close the head.
+- **A post-authentication hook** and presets for common tools: the JavaScript block is
+ there, the hook that would run at sign-in is not.
+- **Rewriting OpenAPI specs in proxied answers**: only the developer documentation portal
+ rewrites the spec it serves.

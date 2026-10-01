@@ -21,9 +21,6 @@
           <mat-option value="service" i18n="@@Service_routes">Service routes</mat-option>
         </mat-select>
       </mat-form-field>
-      <button matIconButton (click)="load()" i18n-matTooltip="@@Refresh" matTooltip="Refresh" i18n-aria-label="@@Refresh" aria-label="Refresh">
-        @if (loading()) {<mat-icon spin>autorenew</mat-icon>} @else {<mat-icon>refresh</mat-icon>}
-      </button>
       <button
         matButton="tonal"
         (click)="openProbe()"
@@ -83,6 +80,7 @@
           [routes]="shown()"
           [health]="health()"
           [dataOrigin]="dataOrigin()"
+          [tracingOn]="tracingOn()"
           [reorderable]="!query().trim()"
           (edit)="openEdit($event)"
           (remove)="remove($event)"
@@ -128,6 +126,28 @@
         (routePicked)="openIdentity($event)"
       />
     } @else if (editing() !== null) {
+      <!-- Somebody else saved this route while it was open here, and there are
+           unsaved changes in it: the copy on screen is kept and the news is put
+           where the work is (CONSOLE-13). Reloading is the reader's call because
+           it throws their typing away; saving anyway is refused with a 409, which
+           is the same message from the other end. -->
+      @if (changedUnderEdit(); as change) {
+        <div class="changed-banner">
+          <mat-icon>sync_problem</mat-icon>
+          <span>
+            @if (change.actor) {
+              <ng-container i18n="@@NAME_changed_this_route_since_you_opened_it"
+                >{{ change.actor }} changed this route since you opened it.</ng-container
+              >
+            } @else {
+              <ng-container i18n="@@This_route_changed_since_you_opened_it"
+                >This route changed since you opened it.</ng-container
+              >
+            }
+          </span>
+          <button matButton (click)="reloadUnderEdit()" i18n="@@Reload">Reload</button>
+        </div>
+      }
       <app-route-editor
         [route]="editingRoute()"
         [catalog]="catalog()"

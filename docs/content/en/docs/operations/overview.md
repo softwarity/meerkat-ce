@@ -19,6 +19,8 @@ changed something. Each has one screen, and this page says which.
 | Is a service still answering | [Upstream health](/docs/operations/upstream-health), and the Routes list marks what fails |
 | Why was that call refused with `429` | [Rate limits](/docs/operations/rate-limits) |
 | Who changed this, and when | [The audit trail](/docs/operations/audit) |
+| Who called what, and how it went | [Logs](/docs/operations/logs) |
+| Where the seconds of THAT request went | [Traces](/docs/operations/tracing) |
 | Is this node ready for traffic | [Health probes](/docs/operations/health) |
 | When does that certificate expire | [TLS and certificates](/docs/operations/tls) |
 | What is actually in a backup | [Backup and restore](/docs/operations/backup-restore) |
@@ -30,17 +32,22 @@ changed something. Each has one screen, and this page says which.
 |---|---|---|
 | Traffic counters | memory, on each node | one hour, lost on restart |
 | Endpoint history | memory, on each node | seventy minutes, one point a minute |
-| Audit trail | the database | one year, then purged |
+| Audit trail | the database | a year by default, chosen by root (three months to five years), then purged |
 | Restore points | the database | kept, never pruned |
-| Logs | standard error, structured | whatever collects them |
+| Operational log | standard error, structured | whatever collects it |
+| Access log | standard output, structured, off by default | whatever collects it |
+| Traces | nothing here: exported over OTLP | the collector, a few days |
 
 Nothing about traffic is written to disk, and that is deliberate: an app gateway
 is not a time-series database, and an installation that wants a year of curves
 scrapes them into the one it already runs
 ([metrics](/docs/operations/metrics)).
 
-Logs are structured but plain: there is no configurable level and no request log
-yet (OBS-03).
+[Logs](/docs/operations/logs) are structured, the level changes while the
+gateway runs, and an access log - one line per request crossing the front door -
+turns on when asked. It carries the same identifier as
+[traces](/docs/operations/tracing), which is the join between a line of the
+gateway's and a service's own business audit.
 
 ## A backup and a configuration export are not the same thing
 
@@ -63,7 +70,7 @@ carries no account, no certificate and no secret value, so it is not a backup.
 > [!NOTE] Enterprise edition
 > Running several gateways against one PostgreSQL database is the Enterprise
 > image: the driver that opens the connection and waits on notifications lives
-> there (STORE-03, PERF-03). The community image tells you what it can do instead
+> there. The community image tells you what it can do instead
 > of failing on a driver.
 
 > [!WARNING]

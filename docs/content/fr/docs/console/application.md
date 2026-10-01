@@ -1,11 +1,11 @@
 ---
-title: Général, Locales et Security
+title: Général et Security
 section: La console
 order: 166
 summary: Ce qu'est cette installation, les langues qu'elle parle, et les politiques sous lesquelles vivent tous les comptes.
 ---
 
-# Général, Locales et Security
+# Général et Security
 
 Trois écrans en tête du plan **Application**. Ils portent ce qui est vrai de toute
 l'application, et y écrire demande la capacité `app admin` (ou `root`).
@@ -44,18 +44,14 @@ hérite sauf si elle définit la sienne.
 > [!NOTE]
 > Edition Enterprise : les heures ouvrées.
 
-## Locales
-
-Les langues que **votre application** prend en charge, en codes ISO (`fr`, `en-GB`,
-`pt-BR`...). Elles remplissent les pages intégrées et le bouton utilisateur, et le
-choix d'un utilisateur connecté suit chaque requête proxifiée.
-
-Ajoutez-en une avec l'autocomplétion, qui propose les langues courantes et leurs
-variantes régionales et refuse un code invalide. Chaque ligne montre le code, son nom
-dans votre langue et son nom propre. Ajouter et retirer enregistrent aussitôt : il n'y a
-pas de bouton Save ici.
-
-Vide laisse les pages intégrées en anglais.
+> **Les locales ont déménagé.** Une réserve de langues valable pour toute la gateway
+> vivait ici, chaque route décochant celles qu'elle ne prenait pas en charge. Cela se lit
+> à l'envers : personne ne sait ce qu'une gateway parle, les applications derrière elle
+> le savent. Une route déclare désormais ce en quoi elle est écrite, dans
+> **Routes > (une route) > Locales**, et ce que l'installation offre est l'union de ces
+> déclarations - déployez une route qui parle polonais et la page de connexion offre le
+> polonais, retirez-la et l'offre rétrécit avec elle. Rien à tenir en phase, et aucun
+> écran qu'il faut penser à élargir.
 
 ## Security
 

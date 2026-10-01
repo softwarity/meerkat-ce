@@ -1,8 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Theme } from '../../api.service';
 
@@ -15,17 +13,27 @@ const STEP = 8;
 // every other gap. Further pills add STEP on top.
 const NAV_CLEAR = 112;
 
-// The theme picker, overlaid in the gap between the two preview panes (no top
-// row). An INFINITE carousel: each pill is placed by its shortest circular
-// distance from the selected theme (as a % of the width), so stepping past the
-// end wraps around. The nav block straddles both panes, vertically centred on
-// the pills; the selected theme's palette rides on top of it as a clickable
-// pill - clicking it makes that theme live. Between the arrows: "+" (duplicate
-// + start-from-a-preset) and delete. Pure positioning - never touches the
-// preview width that drives the scale.
+// Prefix that keeps a built-in palette's pill distinct from a copy made of it:
+// a duplicate inherits the source's id, and an id is how a pill is selected.
+export const PRESET_PREFIX = 'preset:';
+
+// The theme picker. An INFINITE carousel: each pill is placed by its shortest
+// circular distance from the selected theme (as a % of the width), so stepping
+// past the end wraps around. Between the two arrows rides the selected
+// palette, and clicking IT is what makes the theme live.
+//
+// The ring carries the stored themes AND the presets, the latter read-only:
+// a preset is code, it cannot be deleted, so the "+" menu whose only job was
+// to put a deleted one back has nothing left to do. Duplicating a preset is
+// how a palette of your own begins.
+//
+// Navigating SELECTS, never activates - an arrow that pushed a half-set
+// palette to every visitor would be a poor arrow. The cost of that split is
+// that "what I am editing" and "what is served" can differ silently, which is
+// what the centre pill's warning state exists to say.
 @Component({
   selector: 'app-theme-carousel',
-  imports: [MatButtonModule, MatDividerModule, MatIconModule, MatMenuModule, MatTooltipModule],
+  imports: [MatButtonModule, MatIconModule, MatTooltipModule],
   templateUrl: './theme-carousel.component.html',
   styleUrl: './theme-carousel.component.scss',
 })
@@ -36,25 +44,49 @@ export class ThemeCarouselComponent {
 
   readonly pick = output<Theme>();
   readonly activateTheme = output<Theme>();
-  readonly duplicateTheme = output<Theme>();
-  readonly removeTheme = output<Theme>();
-  readonly createPreset = output<Theme>();
 
-  protected readonly tipActivate = $localize`:@@Set_active:Set active`;
+  protected readonly tipActivate = $localize`:@@Set_active:Not live - click to activate`;
   protected readonly tipActive = $localize`:@@Active_theme:Active theme`;
 
+  // Stored themes first, then EVERY preset, under a namespaced id.
+  //
+  // They are not deduplicated against the stored ones, and that is deliberate.
+  // A copy carries its source's id, so hiding a preset whose id is already
+  // stored hid the original the moment anybody duplicated it - rename your
+  // copy "Lavender copy" and the built-in Lavender was still nowhere, because
+  // renaming does not change an id. The shelf of built-ins is permanent: the
+  // original stays on it whatever you have made from it, which is the whole
+  // point of having it to duplicate and to compare against.
+  //
+  // The namespace is what lets the two coexist: an id is the selection key,
+  // and a stored copy and its source would otherwise be the same pill.
+  protected readonly ring = computed(() => [
+    ...this.themes(),
+    ...this.presets().map((p) => ({ ...p, id: PRESET_PREFIX + p.id, active: false })),
+  ]);
+
+  protected isPreset(t: Theme): boolean {
+    return t.id.startsWith(PRESET_PREFIX);
+  }
+
+  protected label(t: Theme): string {
+    return this.isPreset(t) ? t.name + ' - ' + this.tipPreset : t.name;
+  }
+
+  private readonly tipPreset = $localize`:@@Theme_preset:built-in`;
+
   protected readonly selected = computed(
-    () => this.themes().find((t) => t.id === this.selectedId()) ?? null,
+    () => this.ring().find((t) => t.id === this.selectedId()) ?? null,
   );
 
   private readonly index = computed(() => {
-    const i = this.themes().findIndex((t) => t.id === this.selectedId());
+    const i = this.ring().findIndex((t) => t.id === this.selectedId());
     return i < 0 ? 0 : i;
   });
 
   // Shortest signed distance of pill i from the selected one, wrapping the ring.
   protected offset(i: number): number {
-    const n = this.themes().length;
+    const n = this.ring().length;
     if (!n) return 0;
     const raw = (((i - this.index()) % n) + n) % n;
     return raw > n / 2 ? raw - n : raw;
@@ -68,12 +100,12 @@ export class ThemeCarouselComponent {
   }
 
   protected prev(): void {
-    const n = this.themes().length;
-    if (n) this.pick.emit(this.themes()[(this.index() - 1 + n) % n]);
+    const n = this.ring().length;
+    if (n) this.pick.emit(this.ring()[(this.index() - 1 + n) % n]);
   }
 
   protected next(): void {
-    const n = this.themes().length;
-    if (n) this.pick.emit(this.themes()[(this.index() + 1) % n]);
+    const n = this.ring().length;
+    if (n) this.pick.emit(this.ring()[(this.index() + 1) % n]);
   }
 }

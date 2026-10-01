@@ -32,7 +32,8 @@ transform it, an access rule decides, and what happened is visible afterwards.
   name.
 - **TLS**: certificates and ACME issuance, serialised so a cluster asks once.
 - **Audit**: every administrative change with its author and a field-level
-  diff.
+  diff, and the security of the accounts - every sign-in, every refusal with its
+  reason and address, every way in changed by its owner.
 - **The console**: the whole administration, on its own port, with the
   capability split that decides who sees which half.
 - **The agent endpoint**: MCP on the control plane, under the same rules a
@@ -59,7 +60,8 @@ line, what is missing from each.
 - **Dev mode** - the tunnel works, sign-in halts on a page naming what is
   substituted and by whom, and a strip says it again while you work. What is
   missing is the scope of a substitution - today it holds for all traffic -
-  then the console screen listing live sessions, and the audit.
+  then the console screen listing live sessions, and the audit of each
+  substitution (a key deposited is already audited).
 - **Notifications** - the SMTP relay is shipped, with one template in the
   theme's colours, and the daily summary of closing accesses goes out on its
   own. What is missing is a template per event, and translated.
@@ -82,6 +84,28 @@ line, what is missing from each.
 - **SAML**, for the enterprises whose identity provider does not speak OpenID
   Connect. It is registrable today and refuses at the factory, which is honest
   and not yet useful.
+- **Your open sessions, and signing out everywhere**: the list of devices
+  signed in on your own account, with the button that closes all of them.
+- **Sign in as**: what a support desk does every day, and which today is done
+  by asking somebody for their password.
+- **A response cache**, because the gateway is already the only place that sees
+  the same request twice.
+- **Serving an application under a sub-path without rebuilding it**: the prefix
+  is stripped on the way in; what the application sends back is still to be
+  rewritten.
+- **gRPC properly**: counters that read `grpc-status`, per-method security, and
+  gRPC-Web. Today a failing gRPC call reads as healthy.
+- **A per-organisation portal**: each customer's own icon, title and
+  arrangement. It would be the product's first per-tenant visual override.
+- **HTTP/3**, once the gain can be measured rather than described.
+- **An external vault**: HashiCorp Vault, Kubernetes secrets and Docker
+  secrets, for installations that already run one and do not want a second.
+- **Rotating the vault's master key**, which does not exist and which is the
+  question every security team asks.
+- **Issues pushed to GitHub, GitLab or Jira**, rather than read in one more
+  screen.
+- **Web Push notifications**, for what an operator has to know without keeping
+  a tab open.
 
 ## Not on the list
 

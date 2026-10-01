@@ -5,12 +5,15 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatSliderModule } from '@angular/material/slider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
-import { ApiService, ModuleChild, ModuleParent, PortalConfig, Route, Settings } from '../api.service';
+import { ApiService, PortalEntry, PortalSubEntry, PortalConfig, Route, Settings } from '../api.service';
 import { ModuleEditorComponent, ModuleDraft, ModuleFormData } from './module-editor.component';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 // The navigation portal (PORTAL-01): build the header-or-rail bar the proxied
 // applications wear, with a live mock-up beside the editor. On, the bar carries
@@ -26,7 +29,9 @@ import { ModuleEditorComponent, ModuleDraft, ModuleFormData } from './module-edi
     MatButtonModule,
     MatButtonToggleModule,
     MatCardModule,
+    MatCheckboxModule,
     MatIconModule,
+    MatSliderModule,
     MatSidenavModule,
     MatSlideToggleModule,
     MatTooltipModule,
@@ -50,12 +55,24 @@ export class PortalPageComponent {
 
   protected readonly loading = signal(true);
 
-  protected readonly enabled = signal(false);
+  // The rendering mode. ONE catalogue below it, read in "links" and "portal"
+  // alike: switching between them must not cost the list (PORTAL-03).
+  protected readonly mode = signal<'none' | 'links' | 'portal'>('none');
+  // The bar is drawn only in portal mode; the catalogue is edited in both of
+  // the modes that have one.
+  protected readonly hasCatalogue = computed(() => this.mode() !== 'none');
+  protected readonly isBar = computed(() => this.mode() === 'portal');
   protected readonly layout = signal<'header' | 'rail'>('header');
   protected readonly side = signal<'left' | 'right'>('left');
   protected readonly display = signal<'both' | 'icon' | 'label'>('both');
   protected readonly showAppName = signal(false);
-  protected readonly parents = signal<ModuleParent[]>([]);
+  // The branding logo in the bar: drawn by default, and this takes it out.
+  protected readonly showLogo = signal(true);
+  // How round it is drawn, 0 (as drawn) to 50 (circle).
+  protected readonly logoRadius = signal(0);
+  // The logo itself, so the choice is made looking at it.
+  protected readonly brandLogo = signal('');
+  protected readonly entries = signal<PortalEntry[]>([]);
 
   // Only enabled UI routes can wear the bar; those are what a module binds to.
   protected readonly uiRoutes = signal<Route[]>([]);
@@ -78,17 +95,17 @@ export class PortalPageComponent {
   protected readonly previewWidth = signal(0);
 
   constructor() {
-    this.api.listRoutes().subscribe({
-      next: (rs) => this.uiRoutes.set(rs.filter((r) => r.isUi && r.enabled)),
-    });
-    this.api.settings().subscribe({
-      next: (s) => {
-        this.settings = s;
-        this.applyPortal(s.portal);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.load();
+    // Somebody else's write (CONSOLE-13). OFFERED and not applied: this screen
+    // is a form, and reloading it under somebody typing would throw their work
+    // away for news they did not ask for. The same bargain the 409 does from
+    // the other end - see stale.interceptor.ts.
+    const live = inject(LiveChangesService);
+    live.on('settings', (change) => live.offer(change, () => this.load()));
+    // The catalogue is a list of ROUTES, so it also follows what the routing
+    // plane does - a route that stopped serving pages is a module that no
+    // longer has anything behind it.
+    live.on('route', () => this.loadRoutes());
 
     // The preview: post the draft whenever it (or the selection) changes and the
     // frame is ready.
@@ -121,11 +138,16 @@ export class PortalPageComponent {
       side: this.side(),
       display: this.display(),
       showName: this.showAppName(),
+      hideLogo: !this.showLogo(),
+      logoRadius: this.logoRadius(),
       // Editing is only offered at full width: the narrower device previews are
       // there to WATCH the bar respond, not to click through it.
       edit: this.previewWidth() === 0,
       selected: this.selected(),
-      parents: this.parents().map((p, i) => ({
+      // `parents` is the BAR's own word, not the catalogue's: the component
+      // draws two surfaces, and what is a parent there is simply an entry
+      // here. Renaming it in the payload silently emptied the preview.
+      parents: this.entries().map((p, i) => ({
         id: String(i),
         label: this.label(p),
         homeLabel: this.homeLabel(p),
@@ -157,14 +179,38 @@ export class PortalPageComponent {
 
   // Load a stored portal into the signals - on first read and to roll back a
   // failed save.
+  private loadRoutes(): void {
+    this.api.listRoutes().subscribe({
+      next: (rs) => this.uiRoutes.set(rs.filter((r) => r.isUi && r.enabled)),
+    });
+  }
+
+  private load(): void {
+    this.loadRoutes();
+    this.api.branding().subscribe({
+      next: (b) => this.brandLogo.set(b.logo || ''),
+      error: () => this.brandLogo.set(''),
+    });
+    this.api.settings().subscribe({
+      next: (s) => {
+        this.settings = s;
+        this.applyPortal(s.portal);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
+  }
+
   private applyPortal(p: PortalConfig | undefined): void {
-    const c = p ?? { enabled: false, layout: 'header', side: 'left', display: 'both' };
-    this.enabled.set(!!c.enabled);
+    const c = p ?? { mode: 'none' as const, layout: 'header', side: 'left', display: 'both' };
+    this.mode.set(c.mode ?? 'none');
     this.layout.set(c.layout === 'rail' ? 'rail' : 'header');
     this.side.set(c.side === 'right' ? 'right' : 'left');
     this.display.set(c.display === 'icon' || c.display === 'label' ? c.display : 'both');
     this.showAppName.set(!!c.showAppName);
-    this.parents.set((c.parents ?? []).map(clone));
+    this.showLogo.set(!c.hideLogo);
+    this.logoRadius.set(c.logoRadius ?? 0);
+    this.entries.set((c.entries ?? []).map(clone));
   }
 
   // Every change persists at once: a toggle IS the setting, and a module edit is
@@ -194,12 +240,14 @@ export class PortalPageComponent {
 
   private current(): PortalConfig {
     return {
-      enabled: this.enabled(),
+      mode: this.mode(),
       layout: this.layout(),
       side: this.side(),
       display: this.display(),
       showAppName: this.showAppName(),
-      parents: this.parents(),
+      hideLogo: !this.showLogo(),
+      logoRadius: this.logoRadius(),
+      entries: this.entries(),
     };
   }
 
@@ -209,18 +257,18 @@ export class PortalPageComponent {
     return this.uiRoutes().find((r) => r.id === id)?.name ?? id;
   }
 
-  protected label(m: ModuleParent | ModuleChild): string {
+  protected label(m: PortalEntry | PortalSubEntry): string {
     return (m.label || '').trim() || this.routeName(m.routeId);
   }
 
-  protected homeLabel(m: ModuleParent): string {
+  protected homeLabel(m: PortalEntry): string {
     return (m.homeLabel || '').trim() || this.label(m);
   }
 
   // ── layout controls ─────────────────────────────────────────────────────
 
-  protected setEnabled(v: boolean): void {
-    this.enabled.set(v);
+  protected setMode(v: 'none' | 'links' | 'portal'): void {
+    this.mode.set(v);
     this.persist();
   }
   protected setLayout(v: 'header' | 'rail'): void {
@@ -242,6 +290,14 @@ export class PortalPageComponent {
     this.showAppName.set(v);
     this.persist();
   }
+  protected setShowLogo(v: boolean): void {
+    this.showLogo.set(v);
+    this.persist();
+  }
+  protected setLogoRadius(v: number): void {
+    this.logoRadius.set(v);
+    this.persist();
+  }
   protected setPreviewWidth(v: number): void {
     this.previewWidth.set(v);
     // Leaving full width leaves the editor: close any open drawer so it cannot
@@ -252,36 +308,55 @@ export class PortalPageComponent {
 
   // ── adding ──────────────────────────────────────────────────────────────
 
+  // The route's own name, which is what an entry falls back to when nobody
+  // gave it a label - the LAST fallback, and the only one left.
+  protected routeNameOf(id: string): string {
+    return this.uiRoutes().find((r) => r.id === id)?.name ?? id;
+  }
+
+  // Reorder from the flat list. The bar reorders from its drawer; both write
+  // the same array, because the order IS the catalogue's order.
+  protected moveEntry(i: number, dir: -1 | 1): void {
+    const j = i + dir;
+    this.entries.update((es) => {
+      if (j < 0 || j >= es.length) return es;
+      const out = [...es];
+      [out[i], out[j]] = [out[j], out[i]];
+      return out;
+    });
+    this.persist();
+  }
+
   protected addParent(): void {
     this.open(this.data.title.add, true, undefined, null, (m) => {
-      this.parents.update((ps) => [...ps, { ...m, children: [] }]);
-      this.selected.set(String(this.parents().length - 1)); // keep the new one selected
+      this.entries.update((ps) => [...ps, { ...m, children: [] }]);
+      this.selected.set(String(this.entries().length - 1)); // keep the new one selected
     });
   }
 
-  private editParent(i: number): void {
-    this.open(this.data.title.edit, true, this.parents()[i], { pi: i, ci: null }, (m) =>
-      this.parents.update((ps) => ps.map((x, j) => (j === i ? { ...x, ...m } : x))),
+  protected editParent(i: number): void {
+    this.open(this.data.title.edit, true, this.entries()[i], { pi: i, ci: null }, (m) =>
+      this.entries.update((ps) => ps.map((x, j) => (j === i ? { ...x, ...m } : x))),
     );
   }
 
   private addChild(pi: number): void {
     this.open(this.data.title.addSub, false, undefined, null, (m) => {
       this.mutateChildren(pi, (cs) => [...cs, childFromDraft(m)]);
-      const ci = (this.parents()[pi].children ?? []).length - 1;
+      const ci = (this.entries()[pi].children ?? []).length - 1;
       this.selected.set(`${pi}/${ci}`); // keep the new sub-module selected
     });
   }
 
   private editChild(pi: number, ci: number): void {
-    const c = (this.parents()[pi].children ?? [])[ci];
+    const c = (this.entries()[pi].children ?? [])[ci];
     this.open(this.data.title.editSub, false, c, { pi, ci }, (m) =>
       this.mutateChildren(pi, (cs) => cs.map((x, j) => (j === ci ? { ...x, ...childFromDraft(m) } : x))),
     );
   }
 
-  private mutateChildren(pi: number, fn: (cs: ModuleChild[]) => ModuleChild[]): void {
-    this.parents.update((ps) =>
+  private mutateChildren(pi: number, fn: (cs: PortalSubEntry[]) => PortalSubEntry[]): void {
+    this.entries.update((ps) =>
       ps.map((p, j) => (j === pi ? { ...p, children: fn(p.children ?? []) } : p)),
     );
   }
@@ -293,7 +368,7 @@ export class PortalPageComponent {
     if (!p) return;
     if (p.ci === null) {
       const ni = p.pi + dir;
-      this.parents.update((ps) => move(ps, p.pi, dir));
+      this.entries.update((ps) => move(ps, p.pi, dir));
       this.persist();
       this.editParent(ni);
     } else {
@@ -308,7 +383,7 @@ export class PortalPageComponent {
     const p = this.editingPath;
     if (!p) return;
     if (p.ci === null) {
-      this.parents.update((ps) => ps.map((x, j) => (j === p.pi ? { ...x, disabled: v } : x)));
+      this.entries.update((ps) => ps.map((x, j) => (j === p.pi ? { ...x, disabled: v } : x)));
     } else {
       this.mutateChildren(p.pi, (cs) => cs.map((x, j) => (j === p.ci ? { ...x, disabled: v } : x)));
     }
@@ -323,7 +398,7 @@ export class PortalPageComponent {
   protected onDelete(): void {
     const p = this.editingPath;
     if (!p) return;
-    if (p.ci === null) this.parents.update((ps) => ps.filter((_, j) => j !== p.pi));
+    if (p.ci === null) this.entries.update((ps) => ps.filter((_, j) => j !== p.pi));
     else this.mutateChildren(p.pi, (cs) => cs.filter((_, j) => j !== p.ci));
     this.persist();
     this.selected.set(null); // the module is gone; nothing to keep selected
@@ -335,7 +410,7 @@ export class PortalPageComponent {
   private open(
     title: string,
     isParent: boolean,
-    m: ModuleParent | ModuleChild | undefined,
+    m: PortalEntry | PortalSubEntry | undefined,
     path: { pi: number; ci: number | null } | null,
     apply: (m: ModuleDraft) => void,
   ): void {
@@ -346,7 +421,7 @@ export class PortalPageComponent {
     let canDown = false;
     if (path) {
       const siblings =
-        path.ci === null ? this.parents().length : (this.parents()[path.pi].children ?? []).length;
+        path.ci === null ? this.entries().length : (this.entries()[path.pi].children ?? []).length;
       const idx = path.ci === null ? path.pi : path.ci;
       canUp = idx > 0;
       canDown = idx < siblings - 1;
@@ -354,6 +429,7 @@ export class PortalPageComponent {
     this.editing.set({
       title,
       isParent,
+      bar: this.isBar(),
       existing: path !== null,
       canUp,
       canDown,
@@ -362,7 +438,7 @@ export class PortalPageComponent {
         routeId: m?.routeId ?? '',
         icon: m?.icon ?? '',
         label: m?.label ?? '',
-        homeLabel: (m as ModuleParent | undefined)?.homeLabel ?? '',
+        homeLabel: (m as PortalEntry | undefined)?.homeLabel ?? '',
         description: m?.description ?? '',
         disabled: !!m?.disabled,
       } satisfies ModuleDraft,
@@ -395,15 +471,15 @@ export class PortalPageComponent {
   };
 }
 
-function clone(p: ModuleParent): ModuleParent {
+function clone(p: PortalEntry): PortalEntry {
   return { ...p, children: (p.children ?? []).map((c) => ({ ...c })) };
 }
 
 // The editor's draft is shared by parents and children, so it carries the
 // parent-only `homeLabel`. A child must NOT ship it: the settings API rejects
 // unknown fields, and one stray key would 400 the whole save (silently dropping
-// the sub-module). Keep only the fields a ModuleChild owns.
-function childFromDraft(m: ModuleDraft): ModuleChild {
+// the sub-module). Keep only the fields a PortalSubEntry owns.
+function childFromDraft(m: ModuleDraft): PortalSubEntry {
   return {
     routeId: m.routeId,
     icon: m.icon,

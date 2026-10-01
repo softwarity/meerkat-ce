@@ -23,9 +23,7 @@ import (
 func TestPickedLocaleLandsOnTheAccount(t *testing.T) {
 	mux, sm, st := setupFlow(t)
 	ctx := context.Background()
-	if err := st.SetSetting(ctx, store.SettingLanguages, []string{"en", "fr"}); err != nil {
-		t.Fatal(err)
-	}
+	speaks(t, st, "en", "fr")
 
 	rec := httptest.NewRecorder()
 	if _, err := sm.Issue(ctx, rec, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
@@ -108,5 +106,44 @@ func TestSignInCarriesTheChosenLanguage(t *testing.T) {
 	}
 	if got != "vi" {
 		t.Errorf("the language cookie is %q, want the account's own", got)
+	}
+}
+
+// And the flow pages follow the routes without being told: the sign-in page
+// offers what a route declares, and stops offering it when the route does.
+//
+// The cache is the trap here - offeredLanguages holds its answer for five
+// seconds - so this reads the store directly rather than through a page, which
+// is where the derivation lives anyway.
+func TestTheSignInOfferFollowsTheRoutes(t *testing.T) {
+	_, _, st := setupFlow(t)
+	ctx := context.Background()
+
+	got, err := st.SpokenLanguages(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("a gateway with no speaking route offers %v", got)
+	}
+
+	speaks(t, st, "fr", "pl")
+	got, err = st.SpokenLanguages(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != "fr" || got[1] != "pl" {
+		t.Errorf("the offer is %v, want the route's two languages", got)
+	}
+
+	// A language no route speaks is not offered, whatever the binary can draw:
+	// Meerkat embeds twenty catalogues and offers none of them on its own.
+	for _, code := range got {
+		if !IsKnownLanguage(code) {
+			t.Errorf("%s is offered and cannot be rendered", code)
+		}
+	}
+	if len(KnownLanguages()) <= len(got) {
+		t.Error("the offer is not smaller than what the binary can render, so this proves nothing")
 	}
 }

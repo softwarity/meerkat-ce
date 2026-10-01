@@ -3,16 +3,42 @@ Meerkat is starting.
   Application plane (your users):  {{ include "meerkat.fullname" . }}:{{ .Values.service.appPort }}
   Control plane (admin console):   {{ include "meerkat.fullname" . }}-admin:{{ .Values.service.adminPort }}
 
-Reach the console without exposing it:
+{{- if eq (.Values.service.adminType | default "ClusterIP") "ClusterIP" }}
+The console is NOT published. Reach it through a tunnel:
 
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "meerkat.fullname" . }}-admin {{ .Values.service.adminPort }}:{{ .Values.service.adminPort }}
+
+A tunnel binds to ONE pod, so a rollout ends it. Where the console has to stay
+reachable, set service.adminType (LoadBalancer, or NodePort with
+service.adminNodePort) instead of relaunching the command.
+{{- else }}
+The console is published by a {{ .Values.service.adminType }} service on port {{ .Values.service.adminPort }}:
+
+  kubectl -n {{ .Release.Namespace }} get svc {{ include "meerkat.fullname" . }}-admin
+
+Publishing the control plane is a decision. Put it behind what your network
+uses to say who may reach it.
+{{- end }}
 
 {{- if .Values.production }}
 
 This gateway is declared PRODUCTION: the developer surface stays closed here
 whatever the settings say.
 {{- end }}
-{{- if .Values.plug.enabled }}
+{{- if and .Values.plug.enabled .Values.production }}
+
+The developer tunnel is NOT open here: this is a production gateway, so the
+developer surface is closed and the deployment grants none of the rights the
+tunnel would use.
+{{- else if not .Values.plug.enabled }}
+
+The developer tunnel is granted nothing (plug.enabled=false). The gateway still
+OPENS it wherever developer mode is on - that switch is in the console, or
+production: true closes the whole developer surface - and an agent with no
+rights says so in its log every minute:
+
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "meerkat.fullname" . }} | grep plug
+{{- else }}
 
 The developer tunnel listens on {{ .Values.plug.port }} ({{ .Values.plug.service.type }} service
 {{ include "meerkat.fullname" . }}-plug). It opens only where developer mode is on AND the

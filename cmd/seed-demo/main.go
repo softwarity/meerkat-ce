@@ -142,11 +142,11 @@ func run(dataDir string) error {
 	// ── two role-gated UI routes: watch them appear/disappear with the group ─
 	routes := []store.Route{
 		{ID: "demo-sales-app", Name: "sales-app", Order: 40, Enabled: true, IsUI: true,
-			Access: store.Access{Roles: []string{"sales"}}, UI: &store.RouteUI{Link: "Sales app"}, Upstream: "https://httpbin.org",
+			Access: store.Access{Roles: []string{"sales"}}, Upstream: "https://httpbin.org",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/sales-app/**"}}}},
 			Filters:    []routing.Spec{{Type: "strip-prefix", Args: map[string]any{"parts": 1}}}},
 		{ID: "demo-ops-app", Name: "ops-app", Order: 41, Enabled: true, IsUI: true,
-			Access: store.Access{Roles: []string{"ops-write"}}, UI: &store.RouteUI{Link: "Ops app"}, Upstream: "https://httpbin.org",
+			Access: store.Access{Roles: []string{"ops-write"}}, Upstream: "https://httpbin.org",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/ops-app/**"}}}},
 			Filters:    []routing.Spec{{Type: "strip-prefix", Args: map[string]any{"parts": 1}}}},
 	}
@@ -154,6 +154,25 @@ func run(dataDir string) error {
 		if err := st.SaveRoute(ctx, rt); err != nil {
 			return fmt.Errorf("route %s: %w", rt.Name, err)
 		}
+	}
+
+	// ── the catalogue that offers them, as a flat menu ─────────────────────
+	// The apps menu no longer falls out of the routes: it is this list. Both
+	// entries are always in it, and what makes one appear or vanish for a
+	// given visitor is the ROUTE's access, which is the whole point of the
+	// demo.
+	portal := store.PortalConfig{
+		Mode: store.PortalModeLinks,
+		Entries: []store.PortalEntry{
+			{RouteID: "demo-sales-app", Label: "Sales app"},
+			{RouteID: "demo-ops-app", Label: "Ops app"},
+		},
+	}
+	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+		return fmt.Errorf("portal: %w", err)
+	}
+	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {
+		return fmt.Errorf("portal setting: %w", err)
 	}
 
 	// ── the issue tracker, on, with two example reports (ISSUE-01/03) ───────

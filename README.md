@@ -4,9 +4,10 @@
 
 **Meerkat** is an **app-gateway**: one door in front of the applications your
 teams build, which takes charge of everything that is not their core business -
-authentication, access rules, organisations, routing, quotas and audit. Your
-services receive requests that are already authenticated, carrying a signed JWT
-with identity, roles and organisation. One binary, zero dependency.
+authentication, access rules, organisations, routing, quotas, audit, and the
+calls they want made on a timer or once, later. Your services receive requests that are
+already authenticated, carrying a signed JWT with identity, roles and
+organisation. One binary, zero dependency.
 
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
@@ -48,6 +49,11 @@ Then browse **http://localhost:9092**, the admin port: the gateway serves its
 API and its login there and proxies everything else to the console dev server,
 HMR included. `MEERKAT_CONSOLE_URL` is what makes that proxying happen - without
 it the admin port answers a JSON status page.
+
+`make telemetry` builds the OpenTelemetry browser bundle and stages it for
+`go:embed` (OBS-04). Skip it and the Enterprise binary still builds - the
+injection stays off and says why - so it is only needed when working on the
+browser half of the tracing.
 
 `make dev` builds the **Enterprise** binary, `make dev-ce` the community one -
 and the difference is what the linker put in, not a flag. The ports, the

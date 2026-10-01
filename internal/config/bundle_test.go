@@ -200,10 +200,13 @@ func TestBundleCarriesEveryBrandingPicture(t *testing.T) {
 	s := openTemp(t)
 	seed(t, s)
 	branding := map[string]any{
-		"appName":    "MY APP",
-		"logo":       onePixel,
-		"favicon":    onePixel,
-		"background": map[string]any{"image": onePixel, "fit": "cover", "dim": 40},
+		"appName": "MY APP",
+		"logo":    onePixel,
+		"favicon": onePixel,
+		"background": map[string]any{"image": onePixel, "fit": "cover", "dim": 40,
+			// The dark scheme's own picture travels too, or the document it is
+			// left in stops being a file anybody opens.
+			"imageDark": onePixel, "fitDark": "contain", "dimDark": 70},
 	}
 	if err := s.SetSetting(ctx, store.SettingBranding, branding); err != nil {
 		t.Fatal(err)
@@ -219,7 +222,8 @@ func TestBundleCarriesEveryBrandingPicture(t *testing.T) {
 	if strings.Contains(string(pkg), "iVBORw0KGgo") {
 		t.Fatal("no picture should be left inline in the package's yaml")
 	}
-	for _, name := range []string{"assets/logo.png", "assets/background.png", "assets/favicon.png"} {
+	for _, name := range []string{"assets/logo.png", "assets/background.png",
+		"assets/background-dark.png", "assets/favicon.png"} {
 		if !hasEntry(t, pkg, name) {
 			t.Errorf("the package does not hold %s", name)
 		}
@@ -233,15 +237,17 @@ func TestBundleCarriesEveryBrandingPicture(t *testing.T) {
 		Logo       string `json:"logo"`
 		Favicon    string `json:"favicon"`
 		Background struct {
-			Image string `json:"image"`
-			Fit   string `json:"fit"`
-			Dim   int    `json:"dim"`
+			Image     string `json:"image"`
+			ImageDark string `json:"imageDark"`
+			Fit       string `json:"fit"`
+			Dim       int    `json:"dim"`
 		} `json:"background"`
 	}
 	if err := json.Unmarshal(back.Settings[store.SettingBranding], &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Logo != onePixel || got.Favicon != onePixel || got.Background.Image != onePixel {
+	if got.Logo != onePixel || got.Favicon != onePixel || got.Background.Image != onePixel ||
+		got.Background.ImageDark != onePixel {
 		t.Fatalf("a picture did not come back whole: %+v", got)
 	}
 	// The settings around the image are untouched by the round trip.

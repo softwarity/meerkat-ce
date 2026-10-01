@@ -10,7 +10,7 @@ summary: How to tell the gateway what your application can do with a colour sche
 A visitor picks light or dark once, in the user button, and expects the whole thing to follow:
 Meerkat's own pages **and** the application behind them. The pages are ours to paint. The
 application is yours, and no two of them read a scheme the same way - which is why the mechanism is
-declared **on the route** rather than guessed (UIF-03).
+declared **on the route** rather than guessed.
 
 This page is written for the person integrating an application. For the pages Meerkat serves
 itself, see [the built-in pages](/docs/customise/built-in-pages).
@@ -30,7 +30,7 @@ chosen, it sets on `<html>`:
 
 - the CSS `color-scheme` property, so form controls, scrollbars and the default canvas follow;
 - `data-meerkat-scheme="light"` or `"dark"`, for an application that would rather read an attribute
-  than a computed style.
+ than a computed style.
 
 On `auto` both are removed, and the browser is back to following the system.
 
@@ -54,9 +54,9 @@ Four answers, and one of them is "there is nothing to switch".
 Two more fields shape it:
 
 - **the tag**, `html` unless you say otherwise. An application that reads its theme on `<body>`
-  never saw it on `<html>`, and that is the single most common reason a switch appears to do nothing.
+ never saw it on `<html>`, and that is the single most common reason a switch appears to do nothing.
 - **the light value and the dark value.** For `attribute` they are the attribute's two values; for
-  the other two they are the names themselves.
+ the other two they are the names themselves.
 
 Which is why an **empty value means something** in the last two: nothing on the tag in that state.
 That is the most widespread shape there is - nothing in light, `dark` in dark:
@@ -85,8 +85,8 @@ Two things that used to travel together and are now separate:
 
 - **offering the switch** is chrome. It belongs to the user button, and a route can offer it or not.
 - **how the application consumes a scheme** belongs to the route, and holds whoever offers the
-  switch - including a [portal](/docs/customise/portal) bar, where there is no per-route button to
-  hang it on.
+ switch - including a [portal](/docs/customise/portal) bar, where there is no per-route button to
+ hang it on.
 
 When a route does **not** offer the switch, it says instead what the injected button itself wears:
 light, dark, or the visitor's own choice. That exists for the application with one look and no
@@ -135,15 +135,15 @@ what the gateway thinks it was told:
 
 ```html
 <script defer src="/meerkat/page.js"
-        data-scheme="select"
-        data-scheme-mechanism="class"
-        data-scheme-tag="body"
-        data-scheme-light=""
-        data-scheme-dark="dark"
-        data-scheme-storage="theme"
-        data-scheme-storage-light="light"
-        data-scheme-storage-dark="dark"
-        data-scheme-storage-auto="system"></script>
+ data-scheme="select"
+ data-scheme-mechanism="class"
+ data-scheme-tag="body"
+ data-scheme-light=""
+ data-scheme-dark="dark"
+ data-scheme-storage="theme"
+ data-scheme-storage-light="light"
+ data-scheme-storage-dark="dark"
+ data-scheme-storage-auto="system"></script>
 ```
 
 If a field you filled in is absent there, the route did not save it. If it is present and nothing

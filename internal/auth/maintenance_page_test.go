@@ -28,9 +28,7 @@ func TestTheUnavailablePageIsADressedPage(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetSetting(ctx, store.SettingLanguages, []string{"en", "fr"}); err != nil {
-		t.Fatal(err)
-	}
+	speaks(t, st, "en", "fr")
 	h := New(st, session.NewManager(st))
 
 	rec := httptest.NewRecorder()
@@ -90,9 +88,7 @@ func TestTheStripeCarriesNoBytesABrowserCouldMisread(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	if err := st.SetSetting(t.Context(), store.SettingLanguages, []string{"en", "fr"}); err != nil {
-		t.Fatal(err)
-	}
+	speaks(t, st, "en", "fr")
 	h := New(st, session.NewManager(st))
 
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)

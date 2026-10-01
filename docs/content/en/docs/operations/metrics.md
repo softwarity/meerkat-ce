@@ -10,7 +10,7 @@ summary: What the gateway counts, and how to scrape it into the monitoring stack
 The counters are in both editions, and so are the console's own curves: that is
 the zero-dependency promise, a gateway you can see with nothing installed. What is
 sold is **externalising** them, into the stack that already holds your retention,
-your alerting and your dashboards (OBS-05).
+your alerting and your dashboards.
 
 > [!NOTE] Enterprise edition
 > The `/metrics` exposition is Enterprise. The community image does not merely
@@ -33,7 +33,7 @@ Per endpoint, where the unit is the template and never a raw path:
 |---|---|
 | `meerkat_endpoint_requests_total` | requests answered by that operation |
 | `meerkat_endpoint_errors_total` | the `4xx` and `5xx` among them |
-| `meerkat_endpoint_duration_seconds_sum` | seconds spent answering it |
+| `meerkat_endpoint_duration_seconds_total` | seconds spent answering it |
 
 There is no per-endpoint histogram, deliberately: a spec declaring two hundred
 operations would turn twelve buckets into two thousand four hundred series for one
@@ -54,34 +54,73 @@ or `deduced`. Never a user, never an address, never a raw path.
 
 ## The endpoint
 
-`/metrics` sits on the **control plane** - no port to open, it is where the console
-already is. Three things gate it, and the refusal says which one is missing:
+`/metrics` has a **port of its own**, like PostgreSQL's exporter (9187) or
+RabbitMQ's (15692). It is chosen in the console, under **Infra, Metrics
+endpoint**, when the exposition is switched on: **9091** by default, another one if the
+platform already uses it. The gateway opens that port on every node while the
+switch is on, moves it when it changes, and closes it when the switch goes off. It
+serves `/metrics` and nothing else - not the console, not the API.
+
+A port this node cannot open, taken or reserved, is refused with the reason, and
+nothing is saved. The ports this gateway's two planes listen on (8080 and 9090 by default) are
+refused outright.
+
+Three things gate it, and the refusal says which one is missing:
 
 1. the Enterprise image;
-2. a switch that ships **off**, in the Prometheus drawer of the Metrics screen;
-3. the gateway-admin capability, or a token whose scope is `metrics`.
+2. a switch that ships **off**;
+3. the network, and a token if you want one.
+
+By default the port **asks for no token**. The network is the lock: it is never
+published, and no route or ingress goes in front of it. A scrape with no credential
+is a monitoring configuration with no secret to rotate.
+
+A second switch, **Require a token**, is for a port that other workloads of the
+cluster can reach and should not read. The counters name every route and every
+endpoint template, which is an operational map of the installation rather than a
+public page. The token is then checked by the control plane's own funnel, and it is
+minted with the `metrics` scope, which opens that one path and nothing else.
 
 ![Access tokens, where a scraper's credential is minted](img/console/access-tokens.webp)
 
-The guard is not a formality. The counters name every route and every endpoint
-template, which is an operational map of the installation rather than a public
-page. A `metrics` token opens that one path and nothing else - a scraper's
-credential lives in the configuration of a monitoring stack, often another team's
-repository, which is where a token is most likely to leak and least likely to be
-rotated.
+`/metrics` also answers on the control plane, **always** with a token. That is the
+door for an installation whose Prometheus reaches the gateway only through the
+console's address.
+
+In Kubernetes the Service has to declare the port for a `ServiceMonitor` to find
+it. The chart does it with the `metrics.port` value, on a `-metrics` Service that is
+always ClusterIP, and that value has to repeat the port chosen in the console.
 
 The format is Prometheus text, `version=0.0.4`, announced in the content type.
 Counters only ever go up and Prometheus does its own differencing; the console's
 window is derived from the same counters rather than the reverse.
 
+## Pushed over OTLP
+
+The endpoint is one way out, where a scraper comes to fetch. The other is to
+**send** the same counters to an OpenTelemetry collector, which is what a stack
+that receives rather than scrapes wants. It is switched on under **Infra,
+OpenTelemetry**, beside the traces, and goes to the same collector with the
+same credential: every 30 seconds, running totals since the gateway started,
+one resource per node (`service.instance.id`).
+
+The names are OpenTelemetry's (`meerkat.requests`, `meerkat.request.duration`
+in seconds...), chosen so that a collector translating them back to Prometheus
+lands on **the same series** the endpoint gives. A dashboard written on one
+door reads the other.
+
+It needs a collector that receives metrics. Jaeger takes traces and nothing
+else: put an OpenTelemetry Collector in front of it. The Test button on that
+page says so.
+
 ## The files to write
 
-The Prometheus drawer carries real resources, served by the gateway under
+The Metrics endpoint page carries real resources, served by the gateway under
 `/monitoring/` on the control plane: one `prometheus.yml`, a Swarm compose file, a
 Kubernetes `ServiceMonitor`, and Grafana's datasource, its dashboard provisioning
 and a ready dashboard. They are copyable and downloadable, and they carry **this**
-installation's listening port - not the port the console was reached at, since a
-published port or an ingress sits in between and a scrape addresses the container.
+installation's metrics port. The token block appears in them only when the port
+asks for one.
 
 There is one `prometheus.yml` and not one per platform: the scrape does not change
 from Swarm to Kubernetes, only the discovery of the target does. The file carries
@@ -104,8 +143,10 @@ degraded version of it.
 ## What is missing
 
 - No p95 curve in the console. The histogram is collected and exposed; Grafana
-  draws it, and the query is in the drawer.
-- No `traceparent` propagated to upstreams (OBS-04).
+ draws it, and the query is on the Metrics endpoint page.
+- Nothing about one request in particular: that is the other half, and it has its own page
+ ([traces](/docs/operations/tracing)). A counter detects and scopes; a trace explains one case.
 - `grpc-status` is not read, so every gRPC call counts as `2xx` and a gRPC route's
-  failure rate reads zero (ROUTE-20).
-- Logs have no configurable level and there is no request log (OBS-03).
+ failure rate reads zero.
+- Nothing about WHO called: no label is ever a user, which is what bounds the cardinality. That
+ question is answered in the [access log](/docs/operations/logs).

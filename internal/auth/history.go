@@ -64,7 +64,7 @@ func countryOf(r *http.Request) string {
 // recordLogin appends a sign-in event, minting the browser cookie on first
 // sight. Best-effort: history must never fail a login. Call it BEFORE the
 // redirect is written so the cookie can still ride the response.
-func (h *Handler) recordLogin(w http.ResponseWriter, r *http.Request, userID, method string) {
+func (h *Handler) recordLogin(w http.ResponseWriter, r *http.Request, userID, tenantID, method string) {
 	token := browserTokenOf(r)
 	if token == "" {
 		t, err := randToken()
@@ -93,6 +93,11 @@ func (h *Handler) recordLogin(w http.ResponseWriter, r *http.Request, userID, me
 	if err := h.st.AddLoginEvent(r.Context(), e, userID); err != nil {
 		slog.Warn("sign-in history record failed", "user", userID, "err", err)
 	}
+	// And the security trail (AUD-01): the history above is the person's own,
+	// deleted with them; this line is the administrator's, and outlives them.
+	// The organisation when it is already known - a person with one - and
+	// empty when it is chosen next: that choice writes its own line.
+	h.securityOfIn(r, secSignin, userID, tenantID, method)
 }
 
 // ---- the /profile/history page ----
@@ -115,7 +120,11 @@ type loginEventView struct {
 }
 
 const profileHistoryBody = `    <style>
-      .lh-lines { flex: 1; min-width: 0; display: grid; gap: 3px; text-align: start; }
+      /* min-width in REMS, not zero: the two pills beside it never wrap, so a
+         zero floor let them squeeze this column to nothing and the address
+         broke one character per line. Found by previewing the longest method
+         name the catalogue has - which is what that preview is for. */
+      .lh-lines { flex: 1; min-width: 7.5rem; display: grid; gap: 3px; text-align: start; }
       .lh-label { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       /* the current browser needs no browser/os/ip - we ARE on it */
       .lh-label.here { color: var(--mk-primary); font-weight: 500; }
@@ -128,6 +137,9 @@ const profileHistoryBody = `    <style>
         text-transform: uppercase; color: var(--mk-on-surface-variant);
         padding: 3px 9px; border-radius: 999px; white-space: nowrap;
         border: 1px solid var(--mk-outline);
+        /* Last to give way, and by an ellipsis rather than by pushing the row:
+           a translation can be half again as long as the English. */
+        min-width: 0; overflow: hidden; text-overflow: ellipsis;
       }
       .lh-when {
         font-family: var(--mk-mono); font-size: .68rem;

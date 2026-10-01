@@ -48,8 +48,13 @@ func (a *API) putMustChangePassword(w http.ResponseWriter, r *http.Request, acto
 }
 
 // postMustChangePasswordAll flags every local account - the answer to a leak,
-// where the question is not which account but all of them. Root only: it is
-// the one action here that reaches every person on the installation at once.
+// where the question is not which account but all of them.
+//
+// App-admin, like the one-account version beside it. It used to be root's on
+// the grounds that it reaches every person at once, which is true and gives no
+// power the capability does not already hold: an app-admin can flag any
+// account, one by one, today. What this adds is speed during an incident, and
+// that belongs to whoever is handling the identity side of it.
 //
 // The ACTOR is spared. Being signed out of the console by one's own click, in
 // the middle of an incident, is the wrong lesson at the wrong moment - and the
@@ -60,7 +65,11 @@ func (a *API) postMustChangePasswordAll(w http.ResponseWriter, r *http.Request, 
 		a.internal(w, err)
 		return
 	}
-	a.auditEvent(r.Context(), actor, "users.must-change-password", "users", "", "", "",
+	// The kind is "user", singular, like every other event about an account:
+	// this one touches all of them, which is what the ACTION says. A plural
+	// kind of its own was a kind nothing else ever named - absent from the
+	// trail's partition, and absent from what the live channel wakes.
+	a.auditEvent(r.Context(), actor, "users.must-change-password", "user", "", "", "",
 		"every local account must change its password at next sign-in")
 	writeJSON(w, http.StatusOK, map[string]int{"users": int(n)})
 }

@@ -19,6 +19,8 @@ Chacune a un écran, et cette page dit lequel.
 | Ce service répond-il encore | [Santé des amonts](/docs/operations/upstream-health), et la liste des routes marque ce qui échoue |
 | Pourquoi cet appel a-t-il été refusé en `429` | [Limites de débit](/docs/operations/rate-limits) |
 | Qui a changé ça, et quand | [Le journal d'audit](/docs/operations/audit) |
+| Qui a appelé quoi, et avec quel résultat | [Les journaux](/docs/operations/logs) |
+| Où sont passées les secondes de CETTE requête | [Les traces](/docs/operations/tracing) |
 | Ce noeud est-il prêt à prendre du trafic | [Les sondes de santé](/docs/operations/health) |
 | Quand ce certificat expire-t-il | [TLS et certificats](/docs/operations/tls) |
 | Ce qu'il y a vraiment dans une sauvegarde | [Sauvegarde et restauration](/docs/operations/backup-restore) |
@@ -30,16 +32,20 @@ Chacune a un écran, et cette page dit lequel.
 |---|---|---|
 | Compteurs de trafic | en mémoire, sur chaque noeud | une heure, perdue au redémarrage |
 | Historique par endpoint | en mémoire, sur chaque noeud | soixante-dix minutes, un point par minute |
-| Journal d'audit | la base | un an, puis purge |
+| Journal d'audit | la base | un an par défaut, choisi par root (de trois mois à cinq ans), puis purge |
 | Points de reprise | la base | gardés, jamais élagués |
-| Journaux | sortie d'erreur, structurés | ce qui les collecte |
+| Journal opérationnel | sortie d'erreur, structuré | ce qui le collecte |
+| Journal d'accès | sortie standard, structuré, livré éteint | ce qui le collecte |
+| Traces | rien ici : exportées en OTLP | le collecteur, quelques jours |
 
 Rien du trafic n'est écrit sur disque, et c'est voulu : une app-gateway n'est pas une base de séries
 temporelles, et une installation qui veut un an de courbes les fait aspirer dans celle qu'elle fait
 déjà tourner ([métriques](/docs/operations/metrics)).
 
-Les journaux sont structurés mais nus : ni niveau réglable, ni journal des requêtes pour l'instant
-(OBS-03).
+Les [journaux](/docs/operations/logs) sont structurés, le niveau se règle à chaud, et un journal
+d'accès - une ligne par requête franchissant la porte d'entrée - s'allume quand on le demande. Il
+porte le même identifiant que [les traces](/docs/operations/tracing), ce qui est la clef de
+jointure entre une ligne de la passerelle et l'audit métier d'un service.
 
 ## Une sauvegarde et un export de configuration ne sont pas la même chose
 
@@ -62,8 +68,8 @@ une sauvegarde.
 
 > [!NOTE] Enterprise edition
 > Faire tourner plusieurs passerelles contre une seule base PostgreSQL est le fait de l'image
-> Enterprise : le pilote qui ouvre la connexion et attend les notifications vit là (STORE-03,
-> PERF-03). L'image communautaire dit ce qu'elle sait faire plutôt que d'échouer sur un pilote.
+> Enterprise : le pilote qui ouvre la connexion et attend les notifications vit là. L'image
+> communautaire dit ce qu'elle sait faire plutôt que d'échouer sur un pilote.
 
 > [!WARNING]
 > La clé maîtresse du coffre est un **fichier** à côté du répertoire de données, et elle le reste

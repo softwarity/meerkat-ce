@@ -30,9 +30,9 @@ func TestPortalJSONFiltersByRouteAccess(t *testing.T) {
 	// shop with a reachable child (intranet) and an unreachable one (reports);
 	// ops is a parent the caller cannot open and that has no reachable child.
 	portal := store.PortalConfig{
-		Enabled: true, Layout: store.PortalHeader, Side: "left",
-		Parents: []store.ModuleParent{
-			{RouteID: "shop", Children: []store.ModuleChild{{RouteID: "intranet"}, {RouteID: "reports"}}},
+		Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
+		Entries: []store.PortalEntry{
+			{RouteID: "shop", Children: []store.PortalSubEntry{{RouteID: "intranet"}, {RouteID: "reports"}}},
 			{RouteID: "ops"},
 		},
 	}

@@ -26,11 +26,12 @@ never sit in a shared cache.
 | `/update-password` | the forced change: a temporary or expired password |
 | `/forgot-password`, `/reset-password` | recovery by e-mail, and the page the link lands on |
 | `/register`, `/confirm` | self-registration and address confirmation |
+| `/confirm-email` | the link confirming a new address changed from the profile |
 | `/select-tenant` | which organisation this session works in |
 | `/select-group` | which group, in exclusive-group mode |
 | `/account-pending` | the waiting room: an account that exists and has been granted nothing yet |
 | `/refused` | signed in, and turned away. It names the rule that refused and offers what this session *can* open |
-| `/profile/...` | the person's own pages: identity, password, second factor, passkeys, authorities, sign-in history, API tokens |
+| `/profile/...` | the person's own pages: identity, password, second factor, passkeys, authorities, sign-in history, active sessions, API tokens, leaving an organisation |
 
 The unavailability page has no path of its own: it answers **any** path with
 `503` while maintenance is on, names the reason from a closed list, and gives an
@@ -99,9 +100,11 @@ Thai, Turkish, Ukrainian, Vietnamese and Simplified Chinese. English is the
 reference: a key missing from another catalogue falls back to the English
 sentence rather than showing blank.
 
-Which of them are offered is up to you, in **Application > Locales**. The offer
-is your list intersected with what is built in, and it never ends up empty -
-English is the floor.
+Which of them are offered is DERIVED, never declared: it is the union of what
+your routes say they speak (**Routes > a route > Locales**), intersected with
+what is built in. It never ends up empty - English is the floor. Deploy a route
+written in Polish and this page offers Polish; retire it and the offer shrinks
+with it.
 
 For one request, the language is picked in this order:
 

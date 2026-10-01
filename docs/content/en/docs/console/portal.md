@@ -1,64 +1,73 @@
 ---
-title: Portal
+title: Applications
 section: The console
 order: 176
-summary: The navigation bar the proxied applications wear, built against a live preview.
+summary: The catalogue of applications the gateway offers, and the three-state control that decides how it offers them.
 ---
 
-# Portal
+# Applications
 
-**Application > Portal.** One bar to move between the applications this gateway
-serves. It is injected into the proxied pages, and each visitor sees only the
-entries their access allows.
+**Application > Portal.** The list of applications this gateway offers, in the
+order you choose, and how it is offered. Each visitor sees only the entries
+their access allows.
 
-It is a **global** setting, like the theme: one bar for the installation, edited
-here.
+It is a **global** setting, like the theme: one catalogue for the installation,
+edited here.
 
-When the portal is on, it **replaces the per-route user button** across every UI
-route: the account button moves into the bar.
+![The Portal screen: the three-state control, the arrangement controls, and the real bar in edit mode below](img/console/portal.webp)
 
-![The Portal screen: the arrangement controls, and the real bar in edit mode underneath](img/console/portal.webp)
+## The three-state control
 
-Header mode, icon and label, the application name beside the logo. The canvas
-under it is the bar itself: *Acme Corp* on the left, three modules, and the
-sub-modules of the selected one shown as a rail.
+| | What is drawn |
+|---|---|
+| **None** | nothing. The user button and the built-in pages carry your brand's name, with nothing to click |
+| **Links** | the list, in the user button's *Applications* submenu and on the data-plane pages |
+| **Portal** | a navigation bar on every page of every application; the built-in pages then offer one way back in |
+
+**Changing mode does not cost the list.** You can build a menu, promote it to a
+bar, come back: the entries stay.
 
 ## What you do here
 
-1. **Turn it on.** Nothing below appears until you do.
-2. **Choose the arrangement**: *header mode* or *rail mode*, which side the rail
-   takes, whether header entries show the icon, the label or both, and whether the
-   application name sits beside the logo.
-3. **Add a module** per application the bar should reach. Modules are built on the
-   canvas, which is **the real bar in edit mode**: clicking an entry opens it in
-   the drawer.
-4. **Check it narrow.** The three width buttons put the preview at tablet and
-   phone widths, so you can watch the overflow chevrons and the waffle launcher
-   appear when the tabs no longer fit. Only the full-width one is editable, and the
+1. **Pick the mode.** Nothing below shows in *None*.
+2. **Add an application** for each UI the list should offer. In *Links* they
+   stack in a numbered list with two arrows for the order. In *Portal* they are
+   built on the canvas, which is **the real bar in edit mode**: clicking an
+   entry opens it in the drawer.
+3. **Choose the arrangement** (*Portal* mode): *header mode* or *rail mode*,
+   which side the rail takes, whether header entries show the icon, the label or
+   both, and whether the application name sits beside the logo.
+4. **Check it narrow** (*Portal* mode). The three width buttons put the preview
+   in tablet and phone, to watch the overflow chevrons and the waffle launcher
+   appear when the tabs no longer fit. Only full width is editable, and the
    width is never saved.
 
-## A module
+## An entry
 
 - **Application (route)** - the UI route this entry leads to. Only **enabled UI
-  routes** can wear the bar, and only those are offered. The module inherits the
-  route's access, which is what makes the bar different per visitor: the payload
-  carries no access rule of its own.
-- **Label** - empty uses the route's name.
-- **Home label** (parents only) - the *back to here* row of a sub-menu. Empty uses
-  the label.
+  routes** are offered. The entry inherits the route's access, and that is what
+  makes the list differ per visitor: the payload carries no access rule.
+- **Label** - empty takes the route's name.
 - **Description** - the tooltip.
-- **Icon** - search the bundled icon set, or paste an SVG.
 
-The quick actions at the top of the drawer move a module up or down, add a
-sub-module to a parent, disable it without deleting it, or remove it.
+In *Portal* mode, what it takes to draw a bar is added:
 
-## Traps
+- **Icon** - search the embedded icon set, or paste an SVG.
+- **Home label** - the *back here* row of a submenu. Empty takes the label.
+- **Sub-applications** - the drawer's quick action adds one.
 
-- **No UI route, no portal.** A module needs an enabled route marked UI on
-  [Routes](/docs/console/routes).
-- **A visitor sees fewer entries than you do**, and that is the design: the bar is
-  filtered by each module's route access.
-- **It never shows inside an iframe.** A page embedded in another is not the place
-  for a navigation bar.
-- **Turning the portal on changes every UI route at once.** The per-route user
-  buttons lose their Applications sub-menu to the bar.
+The quick actions at the top of the drawer move an entry up or down, disable it
+without removing it, or take it out.
+
+## Pitfalls
+
+- **A new UI route does not show up on its own.** It is offered only if it is in
+  this list: that is what replaces the route editor's old *Link* field.
+- **No UI route, no catalogue.** An entry needs a route that is enabled and
+  marked UI in [Routes](/docs/console/routes).
+- **A visitor sees fewer entries than you do**, deliberately: the list is
+  filtered by each entry's route access.
+- **The bar never shows in an iframe.** A page embedded in another is not the
+  place for a navigation bar.
+- **Switching to *Portal* changes every UI route at once.** The per-route user
+  buttons lose their Applications submenu to the bar.

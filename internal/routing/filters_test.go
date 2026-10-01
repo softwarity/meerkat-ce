@@ -232,9 +232,10 @@ func TestRemoveJSONFields(t *testing.T) {
 		t.Fatalf("the rest of the document was lost: %s", out)
 	}
 	// A rewritten body is not the upstream's any more: its length is recomputed
-	// and its ETag goes, or a cache serves one under the name of the other.
-	if res.Header.Get("ETag") != "" {
-		t.Fatal("the upstream ETag survived a rewrite")
+	// and its ETag replaced by one over the bytes actually sent (PERF-06), or a
+	// cache serves one under the name of the other.
+	if tag := res.Header.Get("ETag"); !strings.HasPrefix(tag, `"mk-`) {
+		t.Fatalf("the rewritten body carries %q, not a validator of its own", tag)
 	}
 	if n, _ := strconv.Atoi(res.Header.Get("Content-Length")); n != len(out) {
 		t.Fatalf("Content-Length %q does not match %d bytes", res.Header.Get("Content-Length"), len(out))

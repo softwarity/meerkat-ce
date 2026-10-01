@@ -1,25 +1,60 @@
 <div class="banner">
   <h1 i18n="@@Audit">Audit</h1>
-  <button matIconButton (click)="reload()" i18n-matTooltip="@@Refresh" matTooltip="Refresh">
-    <mat-icon>refresh</mat-icon>
+  @if (me.isRoot() && retentionChoices().length) {
+    <!-- Root's alone (AUD-02): whoever may shorten the trail may erase their
+         own traces with it. -->
+    <mat-form-field class="short" subscriptSizing="dynamic">
+      <mat-label i18n="@@Keep_events_for">Keep events for</mat-label>
+      <mat-select [value]="retention()" (selectionChange)="setRetention($event.value)">
+        @for (d of retentionChoices(); track d) {
+          <mat-option [value]="d">{{ retentionLabel(d) }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  }
+  <button matButton="outlined" ee-feature="STORE-06" (click)="exportCsv()">
+    <mat-icon>download</mat-icon>
+    <ng-container i18n="@@Export_CSV">Export CSV</ng-container>
+    <app-ee-lock
+      feature="STORE-06"
+      i18n-why="@@Audit_export_why"
+      why="Take the trail out as a file, for an auditor or a SIEM, with the filters on screen."
+    />
   </button>
 </div>
 
 <div class="toolbar">
-  <p class="hint" i18n="@@Audit_hint">
-    Every administrative change, with the exact fields that moved and their before and after.
+  <p class="hint" i18n="@@Audit_hint_security">
+    Every administrative change, with the exact fields that moved and their before and after. And the security of
+    the accounts: every sign-in, every refused one with its real reason and address, and every way into an account
+    its owner added or removed.
   </p>
 
   <div class="filters">
-    <mat-form-field class="short" subscriptSizing="dynamic">
-      <mat-label i18n="@@Target">Target</mat-label>
-      <mat-select [value]="target()" (selectionChange)="target.set($event.value); reload()">
-        <mat-option value="" i18n="@@All">All</mat-option>
-        @for (k of targets; track k) {
-          <mat-option [value]="k">{{ k }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
+    <mat-button-toggle-group
+      [value]="view()"
+      (change)="setView($event.value)"
+      hideSingleSelectionIndicator
+      i18n-aria-label="@@Audit_view"
+      aria-label="Which part of the trail"
+    >
+      <mat-button-toggle value="" i18n="@@All">All</mat-button-toggle>
+      <mat-button-toggle value="admin" i18n="@@Audit_changes">Changes</mat-button-toggle>
+      <mat-button-toggle value="account" i18n="@@Audit_data_plane_signins">Data plane sign-ins</mat-button-toggle>
+      <mat-button-toggle value="console" i18n="@@Audit_console_signins">Console sign-ins</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (view() === 'admin') {
+      <mat-form-field class="short" subscriptSizing="dynamic">
+        <mat-label i18n="@@Target">Target</mat-label>
+        <mat-select [value]="target()" (selectionChange)="target.set($event.value); reload()">
+          <mat-option value="" i18n="@@All">All</mat-option>
+          @for (k of targets; track k) {
+            <mat-option [value]="k">{{ k }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
 
     <mat-form-field class="short" subscriptSizing="dynamic">
       <mat-label i18n="@@Period">Period</mat-label>
@@ -44,12 +79,14 @@
   } @else {
     <div class="events">
       @for (e of filtered(); track e.id) {
-        <div class="event">
+        <div class="event" [class.security]="security(e)" [class.refused]="refused(e)">
           <div class="meta">
             <div class="when" [title]="fullWhen(e.at)">{{ relWhen(e.at) }}</div>
             <div class="action">{{ e.action }}</div>
             <div class="who">
-              <ng-container i18n="@@by">by</ng-container> {{ e.actorName || e.actorId || '?' }}
+              <!-- A refused name that matches no account has no actor: what was
+                   TYPED is the only name there is, and "by ?" would hide it. -->
+              <ng-container i18n="@@by">by</ng-container> {{ e.actorName || e.actorId || e.targetName || '?' }}
               @if (e.actorToken) {
                 <!-- An agent or a script acted with this person's token. Naming
                      it is the difference between "root did this" and "the agent
@@ -62,10 +99,26 @@
             </div>
           </div>
           <div>
-            @if (e.targetName || e.targetId) {
+            @if (security(e)) {
+              <div class="target">
+                <span class="kind">{{ plane(e) }}</span>
+                @if (e.detail) {
+                  <span class="reason">{{ e.detail }}</span>
+                }
+              </div>
+              @if (e.tenantName || e.tenantId) {
+                <div class="org"><mat-icon>domain</mat-icon>{{ e.tenantName || e.tenantId }}</div>
+              }
+              @if (e.ip) {
+                <div class="ip">{{ e.ip }}</div>
+              }
+            } @else if (e.targetName || e.targetId) {
               <div class="target">
                 <span class="kind">{{ e.target }}</span> {{ e.targetName || e.targetId }}
               </div>
+            }
+            @if (!security(e) && (e.tenantName || e.tenantId)) {
+              <div class="org"><mat-icon>domain</mat-icon>{{ e.tenantName || e.tenantId }}</div>
             }
             @if (e.changes?.length) {
               <div class="changes">
@@ -78,7 +131,7 @@
                   </div>
                 }
               </div>
-            } @else if (e.detail) {
+            } @else if (e.detail && !security(e)) {
               <div class="detail">{{ e.detail }}</div>
             }
           </div>

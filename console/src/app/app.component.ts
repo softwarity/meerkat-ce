@@ -6,16 +6,19 @@ import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DomSanitizer } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { LiveIndicatorComponent } from '@softwarity/livewire';
 import {
   RailnavComponent,
   RailnavContainerComponent,
   RailnavContentComponent,
   RailnavItemComponent,
+  RailnavSeparatorComponent,
   RailnavSpacerComponent,
 } from '@softwarity/rail-nav';
 import { catchError, filter, firstValueFrom, map, of } from 'rxjs';
 import { ApiService, Tenant } from './api.service';
 import { TenantDialogComponent, TenantDialogResult } from './identity/tenant-dialog.component';
+import { LiveChangesService } from './shared/live-changes.service';
 import { TenantsService } from './shared/tenants.service';
 import { MeService } from './me.service';
 import { SessionWatchService } from './session';
@@ -39,7 +42,9 @@ import { UserMenuComponent } from './shared/user-menu.component';
     RailnavContainerComponent,
     RailnavContentComponent,
     RailnavItemComponent,
+    RailnavSeparatorComponent,
     RailnavSpacerComponent,
+    LiveIndicatorComponent,
     UserMenuComponent,
   ],
   styleUrl: './app.component.scss',
@@ -111,6 +116,7 @@ export class AppComponent {
   protected readonly inVault = computed(() => this.url().startsWith('/vault'));
   protected readonly inMetrics = computed(() => this.url().startsWith('/traffic'));
   protected readonly inAudit = computed(() => this.url().startsWith('/audit'));
+  protected readonly inScheduler = computed(() => this.url().startsWith('/scheduler'));
   protected readonly inIssues = computed(() => this.url().startsWith('/issues'));
   protected readonly inApiDocs = computed(() => this.url().startsWith('/api'));
 
@@ -131,6 +137,14 @@ export class AppComponent {
     // other tabs so one sign-in serves them all.
     inject(SessionWatchService).start();
     this.loadTenants();
+    // The drawer follows what OTHER people do to organisations (CONSOLE-13),
+    // which is the same reason the shared signal exists: an organisation renamed
+    // or deleted on another screen used to sit in the drawer until somebody
+    // reloaded, offering a link to something that was gone. Subscribing here is
+    // also what opens the one socket for the tab, so the indicator beside the
+    // user menu reports the connection from the first paint rather than from
+    // whichever screen happened to watch something.
+    inject(LiveChangesService).on('tenant', () => this.loadTenants());
   }
 
   // Clicking "Tenants" lands on the first org's options; the drawer lists the rest.

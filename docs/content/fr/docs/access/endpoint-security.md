@@ -78,19 +78,16 @@ Une règle peut aussi porter ses propres limites de débit, et celles-là sont �
 précision. Une règle sur `*` et `/**` placée en premier avalerait tout ce qui est en
 dessous : mettez les règles générales en dernier.
 
-Une opération qu'**aucune** règle ne matche retombe sur la **règle de la route**.
+Une opération qu'**aucune** règle ne matche retombe sur la **règle de la route** -
+sauf si **Only listed operations are reachable** est allumé, en pied d'écran. Elle
+est alors refusée à tous, et le tableau affiche *Nobody* sur sa ligne.
 
 > [!WARNING]
-> Il n'y a **aucun interrupteur de refus par défaut**. Une opération que vous avez
-> oubliée n'est pas fermée : elle est régie par la règle de la route, qui peut être
-> déléguée. Laisser une liste incomplète de règles d'endpoint sur une route déléguée
-> ne protège rien.
-
-Si vous voulez un inventaire où seul ce que vous avez listé est atteignable, écrivez
-le refus vous-même, en **dernière** règle : méthode `*`, chemin `/**`, niveau
-*Nobody*. Tout ce qui n'a pas été apparié plus haut y atterrit. C'est la réponse
-d'aujourd'hui au refus par défaut, et FEATURES.md liste toujours l'interrupteur comme
-manquant.
+> Sans cet interrupteur, une opération que vous avez oubliée n'est pas fermée : elle
+> est régie par la règle de la route, qui peut être déléguée - et l'endpoint que le
+> service livrera la semaine prochaine aussi. Laisser une liste incomplète de règles
+> d'endpoint sur une route déléguée ne protège rien. Allumez l'interrupteur quand la
+> liste est censée être le contrat entier.
 
 ## Une règle peut ouvrir autant que fermer
 

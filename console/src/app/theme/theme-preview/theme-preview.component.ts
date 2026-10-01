@@ -36,6 +36,18 @@ export class ThemePreviewComponent {
   // long before it is saved, so the panes show it from the drop.
   readonly background = input<Background>({});
   readonly flat = input(false); // flat design -> --mk-glow 0, effects off
+  // Which template the panes render. "specimen" is the flow-page composite;
+  // "mail:<kind>" is a sample message, and those have no dark half - a mail is
+  // built from light colours inline, because an e-mail client second-guesses a
+  // dark background. One pane there is the truth, not a degraded preview.
+  readonly template = input('specimen');
+  readonly locale = input('en');
+  // Stack every refusal the page can give, rather than one. The Locale tab
+  // asks for it - the wordings are what it is about - and the other tabs do
+  // not: four red boxes stand in front of an arrangement one is trying to
+  // judge, while one of them is the error colour the palette needs on screen.
+  readonly allErrors = input(false);
+  protected readonly isMail = computed(() => this.template().startsWith('mail:'));
   readonly highlight = input('');
   // Which schemes the built-in pages offer, read-only here: the pane of a
   // scheme nobody will be served is dimmed, so the screen never shows a look
@@ -45,8 +57,8 @@ export class ThemePreviewComponent {
   // this travels as a class to swap - not as a URL to reload, which would
   // blank the panes at each candidate, exactly while they are being compared.
   readonly layout = input<PageLayout>({ name: 'centered' });
-  protected readonly darkOffered = computed(() => this.pagesScheme() !== 'light');
-  protected readonly lightOffered = computed(() => this.pagesScheme() !== 'dark');
+  protected readonly darkOffered = computed(() => !this.isMail() && this.pagesScheme() !== 'light');
+  protected readonly lightOffered = computed(() => this.isMail() || this.pagesScheme() !== 'dark');
 
   private readonly sanitizer = inject(DomSanitizer);
   private readonly frames = new Set<HTMLIFrameElement>();
@@ -64,7 +76,10 @@ export class ThemePreviewComponent {
   protected readonly paneWidth = computed(() => Math.round(1280 * this.scale()));
   protected readonly paneHeight = computed(() => Math.round(640 * this.scale()));
 
-  protected readonly darkUrl = computed(() => this.url('dark'));
+  // No dark half for a mail: not dimmed, ABSENT. A scheme the pages do not
+  // offer is still a real page, so it stays on screen greyed; a dark mail
+  // is not a thing that exists, and showing one greyed would claim it is.
+  protected readonly darkUrl = computed(() => (this.isMail() ? null : this.url('dark')));
   protected readonly lightUrl = computed(() => this.url('light'));
 
   constructor() {
@@ -109,7 +124,14 @@ export class ThemePreviewComponent {
   private url(scheme: 'dark' | 'light'): SafeResourceUrl | null {
     const id = this.themeId();
     if (!id) return null;
-    const raw = `/api/themes/${encodeURIComponent(id)}/preview?scheme=${scheme}&v=${this.version()}`;
+    const q = new URLSearchParams({
+      scheme,
+      v: String(this.version()),
+      template: this.template(),
+      locale: this.locale(),
+    });
+    if (this.allErrors()) q.set('errors', 'all');
+    const raw = `/api/themes/${encodeURIComponent(id)}/preview?${q}`;
     return this.sanitizer.bypassSecurityTrustResourceUrl(raw);
   }
 

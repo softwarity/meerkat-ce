@@ -43,6 +43,24 @@ type Spec struct {
 	Version    string      `json:"version,omitempty"` // the API version (info.version)
 	Format     string      `json:"format"`            // spec version, e.g. "2.0", "3.0.3", "3.1.0"
 	Operations []Operation `json:"operations"`
+	// Base is the path the document says it lives under - basePath in 2.0, the
+	// path of the first server in 3.x - and it is part of every operation's
+	// ADDRESS: a client calls base + path, never path alone. Operation.Path
+	// carries it already, and this field is the piece on its own, for a reader
+	// who has to compare with something else.
+	Base string `json:"base,omitempty"`
+}
+
+// cleanBase normalises what a document says about where it lives: "/api/v3",
+// "api/v3/" and "/" all mean the same thing, and "" means the root. What comes
+// back is either empty or a path with a leading slash and no trailing one, so
+// joining it to an operation path needs no second thought.
+func cleanBase(p string) string {
+	p = strings.Trim(strings.TrimSpace(p), "/")
+	if p == "" {
+		return ""
+	}
+	return "/" + p
 }
 
 // Parse reads a raw spec (JSON or YAML) and returns its operation projection.
@@ -70,7 +88,15 @@ func parseV2(doc libopenapi.Document) (*Spec, error) {
 		return nil, fmt.Errorf("openapi: build swagger 2.0 model: %w", err)
 	}
 	sw := &m.Model
+	// Swagger 2.0 splits the address in two: host and basePath. With no host,
+	// the document describes an API answering where it was fetched from, so the
+	// basePath is part of the public address - the same reading as a relative
+	// server in 3.x. With a host, the pair is the service's own address and the
+	// route's upstream carries it.
 	out := &Spec{Format: orDefault(sw.Swagger, "2.0")}
+	if strings.TrimSpace(sw.Host) == "" {
+		out.Base = cleanBase(sw.BasePath)
+	}
 	if sw.Info != nil {
 		out.Title, out.Version = sw.Info.Title, sw.Info.Version
 	}
@@ -80,7 +106,7 @@ func parseV2(doc libopenapi.Document) (*Spec, error) {
 			for op := orderedmap.First(pp.Value().GetOperations()); op != nil; op = op.Next() {
 				o := op.Value()
 				out.Operations = append(out.Operations, Operation{
-					Method: strings.ToUpper(op.Key()), Path: path,
+					Method: strings.ToUpper(op.Key()), Path: out.Base + path,
 					OperationID: o.OperationId, Summary: o.Summary, Tags: o.Tags,
 				})
 			}
@@ -97,6 +123,20 @@ func parseV3(doc libopenapi.Document) (*Spec, error) {
 	}
 	d := &m.Model
 	out := &Spec{Format: orDefault(d.Version, "3.0")}
+	// The first server's PATH, when the server is RELATIVE ("/api/v3",
+	// "/otel-demo"): the document then says its operations answer under that
+	// prefix ON THE HOST THAT SERVED IT, so the prefix is part of the address a
+	// client calls and part of the coordinate a rule names.
+	//
+	// An ABSOLUTE server (https://api.example.com/v1) says something else: the
+	// path belongs to the address of the service itself, which is what the
+	// route's upstream already carries. Prefixing operations with it would name
+	// coordinates no request ever has.
+	if len(d.Servers) > 0 && d.Servers[0] != nil {
+		if u, err := url.Parse(d.Servers[0].URL); err == nil && u.Host == "" && u.Scheme == "" {
+			out.Base = cleanBase(u.Path)
+		}
+	}
 	if d.Info != nil {
 		out.Title, out.Version = d.Info.Title, d.Info.Version
 	}
@@ -106,7 +146,7 @@ func parseV3(doc libopenapi.Document) (*Spec, error) {
 			for op := orderedmap.First(pp.Value().GetOperations()); op != nil; op = op.Next() {
 				o := op.Value()
 				out.Operations = append(out.Operations, Operation{
-					Method: strings.ToUpper(op.Key()), Path: path,
+					Method: strings.ToUpper(op.Key()), Path: out.Base + path,
 					OperationID: o.OperationId, Summary: o.Summary, Tags: o.Tags,
 				})
 			}

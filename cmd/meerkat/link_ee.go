@@ -13,4 +13,5 @@ import (
 	_ "github.com/softwarity/meerkat/ee/directories"
 	_ "github.com/softwarity/meerkat/ee/layouts"
 	_ "github.com/softwarity/meerkat/ee/prometheus"
+	_ "github.com/softwarity/meerkat/ee/telemetry"
 )

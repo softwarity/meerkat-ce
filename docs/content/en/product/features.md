@@ -49,6 +49,22 @@ Read more: [Authenticating and authorising](/docs/access/overview).
 - **Access time windows** per organization, by day, date and time zone. **Enterprise** *partly* `TENANT-04`
 - **Identity passed to your services** as headers, as REMOTE_USER or as a signed JWT (ES256, EdDSA, RS256) with a published JWKS and zero-downtime key rotation; forwarded roles are filtered by expression. `SAUTH-01 AUTH-07 ROUTE-18`
 
+## Scheduled calls
+
+The gateway calls your services at the hour you name, with no broker to install.
+
+Read: [Scheduled calls](/docs/operations/scheduler).
+
+- **A schedule is a route, a path and a cadence** (or a cron calendar, read in a timezone): the service asks to be called, the gateway makes the call through its front door, so every rule posed in front of that service applies. *partly* `SCHED-01`
+- **Or one date, once**: a delayed action - the trigger is something that happened, not a calendar. The service posts the moment it wants to be called back at, and the schedule is finished when it has gone. `SCHED-02`
+- **It runs as `meerkat`, carrying the roles the schedule asks for**: no service account to create or keep in step, and a schedule reaches exactly what its roles reach. The service manages them on the control plane with a token of its own, and finds its own by its own metadata. `SCHED-01`
+- **At least once**, with a run identifier to deduplicate on: a call cut short by a gateway that stopped is sent again by another, same identifier, and an answer - a failure included - is never replayed. A **202** keeps the run open and the service reports its progress, which makes a three-hour job expressible without a three-hour request. `SCHED-01`
+- **No tick, no lock**: the gateway sleeps until the next turn owed and wakes on the second; in a cluster the calls spread over the nodes, and a slow service holds only its own call. `SCHED-01`
+- **A live console screen**, filtered by organisation, service and metadata: pause, bring forward, remove. `SCHED-01`
+- **Every turn is kept**: when it ended, how, what answered, which node made the call - and a dropped or failed one is run again from the screen or the API. `SCHED-03`
+- **Three attempts, then the next turn**: the handful of answers that are usually a moment behind an internal service - not known yet, roles not loaded, nobody answering - are tried again, twice, and never past the schedule's catch-up. A 500 is not: that is the service saying something. `SCHED-04`
+- **Or the service names its own moment**: `424` with a `Retry-After` - the extract is not published yet - and the turn comes back then, with the reason kept on the run that gave it. `SCHED-05`
+
 ## Routing and traffic protection
 
 A complete API gateway, run from the console.
@@ -57,7 +73,7 @@ Read more: [Routes](/docs/concepts/routes), and what a request costs in
 [performance](/product/performance).
 
 - **Routes changed live**, with no restart, propagated to every node within a second. `ROUTE-01`
-- **12 predicates and 32 filters**: path, host, header, cookie, method, weight for canaries, time window; request and response rewriting. `ROUTE-03 to 05`
+- **11 predicates and 33 filters**: path, host, header, cookie, method, weight for canaries, time window; request and response rewriting. `ROUTE-03 to 05`
 - **Rate limiting** per route, user, token, organization or address, several limits at once; **per-endpoint quotas**; standard 429 response. `ROUTE-08 QUOTA-05`
 - **Circuit breaker, timeouts** at three levels, and service health in the console, observed on real traffic. `ROUTE-07 ROUTE-09 SVC-04`
 - **WebSocket, gRPC and body streaming** end to end. *partly* `ROUTE-13 ROUTE-20`
@@ -97,9 +113,11 @@ A console that replaces YAML files and configuration pipelines.
 Read more: [Operations](/docs/operations/overview).
 
 - **Versioned configurations**: several named versions, one active, comparison, YAML export and import, automatic restore point on every change. `CFG-01 to 06`
-- **Audit log** of every administrative action, with a field-by-field diff, append-only, browsable in the console. `AUD-01 AUD-02`
+- **Audit log** of every administrative action, with a field-by-field diff, and of the security of the accounts - every sign-in, every refused one with its real reason and address, every factor, passkey, password or token changed by its owner. Append-only, browsable in the console. `AUD-01 AUD-02`
 - **Built-in dashboards**: traffic, latency and failures per route and per endpoint, with nothing to install. `OBS-01`
-- **Prometheus export** with a ready-made Grafana dashboard and files ready for Swarm and Kubernetes. **Enterprise** `OBS-05`
+- **Prometheus export**, on a port of its own with an optional token, with a ready-made Grafana dashboard and files ready for Swarm and Kubernetes - and the same counters **pushed over OTLP** to the collector the traces go to. **Enterprise** `OBS-05`
+- **Structured logs**, JSON or text, and an **access log** - one line per request crossing the front door, refusals included, carrying the account as the gateway itself authenticated it. That is the half of an audit no service can write: it never saw the call it was refused, and all it knows of the caller is what it was told. `OBS-03`
+- **Distributed tracing** (W3C Trace Context): the context travels in both editions and an identifier is put on every request - handed back to the caller, written in the log, at the foot of the built-in pages - which **joins a line of the gateway's to a service's own business audit**. In Enterprise the gateway puts itself on the trace: its inbound span, the span of the upstream call, and the gap between the two, which is its own time. **OTLP** export to the OpenTelemetry Collector, Tempo, Jaeger or a vendor. The OpenTelemetry bundle can be injected into UI pages - served by Meerkat, never by a CDN - so the trace starts at the click. **Enterprise** `OBS-04`
 - **Active/active cluster** on PostgreSQL, with no session affinity and no primary node. **Enterprise** `PERF-03 STORE-03`
 - **Transactional emails** in your theme colors, and a daily digest of expiring accounts. `NOTIF-01 NOTIF-04`
 - **Deployment**: one image, embedded storage by default, Docker, Swarm or Kubernetes with a Helm chart, liveness and readiness probes, seeding from a file. `DEPLOY-01 OBS-02 LIFE-02`

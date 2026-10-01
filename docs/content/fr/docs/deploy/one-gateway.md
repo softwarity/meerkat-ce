@@ -50,6 +50,12 @@ communautaire fait tourner plug à côté de la passerelle, ce qui est le mode p
 défaut de plug et ne demande rien à Meerkat. À quoi tout cela sert est sur la
 page [Mode développement](/product/dev-mode).
 
+Le déployer n'ouvre encore rien. Le tunnel a aussi son propre interrupteur dans
+la console, **Infra, Plug**, livré éteint, à côté du mode développeur ; cette
+page enregistre l'adresse que les développeurs utilisent et leur donne les
+commandes pour installer plug sous macOS, Linux et Windows. Voir
+[Plug](/docs/operations/plug).
+
 Le fichier Enterprise est celui du dessus plus trois choses : l'image
 Enterprise, un port, et le socket qui permet à l'agent de donner un nom à une
 machine. L'image est dans un registre privé, et c'est un accord commercial qui
@@ -58,7 +64,7 @@ l'ouvre - voir [les éditions](/product/editions).
 ```yaml
 services:
   meerkat:
-    image: ghcr.io/softwarity/meerkat-ee:latest
+    image: ghcr.io/softwarity/meerkat:latest
     ports:
       - "8080:8080"
       - "9090:9090"
@@ -88,22 +94,54 @@ partie que personne n'écrit - comment ne pas faire du point d'entrée le point
 unique de défaillance.
 
 ```bash
-helm install meerkat ./deploy/helm/meerkat \
+helm repo add meerkat https://www.softwarity.io/deploy
+
+helm install meerkat meerkat/meerkat \
   --set admin.password='votre-premier-mot-de-passe'
 
-# Enterprise, tunnel ouvert :
-helm install meerkat ./deploy/helm/meerkat \
-  --set image.repository=ghcr.io/softwarity/meerkat-ee \
+# Enterprise, tunnel ouvert (`plug.enabled` vaut déjà true) :
+helm install meerkat meerkat/meerkat \
+  --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
+  --set admin.password='votre-premier-mot-de-passe'
+
+# Enterprise de production : la surface de développement est fermée, et le
+# chart n'accorde alors aucun droit sur le namespace.
+helm install meerkat meerkat/meerkat \
+  --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
   --set admin.password='votre-premier-mot-de-passe' \
-  --set plug.enabled=true
+  --set production=true
 ```
 
-`plug.enabled` est ce qui accorde au ServiceAccount de cette passerelle le droit
-de **gérer les Services de son propre namespace**, et rien d'autre. C'est ce qui
-permet à une session de pointer un nom de cluster vers la machine d'un
-développeur, puis de le remettre en place. L'agent ne peut pas lire un secret,
-toucher un pod, ni voir un autre namespace. Désactivé, le chart n'accorde
-strictement rien.
+Ce que le chart accorde au ServiceAccount de cette passerelle, **dans son seul
+namespace**, est ce dont l'agent a besoin et rien de plus :
+
+| sur | pour |
+|---|---|
+| `services`, `endpoints` | pointer un nom de cluster vers la machine d'un développeur, puis le remettre en place |
+| `endpointslices` (list, deletecollection) | supprimer la slice que Kubernetes garde pour le pod déployé derrière un Service à port nommé - sans elle, une requête sur deux atteint encore ce pod |
+| `deployments` (lire, patcher) | son propre redémarrage, et la reprise périodique d'un Service garé |
+| `pods` (lire, créer, supprimer) | hériter de l'environnement du service remplacé, et lancer le temps d'une session le pod qui sert ses volumes au poste du développeur |
+| `pods/exec` | lire cet environnement dans le pod garé, comme le fait mirrord |
+| `persistentvolumeclaims` (lire) | refuser avec une raison un volume `ReadWriteOncePod`, plutôt qu'un pod qui ne démarre jamais |
+
+`pods/exec` est le plus large des sept : dans ce namespace, cela revient à
+exécuter du code dans les pods, et lire l'environnement qu'un pod a **déjà
+résolu** est lire les secrets qu'il a résolus. C'est aussi pourquoi l'agent ne
+demande jamais `get secrets`. Il ne voit aucun autre namespace, et la liste est
+celle de plug lui-même (`deploy/plug-k8s.yaml` dans son dépôt) : un droit que
+l'agent a acquis depuis se découvrirait au moment où quelqu'un utilise la
+fonction, ce qui est le pire endroit pour l'apprendre.
+
+Le droit **suit le tunnel** plutôt qu'un interrupteur à lui. `production: true`
+ferme la surface de développement : la passerelle n'ouvre aucun tunnel, et le
+chart n'accorde alors strictement rien - un droit que personne n'exerce est de
+la surface pour rien. Sinon le tunnel peut s'ouvrir - il le fait une fois allumé
+sous **Infra, Plug** -, donc le déploiement accorde ce qu'on peut lui demander
+d'utiliser : c'est pourquoi `plug.enabled` vaut **true par
+défaut**, la combinaison inverse - le tunnel ouvert, les droits absents - étant
+la seule qui ne peut pas marcher, avec un agent qui dit chaque minute qu'il ne
+peut pas faire son travail. `plug.enabled: false` refuse tout de même le grant,
+pour une installation qui veut la surface de développement sans le tunnel.
 
 ## Déclarer une passerelle de production
 
@@ -134,6 +172,6 @@ absent doit apprendre pourquoi.
 | `MEERKAT_TLS_ADDR` / `MEERKAT_ADMIN_TLS_ADDR` | `:8443` / `:9443` | Les portes HTTPS, ouvertes dès qu'un certificat existe pour un nom. En avoir un EST l'activation : aucun interrupteur ne peut dire "actif" alors que rien n'est servi. |
 | `MEERKAT_DATABASE_URL` | - | Un PostgreSQL externe à la place du stockage embarqué. Enterprise, et le prérequis d'un [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | un fichier sous le répertoire de données | La clé maître du coffre. Elle doit être fournie, et identique, sur tous les nœuds d'un cluster. |
-| `MEERKAT_PLUG_ADDR` | `:22222` | Déplace le port du tunnel de développement. Cela ne le coupe pas : fermer la surface de développement, si. |
+| `MEERKAT_PLUG_ADDR` | `:22222` | Déplace le port du tunnel de développement. Cela ne le coupe pas : l'interrupteur **Infra, Plug** le fait, et fermer la surface de développement aussi. |
 | `MEERKAT_PRODUCTION` | non posée | Déclare cette passerelle de production et ferme définitivement la surface de développement. |
 | `MEERKAT_TENANCY` | `single` | Une organisation implicite, ou plusieurs (Enterprise). Choisi une fois, au premier démarrage ; la console en est maîtresse ensuite. |

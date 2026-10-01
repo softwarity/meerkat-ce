@@ -30,6 +30,10 @@ type Role struct {
 	System      bool     `json:"system"`
 	CreatedAt   int64    `json:"createdAt"`
 	UpdatedAt   int64    `json:"updatedAt"`
+	// Rev is the revision this row was READ at, carried back by a save so a
+	// write built on a version somebody has replaced is refused. Zero means "I
+	// read no version" and still wins - see rev.go.
+	Rev int64 `json:"rev,omitempty"`
 }
 
 // Group is a per-organisation bundle of catalogue roles (RBAC-02). A member is
@@ -43,6 +47,10 @@ type Group struct {
 	RoleIDs     []string `json:"roleIds"`
 	CreatedAt   int64    `json:"createdAt"`
 	UpdatedAt   int64    `json:"updatedAt"`
+	// Rev is the revision this row was READ at, carried back by a save so a
+	// write built on a version somebody has replaced is refused. Zero means "I
+	// read no version" and still wins - see rev.go.
+	Rev int64 `json:"rev,omitempty"`
 }
 
 // scanner is the shared surface of *sql.Row and *sql.Rows.
@@ -69,6 +77,10 @@ func (s *Store) SaveRole(ctx context.Context, r Role) error {
 			return fmt.Errorf("store: role %q: that parent would create a cycle", r.Name)
 		}
 	}
+	// See rev.go: a write built on a version somebody has replaced is refused.
+	if err := s.checkRev(ctx, "roles", "role", r.ID, r.Rev); err != nil {
+		return err
+	}
 	tags, _ := json.Marshal(r.Tags)
 	var parent any
 	if r.ParentID != "" {
@@ -76,12 +88,13 @@ func (s *Store) SaveRole(ctx context.Context, r Role) error {
 	}
 	now := time.Now().Unix()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO roles (id, name, description, parent_id, tags, system, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO roles (id, name, description, parent_id, tags, system, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, description = excluded.description,
 		   parent_id = excluded.parent_id, tags = excluded.tags,
-		   system = excluded.system, updated_at = excluded.updated_at`,
+		   system = excluded.system, updated_at = excluded.updated_at,
+		   rev = roles.rev + 1`,
 		r.ID, r.Name, r.Description, parent, string(tags), r.System, now, now)
 	if err != nil {
 		return fmt.Errorf("store: save role %q: %w", r.Name, err)
@@ -92,13 +105,13 @@ func (s *Store) SaveRole(ctx context.Context, r Role) error {
 // GetRole returns one role by id.
 func (s *Store) GetRole(ctx context.Context, id string) (Role, error) {
 	return scanRole(s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, parent_id, tags, system, created_at, updated_at FROM roles WHERE id = ?`, id))
+		`SELECT id, name, description, parent_id, tags, system, created_at, updated_at, rev FROM roles WHERE id = ?`, id))
 }
 
 // ListRoles returns the whole catalogue, ordered by name.
 func (s *Store) ListRoles(ctx context.Context) ([]Role, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, description, parent_id, tags, system, created_at, updated_at FROM roles ORDER BY name ASC`)
+		`SELECT id, name, description, parent_id, tags, system, created_at, updated_at, rev FROM roles ORDER BY name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list roles: %w", err)
 	}
@@ -137,7 +150,7 @@ func scanRole(row scanner) (Role, error) {
 	var r Role
 	var parent sql.NullString
 	var tags string
-	if err := row.Scan(&r.ID, &r.Name, &r.Description, &parent, &tags, &r.System, &r.CreatedAt, &r.UpdatedAt); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.Description, &parent, &tags, &r.System, &r.CreatedAt, &r.UpdatedAt, &r.Rev); err != nil {
 		return Role{}, fmt.Errorf("store: get role: %w", err)
 	}
 	r.ParentID = parent.String
@@ -190,6 +203,10 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 	if g.TenantID == "" {
 		return fmt.Errorf("store: group %q: a tenant is required", g.Name)
 	}
+	// See rev.go: a write built on a version somebody has replaced is refused.
+	if err := s.checkRev(ctx, "groups", "group", g.ID, g.Rev); err != nil {
+		return err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("store: save group %q: %w", g.Name, err)
@@ -197,9 +214,10 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 	defer func() { _ = tx.Rollback() }()
 	now := time.Now().Unix()
 	if _, err = tx.ExecContext(ctx,
-		`INSERT INTO groups (id, tenant_id, name, description, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description, updated_at = excluded.updated_at`,
+		`INSERT INTO groups (id, tenant_id, name, description, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, 1)
+		 ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description,
+		   updated_at = excluded.updated_at, rev = groups.rev + 1`,
 		g.ID, g.TenantID, g.Name, g.Description, now, now); err != nil {
 		return fmt.Errorf("store: save group %q: %w", g.Name, err)
 	}
@@ -219,8 +237,8 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 func (s *Store) GetGroup(ctx context.Context, id string) (Group, error) {
 	var g Group
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, tenant_id, name, description, created_at, updated_at FROM groups WHERE id = ?`, id).
-		Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt)
+		`SELECT id, tenant_id, name, description, created_at, updated_at, rev FROM groups WHERE id = ?`, id).
+		Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt, &g.Rev)
 	if err != nil {
 		return Group{}, fmt.Errorf("store: get group %q: %w", id, err)
 	}
@@ -236,7 +254,7 @@ func (s *Store) GetGroup(ctx context.Context, id string) (Group, error) {
 // ListGroups returns a tenant's groups (with their role sets), ordered by name.
 func (s *Store) ListGroups(ctx context.Context, tenantID string) ([]Group, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, tenant_id, name, description, created_at, updated_at FROM groups WHERE tenant_id = ? ORDER BY name ASC`,
+		`SELECT id, tenant_id, name, description, created_at, updated_at, rev FROM groups WHERE tenant_id = ? ORDER BY name ASC`,
 		tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list groups: %w", err)
@@ -247,7 +265,7 @@ func (s *Store) ListGroups(ctx context.Context, tenantID string) ([]Group, error
 		// RoleIDs starts as an empty slice, never nil: a role-less group must
 		// serialise as [] (the console indexes into it).
 		g := Group{RoleIDs: []string{}}
-		if err := rows.Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt, &g.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan group: %w", err)
 		}
 		groups = append(groups, g)

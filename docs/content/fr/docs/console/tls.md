@@ -74,6 +74,13 @@ n'est jamais forcée, ni la sonde de vivacité. Si tous les certificats expirent
 redirection **se met elle-même en retrait** et le dit, plutôt que d'envoyer les
 appelants vers une porte qu'aucun n'ouvrira.
 
+L'interrupteur est toujours là, grisé tant que la porte HTTPS des applications n'est pas ouverte -
+aucun nom d'application n'a encore de certificat - avec une ligne qui le dit. **HSTS duration** est
+dessous, actif une fois HTTPS forcé : forcer HTTPS envoie aussi HSTS, donc les
+navigateurs cessent d'envoyer même la première requête en clair - celle qu'une redirection ne peut
+pas protéger. Un jour par défaut, jusqu'à deux ans. Jamais envoyé à localhost ni à une adresse IP ;
+une route ou un service qui pose sa propre valeur la garde. Voir [TLS](/docs/operations/tls).
+
 ## Certificats automatiques (ACME)
 
 Un compte, et une case à cocher par nom : ce qui varie n'est jamais le plan, c'est le

@@ -23,6 +23,13 @@ endpoint : tout cela est dans l'image gratuite, et y restera. Vendre la sûreté
 ceux qui peuvent le moins la payer n'est pas un modèle que nous voulons.
 :::
 
+La règle, telle qu'elle a été arrêtée le **8 août 2026**, tient en deux
+phrases : **ce qui coûte à l'organisation qui grandit se paie ; ce qui protège
+l'utilisateur ne se paie pas.** Sa conséquence se lit dans la colonne d'en
+face : là où les offres d'identité facturent le SSO et le second facteur au
+palier supérieur, Meerkat ne pousse jamais à déployer moins sûr pour payer
+moins cher.
+
 ## Ce que l'édition gratuite fait déjà
 
 Tout ce que décrit la [page des fonctionnalités](/product/features), moins les
@@ -42,7 +49,7 @@ agent. En production, en entreprise, commercialement, gratuitement.
 | **Les rôles depuis l'annuaire** | Accordés dans Meerkat | Règles de groupe : un groupe LDAP, une équipe GitHub ou un claim OIDC devient une appartenance et ses rôles, à chaque connexion. |
 | **Heures ouvrées** | - | Fenêtres d'accès : plages horaires, jours de la semaine, fuseau. Partiel, voir la [feuille de route](/project/roadmap). |
 | **Plusieurs passerelles** | Une passerelle sur son stockage embarqué | Actif/actif sur un PostgreSQL partagé : bus de changement, certificats partagés, aucune affinité de session à réclamer. Voir [la page cluster](/docs/deploy/kubernetes). |
-| **Supervision** | Écrans de trafic et de métriques, intégrés, rien à installer | Les mêmes écrans, plus une exposition Prometheus pour que la stack que vous avez déjà les collecte. |
+| **Supervision** | Écrans de trafic et de métriques, intégrés, rien à installer | Les mêmes écrans, plus une exposition Prometheus pour que la stack que vous avez déjà les collecte, et les mêmes compteurs poussés en OTLP vers votre collecteur. |
 | **Configurations enregistrées** | Trois à la fois, et la console dit où vous en êtes avant d'atteindre le plafond | Autant que vous voulez : une par client, une par environnement. |
 | **Pages intégrées** | Vos couleurs, votre logo, votre nom, la disposition centrée | Les dispositions split, tiroir, bandeau et nue en plus, et la marque Meerkat retirée des pages que vous servez. |
 | **Tunnel de développement** | plug tourne à côté de la passerelle, ce qui est son mode par défaut | Le tunnel dans la passerelle, et chaque substitution attribuée au développeur qui l'a posée. Voir [Mode développement](/product/dev-mode). |

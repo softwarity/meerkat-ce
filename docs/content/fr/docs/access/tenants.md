@@ -40,6 +40,12 @@ membres, ses groupes, ses règles de groupe, réinitialiser le mot de passe d'un
 membre, lire l'historique de connexion d'un membre. Cela n'accorde rien en dehors de
 cette organisation, et en particulier pas le catalogue global de rôles.
 
+Une personne peut aussi **quitter** l'organisation où elle se trouve, depuis son profil : *Leave
+this organisation*, à côté de son nom, puis une confirmation qui dit que seul un administrateur
+pourra l'y rajouter. L'appartenance disparaît, la session cesse aussitôt de porter l'organisation,
+et la ligne `member.leave` arrive dans le [journal d'audit](/docs/operations/audit) de
+l'organisation. En multi-organisations seulement : une installation unique n'a rien à quitter.
+
 ![Les membres d'une organisation, et ce que chacun y est](img/console/members.webp)
 
 ## Le choix à la connexion

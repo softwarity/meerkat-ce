@@ -40,12 +40,9 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       },
       { path: 'mail-relay', label: $localize`:@@Mail_relay:Mail relay`, icon: 'outgoing_mail' },
       { path: 'tls', label: $localize`:@@TLS:TLS`, icon: 'lock' },
-      {
-        path: 'access-tokens',
-        label: $localize`:@@Access_tokens:Access tokens`,
-        icon: 'key',
-        roles: 'root',
-      },
+      // Everybody who administers a domain mints their OWN tokens, and a token
+      // is never more than its owner - so this is on both planes, not root's.
+      { path: 'access-tokens', label: $localize`:@@Access_tokens:Access tokens`, icon: 'key' },
       {
         path: 'configuration',
         label: $localize`:@@Configuration:Configuration`,
@@ -55,18 +52,26 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // Below the configuration, and on its own: connecting an assistant is
       // not the same act as minting a key, and the flow that does it produces
       // no key at all.
-      { path: 'mcp', label: $localize`:@@MCP:MCP`, icon: 'smart_toy', roles: 'root' },
+      { path: 'mcp', label: $localize`:@@MCP:MCP`, icon: 'smart_toy' },
       // The shape of the objects this installation keeps, apart from the
       // things that USE them: an account's fields are decided once, not
       // administered daily.
       { path: 'model', label: $localize`:@@Model:Model`, icon: 'schema' },
+      // Where the traces go. Last, because an installation wires it once and
+      // then decides route by route which ones it wants to follow.
+      { path: 'opentelemetry', label: $localize`:@@OpenTelemetry:OpenTelemetry`, icon: 'timeline' },
+      // Where a scraper reads the counters: the other way out for metrics,
+      // beside the one that pushes them.
+      { path: 'metrics-endpoint', label: $localize`:@@Metrics_endpoint:Metrics endpoint`, icon: 'sensors' },
+      // The developer tunnel: a port into the cluster, opened for the people
+      // who plug their machine in.
+      { path: 'plug', label: $localize`:@@Plug:Plug`, icon: 'power' },
     ],
   },
   application: {
     title: $localize`:@@Application:Application`,
     links: [
       { path: 'general', label: $localize`:@@Section_general:General`, icon: 'tune' },
-      { path: 'locales', label: $localize`:@@Locales:Locales`, icon: 'translate' },
       { path: 'roles', label: $localize`:@@Roles:Roles`, icon: 'badge' },
       // Groups, Members and the group rules hang off an ORGANISATION. In single
       // mode there is one and nobody names it, so they live here; in multi they
@@ -75,6 +80,8 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // organisation.
       { path: 'groups', label: $localize`:@@Groups:Groups`, icon: 'groups', singleOnly: true },
       { path: 'users', label: $localize`:@@Users:Users`, icon: 'group' },
+      // Who is signed in where, right now (CONSOLE-08).
+      { path: 'sessions', label: $localize`:@@Sessions:Sessions`, icon: 'devices' },
       { path: 'members', label: $localize`:@@Members:Members`, icon: 'badge_check', singleOnly: true },
       { path: 'group-rules', label: $localize`:@@Group_rules:Group rules`, icon: 'rule', singleOnly: true },
       // The pages this gateway serves: one entry, three tabs on its left panel
@@ -90,6 +97,9 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // applications wear, in place of their per-route user buttons.
       { path: 'portal', label: $localize`:@@Portal:Portal`, icon: 'apps' },
       { path: 'security', label: $localize`:@@Security:Security`, icon: 'shield' },
+      // The same screen as on the infra plane: an app admin's agent needs a key
+      // too, and it would otherwise have to borrow somebody else's.
+      { path: 'access-tokens', label: $localize`:@@Access_tokens:Access tokens`, icon: 'key' },
     ],
   },
 };

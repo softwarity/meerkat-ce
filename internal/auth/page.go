@@ -55,6 +55,42 @@ func (h *Handler) pageJS(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(pageJS))
 }
 
+// schemeJS serves ONE route's scheme script (SchemeConfig.Script) as a real
+// same-origin file, wrapped in the function the agent calls.
+//
+// It is a file and not an attribute the agent evaluates, because an application
+// worth putting behind a gateway sends a Content-Security-Policy, and RabbitMQ's
+// is the ordinary one: "script-src 'self'". Under it new Function throws
+// EvalError - measured, in the browser, against the real management console -
+// while a script fetched from the gateway's own origin is exactly what 'self'
+// allows. The same policy is why the localStorage pre-write inline in the page
+// is dropped there and the agent's own write is what lands.
+//
+// The route is named in the query, and the body's hash rides with it so an edit
+// reaches a browser that cached the last one. No session is required: this is
+// code that runs in the page, the same as the agent beside it.
+func (h *Handler) schemeJS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	body := ""
+	if id := r.URL.Query().Get("r"); id != "" {
+		if rt, err := h.st.GetRoute(r.Context(), id); err == nil && rt.IsUI && rt.UI != nil {
+			if s := rt.UI.Scheme; s != nil && s.Mechanism == store.SchemeScript {
+				body = s.Script
+			}
+		}
+	}
+	if body == "" {
+		// Nothing to run: say so in one line rather than 404, so a page that
+		// asked for a route since retyped does not log an error over a setting.
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte("/* meerkat: this route declares no scheme script */\n"))
+		return
+	}
+	// The URL carries the body's hash, so this answer is good until it changes.
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	_, _ = w.Write([]byte("window.meerkatSchemeFn=function(colorScheme){\n" + body + "\n};\n"))
+}
+
 const pageJS = `(() => {
   if (window.meerkatPage) return;
 
@@ -86,9 +122,42 @@ const pageJS = `(() => {
   // instead of by this route - see SchemeConfig.
   const schemeAware = () => cfg.scheme === 'select' || !!cfg.schemeMechanism || !!cfg.schemeStorage;
 
+  // The ESCAPE HATCH (SchemeConfig.Script): the integrator's own body, served
+  // as /meerkat/scheme.js beside this agent and wrapping itself in
+  // window.meerkatSchemeFn. It is a FILE and not a string this evaluates,
+  // because the applications worth a gateway send a Content-Security-Policy and
+  // "script-src 'self'" - RabbitMQ's, measured - refuses new Function outright
+  // while allowing a script from this origin.
+  //
+  // It is deferred, so at head time there is nothing to call yet; the
+  // DOMContentLoaded catch-up below is what runs it at load, after the deferred
+  // scripts and before the page's own ready handlers.
+  const runSchemeScript = (v) => {
+    const fn = window.meerkatSchemeFn;
+    if (typeof fn !== 'function') return;
+    try { fn(v); } catch (e) { console.error('[meerkat] scheme script failed:', e); }
+  };
+
+  // An application with ONE look (the route's scheme-wear): the document wears
+  // it from the first paint, and the visitor's choice is never applied - this
+  // application does not take one. What inherits the document's color-scheme
+  // follows it, the portal bar first: its colours are the document's, so on a
+  // dark application with no color-scheme of its own the bar used to stay light.
+  if (cfg.schemeWear === 'light' || cfg.schemeWear === 'dark') {
+    document.documentElement.style.colorScheme = cfg.schemeWear;
+    document.documentElement.setAttribute('data-meerkat-scheme', cfg.schemeWear);
+  }
+
   const applyScheme = (v) => {
     if (!schemeAware()) return;
     lastScheme = v;
+    // An application with no follow-the-system state (SchemeConfig.NoAuto) is
+    // handed the system's CURRENT answer instead of "auto": clearing the
+    // attribute or dropping its stored key would leave it on whatever it
+    // defaults to, which is the one thing the visitor did not ask for. The
+    // CHOICE stays auto above, so the darkMedia listener keeps this in step as
+    // the system changes.
+    if (v === 'auto' && cfg.schemeNoAuto) v = darkMedia.matches ? 'dark' : 'light';
     // The application keeps its own light/dark under a key the route names, and
     // acts on THAT - ng-m3-theme even clears the document's color-scheme when it
     // reads "system". So the choice is written in its vocabulary: light or dark
@@ -116,6 +185,11 @@ const pageJS = `(() => {
     syncStripScheme();
     const mech = cfg.schemeMechanism;
     if (!mech) return;
+    // It gets the CHOICE, not the resolved scheme: "auto" is the visitor asking
+    // to follow their system, and only the application knows how to be put back
+    // on it - RabbitMQ restores a media query, another drops a stored key.
+    // Handing it "light" there would settle a question it was asked to reopen.
+    if (mech === 'script') { runSchemeScript(v); return; }
     // The tag the ROUTE named, <html> unless it says otherwise - which is
     // where a color scheme is read from, and where an application with no
     // opinion puts it. It may not be PARSED yet: this runs from <head>, on
@@ -521,7 +595,7 @@ const pageJS = `(() => {
   let imposedScheme = '';
   const syncStripScheme = () => {
     if (!stripHost) return;
-    const scheme = imposedScheme || document.documentElement.getAttribute('data-meerkat-scheme');
+    const scheme = imposedScheme || cfg.schemeWear || document.documentElement.getAttribute('data-meerkat-scheme');
     if (scheme) stripHost.setAttribute('data-scheme', scheme);
     else stripHost.removeAttribute('data-scheme');
   };
@@ -570,9 +644,9 @@ const pageJS = `(() => {
     const bar = stripRoot.lastElementChild;
     bar.className = 'pb' + (collapsed ? ' min' : '');
     bar.innerHTML =
-      '<button class="pb-tab" title="' + esc(lb('pluggedTitle', 'Served from a developer machine')) + '">' +
+      '<button class="pb-tab" title="' + esc('Served from a developer machine') + '">' +
       '<span class="pb-badge">plug</span><span class="pb-chev">' + (collapsed ? '\u25b4' : '\u25be') + '</span></button>' +
-      '<span class="pb-title">' + esc(lb('pluggedTitle', 'Served from a developer machine')) + '</span>' +
+      '<span class="pb-title">' + esc('Served from a developer machine') + '</span>' +
       '<ul class="pb-list">' + groups.map(([who, list]) =>
         '<li>' +
         (who ? '<span class="pb-who">' + esc(who) + '</span>' : '') +

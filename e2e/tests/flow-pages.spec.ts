@@ -380,3 +380,140 @@ test.describe.serial('flow-email-signin', () => {
     }
   });
 });
+
+// flow-scheduler: a service asks to be called later, and the gateway calls it.
+//
+// The whole shape in one pass: root mints the service's credential, the
+// service names its own schedule, finds it again by its own metadata, and the
+// gateway makes the call. The route points at the gateway's OWN unavailable
+// page rather than at a service of its own: what this proves is that the call
+// is made, carries its run identifier, and is recorded - not what the far end
+// does with it.
+test.describe.serial('flow-scheduler', () => {
+  test('a service schedules a call to itself, and the gateway makes it', async () => {
+    const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
+    const routes = (await (await root.get('/api/routes')).json()) as { id: string; name: string }[];
+    const target = routes[0];
+    expect(target, 'the seeded gateway must have a route to point at').toBeTruthy();
+
+    // The credential a backend holds, and its whole perimeter: it writes
+    // schedules on this port, and nothing else.
+    const minted = await root.post('/api/admin-tokens', {
+      data: { name: 'e2e stations', scope: 'schedules' },
+    });
+    expect(minted.status(), await minted.text()).toBe(201);
+    const { token } = (await minted.json()) as { token: string };
+    const svc = await request.newContext({
+      baseURL: ADMIN_URL,
+      extraHTTPHeaders: { Authorization: `Bearer ${token}` },
+    });
+
+    // It opens the schedules and nothing else on this port.
+    expect((await svc.get('/api/me')).status()).toBe(403);
+
+    // An ordinary create: the gateway hands back the id.
+    const body = {
+      name: 'e2e station 42',
+      // What the call may reach is in the SCHEDULE, not in the token: it goes
+      // out as "meerkat" holding these roles, and no account is behind it.
+      roles: ['e2e_scheduled'],
+      routeId: target.id,
+      method: 'POST',
+      path: '/e2e/scheduled',
+      every: 'PT1M',
+      metadata: { station: '42', kind: 'e2e' },
+    };
+    const made = await svc.post('/api/schedules', { data: body });
+    expect(made.status(), await made.text()).toBe(201);
+    const schedule = (await made.json()) as { id: string; roles: string[] };
+    expect(schedule.id.startsWith('sch_'), 'the gateway hands back its own id').toBeTruthy();
+    expect((await svc.put(`/api/schedules/${schedule.id}`, { data: body })).status()).toBe(200);
+
+    // One role is said in the singular, and lands in the same field.
+    const single = await svc.post('/api/schedules', {
+      data: {
+        name: 'e2e singular', role: 'e2e_scheduled',
+        routeId: target.id, path: '/e2e/scheduled', every: 'PT1H',
+      },
+    });
+    expect(single.status(), await single.text()).toBe(201);
+    const one = (await single.json()) as { id: string; roles: string[] };
+    expect(one.roles, 'the singular is the same field').toEqual(['e2e_scheduled']);
+    expect((await svc.delete(`/api/schedules/${one.id}`)).status()).toBe(204);
+
+    // Found again by what the service filed it under.
+    const count = async (query: string) =>
+      ((await (await svc.get('/api/schedules' + query)).json()) as unknown[]).length;
+    expect(await count('?meta.station=42')).toBe(1);
+    expect(await count('?meta.station=99')).toBe(0);
+    expect(await count('?meta.station=~^4')).toBe(1);
+
+    // A cadence starts at once: the gateway makes the first call as soon as
+    // the schedule is written, and nothing more is owed while it is in
+    // flight - "run now" under it is a 409. So wait for that first turn to
+    // close, then bring the next one forward and wait for it too.
+    type Seen = { lastState: string; nextAt: number; runId?: string };
+    const read = async () =>
+      (await (await svc.get(`/api/schedules/${schedule.id}`)).json()) as Seen;
+    await expect
+      .poll(async () => (await read()).lastState, { timeout: 30_000, intervals: [250] })
+      .toMatch(/done|failed/);
+    const ran = await svc.post(`/api/schedules/${schedule.id}/run`);
+    expect(ran.status(), await ran.text()).toBe(202);
+    // The turn is owed at the second the 202 names; the call's close arms the
+    // next one a cadence later. Seconds are too coarse for anything else: two
+    // runs can close inside the same one.
+    const owed = ((await ran.json()) as Seen).nextAt;
+    await expect
+      .poll(
+        async () => {
+          const now = await read();
+          return !now.runId && now.nextAt > owed ? now.lastState : 'in flight';
+        },
+        { timeout: 30_000, intervals: [250] },
+      )
+      .toMatch(/done|failed/);
+
+    // What each turn did (SCHED-03): the row keeps the last result, the
+    // history keeps them all - and a turn is asked for again by name.
+    type Run = { id: string; state: string; status?: number };
+    const runs = (await (
+      await svc.get(`/api/schedules/${schedule.id}/runs`)
+    ).json()) as Run[];
+    expect(runs.length, 'both turns are in the history').toBeGreaterThanOrEqual(2);
+    expect(runs[0].state).toMatch(/done|failed/);
+    const replay = await svc.post(`/api/schedules/${schedule.id}/run`, {
+      data: { replayOf: runs[0].id },
+    });
+    expect(replay.status(), await replay.text()).toBe(202);
+    await expect
+      .poll(async () => (await read()).runId === undefined || (await read()).runId === '', {
+        timeout: 30_000,
+        intervals: [250],
+      })
+      .toBe(true);
+    const after = (await (
+      await svc.get(`/api/schedules/${schedule.id}/runs`)
+    ).json()) as (Run & { cause?: string; ofRun?: string })[];
+    expect(after.length, 'the replay is in the history too').toBeGreaterThan(runs.length);
+    expect(after[0].cause, 'and it names what it continues').toBe('replay');
+    expect(after[0].ofRun).toBe(runs[0].id);
+
+    // A run that is not this schedule's is refused rather than fired blindly.
+    expect(
+      (
+        await svc.post(`/api/schedules/${schedule.id}/run`, {
+          data: { replayOf: 'run-nope' },
+        })
+      ).status(),
+    ).toBe(404);
+
+    // An operator sees it from the console side; the service removes it.
+    const seen = await root.get('/api/schedules');
+    expect(await seen.text()).toContain(schedule.id);
+    expect((await svc.delete(`/api/schedules/${schedule.id}`)).status()).toBe(204);
+
+    await svc.dispose();
+    await root.dispose();
+  });
+});

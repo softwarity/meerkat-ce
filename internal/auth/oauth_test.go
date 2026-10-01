@@ -130,7 +130,7 @@ func TestAnAgentConnectsWithoutACopiedSecret(t *testing.T) {
 	if !strings.Contains(page, "Claude Code") {
 		t.Fatalf("the consent page must name who is asking:\n%s", page)
 	}
-	if !strings.Contains(page, `name="scope"`) || !strings.Contains(page, `name="domain"`) {
+	if !strings.Contains(page, `name="scope"`) {
 		t.Fatalf("the consent page must ask for the perimeter:\n%s", page)
 	}
 
@@ -139,7 +139,6 @@ func TestAnAgentConnectsWithoutACopiedSecret(t *testing.T) {
 		"request": {ask.Encode()},
 		"approve": {"yes"},
 		"scope":   {store.ScopeFull},
-		"domain":  {store.DomainGateway},
 	}
 	location := postForm(t, srv.URL+"/oauth/authorize", form, cookie)
 	back, err := url.Parse(location)
@@ -195,8 +194,8 @@ func TestAnAgentConnectsWithoutACopiedSecret(t *testing.T) {
 	if got.Name != "Claude Code" || got.ClientID != reg.ClientID {
 		t.Errorf("the token must name the agent: %+v", got)
 	}
-	if got.Scope != store.ScopeFull || got.Domain != store.DomainGateway {
-		t.Errorf("the approved perimeter was not carried: scope=%q domain=%q", got.Scope, got.Domain)
+	if got.Scope != store.ScopeFull {
+		t.Errorf("the approved perimeter was not carried: scope=%q", got.Scope)
 	}
 
 	// 8. Refreshing keeps ONE connection with a new key, rather than piling up
@@ -415,33 +414,34 @@ func TestTheChoosersOfferAWayOut(t *testing.T) {
 	}
 }
 
-// The apps menu lists PLACES, not routes. An installation commonly fronts one
-// product with several routes - one per organisation, one per version - which
-// differ in what they proxy and never in where you go. Listing them twice
-// offered a choice that is not one, and ticked both, since the tick is matched
-// on the entry path and both carried it.
-func TestTheAppsMenuListsAPlaceOnce(t *testing.T) {
+// The apps menu lists WHAT SOMEBODY LISTED, and nothing else.
+//
+// This used to be the place a heuristic lived: the menu was derived from the
+// routes, an installation commonly fronts one product with several routes -
+// one per organisation, one per version - and they differ in what they proxy,
+// never in where you go, so the builder deduplicated them by entry path and
+// hoped. The catalogue has nothing to guess: three routes exist, two are
+// listed, two are offered, in the order they were listed (PORTAL-03).
+func TestTheAppsMenuOffersTheCatalogueAndNothingElse(t *testing.T) {
 	_, sm, st := setupFlow(t)
 	ctx := context.Background()
 	h := New(st, sm)
 
-	ui := func(id, link string, order int, access store.Access) store.Route {
+	ui := func(id string, order int, access store.Access) store.Route {
 		return store.Route{
 			ID: id, Name: id, Order: order, Enabled: true, IsUI: true,
 			Upstream:   "http://x.invalid",
 			Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/**"}}}},
 			Access:     access,
-			UI:         &store.RouteUI{Link: link},
 		}
 	}
-	// The shape that produced the double entry: two routes on the same path,
-	// same label, both reachable by this caller.
+	// The shape that used to produce a double entry: two routes on the same
+	// path, both reachable by this caller. Only one of them is catalogued.
 	for _, r := range []store.Route{
-		ui("httpbin-acme", "httpbin", 5, store.Access{}),
-		ui("httpbin-globex", "httpbin", 6, store.Access{}),
-		// A different place is still its own entry.
+		ui("httpbin-acme", 5, store.Access{}),
+		ui("httpbin-globex", 6, store.Access{}),
 		func() store.Route {
-			r := ui("sales", "sales", 7, store.Access{})
+			r := ui("sales", 7, store.Access{})
 			r.Predicates = []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/sales/**"}}}}
 			return r
 		}(),
@@ -450,6 +450,21 @@ func TestTheAppsMenuListsAPlaceOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	portal := store.PortalConfig{Mode: store.PortalModeLinks,
+		Entries: []store.PortalEntry{
+			{RouteID: "httpbin-acme", Label: "httpbin"},
+			{RouteID: "sales", Label: "sales"},
+		}}
+	routes, err := st.ListRoutes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {
+		t.Fatal(err)
+	}
 
 	links := h.reachableLinks(ctx, store.Session{UserID: "u1"})
 	var places []string
@@ -457,9 +472,13 @@ func TestTheAppsMenuListsAPlaceOnce(t *testing.T) {
 		places = append(places, l.Name+" -> "+l.Href)
 	}
 	if len(links) != 2 {
-		t.Fatalf("the menu offers %v, want one entry per place", places)
+		t.Fatalf("the menu offers %v, want the two entries catalogued", places)
 	}
 	if links[0].Href != "/" || links[1].Href != "/sales" {
 		t.Errorf("the menu offers %v", places)
+	}
+	// The uncatalogued twin is NOT offered, and needed no rule to keep out.
+	if strings.Count(places[0]+places[1], "httpbin") != 1 {
+		t.Errorf("an uncatalogued route walked into the menu: %v", places)
 	}
 }

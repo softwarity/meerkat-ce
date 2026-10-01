@@ -86,7 +86,7 @@ func TestAuditTrail(t *testing.T) {
 func TestEventIDsSortByTime(t *testing.T) {
 	var ids []string
 	for range 20 {
-		ids = append(ids, newEventID())
+		ids = append(ids, NewEventID())
 		time.Sleep(2 * time.Millisecond)
 	}
 	for i := 1; i < len(ids); i++ {
@@ -105,7 +105,7 @@ func TestEventIDsSortByTime(t *testing.T) {
 	// distinct - a primary key does not get to collide.
 	seen := map[string]bool{}
 	for range 500 {
-		id := newEventID()
+		id := NewEventID()
 		if seen[id] {
 			t.Fatal("two identical ids")
 		}

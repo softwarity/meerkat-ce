@@ -1,11 +1,11 @@
 ---
-title: General, Locales and Security
+title: General and Security
 section: The console
 order: 166
 summary: What this installation is, which languages it speaks, and the policies every account lives under.
 ---
 
-# General, Locales and Security
+# General and Security
 
 Three screens at the top of the **Application** plane. They hold what is true of
 the whole application, and writing to them takes the `app admin` capability (or
@@ -44,18 +44,13 @@ inherits unless it defines its own.
 > [!NOTE]
 > Enterprise edition: working hours.
 
-## Locales
-
-The locales **your application** supports, as ISO codes (`fr`, `en-GB`,
-`pt-BR`...). They fill the built-in pages and the user button, and a signed-in
-user's choice follows every proxied request.
-
-Add one with the autocomplete, which proposes the common languages and their
-regional variants and refuses a code that is not valid. Each row shows the code,
-its name in your language and its own name. Adding and removing save
-immediately - there is no Save button here.
-
-Empty leaves the built-in pages in English.
+> **Locales moved.** A gateway-wide pool of languages used to live here, with
+> each route unchecking the ones it did not support. It reads backwards: nobody
+> knows what a gateway speaks, the applications behind it do. A route now
+> declares what it is written in, under **Routes > (a route) > Locales**, and
+> what this installation offers is the union of those - deploy a route that
+> speaks Polish and the sign-in page offers Polish, retire it and the offer
+> shrinks with it. Nothing to keep in step, and no screen to remember to widen.
 
 ## Security
 
@@ -96,8 +91,8 @@ whole screen.
 
 - **General saves on the button, its two switches do not.** The organisation mode
   and developer mode take effect on the click; the working hours wait for Save.
-- **Locales are the application's, not the console's.** The console is English
-  only.
+- **Languages are the applications', not the console's.** The console is
+  English only, and what the built-in pages offer comes from the routes.
 - **An empty password policy accepts anything**, however short. The screen says
   so in as many words.
 - **Session TTL is on Security, not General**: how long one stays signed in is a

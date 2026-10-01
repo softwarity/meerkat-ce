@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/openapi"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
@@ -40,6 +41,12 @@ type routeOperations struct {
 	Access     store.Access            `json:"access"`
 	Operations []openapi.Operation     `json:"operations"`
 	Security   *store.EndpointSecurity `json:"security,omitempty"`
+	// Prefix is the part of the route's own path that every operation below
+	// carries (gateway.KeptPrefix). It is IN those paths - they are the
+	// coordinate the guard compares - and it is the same on every line, so the
+	// screen says it once instead of repeating it fifteen times in a column
+	// where what differs is the rest.
+	Prefix string `json:"prefix,omitempty"`
 }
 
 // routeSecurityPayload is the endpoint-security screen's PUT body: the route's
@@ -51,6 +58,8 @@ type routeSecurityPayload struct {
 	// there. This screen shows it as the default its overrides refine.
 	Access    store.Access           `json:"access"`
 	Endpoints []store.EndpointPolicy `json:"endpoints"`
+	// DenyUnlisted: only the listed operations are reachable.
+	DenyUnlisted bool `json:"denyUnlisted,omitempty"`
 }
 
 // getRouteOperations fetches the route's OpenAPI spec, parses it (Swagger 2.0 or
@@ -66,9 +75,20 @@ func (a *API) getRouteOperations(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, specReadStatus(err), err.Error())
 		return
 	}
+	// The coordinate the GUARD compares against, not the key in the document:
+	// the route's own prefix minus what it strips (gateway.KeptPrefix). The
+	// editor writes rules in what this list shows, so showing the spec's raw
+	// paths is how a rule comes to name something no request ever carries.
+	kept := gateway.KeptPrefix(route)
+	ops := make([]openapi.Operation, 0, len(spec.Operations))
+	for _, op := range spec.Operations {
+		op.Path = kept + op.Path
+		ops = append(ops, op)
+	}
 	writeJSON(w, http.StatusOK, routeOperations{
 		Title: spec.Title, Version: spec.Version, Format: spec.Format,
-		Access: route.Access, Operations: spec.Operations, Security: securityOf(route),
+		Access: route.Access, Operations: ops, Security: securityOf(route),
+		Prefix: kept,
 	})
 }
 
@@ -86,12 +106,15 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 		writeErr(w, http.StatusBadRequest, "malformed security: "+err.Error())
 		return
 	}
-	sec := store.EndpointSecurity{Endpoints: payload.Endpoints}
+	sec := store.EndpointSecurity{Endpoints: payload.Endpoints, DenyUnlisted: payload.DenyUnlisted}
 	if err := sec.Validate(); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	before := routeSecurityPayload{Access: route.Access, Endpoints: endpointsOf(route)}
+	if s := securityOf(route); s != nil {
+		before.DenyUnlisted = s.DenyUnlisted
+	}
 
 	// The route's own Access is NOT written from here: this screen is about
 	// operations. Sent along for context, ignored on the way in - a screen
@@ -101,7 +124,7 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 	if route.API != nil {
 		api = *route.API // keep openapiUrl and any future API options
 	}
-	if len(sec.Endpoints) == 0 {
+	if len(sec.Endpoints) == 0 && !sec.DenyUnlisted {
 		api.Security = nil
 	} else {
 		api.Security = &sec
@@ -122,7 +145,7 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
 		return
 	}
-	after := routeSecurityPayload{Access: route.Access, Endpoints: sec.Endpoints}
+	after := routeSecurityPayload{Access: route.Access, Endpoints: sec.Endpoints, DenyUnlisted: sec.DenyUnlisted}
 	a.auditUpdate(r.Context(), actor, "route.security", "route", route.ID, route.Name, "", before, after)
 	writeJSON(w, http.StatusOK, after)
 }

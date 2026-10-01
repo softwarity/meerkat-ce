@@ -81,9 +81,20 @@ fichier référence des entrées de coffre que cette passerelle n'a pas, une sec
 les liste pour que vous les remplissiez tout de suite.
 
 > [!NOTE]
-> Edition Enterprise : garder plusieurs configurations et basculer entre elles
-> (enregistrer, importer, dupliquer, rendre courante). L'export est dans les deux
-> éditions.
+> Chaque action marche dans les deux éditions - enregistrer, importer, dupliquer,
+> rendre courante, exporter. Ce qui change est la taille de l'étagère : l'édition
+> communautaire garde **trois** configurations enregistrées à la fois et dit où
+> vous en êtes à côté du bouton Import (*2 of 3 saved*), avant d'atteindre le
+> plafond ; Enterprise en garde autant que vous voulez.
+
+### Comparer deux configurations enregistrées
+
+Dès qu'il y en a deux sur l'étagère, une ligne enregistrée propose **Compare with another saved
+configuration** : choisissez l'autre, et le dialogue liste ce qui change en passant de la première à
+la seconde - ajouté, modifié, retiré, objet par objet, avec les champs qui ont bougé dans une
+modification. Ce qui tourne est laissé de côté : c'est la question qu'on pose à la configuration
+d'un client et au modèle dont elle est partie, avant de toucher à l'une ou l'autre.
+`GET /api/configurations/{id}/compare/{other}`.
 
 ## History
 

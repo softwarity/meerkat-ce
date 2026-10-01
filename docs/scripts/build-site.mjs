@@ -104,9 +104,22 @@ const slugify = (s) =>
 //   :::
 //
 // `cards` and `grid` cut their body at each `###` and wrap the pieces;
-// `gallery` turns images into captioned figures; everything else is a div with
-// the block's name, rendered normally inside.
-const BLOCKS = new Set(['hero', 'cards', 'grid', 'gallery', 'steps', 'cta', 'lead', 'split', 'quote', 'figure', 'stats']);
+// `gallery` turns images into captioned figures; `details` folds its body away
+// behind a summary; everything else is a div with the block's name, rendered
+// normally inside.
+//
+// `details` exists because a page that opens on sixty lines of YAML is a page
+// somebody closes. The block takes its summary as the argument's words:
+//
+//   ::: details Le fichier complet
+//   ```yaml
+//   ...
+//   ```
+//   :::
+//
+// Folded by default, and that is the point - what a reader NEEDS is the
+// sentence above it; the file is there for the one who is about to paste it.
+const BLOCKS = new Set(['hero', 'cards', 'grid', 'gallery', 'steps', 'cta', 'lead', 'split', 'quote', 'figure', 'stats', 'details']);
 
 function renderBlock(name, body, file, lang, arg) {
   if (name === 'cards' || name === 'grid') {
@@ -135,6 +148,16 @@ function renderBlock(name, body, file, lang, arg) {
       return `<div class="mk-stat"><b>${inline(value.trim())}</b><span>${inline(rest.join(' ').trim())}</span></div>`;
     });
     return `<div class="mk-stats">${cells.join('')}</div>`;
+  }
+  if (name === 'details') {
+    // The summary is what the block was given, or a neutral word: a fold with
+    // no label is a fold nobody opens.
+    const label = (arg || '').trim();
+    const summary = label ? inline(label) : (lang === 'fr' ? 'Voir le détail' : 'Show the detail');
+    return (
+      `<details class="mk-details"><summary>${summary}</summary>` +
+      `<div class="mk-details-body">${render(body, file, lang).html}</div></details>`
+    );
   }
   if (name === 'gallery') {
     const figures = [];
@@ -168,7 +191,9 @@ function render(md, file, lang) {
     const line = lines[i];
 
     // A layout block. Nesting one inside another is not supported and says so.
-    const block = line.match(/^:::\s*([a-z-]+)(?:\s+([a-z0-9-]+))?\s*$/);
+    // The argument is free text, not a single token: `figure` names a file
+    // in one word, `details` wants a sentence to put on its summary.
+    const block = line.match(/^:::\s*([a-z-]+)(?:\s+(\S.*?))?\s*$/);
     if (block) {
       const name = block[1];
       const arg = block[2] || '';
@@ -182,7 +207,7 @@ function render(md, file, lang) {
       let depth = 1;
       i++;
       while (i < lines.length) {
-        if (/^:::\s*[a-z-]+(\s+[a-z0-9-]+)?\s*$/.test(lines[i])) depth++;
+        if (/^:::\s*[a-z-]+(\s+\S.*?)?\s*$/.test(lines[i])) depth++;
         else if (/^:::\s*$/.test(lines[i])) {
           depth--;
           if (depth === 0) break;

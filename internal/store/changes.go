@@ -28,7 +28,7 @@ import (
 // file, so there is nobody to tell.
 
 // The topics a node re-reads. Closed on purpose: a topic is something a node
-// KEEPS IN MEMORY and would otherwise serve stale, and there are two of those.
+// KEEPS IN MEMORY and would otherwise serve stale, and there are four of those.
 // Anything read from the database on every request needs no bus.
 const (
 	// TopicRouting is the compiled route plan: routes, their deposited specs,
@@ -36,6 +36,12 @@ const (
 	TopicRouting = "routing"
 	// TopicCertificates is the material the HTTPS listeners hold open.
 	TopicCertificates = "certificates"
+	// TopicMetricsPort is the port a node holds open for scrapers (OBS-05):
+	// chosen and switched in the console, opened and closed on every node.
+	TopicMetricsPort = "metrics-port"
+	// TopicTelemetry is the exporters a node runs towards a collector
+	// (OBS-04, OBS-05): the spans and the pushed counters.
+	TopicTelemetry = "telemetry"
 )
 
 // The signals, which are the other kind of message on the same channel.
@@ -68,6 +74,11 @@ const (
 	// know which token they touched, not the hash a caller presents. "*"
 	// drops them all: the gateway-wide token policy just changed.
 	TopicAPIToken = "api-token"
+	// TopicSchedules says the schedule list moved (SCHED-01): one was written,
+	// paused, or brought forward. What it buys is latency and nothing else -
+	// the table is what the next pass reads, so a lost notification costs one
+	// tick and never a run.
+	TopicSchedules = "schedules"
 	// TopicEvent carries a live-channel message to the pages the OTHER nodes
 	// hold open (internal/events). The argument is the hub topic, a space, and
 	// the encoded message.
@@ -85,6 +96,19 @@ const (
 	// a node it stops hearing from expires. That is what makes a node that
 	// starts late correct within one interval, with nothing to reconcile.
 	TopicServed = "served"
+	// TopicChanged carries ONE administrative write to the consoles the other
+	// nodes hold open (CONSOLE-13): the kind of object, the instance, and who
+	// did it, so a screen anywhere reloads what it is showing. The argument is
+	// the event encoded as JSON, without its field-level diff and with its names
+	// clipped - the trail keeps the diff, and a theme's palette alone would pass
+	// what a notification carries.
+	//
+	// A signal and not a topic, and the distinction is the one at the top of
+	// this file: there is no table behind it to re-read, because what a screen
+	// does next is call the API it already calls. Losing one leaves a screen
+	// late until its next reason to read, never wrong - a late screen writing
+	// over somebody is refused by the row's revision.
+	TopicChanged = "changed"
 	// TopicMetrics carries a node's own request counters to the others, so the
 	// console's curves are the CLUSTER's and not whichever node the load
 	// balancer happened to hand the screen (OBS-01). The argument is one

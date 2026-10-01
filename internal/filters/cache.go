@@ -1,6 +1,9 @@
 package filters
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // Personal marks a response the gateway has written somebody's IDENTITY into.
 //
@@ -28,4 +31,35 @@ func Personal(h http.Header) {
 	// left behind is what heuristic freshness is computed from.
 	h.Del("Last-Modified")
 	h.Del("ETag")
+}
+
+// Rewritten marks a response whose BODY the gateway changed.
+//
+// The upstream's caching headers describe the upstream's bytes, and these are
+// not them - the same reason RewriteBody drops the ETag just above. A static
+// file server sending its index.html as `max-age=600` is describing a document
+// that did not carry a user button, a portal bar, a tracing bundle or a
+// stylesheet of yours. Keep that header and the visitor holds ten minutes of
+// the PREVIOUS configuration: tick a box in the console, reload, see nothing,
+// and conclude the box does not work. Which is exactly what happened.
+//
+// no-cache rather than no-store: the browser may keep the copy, it simply may
+// not use it without asking. no-store would also disable the back/forward
+// cache in Chrome and Firefox, making every Back on every proxied page a full
+// round trip - a real cost, paid on every navigation, to fix a problem
+// no-cache already fixes.
+//
+// A response already marked Personal is left alone: no-store is stronger, it
+// is there because the bytes belong to one person, and this must never quietly
+// weaken it.
+func Rewritten(h http.Header) {
+	if strings.Contains(strings.ToLower(h.Get("Cache-Control")), "no-store") {
+		return
+	}
+	h.Set("Cache-Control", "no-cache")
+	h.Del("Expires")
+	h.Del("Pragma")
+	// Heuristic freshness is computed from this when nothing else says
+	// otherwise, so a date left behind reintroduces the cache we just removed.
+	h.Del("Last-Modified")
 }

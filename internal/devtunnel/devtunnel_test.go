@@ -133,6 +133,11 @@ func TestTheTunnelIsAskedBeforeItIsAnnounced(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
+	// Its own switch, which ships off: the tunnel runs only when developer
+	// mode AND this say so.
+	if err := st.SetSetting(context.Background(), store.SettingPlug, store.PlugSetting{Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
 
 	var ran atomic.Bool
 	refuse := errors.New("no orchestrator here: " + ErrNoResources.Error())
@@ -181,6 +186,65 @@ func TestTheTunnelIsAskedBeforeItIsAnnounced(t *testing.T) {
 	}
 	if !ran.Load() {
 		t.Fatal("the tunnel never started once it could")
+	}
+}
+
+// The tunnel's own switch ships off, and off it keeps the port closed however
+// available the orchestrator is - with the reason on the status the console
+// shows, so a switch that is off is not mistaken for a broken tunnel.
+func TestTheTunnelWaitsForItsOwnSwitch(t *testing.T) {
+	saved, savedPoll := hooks, pollEvery
+	pollEvery = 20 * time.Millisecond
+	t.Cleanup(func() { hooks, pollEvery = saved, savedPoll })
+
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	var ran atomic.Bool
+	Register(Hooks{
+		Available: func() error { return nil },
+		Run: func(ctx context.Context, _ Deps) error {
+			ran.Store(true)
+			<-ctx.Done()
+			return nil
+		},
+	})
+	ctx, stop := context.WithCancel(context.Background())
+	supervised := make(chan struct{})
+	go func() {
+		defer close(supervised)
+		Supervise(ctx, Deps{Store: st, Registry: NewRegistry(events.NewHub()), Addr: ":22222"})
+	}()
+	t.Cleanup(func() {
+		stop()
+		<-supervised
+	})
+
+	time.Sleep(5 * pollEvery)
+	if ran.Load() {
+		t.Fatal("the tunnel ran with its own switch off")
+	}
+	if s := CurrentStatus(); s.State != StateOff || !strings.Contains(s.Why, "Infra, Plug") {
+		t.Errorf("the status does not say which switch is off: %+v", s)
+	}
+
+	// On, and woken: no waiting for the next tick.
+	if err := st.SetSetting(ctx, store.SettingPlug, store.PlugSetting{Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	Wake()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && !ran.Load() {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !ran.Load() {
+		t.Fatal("the tunnel did not start once switched on")
+	}
+	if s := CurrentStatus(); s.State != StateRunning || s.Port != "22222" {
+		t.Errorf("status %+v, want running on 22222", s)
 	}
 }
 

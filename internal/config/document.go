@@ -93,7 +93,6 @@ var ExportedSettings = []string{
 	store.SettingSessionTTL,
 	store.SettingPasswordPolicy,
 	store.SettingBranding,
-	store.SettingLanguages,
 	store.SettingMFARequired,
 	store.SettingMFAEmailOTP,
 	store.SettingTrustedBrowser,
@@ -105,6 +104,13 @@ var ExportedSettings = []string{
 	store.SettingPagesScheme,
 	store.SettingPageLayout,
 	store.SettingPortal,
+	// Where traces go and how much of them (OBS-04). It travels because it
+	// describes an OBSERVABILITY POSTURE rather than one machine: an
+	// environment that exports its traces should export them wherever this
+	// configuration lands. The collector's address is a name the target
+	// environment resolves; the credential never travels, because what is
+	// stored is a vault reference and the vault is a separate artifact.
+	store.SettingTelemetry,
 	// What an account carries beyond what this product invented (MODEL-01),
 	// and the notice about the windows closing (MODEL-02). The definitions
 	// travel because ROUTES travel: a route that forwards `employeeNumber`
@@ -136,7 +142,12 @@ var ExportedSettings = []string{
 // stampedKeys are written by the store on every save. They say WHEN an object
 // was touched, not how it is configured: exporting them would make every diff
 // noisy and every import a lie about the history of the install it lands in.
-var stampedKeys = []string{"createdAt", "updatedAt"}
+// The keys a COMPARISON must not see: when the row was touched, and which
+// write it is on. They say something true about this installation and nothing
+// about the configuration, so two identical configurations that differ in them
+// are identical - otherwise re-importing a document reports every route as
+// changed because the stored ones have been written since.
+var stampedKeys = []string{"createdAt", "updatedAt", "rev"}
 
 // Marshal renders the document as YAML - what an export downloads.
 //

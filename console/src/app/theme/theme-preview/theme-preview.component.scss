@@ -18,6 +18,15 @@
   z-index: 5;
 }
 
+// With ONE pane - a mail has no dark half - there is no boundary to straddle,
+// and the middle of the only pane is the middle of the message. The rail drops
+// below it instead: still reachable, and covering nothing.
+.duo.solo .rail-slot {
+  top: auto;
+  bottom: -22px;
+  transform: none;
+}
+
 .pane {
   position: relative;
   justify-self: center;

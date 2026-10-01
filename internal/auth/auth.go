@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"html/template"
@@ -254,6 +255,17 @@ const flowTop = `<!doctype html>
       text-shadow: 0 1px 3px var(--mk-surface), 0 0 8px var(--mk-surface);
     }
     .powered a:hover { color: var(--mk-primary); }
+    /* The name of this request (OBS-04): readable enough to copy, quiet
+       enough that nobody reads it who is not looking for it. Under the mark
+       when there is one, in its place when there is not - selectable, because
+       the whole point is that somebody hands it to support. */
+    .trace-id {
+      position: absolute; left: 0; right: 0; bottom: 3px;
+      margin: 0; text-align: center; z-index: 3;
+      font-family: var(--mk-mono); font-size: .52rem; letter-spacing: .06em;
+      color: var(--mk-on-surface-variant); opacity: .45;
+      user-select: all;
+    }
     /* The way back, on eighteen pages - and styled on one of them, which is
        why the sign-in page offered "Forgot your password?" as a browser's
        default blue underline over somebody's branding photograph. A rule
@@ -470,6 +482,20 @@ const flowTop = `<!doctype html>
     }
     .pw-toggle:hover { color: var(--mk-primary); filter: none; box-shadow: none; transform: translateY(-50%); }
     .pw-toggle svg { display: block; }
+    /* A copy button injected into every [data-copy] block - a command, a
+       setup key, backup codes: things somebody takes elsewhere, one place. It
+       sits in the block's top corner, outside what scrolls. */
+    .cp-wrap { position: relative; display: grid; }
+    .cp-wrap > [data-copy] { padding-inline-end: 42px; }
+    .cp-btn {
+      position: absolute; top: 5px; right: 5px; margin: 0; width: 28px; height: 28px; padding: 0;
+      border: 1px solid transparent; border-radius: var(--mk-radius-small);
+      background: var(--mk-surface-container-high);
+      color: var(--mk-on-surface-variant); cursor: pointer; display: grid; place-items: center; box-shadow: none;
+    }
+    .cp-btn:hover { color: var(--mk-primary); border-color: var(--mk-outline); filter: none; box-shadow: none; transform: none; }
+    .cp-btn:active { transform: none; }
+    .cp-btn.ok { color: var(--mk-primary); border-color: var(--mk-primary); }
     .field > span {
       font-family: var(--mk-mono); font-size: .64rem; letter-spacing: .18em;
       text-transform: uppercase; color: var(--mk-on-surface-variant);
@@ -519,6 +545,10 @@ const flowTop = `<!doctype html>
     .error {
       margin: 0; padding: 9px 12px; border-radius: var(--mk-radius-small);
       color: var(--mk-error); font-size: .82rem;
+      /* Newlines kept: a preview shows every refusal a page can give at once,
+         one per line, and a served page that wraps its message over two lines
+         gets two lines rather than one run-on sentence. */
+      white-space: pre-line;
       background: color-mix(in srgb, var(--mk-error) 12%, transparent);
       border: 1px solid color-mix(in srgb, var(--mk-error) 30%, transparent);
     }
@@ -739,6 +769,7 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
     </div>
   </main>
   {{if .PoweredBy}}<p class="powered"><a href="{{.MarkURL}}" target="_blank" rel="noopener noreferrer">{{.MarkText}}</a></p>{{end}}
+  {{if .TraceID}}<p class="trace-id">{{.TraceID}}</p>{{end}}
   {{if not .Preview}}<script>
   // A page in somebody's iframe drops the brand and fills the frame - the
   // compact arrangement, which is a response to a CONTEXT and not one of the
@@ -772,6 +803,37 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
         inp.type = show ? 'text' : 'password';
         btn.innerHTML = show ? eyeOff : eye;
         inp.focus();
+      });
+    }
+  })();
+  // Every [data-copy] block gets a copy button (generic, like the eye above):
+  // the clipboard API where the page is trusted, a selection otherwise - a
+  // gateway reached over plain HTTP by an address is not a secure context.
+  (() => {
+    const icon = '<svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true" width="16" height="16"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-520q0-17 11.5-28.5T160-720q17 0 28.5 11.5T200-680v520h400q17 0 28.5 11.5T640-120q0 17-11.5 28.5T600-80H200Zm160-240v-480 480Z"/></svg>';
+    for (const el of document.querySelectorAll('[data-copy]')) {
+      const wrap = document.createElement('div');
+      wrap.className = 'cp-wrap';
+      el.parentNode.insertBefore(wrap, el);
+      wrap.appendChild(el);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cp-btn';
+      btn.title = '{{.T.copy}}';
+      btn.setAttribute('aria-label', '{{.T.copy}}');
+      btn.innerHTML = icon;
+      wrap.appendChild(btn);
+      btn.addEventListener('click', async () => {
+        const text = el.innerText.trim();
+        try { await navigator.clipboard.writeText(text); }
+        catch (e) {
+          const rg = document.createRange(); rg.selectNodeContents(el);
+          const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+          try { document.execCommand('copy'); } catch (e2) {}
+          sel.removeAllRanges();
+        }
+        btn.classList.add('ok');
+        setTimeout(() => btn.classList.remove('ok'), 1200);
       });
     }
   })();
@@ -894,6 +956,26 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
     };
   })();{{end}}
   </script>
+  {{if .Preview}}<script>
+  // NOTHING LEAVES A PREVIEW. These pages are the real ones, with real forms
+  // and real links, and the console serves them from the ADMIN plane: a click
+  // on "Create an account" walks the frame into the console, and a form posts
+  // to a handler that was never meant to hear from a palette.
+  //
+  // The stubbed fetch never settles on purpose rather than as a shortcut: what
+  // a page does after a call is in the .then of it, so a call that never comes
+  // back leaves the page exactly as it is - which is what a preview is.
+  (function () {
+    window.fetch = function () { return new Promise(function () {}); };
+    addEventListener('click', function (e) {
+      var p = e.composedPath ? e.composedPath() : [];
+      for (var i = 0; i < p.length; i++) {
+        if (p[i] && p[i].tagName === 'A') { e.preventDefault(); return; }
+      }
+    }, true);
+    addEventListener('submit', function (e) { e.preventDefault(); }, true);
+  })();
+  </script>{{end}}
 </body>
 </html>`
 
@@ -1018,7 +1100,7 @@ const pluggedBody = `    <style>
       .pg-names > span { white-space: nowrap; }
     </style>
     <form method="post" action="/plugged">
-      <p class="lead">{{.T.pluggedTitle}}</p>
+      <p class="lead">Served from a developer's machine</p>
       {{range .Served}}
       <div class="pg-row">
         {{if .Who}}<span class="pg-who">{{.Who}}</span>{{end}}
@@ -1026,7 +1108,7 @@ const pluggedBody = `    <style>
       </div>
       {{end}}
       <input type="hidden" name="next" value="{{.Next}}">
-      <button type="submit">{{.T.pluggedContinue}}</button>
+      <button type="submit">Continue</button>
     </form>
 `
 
@@ -1136,6 +1218,10 @@ const profileBody = `    <style>
          legible on a plain page and gone on a photograph, which is the only
          kind of page an integrator actually ships. The colour is what says
          "this is the way out", not the absence of a background. */
+      /* Leaving the organisation: a quiet link beside its name, in the colour
+         of what cannot be undone from here. */
+      .org-leave { margin-left: 8px; font-size: .74rem; color: var(--mk-error); text-decoration: none; }
+      .org-leave:hover { text-decoration: underline; }
       .leave {
         margin: 0; width: 100%; box-shadow: none;
         color: var(--mk-error); font-size: .88rem; font-weight: 600; padding: 13px 16px;
@@ -1200,6 +1286,7 @@ const profileBody = `    <style>
       .em-save { margin: 0; font-size: .82rem; padding: 8px 16px; }
     </style>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
     <div class="panel identity">
     <form method="post" action="/profile/avatar" enctype="multipart/form-data" class="avatar-form">
       {{if .Avatar}}
@@ -1227,9 +1314,8 @@ const profileBody = `    <style>
         {{if .Email}}<span class="em-value">{{.Email}}</span>{{else}}<span class="em-none">{{.T.emailNone}}</span>{{end}}
         <button type="button" class="em-edit" id="em-open" aria-label="{{.T.emailEdit}}" title="{{.T.emailEdit}}">&#9998;</button>
       </dd></div>
-      {{if .TenantName}}<div><dt>{{.T.factOrganisation}}</dt><dd>{{.TenantName}}</dd></div>{{end}}
+      {{if .TenantName}}<div><dt>{{.T.factOrganisation}}</dt><dd>{{.TenantName}} <a class="org-leave" href="/profile/leave">{{.T.leaveOrganisation}}</a></dd></div>{{end}}
     </dl>
-    {{if not .Console}}
     <form method="post" action="/profile/timezone" class="tz-form" id="tz-form">
       <label class="tz-title" for="tz">{{.T.timezone}}</label>
       <select name="timezone" id="tz" class="tz-select"><option value="{{.Timezone}}">{{.Timezone}}</option></select>
@@ -1239,7 +1325,6 @@ const profileBody = `    <style>
         <button type="submit" class="tz-btn tz-save" id="tz-save">{{.T.tzSave}}</button>
       </div>
     </form>
-    {{end}}
     </div>
     <dialog id="em-dialog" class="em-dialog">
       <form method="post" action="/profile/email">
@@ -1266,10 +1351,12 @@ const profileBody = `    <style>
       document.getElementById('em-cancel').addEventListener('click', () => dlg.close());
     })();
     </script>
-    <!-- The zone is what an APPLICATION renders this person's dates in. The
-         console shows its own dates the browser's way, so the control would be
-         a setting with no visible effect on the screen offering it. -->
-    {{if not .Console}}
+    <!-- The zone is what renders this person's dates, on BOTH planes: an
+         application's pages on one side, and the console's own screens on the
+         other - the scheduler shows the hour of a run in it, or in UTC, on a
+         switch. It used to be hidden here, back when the console read every
+         date the browser's way and this would have been a setting with no
+         visible effect on the screen offering it. -->
     <script>
     (() => {
       // The zone list comes from the BROWSER (Intl.supportedValuesOf), not from
@@ -1337,14 +1424,13 @@ const profileBody = `    <style>
       setInterval(tick, 30000);
     })();
     </script>
-    {{end}}
     <a class="mfa-link" href="/profile/security">
       <span class="mfa-label">{{.T.security}}</span>
       <span class="mfa-state">&rsaquo;</span>
     </a>
     {{if .IsDev}}
     <a class="mfa-link" href="/profile/dev">
-      <span class="mfa-label">{{.T.developer}}</span>
+      <span class="mfa-label">Developer</span>
       <span class="mfa-state">&rsaquo;</span>
     </a>
     {{end}}
@@ -1394,6 +1480,10 @@ const profileSecurityBody = `    <style>
       <span class="mfa-label">{{.T.signinHistory}}</span>
       <span class="mfa-state">&rsaquo;</span>
     </a>
+    <a class="mfa-link" href="/profile/sessions">
+      <span class="mfa-label">{{.T.sessionsActive}}</span>
+      <span class="mfa-state">&rsaquo;</span>
+    </a>
     {{if .Authorities}}
     <a class="mfa-link" href="/profile/authorities">
       <span class="mfa-label">{{.T.authorities}}</span>
@@ -1436,21 +1526,23 @@ const profileDevBody = `    <style>
       .dev-link .dl-state.on { color: var(--mk-primary); }
       .dev-link .dl-desc { margin: 0; font-size: .76rem; color: var(--mk-on-surface-variant); }
     </style>
-    <p class="lead">{{.T.developer}}</p>
+    <p class="lead">Developer</p>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    {{if .PlugOpen}}
     <a class="dev-link" href="/profile/dev/key">
       <span class="dl-row">
-        <span class="dl-label">{{.T.devKey}}</span>
-        <span class="dl-state{{if .DevKeyFingerprint}} on{{end}}">{{if .DevKeyFingerprint}}{{.T.devKeySet}}{{else}}&rsaquo;{{end}}</span>
+        <span class="dl-label">plug key</span>
+        <span class="dl-state{{if .Keys}} on{{end}}">{{if .Keys}}{{len .Keys}} {{if eq (len .Keys) 1}}key{{else}}keys{{end}}{{else}}&rsaquo;{{end}}</span>
       </span>
-      <p class="dl-desc">{{.T.devKeyDesc}}</p>
+      <p class="dl-desc">Register your public SSH key so your plugged services authenticate as you.</p>
     </a>
+    {{end}}
     <a class="dev-link" href="/meerkat/apidocs/">
       <span class="dl-row">
-        <span class="dl-label">{{.T.devApi}}</span>
+        <span class="dl-label">OpenAPI documentation</span>
         <span class="dl-state">&rsaquo;</span>
       </span>
-      <p class="dl-desc">{{.T.devApiDesc}}</p>
+      <p class="dl-desc">Explore and try the APIs of the routes that declare a spec, as any profile you choose.</p>
     </a>
     <p class="back"><a href="/profile">{{.T.backToProfile}}</a></p>
 `
@@ -1468,6 +1560,7 @@ const profileDevKeyBody = `    <style>
          Its own line, whole, in mono - beside a label it wrapped mid-hash and
          two halves of one hash compare as neither. */
       .dk-fact { display: grid; gap: 3px; }
+      .dk-key { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
       .dk-label {
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
         text-transform: uppercase; color: var(--mk-on-surface-variant);
@@ -1494,47 +1587,50 @@ const profileDevKeyBody = `    <style>
       .dk-clear:hover { filter: none; box-shadow: none; transform: none; text-decoration: underline; }
       .dk-steps { display: grid; gap: 6px; margin-top: 18px; }
       .dk-steps pre {
-        margin: 0; padding: 10px 12px; overflow-x: auto;
+        margin: 0; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere;
         font-family: var(--mk-mono); font-size: .7rem; line-height: 1.7;
         text-align: start; user-select: all;
         background: var(--mk-surface-container); color: var(--mk-on-surface);
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
       }
     </style>
-    {{if .DevKeyFingerprint}}
-    <form method="post" action="/profile/dev-key" class="dk-form">
-      <p class="lead">{{.T.devKey}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <p class="lead">plug keys</p>
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    {{/* One key per workstation: plug keeps a pair per profile, so a second
+         machine is a second key, and removing one closes that machine alone. */}}
+    {{range .Keys}}
+    <form method="post" action="/profile/dev-key" class="dk-form dk-key">
       <div class="dk-fact">
-        <span class="dk-label">{{.T.devKeyFingerprint}}</span>
-        <span class="dk-value">{{.DevKeyFingerprint}}</span>
-        {{if .DevKeyComment}}<span class="dk-comment">{{.DevKeyComment}}</span>{{end}}
+        <span class="dk-value">{{.Fingerprint}}</span>
+        <span class="dk-comment">{{if .Comment}}{{.Comment}} - {{end}}added {{.Added}}</span>
       </div>
-      <p class="dk-hint">{{.T.devKeyHint}}</p>
-      <input type="hidden" name="action" value="clear">
-      <button class="dk-clear" type="submit">{{.T.devKeyRemove}}</button>
+      <input type="hidden" name="action" value="remove">
+      <input type="hidden" name="id" value="{{.ID}}">
+      <button class="dk-clear" type="submit">Remove</button>
     </form>
-    {{else}}
-    <form method="post" action="/profile/dev-key" class="dk-form">
-      <p class="lead">{{.T.devKey}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-      <textarea name="key" rows="4" placeholder="ssh-ed25519 AAAA... you@laptop" required></textarea>
-      <button type="submit">{{.T.devKeySave}}</button>
-      <p class="dk-hint">{{.T.devKeyHint}}</p>
-    </form>
-    {{/* The three commands, in the order somebody runs them the first time.
-         plug is not installed from a package manager: it comes FROM the
-         cluster it plugs you into, which is also why the host is a blank
-         nobody here can fill - this gateway does not know which cluster you
-         develop against. Telling someone to run "plug pubkey" without saying
-         where plug comes from is the gap this page had. */}}
-    <div class="dk-steps">
-      <p class="dk-hint">{{.T.devKeyInstall}}</p>
-      <pre>ssh -p 2222 get@&lt;your-cluster&gt; install | sh
-plug keygen
-plug pubkey</pre>
-    </div>
     {{end}}
+    <form method="post" action="/profile/dev-key" class="dk-form">
+      {{if .Keys}}<span class="dk-label">Another workstation</span>{{end}}
+      <textarea name="key" rows="4" placeholder="ssh-ed25519 AAAA... you@laptop" required></textarea>
+      <button type="submit">Add key</button>
+      <p class="dk-hint">The key plug offers when it opens a tunnel to this gateway, one per workstation. Run plug keygen on the machine, then plug pubkey, and paste what it prints. Removing a key closes the door to that machine at its next connection.</p>
+    </form>
+    {{/* The commands, in the order somebody runs them the first time, with
+         THIS gateway's published address in them - the one Infra, Plug
+         records, since the gateway cannot see what a NodePort or a
+         LoadBalancer publishes. plug is not installed from a package
+         manager: it comes FROM the gateway it plugs you into, and the
+         installer names the profile after the host, which is why keygen and
+         pubkey take it. */}}
+    <div class="dk-steps">
+      <p class="dk-hint">No plug yet? It installs from this gateway, not from a package manager. macOS and Linux:</p>
+      <pre data-copy>ssh -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install | sh</pre>
+      <p class="dk-hint">Windows, from Git Bash:</p>
+      <pre data-copy>ssh -n -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install-windows | bash -s -- {{.PlugHost}} {{.PlugPort}}</pre>
+      <p class="dk-hint">Then the key pair, once per machine - and paste what the second line prints above:</p>
+      <pre data-copy>plug keygen -p {{.PlugHost}}
+plug pubkey -p {{.PlugHost}}</pre>
+    </div>
     <p class="back"><a href="/profile/dev">{{.T.backToDeveloper}}</a></p>
 `
 
@@ -1773,9 +1869,14 @@ type brandView struct {
 // planes answer it: the DATA plane because its pages wear it, the ADMIN plane
 // because the console's theme preview iframes the specimen from there.
 // backgroundDarkPath is the same for the dark scheme's own picture (THEME-06).
+// faviconPath is that same arrangement for the tab icon: an ENDPOINT rather
+// than a data URI in every page, so a 64 KiB image is fetched once and cached.
+// The portal bar draws it from there too, which is why it is a name and not a
+// literal in two files.
 const (
 	backgroundPath     = "/meerkat/background"
 	backgroundDarkPath = "/meerkat/background-dark"
+	faviconPath        = "/meerkat/favicon"
 )
 
 func toBrandView(b store.Branding) brandView {
@@ -1852,7 +1953,32 @@ func previewScheme(scheme string) string {
 // design system) with an arbitrary theme, one scheme forced - the console's
 // theme editor iframes it twice, dark and light side by side. No session, no
 // side effect.
-func WriteThemePreview(w http.ResponseWriter, t store.Theme, b store.Branding, scheme string, l store.PageLayout) {
+func WriteThemePreview(
+	w http.ResponseWriter, t store.Theme, b store.Branding, scheme string, l store.PageLayout, locale string,
+) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = specimenPage.Execute(w, struct {
+		flowChrome
+		Next        string
+		Error       string
+		LayoutNames []string
+	}{LayoutNames: store.PageLayouts, flowChrome: previewChrome(t, b, scheme, l, locale)})
+}
+
+// previewChrome is the chrome a preview wears: a theme that may be neither
+// saved nor active, a forced scheme, and no request behind it. Shared by the
+// specimen and the pages so the two can never drift into showing the same
+// palette differently.
+func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageLayout, locale string) flowChrome {
+	// A language nobody has heard of falls back to English. One somebody ADDED
+	// here is honoured even though the binary does not carry it: it stands on
+	// English and wears its own wordings over the top, which is what makes a
+	// language one can create in the console visible in the preview.
+	lang := locale
+	if lang == "" || !IsKnownLanguage(lang) {
+		lang = "en"
+	}
 	// The forced scheme rides on Scheme below: the template emits the
 	// color-scheme rule AND the body class from it, so adding the rule here too
 	// would write it twice.
@@ -1863,14 +1989,7 @@ func WriteThemePreview(w http.ResponseWriter, t store.Theme, b store.Branding, s
 	if store.SanitizePageLayout(&l) != nil {
 		l = store.DefaultPageLayout()
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_ = specimenPage.Execute(w, struct {
-		flowChrome
-		Next        string
-		Error       string
-		LayoutNames []string
-	}{LayoutNames: store.PageLayouts, flowChrome: flowChrome{
+	return flowChrome{
 		ThemeCSS: template.CSS(css), //nolint:gosec // store sanitizes hex-only tokens
 		Layout:   l,
 		// The whole catalogue, so the Layout tab changes arrangement by
@@ -1879,8 +1998,16 @@ func WriteThemePreview(w http.ResponseWriter, t store.Theme, b store.Branding, s
 		Preview:   true,
 		Brand:     toBrandView(b),
 		Title:     "Theme preview - Meerkat",
-		Lang:      "en",
-		Langs:     []string{"en"},
+		// The language the caller asked for, not English. Every page here is
+		// translated, and a preview that always spoke English could show the
+		// palette and never the TEXT - which is half of what a page looks
+		// like, and all of what a translator needs to see.
+		Lang: lang,
+		Dir:  Dir(lang),
+		// One language: the preview IS a language, chosen outside the page,
+		// the same way each pane IS a scheme. A switcher inside it would offer
+		// to change something the frame already decides.
+		Langs: []string{lang},
 		// The pane IS a scheme: pass the forced one through, so the body wears
 		// the mk-scheme class a served page would - which is what picks the
 		// per-scheme background. "auto" here left both panes on the light one.
@@ -1891,8 +2018,8 @@ func WriteThemePreview(w http.ResponseWriter, t store.Theme, b store.Branding, s
 		PoweredBy: !b.HideMark || !edition.Enterprise,
 		MarkText:  MarkText,
 		MarkURL:   MarkURL,
-		T:         messages["en"],
-	}})
+		T:         catalogue(lang),
+	}
 }
 
 // Register mounts the auth endpoints on mux.
@@ -1921,6 +2048,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		mux.HandleFunc("GET /refused", h.showRefused)
 		// The injected <meerkat-user-button> web component (UI routes).
 		h.registerUserButton(mux)
+		// The browser half of the tracing (OBS-04): the bundle this gateway
+		// serves itself, and the relay that keeps the collector private.
+		h.registerTelemetry(mux)
 		// The injected <meerkat-portal-nav> web component (PORTAL-01): the
 		// navigation bar that, when a portal is configured, carries the button.
 		h.registerPortal(mux)
@@ -1960,6 +2090,16 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /profile/connect/{provider}", h.showConnect)
 	mux.HandleFunc("POST /profile/disconnect/{provider}", h.doDisconnect)
 	mux.HandleFunc("GET /profile/history", h.showProfileHistory)
+	// The account's live sessions, each closable (AUTH-14, SEC-07).
+	mux.HandleFunc("GET /profile/sessions", h.showProfileSessions)
+	mux.HandleFunc("POST /profile/sessions", h.doProfileSessions)
+	// Leaving the organisation one is in (TENANT-02): a confirmation, then the
+	// membership goes.
+	mux.HandleFunc("GET /profile/leave", h.showProfileLeave)
+	// The new address's confirmation (AUTH-22). Not under /profile: the link
+	// may be opened in another browser, signed in or not.
+	mux.HandleFunc("GET /confirm-email", h.doConfirmEmail)
+	mux.HandleFunc("POST /profile/leave", h.doProfileLeave)
 	// Self-service second-factor management (MFA-01): enrol, renew, disable.
 	mux.HandleFunc("GET /profile/mfa", h.showProfileMFA)
 	mux.HandleFunc("POST /profile/mfa", h.doProfileMFA)
@@ -1999,7 +2139,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /totp/email", h.sendMFAEmail)
 	mux.HandleFunc("GET /totp-enroll", h.showTOTPEnroll)
 	mux.HandleFunc("POST /totp-enroll", h.doTOTPEnroll)
-	mux.HandleFunc("GET /meerkat/favicon", h.favicon)
+	mux.HandleFunc("GET "+faviconPath, h.favicon)
 	// The old path, kept because pages cached in a browser still ask for it.
 	mux.HandleFunc("GET /meerkat/favicon.svg", h.favicon)
 	mux.HandleFunc("GET "+backgroundPath, h.background)
@@ -2072,10 +2212,20 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		h.render(w, r, next, h.tr(r, "errTooManyAttempts"), http.StatusTooManyRequests)
 		return
 	}
-	fail := func() {
+	// Every refusal is a line of the security trail (AUD-01), with its real
+	// reason - and the attempt that trips the throttle is one more, so the
+	// trail says when an account started being hammered. The attempts refused
+	// AFTER it write nothing: an attacker at a thousand tries a second must
+	// not become a thousand rows a second.
+	fail := func(u store.User, reason string) {
 		h.regLimit.hit(r.Context(), loginKey)
+		h.security(r, secSigninRefused, u, reason)
+		if pol.LoginAttempts > 0 && h.regLimit.count(r.Context(), loginKey, window) == pol.LoginAttempts {
+			h.security(r, secSigninLocked, u, refusedThrottled)
+		}
 		h.render(w, r, next, h.tr(r, "errInvalidCreds"), http.StatusUnauthorized)
 	}
+	typed := store.User{Username: username}
 
 	user, err := h.st.GetUserByUsername(r.Context(), username)
 	// Same code path and same message whether the user is unknown or the
@@ -2089,7 +2239,7 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 			h.regLimit.reset(r.Context(), loginKey)
 			return
 		}
-		fail()
+		fail(typed, refusedCredentials)
 		return
 	}
 	// A password that is CORRECT but no longer accepted (AUTH-24) takes the
@@ -2103,13 +2253,13 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 			h.regLimit.reset(r.Context(), loginKey)
 			return
 		}
-		fail()
+		fail(user, refusedCredentials)
 		return
 	}
 	// A disabled account answers exactly like a bad password (SEC-09), and its
 	// disabling takes effect immediately (SEC-07) since sessions resolve users.
 	if !user.Enabled {
-		fail()
+		fail(user, refusedDisabled)
 		return
 	}
 	// Outside its validity window (RBAC-05). Told plainly, WITH the date, and
@@ -2123,16 +2273,20 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		if time.Now().Unix() < user.ValidFrom {
 			key, when = "errAccessNotOpen", user.ValidFrom
 		}
+		h.security(r, secSigninRefused, user, refusedValidity)
 		h.render(w, r, next,
 			fmt.Sprintf(h.tr(r, key), time.Unix(when, 0).UTC().Format(time.DateOnly)),
 			http.StatusForbidden)
 		return
 	}
 	h.regLimit.reset(r.Context(), loginKey)
+	// The password is proved: the one moment a weak hash can be made strong.
+	h.rehashIfWeak(r, user, password)
 	// A self-registered account stays unusable until its address is confirmed
 	// (AUTH-20). Only revealed to someone holding the CORRECT password, and
 	// the confirmation is re-sent (rate-limited) - the usual lost-mail rescue.
 	if user.SelfRegistered && !user.EmailVerified {
+		h.security(r, secSigninRefused, user, refusedUnconfirmed)
 		if h.registerAllow(r.Context(), clientIP(r)) {
 			if err := h.sendConfirmation(r, user); err != nil {
 				slog.Warn("confirmation re-send failed", "user", user.Username, "err", err)
@@ -2211,6 +2365,7 @@ func (h *Handler) resolveTenantAndGo(w http.ResponseWriter, r *http.Request, use
 		if !h.withinHours(r.Context(), user.ID, tid) {
 			// A closed window is refused EXPLICITLY (TENANT-04) - unlike bad
 			// credentials, there is nothing to enumerate here.
+			h.securityIn(r, secSigninRefused, user, tid, refusedHours)
 			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
 			return
 		}
@@ -2271,7 +2426,7 @@ func (h *Handler) issueAndGo(w http.ResponseWriter, r *http.Request, user store.
 	}
 	// The session is issued: THIS is a completed sign-in (a refused window or
 	// a failed issue above never lands in the history).
-	h.recordLogin(w, r, user.ID, method)
+	h.recordLogin(w, r, user.ID, tenantID, method)
 	// The halt (DEV-11). There are two terminals for a sign-in - this one for a
 	// session with no step to answer, finishFlow for one that answered some -
 	// and both go through it, or half the logins would never see it.
@@ -2363,6 +2518,7 @@ func (h *Handler) continueAfterStep(w http.ResponseWriter, r *http.Request, user
 		http.Redirect(w, r, next, http.StatusSeeOther)
 	case 1:
 		if !h.withinHours(r.Context(), userID, memberships[0].TenantID) {
+			h.securityOfIn(r, secSigninRefused, userID, memberships[0].TenantID, refusedHours)
 			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
 			return
 		}
@@ -2436,7 +2592,7 @@ func (h *Handler) doUpdatePassword(w http.ResponseWriter, r *http.Request) {
 		h.renderUpdatePassword(w, r, h.tr(r, "errPwReused"), http.StatusUnprocessableEntity)
 		return
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -2445,6 +2601,7 @@ func (h *Handler) doUpdatePassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.securityOf(r, secPasswordChange, sess.UserID, "required")
 	h.advanceAfterPassword(w, r, sess)
 }
 
@@ -2486,7 +2643,7 @@ func (h *Handler) finishFlow(w http.ResponseWriter, r *http.Request, sess store.
 	if sess.Pending == stepTOTP || sess.Pending == stepTOTPEnroll {
 		method = withSecondFactor(method)
 	}
-	h.recordLogin(w, r, sess.UserID, method)
+	h.recordLogin(w, r, sess.UserID, sess.TenantID, method)
 	// The halt (DEV-11), when a developer's machine is answering for something:
 	// one screen, read once, before starting. AFTER the login is recorded, so
 	// walking past it cannot lose the record - and it is walkable past on
@@ -2509,8 +2666,11 @@ func (h *Handler) renderUpdatePassword(w http.ResponseWriter, r *http.Request, e
 // nothing is edited inline here.
 type profileData struct {
 	flowChrome
-	Avatar     template.URL
-	Error      string
+	Avatar template.URL
+	Error  string
+	// Notice is news that is not an error: a confirmation on its way, an
+	// address just confirmed.
+	Notice     string
 	Initials   string
 	Username   string
 	Fullname   string
@@ -2566,9 +2726,17 @@ type authorityLink struct {
 // users only).
 type profileDevData struct {
 	flowChrome
-	Error             string
-	DevKeyFingerprint string
-	DevKeyComment     string
+	Error string
+	// Keys are the developer's deposited public keys, one per workstation.
+	Keys []devKeyRow
+	// PlugOpen says the developer tunnel is switched on (Infra, Plug): the
+	// key is offered only then, since a key for a door that does not exist is
+	// a key nobody can use.
+	PlugOpen bool
+	// PlugHost and PlugPort are what the developer types, from the same
+	// setting the console prints its commands with.
+	PlugHost string
+	PlugPort int
 }
 
 // passkeyView is one profile row: name it, date it, revoke it.
@@ -2661,7 +2829,7 @@ func (h *Handler) doProfilePassword(w http.ResponseWriter, r *http.Request) {
 		h.renderProfilePassword(w, r, h.tr(r, "errPwReused"), http.StatusUnprocessableEntity)
 		return
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -2670,6 +2838,7 @@ func (h *Handler) doProfilePassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.securityOf(r, secPasswordChange, sess.UserID, "")
 	http.Redirect(w, r, "/profile", http.StatusSeeOther)
 }
 
@@ -2710,10 +2879,29 @@ func (h *Handler) doProfileEmail(w http.ResponseWriter, r *http.Request) {
 		h.renderProfile(w, r, sess, h.tr(r, "errEmailTaken"), http.StatusConflict)
 		return
 	}
+	// The address is where a password reset lands: changing it is changing a
+	// way into the account. So, when a relay can carry a message, it does not
+	// change here - a link goes to the NEW address, and the change is made
+	// when that link comes back (AUTH-22). Otherwise a session somebody else
+	// got hold of was enough to point the account's recovery at their own box.
+	if h.st.GetSMTP(r.Context()).Configured() {
+		if err := h.requestEmailChange(r, sess.UserID, email); err != nil {
+			slog.Error("address change mail failed", "user", sess.UserID, "err", err)
+			h.renderProfile(w, r, sess, h.tr(r, "errBadEmail"), http.StatusBadGateway)
+			return
+		}
+		h.securityOf(r, secEmailChangeAsked, sess.UserID, email)
+		h.renderProfileNotice(w, r, sess, fmt.Sprintf(h.tr(r, "emailChangeSent"), email))
+		return
+	}
+	// No relay: nothing could carry a confirmation, and refusing would leave
+	// an account without a working address at all. Changed at once, as
+	// before, and the trail keeps it.
 	if err := h.st.SetUserEmail(r.Context(), sess.UserID, email); err != nil {
 		h.renderProfile(w, r, sess, h.tr(r, "errBadEmail"), http.StatusInternalServerError)
 		return
 	}
+	h.securityOf(r, secEmailChange, sess.UserID, email)
 	http.Redirect(w, r, "/profile", http.StatusSeeOther)
 }
 
@@ -2819,19 +3007,61 @@ func (h *Handler) doProfileDevKey(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}
+	if !h.st.PlugAllowed(r.Context(), u) {
+		http.Error(w, plugClosed, http.StatusForbidden)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	key := ""
-	if r.PostFormValue("action") != "clear" {
-		key = strings.TrimSpace(r.PostFormValue("key"))
+	// A key opens the developer tunnel: the trail names which, by its
+	// fingerprint, and never the key itself.
+	if r.PostFormValue("action") == "remove" {
+		if k, ok, err := h.st.DeleteDevKey(r.Context(), sess.UserID, r.PostFormValue("id")); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		} else if ok {
+			h.securityOf(r, secDevKeyRemove, sess.UserID, k.Fingerprint)
+		}
+		http.Redirect(w, r, "/profile/dev/key", http.StatusSeeOther)
+		return
 	}
-	if err := h.st.SetUserDevKey(r.Context(), sess.UserID, key); err != nil {
+	k, err := h.st.AddDevKey(r.Context(), sess.UserID, r.PostFormValue("key"))
+	if errors.Is(err, store.ErrDevKeyTaken) {
+		// English, like the page: a developer's tools are not translated.
+		h.renderProfileDevKey(w, r, sess, "This key is already deposited on this gateway.", http.StatusConflict)
+		return
+	}
+	if err != nil {
 		h.renderProfileDevKey(w, r, sess, h.tr(r, "errBadKey"), http.StatusUnprocessableEntity)
 		return
 	}
+	h.securityOf(r, secDevKeyAdd, sess.UserID, k.Fingerprint)
 	http.Redirect(w, r, "/profile/dev/key", http.StatusSeeOther)
+}
+
+// devKeyRow is one deposited key, as the profile page lists it.
+type devKeyRow struct {
+	ID          string
+	Fingerprint string
+	Comment     string
+	Added       string
+}
+
+func (h *Handler) devKeyRows(r *http.Request, userID string) []devKeyRow {
+	keys, err := h.st.ListDevKeys(r.Context(), userID)
+	if err != nil {
+		slog.Warn("dev keys list failed", "user", userID, "err", err)
+		return nil
+	}
+	rows := make([]devKeyRow, 0, len(keys))
+	for _, k := range keys {
+		fp, comment := devKeyView(k.Line)
+		rows = append(rows, devKeyRow{ID: k.ID, Fingerprint: fp, Comment: comment,
+			Added: time.Unix(k.CreatedAt, 0).UTC().Format(time.DateOnly)})
+	}
+	return rows
 }
 
 // devKeyView summarizes a stored key for the profile page: the fingerprint
@@ -2849,7 +3079,20 @@ func devKeyView(line string) (fingerprint, comment string) {
 }
 
 func (h *Handler) renderProfile(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
-	data := profileData{flowChrome: h.flowData(r, "titleProfile"), Error: errMsg}
+	notice := ""
+	if r.URL.Query().Get("email") == "confirmed" {
+		notice = h.tr(r, "emailChanged")
+	}
+	h.renderProfileWith(w, r, sess, errMsg, notice, status)
+}
+
+// renderProfileNotice is the profile with news that is not an error.
+func (h *Handler) renderProfileNotice(w http.ResponseWriter, r *http.Request, sess store.Session, notice string) {
+	h.renderProfileWith(w, r, sess, "", notice, http.StatusOK)
+}
+
+func (h *Handler) renderProfileWith(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg, notice string, status int) {
+	data := profileData{flowChrome: h.flowData(r, "titleProfile"), Error: errMsg, Notice: notice}
 	// Through safeNext, which is the same guard every post-login destination
 	// goes through: a relative path of this site, never an absolute URL. The
 	// value arrives in a query string, so it is a stranger until it passes.
@@ -2970,10 +3213,12 @@ func (h *Handler) showProfileDev(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}
-	data := profileDevData{flowChrome: h.flowData(r, "titleDeveloper")}
-	if key, err := h.st.GetUserDevKey(r.Context(), sess.UserID); err == nil && key != "" {
-		data.DevKeyFingerprint, data.DevKeyComment = devKeyView(key)
-	}
+	// English, like the page it titles: a developer's tools are not translated
+	// (see userButtonMenuLabels), and a French tab over an English page is the
+	// worst of the two.
+	data := profileDevData{flowChrome: h.flowData(r, ""), PlugOpen: h.st.Plug(r.Context()).Enabled}
+	data.Title = "Developer - Meerkat"
+	data.Keys = h.devKeyRows(r, sess.UserID)
 	writeFlow(w, profileDevPage, data, http.StatusOK)
 }
 
@@ -2993,14 +3238,22 @@ func (h *Handler) showProfileDevKey(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}
+	if !h.st.PlugAllowed(r.Context(), u) {
+		http.Error(w, plugClosed, http.StatusForbidden)
+		return
+	}
 	h.renderProfileDevKey(w, r, sess, "", http.StatusOK)
 }
 
+// plugClosed is what the key pages answer while the tunnel is off: said, so a
+// bookmarked page does not read as a broken one.
+const plugClosed = "the developer tunnel (plug) is not open on this gateway: an infrastructure administrator opens it under Infra, Plug"
+
 func (h *Handler) renderProfileDevKey(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
-	data := profileDevData{flowChrome: h.flowData(r, "titleDeveloper"), Error: errMsg}
-	if key, err := h.st.GetUserDevKey(r.Context(), sess.UserID); err == nil && key != "" {
-		data.DevKeyFingerprint, data.DevKeyComment = devKeyView(key)
-	}
+	data := profileDevData{flowChrome: h.flowData(r, ""), Error: errMsg, PlugOpen: true}
+	data.PlugHost, data.PlugPort = h.st.Plug(r.Context()).Address()
+	data.Title = "plug keys - Meerkat"
+	data.Keys = h.devKeyRows(r, sess.UserID)
 	writeFlow(w, profileDevKeyPage, data, status)
 }
 
@@ -3094,6 +3347,7 @@ func (h *Handler) showSelectTenant(w http.ResponseWriter, r *http.Request) {
 	case 1:
 		// Nothing to choose - stamp the only tenant (hours-checked) and go.
 		if !h.withinHours(r.Context(), sess.UserID, memberships[0].TenantID) {
+			h.securityOfIn(r, secSigninRefused, sess.UserID, memberships[0].TenantID, refusedHours)
 			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
 			return
 		}
@@ -3101,6 +3355,7 @@ func (h *Handler) showSelectTenant(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		h.securityOfIn(r, secSigninTenant, sess.UserID, memberships[0].TenantID, memberships[0].TenantName)
 		if h.applyGroupStep(r, sess.UserID, memberships[0].TenantID) {
 			next = "/select-group"
 		}
@@ -3149,6 +3404,7 @@ func (h *Handler) doSelectTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !h.withinHours(r.Context(), sess.UserID, chosen.TenantID) {
+		h.securityOfIn(r, secSigninRefused, sess.UserID, chosen.TenantID, refusedHours)
 		h.renderSelect(w, r, memberships,
 			fmt.Sprintf(h.tr(r, "errTenantRefused"), chosen.TenantName), http.StatusForbidden, "")
 		return
@@ -3157,6 +3413,9 @@ func (h *Handler) doSelectTenant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// Entering an organisation - at sign-in, or switching later - is a line
+	// of its own, stamped with it: its administrators see who came in.
+	h.securityOfIn(r, secSigninTenant, sess.UserID, chosen.TenantID, chosen.TenantName)
 	// Groups are per tenant: the switch reset the active group; in exclusive
 	// mode with several groups the user picks again for THIS tenant.
 	if h.applyGroupStep(r, sess.UserID, chosen.TenantID) {
@@ -3184,6 +3443,9 @@ func (h *Handler) renderSelect(w http.ResponseWriter, r *http.Request, tenants [
 }
 
 func (h *Handler) doLogout(w http.ResponseWriter, r *http.Request) {
+	if sess, err := h.sm.Resolve(r.Context(), r); err == nil {
+		h.securityOfIn(r, secSignout, sess.UserID, sess.TenantID, "")
+	}
 	if err := h.sm.Destroy(r.Context(), w, r); err != nil {
 		slog.Error("logout failed", "err", err)
 	}
@@ -3231,45 +3493,73 @@ type publicLink struct {
 	Href string
 }
 
-// publicLinks lists the enabled, unauthenticated UI routes that expose a
-// usable entry path. API routes are not navigation targets and stay out -
-// and so does the ADMIN plane's login: application routes are a data-plane
-// affair, the console offers nothing anonymous.
-func (h *Handler) publicLinks(ctx context.Context) []publicLink {
+// catalogue resolves the portal catalogue into offerable links: the entries
+// in the order somebody chose, each one an existing enabled UI route with a
+// usable entry path, each one passing `grants`.
+//
+// THE CATALOGUE SAYS WHAT EXISTS, THE ROUTE SAYS WHO SEES IT. Nothing here
+// decides access: `grants` is the caller's own test, and an entry whose route
+// refuses it is simply absent. Putting a rule in the catalogue would put a
+// security decision in a display setting.
+//
+// In portal mode the answer is capped at ONE: once a bar is drawn on every UI
+// page, the bar is the navigation, and a built-in page outside the
+// applications only needs a way back in - the first entry the caller may open,
+// which is also where a fresh sign-in lands.
+func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) []publicLink {
+	// The admin plane offers no application links at all: application routes
+	// are a data-plane affair, and the console offers nothing anonymous.
 	if h.adminPlane {
+		return nil
+	}
+	cfg := h.st.Portal(ctx)
+	if cfg.Mode == store.PortalModeNone || len(cfg.Entries) == 0 {
 		return nil
 	}
 	routes, err := h.st.ListRoutes(ctx)
 	if err != nil {
 		return nil
 	}
-	var links []publicLink
+	byID := make(map[string]store.Route, len(routes))
 	for _, rt := range routes {
-		// Listed = a UI route that opted in with a menu Link, public (no gateway
-		// gate: empty Access, delegated to the upstream), reachable without a
-		// session. The Link is the displayed label.
-		if !rt.Enabled || !rt.Access.Empty() || !rt.IsUI || rt.UI == nil || rt.UI.Link == "" {
+		byID[rt.ID] = rt
+	}
+	var links []publicLink
+	for _, e := range cfg.Entries {
+		if e.Disabled {
 			continue
 		}
-		if href := routeEntryPath(rt); href != "" {
-			links = append(links, publicLink{Name: rt.UI.Link, Href: href})
+		rt, ok := byID[e.RouteID]
+		// A route deleted after it entered the catalogue leaves a dangling id.
+		// Skipped at read time rather than refused at write time: a deletion
+		// elsewhere must not make this screen fail.
+		if !ok || !rt.Enabled || !rt.IsUI || !grants(rt) {
+			continue
+		}
+		href := routeEntryPath(rt)
+		if href == "" {
+			continue
+		}
+		links = append(links, publicLink{Name: portalLabel(e.Label, rt), Href: href})
+		if cfg.Mode == store.PortalModePortal {
+			break
 		}
 	}
 	return links
 }
 
-// reachableLinks lists the UI routes THIS session may open: the public ones,
-// the authenticated ones (the caller is signed in), and the role-gated ones
-// whose role the active tenant actually grants. This feeds the profile hub
-// and the user-button's Applications submenu - the way back into the apps.
+// publicLinks is the catalogue as an anonymous visitor may see it, offered on
+// the login page under the form: only entries whose route has NO gateway gate
+// at all, since a link that leads to a sign-in page is not an offer.
+func (h *Handler) publicLinks(ctx context.Context) []publicLink {
+	return h.catalogue(ctx, func(rt store.Route) bool { return rt.Access.Empty() })
+}
+
+// reachableLinks is the catalogue THIS session may open: the public entries,
+// the authenticated ones, and the role-gated ones whose role the active tenant
+// actually grants. This feeds the profile hub and the user button's
+// Applications submenu - the way back into the apps.
 func (h *Handler) reachableLinks(ctx context.Context, sess store.Session) []publicLink {
-	if h.adminPlane {
-		return nil
-	}
-	routes, err := h.st.ListRoutes(ctx)
-	if err != nil {
-		return nil
-	}
 	// The caller, to test each route's Access. Memberships are NOT filled in:
 	// this list is what one can open right now, in the organisation currently
 	// active - offering a link that would land on the tenant chooser would be
@@ -3281,33 +3571,7 @@ func (h *Handler) reachableLinks(ctx context.Context, sess store.Session) []publ
 	if names, err := h.st.SessionRoleNames(ctx, sess.UserID, sess.TenantID, sess.GroupID); err == nil {
 		caller.Roles = names
 	}
-	var links []publicLink
-	// Two routes that lead to the SAME address are one application to whoever
-	// clicks: an installation commonly fronts one product with several routes -
-	// one per organisation, one per version - and they differ in what they
-	// proxy, never in where you go. Listing them twice offered a choice that
-	// is not one, and TICKED BOTH, since the tick is matched on the entry path
-	// and both carried it. The first wins, which is also the one the router
-	// would pick: the menu walks the routes in the same order the engine does.
-	seen := map[string]bool{}
-	for _, rt := range routes {
-		// Only UI routes that opted into the apps menu with a Link, and only
-		// when the caller's access grants them (an empty Access is public). The
-		// Link is the displayed label.
-		if !rt.Enabled || !rt.IsUI || rt.UI == nil || rt.UI.Link == "" {
-			continue
-		}
-		if !rt.Access.Grants(caller) {
-			continue
-		}
-		href := routeEntryPath(rt)
-		if href == "" || seen[href] {
-			continue
-		}
-		seen[href] = true
-		links = append(links, publicLink{Name: rt.UI.Link, Href: href})
-	}
-	return links
+	return h.catalogue(ctx, func(rt store.Route) bool { return rt.Access.Grants(caller) })
 }
 
 // routeEntryPath derives a clickable entry URL from the route's first path
@@ -3337,7 +3601,7 @@ func routeEntryPath(rt store.Route) string {
 
 // dummyHash keeps the failure path constant-time-ish for unknown users.
 var dummyHash = func() []byte {
-	h, _ := bcrypt.GenerateFromPassword([]byte("meerkat-dummy"), bcrypt.DefaultCost)
+	h, _ := bcrypt.GenerateFromPassword([]byte("meerkat-dummy"), passwordCost)
 	return h
 }()
 
@@ -3380,7 +3644,7 @@ func SeedAdmin(ctx context.Context, st *store.Store) error {
 		}
 		password = base64.RawURLEncoding.EncodeToString(raw)
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		return err
 	}

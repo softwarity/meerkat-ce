@@ -24,6 +24,7 @@ numbers are shares, not percentages: `8` and `2` is the same split as `80` and
 
 ## Example
 
+::: details The full configuration
 ```yaml
 routes:
   - id: checkout
@@ -55,6 +56,7 @@ routes:
           group: checkout
           weight: 2
 ```
+:::
 
 One request in five goes to the new version.
 

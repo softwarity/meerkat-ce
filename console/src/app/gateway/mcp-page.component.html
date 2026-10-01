@@ -34,12 +34,7 @@
     }
   </mat-button-toggle-group>
 
-  <div class="row">
-    <pre>{{ command() }}</pre>
-    <button matIconButton (click)="copy(command(), 'cmd')" i18n-matTooltip="@@Copy" matTooltip="Copy">
-      <mat-icon>{{ copied() === 'cmd' ? 'check' : 'content_copy' }}</mat-icon>
-    </button>
-  </div>
+  <app-snippet [filename]="client().id === 'json' ? 'mcp.json' : 'connect.sh'" [downloadable]="false" [content]="command()" />
   <p class="hint" i18n="@@MCP_first_call_hint">
     The first call opens your browser on this console. Approve it, and the agent is connected.
   </p>
@@ -56,12 +51,11 @@
     <p class="hint">
       <a routerLink="/infra/access-tokens" i18n="@@Generate_a_token">Generate a token</a>
     </p>
-    <div class="row">
-      <pre>{{ tokenCommand() }}</pre>
-      <button matIconButton (click)="copy(tokenCommand(), 'tok')" i18n-matTooltip="@@Copy" matTooltip="Copy">
-        <mat-icon>{{ copied() === 'tok' ? 'check' : 'content_copy' }}</mat-icon>
-      </button>
-    </div>
+    <app-snippet
+      [filename]="client().id === 'json' ? 'mcp.json' : 'connect-with-token.sh'"
+      [downloadable]="false"
+      [content]="tokenCommand()"
+    />
   </mat-expansion-panel>
 
   <h2 i18n="@@Connected_agents">Connected agents</h2>

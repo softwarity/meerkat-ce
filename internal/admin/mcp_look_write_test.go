@@ -121,8 +121,8 @@ func TestThePortalIsWrittenAgainstTheRoutesThatExist(t *testing.T) {
 	ctx := mcpCtx(rootUser(t, f))
 
 	if _, err := f.api.toolSavePortal(ctx, json.RawMessage(
-		`{"enabled":true,"layout":"header","parents":[{"routeId":"ghost","label":"Ghost"}]}`)); err == nil {
-		t.Error("a module bound to no route should be refused")
+		`{"mode":"portal","layout":"header","entries":[{"routeId":"ghost","label":"Ghost"}]}`)); err == nil {
+		t.Error("an entry bound to no route should be refused")
 	} else if !strings.Contains(err.Error(), "ghost") {
 		t.Errorf("the refusal should name the route: %v", err)
 	}
@@ -136,22 +136,22 @@ func TestThePortalIsWrittenAgainstTheRoutesThatExist(t *testing.T) {
 		t.Fatalf("seeding a route: %v", err)
 	}
 	out, err := f.api.toolSavePortal(ctx, json.RawMessage(
-		`{"enabled":true,"layout":"rail","side":"right","display":"icon","parents":[{"routeId":"sales","label":"Sales","icon":"storefront"}]}`))
+		`{"mode":"portal","layout":"rail","side":"right","display":"icon","entries":[{"routeId":"sales","label":"Sales","icon":"storefront"}]}`))
 	if err != nil {
 		t.Fatalf("save_portal: %v", err)
 	}
-	if m, ok := out.(map[string]any); !ok || m["modules"] != 1 {
+	if m, ok := out.(map[string]any); !ok || m["entries"] != 1 {
 		t.Errorf("the answer should say what was saved, got %#v", out)
 	}
 	saved := f.api.st.Portal(ctx)
-	if !saved.Enabled || saved.Layout != store.PortalRail || saved.Side != "right" {
+	if saved.Mode != store.PortalModePortal || saved.Layout != store.PortalRail || saved.Side != "right" {
 		t.Errorf("the arrangement was not kept: %+v", saved)
 	}
-	if len(saved.Parents) != 1 || saved.Parents[0].RouteID != "sales" {
-		t.Fatalf("the module was not kept: %+v", saved.Parents)
+	if len(saved.Entries) != 1 || saved.Entries[0].RouteID != "sales" {
+		t.Fatalf("the entry was not kept: %+v", saved.Entries)
 	}
-	if !strings.HasPrefix(saved.Parents[0].Icon, "<svg") {
-		t.Errorf("an icon named should be stored as its drawing, got %.40q", saved.Parents[0].Icon)
+	if !strings.HasPrefix(saved.Entries[0].Icon, "<svg") {
+		t.Errorf("an icon named should be stored as its drawing, got %.40q", saved.Entries[0].Icon)
 	}
 }
 

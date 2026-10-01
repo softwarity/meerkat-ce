@@ -24,7 +24,7 @@ services:
     # links no PostgreSQL driver, and says so in a sentence rather than
     # failing on one. Pin a release rather than following latest on what holds
     # your front door.
-    image: ghcr.io/softwarity/meerkat-ee:latest
+    image: ghcr.io/softwarity/meerkat:latest
     ports:
       # Published on the routing mesh: any node answers, whichever task runs.
       - target: 8080

@@ -364,7 +364,7 @@ func (h *Handler) doRegister(w http.ResponseWriter, r *http.Request) {
 		taken = true
 	}
 	if !taken {
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -379,8 +379,11 @@ func (h *Handler) doRegister(w http.ResponseWriter, r *http.Request) {
 		if err := h.st.CreateUser(ctx, u); err != nil {
 			// A race on uniqueness lands here: still the neutral outcome.
 			slog.Warn("self-registration create failed", "err", err)
-		} else if err := h.sendConfirmation(r, u); err != nil {
-			slog.Error("confirmation e-mail failed", "user", u.Username, "err", err)
+		} else {
+			h.security(r, secRegister, u, "")
+			if err := h.sendConfirmation(r, u); err != nil {
+				slog.Error("confirmation e-mail failed", "user", u.Username, "err", err)
+			}
 		}
 	}
 	writeFlow(w, registerSentPage, struct{ flowChrome }{h.flowData(r, "titleRegister")}, http.StatusOK)
@@ -395,8 +398,9 @@ func (h *Handler) sendConfirmation(r *http.Request, u store.User) error {
 	if err != nil {
 		return err
 	}
+	hours := h.st.GetRegistrationPolicy(r.Context()).ConfirmHours
 	if err := h.st.PutEmailToken(r.Context(), hashTrust(token), u.ID, confirmPurpose,
-		time.Now().Add(24*time.Hour).Unix()); err != nil {
+		time.Now().Add(time.Duration(hours)*time.Hour).Unix()); err != nil {
 		return err
 	}
 	link := h.externalURL(r) + "/confirm?token=" + token
@@ -406,7 +410,7 @@ func (h *Handler) sendConfirmation(r *http.Request, u store.User) error {
 		Subject:   fmt.Sprintf(t["mailConfirmSubject"], brand.AppName),
 		Preheader: fmt.Sprintf(t["mailConfirmHeading"], brand.AppName),
 		Heading:   fmt.Sprintf(t["mailConfirmHeading"], brand.AppName),
-		Intro:     []string{t["mailConfirmIntro"]},
+		Intro:     []string{t["mailConfirmIntro"], linkValidity(t, hours)},
 		Button:    &mail.Button{Label: t["mailConfirmCta"], URL: link},
 		Outro:     []string{t["mailConfirmOutro"]},
 	}))
@@ -438,6 +442,7 @@ func (h *Handler) doConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if u, err := h.st.GetUserByID(r.Context(), userID); err == nil {
+		h.security(r, secRegisterConfirm, u, "")
 		h.notifyAdminsNewAccount(r.Context(), u)
 	}
 	writeFlow(w, confirmedPage, struct{ flowChrome }{h.flowData(r, "titleConfirmed")}, http.StatusOK)
@@ -492,10 +497,8 @@ func waitingRoom(user store.User, memberships int) bool {
 		!user.Dev && !user.TenantCreator
 }
 
-// messagesFor picks a mail catalogue by stored locale, falling back to en.
+// messagesFor picks a mail catalogue by stored locale, falling back to en -
+// the installation's own strings over the embedded ones (see catalogue).
 func messagesFor(locale string) map[string]string {
-	if t, ok := messages[locale]; ok {
-		return t
-	}
-	return messages["en"]
+	return catalogue(locale)
 }

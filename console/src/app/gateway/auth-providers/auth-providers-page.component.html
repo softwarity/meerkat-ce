@@ -2,9 +2,6 @@
   <mat-drawer-content>
     <div class="banner">
       <h1 class="flex-1 m-0" i18n="@@Authentication">Authentication</h1>
-      <button matIconButton (click)="load()" i18n-matTooltip="@@Refresh" matTooltip="Refresh" i18n-aria-label="@@Refresh" aria-label="Refresh">
-        @if (loading()) {<mat-icon spin>autorenew</mat-icon>} @else {<mat-icon>refresh</mat-icon>}
-      </button>
     </div>
 
     <div class="content">
@@ -25,6 +22,22 @@
           nothing until an administrator places it in an organization and grants roles, and
           administrators are told when one appears. Each authority decides for itself besides;
           off here, none of them may.
+        </span>
+      </div>
+      <!-- The mailed links that prove an address: the one finishing a sign-up
+           and the one confirming a new address from the profile. -->
+      <div class="master">
+        <mat-form-field class="confirm-for" subscriptSizing="dynamic">
+          <mat-label i18n="@@Confirmation_links_valid_for">Confirmation links valid for</mat-label>
+          <mat-select [value]="confirmHours()" (selectionChange)="setConfirmHours($event.value)">
+            @for (c of confirmChoices; track c.hours) {
+              <mat-option [value]="c.hours">{{ c.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <span class="hint text-muted" i18n="@@Confirmation_links_hint">
+          The link that finishes a sign-up, and the one sent to a new address before it replaces
+          the old one: a changed address takes effect only once confirmed, and the old one is told.
         </span>
       </div>
 

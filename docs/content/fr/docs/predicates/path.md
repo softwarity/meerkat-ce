@@ -30,6 +30,10 @@ predicates:
 
 ## Notes
 
+La notation est celle des motifs de chemin **à la Ant** de la famille Spring
+([PathPattern](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/util/pattern/PathPattern.html)),
+en sous-ensemble strict : ni `?`, ni joker `*`, ni `{*nom}`.
+
 Un motif doit commencer par `/` et se compare **segment par segment** :
 
 - `{nom}` prend exactement un segment, quel qu'il soit : `/orders/{id}` matche `/orders/8814` et pas `/orders/8814/lines`.
@@ -48,3 +52,16 @@ Les frontières de segment sont respectées : `/demo/**` matche `/demo` et
 `{nom}` matche un segment mais ne capture rien de réutilisable : aucun filtre ne
 peut relire la valeur. Passez par
 [rewrite-path](/docs/filters/rewrite-path) quand elle doit être déplacée.
+
+## Exclure un chemin
+
+Un motif ne sait pas dire « tout sauf », et il n'y a pas d'expression régulière non plus : la
+passerelle lit le préfixe d'un motif de chemin à plusieurs endroits (la sécurité par endpoint
+qui ramène une requête à son opération OpenAPI, le lien du portail vers une application, la
+redirection de langue, les métriques par endpoint), et une expression régulière n'a pas de
+préfixe à lire.
+
+Pour tenir un chemin à l'écart, donnez-lui une **route à lui**, placée au-dessus des autres, qui
+refuse toujours - accès *Nobody*, ou un 404 fixe. Elle couvre toutes les routes qui auraient
+attrapé ce chemin, attrape-tout compris, là où une exclusion écrite dans une route devrait être
+répétée dans chacune, et serait oubliée dans la suivante.

@@ -1,0 +1,120 @@
+// Same frame as the OpenTelemetry page next to it.
+:host {
+  display: block;
+}
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+}
+.banner h1 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+.content {
+  padding: 0 24px 24px;
+  max-width: 760px;
+}
+.lead {
+  margin: 0 0 16px;
+  line-height: 1.5;
+  color: var(--mat-sys-on-surface-variant);
+}
+.hint {
+  margin: 0 0 14px;
+  line-height: 1.5;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+}
+a {
+  color: var(--mat-sys-primary);
+}
+.lead a {
+  color: var(--mat-sys-primary);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+.status {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.status.on {
+  color: var(--mat-sys-primary);
+}
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+.group {
+  margin: 22px 0 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mat-sys-on-surface-variant);
+}
+// Two fields on one line: a grid, so each keeps its own height.
+.pair {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+.actions {
+  margin: 4px 0 8px;
+}
+.failed {
+  margin: 8px 0;
+  color: var(--mat-sys-error);
+}
+.os {
+  margin-bottom: 12px;
+}
+.steps {
+  margin: 0;
+  padding-left: 20px;
+}
+.steps li {
+  margin-bottom: 8px;
+}
+.steps p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+  font-size: 0.9em;
+}
+.devs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.devs li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.devs mat-icon {
+  color: var(--mat-sys-on-surface-variant);
+}
+.devs mat-icon.on {
+  color: var(--mat-sys-primary);
+}
+.devs .who {
+  min-width: 140px;
+}
+.devs .fp {
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.profile {
+  display: block;
+  max-width: 320px;
+  margin-bottom: 4px;
+}

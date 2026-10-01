@@ -38,7 +38,7 @@ where there is one and a second cannot be created, the badge would grant nothing
 
 **app admin** - the *Application* plane:
 
-- General settings and Locales
+- General settings
 - Users, and the global role catalogue
 - Security: the password policy, the throttle, two-factor, passkeys, tokens, the session lifetime
 - Built-in pages: theme, layout, branding - and the navigation portal

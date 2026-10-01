@@ -22,6 +22,11 @@ const portalNavJS = `(function () {
 
   var SRC = '/meerkat/portal.json';
   var RAIL_W = 72, RAIL_EXP = 280, HEADER_H = 56, STRIP_H = 48;
+  // The rail's own head is TALLER than the top bar, and deliberately so:
+  // it is @softwarity/rail-nav's 64px, and a rail sitting beside an
+  // application that uses rail-nav must line its burger up with theirs.
+  // Measured side by side, ours sat 4px high and 3px right of theirs.
+  var RAIL_HEAD_H = 64;
   // The account button's height inside the bar: the same 40px box the launcher
   // and the chevrons use, so the row reads as one line of controls.
   var BTN_H = 40;
@@ -126,11 +131,21 @@ const portalNavJS = `(function () {
     // pad) = centre ~36px. Collapsed centers the burger in the 72px rail (=36).
     // Expanded, flex-start with padding-left 24px puts the 24px burger's centre
     // back at 36px; the logo then sits beside it.
-    '.rhead{display:flex;align-items:center;justify-content:center;gap:0;height:' + HEADER_H + 'px;' +
-      'flex:0 0 auto;padding:0;cursor:pointer;color:var(--onsurface);}' +
-    '.rail.exp .rhead{justify-content:flex-start;padding:0 24px;gap:10px;}' +
+    // ALWAYS flex-start with a 24px inset, collapsed and expanded alike, and
+    // that is the whole fix for the close: a 72px rail padded 24 either
+    // side leaves exactly the burger's 24px, so flex-start IS centred when
+    // collapsed. Centring it instead looked identical at rest and broke on
+    // the way out - the class drops at once while the width takes 200ms, so
+    // the burger jumped to the middle of the still-wide rail and swept back
+    // left as it narrowed. Opening never showed it, because there the jump
+    // lands where the burger already is. A leap plus a cross-fade is what
+    // read as a blink.
+    '.rhead{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:flex-start;' +
+      'gap:0;height:' + RAIL_HEAD_H + 'px;flex:0 0 auto;padding:0 24px;cursor:pointer;' +
+      'color:var(--onsurface);-webkit-tap-highlight-color:transparent;}' +
+    '.rail.exp .rhead{gap:10px;}' +
     '.rhead:hover{background:var(--hover);}' +
-    '.rail.r.exp .rhead{flex-direction:row-reverse;}' +
+    '.rail.r .rhead{flex-direction:row-reverse;}' +
     // Burger animates like @softwarity/rail-nav: the hamburger and the menu-open
     // glyphs are stacked and cross-fade with a quarter turn when the rail toggles
     // (no icon swap, so it never jumps). The right side mirrors the whole thing.
@@ -146,8 +161,11 @@ const portalNavJS = `(function () {
       'text-decoration:none;color:inherit;opacity:0;width:0;transition:opacity .15s ease .05s;}' +
     '.rail.exp .rlogo{opacity:1;width:auto;}' +
     '.rlogo img{height:24px;width:auto;display:block;}' +
+    // A collapsed rail is 56px wide: the wordmark and the name fold away, the
+    // square icon stays. Without this the mark simply vanished for as long as
+    // the rail was shut, which is most of the time.
     '.ritems{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;' +
-      'scrollbar-width:none;padding:8px 12px;gap:0;}' +
+      'scrollbar-width:none;padding:12px;gap:0;}' +
     '.ritems::-webkit-scrollbar{display:none;}' +
     '.rfoot{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 12px;}' +
     '.rail.exp .rfoot{align-items:stretch;}' +
@@ -156,14 +174,22 @@ const portalNavJS = `(function () {
       'padding:0;transition:gap .2s ease;}' +
     '.rail.r a.ritem,.rail.r button.ritem{align-items:flex-end;}' +
     '.rail.exp a.ritem,.rail.exp button.ritem{gap:0;}' +
-    '.pill{position:relative;display:flex;align-items:center;justify-content:flex-start;width:48px;height:32px;' +
-      'border-radius:9999px;margin-top:12px;padding-left:13px;transition:background .2s ease,width .2s ease,' +
+    // 10px, not 13: with a 12px items pad and a 24px glyph that puts the icon
+    // centre at 34px, which is where rail-nav puts it. Three pixels is
+    // invisible alone and obvious when the two rails are side by side.
+    '.pill{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:flex-start;' +
+      'width:48px;height:32px;border-radius:9999px;margin-top:12px;padding-left:10px;' +
+      '-webkit-tap-highlight-color:transparent;transition:background .2s ease,width .2s ease,' +
       'height .2s ease,margin .2s ease;}' +
-    '.rail.r .pill{justify-content:flex-end;padding-left:0;padding-right:13px;}' +
+    '.rail.r .pill{justify-content:flex-end;padding-left:0;padding-right:10px;}' +
+    // The first item sits closer to the head, so that expanding - which
+    // drops every margin-top - does not slide it up: 8 + 16 collapsed is
+    // 0 + 24 expanded, the same 24px from the top either way.
+    'a.ritem:first-child .pill,button.ritem:first-child .pill{margin-top:8px;}' +
     'a.ritem:hover .pill,button.ritem:hover .pill{background:var(--hover);}' +
     'a.ritem.cur .pill,button.ritem.cur .pill{background:var(--active);color:var(--onsurface);}' +
-    '.rail.exp a.ritem .pill,.rail.exp button.ritem .pill{width:auto;height:48px;padding:0 16px 0 13px;gap:12px;margin-top:0;}' +
-    '.rail.r.exp a.ritem .pill,.rail.r.exp button.ritem .pill{flex-direction:row-reverse;padding:0 13px 0 16px;}' +
+    '.rail.exp a.ritem .pill,.rail.exp button.ritem .pill{width:auto;height:48px;padding:0 16px 0 10px;gap:12px;margin-top:0;}' +
+    '.rail.r.exp a.ritem .pill,.rail.r.exp button.ritem .pill{flex-direction:row-reverse;padding:0 10px 0 16px;}' +
     '.pill .badge{position:absolute;top:-6px;right:-6px;}' +
     '.lblo{font-size:12px;font-weight:500;line-height:16px;text-align:center;white-space:nowrap;overflow:hidden;' +
       'text-overflow:ellipsis;width:48px;max-height:16px;opacity:1;transition:opacity .1s ease,max-height .2s ease;}' +
@@ -172,9 +198,25 @@ const portalNavJS = `(function () {
       'width:0;opacity:0;}' +
     '.rail.exp a.ritem .lbli,.rail.exp button.ritem .lbli{width:auto;flex:1;opacity:1;transition:opacity .15s ease .1s;}' +
     '.rail.r .lbli{text-align:right;}' +
+    // The ripple @softwarity/rail-nav gets from matRipple. A hover tint tells
+    // you a surface is live; a ripple tells you the click LANDED, and its
+    // absence is most of why the header felt dead next to theirs.
+    '.rip{position:absolute;z-index:0;border-radius:50%;pointer-events:none;transform:scale(0);opacity:.22;' +
+      'background:currentColor;animation:mk-rip .45s cubic-bezier(.2,0,0,1) forwards;}' +
+    '@keyframes mk-rip{to{transform:scale(1);opacity:0;}}' +
+    // UNDER the content, and that needs saying twice: the ripple is
+    // positioned, so without a z-index it paints above every static
+    // sibling AND above the burger, whose own position:relative puts it
+    // on the same footing - last in the DOM wins. A wash of the text
+    // colour over the glyph, right before it turns, is the flash that
+    // made the close look broken.
+    '.rhead > *:not(.rip),.pill > *:not(.rip):not(.badge){position:relative;z-index:1;}' +
+    '.pill .badge{z-index:2;}' +
+    '@media (prefers-reduced-motion:reduce){.rip{display:none;}' +
+      '.rail,.pill,.burger svg,.backdrop{transition-duration:.01ms !important;}}' +
     // backdrop for an expanded rail
     '.backdrop{position:fixed;top:0;bottom:0;left:0;right:0;z-index:2147483099;background:rgba(0,0,0,.4);' +
-      'opacity:0;pointer-events:none;transition:opacity .3s ease;}' +
+      'opacity:0;pointer-events:none;transition:opacity .2s ease;}' +
     '.backdrop.on{opacity:1;pointer-events:auto;}' +
     // ---- launcher grid ----
     '.grid{position:fixed;z-index:2147483110;background:var(--surface);color:var(--onsurface);' +
@@ -264,6 +306,12 @@ const portalNavJS = `(function () {
       if (!d.side) d.side = 'left';
       if (!d.display) d.display = 'both';
       if (!d.parents) d.parents = [];
+      // A payload that SETTLES the light/dark question settles it for the
+      // preview too. Without this the bar took the viewer's own preference and
+      // wrote it on the document, so a pane asking for light rendered dark on
+      // a dark machine - and both panes of a two-pane preview showed the same
+      // scheme, which is one pane.
+      if (d.schemeImposed && (d.scheme === 'light' || d.scheme === 'dark')) this._previewScheme = d.scheme;
       this._data = d;
       // On a served page an off or empty portal shows nothing; the editor
       // preview always renders the frame, even with no modules yet.
@@ -352,28 +400,42 @@ const portalNavJS = `(function () {
       // the current app (often back to the console). It is decoration; the tabs
       // and rail do the navigating. In the rail it sits in the burger head, so a
       // click there still bubbles up to toggle the drawer.
+      //
+      // TWO independent decisions, and they used to be one and a half: the logo
+      // in the bar or not, and the name in the bar or not. The name used to
+      // appear on its own whenever there was no logo, which meant its switch did
+      // nothing at all on an installation without one - the setting was there
+      // and the bar ignored it. Each answers for itself now, and answering no to
+      // both leaves the head empty, which is a legitimate thing to want: it is
+      // the width the tabs get back.
       var d = this._data, el = document.createElement('span'); el.className = 'brand';
       var appName = (d.brand && d.brand.appName) || '';
-      if (d.brand && d.brand.logo) {
-        var img = document.createElement('img'); img.setAttribute('src', d.brand.logo);
-        img.setAttribute('alt', appName); el.appendChild(img);
-        // Optionally the branding app name sits beside the logo, like the icon.
-        if (d.showName && appName) {
-          var nm = document.createElement('span'); nm.className = 'bname'; nm.textContent = appName; el.appendChild(nm);
-        }
-      } else {
-        // With no logo the name IS the mark - always shown.
-        var t = document.createElement('span'); t.textContent = appName; el.appendChild(t);
+      var logo = (!d.hideLogo && d.brand && d.brand.logo) || '';
+      if (logo) {
+        var img = document.createElement('img'); img.className = 'blogo';
+        img.setAttribute('src', logo); img.setAttribute('alt', appName);
+        // How round, in percent of the box: 0 as drawn, 50 a circle.
+        if (d.logoRadius) img.style.borderRadius = Math.min(50, Math.max(0, d.logoRadius)) + '%';
+        el.appendChild(img);
+      }
+      if (d.showName && appName) {
+        var nm = document.createElement('span'); nm.className = 'bname';
+        nm.textContent = appName; el.appendChild(nm);
       }
       return el;
     }
 
     _userBtn(position) {
-      // In the console preview there is no session to speak of, and mounting the
-      // real button would fetch cross-plane. Stand in for it with the piece that
-      // is useful here: the color-scheme selector the real user button carries,
-      // wired to flip the whole preview between light and dark so both are seen.
-      if (this._preview) {
+      // In the PORTAL editor's preview there is no session to speak of, and
+      // mounting the real button would fetch cross-plane. Stand in for it with
+      // the piece that is useful there: the color-scheme selector the real user
+      // button carries, wired to flip the whole preview between light and dark
+      // so both are seen.
+      //
+      // open-account says a payload IS available (the theme preview hands one
+      // over on window.meerkatPage, so nothing is fetched): the real button
+      // goes in, menu shown, because its rows are most of the bar's text.
+      if (this._preview && !this.hasAttribute('open-account')) {
         var self = this, dark = this._previewScheme === 'dark';
         var sc = document.createElement('button'); sc.className = 'launch'; sc.setAttribute('type', 'button');
         var lbl = dark ? 'Preview in light' : 'Preview in dark';
@@ -384,6 +446,18 @@ const portalNavJS = `(function () {
       }
       var d = this._data, b = document.createElement('meerkat-user-button');
       b.setAttribute('in-portal', '');
+      // The theme preview asks for the menu SHOWN: it is where most of the
+      // bar's text lives, and a shut menu previews a round button. The portal
+      // editor does not ask, since a panel over the bar is in the way of the
+      // catalogue being edited.
+      if (this.hasAttribute('open-account')) {
+        b.setAttribute('open', '');
+        // And in-frame with it: the button removes itself inside an iframe,
+        // because a framed page is somebody else's chrome and two account
+        // menus on one screen is a trap. A preview IS a frame on purpose -
+        // the same exception the bar makes for itself two screens up.
+        b.setAttribute('in-frame', '');
+      }
       // The button's own default (24px) is a discreet corner badge; in the bar
       // it is one control among the tabs, and it has to read at their scale -
       // sized off the surface it sits in (a 56px header, a 72px rail).
@@ -391,9 +465,33 @@ const portalNavJS = `(function () {
       // position's first word is the anchored edge and decides which way the
       // menu opens: at the bottom of a rail it must open UPWARD, not down.
       b.setAttribute('position', position || 'top-right');
-      if (d.languages && d.languages.length) b.setAttribute('languages', d.languages.join(','));
+      // THIS PAGE's languages when the injection named them, the payload's
+      // otherwise. The bar is injected into one route's page and portal.json
+      // does not know which, so it carries the gateway's whole offer - right
+      // for a bar drawn before any page, wrong for the menu on this one.
+      var langs = (this.getAttribute('languages') || '').split(',').filter(Boolean);
+      if (!langs.length) langs = d.languages || [];
+      if (langs.length) b.setAttribute('languages', langs.join(','));
+      // What the switch may be, in order of who decides. The installation
+      // first: built-in pages settled on light or dark leave nothing to switch
+      // between anywhere. THIS ROUTE next, on the injection like the languages
+      // above - the bar is global, the application behind it is not:
+      //
+      //   scheme-wear=…   this page takes no choice, and the bar wears this
+      //   scheme="none"   this page takes no choice, and says nothing about the
+      //                   bar, which then follows the visitor as it always did
+      //   neither         the ordinary case: the switch is offered
+      //
+      // A switch offered over an application that consumes nothing would move
+      // the bar and leave the page as it was, which reads as a broken control
+      // rather than as an application without a colour scheme.
+      var wear = this.getAttribute('scheme-wear');
       if (d.schemeImposed && (d.scheme === 'light' || d.scheme === 'dark')) b.setAttribute('scheme-wear', d.scheme);
-      else b.setAttribute('scheme', 'select');
+      else if (wear === 'light' || wear === 'dark') b.setAttribute('scheme-wear', wear);
+      else if (this.getAttribute('scheme') !== 'none') b.setAttribute('scheme', 'select');
+      // THIS route's application may have no follow-the-system state. Same
+      // rule, same road: the button offers two positions instead of three.
+      if (this.hasAttribute('no-auto')) b.setAttribute('no-auto', '');
       return b;
     }
 
@@ -436,6 +534,27 @@ const portalNavJS = `(function () {
     }
 
     // ---- rail (rail-nav) ------------------------------------------------
+    // A ripple from where the pointer actually went down, sized to reach the
+    // far corner so it covers the surface whatever the aspect ratio. Removed on
+    // animation end rather than on a timer: a timer that outlives a rebuilt DOM
+    // leaves a dot behind.
+    _ripple(host, ev) {
+      var b = host.getBoundingClientRect();
+      var x = (ev && ev.clientX != null) ? ev.clientX - b.left : b.width / 2;
+      var y = (ev && ev.clientY != null) ? ev.clientY - b.top : b.height / 2;
+      var r = Math.max(
+        Math.hypot(x, y), Math.hypot(b.width - x, y),
+        Math.hypot(x, b.height - y), Math.hypot(b.width - x, b.height - y)
+      );
+      var el = document.createElement('span');
+      el.className = 'rip';
+      el.style.left = (x - r) + 'px';
+      el.style.top = (y - r) + 'px';
+      el.style.width = el.style.height = (2 * r) + 'px';
+      el.addEventListener('animationend', function () { el.remove(); });
+      host.appendChild(el);
+    }
+
     _railItem(entry, cur) {
       var self = this;
       var a = document.createElement(entry.href ? 'a' : 'button');
@@ -451,6 +570,7 @@ const portalNavJS = `(function () {
       var li = document.createElement('span'); li.className = 'lbli'; li.textContent = entry.label || ''; pill.appendChild(li);
       a.appendChild(pill);
       var lo = document.createElement('span'); lo.className = 'lblo'; lo.textContent = entry.label || ''; a.appendChild(lo);
+      a.addEventListener('pointerdown', function (ev) { self._ripple(pill, ev); });
       a.addEventListener('click', function () { if (self._expanded) self._setExpanded(false); });
       this._wireSelect(a, entry);
       return a;
@@ -473,6 +593,7 @@ const portalNavJS = `(function () {
       if (opts.logo) {
         var lg = this._brand(); lg.className = 'rlogo'; head.appendChild(lg);
       }
+      head.addEventListener('pointerdown', function (ev) { self._ripple(head, ev); });
       head.addEventListener('click', function () { self._setExpanded(!self._expanded); });
       rail.appendChild(head);
 

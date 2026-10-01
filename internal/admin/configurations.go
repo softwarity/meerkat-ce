@@ -39,6 +39,8 @@ func (a *API) registerConfigurations(mux Mux) {
 	mux.Handle("PUT /api/configurations/{id}/document", a.rootOnly(a.replaceConfigurationDocument))
 	mux.Handle("POST /api/configurations/{id}/activate", a.rootOnly(a.activateConfiguration))
 	mux.Handle("GET /api/configurations/{id}/plan", a.rootOnly(a.configurationPlan))
+	// Two saved configurations against each other, what runs left out (CFG-04).
+	mux.Handle("GET /api/configurations/{id}/compare/{other}", a.rootOnly(a.compareConfigurations))
 	mux.Handle("GET /api/configurations/{id}/export", a.rootOnly(a.exportConfiguration))
 	mux.Handle("GET /api/configurations/{id}/document", a.rootOnly(a.readConfigurationDocument))
 }
@@ -53,7 +55,7 @@ func (a *API) registerConfigurations(mux Mux) {
 //
 // The number is shown before it is reached ("2 of 3"), because a cap
 // discovered by being refused is a trap, and a cap announced is a price.
-const FreeConfigurations = 3
+const FreeConfigurations = store.FreeConfigurations
 
 // roomForAnother refuses only the act that would GROW the shelf past the cap.
 // Everything else - and every act on what is already there - is free, on both
@@ -410,6 +412,35 @@ func (a *API) configurationPlan(w http.ResponseWriter, r *http.Request, _ store.
 		return
 	}
 	writeJSON(w, http.StatusOK, plan)
+}
+
+// compareConfigurations says what changes going from {id} to {other}, object
+// by object, without looking at what runs (CFG-04). The answer has the shape
+// of a plan, so the console reads it with the same table as an import.
+func (a *API) compareConfigurations(w http.ResponseWriter, r *http.Request, _ store.User) {
+	from, err := a.st.GetConfiguration(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "configuration not found")
+		return
+	}
+	to, err := a.st.GetConfiguration(r.Context(), r.PathValue("other"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "the configuration to compare with was not found")
+		return
+	}
+	a1, err := config.Unmarshal([]byte(from.Document))
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, from.Name+": "+err.Error())
+		return
+	}
+	b1, err := config.Unmarshal([]byte(to.Document))
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, to.Name+": "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, config.Plan{
+		Changes: config.Compare(a1, b1), Missing: []config.MissingRef{}, MissingFiles: []config.MissingFile{},
+	})
 }
 
 // activateConfiguration switches to it: apply the document, move the mark,

@@ -22,7 +22,7 @@ de déconnexion et un sélecteur de langue sans que personne n'ouvre ses sources
 |---|---|---|
 | Agent de page | `/meerkat/page.js`, qui installe `window.meerkatPage` | le fait que la route soit une route UI |
 | Bouton utilisateur | un Web Component `meerkat-user-button` : qui vous êtes, l'organisation, la langue, la déconnexion | un interrupteur sur la route |
-| Portail de navigation | une barre `meerkat-portal-nav` listant les applications que cette personne peut ouvrir | un interrupteur global ; elle remplace le bouton isolé |
+| Portail de navigation | une barre `meerkat-portal-nav` listant les applications que cette personne peut ouvrir | le mode `portal` du catalogue global ; elle remplace le bouton isolé |
 | Estampille d'identité | les rôles et les champs du compte écrits dans le balisage de la page, côté serveur | un interrupteur sur la route, champ par champ |
 | CSS et JS maison | ce que vous avez écrit dans la section Injections de la route | leur simple présence |
 | Rappel de langue | une fonction que la gateway appelle quand le visiteur change de langue | une route dont les langues voyagent par script |
@@ -122,6 +122,12 @@ Une injection sautée est silencieuse : pas d'erreur, pas d'en-tête, pas de lig
 journal. Si le bouton manque sur une page, une des conditions ci-dessus est le
 premier endroit à regarder.
 
-Une réponse réécrite perd aussi son `ETag`, puisque les octets ne sont plus ceux
-que l'amont a hachés, et une réponse qui porte une identité est marquée `no-store,
-private` pour qu'aucun cache partagé ne rende à quelqu'un la page d'un autre.
+Une réponse réécrite perd l'`ETag` de l'amont, puisque les octets ne sont plus ceux
+que l'amont a hachés, et part en `no-cache` : le navigateur demande avant de la
+réutiliser, donc un changement de configuration se voit au chargement suivant.
+Demander ne coûte rien quand rien n'a changé : la page reçoit son propre `ETag`, un
+hash des octets réellement envoyés, et la gateway répond elle-même un `304` vide à un
+`If-None-Match` qui correspond. Changez quelque chose dans la console et les octets,
+donc le hash, changent avec. Une réponse qui porte une identité est marquée
+`no-store, private` à la place, sans validateur, pour qu'aucun cache partagé ne rende
+à quelqu'un la page d'un autre.

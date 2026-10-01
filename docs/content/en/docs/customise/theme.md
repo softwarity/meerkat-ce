@@ -9,7 +9,7 @@ summary: Ten colour tokens, a light palette and a dark one, and how to carry a p
 
 A theme is a palette, and nothing else. It colours the pages the gateway serves itself - the
 sign-in flow, the organisation picker, the password pages, the unavailable page - and the small
-pieces it injects into proxied applications (THEME-03, THEME-04).
+pieces it injects into proxied applications.
 
 It is edited under **Application > Built-in pages**, on the **Theme** tab, with the real page
 previewed beside it.
@@ -87,6 +87,6 @@ smuggle anything in.
 ## What is missing
 
 - **Generating a palette from source colours** the Material Design way, a secondary palette, and
-  elevations (THEME-04).
+ elevations.
 - **The console does not consume this palette.** It lives on its own Material tokens, so the
-  console keeps the Softwarity look whatever you choose here (THEME-03).
+ console keeps the Softwarity look whatever you choose here.

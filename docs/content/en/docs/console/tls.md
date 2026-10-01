@@ -73,6 +73,14 @@ forced, and neither is the liveness probe. If every certificate expires, the
 redirect **stands itself down** and says so, rather than sending callers to a
 door none of them will open.
 
+The switch is always there, greyed while the applications' HTTPS door is not
+open - no application name has a certificate yet - with a line saying so.
+**HSTS duration** sits under it, active once HTTPS is forced: forcing HTTPS also sends HSTS,
+so browsers stop sending even the first request in clear - the one a redirect
+cannot protect. A day by default, up to two years. Never sent to localhost or an
+IP address; a route or a service that sets its own value keeps it. See
+[TLS](/docs/operations/tls).
+
 ## Automatic certificates (ACME)
 
 One account, and a tick box per name: what varies is never the plane, it is the

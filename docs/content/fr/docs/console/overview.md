@@ -99,7 +99,7 @@ Ces cinq-là retenues, la console ne surprend plus.
 
 ### Application
 
-- **[General, Locales et Security](/docs/console/application)** - ce que cette installation est, et ses politiques.
+- **[Général et Security](/docs/console/application)** - ce que cette installation est, et ses politiques.
 - **[Roles](/docs/console/roles)** - le catalogue global des rôles.
 - **[Users](/docs/console/users)** - les comptes, leurs capacités, leurs champs.
 - **[Groups, Members et Group rules](/docs/console/organisation)** - qui est dans quel groupe.

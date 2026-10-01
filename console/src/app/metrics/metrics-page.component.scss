@@ -2,10 +2,10 @@
   display: block;
   height: 100%;
 }
-mat-drawer-content > * {
+:host > * {
   padding-inline: 24px;
 }
-mat-drawer-content > header {
+:host > header {
   padding-top: 16px;
 }
 header {
@@ -98,45 +98,6 @@ h2 {
 .routes .n {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-/* The drawer, same head as the ones on the routes banner. */
-mat-drawer {
-  /* Wide enough for a configuration file: the snippets WRAP rather than
-     scroll sideways, so the width is what decides how often a line of YAML is
-     read in two pieces. */
-  width: 680px;
-  max-width: 96vw;
-}
-/* Padded here and not on the drawer: Material scrolls the drawer's inner
-   container and centres a 48px touch target on a 40px icon button, so a close
-   button flush with that edge overhangs it and grows a horizontal scrollbar. */
-.drawer-body {
-  padding: 16px 24px 32px;
-}
-.drawer-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.drawer-head h2 {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--mat-sys-on-surface);
-}
-/* The container is the page: a drawer draws inside it, so it has to hold the
-   content rather than follow it. */
-mat-drawer-container {
-  background: transparent;
-  min-height: 100%;
-}
-mat-drawer-content {
-  background: transparent;
-  overflow: visible;
 }
 
 /* The period the four figures cover, said rather than guessed: "46% refused"
@@ -247,43 +208,6 @@ h2.over {
   font-size: 0.68rem;
   letter-spacing: 0.03em;
   cursor: help;
-}
-
-/* The drawer's own body: it is read once, by somebody with a terminal open
-   beside it, so it is allowed to be long - as long as each half folds away
-   until it is the one being followed. */
-mat-drawer {
-  overflow-y: auto;
-}
-.expose {
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin: 16px 0;
-}
-.expose .hint {
-  margin: 10px 0 6px;
-}
-.expose a {
-  font-size: 0.82rem;
-  color: var(--mat-sys-primary);
-}
-.how {
-  display: block;
-  margin-bottom: 16px;
-}
-/* The two groups the four panels fall into: what Prometheus and Grafana read,
-   and what a platform has to be handed. */
-.group {
-  margin: 20px 0 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--mat-sys-on-surface-variant);
-}
-.how .hint {
-  margin: 0 0 12px;
 }
 
 /* The Enterprise badge rides INSIDE this button, and the button is filled

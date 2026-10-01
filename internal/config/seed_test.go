@@ -139,3 +139,47 @@ func TestSeedReservesTheVaultEntries(t *testing.T) {
 		t.Fatalf("the reference should have been reserved: %v", err)
 	}
 }
+
+// A file the gateway does not apply is not dropped either (CFG-03, LIFE-02):
+// it lands on the shelf as a saved configuration, once per content, where the
+// console can compare it and someone can decide to set it as current. What
+// runs is untouched.
+func TestADifferingFileIsShelvedNotApplied(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	path := write(t, seedFile)
+	if _, err := Seed(ctx, s, path, 1000); err != nil {
+		t.Fatal(err)
+	}
+	if shelf, _ := s.ListConfigurations(ctx); len(shelf) != 0 {
+		t.Fatalf("the file that seeded was shelved too: %+v", shelf)
+	}
+
+	// Somebody edits the file and restarts.
+	changed := strings.Replace(seedFile, "From the file", "From the edited file", 1)
+	if err := os.WriteFile(path, []byte(changed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if seeded, err := Seed(ctx, s, path, 2000); err != nil || seeded {
+		t.Fatalf("a changed file was applied: %v %v", seeded, err)
+	}
+	if r, _ := s.GetRole(ctx, "from-file"); r.Name != "From the file" {
+		t.Fatalf("what runs was changed: %q", r.Name)
+	}
+	shelf, _ := s.ListConfigurations(ctx)
+	if len(shelf) != 1 || !strings.HasPrefix(shelf[0].Name, "meerkat.yaml (") {
+		t.Fatalf("the changed file is not on the shelf: %+v", shelf)
+	}
+	full, _ := s.GetConfiguration(ctx, shelf[0].ID)
+	if !strings.Contains(full.Document, "From the edited file") {
+		t.Fatalf("the shelved document is not the file:\n%s", full.Document)
+	}
+
+	// A second restart with the same file offers nothing new.
+	if _, err := Seed(ctx, s, path, 3000); err != nil {
+		t.Fatal(err)
+	}
+	if shelf, _ := s.ListConfigurations(ctx); len(shelf) != 1 {
+		t.Fatalf("the same file was shelved twice: %d", len(shelf))
+	}
+}

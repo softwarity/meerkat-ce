@@ -237,7 +237,20 @@ func TestResponseHeaderFilters(t *testing.T) {
 	}
 }
 
-func TestInvalidRouteAbortsReloadKeepingOldSnapshot(t *testing.T) {
+// TestBrokenRouteIsLeftOutAndMarked: a route that does not compile is left out
+// and named, and every other route keeps serving.
+//
+// This used to abort the whole reload, which on a RUNNING gateway kept the last
+// good table - defensible - but at STARTUP meant a process that would not boot:
+// one route naming a brick this build does not know, and the gateway was down
+// with every other route. That is not hypothetical. The admin API refuses a bad
+// route at save time, so a stored one can only come from elsewhere: a
+// configuration imported from another version (the import writes routes without
+// that check), a restore, an image rolled back past the brick a route names.
+//
+// So it is left out, logged, and REPORTED - Problems() is what the console
+// reads. A route that quietly stops existing is a support call.
+func TestBrokenRouteIsLeftOutAndMarked(t *testing.T) {
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "ok")
 	}))
@@ -256,19 +269,67 @@ func TestInvalidRouteAbortsReloadKeepingOldSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A broken route arrives: reload must fail loudly...
-	if err := st.SaveRoute(ctx, store.Route{
-		ID: "r2", Name: "broken", Order: 2, Enabled: true, Upstream: up.URL,
-		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": "/a/**/b"}}},
-	}); err != nil {
+	// A route this build cannot compile arrives - here an unknown filter, which
+	// is exactly what a rollback past a brick looks like.
+	// Ahead of the catch-all, or it would never be the one to match and the
+	// fallthrough below would prove nothing.
+	broken := pathRoute("r2", "broken", 0, "/a/**", up.URL)
+	broken.Filters = []routing.Spec{{Type: "no-such-brick"}}
+	if err := st.SaveRoute(ctx, broken); err != nil {
 		t.Fatal(err)
 	}
-	if err := rt.Reload(ctx); err == nil || !strings.Contains(err.Error(), `route "broken"`) {
-		t.Fatalf("reload error = %v, want route name in it", err)
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatalf("one bad route must not fail the reload: %v", err)
 	}
-	// ...and the previous snapshot keeps serving.
+	problems := rt.Problems()
+	if msg := problems["r2"]; msg == "" {
+		t.Fatal("the route was left out with nothing said about it")
+	} else if !strings.Contains(msg, "no-such-brick") {
+		t.Errorf("the problem does not name what is wrong: %q", msg)
+	}
+	if _, ok := problems["r1"]; ok {
+		t.Errorf("a sound route was reported as a problem: %v", problems)
+	}
+	// The rest of the table serves.
 	if res, _ := get(t, rt, "/x"); res.StatusCode != http.StatusOK {
-		t.Fatalf("old snapshot gone: %d", res.StatusCode)
+		t.Fatalf("the sound route stopped serving: %d", res.StatusCode)
+	}
+	// And it does not hand ITS paths to the next route in silence: falling
+	// through is the right answer to an access refusal, not to a defect. It
+	// keeps matching and says the service is unavailable.
+	if res, _ := get(t, rt, "/a/thing"); res.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("a broken route let its traffic fall elsewhere: %d", res.StatusCode)
+	}
+
+	// Mended, it stops being reported.
+	broken.Filters = nil
+	if err := st.SaveRoute(ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(rt.Problems()) != 0 {
+		t.Errorf("a mended route is still reported: %v", rt.Problems())
+	}
+
+	// A route whose PREDICATES are what failed cannot match anything, so there
+	// is nothing to answer with and it is gone entirely - reported all the same.
+	noPreds := store.Route{
+		ID: "r3", Name: "unmatchable", Order: 3, Enabled: true, Upstream: up.URL,
+		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": "/a/**/b"}}},
+	}
+	if err := st.SaveRoute(ctx, noPreds); err != nil {
+		t.Fatal(err)
+	}
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatalf("a route with broken predicates must not fail the reload: %v", err)
+	}
+	if rt.Problems()["r3"] == "" {
+		t.Error("the unmatchable route was not reported")
+	}
+	if res, _ := get(t, rt, "/x"); res.StatusCode != http.StatusOK {
+		t.Fatalf("the sound route stopped serving: %d", res.StatusCode)
 	}
 }
 
@@ -550,8 +611,10 @@ func TestResolveLocale(t *testing.T) {
 	}
 }
 
-// Locale mechanisms: custom/query/path only (Accept-Language always goes),
-// path demands a UI route, names are validated.
+// Locale mechanisms belong to a PAGE. A service route reads Accept-Language,
+// which every route carries with the caller's own language in front, so there
+// is nothing for it to choose: anything else is refused rather than quietly
+// configured and never used.
 func TestValidateLocales(t *testing.T) {
 	mk := func(isUI bool, mech, header, param string) store.Route {
 		return store.Route{IsUI: isUI, Upstream: "http://up",
@@ -560,11 +623,23 @@ func TestValidateLocales(t *testing.T) {
 	if err := Validate(mk(true, "query", "", "lg")); err != nil {
 		t.Fatalf("valid locales refused: %v", err)
 	}
-	if err := Validate(mk(false, "query", "", "")); err != nil {
-		t.Fatalf("query mechanism on an API refused: %v", err)
+	for _, mech := range []string{"query", "path", "script", "custom"} {
+		if err := Validate(mk(false, mech, "X-Locale", "lg")); err == nil {
+			t.Errorf("%s mechanism accepted on a service route", mech)
+		}
 	}
-	if err := Validate(mk(false, "path", "", "")); err == nil {
-		t.Fatal("path mechanism accepted on a non-UI route")
+	// Accept-Language, and saying nothing, are the two a service route may do.
+	if err := Validate(mk(false, "accept", "", "")); err != nil {
+		t.Fatalf("Accept-Language refused on a service route: %v", err)
+	}
+	if err := Validate(mk(false, "", "", "")); err != nil {
+		t.Fatalf("a service route with no mechanism refused: %v", err)
+	}
+	// And it declares no language: it serves no page to write in one.
+	speaking := mk(false, "", "", "")
+	speaking.Locales.Speaks = []string{"fr"}
+	if err := Validate(speaking); err == nil {
+		t.Error("a service route was allowed to declare a language")
 	}
 	if err := Validate(mk(true, "header", "", "")); err == nil {
 		t.Fatal("header is not a mechanism anymore (always sent)")
@@ -1314,18 +1389,15 @@ func TestLocaleInTheURLFollowsThePerson(t *testing.T) {
 	up := htmlUpstream(t, "/app/en/page")
 	r := pathRoute("ui", "ui", 1, "/app/**", up.URL)
 	r.IsUI = true
-	r.Locales = &store.LocalesConfig{Mechanism: "path"}
-	// The offer is the APPLICATION's: without it a route has no language to
+	// The ROUTE says what it speaks: without it there is no language to
 	// recognise in a path.
+	r.Locales = &store.LocalesConfig{Mechanism: "path", Speaks: []string{"en", "fr"}}
 	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
 	ctx := context.Background()
-	if err := st.SetSetting(ctx, store.SettingLanguages, []string{"en", "fr"}); err != nil {
-		t.Fatal(err)
-	}
 	if err := st.SaveRoute(ctx, r); err != nil {
 		t.Fatal(err)
 	}
@@ -1395,16 +1467,13 @@ func TestLocaleQueryFollowsThePerson(t *testing.T) {
 	up := htmlUpstream(t, "/app/page")
 	r := pathRoute("q", "q", 1, "/app/**", up.URL)
 	r.IsUI = true
-	r.Locales = &store.LocalesConfig{Mechanism: "query", Param: "lg"}
+	r.Locales = &store.LocalesConfig{Mechanism: "query", Param: "lg", Speaks: []string{"en", "fr"}}
 	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
 	ctx := context.Background()
-	if err := st.SetSetting(ctx, store.SettingLanguages, []string{"en", "fr"}); err != nil {
-		t.Fatal(err)
-	}
 	if err := st.SaveRoute(ctx, r); err != nil {
 		t.Fatal(err)
 	}
@@ -1775,6 +1844,72 @@ func TestSchemeSaysWhichTagCarriesIt(t *testing.T) {
 	}
 }
 
+// TestSchemeScriptIsServedNotEvaluated: the escape hatch's body never rides in
+// the page. It is fetched as its own same-origin script, because the
+// applications worth a gateway send a Content-Security-Policy and the ordinary
+// one - "script-src \'self\'", which is what RabbitMQ sends - refuses
+// new Function outright while allowing that script. The first shape of this
+// feature put the body in a data attribute and the agent evaluated it; the
+// browser said EvalError, and this test is what remembers why.
+func TestSchemeScriptIsServedNotEvaluated(t *testing.T) {
+	route := func(s *store.SchemeConfig) store.Route {
+		r := pathRoute("ui", "ui", 1, "/app/**", "http://up")
+		r.IsUI = true
+		r.UI = &store.RouteUI{Scheme: s}
+		return r
+	}
+
+	body := `document.querySelectorAll("link[media*=dark]").forEach(l => l.media = colorScheme === "dark" ? "all" : "not all");`
+	got := pageAgentFragment(route(&store.SchemeConfig{
+		Select: true, Mechanism: store.SchemeScript, Script: body}), nil)
+	if !strings.Contains(got, `data-scheme-mechanism="script"`) {
+		t.Errorf("the script mechanism was not named:\n%s", got)
+	}
+	if strings.Contains(got, "querySelectorAll") {
+		t.Errorf("the body rode in the page instead of being served:\n%s", got)
+	}
+	if !strings.Contains(got, `src="/meerkat/scheme.js?r=ui&amp;v=`) {
+		t.Errorf("the route's scheme script is not fetched:\n%s", got)
+	}
+	// The hash busts a cached answer when the body changes, and only then.
+	other := pageAgentFragment(route(&store.SchemeConfig{
+		Select: true, Mechanism: store.SchemeScript, Script: body + " // and one more thing"}), nil)
+	ver := func(frag string) string {
+		i := strings.Index(frag, "&amp;v=")
+		return frag[i : i+15]
+	}
+	if ver(got) == ver(other) {
+		t.Errorf("two different bodies share a version: %s", ver(got))
+	}
+	// The shapes that write on an element carry a tag and two values. This one
+	// writes on nothing: carrying them would be exporting settings nothing reads.
+	got = pageAgentFragment(route(&store.SchemeConfig{
+		Select: true, Mechanism: store.SchemeScript, Script: "void 0;", Tag: "body", Light: "lt", Dark: "dk"}), nil)
+	for _, unwanted := range []string{"data-scheme-tag", "data-scheme-light", "data-scheme-dark", "data-scheme-attribute"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("the script mechanism carried %s:\n%s", unwanted, got)
+		}
+	}
+
+	// A mechanism that runs a body needs one, and the refusal says what the body
+	// is: the alternative was a route that saves, injects, and does nothing.
+	err := Validate(route(&store.SchemeConfig{Select: true, Mechanism: store.SchemeScript}))
+	if err == nil {
+		t.Fatal("the script mechanism was accepted with no script")
+	}
+	if !strings.Contains(err.Error(), "colorScheme") {
+		t.Errorf("the refusal does not say what the body is called with: %v", err)
+	}
+	if err := Validate(route(&store.SchemeConfig{
+		Select: true, Mechanism: store.SchemeScript, Script: strings.Repeat("x", store.SchemeScriptMax+1)})); err == nil {
+		t.Error("a body past the limit was accepted")
+	}
+	if err := Validate(route(&store.SchemeConfig{
+		Select: true, Mechanism: store.SchemeScript, Script: "void 0;"})); err != nil {
+		t.Errorf("a sound script route was refused: %v", err)
+	}
+}
+
 // A route that offers no switch has nothing for the button to follow, and the
 // button followed the visitor's system: light chrome floating on an
 // application that is always dark. The route says what it wears there.
@@ -1805,5 +1940,230 @@ func TestButtonWearsWhatTheRouteSaysWhenThereIsNoSwitch(t *testing.T) {
 		t.Error("an unknown button scheme was accepted")
 	} else if !strings.Contains(err.Error(), "light, dark") {
 		t.Errorf("the refusal does not say what is allowed: %v", err)
+	}
+}
+
+// TestUIRouteAnswersItsBareMountPath: an application published under a path is
+// entered by a URL people type without its final slash, and the browser then
+// resolves every relative link in the page it gets against the parent directory
+// - the page looks fine and everything it asks for 404s. A UI route answers that
+// one path with the slashed one; a service route does not, because there the
+// mount path is often a resource of its own and machine callers do not all
+// follow redirects.
+func TestUIRouteAnswersItsBareMountPath(t *testing.T) {
+	upstream := htmlUpstream(t, "/page")
+	ui := pathRoute("app", "app", 1, "/app/**", upstream.URL,
+		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
+	ui.IsUI = true
+	rt := newRouter(t, ui)
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+	// A redirect is the ANSWER here, so the client must not follow it: following
+	// it measures the page at the other end instead of the move that was made.
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	call := func(base, path string) *http.Response {
+		t.Helper()
+		res, err := client.Get(base + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		_ = res.Body.Close()
+		return res
+	}
+
+	res := call(srv.URL, "/app")
+	if res.StatusCode != http.StatusPermanentRedirect {
+		t.Fatalf("want 308 on the bare mount path, got %d", res.StatusCode)
+	}
+	if loc := res.Header.Get("Location"); loc != "/app/" {
+		t.Errorf("want /app/, got %q", loc)
+	}
+	if loc := call(srv.URL, "/app?a=1&b=2").Header.Get("Location"); loc != "/app/?a=1&b=2" {
+		t.Errorf("the query did not survive the redirect: %q", loc)
+	}
+
+	// Everything else goes through untouched - including the target itself, or
+	// the browser would be sent round for ever.
+	for _, path := range []string{"/app/", "/app/page", "/app/js/main.js"} {
+		if res := call(srv.URL, path); res.StatusCode == http.StatusPermanentRedirect {
+			t.Errorf("%s was redirected: only the mount path itself is answered", path)
+		}
+	}
+
+	// A SERVICE route on the same shape keeps its bare path: it is a resource
+	// there, and its callers are not browsers.
+	svc := pathRoute("api", "api", 1, "/api/**", upstream.URL)
+	svcSrv := httptest.NewServer(newRouter(t, svc))
+	t.Cleanup(svcSrv.Close)
+	if res := call(svcSrv.URL, "/api"); res.StatusCode == http.StatusPermanentRedirect {
+		t.Error("a service route redirected its mount path")
+	}
+
+	// And a UI route that does NOT strip its prefix keeps it too: the
+	// application behind it publishes that path itself, its pages are already
+	// right, and the redirect would ask the upstream for a path it never had.
+	kept := pathRoute("own", "own", 1, "/own/**", upstream.URL)
+	kept.IsUI = true
+	keptSrv := httptest.NewServer(newRouter(t, kept))
+	t.Cleanup(keptSrv.Close)
+	if res := call(keptSrv.URL, "/own"); res.StatusCode == http.StatusPermanentRedirect {
+		t.Error("a UI route that keeps its prefix was redirected")
+	}
+}
+
+// TestNoAutoTravelsToThePageAndTheButton: an application that knows only light
+// and dark (Jaeger is the case that named it) must not be handed "auto" nor
+// offered a switch with a third position. The route says so, and the answer has
+// to reach three places: the agent, which resolves auto before applying it, the
+// standalone button, and the bar that mounts that button under a portal.
+func TestNoAutoTravelsToThePageAndTheButton(t *testing.T) {
+	route := func(s *store.SchemeConfig) store.Route {
+		r := pathRoute("ui", "ui", 1, "/app/**", "http://up")
+		r.IsUI = true
+		r.UI = &store.RouteUI{Scheme: s, UserButton: store.UserButton{Enabled: true}}
+		return r
+	}
+	with := route(&store.SchemeConfig{Select: true, Mechanism: "class", Light: "lt", Dark: "dk", NoAuto: true})
+	without := route(&store.SchemeConfig{Select: true, Mechanism: "class", Light: "lt", Dark: "dk"})
+
+	if got := pageAgentFragment(with, nil); !strings.Contains(got, `data-scheme-no-auto="1"`) {
+		t.Errorf("the agent was not told:\n%s", got)
+	}
+	if got := pageAgentFragment(without, nil); strings.Contains(got, "no-auto") {
+		t.Errorf("a route with a system mode was told otherwise:\n%s", got)
+	}
+	if got := userButtonFragment(with, nil); !strings.Contains(got, " no-auto") {
+		t.Errorf("the button still offers three positions:\n%s", got)
+	}
+	if got := userButtonFragment(without, nil); strings.Contains(got, "no-auto") {
+		t.Errorf("the button lost a position it should keep:\n%s", got)
+	}
+	if got := portalFragment(with, nil); !strings.Contains(got, " no-auto") {
+		t.Errorf("the bar mounts a button that still offers three positions:\n%s", got)
+	}
+	if got := portalFragment(without, nil); strings.Contains(got, "no-auto") {
+		t.Errorf("the bar took a position away from a route that has it:\n%s", got)
+	}
+}
+
+// TestKeptPrefixIsTheCoordinateTheGuardCompares: an operation's address is what
+// a request still carries when the guard looks at it - the route's own prefix
+// minus what it strips. Getting this wrong is how a rule comes to name a path
+// no request ever has, which is what happened to an application published at
+// /otel-demo and mounted there itself.
+func TestKeptPrefixIsTheCoordinateTheGuardCompares(t *testing.T) {
+	// Mounted under a prefix it knows about: it strips nothing, so the prefix
+	// is part of every operation's address.
+	own := pathRoute("a", "a", 1, "/otel-demo/**", "http://up")
+	if got := KeptPrefix(own); got != "/otel-demo" {
+		t.Errorf("a route that strips nothing keeps its prefix, got %q", got)
+	}
+	// Republished: the application behind sees /, and so do the coordinates.
+	republished := pathRoute("b", "b", 1, "/demo/**", "http://up",
+		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
+	if got := KeptPrefix(republished); got != "" {
+		t.Errorf("a route that strips its prefix keeps none of it, got %q", got)
+	}
+	// Two segments published, one stripped: half of it stays.
+	half := pathRoute("c", "c", 1, "/team/app/**", "http://up",
+		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
+	if got := KeptPrefix(half); got != "/app" {
+		t.Errorf("want /app, got %q", got)
+	}
+}
+
+// TestARefusalIsNotCoveredByAnErrorFurtherDown: a caller a rule turns away
+// falls through - two routes may serve the same paths for two audiences - but
+// only to an answer. When the route that answers has nothing at that address
+// either, its 404 replaced the refusal: the person saw "no such page" where the
+// truth was "you may not come in", and the rule they had just written looked
+// like it did nothing.
+func TestARefusalIsNotCoveredByAnErrorFurtherDown(t *testing.T) {
+	// A catch-all that answers 404 for everything but /open, like the seeded
+	// trap pointing at a service that has nothing at those paths.
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/open" {
+			_, _ = io.WriteString(w, "a real page")
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(fallback.Close)
+
+	guarded := pathRoute("guarded", "guarded", 1, "/**", "http://up")
+	guarded.Access = store.Access{Level: store.AccessAuth}
+	catchAll := pathRoute("catch", "catch", 2, "/**", fallback.URL)
+	rt := newRouter(t, guarded, catchAll)
+
+	// Refused by the first, and the catch-all has nothing there: the refusal
+	// is what comes back, not somebody else's 404.
+	res, _ := get(t, rt, "/secret")
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("want the refusal (401), got %d", res.StatusCode)
+	}
+
+	// And where the catch-all DOES have something, it still answers: the
+	// fallthrough is the point, and an answer is an answer.
+	res, body := get(t, rt, "/open")
+	if res.StatusCode != http.StatusOK || !strings.Contains(body, "a real page") {
+		t.Fatalf("the fallthrough stopped working: %d %q", res.StatusCode, body)
+	}
+}
+
+// An application with NO colour scheme has nothing to switch between, and the
+// portal bar carries the switch on every UI route - so the bar is where that
+// has to be said. It was not: the bar offered the switch whatever the route
+// declared, and moving it repainted the bar over a page that stayed as it was.
+func TestThePortalOffersNoSwitchWhereThereIsNothingToSwitch(t *testing.T) {
+	mount := func(s *store.SchemeConfig) store.Route {
+		r := pathRoute("otel", "otel", 1, "/otel/**", "http://up")
+		r.IsUI = true
+		r.UI = &store.RouteUI{Scheme: s}
+		return r
+	}
+	none := mount(&store.SchemeConfig{Mechanism: store.SchemeNone})
+	if got := portalFragment(none, nil); !strings.Contains(got, `scheme="none"`) {
+		t.Errorf("a route with no mechanism must say so to the bar: %s", got)
+	}
+	// And it may still say what the BAR wears there, so a light bar does not
+	// float over a page that is always dark.
+	worn := mount(&store.SchemeConfig{Mechanism: store.SchemeNone, Button: "dark"})
+	if got := portalFragment(worn, nil); !strings.Contains(got, `scheme-wear="dark"`) {
+		t.Errorf("the bar must wear what the route says: %s", got)
+	}
+	// The ordinary case is untouched: a mechanism means a switch.
+	takes := mount(&store.SchemeConfig{Mechanism: "class", Select: true})
+	if got := portalFragment(takes, nil); strings.Contains(got, "scheme=") {
+		t.Errorf("a route that takes a choice needs no attribute: %s", got)
+	}
+}
+
+// An application with ONE look tells its page which one, so the document wears
+// it and what inherits the document's color-scheme - the portal bar above all -
+// matches the application rather than the visitor's choice, which this
+// application does not take. Without it a dark application with no
+// color-scheme of its own sat under a light bar.
+func TestAOneLookApplicationDressesItsDocument(t *testing.T) {
+	route := func(s *store.SchemeConfig) store.Route {
+		r := pathRoute("ui", "ui", 1, "/app/**", "http://up")
+		r.IsUI = true
+		r.UI = &store.RouteUI{Scheme: s}
+		return r
+	}
+	dark := route(&store.SchemeConfig{Mechanism: store.SchemeNone, Button: "dark"})
+	if got := pageAgentFragment(dark, nil); !strings.Contains(got, `data-scheme-wear="dark"`) {
+		t.Errorf("the page was not told its application is dark:\n%s", got)
+	}
+	light := route(&store.SchemeConfig{Mechanism: store.SchemeNone, Button: "light"})
+	if got := pageAgentFragment(light, nil); !strings.Contains(got, `data-scheme-wear="light"`) {
+		t.Errorf("the page was not told its application is light:\n%s", got)
+	}
+	// An application that TAKES a choice is never pinned: its look is the
+	// visitor's to make.
+	switchable := route(&store.SchemeConfig{Select: true, Mechanism: "class", Light: "lt", Dark: "dk", Button: "dark"})
+	if got := pageAgentFragment(switchable, nil); strings.Contains(got, "scheme-wear") {
+		t.Errorf("a route whose application switches was pinned to one look:\n%s", got)
 	}
 }

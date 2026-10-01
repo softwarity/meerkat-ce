@@ -60,9 +60,6 @@ func seed(t *testing.T, s *store.Store) {
 	}); err != nil {
 		t.Fatalf("SetSetting: %v", err)
 	}
-	if err := s.SetSetting(ctx, store.SettingLanguages, []string{"fr", "en"}); err != nil {
-		t.Fatalf("SetSetting: %v", err)
-	}
 }
 
 // TestRoundTrip is the one that matters: a configuration exported, written to a

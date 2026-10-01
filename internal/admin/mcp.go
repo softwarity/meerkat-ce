@@ -41,8 +41,12 @@ func originOf(r *http.Request) string {
 }
 
 func (a *API) registerMCP(mux Mux) {
-	mux.Handle("GET /api/settings/agent", a.rootOnly(a.getAgentSetting))
-	mux.Handle("PUT /api/settings/agent", a.rootOnly(a.putAgentSetting))
+	// Infrastructure: the switch decides whether the DOOR exists on the control
+	// plane, like the certificate of that plane. It hands out nothing - what
+	// comes through it is bounded by the token it presents - so it is not a
+	// partition anybody crosses.
+	mux.Handle("GET /api/settings/agent", a.gw(a.getAgentSetting))
+	mux.Handle("PUT /api/settings/agent", a.infraAdmin(a.putAgentSetting))
 	// The whole path, not "POST /mcp": the console's catch-all sits under "/",
 	// so a GET here would be answered by the single-page app - a client
 	// probing for the transport's optional stream would get HTML and a 200,
@@ -66,7 +70,7 @@ func (a *API) agentEnabled(ctx context.Context) bool {
 	return enabled
 }
 
-func (a *API) getAgentSetting(w http.ResponseWriter, r *http.Request, _ store.User) {
+func (a *API) getAgentSetting(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, agentSetting{Enabled: a.agentEnabled(r.Context())})
 }
 
@@ -305,10 +309,13 @@ func (a *API) tools() []mcp.Tool {
 		{
 			Name: "read_audit", Allow: a.administersSomething, Title: "Read the audit trail", ReadOnly: true,
 			Description: "Who changed what, most recent first, with the value before and after each field. " +
-				"Use it to answer 'when did this change and who did it'.",
+				"Use it to answer 'when did this change and who did it'. The trail also holds the SECURITY " +
+				"of the accounts - sign-ins, refused sign-ins with their reason and address, a factor or a " +
+				"password changed by its owner: kind 'security' keeps those, kind 'admin' leaves them out.",
 			Schema: object(map[string]any{
 				"limit":  map[string]any{"type": "integer", "description": "How many events, 1 to 200 (default 50)."},
-				"target": str("Optional: only this kind of object - route, user, role, settings, tenant, token, issue."),
+				"target": str("Optional: only this kind of object - route, user, role, settings, tenant, token, issue, account (an application account's security), console (a console sign-in)."),
+				"kind":   str("Optional: 'admin' for the changes, 'security' for the sign-ins and the ways into an account. Both when absent."),
 			}),
 			Call: a.toolReadAudit,
 		},
@@ -325,6 +332,10 @@ func (a *API) tools() []mcp.Tool {
 	// The half that changes something, and its own file says how (mcp_write.go).
 	read = append(read, a.lookTools()...)
 	read = append(read, a.writeTools()...)
+	read = append(read, a.scheduleTools()...)
+	read = append(read, a.roleTools()...)
+	read = append(read, a.grantTools()...)
+	read = append(read, a.accountTools()...)
 	return append(read, a.lookWriteTools()...)
 }
 
@@ -488,6 +499,7 @@ func (a *API) toolReadAudit(ctx context.Context, args json.RawMessage) (any, err
 	var in struct {
 		Limit  int    `json:"limit"`
 		Target string `json:"target"`
+		Kind   string `json:"kind"`
 	}
 	if err := decode(args, &in); err != nil {
 		return nil, err
@@ -502,7 +514,7 @@ func (a *API) toolReadAudit(ctx context.Context, args json.RawMessage) (any, err
 	if !ok {
 		return nil, fmt.Errorf("your account administers nothing, so there is no trail to show you")
 	}
-	f := store.AuditFilter{Limit: in.Limit, Target: in.Target, Scope: scope}
+	f := store.AuditFilter{Limit: in.Limit, Target: in.Target, Kind: in.Kind, Scope: scope}
 	events, err := a.st.ListAuditEvents(ctx, f)
 	if err != nil {
 		return nil, err

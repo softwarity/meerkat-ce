@@ -293,13 +293,10 @@ func TestWhatIsServedTravelsToEveryVisitor(t *testing.T) {
 		}
 	}
 
-	// And the labels the strip needs ride along, since the component's JS is
-	// cached for five minutes and this payload is not.
-	for _, want := range []string{"pluggedTitle", "pluggedBy"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("the payload misses the %s label", want)
-		}
-	}
+	// The strip's own words no longer ride along: it is a developer's banner,
+	// and those are English in the component itself. What has to travel is WHO
+	// is serving the name, which is news about the application in front of the
+	// visitor - checked above.
 
 	reg.Drop("checkout")
 	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, nil)); strings.Contains(body, "checkout") {

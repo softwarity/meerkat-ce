@@ -101,6 +101,16 @@
   @include mat.form-field-density(-5);
 }
 
+// The drawer's override switch, and what follows it. A slide toggle carries no
+// margin of its own, so the editor's first floating label came up against it -
+// and on the closed state the sentence explaining what the operation inherits
+// sat on the switch. One rule rather than two, because it is one question: what
+// comes after the switch starts below it.
+mat-slide-toggle + * {
+  display: block;
+  margin-top: 16px;
+}
+
 .inherits {
   display: flex;
   align-items: center;
@@ -472,4 +482,10 @@ mat-drawer {
   padding-left: 6px;
   border-left: 1px solid var(--mat-sys-outline-variant);
   color: var(--mat-sys-tertiary);
+}
+
+// A count that is a WARNING rather than a tally: rules nothing matches.
+.count.stray {
+  color: var(--mat-sys-error);
+  cursor: help;
 }

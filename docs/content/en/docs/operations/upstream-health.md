@@ -16,7 +16,7 @@ wait, a **breaker** that stops calling, and a **verdict** the console reads.
 
 ## How long a route waits
 
-Two bounds, each inherited separately, at three levels (ROUTE-07):
+Two bounds, each inherited separately, at three levels:
 
 1. what the route says;
 2. otherwise the installation, in **Routes > Global**;
@@ -46,12 +46,12 @@ not stop the gateway from sending it a thousand more requests that will each wai
 their own bound - which is how a service that is merely down takes the gateway's
 capacity with it, and how it is met by a stampede the moment it recovers.
 
-So, per route and **off by default** (ROUTE-09):
+So, per route and **off by default**:
 
 - after N **consecutive** failures the route stops calling and serves the
-  unavailable page immediately;
+ unavailable page immediately;
 - after a cool-down, **one** request is let through. If it works the circuit closes;
-  if it fails, the cool-down starts again.
+ if it fails, the cool-down starts again.
 
 | Setting | Default | Range |
 |---|---|---|
@@ -73,8 +73,7 @@ meet that because somebody chose it.
 
 ## What the console shows
 
-The Routes list marks the routes that are no longer answering and says **why**
-(SVC-04, ROUTE-11). It costs nothing to collect: the breaker already watches every
+The Routes list marks the routes that are no longer answering and says **why**. It costs nothing to collect: the breaker already watches every
 real answer, so this reports what it knows rather than probing on its own.
 
 A separate prober would have been a second opinion, formed on traffic nobody sent,
@@ -82,7 +81,7 @@ about a path the real requests may not even take. The cost is that a route nobod
 called yet has nothing to say - which is honest, and is exactly what the gateway
 knows.
 
-Not there yet (ROUTE-11, SVC-04): an **active probe**, which alone could speak about
+Not there yet: an **active probe**, which alone could speak about
 a route no one calls; and a second level, a service's own `/health`.
 
 ## In a cluster

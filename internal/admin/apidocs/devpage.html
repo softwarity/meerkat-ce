@@ -100,6 +100,15 @@
       </svg>
       <span class="mk-word">meerkat</span><span class="mk-sub">dev</span>
     </span>
+    <!-- The way out. These docs are opened FROM an application - a link, a
+         bookmark, the console - and the browser's own back button is the only
+         thing that took anybody home; on a page opened in a new tab, not even
+         that. So: the page that sent us here when it was one of ours, the
+         history when there is one, and the gateway's front door otherwise. -->
+    <button type="button" class="mk-btn" id="mk-back" title="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Back
+    </button>
     <label class="mk-pick">
       <select id="mk-spec" aria-label="OpenAPI specification"></select>
     </label>
@@ -374,6 +383,23 @@
       $('swagger').innerHTML = '<p class="mk-error">Could not load the catalogue - is your session still alive?</p>';
     });
     $('mk-spec').addEventListener('change', (e) => mount(e.target.value));
+
+    // Back: where we CAME from when that was a page of this gateway, the
+    // history when there is one, the front door otherwise. The referrer is
+    // untrusted, so only its path is used and only when the host is ours - the
+    // button cannot become a way off this site, whatever the header said.
+    $('mk-back').addEventListener('click', () => {
+      let back = '';
+      try {
+        const ref = new URL(document.referrer || '', location.href);
+        if (document.referrer && ref.host === location.host && !ref.pathname.startsWith('/meerkat/apidocs')) {
+          back = ref.pathname + ref.search;
+        }
+      } catch { /* no referrer worth reading */ }
+      if (back) location.assign(back);
+      else if (history.length > 1) history.back();
+      else location.assign('/');
+    });
   </script>
 </body>
 </html>

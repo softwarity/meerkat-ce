@@ -1,0 +1,125 @@
+<mat-card appearance="outlined">
+  <div class="head">
+    <span class="grow">
+      <b>{{ scope.previewLocale() }}</b>
+      <span class="scope text-muted">{{ scope.template() }}</span>
+    </span>
+    @if (holes()) {
+      <span class="holes" matTooltip="Strings this language has no wording for: the page shows the English there"
+        i18n-matTooltip="@@Locale_holes_hint4">{{ holes() }} <ng-container i18n="@@Missing">missing</ng-container></span>
+    }
+    <button matIconButton [matMenuTriggerFor]="more" matTooltip="More" i18n-matTooltip="@@More"
+      aria-label="More" i18n-aria-label="@@More">
+      <mat-icon>more_vert</mat-icon>
+    </button>
+    <mat-menu #more="matMenu">
+      <button mat-menu-item (click)="export(false)">
+        <mat-icon>download</mat-icon>
+        <span i18n="@@Locale_export_screen">Export this screen</span>
+      </button>
+      <button mat-menu-item (click)="export(true)">
+        <mat-icon>download</mat-icon>
+        <span i18n="@@Locale_export_all">Export the whole language</span>
+      </button>
+      <button mat-menu-item (click)="file.click()">
+        <mat-icon>upload</mat-icon>
+        <span i18n="@@Locale_import">Import a file</span>
+      </button>
+      <!-- For a language ADDED here, resetting is removing: there is no
+           shipped version to go back to, and saying "reset" would delete a
+           language somebody thought they were tidying. -->
+      @if (added()) {
+        <button mat-menu-item class="danger" (click)="resetAll()">
+          <mat-icon>delete</mat-icon>
+          <span i18n="@@Locale_delete">Delete this language</span>
+        </button>
+        <div class="menu-why" i18n="@@Locale_delete_hint">
+          This language was added here. It has no shipped version, so removing its wordings removes
+          the language.
+        </div>
+      } @else {
+        <button mat-menu-item (click)="resetAll()">
+          <mat-icon>restart_alt</mat-icon>
+          <span i18n="@@Locale_reset_all">Reset this language</span>
+        </button>
+        <div class="menu-why" i18n="@@Locale_reset_hint">
+          Resetting drops every wording changed here and puts back the ones the product ships.
+        </div>
+      }
+    </mat-menu>
+    <input #file type="file" hidden accept="application/json,.json" (change)="import($event)" />
+  </div>
+
+  @if (loading()) {
+    <p class="text-muted" i18n="@@Loading">Loading...</p>
+  } @else if (!strings().length) {
+    <p class="text-muted" i18n="@@Locale_no_strings">This screen renders no text of its own.</p>
+  } @else {
+    @for (sec of sections(); track sec.group) {
+      <!-- A heading per kind. The server sorts, the screen only says where one
+           run ends and the next begins: thirty strings in one alphabetical
+           column is a list one reads twice to find the button. -->
+      <h4 class="kind text-muted">{{ sec.label }}</h4>
+      @for (s of sec.items; track s.key) {
+      <div class="line" [class.over]="s.overridden" [class.gap]="s.missing">
+        <mat-form-field appearance="outline" class="val">
+          <!-- The KEY as the floating label: an identifier, always in view and
+               never in the way. It used to take a column eleven rems wide. -->
+          <mat-label>{{ s.key }}</mat-label>
+          <input
+            matInput
+            [value]="valueOf(s)"
+            [placeholder]="s.reference"
+            (input)="edit(s.key, $any($event.target).value)"
+          />
+          <!-- On other screens too. The catalogue holds ONE copy of a string,
+               so this one is also somebody else's - and a wording tuned here
+               moves there. Always rendered and hidden when it is not shared:
+               inside an @if it would land in the default slot rather than the
+               suffix, control-flow blocks having static selectors. -->
+          <span
+            matTextSuffix
+            class="shared"
+            [class.gone]="s.screens < 2"
+            [matTooltip]="sharedTip(s)"
+            matTooltipPosition="above"
+            >{{ s.screens }}</span
+          >
+          <!-- Put back what the product ships, on the line it belongs to and
+               INSIDE the field: a button in a column of its own pushed every
+               row narrower for something most rows never show. -->
+          <!-- ALWAYS rendered, hidden when there is nothing to put back.
+               Wrapped in @if it landed under the value instead of in the
+               suffix slot: ng-content selectors are static, so a node inside a
+               control-flow block matches the DEFAULT slot, not [matIconSuffix].
+               Kept in place it also holds the field's width steady, so rows do
+               not jump the moment one of them is edited. -->
+          <button
+            matIconButton
+            matIconSuffix
+            [class.gone]="!s.overridden"
+            [disabled]="!s.overridden"
+            (click)="revert(s)"
+            matTooltip="Put back what the product ships"
+            i18n-matTooltip="@@Locale_revert_one"
+            aria-label="Revert"
+            i18n-aria-label="@@Revert"
+          >
+            <mat-icon>undo</mat-icon>
+          </button>
+        </mat-form-field>
+      </div>
+      @if (s.overridden && s.embedded) {
+        <div class="shipped text-muted">
+          <span i18n="@@Locale_shipped">ships as</span> {{ s.embedded }}
+        </div>
+      }
+      }
+    }
+
+    <div class="actions">
+      <span class="grow"></span>
+      <button matButton="tonal" (click)="save()" [disabled]="saving() || !dirty()" i18n="@@Save">Save</button>
+    </div>
+  }
+</mat-card>

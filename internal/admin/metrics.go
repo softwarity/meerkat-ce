@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -26,9 +27,13 @@ import (
 // scrapes /metrics into the time-series database it already runs, which is the
 // Enterprise half of this feature. See internal/metrics for why a gateway
 // should not grow into one badly.
-// expositionPath is where a Prometheus scrapes (OBS-05). On the CONTROL plane,
-// not the data plane: what it carries is how this gateway is running, which is
-// an operator's business and not an application's traffic.
+// expositionPath is where a Prometheus scrapes (OBS-05). Never on the data
+// plane: what it carries is how this gateway is running, which is an
+// operator's business and not an application's traffic. Two doors answer it:
+// the METRICS port (ExpositionHandler), which is the one a monitoring stack
+// is pointed at, and the control plane, behind the admin guard, for the
+// installation whose Prometheus can only reach this gateway through the
+// console's own address.
 //
 // The whole path, not "GET /metrics": the console's catch-all sits under "/",
 // so a scraper reaching a mistyped method would be answered by the
@@ -47,8 +52,10 @@ func RegisterExposition(f func(w io.Writer, reg *metrics.Registry)) { exposition
 
 func (a *API) registerMetrics(mux Mux) {
 	mux.Handle("GET /api/metrics", a.infraAdmin(a.readMetrics))
-	mux.Handle("GET /api/settings/metrics", a.rootOnly(a.getMetricsSetting))
-	mux.Handle("PUT /api/settings/metrics", a.rootOnly(a.putMetricsSetting))
+	// Same reasoning as the tracing next door: where this gateway is scraped
+	// from is infrastructure, not a partition anybody crosses.
+	mux.Handle("GET /api/settings/metrics", a.gw(a.getMetricsSetting))
+	mux.Handle("PUT /api/settings/metrics", a.infraAdmin(a.putMetricsSetting))
 	// Behind the same guard as the screen showing the same numbers, and NOT
 	// merely behind a session: the counters name every route, every route's
 	// name and every endpoint template, which is an operational map of the
@@ -74,12 +81,31 @@ func (a *API) registerMetrics(mux Mux) {
 	// the test that refuses an undecided section inspects the surface a bare
 	// API registers - so an endpoint hidden behind a field would have slipped
 	// past the one check written to stop exactly that.
-	mux.Handle("GET /api/live", a.infraAdmin(func(w http.ResponseWriter, r *http.Request, _ store.User) {
+	// It answers every ADMINISTRATOR and not only the routing plane's, because
+	// what is on it is no longer only the traffic curves: the screens of both
+	// planes watch it to learn that what they are showing moved (CONSOLE-13).
+	// It also closed a hole rather than opening one - the scheduled calls answer
+	// an application administrator (/api/schedules) while their screen draws
+	// from this socket, so that screen stayed empty for exactly the person the
+	// API was opened to.
+	//
+	// What a subscriber may then WATCH is decided per caller, here, and handed
+	// to the channel: the library shares one read between the subscribers of a
+	// topic and cannot tell them apart, so a perimeter chosen anywhere but at
+	// the upgrade would not be a perimeter at all.
+	mux.Handle("GET /api/live", a.authed(func(w http.ResponseWriter, r *http.Request, actor store.User) {
 		if a.Live == nil {
 			writeErr(w, http.StatusServiceUnavailable, "this build runs no live channel")
 			return
 		}
-		a.Live.ServeHTTP(w, r)
+		p, ok := a.livePerimeter(r.Context(), actor)
+		if !ok {
+			writeErr(w, http.StatusForbidden,
+				"the live channel answers an administrator: root, the gateway-admin or app-admin capability, "+
+					"or the administration of an organisation")
+			return
+		}
+		a.Live(p, w, r)
 	}))
 }
 
@@ -88,6 +114,9 @@ func (a *API) registerMetrics(mux Mux) {
 // inherited from an upgrade - the same shape as the agent endpoint.
 type metricsSetting struct {
 	Enabled bool `json:"enabled"`
+	// RequireToken makes the metrics port ask for a token too. Off by
+	// default: see store.SettingMetricsTokenRequired.
+	RequireToken bool `json:"requireToken"`
 	// Enterprise says whether this build can serve it at all, so the console
 	// shows the switch as locked rather than as off. Read-only: an edition is
 	// decided by which image is running, never by a request.
@@ -102,6 +131,9 @@ type metricsSetting struct {
 	// either way. The examples in the Prometheus drawer carry this number, and
 	// they used to carry the browser's, which was right only in development.
 	Port string `json:"port"`
+	// MetricsPort is the port the gateway opens for scrapers while this is
+	// on, and the one the examples point at. Chosen with the switch.
+	MetricsPort int `json:"metricsPort"`
 	// DataOrigin is where the data plane answers, as a reader would type it.
 	// The monitoring examples put it in the two UIs' own configuration: behind
 	// a route, Prometheus and Grafana still have to know the public URL they
@@ -127,11 +159,24 @@ func (a *API) metricsEnabled(ctx context.Context) bool {
 	return enabled
 }
 
-func (a *API) getMetricsSetting(w http.ResponseWriter, r *http.Request, _ store.User) {
-	writeJSON(w, http.StatusOK, metricsSetting{
-		Enabled: a.metricsEnabled(r.Context()), Enterprise: edition.Enterprise,
-		Path: expositionPath, Port: a.adminPort(), DataOrigin: a.dataOrigin(r),
-	})
+func (a *API) metricsTokenRequired(ctx context.Context) bool {
+	var required bool
+	_ = a.st.GetSetting(ctx, store.SettingMetricsTokenRequired, &required)
+	return required
+}
+
+// metricsState is the setting as it stands, with what the console needs to
+// write the examples around it.
+func (a *API) metricsState(r *http.Request) metricsSetting {
+	return metricsSetting{
+		Enabled: a.metricsEnabled(r.Context()), RequireToken: a.metricsTokenRequired(r.Context()),
+		Enterprise: edition.Enterprise, Path: expositionPath, Port: a.adminPort(),
+		MetricsPort: a.metricsPortSetting(r.Context()), DataOrigin: a.dataOrigin(r),
+	}
+}
+
+func (a *API) getMetricsSetting(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, a.metricsState(r))
 }
 
 func (a *API) putMetricsSetting(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -146,16 +191,102 @@ func (a *API) putMetricsSetting(w http.ResponseWriter, r *http.Request, actor st
 			return
 		}
 	}
-	before := metricsSetting{Enabled: a.metricsEnabled(r.Context())}
-	if err := a.st.SetSetting(r.Context(), store.SettingMetricsEndpoint, body.Enabled); err != nil {
+	if body.MetricsPort == 0 {
+		body.MetricsPort = DefaultMetricsPort
+	}
+	if err := a.checkMetricsPort(body.MetricsPort); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	ctx := r.Context()
+	before := decidedMetrics{a.metricsEnabled(ctx), a.metricsTokenRequired(ctx), a.metricsPortSetting(ctx)}
+	after := decidedMetrics{body.Enabled, body.RequireToken, body.MetricsPort}
+	if err := a.saveMetrics(ctx, after); err != nil {
 		a.internal(w, err)
 		return
 	}
-	a.auditUpdate(r.Context(), actor, "metrics.expose", "settings", "", "", "",
-		metricsSetting{Enabled: before.Enabled}, metricsSetting{Enabled: body.Enabled})
-	writeJSON(w, http.StatusOK, metricsSetting{
-		Enabled: body.Enabled, Enterprise: edition.Enterprise,
-		Path: expositionPath, Port: a.adminPort(), DataOrigin: a.dataOrigin(r),
+	// Opened HERE before anything is said, so a port this node cannot open is
+	// refused with the reason rather than saved and left dark. The setting
+	// goes back to what it was: a decision the gateway cannot carry out is
+	// not one it should keep.
+	if err := a.ReloadMetricsPort(ctx); err != nil {
+		if rerr := a.saveMetrics(ctx, before); rerr == nil {
+			_ = a.ReloadMetricsPort(ctx)
+		}
+		writeErr(w, http.StatusConflict, err.Error()+" - choose another port")
+		return
+	}
+	a.announce(ctx, store.TopicMetricsPort)
+	a.auditUpdate(ctx, actor, "metrics.expose", "settings", "", "", "", before, after)
+	writeJSON(w, http.StatusOK, a.metricsState(r))
+}
+
+// decidedMetrics is what a person decides about the exposition: what is
+// saved, and what the audit compares.
+type decidedMetrics struct {
+	Enabled      bool `json:"enabled"`
+	RequireToken bool `json:"requireToken"`
+	Port         int  `json:"port"`
+}
+
+func (a *API) saveMetrics(ctx context.Context, d decidedMetrics) error {
+	if err := a.st.SetSetting(ctx, store.SettingMetricsEndpoint, d.Enabled); err != nil {
+		return err
+	}
+	if err := a.st.SetSetting(ctx, store.SettingMetricsTokenRequired, d.RequireToken); err != nil {
+		return err
+	}
+	return a.st.SetSetting(ctx, store.SettingMetricsPort, d.Port)
+}
+
+// checkMetricsPort refuses what cannot be a port, and the two this gateway
+// already serves: sharing one would put the counters behind the console or
+// in front of the applications, which are the two places they must not be.
+func (a *API) checkMetricsPort(port int) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("metrics port %d: a port is a number from 1 to 65535", port)
+	}
+	taken := map[string]string{a.adminPort(): "the control plane"}
+	if _, p, err := net.SplitHostPort(a.DataAddr); err == nil && p != "" {
+		taken[p] = "the applications"
+	}
+	if who, ok := taken[strconv.Itoa(port)]; ok {
+		return fmt.Errorf("metrics port %d is already taken by %s: choose another one, %d is the usual", port, who, DefaultMetricsPort)
+	}
+	return nil
+}
+
+// ExpositionHandler is what the metrics port serves: /metrics, and nothing
+// else - not the console, not the API, not a health check that would make
+// this port worth publishing.
+//
+// Open by default, like PostgreSQL's and RabbitMQ's exporters: this port is
+// never published, so the network is the lock, and a scraper that needs no
+// credential is a scrape configuration with no secret in it. The switch that
+// closes it sends the request through the control plane's own funnel, so a
+// token here is checked exactly as it is there - same perimeter, same guard,
+// the metrics scope opening this path and nothing more.
+//
+// The two things the funnel does not decide still hold either way: the
+// Enterprise image and the switch that says the door exists at all.
+func (a *API) ExpositionHandler() http.Handler {
+	guarded := a.infraAdmin(a.serveExposition)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != expositionPath {
+			writeErr(w, http.StatusNotFound,
+				"this port serves "+expositionPath+" and nothing else: the console and the API are on the control plane")
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			writeErr(w, http.StatusMethodNotAllowed, expositionPath+" is read with GET")
+			return
+		}
+		if a.metricsTokenRequired(r.Context()) {
+			guarded.ServeHTTP(w, r)
+			return
+		}
+		a.serveExposition(w, r, store.User{})
 	})
 }
 
@@ -170,7 +301,7 @@ func (a *API) serveExposition(w http.ResponseWriter, r *http.Request, _ store.Us
 	}
 	if !a.metricsEnabled(r.Context()) {
 		writeErr(w, http.StatusForbidden,
-			"this gateway does not expose "+expositionPath+": turn it on in the console, under Metrics, Prometheus")
+			"this gateway does not expose "+expositionPath+": turn it on in the console, under Infra, Metrics endpoint")
 		return
 	}
 	reg := a.registry()

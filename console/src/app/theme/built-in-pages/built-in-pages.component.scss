@@ -1,22 +1,26 @@
-.banner {
+/* The screen fits the screen, and what overflows scrolls INSIDE its column.
+   The Locale tab lists a page's strings, which on a long page is a few
+   centimetres more than the viewport - and letting the window scroll for that
+   drags the banner, the tabs and the preview out of sight to reach a field.
+   The preview is the one thing that must never leave: it is what the strings
+   are being judged against. */
+:host {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-
-  h1 {
-    font-size: 1.15rem;
-    font-weight: 500;
-    margin: 0;
-    flex: 1;
-  }
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .layout {
   display: flex;
   gap: 16px;
-  padding: 0 24px 24px;
-  align-items: flex-start;
+  /* The banner is gone - it repeated what the menu on the left already says,
+     and cost a line of height on BOTH columns. The tabs take its place, so
+     they take its top padding too. */
+  padding: 12px 24px 24px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 /* The tabs live HERE and nowhere else: the preview on the right is the one
@@ -25,16 +29,23 @@
 .left {
   flex: 0 0 430px;
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
+/* The tab bar stays put; only the panel under it scrolls. */
 .left mat-tab-nav-panel {
-  display: grid;
-  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .preview {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }

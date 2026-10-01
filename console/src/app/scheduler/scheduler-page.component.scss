@@ -1,0 +1,275 @@
+@use "../../styles/table";
+
+// The routes' shape: the banner stays put, the table area fills what is left
+// and scrolls under its own sticky header.
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  flex: none;
+
+  h1 {
+    font-size: 1.15rem;
+    font-weight: 500;
+    margin: 0;
+    flex: none;
+  }
+
+  mat-form-field {
+    min-width: 170px;
+    flex: none;
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0 24px 24px;
+}
+
+.table-wrap {
+  @include table.frame;
+}
+
+// Two lines in one cell: what the row is, and what qualifies it - the account
+// under the name, the service under the call. It halves the columns without
+// losing anything.
+.lines {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 500;
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+
+.mono {
+  font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  font-size: 0.85em;
+}
+
+.off {
+  opacity: 0.55;
+}
+
+.paused {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// The last run, as a dot and a word rather than a chip: a chip in a dense
+// table is a button nobody can press.
+.result {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mat-sys-primary);
+  }
+
+  &.failed .dot {
+    background: var(--mat-sys-error);
+  }
+}
+
+.running mat-progress-bar {
+  width: 120px;
+}
+
+mat-cell {
+  gap: 8px;
+}
+
+// The last column holds a result AND the row's actions: the actions go to its
+// end, where a column of buttons would have been.
+mat-cell:last-of-type {
+  justify-content: space-between;
+}
+
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+  padding: 24px 0;
+}
+
+@include table.banded-rows;
+
+// The detail panel. Read-only: what a service wrote is a service's business,
+// and the three actions at the bottom are the operator's half.
+mat-drawer-container {
+  height: 100%;
+  background: transparent;
+}
+
+mat-drawer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+mat-drawer {
+  width: min(460px, 90vw);
+
+  // The explanation panel is wider than a schedule's facts: it holds command
+  // lines and a JSON payload, and those WRAP in 460px - a reader cannot tell a
+  // wrapped curl line from a second one.
+  &.wide {
+    width: min(760px, 96vw);
+  }
+}
+
+// Wider than the selects: a condition is text, and `station=~^st-\d+$` in a
+// 170px box is a filter nobody can read back.
+.banner .meta {
+  min-width: 260px;
+  flex: none;
+}
+
+.bad {
+  color: var(--mat-sys-error);
+}
+
+// The socket's own light, dressed by this console's palette: the package
+// leaves the colours to custom properties precisely so it knows nothing about
+// the theme it lands in.
+lw-live-indicator {
+  --lw-live: var(--mat-sys-primary);
+  --lw-down: var(--mat-sys-error);
+  flex: none;
+  // It sits beside the title, so IT carries the push: title and light on the
+  // left, the filters against the right edge.
+  margin-right: auto;
+}
+
+// The zone switch, with the filters: two columns carry dates, so it belongs to
+// the screen. Small, because it is a statement about what is drawn rather than
+// a question somebody has to answer.
+.banner .utc {
+  flex: none;
+
+  .mat-button-toggle-label-content {
+    line-height: 22px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+  }
+}
+
+mat-row.clickable {
+  cursor: pointer;
+}
+
+.drawer {
+  padding: 20px 24px 24px;
+
+  h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+
+  h3 {
+    margin: 24px 0 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 16px;
+    margin: 8px 0 0;
+  }
+
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85em;
+  }
+
+  dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  // A failure's own words, whole: this is the one place they fit.
+  .detail {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 0.82em;
+  }
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+// Folded, and flat against the drawer: it is a detail somebody opens, not a
+// second card competing with the facts above it.
+.payload {
+  margin-top: 24px;
+  background: transparent;
+}
+
+.drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+
+  .danger {
+    color: var(--mat-sys-error);
+  }
+}
+
+// The history in the drawer: one line per ended turn, the result first so a
+// column of dots reads down the side, the detail wrapping under it.
+.runs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: 0.75rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+    .when {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .detail {
+      grid-column: 1 / -1;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.85em;
+      overflow-wrap: anywhere;
+    }
+  }
+}

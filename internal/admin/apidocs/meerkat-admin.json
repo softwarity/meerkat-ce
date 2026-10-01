@@ -338,6 +338,19 @@
         "responses": { "200": { "description": "Sent" }, "502": { "description": "SMTP refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
       }
     },
+    "/api/settings/telemetry": {
+      "get": { "tags": ["Settings"], "summary": "Where this gateway's traces go (gateway scope)", "responses": { "200": { "description": "The setting, plus `enterprise` (can this image export) and `exporting` (are spans leaving right now). A header value comes back AS WRITTEN - a vault reference, never the secret behind it.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TelemetryConfig" } } } }, "403": { "$ref": "#/components/responses/Forbidden" } } },
+      "put": { "tags": ["Settings"], "summary": "Point this gateway at a collector (infra admin)", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TelemetryConfig" } } } }, "responses": { "200": { "description": "The applied setting" }, "422": { "description": "The address or a rate cannot work, and the message says what is allowed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "403": { "$ref": "#/components/responses/Forbidden" } } }
+    },
+    "/api/settings/telemetry/test": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Ask a collector whether it answers, before saving (infra admin)",
+        "description": "Posts an EMPTY OTLP batch to `<endpoint>/v1/traces`: the whole path is exercised - name resolution, network, TLS, the credential, the collector's own answer - and no span is recorded anywhere. The answer carries the status and how long it took, never the collector's body: this makes the gateway call an address it is handed, and reporting what came back would turn it into a reader of whatever it can reach.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["endpoint"], "properties": { "endpoint": { "type": "string", "example": "http://jaeger:4318" }, "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Resolved at the moment of the call, so a vault reference works here as it does in the setting" }, "metrics": { "type": "boolean", "description": "Probe /v1/metrics too: a backend may take traces and nothing else (Jaeger does)" } } } } } },
+        "responses": { "200": { "description": "The collector answered", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "integer" }, "ms": { "type": "integer", "format": "int64" } } } } } }, "422": { "description": "The address cannot work", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "502": { "description": "Nothing answered, or the collector refused - the message names the likely cause", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
     "/api/themes": {
       "get": { "tags": ["Themes"], "summary": "List flow-page themes", "responses": { "200": { "description": "Themes", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Theme" } } } } } } },
       "post": { "tags": ["Themes"], "summary": "Create a theme", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Theme" } } } }, "responses": { "201": { "description": "The theme" } } }
@@ -362,15 +375,18 @@
     "/api/audit": {
       "get": {
         "tags": ["Audit"],
-        "summary": "The audit trail, scoped to the domains the actor administers",
-        "description": "root sees everything; infra-admin the routing plane; app-admin the identity domain; a tenant admin their tenants. Cumulative capabilities see the union.",
+        "summary": "The audit trail: the changes, and the security of the accounts, scoped to the domains the actor administers",
+        "description": "Two halves in one trail. The CHANGES: every administrative mutation, with the field-level diff. The SECURITY of the accounts (targets `account` and `console`): sign-ins, refused sign-ins with their reason and address, a lock-out, a password, second factor, passkey, token or plug key changed by its owner. root sees everything; infra-admin the routing plane; app-admin the identity domain, the application accounts' security included; a tenant admin their tenants. A console sign-in is root's alone. Cumulative capabilities see the union.",
         "parameters": [
-          { "name": "target", "in": "query", "schema": { "type": "string" }, "description": "Filter by target kind (route, user, tenant, ...)" },
-          { "name": "from", "in": "query", "schema": { "type": "integer" }, "description": "Unix seconds lower bound" },
-          { "name": "to", "in": "query", "schema": { "type": "integer" }, "description": "Unix seconds upper bound" },
-          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Free-text search" }
+          { "name": "kind", "in": "query", "schema": { "type": "string", "enum": ["admin", "security"] }, "description": "`admin` keeps the changes, `security` the sign-ins and the ways into an account. Both when absent" },
+          { "name": "target", "in": "query", "schema": { "type": "string" }, "description": "Only this target kind (route, user, tenant, ..., account, console)" },
+          { "name": "targetId", "in": "query", "schema": { "type": "string" }, "description": "Only this instance" },
+          { "name": "actor", "in": "query", "schema": { "type": "string" }, "description": "Only this actor's id" },
+          { "name": "since", "in": "query", "schema": { "type": "integer" }, "description": "Unix seconds lower bound" },
+          { "name": "until", "in": "query", "schema": { "type": "integer" }, "description": "Unix seconds upper bound" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" }, "description": "How many events (default 200)" }
         ],
-        "responses": { "200": { "description": "Events, newest first", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEvent" } } } } }, "403": { "$ref": "#/components/responses/Forbidden" } }
+        "responses": { "200": { "description": "Events, newest first", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEvent" } } } } }, "400": { "description": "An unknown kind" }, "403": { "$ref": "#/components/responses/Forbidden" } }
       }
     },
     "/api/admin-tokens": {
@@ -487,6 +503,8 @@
           "enabled": { "type": "boolean" },
           "access": { "$ref": "#/components/schemas/Access" },
           "isUi": { "type": "boolean", "description": "UI route (web application) vs API route (machines)" },
+          "telemetry": { "type": "boolean", "description": "Whether this gateway reports on what this route answers (OBS-04). ABSENT means not said, which reads as traced; false takes the route out of the telemetry - no span of ours, nothing injected. What the caller sent still travels on either way, and the identifier still joins the access log to your service's audit." },
+          "telemetryUi": { "type": "boolean", "description": "Start the journey IN THE PAGE: the OpenTelemetry bundle is injected into this route's pages, so the first span is the click and the gateway's crossing is its child. UI routes only, and ignored when telemetry is false." },
           "upstream": { "type": "string", "description": "Target base URL; unused when a terminal filter answers" },
           "predicates": { "type": "array", "items": { "$ref": "#/components/schemas/Spec" } },
           "filters": { "type": "array", "items": { "$ref": "#/components/schemas/Spec" } },
@@ -663,6 +681,20 @@
         "description": "Application-wide configuration; see the Settings screens for the exact keys (working hours, session TTL, SMTP, security, group mode...).",
         "additionalProperties": true
       },
+      "TelemetryConfig": {
+        "type": "object",
+        "description": "Where this gateway's traces and pushed counters go (OBS-04, OBS-05). Exporting is Enterprise; the trace context travels in both editions. WHICH routes are traced is not here - each route answers for itself.",
+        "properties": {
+          "enabled": { "type": "boolean", "description": "Anything leaves for the collector at all; what leaves is traces and metrics" },
+          "traces": { "type": "boolean", "description": "Send this gateway's spans" },
+          "metrics": { "type": "boolean", "description": "Push the counters /metrics exposes, over OTLP to the same collector, every 30 seconds - cumulative, one resource per node. Needs a collector that receives metrics" },
+          "endpoint": { "type": "string", "example": "http://jaeger:4318", "description": "The collector's BASE address; the exporter adds /v1/traces" },
+          "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Sent with every export. A value may be a vault reference ($otlp-token), which is how a credential reaches a collector without being stored here" },
+          "sample": { "type": "number", "format": "double", "description": "Share of the journeys OPENED HERE that are recorded, 0 to 1. A caller who already decided is respected rather than overruled" },
+          "maxPerSecond": { "type": "integer", "format": "int64", "description": "Ceiling on journeys recorded per second, whoever decided. 0 removes it" },
+          "gatewayDetail": { "type": "boolean", "description": "Add the gateway's OWN steps to the traces it records - the identity handed to an upstream, each query to the store. Off by default: it never adds a trace, only depth to the sampled ones" }
+        }
+      },
       "Theme": {
         "type": "object",
         "description": "A flow-page theme: independent dark and light palettes, flat/glow switch. The exact token set is the Built-in pages editor's business.",
@@ -680,13 +712,15 @@
           "at": { "type": "integer", "description": "Unix seconds" },
           "actorId": { "type": "string" },
           "actorName": { "type": "string" },
-          "action": { "type": "string", "example": "route.update" },
+          "actorToken": { "type": "string", "description": "The control-plane token that acted, when one did" },
+          "action": { "type": "string", "example": "route.update", "description": "A dotted verb. On the security half: signin, signin.organisation, signin.refused (detail: the reason), signin.locked, signout, password.change, password.forgot, password.reset, mfa.enroll, mfa.remove, passkey.add, passkey.remove, email.change.request, email.change, token.create, token.revoke, register, register.confirm, devkey.add, devkey.remove" },
           "target": { "type": "string", "example": "route" },
           "targetId": { "type": "string" },
           "targetName": { "type": "string" },
           "tenantId": { "type": "string" },
           "changes": { "type": "array", "items": { "$ref": "#/components/schemas/FieldChange" } },
-          "detail": { "type": "string" }
+          "detail": { "type": "string" },
+          "ip": { "type": "string", "description": "The address the gateway resolved, on a security event" }
         }
       },
       "Issue": {

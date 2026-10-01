@@ -1,6 +1,7 @@
 # Meerkat, community edition, one gateway on its own volume.
 #
-#   helm install meerkat ./meerkat -f values-ce-one-node.yaml \
+#   helm repo add meerkat https://www.softwarity.io/deploy
+#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ce-one-node.yaml \
 #     --set admin.password='choose-one'
 #
 # This IS the default shape, written out so it can be read: one pod, the

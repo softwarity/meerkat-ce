@@ -72,14 +72,14 @@ L'ancien fichier est gardé : une restauration qu'on regrette doit avoir un chem
 
 Un document, en YAML : les routes, le catalogue de rôles, les organisations et leurs groupes, les
 autorités par lesquelles les gens se connectent, le relais mail, les thèmes et les réglages de la
-passerelle (CONSOLE-05, CFG-05).
+passerelle.
 
 Ce qu'il ne porte **pas** fait autant partie de la conception que ce qu'il porte :
 
 - **aucun compte**, aucune appartenance, aucune session : ils portent des identifiants, des secrets de
-  second facteur et des passkeys ;
+ second facteur et des passkeys ;
 - **aucun certificat**, aucune clé de signature, aucune clé de simulation : elles sont générées là où
-  elles servent ;
+ elles servent ;
 - **aucune valeur secrète.** Un champ secret déclaré voyage sous sa référence `$nom` ou pas du tout.
 
 Un export est donc **public par construction**. Il part dans un ticket, un mail au support ou un dépôt
@@ -95,14 +95,14 @@ doivent voyager. Un import qui n'en porte aucune laisse celles en place tranquil
 
 ## Les points de reprise : la bande
 
-La passerelle tient sa propre bande (CFG-06). Un point est écrit quand un changement déplace
+La passerelle tient sa propre bande. Un point est écrit quand un changement déplace
 l'**empreinte** de la configuration - et non quand un endpoint est appelé, ce qui est ce qui rend la
 bande à la fois abordable et complète :
 
 - un endpoint ajouté plus tard est couvert sans que personne y pense ;
 - un enregistrement qui ne change rien n'écrit rien ;
 - ce qui n'est pas de la configuration - créer un compte, remplir le coffre, ouvrir une session - n'y
-  laisse aucune trace du tout.
+ laisse aucune trace du tout.
 
 Un point a une heure, un auteur et la phrase que le journal d'audit a écrite à la même seconde.
 Personne ne demande un point et personne ne le nomme : c'est toute la différence avec une configuration
@@ -119,7 +119,7 @@ rendrait seulement le produit plus risqué là où il sert le plus.
 
 ## Les configurations nommées
 
-Plusieurs configurations coexistent et exactement une est active (CFG-01, CFG-02). La console les
+Plusieurs configurations coexistent et exactement une est active. La console les
 compare - objets ajoutés, supprimés, modifiés - et montre ce même diff quand un fichier est importé,
 avant que rien ne soit écrit. Un agent peut ranger l'état courant sous un nom en un appel, ce qui est
 ce qu'un admin prudent demande en mots avant un gros changement.

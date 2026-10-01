@@ -82,3 +82,26 @@ mat-drawer {
 .banner .kind {
   width: 150px;
 }
+
+// Somebody else changed the route being edited (CONSOLE-13). At the top of the
+// drawer, above the editor: it is about the work in front of the reader, not
+// about the page behind it.
+.changed-banner {
+  // Sticky, because the drawer scrolls: the news slid out of sight the moment
+  // the editor jumped to the error at the bottom of the form, which is exactly
+  // when the reader needs to know why the save was refused.
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font-size: 0.9rem;
+
+  span {
+    flex: 1;
+  }
+}

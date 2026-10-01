@@ -15,6 +15,7 @@ import { MeService } from '../me.service';
 import { FormFieldComponent } from '../shared/form-field.component';
 import { SecretFieldComponent } from '../shared/secret-field.component';
 import { isRef } from '../shared/vault-ref';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 // Enough to catch a typo, not to rule on RFC 5322: the relay itself is the real
 // judge, and the point here is only to stop a pointless round-trip.
@@ -153,11 +154,21 @@ export class MailRelayPageComponent {
     // is one click.
     this.testTo.set(this.me.user()?.email ?? '');
     this.reload();
-    // The data plane's language pool, English always in it (the flow pages fall
-    // back to English, so a sample can always be sent in it).
-    this.api.settings().subscribe({
-      next: (s) => {
-        const langs = [...new Set(['en', ...(s.languages ?? [])])];
+    // Somebody else's write (CONSOLE-13). OFFERED and not applied: this screen
+    // is a form, and reloading it under somebody typing would throw their work
+    // away for news they did not ask for.
+    const live = inject(LiveChangesService);
+    live.on('settings', (change) => live.offer(change, () => this.reload()));
+    // Every language this gateway can RENDER, English always in it (the mails
+    // fall back to English, so a sample can always be sent in it).
+    //
+    // What it can render rather than what its routes speak: this is a test of a
+    // relay, and being able to send a sample in a language before any route
+    // declares it is the point - one looks at the message before wiring the
+    // application that will need it.
+    this.api.locales().subscribe({
+      next: (l) => {
+        const langs = [...new Set(['en', ...l.map((x) => x.code)])];
         this.testLangs.set(langs);
         if (!langs.includes(this.testLocale())) this.testLocale.set('en');
       },

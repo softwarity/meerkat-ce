@@ -16,6 +16,7 @@ import { ApiService, ConfigPlan, RestorePoint } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { ConfigurationYamlComponent } from './configuration-yaml.component';
+import { LiveChangesService } from '../../shared/live-changes.service';
 
 // The tape (CFG-06): one restore point per change, newest first.
 //
@@ -319,6 +320,9 @@ export class ConfigurationHistoryComponent {
 
   constructor() {
     this.reload();
+    // Somebody else's write (CONSOLE-13): a configuration saved, switched,
+    // imported or restored anywhere shows up here without a click.
+    inject(LiveChangesService).on('config', () => this.reload());
     // Same as the Management drawer: the URL decides what is open, so a pasted
     // link loads the same document a click would.
     effect(() => {

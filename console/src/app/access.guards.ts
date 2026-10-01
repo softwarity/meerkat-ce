@@ -116,6 +116,18 @@ export const auditAccess: CanActivateFn = async (_route, state) => {
   return ok ? true : bounce(router, state, landing(me));
 };
 
+// schedulerAccess gates the transverse Scheduler section. A schedule belongs
+// to an ACCOUNT and to a service, which is the application's identity rather
+// than the routing plane's - so it is the application's administrators who
+// read it, and root.
+export const schedulerAccess: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  const ok = me.isRoot() || me.isAppAdmin();
+  return ok ? true : bounce(router, state, landing(me));
+};
+
 // issuesAccess gates the transverse Issues section: anyone who administers a
 // domain may open it (root, infra-admin, app-admin, or a tenant admin). The
 // API scopes the CONTENT (a tenant admin sees their tenants' reports only).

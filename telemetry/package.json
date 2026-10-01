@@ -1,0 +1,24 @@
+{
+  "name": "meerkat-telemetry",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The OpenTelemetry browser bundle Meerkat serves itself, never a CDN.",
+  "scripts": {
+    "build": "esbuild entry.js --bundle --format=iife --minify --target=es2020 --outfile=dist/telemetry.js",
+    "check": "node compat.test.mjs"
+  },
+  "dependencies": {
+    "@opentelemetry/core": "^2.11.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/instrumentation": "^0.222.0",
+    "@opentelemetry/instrumentation-fetch": "^0.222.0",
+    "@opentelemetry/instrumentation-xml-http-request": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-web": "^2.11.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

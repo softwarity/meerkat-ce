@@ -1,7 +1,7 @@
 ---
 title: GitHub
 section: Authentification
-order: 108
+order: 109
 summary: Se connecter avec un compte GitHub, restreint aux organisations que vous nommez.
 ---
 

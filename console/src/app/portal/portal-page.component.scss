@@ -364,3 +364,66 @@
   border-bottom: 1px solid var(--mat-sys-outline-variant);
   overflow: hidden;
 }
+
+/* The mode control and the flat list it reveals (PORTAL-03). One catalogue,
+   two ways of editing it: the bar draws itself, a menu is just a list. */
+.modes {
+  /* styles.scss forces every mat-button-toggle-group to display:flex, so a
+     block wrapper would let it stretch the whole card - and a choice drawn
+     edge to edge reads like a progress bar. A flex wrapper sizes it to its
+     three buttons instead. */
+  display: flex;
+  margin: 0 0 0.25rem;
+}
+
+.mode-hint {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.links {
+  padding: 0;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.link-row:last-child {
+  border-bottom: none;
+}
+
+.link-row.off {
+  opacity: 0.55;
+}
+
+.link-row .pos {
+  min-width: 1.5rem;
+  text-align: right;
+  color: var(--mat-sys-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+.link-row .grow {
+  display: flex;
+  flex-direction: column;
+}
+
+.link-row .path {
+  font-size: 0.8rem;
+}
+
+/* One control line per option, all the same height so the toggles of two
+   neighbouring options sit on the same line - one of them carries a slider, and
+   without this the taller row pushed its own toggle off the other's level. */
+.opt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 48px;
+}

@@ -18,6 +18,7 @@ import {
   GroupDialogResult,
 } from '../group-dialog.component';
 import { DialogsService } from '../../shared/dialogs.service';
+import { LiveChangesService } from '../../shared/live-changes.service';
 
 // The per-tenant groups matrix (RBAC-02): rows are the GLOBAL role catalogue,
 // columns are this tenant's groups, a cell checkbox = the role belongs to the
@@ -102,6 +103,12 @@ export class GroupsMatrixComponent {
 
 
   constructor() {
+    // Somebody else's write (CONSOLE-13): a group created, a membership given
+    // or taken away shows up here without a click. Quietly, and the whole
+    // matrix rather than one cell - a cell here is a pair, and what moved may
+    // be the row, the column or the crossing.
+    inject(LiveChangesService).on('group', () => this.load(true));
+    inject(LiveChangesService).on('grouprule', () => this.load(true));
     effect(() => {
       this.tenantId(); // re-run when the tenant changes
       this.load();
@@ -110,8 +117,8 @@ export class GroupsMatrixComponent {
     effect(() => this.availableTags.emit(this.allTags()));
   }
 
-  private load(): void {
-    this.loading.set(true);
+  private load(quiet = false): void {
+    if (!quiet) this.loading.set(true);
     forkJoin({ roles: this.api.listRoles(), groups: this.api.listGroups(this.tenantId()) }).subscribe({
       next: ({ roles, groups }) => {
         this.roles.set(roles);

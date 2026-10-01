@@ -211,7 +211,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(10, sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_sum[5m])) / sum by (name, endpoint, source) (rate(meerkat_endpoint_requests_total[5m])))",
+          "expr": "topk(10, sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_total[5m])) / sum by (name, endpoint, source) (rate(meerkat_endpoint_requests_total[5m])))",
           "datasource": {
             "type": "prometheus",
             "uid": "meerkat-prometheus"
@@ -244,7 +244,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(10, sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_sum[5m])))",
+          "expr": "topk(10, sum by (name, endpoint, source) (rate(meerkat_endpoint_duration_seconds_total[5m])))",
           "datasource": {
             "type": "prometheus",
             "uid": "meerkat-prometheus"

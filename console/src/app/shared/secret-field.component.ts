@@ -41,6 +41,11 @@ export class SecretFieldComponent {
 
   readonly label = input('');
   readonly hint = input('');
+  // The explanation, as an info icon beside the field rather than a paragraph
+  // under it - the rule every field on these screens follows. It also keeps a
+  // secret field the same WIDTH as its neighbours: that icon is a gutter, and
+  // a field without one ran past the row beneath it.
+  readonly info = input('');
   readonly placeholder = input('');
   // Classes for the field itself. The host is display:contents, so a class put
   // on <app-secret-field> would reach no box - the layout ones (a grid span)

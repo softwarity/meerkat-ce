@@ -9,21 +9,33 @@ import (
 	"github.com/softwarity/meerkat/internal/icons"
 )
 
-// PortalConfig is the navigation portal (PORTAL-01): a header or a rail that
-// moves between the UI routes this gateway serves, as if they were one
-// application. It is GLOBAL, like the theme and the branding - one arrangement
-// for the installation, already personalised per visitor by the ROUTE ACCESS
-// (a module a caller may not open is not offered). A per-tenant arrangement is
-// PORTAL-02 and deliberately not this: it would be the product's first
-// per-tenant visual override, and the theme and branding are global today.
+// PortalConfig is THE CATALOGUE of applications this gateway offers, plus the
+// way it is rendered (PORTAL-01, PORTAL-03). It is GLOBAL, like the theme and
+// the branding - one arrangement for the installation, already personalised
+// per visitor by the ROUTE ACCESS (an entry a caller may not open is not
+// offered). A per-tenant arrangement is PORTAL-02 and deliberately not this: it
+// would be the product's first per-tenant visual override, and the theme and
+// branding are global today.
 //
-// It is edited on its own screen (Application, Portal) and shown, when on, on
-// every proxied UI page - injected the same way the user button is, which then
-// rides INSIDE the portal bar rather than in a corner of its own.
+// ONE CATALOGUE, THREE RENDERINGS. The list of applications used to be DERIVED
+// from the routes, each UI route carrying its own menu label. That put the name
+// of an application in three places at once (the portal override, the route's
+// label, the route's name) and forced the menu builder to GUESS which routes
+// were the same application - an installation commonly fronts one product with
+// several routes, one per organisation or per version, and they differ in what
+// they proxy, never in where you go. An explicit list has nothing to guess, and
+// it has an order somebody chose rather than the routing order, which exists
+// for "first match wins" and means nothing to a reader.
+//
+// Mode decides what is drawn, and CHANGING IT KEEPS THE CATALOGUE: moving from
+// a menu to a bar is a rendering decision, not a reason to retype the list.
+//
+// It is edited on its own screen (Application, Portal). In portal mode the bar
+// is injected into every proxied UI page, the same way the user button is -
+// which then rides INSIDE the bar rather than in a corner of its own.
 type PortalConfig struct {
-	// Enabled off is the state of every installation until someone builds a
-	// portal: the per-route user button behaves exactly as before.
-	Enabled bool `json:"enabled"`
+	// Mode is what the catalogue is drawn as: nothing, a menu, or a bar.
+	Mode string `json:"mode"`
 	// Layout says which surface carries the PARENTS: "header" puts them in a
 	// top strip of tabs and their children in a rail; "rail" puts the parents
 	// in a rail and their children in a top strip. The one axis portal-nav
@@ -37,19 +49,33 @@ type PortalConfig struct {
 	// (the text alone) or "both". Global to the bar, like portal-svc's
 	// tabDisplay but one setting for the whole portal.
 	Display string `json:"display"`
-	// ShowAppName writes the branding app name beside the data-plane logo in
-	// the bar. Off by default: the logo alone is the mark. Only meaningful when
-	// a logo is set - with none, the name is already the brand it falls back to.
+	// ShowAppName puts the branding's app name in the bar. Its own decision,
+	// like HideLogo beside it: the name used to appear on its own whenever no
+	// logo was drawn, so on an installation without one this setting existed and
+	// changed nothing. Off by default, and no it is off there really is nothing
+	// at the head of the bar - which is width the tabs get back.
 	ShowAppName bool `json:"showAppName,omitempty"`
-	// Parents are the top-level modules, in display order.
-	Parents []ModuleParent `json:"parents,omitempty"`
+	// HideLogo takes the branding's logo OUT of the bar. It is drawn by default,
+	// which is what the bar has always done - an installation that never touched
+	// this keeps its head as it was. Said in the negative for exactly that
+	// reason: the zero value has to mean "as before".
+	HideLogo bool `json:"hideLogo,omitempty"`
+	// LogoRadius rounds it, 0 (as drawn) to 50 (a circle), in percent of its
+	// box. The bar sits beside round avatars and pill-shaped tabs, so how much
+	// the mark is rounded is a decision about THIS bar - the alternative was
+	// re-cutting the image to change a corner.
+	LogoRadius int `json:"logoRadius,omitempty"`
+	// Entries are the applications, in the order they are offered. Read in
+	// every mode but "none"; the icons and children below them are read only
+	// when a bar is drawn.
+	Entries []PortalEntry `json:"entries,omitempty"`
 }
 
-// ModuleParent is one top-level module: a full application in its own right
-// (it has a route and is navigable), which may gather children shown in the
-// secondary surface. When it has children, the bar offers a "home" back to the
-// parent itself.
-type ModuleParent struct {
+// PortalEntry is one application in the catalogue: a route, the name it is
+// offered under, and - when a bar is drawn - an icon and the children shown in
+// the secondary surface. When it has children, the bar offers a "home" back to
+// the entry itself.
+type PortalEntry struct {
 	// RouteID binds the entry to an existing UI route; the entry inherits the
 	// route's address and access from it, and a label/icon may override what
 	// the route offers.
@@ -59,7 +85,9 @@ type ModuleParent struct {
 	// it as a CSS mask, so no icon font is ever loaded. Empty falls back to the
 	// label's initial.
 	Icon string `json:"icon,omitempty"`
-	// Label overrides the route's own name in the bar; empty uses the route.
+	// Label is the name this application is offered under. Empty falls back to
+	// the route's name - the LAST remaining fallback, and there is no third:
+	// the route no longer carries a menu label of its own.
 	Label string `json:"label,omitempty"`
 	// HomeLabel is what the "back to this module" entry reads when the parent
 	// has children (its own row in the secondary surface). Empty uses Label.
@@ -72,23 +100,42 @@ type ModuleParent struct {
 	Badge string `json:"badge,omitempty"`
 	// Disabled turns the module off for everyone without removing it: kept in
 	// the config but never served. Zero value (false) means enabled.
-	Disabled bool          `json:"disabled,omitempty"`
-	Children []ModuleChild `json:"children,omitempty"`
+	Disabled bool             `json:"disabled,omitempty"`
+	Children []PortalSubEntry `json:"children,omitempty"`
 }
 
-// ModuleChild is a sub-module of a parent, shown in the secondary surface.
-type ModuleChild struct {
+// PortalSubEntry is a sub-module of a parent, shown in the secondary surface.
+type PortalSubEntry struct {
 	RouteID string `json:"routeId"`
-	// Icon is an SVG string, same as the parent's (see ModuleParent.Icon).
+	// Icon is an SVG string, same as the parent's (see PortalEntry.Icon).
 	Icon        string `json:"icon,omitempty"`
 	Label       string `json:"label,omitempty"`
 	Description string `json:"description,omitempty"`
 	Badge       string `json:"badge,omitempty"`
-	// Disabled turns the sub-module off for everyone (see ModuleParent.Disabled).
+	// Disabled turns the sub-module off for everyone (see PortalEntry.Disabled).
 	Disabled bool `json:"disabled,omitempty"`
 }
 
-// Portal layouts: which surface carries the parents.
+// Portal modes: what the catalogue is drawn as.
+const (
+	// PortalModeNone offers no catalogue at all. The user button and the
+	// built-in pages show the branding name and nothing to click: an
+	// installation with one application has no menu to draw.
+	PortalModeNone = "none"
+	// PortalModeLinks offers the catalogue as a flat list - the user button's
+	// Applications submenu, and the built-in data-plane pages.
+	PortalModeLinks = "links"
+	// PortalModePortal draws the navigation bar on every proxied UI page. The
+	// built-in pages then offer ONE link, the first entry the caller may open:
+	// once there is a bar, the bar is the navigation, and a page outside the
+	// applications only needs a way back in.
+	PortalModePortal = "portal"
+)
+
+// PortalModes is the closed catalogue in the order the console offers it.
+var PortalModes = []string{PortalModeNone, PortalModeLinks, PortalModePortal}
+
+// Portal layouts: which surface carries the top-level entries.
 const (
 	// PortalHeader: parents in a top strip of tabs, children in a rail.
 	PortalHeader = "header"
@@ -109,11 +156,13 @@ const (
 // PortalDisplays is the closed catalogue in the order the console offers it.
 var PortalDisplays = []string{PortalDisplayBoth, PortalDisplayIcon, PortalDisplayLabel}
 
-// DefaultPortalConfig is what an installation that never built a portal gets:
-// off, and the header arrangement with icon-and-label entries as a starting
-// point once turned on.
+// DefaultPortalConfig is what an installation that never built a catalogue
+// gets: no catalogue, and the header arrangement with icon-and-label entries as
+// a starting point for whoever later draws a bar.
 func DefaultPortalConfig() PortalConfig {
-	return PortalConfig{Enabled: false, Layout: PortalHeader, Side: "left", Display: PortalDisplayBoth}
+	return PortalConfig{
+		Mode: PortalModeNone, Layout: PortalHeader, Side: "left", Display: PortalDisplayBoth,
+	}
 }
 
 // Portal reads the stored portal configuration, falling back to the default on
@@ -135,6 +184,13 @@ func (s *Store) Portal(ctx context.Context) PortalConfig {
 // guards the WRITE: nothing enters the portal that is not, right now, an
 // enabled UI route.
 func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
+	cfg.Mode = strings.TrimSpace(cfg.Mode)
+	if cfg.Mode == "" {
+		cfg.Mode = PortalModeNone
+	}
+	if !slices.Contains(PortalModes, cfg.Mode) {
+		return fmt.Errorf("portal mode %q: allowed are %s", cfg.Mode, strings.Join(PortalModes, ", "))
+	}
 	cfg.Layout = strings.TrimSpace(cfg.Layout)
 	if cfg.Layout == "" {
 		cfg.Layout = PortalHeader
@@ -157,9 +213,14 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
 	if !slices.Contains(PortalDisplays, cfg.Display) {
 		return fmt.Errorf("portal display %q: allowed are %s", cfg.Display, strings.Join(PortalDisplays, ", "))
 	}
+	// Past a half the corners meet and more only distorts the mark, so the
+	// refusal names the two ends rather than clamping in silence.
+	if cfg.LogoRadius < 0 || cfg.LogoRadius > 50 {
+		return fmt.Errorf("portal logo radius %d: allowed are 0 (as drawn) to 50 (circle)", cfg.LogoRadius)
+	}
 
-	// A UI route is one that can wear the portal bar: it must exist, be enabled
-	// and be a UI route. Anything else is refused, naming the id.
+	// A catalogue entry points at an application: the route must exist, be
+	// enabled and be a UI route. Anything else is refused, naming the id.
 	uiRoutes := map[string]bool{}
 	for _, rt := range routes {
 		if rt.Enabled && rt.IsUI {
@@ -168,7 +229,7 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
 	}
 	checkRoute := func(kind, id string) error {
 		if id == "" {
-			return fmt.Errorf("portal %s: a module needs a route", kind)
+			return fmt.Errorf("portal %s: an entry needs a route", kind)
 		}
 		if !uiRoutes[id] {
 			return fmt.Errorf("portal %s route %q: not an enabled UI route", kind, id)
@@ -176,19 +237,19 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
 		return nil
 	}
 
-	seenParents := map[string]bool{}
-	parents := cfg.Parents[:0]
-	for i := range cfg.Parents {
-		p := cfg.Parents[i]
-		if err := checkRoute("module", p.RouteID); err != nil {
+	seenEntries := map[string]bool{}
+	entries := cfg.Entries[:0]
+	for i := range cfg.Entries {
+		p := cfg.Entries[i]
+		if err := checkRoute("entry", p.RouteID); err != nil {
 			return err
 		}
-		if seenParents[p.RouteID] {
-			// A route listed twice as a parent is one choice offered twice:
-			// the second is dropped, the first wins (the order the admin set).
+		if seenEntries[p.RouteID] {
+			// A route listed twice is one choice offered twice: the second
+			// is dropped, the first wins (the order the admin set).
 			continue
 		}
-		seenParents[p.RouteID] = true
+		seenEntries[p.RouteID] = true
 		// The icon is stored as an SVG: a bare name is resolved to its
 		// catalogue SVG, a pasted SVG is sanitized to viewBox + path, anything
 		// else is dropped (icons.Resolve).
@@ -202,7 +263,7 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
 		children := p.Children[:0]
 		for j := range p.Children {
 			c := p.Children[j]
-			if err := checkRoute("sub-module", c.RouteID); err != nil {
+			if err := checkRoute("sub-entry", c.RouteID); err != nil {
 				return err
 			}
 			if seenChildren[c.RouteID] {
@@ -216,8 +277,8 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
 			children = append(children, c)
 		}
 		p.Children = children
-		parents = append(parents, p)
+		entries = append(entries, p)
 	}
-	cfg.Parents = parents
+	cfg.Entries = entries
 	return nil
 }

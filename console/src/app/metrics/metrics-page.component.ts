@@ -5,20 +5,17 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { LiveWindowDataSource } from '@softwarity/livewire';
 import type { EChartsCoreOption } from 'echarts/core';
-import { ApiService, Discovery } from '../api.service';
+import { ApiService } from '../api.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
-import { SnippetComponent } from '../shared/snippet.component';
 import { ChartComponent } from './chart.component';
-import { MONITORING, PLATFORMS, gatewayNetwork, monitoringUrl, stamp, variant } from './monitoring-files';
 import {
   EndpointsAnswer,
+  quantile,
+  sumBuckets,
   TrafficRoute,
   TrafficSample,
   TrafficService,
@@ -41,13 +38,9 @@ import {
     EeLockComponent,
     MatButtonModule,
     MatButtonToggleModule,
-    MatExpansionModule,
     MatIconModule,
-    MatSidenavModule,
-    MatSlideToggleModule,
     MatTooltipModule,
     RouterLink,
-    SnippetComponent,
   ],
   templateUrl: './metrics-page.component.html',
   styleUrl: './metrics-page.component.scss',
@@ -96,9 +89,7 @@ export class MetricsPageComponent {
       .subscribe((answer) => this.perEndpoint.set(answer));
   }
 
-  protected readonly samples = computed(() =>
-    this.rows().filter((r): r is TrafficSample => !!r),
-  );
+  protected readonly samples = computed(() => this.rows().filter((r): r is TrafficSample => !!r));
   protected readonly latest = computed(() => this.samples().at(-1));
   // How much of the window is actually there, so the table below can say what
   // it ranks over rather than implying an hour it may not have.
@@ -116,7 +107,7 @@ export class MetricsPageComponent {
   // ── the numbers above the charts ──────────────────────────────────────────
   //
   // Over the LAST MINUTE, not over the window. The charts tell the story; these
-  // four answer "how bad is it right now", and averaging seventeen minutes
+  // five answer "how bad is it right now", and averaging seventeen minutes
   // makes a burst that stopped a quarter of an hour ago go on dominating the
   // headline long after it ended. The period is written on the screen rather
   // than left to be guessed.
@@ -154,6 +145,13 @@ export class MetricsPageComponent {
     const { requests, spent } = this.totals();
     return requests > 0 ? (spent / requests) * 1000 : 0;
   });
+  // The mean hides the slow tail - ninety fast answers and ten of three
+  // seconds average out to something nobody ever waited for. The p95 is the
+  // time 95% of the answers came under: the one a user complaining is on.
+  protected readonly p95Ms = computed(() => {
+    const p = quantile(sumBuckets(this.recent().flatMap((s) => s.routes)), 0.95);
+    return p === null ? 0 : p * 1000;
+  });
 
   // ── traffic, by status class ─────────────────────────────────────────────
   protected readonly trafficOption = computed<EChartsCoreOption>(() => {
@@ -164,9 +162,21 @@ export class MetricsPageComponent {
     const classAt = (s: TrafficSample, i: number) =>
       s.routes.reduce((n, r) => n + (r.byClass[i] ?? 0), 0) / Math.max(s.seconds, 1);
     return this.lines(at, [
-      { name: $localize`:@@Metrics_ok:Answered`, colour: '#4caf50', data: samples.map((s) => classAt(s, 2) + classAt(s, 3)) },
-      { name: $localize`:@@Metrics_refused:Refused`, colour: '#ffa726', data: samples.map((s) => classAt(s, 4)) },
-      { name: $localize`:@@Metrics_failed:Failed`, colour: '#ef5350', data: samples.map((s) => classAt(s, 5)) },
+      {
+        name: $localize`:@@Metrics_ok:Answered`,
+        colour: '#4caf50',
+        data: samples.map((s) => classAt(s, 2) + classAt(s, 3)),
+      },
+      {
+        name: $localize`:@@Metrics_refused:Refused`,
+        colour: '#ffa726',
+        data: samples.map((s) => classAt(s, 4)),
+      },
+      {
+        name: $localize`:@@Metrics_failed:Failed`,
+        colour: '#ef5350',
+        data: samples.map((s) => classAt(s, 5)),
+      },
     ]);
   });
 
@@ -183,8 +193,24 @@ export class MetricsPageComponent {
       }
       return n > 0 ? (spent / n) * 1000 : 0;
     });
+    // Per interval, from the buckets of every route that answered in it. An
+    // interval with no traffic draws nothing rather than a zero, which would
+    // read as an instant answer.
+    const p95 = samples.map((s) => {
+      const p = quantile(sumBuckets(s.routes), 0.95);
+      return p === null ? null : p * 1000;
+    });
     return this.lines(at, [
-      { name: $localize`:@@Metrics_mean_latency:Mean`, colour: '#42a5f5', data: mean },
+      {
+        name: $localize`:@@Metrics_mean_latency:Mean`,
+        colour: '#42a5f5',
+        data: mean,
+      },
+      {
+        name: $localize`:@@Metrics_p95_latency:p95`,
+        colour: '#ab47bc',
+        data: p95,
+      },
     ]);
   });
 
@@ -206,15 +232,26 @@ export class MetricsPageComponent {
   protected readonly axis = signal<'slow' | 'failing' | 'costly'>('slow');
   protected readonly axes = [
     { key: 'slow' as const, label: $localize`:@@Metrics_axis_slow:Slowest` },
-    { key: 'failing' as const, label: $localize`:@@Metrics_axis_failing:Failing` },
-    { key: 'costly' as const, label: $localize`:@@Metrics_axis_costly:Costliest` },
+    {
+      key: 'failing' as const,
+      label: $localize`:@@Metrics_axis_failing:Failing`,
+    },
+    {
+      key: 'costly' as const,
+      label: $localize`:@@Metrics_axis_costly:Costliest`,
+    },
   ];
 
   protected readonly ranked = computed(() => {
     const by = new Map<string, { name: string; requests: number; errors: number; spent: number }>();
     for (const s of this.samples()) {
       for (const r of s.routes) {
-        const row = by.get(r.id) ?? { name: r.name || r.id, requests: 0, errors: 0, spent: 0 };
+        const row = by.get(r.id) ?? {
+          name: r.name || r.id,
+          requests: 0,
+          errors: 0,
+          spent: 0,
+        };
         row.requests += r.byClass.reduce((a, b) => a + b, 0);
         row.errors += (r.byClass[5] ?? 0) + (r.byClass[4] ?? 0);
         row.spent += r.sumSecs;
@@ -244,9 +281,7 @@ export class MetricsPageComponent {
   // How many requests were refused or failed over the covered period. On the
   // selector, so nobody has to switch to find out there is nothing to switch
   // for - or that there is.
-  protected readonly failingCount = computed(() =>
-    this.ranked().reduce((n, r) => n + r.errors, 0),
-  );
+  protected readonly failingCount = computed(() => this.ranked().reduce((n, r) => n + r.errors, 0));
 
   // ── which endpoint of the route ──────────────────────────────────────────
   //
@@ -303,38 +338,19 @@ export class MetricsPageComponent {
       .slice(0, 10);
   });
 
-  // ── the Prometheus half ──────────────────────────────────────────────────
-  // A drawer off a button in the header: it is read ONCE, when somebody wires
-  // a monitoring stack up, and a page carrying it at the bottom forever makes
-  // every reader scroll past an explanation they have already had.
-  protected readonly prometheusOpen = signal(false);
-
+  // ── the metrics endpoint ─────────────────────────────────────────────────
+  // Configured in Infra (metrics-endpoint), beside OpenTelemetry. What stays
+  // here is the STATE, on the header button that leads there.
   private readonly api = inject(ApiService);
   protected readonly exposed = signal(false);
-  protected readonly saving = signal(false);
   private readonly path = signal('/metrics');
-  protected readonly exposePath = this.path.asReadonly();
   protected readonly prometheusTip = computed(() =>
     this.exposed()
       ? $localize`:@@Metrics_tip_on:Exposed at ${this.path()}:PATH:`
       : $localize`:@@Metrics_tip_off:Not exposed - nothing scrapes this gateway`,
   );
-  // The port this gateway listens on, as it says itself. The examples below
-  // are scraped from inside the cluster, where the browser's own port means
-  // nothing.
-  private readonly port = signal('9090');
-  // The network the compose file has to join, asked of the runtime (SVC-02)
-  // when the drawer opens rather than on every visit: it is a call to the
-  // Docker socket with a five-second budget.
-  private readonly runtime = httpResource<Discovery>(() =>
-    this.prometheusOpen() ? '/api/services' : undefined,
-  );
-  private readonly network = computed(() => gatewayNetwork(this.runtime.value()?.reach ?? []));
-  private readonly dataOrigin = signal('');
 
-  // Read once, when the screen is built rather than when the drawer opens: it
-  // is one small call, and a switch that arrives after the drawer does flickers
-  // from off to on in front of whoever opened it.
+  // Read once, when the screen is built: one small call.
   private loadExposure() {
     this.api
       .metricsSetting()
@@ -342,76 +358,12 @@ export class MetricsPageComponent {
       .subscribe((s) => {
         this.exposed.set(s.enabled);
         this.path.set(s.path);
-        this.port.set(s.port);
-        this.dataOrigin.set(s.dataOrigin);
       });
   }
-
-  protected expose(enabled: boolean) {
-    this.saving.set(true);
-    this.api
-      .setMetricsSetting(enabled)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (s) => {
-          this.exposed.set(s.enabled);
-          this.saving.set(false);
-        },
-        // Put back what the gateway still holds. A switch that stays where the
-        // click left it after a refusal is a switch that lies about the state
-        // of the product.
-        error: () => {
-          this.saving.set(false);
-          this.loadExposure();
-        },
-      });
-  }
-
-  // The examples are FILES (console/public/monitoring), fetched from this
-  // gateway rather than built here, and stamped with THIS installation's own
-  // path and port on the way through: an example with a placeholder host in
-  // it is one the reader has to translate, and the translation is where it
-  // goes wrong.
-  //
-  // Fetched when the drawer OPENS, not when the page loads: six requests
-  // behind every visit to a screen that is read for its curves is six
-  // requests nobody asked for. An undefined URL is a request httpResource
-  // does not make, and that is what the closed drawer returns.
-  private file(name: string) {
-    const res = httpResource.text(() => (this.prometheusOpen() ? monitoringUrl(name) : undefined));
-    return computed(() => {
-      // A comment rather than an empty box: a panel showing nothing at all
-      // says nothing about whether there is nothing to show.
-      if (res.error()) return `# ${monitoringUrl(name)} did not answer`;
-      return stamp(res.value() ?? '', {
-        path: this.path(),
-        port: this.port(),
-        network: this.network(),
-        dataOrigin: this.dataOrigin(),
-      });
-    });
-  }
-  protected readonly scrape = this.file(MONITORING.scrape);
-  protected readonly swarmStack = this.file(MONITORING.swarmStack);
-  protected readonly k8sMonitor = this.file(MONITORING.k8sMonitor);
-  protected readonly grafanaSource = this.file(MONITORING.grafanaSource);
-  protected readonly grafanaDashboards = this.file(MONITORING.grafanaDashboards);
-  protected readonly grafanaDashboard = this.file(MONITORING.grafanaDashboard);
-  protected readonly grafanaQueries = this.file(MONITORING.grafanaQueries);
-
-  // Shown whole, saved per platform. The panel carries both discoveries so a
-  // reader sees what the choice is; the buttons carry away a file that runs.
-  protected readonly scrapeVariants = computed(() =>
-    PLATFORMS.map((p) => ({
-      label: p.label,
-      filename: MONITORING.scrape,
-      content: variant(this.scrape(), p.key),
-    })),
-  );
 
   private lines(
     at: number[],
-    series: { name: string; colour: string; data: number[] }[],
+    series: { name: string; colour: string; data: (number | null)[] }[],
   ): EChartsCoreOption {
     return {
       animation: false,

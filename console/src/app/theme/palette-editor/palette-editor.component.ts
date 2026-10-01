@@ -1,10 +1,11 @@
-import { Component, computed, inject, input, model, output } from '@angular/core';
+import { Component, computed, inject, input, model, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { CSS_VARS, TOKEN_GROUPS } from '../theme-tokens';
@@ -34,6 +35,7 @@ const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatMenuModule,
     MatTooltipModule,
   ],
   templateUrl: './palette-editor.component.html',
@@ -58,11 +60,36 @@ export class PaletteEditorComponent {
   // gradient) at once. Surfaced as a "Glow" checkbox (checked = effects on), so
   // stored inverted. Two-way - the page persists it with the theme.
   readonly flat = model<boolean>(false);
+  // The theme this palette belongs to, named where the column header used to
+  // read "Token" - a word that told a reader nothing every row below did not
+  // already say. Two-way, because the pencil renames in place.
+  readonly name = model('');
+  // A built-in palette is shown and duplicated, never written to: it is code,
+  // and there is no row behind it.
+  readonly readOnly = input(false);
+  // The live theme. The store already refuses to delete it - "activate another
+  // theme first" - but a menu item that silently does nothing is worse than
+  // one that is plainly out of reach.
+  readonly active = input(false);
+  protected readonly canDelete = computed(() => !this.readOnly() && !this.active());
+  // Something on screen differs from what was loaded. The arrows select as you
+  // pass them, so this is the only thing between an edit and its silent loss.
+  readonly dirty = input(false);
+  protected readonly renaming = signal(false);
+
   readonly hoverToken = output<string>();
   readonly save = output<void>();
+  readonly duplicate = output<void>();
+  readonly remove = output<void>();
   readonly saving = input(false);
 
+  protected startRename(): void {
+    if (!this.readOnly()) this.renaming.set(true);
+  }
+
   protected readonly tokenGroups = TOKEN_GROUPS;
+  protected readonly tipReadOnly = $localize`:@@Theme_builtin_hint2:A built-in palette is not written to - duplicate it first`;
+  protected readonly tipClean = $localize`:@@Theme_nothing_to_save:Nothing changed`;
 
   private readonly snack = inject(MatSnackBar);
 

@@ -38,7 +38,9 @@ decisions, and two of them is none.
 
 HSTS is sent **only over TLS**, whatever `hstsMaxAge` says. A browser remembers it
 for months and would then refuse plain HTTP, which is how a development gateway
-becomes unreachable. It is sent with `includeSubDomains`.
+becomes unreachable. It is sent with `includeSubDomains`. For every route at
+once, HSTS follows **Force HTTPS** on the TLS screen; a value set here wins over
+it.
 
 `X-XSS-Protection` and the other two IE-era headers are not sent at all: current
 browsers ignore them.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"html"
 	"net/http"
 	"net/url"
 	"strings"
@@ -48,6 +49,21 @@ func TestDeveloperHub(t *testing.T) {
 	// answers "" and every Contains on it passes for the wrong reason - which
 	// is how the assertion that used to guard the API entry was green while
 	// testing nothing at all.
+	// The tunnel ships off: no key is offered for a door that is not there,
+	// and a bookmarked key page says why rather than looking broken.
+	if body := bodyString(do(t, mux, "GET", "/profile/dev", nil, devC)); strings.Contains(body, `href="/profile/dev/key"`) {
+		t.Fatal("the hub offered the plug key with the tunnel off")
+	}
+	if res := do(t, mux, "GET", "/profile/dev/key", nil, devC); res.Code != http.StatusForbidden || !strings.Contains(bodyString(res), "Infra, Plug") {
+		t.Fatalf("key page with the tunnel off: code=%d", res.Code)
+	}
+	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC)); strings.Contains(body, `"plug":true`) {
+		t.Fatalf("the user button offers the key with the tunnel off: %s", body)
+	}
+	if err := st.SetSetting(ctx, store.SettingPlug, store.PlugSetting{Enabled: true, Host: "dev.example.com", Port: 30222}); err != nil {
+		t.Fatal(err)
+	}
+
 	hub := do(t, mux, "GET", "/profile/dev", nil, devC)
 	hubBody := bodyString(hub)
 	if hub.Code != http.StatusOK || !strings.Contains(hubBody, `href="/profile/dev/key"`) {
@@ -71,12 +87,64 @@ func TestDeveloperHub(t *testing.T) {
 	// The key sub-page renders its form, and something that is not a public
 	// key is refused there.
 	key := do(t, mux, "GET", "/profile/dev/key", nil, devC)
-	if key.Code != http.StatusOK || !strings.Contains(bodyString(key), "ssh-ed25519") {
+	keyBody := bodyString(key)
+	if key.Code != http.StatusOK || !strings.Contains(keyBody, "ssh-ed25519") {
 		t.Fatalf("key page: code=%d", key.Code)
+	}
+	// The commands carry the address developers use, as Infra, Plug records
+	// it - copied, not translated.
+	for _, want := range []string{
+		"-p 30222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@dev.example.com install | sh",
+		"install-windows | bash -s -- dev.example.com 30222",
+		"plug keygen -p dev.example.com",
+		"plug pubkey -p dev.example.com",
+	} {
+		if !strings.Contains(keyBody, want) {
+			t.Errorf("the key page does not carry %q", want)
+		}
 	}
 	bad := do(t, mux, "POST", "/profile/dev-key", url.Values{"key": {"not a key"}}, devC)
 	if bad.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("bad key: code=%d, want 422", bad.Code)
+	}
+
+	// Two workstations, two keys: both listed, each removable on its own, and
+	// each step a line of the trail named by the fingerprint.
+	var lines []string
+	for range 2 {
+		pub, _, _ := ed25519.GenerateKey(rand.Reader)
+		pk, _ := ssh.NewPublicKey(pub)
+		line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pk)))
+		lines = append(lines, line)
+		if res := do(t, mux, "POST", "/profile/dev-key", url.Values{"key": {line}}, devC); res.Code != http.StatusSeeOther {
+			t.Fatalf("adding a key: code=%d", res.Code)
+		}
+	}
+	if res := do(t, mux, "POST", "/profile/dev-key", url.Values{"key": {lines[0]}}, devC); res.Code != http.StatusConflict {
+		t.Fatalf("the same key twice: code=%d, want 409", res.Code)
+	}
+	keys, _ := st.ListDevKeys(ctx, "d")
+	if len(keys) != 2 {
+		t.Fatalf("keys after two additions: %d", len(keys))
+	}
+	// Unescaped: a fingerprint's "+" is written as an entity in the HTML.
+	page := html.UnescapeString(bodyString(do(t, mux, "GET", "/profile/dev/key", nil, devC)))
+	for _, k := range keys {
+		if !strings.Contains(page, k.Fingerprint) {
+			t.Errorf("the page does not list %s", k.Fingerprint)
+		}
+	}
+	do(t, mux, "POST", "/profile/dev-key", url.Values{"action": {"remove"}, "id": {keys[0].ID}}, devC)
+	if left, _ := st.ListDevKeys(ctx, "d"); len(left) != 1 || left[0].ID != keys[1].ID {
+		t.Fatalf("after removing one: %+v", left)
+	}
+	trail, _ := st.ListAuditEvents(ctx, store.AuditFilter{Kind: store.AuditKindSecurity})
+	seen := map[string]int{}
+	for _, e := range trail {
+		seen[e.Action]++
+	}
+	if seen[secDevKeyAdd] != 2 || seen[secDevKeyRemove] != 1 {
+		t.Fatalf("the trail holds %v", seen)
 	}
 
 	// A non-dev is refused at the hub and the sub-page.
@@ -153,11 +221,12 @@ func TestTheButtonOffersTheDeveloperKey(t *testing.T) {
 	devC := postLogin(t, mux, url.Values{"username": {"devon"}, "password": {"s3cret"}}).Result().Cookies()[0]
 	bobC := postLogin(t, mux, url.Values{"username": {"bob"}, "password": {"s3cret"}}).Result().Cookies()[0]
 
-	// The label rides in the payload, because the component's JS is cached for
-	// five minutes and this is not.
+	// The developer rows name themselves in English in the component - they
+	// open a developer's tools, which this product does not translate - so what
+	// travels is the STATE, not the wording: whether a key is deposited.
 	body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC))
-	if !strings.Contains(body, `"devKey"`) {
-		t.Fatalf("the menu label for the key does not travel: %s", body)
+	if !strings.Contains(body, `"devDocs":true`) {
+		t.Fatalf("the developer submenu is not offered to a dev: %s", body)
 	}
 	// No key deposited yet, so no check mark to claim otherwise.
 	if strings.Contains(body, `"devKey":true`) {
@@ -172,7 +241,7 @@ func TestTheButtonOffersTheDeveloperKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetUserDevKey(ctx, "d", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pk)))); err != nil {
+	if _, err := st.AddDevKey(ctx, "d", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pk)))); err != nil {
 		t.Fatal(err)
 	}
 	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC)); !strings.Contains(body, `"devKey":true`) {
@@ -205,8 +274,21 @@ func TestTheProfileReturnsWhereYouWere(t *testing.T) {
 		ID: "embed", Name: "embed", Order: 1, Enabled: true, IsUI: true,
 		Upstream:   "http://example.invalid",
 		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/embed/**"}}}},
-		UI:         &store.RouteUI{Link: "NEO"},
 	}); err != nil {
+		t.Fatal(err)
+	}
+	// And catalogued, which is what puts an application in the menu now: the
+	// route existing is no longer enough (PORTAL-03).
+	portal := store.PortalConfig{Mode: store.PortalModeLinks,
+		Entries: []store.PortalEntry{{RouteID: "embed", Label: "NEO"}}}
+	routes, err := st.ListRoutes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()

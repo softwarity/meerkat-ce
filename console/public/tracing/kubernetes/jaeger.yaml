@@ -1,0 +1,62 @@
+# kubectl apply -f jaeger.yaml
+#
+# A collector and somewhere to read traces, in one object each. For a cluster
+# that keeps traces for real, the Jaeger Operator (or Grafana Tempo, which
+# stores on object storage and costs far less at volume) is what you want -
+# this is the shape, not the capacity plan.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  labels: { app: jaeger }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: jaeger }
+  template:
+    metadata:
+      labels: { app: jaeger }
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:latest
+          env:
+            # In memory, and it says so: a pod restart loses the traces. Swap
+            # for badger with a volume, or for a real backend, before anybody
+            # depends on yesterday.
+            - { name: SPAN_STORAGE_TYPE, value: memory }
+            # The UI is served behind a Meerkat route, and it has to know the
+            # prefix it answers under.
+            - { name: QUERY_BASE_PATH, value: /jaeger }
+          ports:
+            - { name: otlp-http, containerPort: 4318 }
+            - { name: ui, containerPort: 16686 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+spec:
+  # ClusterIP, and said out loud: NOTHING here leaves the cluster. No
+  # NodePort, no LoadBalancer, no Ingress. The gateway reaches the collector
+  # on 4318 from inside, and a person reaches the UI through a route on the
+  # gateway - which is the whole point: your traces are behind the sign-in you
+  # already have, rather than behind a second door somebody has to protect.
+  type: ClusterIP
+  selector: { app: jaeger }
+  ports:
+    - { name: otlp-http, port: 4318, targetPort: otlp-http }
+    - { name: ui, port: 16686, targetPort: ui }
+
+# Then, in the console: Infra, OpenTelemetry. Set the collector address to
+# http://jaeger.<namespace>.svc:4318 - or just http://jaeger:4318 when the
+# gateway runs in this namespace - and press Test: it posts an empty batch and
+# says what answered.
+#
+# And give the UI a route on the gateway: path /jaeger/**, strip-prefix 1,
+# upstream http://jaeger:16686, marked as a UI route. That is the only way in,
+# and it is the one that passes your own sign-in.

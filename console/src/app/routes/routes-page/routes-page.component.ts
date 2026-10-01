@@ -16,6 +16,7 @@ import { forkJoin } from 'rxjs';
 import { ApiService, CatalogEntry, Edition, Maintenance, Route, RouteHealth } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { ChangeRow, LiveChangesService } from '../../shared/live-changes.service';
 import { RouteEditorComponent } from '../route-editor/route-editor.component';
 import { RouteProbeDialogComponent } from '../route-probe-dialog.component';
 import { RoutesTableComponent } from '../routes-table/routes-table.component';
@@ -76,6 +77,14 @@ export class RoutesPageComponent {
   // port or an ingress sits between them.
   private readonly editionRes = httpResource<Edition>(() => '/api/edition');
   protected readonly dataOrigin = computed(() => this.editionRes.value()?.dataOrigin ?? '');
+  protected readonly tracingOn = signal(false);
+
+  private readTracing(): void {
+    this.api.telemetrySetting().subscribe({
+      next: (t) => this.tracingOn.set(t.enabled && t.traces),
+      error: () => {},
+    });
+  }
   protected readonly catalog = signal<CatalogEntry[]>([]);
 
   // The Global drawer, and the one piece of its state this page needs on its
@@ -118,9 +127,111 @@ export class RoutesPageComponent {
     // fetched must not put a red box in front of them.
     this.api.maintenance().subscribe({ next: (m) => this.maintenance.set(m), error: () => {} });
     this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
+    // Whether traces leave at all, for the mark beside each traced route. Read
+    // again when a setting moves, silently: it changes a mark, not a form, so
+    // there is nothing to ask anybody.
+    this.readTracing();
+    inject(LiveChangesService).on('settings', () => this.readTracing());
+    // Somebody else's write (CONSOLE-13): the list follows a route created,
+    // renamed, reordered or deleted anywhere, and the health badge with it -
+    // a route that stopped compiling is exactly the news this screen is for.
+    //
+    // With ONE exception, and it is the whole reason this is not two lines: the
+    // list is what feeds the open editor, so reloading it while somebody is
+    // typing in that route would reseed their draft and take the typing with
+    // it. In that case the list waits and the editor says so instead. A write
+    // to ANOTHER route is no such problem, which is what the event's own
+    // targetId answers.
+    inject(LiveChangesService).on('route', (change) => {
+      const open = this.editingRoute();
+      // A DELETION of the route in the drawer wins over everything below,
+      // unsaved work included: there is nothing left to edit, and an editor
+      // sitting on a row that no longer exists lets somebody keep working
+      // towards a 409. It says who did it and closes.
+      if (open && change.targetId === open.id && change.action?.endsWith('.delete')) {
+        this.deletedBy = change.actor ?? '';
+        this.refresh();
+        return;
+      }
+      if (open && this.editorDirty() && (!change.targetId || change.targetId === open.id)) {
+        // Is it somebody else's? The event says WHO by account name, and two
+        // tabs of one operator are the very case this feature is about - so
+        // the account is no answer. The REVISION is: what this screen holds is
+        // what it last saved or last read, and a write that left it where it
+        // is is this screen's own. Asked of the gateway rather than guessed,
+        // because "I saved a second ago" is a race and a revision is a fact.
+        this.api.getRoute(open.id).subscribe({
+          next: (fresh) => {
+            if (fresh.rev === open.rev) return; // ours: nothing to say
+            this.changedUnderEdit.set(change);
+          },
+          error: () => this.changedUnderEdit.set(change),
+        });
+        return;
+      }
+      this.apply(change);
+    });
+  }
+
+  // What one write costs this screen.
+  //
+  // A write NAMES the row it touched, so a save on one route costs one GET
+  // rather than the whole list - which is what matters on the installations
+  // this is written for, where the list is not five rows. A write that names
+  // nothing (a reorder, a configuration import, a gap in the journal after a
+  // laptop woke up) moved rows nobody named, and there the list is the answer.
+  //
+  // A creation and a deletion go through the list too, deliberately: where a
+  // new route lands is decided by its order, and the gateway is what knows it.
+  private apply(change: ChangeRow): void {
+    const id = change.targetId;
+    if (!id || !change.action?.endsWith('.update')) {
+      this.refresh();
+      return;
+    }
+    if (!this.routes().some((r) => r.id === id)) {
+      // Not on this screen - a route the filter hides, or one this reader has
+      // never listed. Nothing to reload, and asking for it would be asking the
+      // gateway about a row nobody is showing.
+      return;
+    }
+    this.api.getRoute(id).subscribe({
+      next: (fresh) => {
+        // A NEW array holding a NEW object. The table takes its rows through an
+        // input signal, and this application is zoneless: mutating the route in
+        // place, or writing back the array this signal already holds, changes
+        // what is on screen for nobody - the reference is what is compared, and
+        // there is no zone to notice the rest.
+        this.routes.update((list) => list.map((r) => (r.id === fresh.id ? fresh : r)));
+        // The badge follows the same write: a route that stopped compiling is
+        // exactly the news this screen is for.
+        this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
+      },
+      // Gone between the write and this read - or refused. The list settles it.
+      error: () => this.refresh(),
+    });
+  }
+
+  // The list and the health badge, as the gateway has them now.
+  private refresh(): void {
+    this.load(true);
+    this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
+  }
+
+  // What somebody else did to the route being edited, while it holds unsaved
+  // changes. Cleared by whatever settles it: reloading, saving, or closing.
+  protected readonly changedUnderEdit = signal<ChangeRow | null>(null);
+
+  // The reader asked for it, so the editor IS reseeded - that is what Reload
+  // means here, and it is why the banner does not do it on its own.
+  protected reloadUnderEdit(): void {
+    this.changedUnderEdit.set(null);
+    this.load(true, true);
+    this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
   }
 
   protected openEdit(route: Route): void {
+    this.changedUnderEdit.set(null);
     void this.router.navigate(['/infra/routes', route.id, 'target']);
   }
 
@@ -190,7 +301,11 @@ export class RoutesPageComponent {
       });
       if (!ok) return;
     }
+    // Whatever was waiting on the open editor is settled by leaving it: the
+    // list reloads on its own from here.
+    this.changedUnderEdit.set(null);
     void this.router.navigate(['/infra/routes']);
+    this.refresh();
   }
 
   protected changeSection(s: string): void {
@@ -198,16 +313,63 @@ export class RoutesPageComponent {
     if (e && e !== 'new') void this.router.navigate(['/infra/routes', e.id, s]);
   }
 
-  load(): void {
-    this.loading.set(true);
+  // quiet skips the loading state, which is what a reload nobody asked for
+  // needs: a push that replaced the list with a spinner would take the screen
+  // away from somebody reading it, to show them the same list a moment later.
+  load(quiet = false, adopt = false): void {
+    if (!quiet) this.loading.set(true);
     forkJoin({ catalog: this.api.catalog(), routes: this.api.listRoutes() }).subscribe({
       next: ({ catalog, routes }) => {
         this.catalog.set(catalog);
-        this.routes.set(routes);
+        this.routes.set(this.mindTheOpenEditor(routes, adopt));
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  // A fresh list, minus what it would break in the drawer.
+  //
+  // The editor reads the route out of THIS list, so replacing the list reseeds
+  // its draft - and a reload nobody asked for would throw away somebody's
+  // typing because a colleague created an unrelated route. So while the editor
+  // holds unsaved work, the open route keeps the object the editor was seeded
+  // from, and the news is put in the banner instead.
+  //
+  // The route being edited DISAPPEARING is the other case, and it is not about
+  // dirtiness: a drawer that closes by itself while somebody is reading it owes
+  // them a word about why.
+  private mindTheOpenEditor(fresh: Route[], adopt: boolean): Route[] {
+    const open = this.editingRoute();
+    if (!open) return fresh;
+    const now = fresh.find((r) => r.id === open.id);
+    if (!now) {
+      this.sayDeleted(open, this.deletedBy);
+      return fresh;
+    }
+    if (!this.editorDirty() || adopt) return fresh;
+    if (JSON.stringify(now) !== JSON.stringify(open)) {
+      // Changed, and nothing told us by whom - an import, or a gap in the
+      // journal. The banner says so without naming anyone.
+      this.changedUnderEdit.update((known) => known ?? { kind: 'route', at: Date.now() / 1000 } as ChangeRow);
+    }
+    return fresh.map((r) => (r.id === open.id ? open : r));
+  }
+
+  // Who deleted the route under the editor, when the write named them.
+  private deletedBy = '';
+
+  private sayDeleted(open: Route, by: string): void {
+    this.deletedBy = '';
+    this.changedUnderEdit.set(null);
+    this.snack.open(
+      by
+        ? $localize`:@@NAME_deleted_this_route_while_you_were_editing:${by}:NAME: deleted the route "${open.name}:ROUTE:" while you were editing it. Your changes were not saved.`
+        : $localize`:@@This_route_was_deleted_while_you_were_editing:The route "${open.name}:ROUTE:" was deleted while you were editing it. Your changes were not saved.`,
+      undefined,
+      { duration: 10000 },
+    );
+    void this.router.navigate(['/infra/routes']);
   }
 
   // Save keeps the drawer OPEN: the URL stays (or gains the fresh id after a
@@ -217,7 +379,17 @@ export class RoutesPageComponent {
     if (this.editing() === 'new') {
       void this.router.navigate(['/infra/routes', saved.id, 'target'], { replaceUrl: true });
     }
-    this.load();
+    // Saved, so there is nothing left to warn about: this copy IS the current
+    // one now - the gateway refused it otherwise (409, and the interceptor says
+    // so).
+    //
+    // ADOPTING, and that is what was missing: the draft is still "dirty"
+    // against the list until the list carries what was just saved, so a plain
+    // reload took the guard below and KEPT the old object - the draft was never
+    // reseeded, dirty stayed true for ever, and every write from then on raised
+    // the banner. Two saves in a row and the editor was unusable.
+    this.changedUnderEdit.set(null);
+    this.load(false, true);
   }
 
   // Persist a drag-reorder: apply optimistically, then save (order is

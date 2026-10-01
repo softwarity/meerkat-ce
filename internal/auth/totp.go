@@ -10,12 +10,12 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/mfa"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/useragent"
 )
 
 // trustCookieName carries the opaque trusted-browser token (MFA-03) - a factor
@@ -94,52 +94,7 @@ func (h *Handler) issueTrust(w http.ResponseWriter, r *http.Request, userID stri
 // style, derived from the User-Agent with a light sniff - no parsing library
 // (offline-first); an unrecognized UA falls back to its head, trimmed.
 func browserLabel(r *http.Request) string {
-	ua := strings.TrimSpace(r.UserAgent())
-	if ua == "" {
-		return "Unknown browser"
-	}
-	browser := ""
-	switch {
-	case strings.Contains(ua, "Edg/"):
-		browser = "Edge"
-	case strings.Contains(ua, "OPR/") || strings.Contains(ua, "Opera"):
-		browser = "Opera"
-	case strings.Contains(ua, "Chrome/"):
-		browser = "Chrome"
-	case strings.Contains(ua, "Firefox/"):
-		browser = "Firefox"
-	case strings.Contains(ua, "Safari/"):
-		browser = "Safari"
-	}
-	osName := ""
-	switch {
-	case strings.Contains(ua, "iPhone"):
-		osName = "iPhone"
-	case strings.Contains(ua, "iPad"):
-		osName = "iPad"
-	case strings.Contains(ua, "Android"):
-		osName = "Android"
-	case strings.Contains(ua, "Mac OS X"), strings.Contains(ua, "Macintosh"):
-		osName = "macOS"
-	case strings.Contains(ua, "Windows"):
-		osName = "Windows"
-	case strings.Contains(ua, "CrOS"):
-		osName = "ChromeOS"
-	case strings.Contains(ua, "Linux"):
-		osName = "Linux"
-	}
-	switch {
-	case browser != "" && osName != "":
-		return browser + " - " + osName
-	case browser != "":
-		return browser
-	case osName != "":
-		return osName
-	}
-	if len(ua) > 60 {
-		ua = ua[:60]
-	}
-	return ua
+	return useragent.Label(r.UserAgent())
 }
 
 // ttlDays renders an ISO-8601 trust duration as a whole number of days for the
@@ -256,6 +211,13 @@ func (h *Handler) doTOTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.verifySecondFactor(r, sess.UserID, r.PostFormValue("code")) {
 		h.regLimit.hit(r.Context(), totpKey)
+		// A wrong second factor is the line that matters most: whoever typed
+		// it already had the password. Bounded like the password's: the code
+		// that trips the throttle says so, the ones after it write nothing.
+		h.securityOf(r, secSigninRefused, sess.UserID, refusedCode)
+		if pol.TotpAttempts > 0 && h.regLimit.count(r.Context(), totpKey, window) == pol.TotpAttempts {
+			h.securityOf(r, secSigninLocked, sess.UserID, refusedCode)
+		}
 		h.renderChallenge(w, r, h.tr(r, "errBadCode"), http.StatusUnprocessableEntity)
 		return
 	}
@@ -472,6 +434,7 @@ func (h *Handler) doProfileMFA(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		h.securityOf(r, secMFAEnroll, sess.UserID, "")
 		writeFlow(w, totpEnrollPage, totpEnrollData{
 			flowChrome: h.flowData(r, "titleSetupTwoFactor"),
 			Scratch:    plain, Action: "/profile/mfa", Cancel: "/profile",
@@ -487,6 +450,7 @@ func (h *Handler) doProfileMFA(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		h.securityOf(r, secMFARemove, sess.UserID, "")
 		_ = h.st.RevokeAllTrustedBrowsers(r.Context(), sess.UserID)
 		http.Redirect(w, r, "/profile", http.StatusSeeOther)
 	case "revoke":
@@ -563,6 +527,7 @@ func (h *Handler) confirmEnrolment(w http.ResponseWriter, r *http.Request, userI
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return nil, false
 	}
+	h.securityOf(r, secMFAEnroll, userID, "")
 	// Replacing the authenticator invalidates every remembered browser: old
 	// trust must not skip the new factor (no-op on a first enrolment).
 	_ = h.st.RevokeAllTrustedBrowsers(r.Context(), userID)
@@ -664,7 +629,7 @@ const totpEnrollBody = `    <style>
         border-radius: var(--mk-radius-small); background: #fff; padding: 10px;
       }
       .secret {
-        margin: 0; text-align: center; font-family: var(--mk-mono); font-size: .8rem;
+        margin: 0; padding: 8px 42px; text-align: center; font-family: var(--mk-mono); font-size: .8rem;
         letter-spacing: .12em; word-break: break-all; color: var(--mk-on-surface-variant);
       }
       .codes {
@@ -681,7 +646,7 @@ const totpEnrollBody = `    <style>
     <form method="post" action="{{.Action}}">
       <p class="lead">{{.T.saveBackupCodes}}</p>
       <p class="hint">{{.T.backupHint}}</p>
-      <ul class="codes">{{range .Scratch}}<li>{{.}}</li>{{end}}</ul>
+      <ul class="codes" data-copy>{{range .Scratch}}<li>{{.}}</li>{{end}}</ul>
       <input type="hidden" name="step" value="ack">
       <button type="submit">{{.T.savedContinue}}</button>
     </form>
@@ -691,7 +656,7 @@ const totpEnrollBody = `    <style>
       {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
       <p class="hint">{{.T.scanHint}}</p>
       {{if .QR}}<img class="qr" src="{{.QR}}" alt="{{.T.qrAlt}}" width="200" height="200">{{end}}
-      <p class="secret" aria-label="{{.T.setupKey}}">{{.Secret}}</p>
+      <p class="secret" data-copy aria-label="{{.T.setupKey}}">{{.Secret}}</p>
       <label class="field">
         <span>{{.T.sixDigitCode}}</span>
         <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" autofocus required>

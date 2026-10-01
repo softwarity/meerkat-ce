@@ -2,6 +2,8 @@ package filters
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -156,7 +158,74 @@ func RewriteBody(res *http.Response, transform func([]byte) []byte) error {
 	// changed, a cache would serve one under the name of the other - and the
 	// next conditional request would be answered 304 with the wrong body.
 	res.Header.Del("ETag")
+	// And the caching rules, for the same reason: they describe a document
+	// that no longer exists. Without this, a configuration change in the
+	// console lands only after the upstream's max-age has run out.
+	Rewritten(res.Header)
+	validate(res, out)
 	return nil
+}
+
+// validate gives a rewritten page a validator of its own, and answers the
+// revalidation itself (PERF-06).
+//
+// no-cache makes the browser ask before every reuse, which is right - the
+// page may carry the PREVIOUS configuration - but without a validator every
+// asking was a full download of a page that had not changed. So: an ETag over
+// the bytes actually sent, and a 304 when the browser presents it. A change in
+// the console changes the bytes, so the hash, so the next request gets the new
+// page; nothing changed, and the answer is empty.
+//
+// STRONG, because it is computed over the exact octets of this representation
+// - the encoded ones, so a gzip body and a plain body of the same page are two
+// validators, as they must be. Several filters may rewrite one response in
+// turn: each pass hashes what it produced, so only the last pass's tag is the
+// one a browser can hold, and an earlier pass can only match when every later
+// one left the bytes alone - when its tag IS the final one.
+//
+// Only on a 200, and never on a response kept from every cache (no-store): a
+// page stamped for one person is not to be revalidated, it is not to be kept.
+func validate(res *http.Response, out []byte) {
+	if res.StatusCode != http.StatusOK ||
+		strings.Contains(strings.ToLower(res.Header.Get("Cache-Control")), "no-store") {
+		return
+	}
+	sum := sha256.Sum256(out)
+	etag := `"mk-` + hex.EncodeToString(sum[:16]) + `"`
+	res.Header.Set("ETag", etag)
+	req := res.Request
+	if req == nil || (req.Method != http.MethodGet && req.Method != http.MethodHead) {
+		return
+	}
+	if !etagMatches(req.Header.Get("If-None-Match"), etag) {
+		return
+	}
+	// The browser already holds these very bytes.
+	_ = res.Body.Close()
+	res.StatusCode = http.StatusNotModified
+	res.Status = "304 Not Modified"
+	res.Body = http.NoBody
+	res.ContentLength = 0
+	res.Header.Del("Content-Length")
+}
+
+// etagMatches is If-None-Match's comparison: WEAK (RFC 9110 13.1.2), so a W/
+// on either side does not matter, over a list of tags or "*".
+func etagMatches(header, etag string) bool {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return false
+	}
+	if header == "*" {
+		return true
+	}
+	want := strings.TrimPrefix(etag, "W/")
+	for _, t := range strings.Split(header, ",") {
+		if strings.TrimPrefix(strings.TrimSpace(t), "W/") == want {
+			return true
+		}
+	}
+	return false
 }
 
 // joined is what a body handed back in two pieces has to be: the bytes already

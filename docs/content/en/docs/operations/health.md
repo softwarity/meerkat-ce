@@ -1,7 +1,7 @@
 ---
 title: Health probes
 section: Operations
-order: 212
+order: 213
 summary: Which of /healthz and /readyz answers what, and why the liveness probe never touches the database.
 ---
 
@@ -9,7 +9,7 @@ summary: Which of /healthz and /readyz answers what, and why the liveness probe 
 
 Two probes, served on **both** planes, answering two different questions. Pointing
 an orchestrator at the wrong one is the most expensive mistake available here, so
-they are kept apart on purpose (OBS-02).
+they are kept apart on purpose.
 
 ## /healthz is liveness
 
@@ -31,11 +31,11 @@ It decides whether to **send traffic**, so it asks the two questions that make a
 node useless:
 
 - **does the store answer?** A ping, bounded to two seconds. A readiness check that
-  hangs is a readiness check that says nothing, and the orchestrator's own timeout
-  then decides on no information at all.
+ hangs is a readiness check that says nothing, and the orchestrator's own timeout
+ then decides on no information at all.
 - **has the router compiled its table at least once?** A node that has accepted
-  connections but never compiled answers `404` to everything, which a rolling
-  update happily reads as a healthy instance and feeds live traffic.
+ connections but never compiled answers `404` to everything, which a rolling
+ update happily reads as a healthy instance and feeds live traffic.
 
 On failure it is a `503` **with the reason**, because an operator reading a probe
 failure needs to know which of the two it was.

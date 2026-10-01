@@ -15,10 +15,15 @@
   </p>
   @if (data(); as d) {
     <!-- Both labels sit ON the border, the way an outlined field carries its
-         own: they name the box without taking a line inside it. And it is
-         "JWKS", not "JWKS (data plane)" - a plane is a word from this
-         product's own vocabulary, and it was answering a question nobody had
-         asked. -->
+         own: they name the box without taking a line inside it.
+         The path used to stand alone, on the grounds that naming a plane was
+         this product's vocabulary answering a question nobody had asked. The
+         person who wrote the product asked it: which port is this on. A
+         RELATIVE path has no answer written in it, and the console cannot
+         build the absolute one - the gateway answers on whatever addresses an
+         installation gives it, and none of them is this console's. So the line
+         below says which address to put in front, in the reader's terms rather
+         than in ours. -->
     <div class="jwks">
       <span class="lbl" i18n="@@JWKS_endpoint">JWKS</span>
       <span class="badge" i18n="@@Recommended">Recommended</span>
@@ -34,12 +39,14 @@
     <!-- The choice and its consequence, rather than the mechanism: what a
          reader has to leave with is that one path costs nothing forever and
          the other is theirs to maintain forever. -->
-    <p class="fallback" i18n="@@Static_fallback">
-      The recommended path, and the only one where rotating costs nothing: a service reads this
-      once, caches it, and reads it again the day a token names a key it does not know. Rotate, and
-      it finds the new one on its own. A service that cannot fetch a JWKS takes the PEM from its
-      row below instead - and then every rotation means going back to every service holding one,
-      which is why that is the fallback and not the plan.
+    <p class="fallback" i18n="@@Static_fallback2">
+      Served by the gateway itself, at the address your services already use to reach it - the one
+      the route answers on, not this console's. A service that fetches it DECLARES NOTHING: no key
+      to paste, no setting to keep in step. It reads this once, caches it, and reads it again the
+      day a token names a key it does not know - so a rotation reaches it on its own. A service
+      that cannot fetch a JWKS takes the PEM from its row below instead, and then every rotation
+      means going back to every service holding one, which is why that is the fallback and not the
+      plan.
     </p>
 
     @for (k of d.keys; track k.algorithm) {

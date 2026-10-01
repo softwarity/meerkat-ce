@@ -35,6 +35,18 @@ La gateway est un unique binaire Go sans dépendance : elle sert le plan de
 données sur un port et sa console d'administration sur un autre. Rien d'autre
 n'a besoin d'être installé pour la faire tourner.
 
+Ce que ça donne en chiffres : l'image Community pèse **70 Mo** - moins de 20 Mo
+à télécharger, une fois les couches compressées - et le binaire ne dépend que de
+**douze bibliothèques directes**, en Go pur : pas de CGO, donc rien à installer
+sur l'hôte et rien qui se compile différemment selon la machine. C'est ce qui
+rend la ligne « 1 pod » du [dossier](/product/the-case) tenable plutôt que
+théorique.
+
+L'image Enterprise pèse **190 Mo**, et l'écart n'est pas la passerelle : ce sont
+les **clients [plug](/product/dev-mode)** qu'elle distribue elle-même, un binaire
+signé par système et par architecture, soit 80 Mo qu'un développeur récupère
+depuis la passerelle plutôt que depuis un site de téléchargement.
+
 ## Pourquoi ce nom
 
 ::: figure meerkat
@@ -46,6 +58,6 @@ Le suricate est la sentinelle de la nature : il monte la garde à l'entrée du
 terrier et donne l'alerte, pour que le reste de la colonie travaille sans avoir
 à s'inquiéter de rien. C'est exactement ce que cette passerelle fait pour vos
 services. Même le tunnel [plug](https://github.com/softwarity/plug) entre dans
-l'image : c'est par lui que la machine d'un développeur se creuse un chemin
+le tableau : c'est par lui que la machine d'un développeur se creuse un chemin
 jusqu'au terrier. Et comme un groupe de suricates s'appelle une *mob*, vous
 savez déjà comment nommer un cluster de nœuds Meerkat.

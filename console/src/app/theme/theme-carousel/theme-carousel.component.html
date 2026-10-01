@@ -1,18 +1,23 @@
 <div class="rail">
-  <!-- Infinite ring of pills, spread across the width. -->
+  <!-- Infinite ring of pills, spread across the width. The presets ride in it
+       read-only: they are code, they cannot be deleted, so there is nothing to
+       put back and no "+" to put it back with. A pill names itself in its
+       tooltip - four swatches and a word would be a crowded pill. -->
   <div class="track">
-    @for (t of themes(); track t.id; let i = $index) {
+    @for (t of ring(); track t.id; let i = $index) {
       @let o = offset(i);
       <button
         class="pill"
         [class.slide]="o >= -3 && o <= 3"
         [class.centered]="o === 0"
         [class.active]="t.active"
+        [class.preset]="isPreset(t)"
         [style.left]="leftFor(o)"
         [attr.aria-current]="t.active ? 'true' : null"
+        [matTooltip]="label(t)"
+        matTooltipPosition="above"
         (click)="pick.emit(t)"
-        i18n-aria-label="@@Theme_swatches"
-        aria-label="Theme"
+        [attr.aria-label]="label(t)"
       >
         <span class="swatch" [style.background]="t.dark['surface']"></span>
         <span class="swatch" [style.background]="t.dark['primary']"></span>
@@ -24,70 +29,32 @@
 
   @if (selected(); as t) {
     <div class="nav">
-      <!-- Current theme's palette as a pill, straddling the nav block's top edge.
-           Clicking it makes this theme live. -->
+      <button matIconButton (click)="prev()" i18n-aria-label="@@Previous_theme" aria-label="Previous theme">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <!-- The centre pill is the ACTIVATE control, and it warns while the theme
+           under it is not the one visitors see. Navigating only selects - it
+           would be a poor arrow that pushed a half-set palette live - so
+           without this the gap between "what I am editing" and "what is
+           served" is invisible, and an admin leaves believing they shipped. -->
       <button
         class="current-pill"
         [class.active]="t.active"
+        [class.warn]="!t.active"
         (click)="t.active || activateTheme.emit(t)"
         [attr.aria-pressed]="t.active"
         [matTooltip]="t.active ? tipActive : tipActivate"
         matTooltipPosition="above"
-        i18n-aria-label="@@Set_active"
-        aria-label="Set active"
+        [attr.aria-label]="t.active ? tipActive : tipActivate"
       >
         <span class="swatch" [style.background]="t.dark['surface']"></span>
         <span class="swatch" [style.background]="t.dark['primary']"></span>
         <span class="swatch" [style.background]="t.light['surface']"></span>
         <span class="swatch" [style.background]="t.light['primary']"></span>
       </button>
-
-      <div class="controls">
-        <button matIconButton (click)="prev()" i18n-aria-label="@@Previous_theme" aria-label="Previous theme">
-          <mat-icon>chevron_left</mat-icon>
-        </button>
-        <button
-          matIconButton
-          [matMenuTriggerFor]="addMenu"
-          i18n-matTooltip="@@Add_theme"
-          matTooltip="Add theme"
-          i18n-aria-label="@@Add_theme"
-          aria-label="Add theme"
-        >
-          <mat-icon>add</mat-icon>
-        </button>
-        <button
-          matIconButton
-          (click)="removeTheme.emit(t)"
-          [disabled]="t.active"
-          i18n-matTooltip="@@Delete"
-          matTooltip="Delete"
-          i18n-aria-label="@@Delete"
-          aria-label="Delete"
-        >
-          <mat-icon>delete</mat-icon>
-        </button>
-        <button matIconButton (click)="next()" i18n-aria-label="@@Next_theme" aria-label="Next theme">
-          <mat-icon>chevron_right</mat-icon>
-        </button>
-      </div>
-    </div>
-
-    <mat-menu #addMenu="matMenu">
-      <button mat-menu-item (click)="duplicateTheme.emit(t)">
-        <mat-icon>content_copy</mat-icon>
-        <span i18n="@@Duplicate">Duplicate</span>
+      <button matIconButton (click)="next()" i18n-aria-label="@@Next_theme" aria-label="Next theme">
+        <mat-icon>chevron_right</mat-icon>
       </button>
-      <mat-divider></mat-divider>
-      @for (p of presets(); track p.id) {
-        <button mat-menu-item (click)="createPreset.emit(p)">
-          <span class="preset-swatches">
-            <span class="swatch" [style.background]="p.dark['primary']"></span>
-            <span class="swatch" [style.background]="p.light['primary']"></span>
-          </span>
-          <span>{{ p.name }}</span>
-        </button>
-      }
-    </mat-menu>
+    </div>
   }
 </div>

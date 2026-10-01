@@ -14,11 +14,17 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
         [(dark)]="scope.dark"
         [(light)]="scope.light"
         [(flat)]="scope.flat"
+        [(name)]="scope.name"
+        [readOnly]="scope.readOnly()"
+        [active]="!!scope.selected()?.active"
+        [dirty]="scope.dirty()"
         [pagesScheme]="scope.pagesScheme()"
         (pagesSchemeChange)="scope.setPagesScheme($event)"
         [saving]="scope.saving()"
         (hoverToken)="scope.hover($event)"
         (save)="scope.saveTheme()"
+        (duplicate)="scope.createFrom()"
+        (remove)="scope.removeSelected()"
       />
     }
   `,

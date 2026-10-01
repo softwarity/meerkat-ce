@@ -12,19 +12,27 @@ import (
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// Control-plane API tokens (foundation for headless management - a CLI or an
-// MCP server driving Meerkat, PLANNED). A control-plane token authenticates its
-// owner on the ADMIN port only (the plane isolation lives in session.Resolve),
-// so it carries no tenant/group context. Minting is root-only: the token acts
-// with the owner's capabilities, and only root should hand out control-plane
-// access. Only the token HASH is stored; the clear value is shown once.
+// Control-plane API tokens: what a CLI, a script or an agent presents on the
+// ADMIN port (the plane isolation lives in session.Resolve), so it carries no
+// tenant/group context. Only the token HASH is stored; the clear value is shown
+// once.
+//
+// WHO MAY MINT ONE: anybody who administers a domain, and each person only
+// ever sees and manages their OWN tokens. It used to be root's, on the grounds
+// that only root should hand out control-plane access - but a token hands out
+// nothing. It authenticates its owner, whose capabilities are read again from
+// the store on every request, and its perimeter only ever takes away (see
+// authed). An infra admin's token is an infra admin; revoke the capability and
+// every token that person minted loses it at the next call. Keeping minting at
+// root meant that an app admin who wanted an agent on their own domain had to
+// borrow root's credentials - the one outcome this design exists to prevent.
 func (a *API) registerAdminTokens(mux Mux) {
-	mux.Handle("GET /api/admin-tokens", a.rootOnly(a.listAdminTokens))
-	mux.Handle("POST /api/admin-tokens", a.rootOnly(a.createAdminToken))
-	mux.Handle("DELETE /api/admin-tokens/{id}", a.rootOnly(a.revokeAdminToken))
-	mux.Handle("PUT /api/admin-tokens/{id}", a.rootOnly(a.updateAdminToken))
-	mux.Handle("POST /api/admin-tokens/{id}/renew", a.rootOnly(a.renewAdminToken))
-	mux.Handle("POST /api/admin-tokens/{id}/toggle", a.rootOnly(a.toggleAdminToken))
+	mux.Handle("GET /api/admin-tokens", a.domainAdmin(a.listAdminTokens))
+	mux.Handle("POST /api/admin-tokens", a.domainAdmin(a.createAdminToken))
+	mux.Handle("DELETE /api/admin-tokens/{id}", a.domainAdmin(a.revokeAdminToken))
+	mux.Handle("PUT /api/admin-tokens/{id}", a.domainAdmin(a.updateAdminToken))
+	mux.Handle("POST /api/admin-tokens/{id}/renew", a.domainAdmin(a.renewAdminToken))
+	mux.Handle("POST /api/admin-tokens/{id}/toggle", a.domainAdmin(a.toggleAdminToken))
 }
 
 func (a *API) listAdminTokens(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -41,11 +49,10 @@ func (a *API) listAdminTokens(w http.ResponseWriter, r *http.Request, actor stor
 
 func (a *API) createAdminToken(w http.ResponseWriter, r *http.Request, actor store.User) {
 	var body struct {
-		Name   string `json:"name"`
-		Days   int    `json:"days"`   // 0 = never expires
-		Scope  string `json:"scope"`  // full | readonly, empty = the safe one
-		Domain string `json:"domain"` // gateway | app, empty = the whole plane
-		From   string `json:"from"`   // CIDR ranges, empty = anywhere
+		Name  string `json:"name"`
+		Days  int    `json:"days"`  // 0 = never expires
+		Scope string `json:"scope"` // full | readonly | metrics | schedules
+		From  string `json:"from"`  // CIDR ranges, empty = anywhere
 	}
 	if err := decodeStrict(r, &body); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())
@@ -60,11 +67,6 @@ func (a *API) createAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 		name = name[:60]
 	}
 	scope, err := store.SanitizeTokenScope(body.Scope)
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	domain, err := store.SanitizeTokenDomain(body.Domain)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -86,18 +88,18 @@ func (a *API) createAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 	id := newID()
 	if err := a.st.AddAPIToken(r.Context(), store.NewToken{
 		ID: id, UserID: actor.ID, Name: name, TokenHash: hash, Prefix: prefix,
-		Plane: store.PlaneAdmin, Scope: scope, Domain: domain, FromCIDRs: from,
+		Plane: store.PlaneAdmin, Scope: scope, FromCIDRs: from,
 		ExpiresAt: expiresAt,
 	}); err != nil {
 		a.internal(w, err)
 		return
 	}
 	a.auditEvent(r.Context(), actor, "token.create", "token", id, name, "",
-		"control-plane token, "+perimeterWords(scope, domain, from))
+		"control-plane token, "+perimeterWords(scope, from))
 	// The clear value travels exactly once, here.
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id": id, "name": name, "prefix": prefix, "token": secret,
-		"expiresAt": expiresAt, "scope": scope, "domain": domain, "fromCidrs": from,
+		"expiresAt": expiresAt, "scope": scope, "fromCidrs": from,
 	})
 }
 
@@ -138,7 +140,7 @@ func (a *API) renewAdminToken(w http.ResponseWriter, r *http.Request, actor stor
 		"a new secret; the previous one stops working")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": id, "name": before.Name, "prefix": prefix, "token": secret,
-		"expiresAt": before.ExpiresAt, "scope": before.Scope, "domain": before.Domain,
+		"expiresAt": before.ExpiresAt, "scope": before.Scope,
 		"fromCidrs": before.FromCIDRs,
 	})
 }
@@ -205,7 +207,7 @@ func (a *API) updateAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 	if body.Days > 0 {
 		expiresAt = time.Now().Add(time.Duration(body.Days) * 24 * time.Hour).Unix()
 	}
-	edit := store.TokenEdit{Name: name, Scope: body.Scope, Domain: body.Domain,
+	edit := store.TokenEdit{Name: name, Scope: body.Scope,
 		FromCIDRs: body.From, ExpiresAt: expiresAt}
 	existed, err := a.st.UpdateAPIToken(r.Context(), actor.ID, id, edit)
 	if err != nil {
@@ -297,14 +299,8 @@ func mintToken() (secret, hash, prefix string, err error) {
 // perimeterWords is the perimeter in the audit's own words. A trail saying
 // "control-plane token" for a read-only gateway token and for a root one alike
 // would be recording the least interesting half of the event.
-func perimeterWords(scope, domain, from string) string {
+func perimeterWords(scope, from string) string {
 	words := scope
-	switch domain {
-	case store.DomainGateway:
-		words += ", routing plane only"
-	case store.DomainApp:
-		words += ", application identity only"
-	}
 	if from != "" {
 		words += ", from " + from
 	}

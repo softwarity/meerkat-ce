@@ -16,6 +16,7 @@ import { ApiService, Settings, User } from "../../api.service";
 import { MeService } from "../../me.service";
 import { DialogsService } from "../../shared/dialogs.service";
 import { FormFieldComponent } from "../../shared/form-field.component";
+import { LiveChangesService } from "../../shared/live-changes.service";
 import { UserCreateComponent } from "../user-create.component";
 import {
   UserEditorComponent,
@@ -137,10 +138,15 @@ export class UsersPageComponent {
 
   constructor() {
     this.load();
+    // Somebody else's write (CONSOLE-13): an account created, disabled, given a
+    // capability or deleted anywhere shows up here without a click. Quietly -
+    // see load - because a spinner replacing a list nobody asked to reload
+    // takes the screen away from whoever is reading it.
+    inject(LiveChangesService).on("user", () => this.load(true));
   }
 
-  protected load(): void {
-    this.loading.set(true);
+  protected load(quiet = false): void {
+    if (!quiet) this.loading.set(true);
     forkJoin({
       users: this.api.listUsers(),
       settings: this.api.settings(),

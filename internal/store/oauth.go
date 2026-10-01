@@ -150,7 +150,6 @@ type OAuthCode struct {
 	// by somebody else.
 	Challenge string
 	Scope     string // the perimeter approved: readonly | full
-	Domain    string // and over what: "" | gateway | app
 	Resource  string // the audience the token is for (RFC 8707)
 	ExpiresAt int64
 }
@@ -164,7 +163,7 @@ func (s *Store) SaveOAuthCode(ctx context.Context, c OAuthCode) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO oauth_codes (code_hash, client_id, user_id, redirect_uri, challenge, scope, domain, resource, expires_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.Hash, c.ClientID, c.UserID, c.RedirectURI, c.Challenge, c.Scope, c.Domain, c.Resource,
+		c.Hash, c.ClientID, c.UserID, c.RedirectURI, c.Challenge, c.Scope, "", c.Resource,
 		time.Now().Add(codeLifetime).Unix())
 	if err != nil {
 		return fmt.Errorf("store: save oauth code: %w", err)
@@ -178,8 +177,8 @@ func (s *Store) TakeOAuthCode(ctx context.Context, hash string) (OAuthCode, erro
 	var c OAuthCode
 	err := s.db.QueryRowContext(ctx,
 		`DELETE FROM oauth_codes WHERE code_hash = ?
-		 RETURNING code_hash, client_id, user_id, redirect_uri, challenge, scope, domain, resource, expires_at`, hash).
-		Scan(&c.Hash, &c.ClientID, &c.UserID, &c.RedirectURI, &c.Challenge, &c.Scope, &c.Domain, &c.Resource, &c.ExpiresAt)
+		 RETURNING code_hash, client_id, user_id, redirect_uri, challenge, scope, resource, expires_at`, hash).
+		Scan(&c.Hash, &c.ClientID, &c.UserID, &c.RedirectURI, &c.Challenge, &c.Scope, &c.Resource, &c.ExpiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return c, errors.New("this authorisation code is unknown or already used")
 	}

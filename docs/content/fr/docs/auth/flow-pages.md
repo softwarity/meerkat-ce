@@ -26,11 +26,12 @@ personne ne doit jamais dormir dans un cache partagé.
 | `/update-password` | le changement forcé : un mot de passe temporaire ou expiré |
 | `/forgot-password`, `/reset-password` | la récupération par courriel, et la page sur laquelle le lien atterrit |
 | `/register`, `/confirm` | l'auto-inscription et la confirmation d'adresse |
+| `/confirm-email` | le lien qui confirme une nouvelle adresse changée depuis le profil |
 | `/select-tenant` | dans quelle organisation cette session travaille |
 | `/select-group` | dans quel groupe, en mode de groupe exclusif |
 | `/account-pending` | la salle d'attente : un compte qui existe et à qui rien n'a encore été accordé |
 | `/refused` | connecté, et écarté. La page nomme la règle qui a refusé et propose ce que cette session *peut* ouvrir |
-| `/profile/...` | les pages de la personne : identité, mot de passe, second facteur, passkeys, autorités, historique de connexion, jetons d'API |
+| `/profile/...` | les pages de la personne : identité, mot de passe, second facteur, passkeys, autorités, historique de connexion, sessions actives, jetons d'API, quitter une organisation |
 
 La page d'indisponibilité n'a pas de chemin à elle : elle répond sur **n'importe
 quel** chemin tant que la maintenance est active, en `503`, nomme la raison choisie
@@ -102,9 +103,11 @@ portugais, russe, thaï, turc, ukrainien, vietnamien et chinois simplifié. L'an
 est la référence : une clé absente d'un autre catalogue retombe sur la phrase
 anglaise plutôt que d'afficher du vide.
 
-Lesquels sont proposés vous appartient, dans **Application > Locales**. L'offre est
-votre liste intersectée avec ce qui est embarqué, et elle ne finit jamais vide :
-l'anglais est le plancher.
+Lesquels sont proposés est **dérivé**, jamais déclaré : c'est l'union de ce que vos
+routes disent parler (**Routes > une route > Locales**), intersectée avec ce qui est
+embarqué. L'offre ne finit jamais vide : l'anglais est le plancher. Déployez une route
+écrite en polonais et cette page offre le polonais ; retirez-la et l'offre rétrécit
+avec elle.
 
 Pour une requête, la langue est choisie dans cet ordre :
 

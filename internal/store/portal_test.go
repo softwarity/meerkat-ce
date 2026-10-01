@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func portalRoutes() []Route {
 	return []Route{
@@ -13,7 +16,7 @@ func portalRoutes() []Route {
 }
 
 func TestSanitizePortalConfigDefaults(t *testing.T) {
-	cfg := PortalConfig{Enabled: true}
+	cfg := PortalConfig{Mode: PortalModePortal}
 	if err := SanitizePortalConfig(&cfg, portalRoutes()); err != nil {
 		t.Fatalf("empty layout/side should default, got %v", err)
 	}
@@ -75,7 +78,7 @@ func TestSanitizePortalConfigRejectsUnknownRoute(t *testing.T) {
 	}
 	for name, id := range cases {
 		t.Run(name, func(t *testing.T) {
-			cfg := PortalConfig{Layout: PortalHeader, Parents: []ModuleParent{{RouteID: id}}}
+			cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{{RouteID: id}}}
 			if err := SanitizePortalConfig(&cfg, portalRoutes()); err == nil {
 				t.Fatalf("route %q (%s) must be refused: not an enabled UI route", id, name)
 			}
@@ -84,12 +87,12 @@ func TestSanitizePortalConfigRejectsUnknownRoute(t *testing.T) {
 }
 
 func TestSanitizePortalConfigRejectsEmptyRoute(t *testing.T) {
-	cfg := PortalConfig{Layout: PortalHeader, Parents: []ModuleParent{{RouteID: ""}}}
+	cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{{RouteID: ""}}}
 	if err := SanitizePortalConfig(&cfg, portalRoutes()); err == nil {
 		t.Fatal("a module with no route must be refused")
 	}
-	cfg = PortalConfig{Layout: PortalHeader, Parents: []ModuleParent{
-		{RouteID: "a", Children: []ModuleChild{{RouteID: ""}}},
+	cfg = PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{
+		{RouteID: "a", Children: []PortalSubEntry{{RouteID: ""}}},
 	}}
 	if err := SanitizePortalConfig(&cfg, portalRoutes()); err == nil {
 		t.Fatal("a sub-module with no route must be refused")
@@ -99,19 +102,19 @@ func TestSanitizePortalConfigRejectsEmptyRoute(t *testing.T) {
 func TestSanitizePortalConfigDedups(t *testing.T) {
 	cfg := PortalConfig{
 		Layout: PortalHeader,
-		Parents: []ModuleParent{
-			{RouteID: "a", Children: []ModuleChild{{RouteID: "b"}, {RouteID: "b"}}},
-			{RouteID: "a"}, // duplicate parent
+		Entries: []PortalEntry{
+			{RouteID: "a", Children: []PortalSubEntry{{RouteID: "b"}, {RouteID: "b"}}},
+			{RouteID: "a"}, // duplicate entry
 			{RouteID: "c"},
 		},
 	}
 	if err := SanitizePortalConfig(&cfg, portalRoutes()); err != nil {
 		t.Fatalf("valid config should pass, got %v", err)
 	}
-	if len(cfg.Parents) != 2 {
-		t.Fatalf("duplicate parent should be dropped, got %d parents", len(cfg.Parents))
+	if len(cfg.Entries) != 2 {
+		t.Fatalf("duplicate entry should be dropped, got %d entries", len(cfg.Entries))
 	}
-	if got := len(cfg.Parents[0].Children); got != 1 {
+	if got := len(cfg.Entries[0].Children); got != 1 {
 		t.Errorf("duplicate child should be dropped, got %d children", got)
 	}
 }
@@ -120,7 +123,7 @@ func TestSanitizePortalConfigTrimsAndResolvesIcon(t *testing.T) {
 	cfg := PortalConfig{
 		Layout: PortalRail,
 		Side:   "right",
-		Parents: []ModuleParent{
+		Entries: []PortalEntry{
 			// A bare name is resolved to its catalogue SVG; text fields trimmed.
 			{RouteID: "a", Icon: "  home ", Label: " Home ", Description: " tip "},
 		},
@@ -128,7 +131,7 @@ func TestSanitizePortalConfigTrimsAndResolvesIcon(t *testing.T) {
 	if err := SanitizePortalConfig(&cfg, portalRoutes()); err != nil {
 		t.Fatalf("valid config should pass, got %v", err)
 	}
-	p := cfg.Parents[0]
+	p := cfg.Entries[0]
 	if !containsSub(p.Icon, "<svg") {
 		t.Errorf("a bare icon name should resolve to an svg, got %q", p.Icon)
 	}
@@ -152,4 +155,22 @@ func containsSub(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// TestPortalLogoRadiusHasTwoEnds: the radius is a percentage of the mark's box,
+// and past a half the corners meet - more only distorts it. The refusal names
+// the two ends rather than clamping in silence.
+func TestPortalLogoRadiusHasTwoEnds(t *testing.T) {
+	for _, r := range []int{-1, 51} {
+		cfg := PortalConfig{Mode: PortalModePortal, LogoRadius: r}
+		if err := SanitizePortalConfig(&cfg, nil); err == nil {
+			t.Errorf("radius %d was accepted", r)
+		} else if !strings.Contains(err.Error(), "circle") {
+			t.Errorf("the refusal does not name the ends: %v", err)
+		}
+	}
+	cfg := PortalConfig{Mode: PortalModePortal, LogoRadius: 50, HideLogo: true}
+	if err := SanitizePortalConfig(&cfg, nil); err != nil {
+		t.Errorf("a circle with the logo out was refused: %v", err)
+	}
 }

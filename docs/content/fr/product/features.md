@@ -49,6 +49,22 @@ Qui accède à quoi, décidé à la porte, jamais dans chaque application.
 - **Plages horaires d'accès** par organisation, jours, dates et fuseau. **Enterprise** *partiel* `TENANT-04`
 - **Identité transmise à vos services** en en-têtes, en REMOTE_USER ou en JWT signé (ES256, EdDSA, RS256) avec JWKS publié et rotation des clés sans coupure ; les rôles transmis se filtrent par expression. `SAUTH-01 AUTH-07 ROUTE-18`
 
+## Appels planifiés
+
+La passerelle appelle vos services à l'heure dite, sans courtier à installer.
+
+À lire : [Appels planifiés](/docs/operations/scheduler).
+
+- **Une tâche est une route, un chemin et une cadence** (ou un calendrier cron, lu dans un fuseau) : le service demande qu'on l'appelle, la passerelle fait l'appel par sa porte d'entrée, donc toutes les règles posées devant le service s'appliquent. *partiel* `SCHED-01`
+- **Ou une date, une fois** : une action différée - le déclencheur est quelque chose qui est arrivé, pas un calendrier. Le service pose le moment où il veut être rappelé, et la tâche est terminée une fois l'appel parti. `SCHED-02`
+- **Elle s'exécute comme `meerkat`, munie des rôles que la tâche demande** : aucun compte de service à créer ni à tenir à jour, et une tâche atteint exactement ce que ses rôles atteignent. Le service la gère depuis le plan de contrôle avec un jeton dédié, et retrouve les siennes par ses propres métadonnées. `SCHED-01`
+- **Au moins une fois**, avec un identifiant d'exécution à dédupliquer : un appel coupé par une passerelle qui s'arrête est renvoyé par une autre, même identifiant, et une réponse - un échec compris - n'est jamais rejouée. Un **202** garde l'exécution ouverte et le service rapporte sa progression, ce qui rend un travail de trois heures exprimable sans requête de trois heures. `SCHED-01`
+- **Ni tic, ni verrou** : la passerelle dort jusqu'au prochain tour dû et se réveille à la seconde ; en cluster les appels se répartissent entre les nœuds, et un service lent ne retient que son propre appel. `SCHED-01`
+- **Écran de console en direct**, filtrable par organisation, service et métadonnées : suspendre, avancer, supprimer. `SCHED-01`
+- **Chaque tour est gardé** : quand il s'est terminé, comment, ce qui a répondu, quel noeud a fait l'appel - et un tour abandonné ou en échec se rejoue depuis l'écran ou l'API. `SCHED-03`
+- **Trois tentatives, puis le tour suivant** : la poignée de réponses qui sont le plus souvent un moment devant un service interne - pas encore connu, rôles pas chargés, personne qui répond - repart deux fois, jamais au-delà du rattrapage de la tâche. Un 500, non : là le service dit quelque chose. `SCHED-04`
+- **Ou le service nomme lui-même le moment** : un `424` avec un `Retry-After` - l'extraction n'est pas encore publiée - et le tour revient à ce moment-là, la raison gardée sur l'exécution qui l'a donnée. `SCHED-05`
+
 ## Routage et protection du trafic
 
 Une API gateway complète, pilotée depuis la console.
@@ -57,7 +73,7 @@ Une API gateway complète, pilotée depuis la console.
 [performance](/product/performance).
 
 - **Routes modifiées à chaud**, sans redémarrage, propagées à tous les nœuds en une seconde. `ROUTE-01`
-- **12 prédicats et 32 filtres** : chemin, hôte, en-tête, cookie, méthode, poids pour le canary, plage horaire ; réécriture des requêtes et réponses. `ROUTE-03 à 05`
+- **11 prédicats et 33 filtres** : chemin, hôte, en-tête, cookie, méthode, poids pour le canary, plage horaire ; réécriture des requêtes et réponses. `ROUTE-03 à 05`
 - **Limitation de débit** par route, utilisateur, jeton, organisation ou adresse, plusieurs bornes à la fois ; **quotas par endpoint** ; réponse 429 standard. `ROUTE-08 QUOTA-05`
 - **Disjoncteur, timeouts** à trois niveaux et état des services dans la console, observé sur le trafic réel. `ROUTE-07 ROUTE-09 SVC-04`
 - **WebSocket, gRPC et streaming** des corps de bout en bout. *partiel* `ROUTE-13 ROUTE-20`
@@ -97,9 +113,11 @@ Une console qui remplace les fichiers YAML et les pipelines de configuration.
 À lire : [Exploitation](/docs/operations/overview).
 
 - **Configurations versionnées** : plusieurs versions nommées, une active, comparaison, export et import YAML, point de reprise automatique à chaque changement. `CFG-01 à 06`
-- **Journal d'audit** de chaque action d'administration, avec le diff champ par champ, en ajout seul, consultable dans la console. `AUD-01 AUD-02`
+- **Journal d'audit** de chaque action d'administration, avec le diff champ par champ, et de la sécurité des comptes - chaque connexion, chaque connexion refusée avec sa vraie raison et son adresse, chaque facteur, passkey, mot de passe ou jeton changé par son titulaire. En ajout seul, consultable dans la console. `AUD-01 AUD-02`
 - **Tableaux de bord intégrés** : trafic, latence et échecs par route et par endpoint, sans rien installer. `OBS-01`
-- **Export Prometheus** avec tableau de bord Grafana fourni et fichiers prêts pour Swarm et Kubernetes. **Enterprise** `OBS-05`
+- **Export Prometheus**, sur un port à lui avec un jeton facultatif, avec tableau de bord Grafana fourni et fichiers prêts pour Swarm et Kubernetes - et les mêmes compteurs **poussés en OTLP** vers le collecteur des traces. **Enterprise** `OBS-05`
+- **Journaux structurés**, en JSON ou en texte, et un **journal d'accès** - une ligne par requête franchissant la porte d'entrée, refus compris, avec le compte tel que la passerelle l'a authentifié. C'est la moitié de l'audit qu'aucun service ne peut écrire : il n'a jamais vu l'appel qu'on lui a refusé, et il ne sait de l'appelant que ce qu'on lui en a dit. `OBS-03`
+- **Traces distribuées** (W3C Trace Context) : le contexte traverse dans les deux éditions et un identifiant est posé sur chaque requête - rendu à l'appelant, écrit dans le journal, au pied des pages intégrées -, ce qui **joint une ligne de la passerelle à l'audit métier d'un service**. En Enterprise, la passerelle se déclare sur la trace : son span d'entrée, celui de l'appel amont, et l'écart entre les deux qui est son temps propre. Export **OTLP** vers l'OpenTelemetry Collector, Tempo, Jaeger ou un éditeur. Le paquet OpenTelemetry peut être injecté dans les pages UI - servi par Meerkat, jamais par un CDN - pour que la trace commence au clic. **Enterprise** `OBS-04`
 - **Cluster actif/actif** sur PostgreSQL, sans affinité de session ni nœud primaire. **Enterprise** `PERF-03 STORE-03`
 - **E-mails transactionnels** aux couleurs du thème et résumé quotidien des comptes qui expirent. `NOTIF-01 NOTIF-04`
 - **Déploiement** : une image, base embarquée par défaut, Docker, Swarm ou Kubernetes avec chart Helm, sondes de vivacité et de disponibilité, amorçage par fichier. `DEPLOY-01 OBS-02 LIFE-02`
@@ -114,7 +132,7 @@ Tester sur le vrai cluster sans rien déployer.
 - **plug autonome, avec Community** : un conteneur agent ajouté à votre stack Docker, Swarm ou Kubernetes, gratuit sous licence FSL. `plug`
 - **plug intégré, avec Enterprise** : l'agent vit dans la gateway, rien à déployer à côté ; chaque développeur s'authentifie par sa clé SSH, et chaque page signale le service servi depuis un poste. **Enterprise** *partiel* `DEV-02 DEV-03 DEV-04`
 - **Mode test UI** : naviguer avec une identité simulée pour voir exactement ce qu'un rôle voit. `DEV-10`
-- **Swagger UI embarqué** sur les specs OpenAPI des routes, sans CDN. `DEV-09 LIFE-04`
+- **Swagger UI embarqué** sur les specs OpenAPI de **toutes** les routes, sans CDN : les appels y passent par la passerelle, donc par l'authentification et les règles de la route, et l'identité du *Try it out* se **simule** - un utilisateur, des groupes ou des rôles - pour voir ce que l'API répond à chacun. `DEV-09 LIFE-04`
 
 ## Piloté par un agent IA
 

@@ -414,6 +414,11 @@ func (a *API) putTLS(w http.ResponseWriter, r *http.Request, actor store.User) {
 	}
 	cfg.ConsoleName = strings.ToLower(strings.TrimSpace(cfg.ConsoleName))
 	cfg.AppNames = trimAll(cfg.AppNames)
+	if cfg.HSTSMaxAge < 0 || cfg.HSTSMaxAge > certs.MaxHSTS {
+		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"hstsMaxAge %d: expected 0 (off) up to %d seconds (two years)", cfg.HSTSMaxAge, certs.MaxHSTS))
+		return
+	}
 	cfg.ACME.Domains = trimAll(cfg.ACME.Domains)
 	// Every automatic domain must have a declared name, or it would sit in the
 	// authority's closed list with no row on screen to switch it off again.

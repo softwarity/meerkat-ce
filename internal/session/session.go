@@ -154,6 +154,10 @@ func (m *Manager) IssueWith(ctx context.Context, w http.ResponseWriter, r *http.
 		ExpiresAt: m.now().Add(ttl).Unix(),
 		TTL:       int64(ttl.Seconds()),
 		Plane:     m.plane,
+		// What a list of sessions shows (AUTH-14): when, from where, with what.
+		CreatedAt: m.now().Unix(),
+		IP:        filters.ClientIP(r),
+		Agent:     clipAgent(r.UserAgent()),
 	}
 	if err := m.st.CreateSession(ctx, sess); err != nil {
 		return "", err
@@ -416,7 +420,7 @@ func (m *Manager) resolveToken(ctx context.Context, r *http.Request) (store.Sess
 		// What a cookie session can never carry: this caller is a token. The
 		// guard reads the perimeter (MCP-02) and the audit reads the name
 		// (MCP-03) - both would be unanswerable from the account alone.
-		TokenID: tok.ID, TokenName: tok.Name, TokenScope: tok.Scope, TokenDomain: tok.Domain,
+		TokenID: tok.ID, TokenName: tok.Name, TokenScope: tok.Scope,
 	}, true
 }
 
@@ -457,8 +461,10 @@ func (m *Manager) readToken(ctx context.Context, tokenHash string, now time.Time
 		tok: tok,
 		// The gateway-wide personal-token policy (AUTH-16) gates DATA tokens
 		// only; admin (control-plane) tokens are a root capability, not that
-		// policy's.
-		allowed: m.plane != DataPlane || m.st.APITokensAllowed(ctx),
+		// policy's. A scheduled run's own credential is not a personal token
+		// either - it is the gateway calling a service on its owner's behalf,
+		// and turning personal tokens off must not stop the night's jobs.
+		allowed: m.plane != DataPlane || store.IsRunCredential(tok.ID) || m.st.APITokensAllowed(ctx),
 		owner:   store.User{ID: u.ID, Enabled: u.Enabled, ValidFrom: u.ValidFrom, ValidUntil: u.ValidUntil},
 		readAt:  now,
 	}
@@ -552,4 +558,49 @@ func (m *Manager) remember(th string, e cacheEntry) {
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+// clipAgent bounds a User-Agent before it is stored: the header is the
+// caller's to write, and a row is not the place for whatever they pasted.
+func clipAgent(ua string) string {
+	if len(ua) > 300 {
+		return ua[:300]
+	}
+	return ua
+}
+
+// CurrentID is the public id of the session the request carries, "" without
+// one - what a list of sessions marks as "this browser".
+func (m *Manager) CurrentID(r *http.Request) string {
+	c, err := r.Cookie(m.cookieName)
+	if err != nil || c.Value == "" {
+		return ""
+	}
+	return store.SessionID(hashToken(c.Value))
+}
+
+// RevokeByIDOf is RevokeByID for a session that must belong to owner: a
+// person closing their own sessions cannot close anyone else's by sending
+// another id. "" when it is not theirs, and nothing is closed.
+func (m *Manager) RevokeByIDOf(ctx context.Context, id, owner string) (string, string, error) {
+	_, userID, _, err := m.st.SessionHashByID(ctx, id)
+	if err != nil || userID != owner {
+		return "", "", err
+	}
+	return m.RevokeByID(ctx, id)
+}
+
+// RevokeByID ends one session by its public id (AUTH-14, SEC-07), on every
+// node: the row goes, and so do the caches that would have answered for it
+// for a few more seconds. It says whose session it was, for the trail.
+func (m *Manager) RevokeByID(ctx context.Context, id string) (userID, plane string, err error) {
+	hash, userID, plane, err := m.st.SessionHashByID(ctx, id)
+	if err != nil {
+		return "", "", err
+	}
+	if err := m.st.DeleteSession(ctx, hash); err != nil {
+		return "", "", err
+	}
+	m.dropped(hash)
+	return userID, plane, nil
 }

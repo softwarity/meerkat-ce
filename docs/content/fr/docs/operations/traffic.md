@@ -19,14 +19,14 @@ ou la capacité gateway-admin.
 ## Ce qu'il montre
 
 - Deux courbes sur la dernière heure, un point toutes les `5s` : ce qui a été répondu et ce qui a
-  échoué.
-- Quatre chiffres sur la **dernière minute**. Moyenner une heure garderait un incident de cinq
-  minutes dans le titre longtemps après sa fin, donc la période est écrite sur l'écran plutôt que
-  supposée.
+ échoué.
+- Cinq chiffres sur la **dernière minute**, dont le p95. Moyenner une heure garderait un incident de cinq
+ minutes dans le titre longtemps après sa fin, donc la période est écrite sur l'écran plutôt que
+ supposée.
 - Un classement des routes sur trois axes : les plus lentes, celles qui échouent, et celles qui
-  coûtent le plus de temps au total.
+ coûtent le plus de temps au total.
 - Ouvrir une route liste **ses endpoints**, sur la même période que celle que dessine la table. Deux
-  horloges sur un écran, c'est un écran dont les lignes ne font pas la somme de celle du dessus.
+ horloges sur un écran, c'est un écran dont les lignes ne font pas la somme de celle du dessus.
 
 ![Le même écran, déroulé sur le classement par route](img/console/metrics.webp)
 
@@ -43,27 +43,25 @@ instrument.
 Un gabarit vient de l'un de deux endroits, et l'écran dit lequel :
 
 - **déclaré** - une spec OpenAPI déposée sur la route, les règles par endpoint que quelqu'un a
-  écrites, ou une spec que le plan de contrôle a résolue depuis le service. Quelqu'un l'a écrit, donc
-  c'est exact.
+ écrites, ou une spec que le plan de contrôle a résolue depuis le service. Quelqu'un l'a écrit, donc
+ c'est exact.
 - **déduit** - la forme d'un chemin que cette passerelle a vu, les segments qui ressemblent à un
-  identifiant pliés en `{id}`. Ça se trompe parfois : l'année de `/files/2024/report` n'est pas un
-  identifiant. Ces lignes portent la mention **déduit** partout où elles s'affichent.
+ identifiant pliés en `{id}`. Ça se trompe parfois : l'année de `/files/2024/report` n'est pas un
+ identifiant. Ces lignes portent la mention **déduit** partout où elles s'affichent.
 
 La déduction est bornée deux fois : par le pliage, et par un budget de deux cents gabarits par route,
 tout ce qui dépasse partageant un seul seau.
 
 ## Ce qu'il ne montre pas
 
-- **Les requêtes une par une.** Les compteurs sont des agrégats ; rien n'enregistre un appel
-  (OBS-03).
-- **Les percentiles.** L'histogramme de latence est collecté et exposé, mais aucune courbe de p95
-  n'est tracée ici.
-- **Les traces.** `traceparent` n'est pas propagé vers les amonts (OBS-04).
+- **Les requêtes une par une.** Les compteurs sont des agrégats. Une ligne par appel, c'est le
+ [journal d'accès](/docs/operations/logs), et il est livré éteint.
+- **Les traces.** Les compteurs sont des agrégats : pour savoir où sont passées les secondes d'UNE
+ requête, il faut [les traces](/docs/operations/tracing).
 - **Qui a appelé.** Aucune étiquette n'est jamais un utilisateur, une adresse ou un chemin brut.
-  C'est ce qui borne la cardinalité.
+ C'est ce qui borne la cardinalité.
 - **Le verdict d'un appel gRPC.** Un appel gRPC répond toujours `200` et met son verdict dans
-  `grpc-status`, que les compteurs ne lisent pas : une route gRPC en échec se lit donc comme saine ici
-  (ROUTE-20).
+ `grpc-status`, que les compteurs ne lisent pas : une route gRPC en échec se lit donc comme saine ici.
 
 ## La rétention
 

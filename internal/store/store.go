@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -160,6 +161,16 @@ CREATE TABLE IF NOT EXISTS routes (
   ord           BIGINT NOT NULL DEFAULT 0,
   enabled       BOOLEAN NOT NULL DEFAULT TRUE,
   is_ui         BOOLEAN NOT NULL DEFAULT FALSE,
+  -- The route's place in the tracing (v65, OBS-04). Two answers, because they
+  -- are two questions: whether this route is reported on at all, and whether
+  -- the journey starts in its pages rather than here. Scalars and not a JSON
+  -- block: a switch somebody flips is not a configuration.
+  --
+  -- telemetry is NULLABLE on purpose: null is "not said", which reads as
+  -- traced. A NOT NULL DEFAULT would have made a route that never mentioned
+  -- the subject look like one that answered no.
+  telemetry     BOOLEAN,
+  telemetry_ui  BOOLEAN NOT NULL DEFAULT FALSE,
   upstream      TEXT NOT NULL,
   predicates    TEXT NOT NULL DEFAULT '[]',
   filters       TEXT NOT NULL DEFAULT '[]',
@@ -183,8 +194,13 @@ CREATE TABLE IF NOT EXISTS routes (
   rate_limits   TEXT NOT NULL DEFAULT '[]',
   -- The route's unified base security (RBAC-06): who may call it at all,
   -- which per-endpoint rules then override (RBAC-07).
-  access        TEXT NOT NULL DEFAULT '{}'
-);
+  access        TEXT NOT NULL DEFAULT '{}',
+  -- The revision this row is on, raised by every write. It is what a writer
+  -- says it edited, so a save built on a version somebody else has replaced is
+  -- refused instead of quietly winning: three writers on one route - a console
+  -- screen opened five minutes ago, an agent, an API call - and the last one
+  -- destroys what the other two decided, without anyone noticing.
+  rev           BIGINT NOT NULL DEFAULT 0);
 
 -- A spec deposited on a route (SVC-06). Kept out of the routes' api column on
 -- purpose: that column is read in full by every ListRoutes - the console's
@@ -251,16 +267,15 @@ CREATE TABLE IF NOT EXISTS users (
   -- all of the 31st.
   valid_from           BIGINT NOT NULL DEFAULT 0,
   valid_until          BIGINT NOT NULL DEFAULT 0,
-  -- A DEVELOPER's public SSH key (one authorized_keys line): the credential
-  -- their plugged service authenticates with (DEV-11). Self-service, /profile.
-  -- A key rather than a signed certificate, so that removing it takes effect
-  -- at the next connection instead of at an expiry date.
-  dev_key              TEXT NOT NULL DEFAULT '',
   -- Self-registration (AUTH-20). email_verified defaults to 1: admin-created
   -- accounts answer for their address; only the /register flow creates
   -- unverified ones (and confirms them by e-mail).
   email_verified       BOOLEAN NOT NULL DEFAULT TRUE,
-  self_registered      BOOLEAN NOT NULL DEFAULT FALSE
+  self_registered      BOOLEAN NOT NULL DEFAULT FALSE,
+  -- The revision this row is on, raised by every write. See ErrStale: a save
+  -- built on a version somebody has already replaced is refused rather than
+  -- winning silently.
+  rev BIGINT NOT NULL DEFAULT 0
 );
 
 -- v27 the vault (VAULT-01): named entries the configuration references by
@@ -288,6 +303,7 @@ CREATE TABLE IF NOT EXISTS vault_entries (
 CREATE TABLE IF NOT EXISTS password_history (
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   password_hash TEXT NOT NULL,
+  -- Milliseconds: it only orders the history, and a second tied two changes.
   changed_at    BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_password_history_user ON password_history(user_id, changed_at DESC);
@@ -313,7 +329,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   -- The lifetime this session was issued with, in seconds: the deadline above
   -- slides, and pushing it needs the value the login resolved.
   ttl        BIGINT NOT NULL DEFAULT 0,
-  plane      TEXT NOT NULL DEFAULT 'data'
+  plane      TEXT NOT NULL DEFAULT 'data',
+  -- What a list of sessions shows (v69, AUTH-14): when it was opened, from
+  -- which address, with which browser. Recorded at issue, never updated.
+  created_at BIGINT NOT NULL DEFAULT 0,
+  ip         TEXT NOT NULL DEFAULT '',
+  agent      TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS sessions_expires ON sessions(expires_at);
 
@@ -333,7 +354,11 @@ CREATE TABLE IF NOT EXISTS tenants (
   -- member. This is why there is no OWNER membership type.
   owner_id        TEXT NOT NULL DEFAULT '',
   created_at      BIGINT NOT NULL DEFAULT 0,
-  updated_at      BIGINT NOT NULL DEFAULT 0
+  updated_at      BIGINT NOT NULL DEFAULT 0,
+  -- The revision this row is on, raised by every write. See ErrStale: a save
+  -- built on a version somebody has already replaced is refused rather than
+  -- winning silently.
+  rev BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS memberships (
@@ -365,6 +390,20 @@ CREATE TABLE IF NOT EXISTS themes (
   dark       TEXT NOT NULL DEFAULT '{}',
   light      TEXT NOT NULL DEFAULT '{}',
   created_at BIGINT NOT NULL DEFAULT 0,
+  updated_at BIGINT NOT NULL DEFAULT 0,
+  -- The revision this row is on, raised by every write. See ErrStale: a save
+  -- built on a version somebody has already replaced is refused rather than
+  -- winning silently.
+  rev BIGINT NOT NULL DEFAULT 0
+);
+
+-- Locale overrides (v61): the strings an integrator corrected or added, on top
+-- of the twenty catalogues the binary embeds. One row per language, holding
+-- ONLY what differs - so an upgrade that fixes a translation is picked up
+-- everywhere it was not overridden, and a reset is a DELETE.
+CREATE TABLE IF NOT EXISTS locale_overrides (
+  code       TEXT PRIMARY KEY,
+  entries    TEXT NOT NULL DEFAULT '{}',
   updated_at BIGINT NOT NULL DEFAULT 0
 );
 
@@ -378,7 +417,11 @@ CREATE TABLE IF NOT EXISTS roles (
   tags        TEXT NOT NULL DEFAULT '[]',
   system      BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  BIGINT NOT NULL DEFAULT 0,
-  updated_at  BIGINT NOT NULL DEFAULT 0
+  updated_at  BIGINT NOT NULL DEFAULT 0,
+  -- The revision this row is on, raised by every write. See ErrStale: a save
+  -- built on a version somebody has already replaced is refused rather than
+  -- winning silently.
+  rev BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -390,6 +433,11 @@ CREATE TABLE IF NOT EXISTS groups (
   description TEXT NOT NULL DEFAULT '',
   created_at BIGINT NOT NULL DEFAULT 0,
   updated_at BIGINT NOT NULL DEFAULT 0,
+  -- The revision this row is on, raised by every write. See ErrStale: a save
+  -- built on a version somebody has already replaced is refused rather than
+  -- winning silently. Before the table constraint below: a column after one is
+  -- a syntax error, which is how this was found.
+  rev BIGINT NOT NULL DEFAULT 0,
   UNIQUE (tenant_id, name)
 );
 CREATE INDEX IF NOT EXISTS groups_tenant ON groups(tenant_id);
@@ -473,6 +521,21 @@ DROP TABLE IF EXISTS webauthn_challenges;
 -- browser_hash is the hash of the durable MEERKAT_BROWSER token ("this
 -- browser" badge); country comes from a CDN/LB geo header when present.
 -- Pruned to a fixed depth per user on every insert.
+-- A DEVELOPER's public SSH keys (v67, DEV-02): the credentials their plugged
+-- services authenticate with (DEV-11), one per workstation - plug keeps a pair
+-- per profile, so two machines are two keys. Self-service, /profile. A key
+-- rather than a signed certificate, so that removing it takes effect at the
+-- next connection instead of at an expiry date. The fingerprint is unique
+-- across the installation: an accepted key must name ONE person.
+CREATE TABLE IF NOT EXISTS dev_keys (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key_line    TEXT NOT NULL,
+  fingerprint TEXT NOT NULL UNIQUE,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dev_keys_user ON dev_keys(user_id);
+
 CREATE TABLE IF NOT EXISTS login_events (
   id           TEXT PRIMARY KEY,
   user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -491,7 +554,10 @@ CREATE TABLE IF NOT EXISTS email_tokens (
   token_hash TEXT PRIMARY KEY,
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   purpose    TEXT NOT NULL,
-  expires_at BIGINT NOT NULL
+  expires_at BIGINT NOT NULL,
+  -- What the token carries besides its account (v68, AUTH-22): the NEW
+  -- address of a change waiting for confirmation. Empty for the others.
+  payload    TEXT NOT NULL DEFAULT ''
 );
 
 -- External authentication (v30, AUTH-19): one row per configured authority.
@@ -518,7 +584,11 @@ CREATE TABLE IF NOT EXISTS auth_providers (
   -- over there.
   captcha       BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    BIGINT NOT NULL DEFAULT 0,
-  updated_at    BIGINT NOT NULL DEFAULT 0
+  updated_at    BIGINT NOT NULL DEFAULT 0,
+  -- The revision this row is on, raised by every write. See ErrStale: a save
+  -- built on a version somebody has already replaced is refused rather than
+  -- winning silently.
+  rev BIGINT NOT NULL DEFAULT 0
 );
 
 -- The link between a local account and what an authority calls that person.
@@ -621,7 +691,10 @@ CREATE TABLE IF NOT EXISTS audit_events (
   actor_token TEXT NOT NULL DEFAULT '',
   tenant_id   TEXT NOT NULL DEFAULT '',
   changes     TEXT NOT NULL DEFAULT '[]',
-  detail      TEXT NOT NULL DEFAULT ''
+  detail      TEXT NOT NULL DEFAULT '',
+  -- The address the gateway resolved, on an account's security events
+  -- (v66, AUD-01): a sign-in, a refusal, a factor added. Empty on a change.
+  ip          TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS audit_events_at ON audit_events(at);
 CREATE INDEX IF NOT EXISTS audit_events_tenant ON audit_events(tenant_id, at);
@@ -780,9 +853,135 @@ CREATE TABLE IF NOT EXISTS change_marks (
   topic   TEXT PRIMARY KEY,
   version BIGINT NOT NULL DEFAULT 0,
   at      BIGINT NOT NULL DEFAULT 0
-);`
+);
 
-const schemaVersion = 55
+-- Scheduled calls (SCHED-01): what to call, when, and as whom.
+--
+-- The target is a ROUTE and a path, never a URL: a service that moves keeps
+-- its schedules, and a schedule cannot name an address its roles could not
+-- reach anyway. The call enters by the gateway's own front door, so every
+-- rule a real caller meets applies to it.
+--
+-- roles is WHAT THE CALL CARRIES, and there is no account behind it: the call
+-- is made as "meerkat" with these roles, so nobody has to keep a service
+-- account's rights in step with the endpoints it calls. created_by records who
+-- asked for the schedule, which is a different question and the audit's one.
+CREATE TABLE IF NOT EXISTS schedules (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL DEFAULT '',
+  -- The roles the CALL carries. A scheduled call is made as "meerkat" - there
+  -- is no account behind it - and these are what the route's rule, the
+  -- endpoint rules and the forwarded identity read.
+  roles       TEXT NOT NULL DEFAULT '',
+  created_by  TEXT NOT NULL DEFAULT '',
+  tenant_id   TEXT NOT NULL DEFAULT '',
+  route_id    TEXT NOT NULL,
+  method      TEXT NOT NULL DEFAULT 'POST',
+  path        TEXT NOT NULL DEFAULT '/',
+  body        TEXT NOT NULL DEFAULT '',
+  content_type TEXT NOT NULL DEFAULT '',
+  -- Headers the call carries beyond the gateway's own. Values may be vault
+  -- references, resolved at the moment of the call - so a service's own key
+  -- lives in the vault and never in this row.
+  headers     TEXT NOT NULL DEFAULT '',
+  -- The service's own filing system: a JSON object of text values it chose,
+  -- which Meerkat stores, returns and filters on without knowing what any of
+  -- it means. How a service finds its own schedules again among thousands.
+  metadata    TEXT NOT NULL DEFAULT '',
+  -- WHEN, said one of three ways. every is an ISO duration between two runs, a
+  -- CADENCE counted from the end of the last one; cron is a five-field
+  -- expression, a CALENDAR - "every Monday at three" - which a duration cannot
+  -- express and which does not drift; at is a single date. One of them, never
+  -- two.
+  every       TEXT NOT NULL DEFAULT '',
+  cron        TEXT NOT NULL DEFAULT '',
+  -- The third way: ONE date, RFC 3339 with its offset. The call goes out
+  -- then, once, and the schedule is over - a delayed action, where the
+  -- trigger is something that happened rather than a calendar.
+  at          TEXT NOT NULL DEFAULT '',
+  -- Where that calendar is read: three in the morning is a question about
+  -- where. Empty is UTC, and it stays empty for a cadence.
+  timezone    TEXT NOT NULL DEFAULT '',
+  start_at    BIGINT NOT NULL DEFAULT 0,
+  -- What to do when the previous run has not finished, and how late a missed
+  -- run may still go out.
+  overlap     TEXT NOT NULL DEFAULT 'skip',
+  catch_up    BIGINT NOT NULL DEFAULT 0,
+  timeout     TEXT NOT NULL DEFAULT '',
+  paused      BOOLEAN NOT NULL DEFAULT FALSE,
+  next_at     BIGINT NOT NULL DEFAULT 0,
+  -- The CURRENT run, and the lease that makes a cluster safe: claimed_at is
+  -- written when a node takes the run, when the service answers 202, and each
+  -- time it reports. A run whose lease has lapsed is settled by whichever
+  -- node sees it first - a node can die mid-call, and a row left 'running'
+  -- for ever is a schedule that silently stops.
+  run_id      TEXT NOT NULL DEFAULT '',
+  run_started BIGINT NOT NULL DEFAULT 0,
+  claimed_by  TEXT NOT NULL DEFAULT '',
+  claimed_at  BIGINT NOT NULL DEFAULT 0,
+  progress    BIGINT NOT NULL DEFAULT 0,
+  -- Where the run in flight stands: 'calling' until the service answers,
+  -- 'accepted' once it has taken the work (a 202, or a report since). It is
+  -- what a lapsed lease is read against: a call nobody answered is sent
+  -- again, a job the service took and went quiet on is lost.
+  run_state   TEXT NOT NULL DEFAULT '',
+  -- How many times this run has been SENT. More than one means a node
+  -- stopped before the answer came; the cap is what keeps a call that brings
+  -- a node down from bringing them all down in turn.
+  attempts    BIGINT NOT NULL DEFAULT 0,
+  -- Why this turn goes out, and what it continues: posed when the turn is
+  -- armed, copied into the history when the run ends. See schedule_runs.
+  run_cause   TEXT NOT NULL DEFAULT '',
+  run_of      TEXT NOT NULL DEFAULT '',
+  -- How many attempts the turn being armed has already had. A claim reads it
+  -- and writes attempts = turn_try + 1, so "attempt 2 of 3" survives the run
+  -- that ended - a retry is a new run, of the same turn.
+  turn_try    BIGINT NOT NULL DEFAULT 0,
+  -- How the last FINISHED run ended. Not touched while a run is in flight,
+  -- so a screen can show both at once.
+  last_state  TEXT NOT NULL DEFAULT '',
+  last_detail TEXT NOT NULL DEFAULT '',
+  last_at     BIGINT NOT NULL DEFAULT 0,
+  created_at  BIGINT NOT NULL DEFAULT 0,
+  updated_at  BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules (paused, next_at);
+
+-- What each turn did (SCHED-03): one row per turn that ENDED, written when it
+-- does, carrying which attempt ended it - a call cut short by a gateway that
+-- stopped never ends, so it leaves no row of its own; the row that follows
+-- says attempt 2.
+--
+-- The schedule itself keeps only the last result, because that is what a list
+-- shows; this is where "since when is it failing", "did last night's close
+-- run" and "which node made that call" are answered. A turn that never went
+-- out is recorded too - dropped for being late is exactly what somebody comes
+-- looking for, and exactly what they then want to replay.
+--
+-- cause and of_run are the CHAIN: a turn, a call sent again after a gateway
+-- stopped, or a replay asked for by hand - and which run it continues. Read
+-- together they say "this one is the second attempt of the turn owed at four".
+CREATE TABLE IF NOT EXISTS schedule_runs (
+  id          TEXT PRIMARY KEY,
+  schedule_id TEXT NOT NULL,
+  run_id      TEXT NOT NULL DEFAULT '',
+  attempt     BIGINT NOT NULL DEFAULT 1,
+  node        TEXT NOT NULL DEFAULT '',
+  cause       TEXT NOT NULL DEFAULT '',
+  of_run      TEXT NOT NULL DEFAULT '',
+  started_at  BIGINT NOT NULL DEFAULT 0,
+  ended_at    BIGINT NOT NULL DEFAULT 0,
+  state       TEXT NOT NULL DEFAULT '',
+  status      BIGINT NOT NULL DEFAULT 0,
+  detail      TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_schedule_runs_of ON schedule_runs (schedule_id, ended_at);
+CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);`
+
+// v56 scheduled calls (SCHED-01): the schedules table. A row is what to call,
+// when, and as whom - and the lease columns are what let several gateways
+// share one schedule without running it twice or losing it when a node dies.
+const schemaVersion = 69
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -836,6 +1035,8 @@ func (s *Store) migrate() error {
 	// weight, and leaving a dev_cert nobody reads is how a schema starts
 	// describing something the product no longer does.
 	_, _ = s.db.Exec(`ALTER TABLE users DROP COLUMN dev_cert`)
+	// And then one key per account became several (v67, dev_keys).
+	_, _ = s.db.Exec(`ALTER TABLE users DROP COLUMN dev_key`)
 	if err := s.seedDefaultSettings(); err != nil {
 		return err
 	}
@@ -1079,6 +1280,13 @@ type EndpointSecurity struct {
 	// match wins, in list order. The whole-route default is the route's own
 	// Access, not a field here.
 	Endpoints []EndpointPolicy `json:"endpoints,omitempty"`
+	// DenyUnlisted closes every operation no rule lists (RBAC-07): only what
+	// is written is reachable. Without it, an operation nobody wrote a rule
+	// for falls back to the route's own rule - which may be delegated, so an
+	// endpoint the service adds tomorrow is open the moment it ships. The
+	// same effect was reachable by a last "* /** Nobody" rule, which has to
+	// stay last and is exactly the kind of line that gets reordered away.
+	DenyUnlisted bool `json:"denyUnlisted,omitempty"`
 }
 
 // EndpointPolicy is one operation's access override. Method is an upper-case
@@ -1212,11 +1420,44 @@ type SchemeConfig struct {
 	// ng-m3-theme writes "system". Empty REMOVES the entry instead, which for an
 	// application whose default is already the system comes to the same thing.
 	StorageAuto string `json:"storageAuto,omitempty"`
+	// NoAuto says this application has NO follow-the-system state: it knows
+	// light and dark and nothing else. Jaeger is the case that named it.
+	//
+	// What changes when it is set: the visitor's "auto" is RESOLVED before it
+	// reaches the application - the agent writes the system's current answer
+	// rather than clearing the attribute or dropping the stored key - and the
+	// button's switch stops offering a third state nobody behind it can honour.
+	// The choice itself stays auto on the account and in the cookie, so the
+	// page keeps following the system as it changes, and a route that does
+	// have an auto still gets one.
+	NoAuto bool `json:"noAuto,omitempty"`
+	// Script is the BODY of a function the agent calls whenever the scheme
+	// changes, for the application whose own switch is none of the shapes
+	// above. It is called as function(colorScheme) with "light", "dark" or
+	// "auto" - auto being the visitor asking to follow their system, which the
+	// body answers by putting the application BACK on the system rather than by
+	// picking a side.
+	//
+	// Why a body and not more settings: the shapes above cover an attribute and
+	// a class on one element, and the next application always consumes light
+	// and dark one notch outside them - RabbitMQ swaps the media attribute of
+	// two stylesheet links, another dispatches an event, another calls a global
+	// its bundle exported. Naming each as a mechanism would be a setting per
+	// vendor forever. Read only when Mechanism is "script".
+	//
+	// It is the integrator's own code running on the integrator's own page, the
+	// same trust as the pages they configure the gateway to serve - and no more
+	// than that: it is written by an admin who can already inject a bar, a
+	// button and a theme into these pages. It is SERVED as its own same-origin
+	// script (/meerkat/scheme.js) rather than evaluated from the page: the
+	// applications worth a gateway send a Content-Security-Policy, and the
+	// ordinary one refuses new Function while allowing that script.
+	Script string `json:"script,omitempty"`
 }
 
 // SchemeMechanisms are the ways an application's own light/dark switch is
 // driven, "" (the CSS color-scheme alone) aside.
-var SchemeMechanisms = []string{SchemeNone, "attribute", "add-attribute", "class"}
+var SchemeMechanisms = []string{SchemeNone, "attribute", "add-attribute", "class", SchemeScript}
 
 // SchemeNone says this UI has NO colour scheme of its own: not that it takes
 // the CSS color-scheme and nothing more (that is the empty mechanism), but that
@@ -1225,6 +1466,17 @@ var SchemeMechanisms = []string{SchemeNone, "attribute", "add-attribute", "class
 // carries the switch - what it offers there is the data plane's own light/dark,
 // which is Theme's business, not this route's.
 const SchemeNone = "none"
+
+// SchemeScript is the escape hatch: the integrator writes the body of the
+// function that dresses their application, and the agent calls it. See
+// SchemeConfig.Script.
+const SchemeScript = "script"
+
+// SchemeScriptMax is how long that body may be. A limit rather than none
+// because it is fetched by every page this route serves: a few lines reaching
+// into the application is the shape this is for, and a bundle pasted into it
+// would be a bundle the gateway serves.
+const SchemeScriptMax = 4000
 
 // SchemeSetsAttribute says whether a mechanism carries an attribute NAME of
 // its own. The other two spell their two names out in Light and Dark.
@@ -1286,9 +1538,22 @@ type LocalesConfig struct {
 	Mechanisms []string `json:"mechanisms,omitempty"`
 	Header     string   `json:"header,omitempty"` // custom header name
 	Param      string   `json:"param,omitempty"`  // query parameter name
-	// Disabled excludes application locales THIS route's UI does not
-	// support: they leave the button's menu and the forwarding resolution.
-	Disabled []string `json:"disabled,omitempty"`
+	// Speaks is the languages THIS route's UI is written in - the only place a
+	// language is declared in this product.
+	//
+	// It used to be the other way round: a gateway-wide pool of locales, and
+	// each route SUBTRACTING the ones it does not support. That reads
+	// backwards. Nobody knows what a gateway speaks - the applications behind
+	// it do, one by one, and they are what gets deployed and redeployed. A
+	// route arriving with a new language had to wait for somebody to widen a
+	// list somewhere else before it could be used, and a route leaving left
+	// its language in the pool with nothing serving it.
+	//
+	// So the declaration lives where the knowledge is, and the gateway's own
+	// offer - the flow pages, the account menu - is the UNION of what its
+	// routes say (SpokenLanguages). Nothing to keep in step: deploy a route
+	// that speaks Polish and the sign-in page offers Polish.
+	Speaks []string `json:"speaks,omitempty"`
 	// OnChange is the "script" mechanism's body: JavaScript run with the
 	// person's language in `locale`, whenever it changes - here, or in another
 	// tab of the same browser - and once when a page loads, so an application
@@ -1339,10 +1604,6 @@ type RouteUI struct {
 	CustomCSS string `json:"customCss,omitempty"`
 	// CustomJS is injected verbatim inside a <script> tag after <head>.
 	CustomJS string `json:"customJs,omitempty"`
-	// Link is the app's menu label. When set, the route is listed in the user's
-	// apps menu (subject to access) under this name; empty = reachable but
-	// unlisted.
-	Link string `json:"link,omitempty"`
 }
 
 // IdentityFields are the signed-in user's facts a route may forward to its
@@ -1387,10 +1648,16 @@ type IdentityAttr struct {
 // Route is one declarative routing rule: predicates match a request, filters
 // transform it, and the upstream (or a terminal filter) answers it.
 type Route struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Order   int    `json:"order"`
-	Enabled bool   `json:"enabled"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Rev is the revision this route was READ at, and the one a write says it
+	// is built on. Sent back by every read, carried by a save, and refused when
+	// the stored row has moved on - see SaveRoute. Zero means "I read no
+	// version": the write then wins, which is what a seed, an import or a
+	// server-side read-modify-write legitimately does.
+	Rev     int64 `json:"rev,omitempty"`
+	Order   int   `json:"order"`
+	Enabled bool  `json:"enabled"`
 	// Access is the route's base security (RBAC-06): the unified rule applied to
 	// the whole route (authenticated + users + roles, OR-combined). Empty means
 	// delegated to the upstream. Endpoint-security overrides refine it per
@@ -1399,12 +1666,47 @@ type Route struct {
 	Access Access `json:"access"`
 	// IsUI toggles the UI-only options (user button, page injections, path
 	// locales): a route is always a service, UI comes on top (ROUTE-02).
-	IsUI       bool           `json:"isUi"`
-	Upstream   string         `json:"upstream"`
-	Predicates []routing.Spec `json:"predicates"`
-	Filters    []routing.Spec `json:"filters"`
-	API        *RouteAPI      `json:"api,omitempty"`
-	UI         *RouteUI       `json:"ui,omitempty"`
+	IsUI bool `json:"isUi"`
+	// Telemetry says whether this gateway reports on what this route answers
+	// (OBS-04). THREE STATES, and that is why it is a pointer:
+	//
+	//   nil    not said - traced, which is what a gateway does by default
+	//   true   traced, said out loud
+	//   false  out of the telemetry: no span of ours, nothing injected
+	//
+	// Positive rather than a `noTelemetry` negative, which read as a double
+	// negative everywhere it was used - and nil rather than a false default,
+	// so a route that arrives from an import or a seed without the field is
+	// traced rather than silently dropped out of the backend.
+	//
+	// WHY A ROUTE NEEDS TO SAY NO. A gateway sees every request that crosses
+	// it, so without a per-route answer its spans are mostly nobody's journey:
+	// an operator reading a proxied RabbitMQ admin, somebody browsing Jaeger,
+	// a probe every ten seconds - volume in a backend whose whole value is
+	// that ONE story can be found in it.
+	//
+	// Off, the context still travels: what a caller sent is forwarded
+	// untouched, and the identifier still joins the access log to a service's
+	// own audit. What stops is us reporting on this route.
+	Telemetry *bool `json:"telemetry,omitempty"`
+	// TelemetryUI starts the journey IN THE PAGE rather than at this gateway:
+	// a plain bool, because "not said" and "no" are the same answer here - a
+	// page is not instrumented until somebody asks for it.
+	// the OpenTelemetry bundle is injected into this route's pages, so the
+	// first span is the click - the network before us, the browser's queueing,
+	// the rendering, and the calls that never reach us at all - and our own
+	// crossing becomes a child of it.
+	//
+	// A UI route only, and off unless somebody asked: this INJECTS CODE into
+	// an application the gateway does not own, and an application that already
+	// carries its own agent would then produce two traces for one click, with
+	// neither the whole story.
+	TelemetryUI bool           `json:"telemetryUi,omitempty"`
+	Upstream    string         `json:"upstream"`
+	Predicates  []routing.Spec `json:"predicates"`
+	Filters     []routing.Spec `json:"filters"`
+	API         *RouteAPI      `json:"api,omitempty"`
+	UI          *RouteUI       `json:"ui,omitempty"`
 	// Identity forwards the signed-in user to the upstream service - valid
 	// for both route types (an API service wants the caller too).
 	Identity *IdentityForward `json:"identity,omitempty"`
@@ -1430,7 +1732,7 @@ type Route struct {
 // ListRoutes returns every route ordered by ascending Order.
 func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits
+		`SELECT id, name, ord, enabled, is_ui, telemetry, telemetry_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev
 		 FROM routes ORDER BY ord ASC, name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list routes: %w", err)
@@ -1441,7 +1743,7 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 		var r Route
 		var preds, filts, api, ui, identity, locales, access, timeouts, breaker, rateLimits string
 		if err := rows.Scan(&r.ID, &r.Name, &r.Order, &r.Enabled,
-			&r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits); err != nil {
+			&r.IsUI, &r.Telemetry, &r.TelemetryUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits, &r.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan route: %w", err)
 		}
 		if err := json.Unmarshal([]byte(preds), &r.Predicates); err != nil {
@@ -1552,17 +1854,22 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 		}
 		rateLimits = string(b)
 	}
+	// See rev.go: a write built on a version somebody has replaced is refused.
+	if err := s.checkRev(ctx, "routes", "route", r.ID, r.Rev); err != nil {
+		return err
+	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO routes (id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO routes (id, name, ord, enabled, is_ui, telemetry, telemetry_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, ord = excluded.ord, enabled = excluded.enabled,
-		   is_ui = excluded.is_ui, upstream = excluded.upstream,
+		   is_ui = excluded.is_ui, telemetry = excluded.telemetry,
+		   telemetry_ui = excluded.telemetry_ui, upstream = excluded.upstream,
 		   predicates = excluded.predicates, filters = excluded.filters,
 		   api = excluded.api, ui = excluded.ui, identity = excluded.identity, locales = excluded.locales,
 		   access = excluded.access, timeouts = excluded.timeouts, breaker = excluded.breaker,
-		   rate_limits = excluded.rate_limits`,
-		r.ID, r.Name, r.Order, r.Enabled, r.IsUI, r.Upstream,
+		   rate_limits = excluded.rate_limits, rev = routes.rev + 1`,
+		r.ID, r.Name, r.Order, r.Enabled, r.IsUI, r.Telemetry, r.TelemetryUI, r.Upstream,
 		string(preds), string(filts), api, ui, identity, locales, string(access), timeouts, breaker, rateLimits)
 	if err != nil {
 		return fmt.Errorf("store: save route %q: %w", r.Name, err)
@@ -1595,9 +1902,9 @@ func (s *Store) GetRoute(ctx context.Context, id string) (Route, error) {
 	var r Route
 	var preds, filts, api, ui, identity, locales, access, timeouts, breaker, rateLimits string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits
+		`SELECT id, name, ord, enabled, is_ui, telemetry, telemetry_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev
 		 FROM routes WHERE id = ?`, id).
-		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits)
+		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Telemetry, &r.TelemetryUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits, &r.Rev)
 	if err != nil {
 		return Route{}, fmt.Errorf("store: get route %q: %w", id, err)
 	}
@@ -1774,12 +2081,16 @@ type User struct {
 	// The validity window, unix seconds, 0 = no bound on that side.
 	ValidFrom  int64 `json:"validFrom,omitempty"`
 	ValidUntil int64 `json:"validUntil,omitempty"`
+	// Rev is the revision this row was READ at, carried back by a save so a
+	// write built on a version somebody has replaced is refused. Zero means "I
+	// read no version" and still wins - see rev.go.
+	Rev int64 `json:"rev,omitempty"`
 }
 
 const userCols = `id, username, password_hash, fullname, email, enabled,
 	root, dev, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
 	created_at, updated_at, last_connection_at, must_change_password, mfa_required,
-	email_verified, self_registered, password_changed_at, fields, valid_from, valid_until`
+	email_verified, self_registered, password_changed_at, fields, valid_from, valid_until, rev`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
@@ -1787,7 +2098,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Fullname, &u.Email, &u.Enabled,
 		&u.Root, &u.Dev, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastConnectionAt, &u.MustChangePassword, &u.MFARequired,
-		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &fields, &u.ValidFrom, &u.ValidUntil)
+		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &fields, &u.ValidFrom, &u.ValidUntil, &u.Rev)
 	u.Fields = decodeFields(fields)
 	// Derived here so every read carries it and no caller has to remember: the
 	// hash is json:"-", this boolean is what the console is allowed to know.
@@ -1808,8 +2119,8 @@ func (s *Store) CreateUser(ctx context.Context, u User) error {
 		`INSERT INTO users (id, username, password_hash, fullname, email, enabled,
 		   root, dev, tenant_creator, infra_admin, app_admin, locale, timezone,
 		   created_at, updated_at, must_change_password, mfa_required,
-		   email_verified, self_registered, fields, valid_from, valid_until)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		   email_verified, self_registered, fields, valid_from, valid_until, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
 		u.ID, u.Username, u.PasswordHash, u.Fullname, u.Email, u.Enabled,
 		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
 		now, now, u.MustChangePassword, u.MFARequired,
@@ -1826,11 +2137,15 @@ func (s *Store) UpdateUser(ctx context.Context, u User) error {
 	if err := validTristate(u.MFARequired); err != nil {
 		return fmt.Errorf("store: update user %q: mfaRequired: %w", u.Username, err)
 	}
+	// See rev.go: a write built on a version somebody has replaced is refused.
+	if err := s.checkRev(ctx, "users", "account", u.ID, u.Rev); err != nil {
+		return err
+	}
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE users SET username = ?, fullname = ?, email = ?, enabled = ?,
 		   root = ?, dev = ?, tenant_creator = ?, infra_admin = ?, app_admin = ?,
 		   locale = ?, timezone = ?, mfa_required = ?, updated_at = ?,
-		   fields = ?, valid_from = ?, valid_until = ?
+		   fields = ?, valid_from = ?, valid_until = ?, rev = rev + 1
 		 WHERE id = ?`,
 		u.Username, u.Fullname, u.Email, u.Enabled,
 		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
@@ -1842,6 +2157,21 @@ func (s *Store) UpdateUser(ctx context.Context, u User) error {
 		return fmt.Errorf("store: update user %q: %w", u.ID, sql.ErrNoRows)
 	}
 	return nil
+}
+
+// RehashUserPassword replaces a hash by a stronger one of the SAME password
+// (SEC-05): at sign-in, the only moment the clear password is known. Not a
+// change of password, so none of what a change does - no history row, no new
+// changed-at (which would restart the expiry), no forced step cleared. A
+// compare-and-swap on the old hash: a password changed meanwhile wins.
+func (s *Store) RehashUserPassword(ctx context.Context, id, oldHash, newHash string) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?`, newHash, id, oldHash)
+	if err != nil {
+		return false, fmt.Errorf("store: rehash password for user %q: %w", id, err)
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
 }
 
 // SetUserPassword replaces a user's password hash. mustChange marks the new
@@ -1873,8 +2203,12 @@ func (s *Store) SetUserPassword(ctx context.Context, id, passwordHash string, mu
 	// same password set twice in a row would otherwise be filed twice.
 	if previous != "" && previous != passwordHash {
 		if _, err := tx.ExecContext(ctx,
+			// In MILLISECONDS, unlike the users' changed-at: this column only
+			// orders the history, and at a second's resolution two changes in
+			// one second tied - the newest was then picked by the hash, at
+			// random, and a password out of the window could still be refused.
 			`INSERT INTO password_history (user_id, password_hash, changed_at) VALUES (?, ?, ?)`,
-			id, previous, now); err != nil {
+			id, previous, time.Now().UnixMilli()); err != nil {
 			return fmt.Errorf("store: set password for user %q: %w", id, err)
 		}
 		// Trimmed to the ceiling the policy can ask for: history is a rule
@@ -2184,21 +2518,27 @@ type Session struct {
 	// each plane uses its own cookie name AND every resolve checks the plane -
 	// a data-plane token pasted into the admin cookie dies here.
 	Plane string // "data" | "admin"
+	// CreatedAt, IP and Agent are what a list of sessions shows: when it was
+	// opened, from where, with which browser (AUTH-14). Set at issue.
+	CreatedAt int64
+	IP        string
+	Agent     string
 	// The three fields below are NOT columns: they exist only on the session
 	// SYNTHESIZED for an "Authorization: Bearer" call, and they are what tells
 	// the guard that this caller is a token rather than a person - which token
 	// (the audit names it, MCP-03) and how far it may go (MCP-02).
-	TokenID     string
-	TokenName   string
-	TokenScope  string
-	TokenDomain string
+	TokenID    string
+	TokenName  string
+	TokenScope string
 }
 
 // CreateSession persists a session.
 func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO sessions (token_hash, user_id, tenant_id, group_id, pending, next, method, expires_at, ttl, plane) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		sess.TokenHash, sess.UserID, sess.TenantID, sess.GroupID, sess.Pending, sess.Next, sess.Method, sess.ExpiresAt, sess.TTL, sess.Plane)
+		`INSERT INTO sessions (token_hash, user_id, tenant_id, group_id, pending, next, method, expires_at, ttl, plane, created_at, ip, agent)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		sess.TokenHash, sess.UserID, sess.TenantID, sess.GroupID, sess.Pending, sess.Next, sess.Method, sess.ExpiresAt, sess.TTL, sess.Plane,
+		sess.CreatedAt, sess.IP, sess.Agent)
 	if err != nil {
 		return fmt.Errorf("store: create session: %w", err)
 	}
@@ -2283,6 +2623,104 @@ func (s *Store) DeleteSessionsForUser(ctx context.Context, userID string) (int64
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// SessionID is the public name of a session: the head of its token's hash.
+// Never the token, never the whole hash - a list shows it and a revoke button
+// sends it back, and neither is enough to forge a cookie. Sixteen hex digits
+// are sixty-four bits: no two live sessions share one.
+func SessionID(tokenHash string) string {
+	if len(tokenHash) < 16 {
+		return tokenHash
+	}
+	return tokenHash[:16]
+}
+
+// SessionInfo is one live session as a list shows it (AUTH-14, CONSOLE-08).
+type SessionInfo struct {
+	ID         string `json:"id"`
+	UserID     string `json:"userId"`
+	Username   string `json:"username"`
+	Plane      string `json:"plane"`
+	TenantID   string `json:"tenantId,omitempty"`
+	TenantName string `json:"tenantName,omitempty"`
+	CreatedAt  int64  `json:"createdAt"`
+	ExpiresAt  int64  `json:"expiresAt"`
+	IP         string `json:"ip,omitempty"`
+	Agent      string `json:"agent,omitempty"`
+	// Pending is a sign-in step still owed: the session exists, it opens nothing yet.
+	Pending string `json:"pending,omitempty"`
+	hash    string
+}
+
+// SessionFilter narrows ListSessions. Search matches the username.
+type SessionFilter struct {
+	UserID string
+	Plane  string
+	Search string
+	Limit  int
+	Offset int
+}
+
+// ListSessions lists the live sessions, newest first, and how many match.
+func (s *Store) ListSessions(ctx context.Context, f SessionFilter, now int64) ([]SessionInfo, int, error) {
+	where := []string{"s.expires_at >= ?"}
+	args := []any{now}
+	if f.UserID != "" {
+		where = append(where, "s.user_id = ?")
+		args = append(args, f.UserID)
+	}
+	if f.Plane != "" {
+		where = append(where, "s.plane = ?")
+		args = append(args, f.Plane)
+	}
+	if q := strings.TrimSpace(f.Search); q != "" {
+		where = append(where, "LOWER(u.username) LIKE ?")
+		args = append(args, "%"+strings.ToLower(q)+"%")
+	}
+	from := ` FROM sessions s JOIN users u ON u.id = s.user_id LEFT JOIN tenants t ON t.id = s.tenant_id
+	          WHERE ` + strings.Join(where, " AND ")
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+from, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("store: count sessions: %w", err)
+	}
+	limit := f.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT s.token_hash, s.user_id, u.username, s.plane, s.tenant_id, COALESCE(t.name, ''),
+		        s.created_at, s.expires_at, s.ip, s.agent, s.pending`+from+
+			` ORDER BY s.created_at DESC, s.token_hash LIMIT ? OFFSET ?`,
+		append(args, limit, f.Offset)...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("store: list sessions: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []SessionInfo
+	for rows.Next() {
+		var si SessionInfo
+		if err := rows.Scan(&si.hash, &si.UserID, &si.Username, &si.Plane, &si.TenantID, &si.TenantName,
+			&si.CreatedAt, &si.ExpiresAt, &si.IP, &si.Agent, &si.Pending); err != nil {
+			return nil, 0, fmt.Errorf("store: list sessions: %w", err)
+		}
+		si.ID = SessionID(si.hash)
+		out = append(out, si)
+	}
+	return out, total, rows.Err()
+}
+
+// SessionHashByID finds a live session by its public id, and whose it is.
+func (s *Store) SessionHashByID(ctx context.Context, id string) (hash, userID, plane string, err error) {
+	if len(id) != 16 {
+		return "", "", "", fmt.Errorf("store: session %q: %w", id, sql.ErrNoRows)
+	}
+	err = s.db.QueryRowContext(ctx,
+		`SELECT token_hash, user_id, plane FROM sessions WHERE token_hash LIKE ?`, id+"%").Scan(&hash, &userID, &plane)
+	if err != nil {
+		return "", "", "", fmt.Errorf("store: session %q: %w", id, err)
+	}
+	return hash, userID, plane, nil
 }
 
 // DeleteSession revokes a single session. Deleting an absent session is not
@@ -2383,4 +2821,45 @@ func (c column) definition() string {
 		def += " DEFAULT " + c.dflt.String
 	}
 	return def
+}
+
+// SpokenLanguages is every language this gateway's routes say they are written
+// in, deduplicated and sorted.
+//
+// THE OFFER IS DERIVED, never declared. It used to be a setting - a pool an
+// operator typed into a screen - with each route subtracting from it, and that
+// asked somebody to know something nobody knows: what a gateway speaks. The
+// applications behind it know, one at a time, and they are what gets deployed.
+// Deriving it means a route that arrives speaking Polish makes the sign-in page
+// offer Polish, and a route that leaves takes its language with it.
+//
+// Disabled routes are out: a route nobody can reach speaks to nobody. Case is
+// folded for the comparison and the first spelling seen is the one kept, since
+// a tag is compared case-insensitively but displayed as written.
+func (s *Store) SpokenLanguages(ctx context.Context) ([]string, error) {
+	routes, err := s.ListRoutes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]string{}
+	for _, r := range routes {
+		if !r.Enabled || r.Locales == nil {
+			continue
+		}
+		for _, code := range r.Locales.Speaks {
+			code = strings.TrimSpace(code)
+			if code == "" {
+				continue
+			}
+			if _, already := seen[strings.ToLower(code)]; !already {
+				seen[strings.ToLower(code)] = code
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for _, code := range seen {
+		out = append(out, code)
+	}
+	sort.Strings(out)
+	return out, nil
 }

@@ -141,3 +141,35 @@ $mat-block: 'mat-card, mat-card-header, mat-card-content, mat-card-actions,'
 @each $role in roles.$known-roles {
   @include reveal('body.#{$role}', "~='#{$role}'");
 }
+
+// A control floating OVER the preview: the template picker at its top edge,
+// the theme ring and the language picker on the seam between its two panes.
+// One surface because they are one kind of thing - a command that belongs to
+// what is behind it, not to the page around it - and three near-identical
+// copies would have drifted the first time one was touched.
+.mk-float-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mat-sys-surface-container-high) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--mat-sys-outline-variant);
+}
+
+// The navigation rail's entries are a LIST, and a list outgrows a short window:
+// on a 480px-high screen this console shows eleven of its fifteen sections and
+// the rest are simply unreachable - the component sizes them with
+// `flex: 1 1 auto; min-height: 0` and gives them no overflow, so what does not
+// fit is clipped rather than scrolled.
+//
+// Global rather than scoped, because .rail-items belongs to @softwarity/rail-nav
+// and no rule of ours reaches inside it otherwise. The real home for this fix is
+// that package; here it is the one line that gives a list what every list wants.
+rail-nav .rail-items {
+  overflow-y: auto;
+  // The rail is narrow: a scrollbar taking 15px of it would push the labels
+  // about. Thin where the browser offers it, overlaid on macOS anyway.
+  scrollbar-width: thin;
+}

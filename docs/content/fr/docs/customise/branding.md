@@ -9,7 +9,7 @@ summary: Nom, logo, favicon et le fond de page - y compris une image différente
 
 La marque, c'est l'identité de l'application sur les pages que la passerelle sert : le nom qu'un
 visiteur lit au-dessus de la carte de connexion, le symbole dans l'onglet du navigateur, l'image
-derrière tout ça (THEME-02, THEME-06).
+derrière tout ça.
 
 Elle est **globale** - une identité par passerelle, quel que soit le thème actif. Les thèmes sont des
 essais de couleur ; l'identité ne se dédouble pas avec eux. Elle s'édite sur l'onglet **Branding** de
@@ -71,7 +71,7 @@ Une photographie passe souvent dans un schéma et pas dans l'autre. Le schéma s
 Un interrupteur décide dans quel sens ça marche :
 
 - **une image pour les deux** - l'image claire sert aussi en sombre, et les champs sombres sont ignorés
-  (la console les désactive) ;
+ (la console les désactive) ;
 - **une image chacun** - deux images, deux cadrages, deux voiles.
 
 Téléverser une image claire et aucune sombre veut dire « utilise-la dans les deux », ce qui est la
@@ -99,4 +99,4 @@ Disposer les pages se vend avec la même clé - voir
 ## Ce qui manque
 
 La couleur de fond du logo a été abandonnée plutôt que construite : l'image de fond a remplacé de fait
-le besoin (THEME-02).
+le besoin.

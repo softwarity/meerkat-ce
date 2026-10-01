@@ -67,6 +67,7 @@ Both probes exist on both ports, and they are not interchangeable. /healthz is L
 
 The rule that follows: whatever sends traffic probes /readyz, and never /healthz.
 
+::: details The full Deployment
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -104,7 +105,7 @@ spec:
           # The external database is an Enterprise capability: the community
           # image links no PostgreSQL driver at all. Pin a release rather than
           # riding "latest" on something that answers your front door.
-          image: ghcr.io/softwarity/meerkat-ee:latest
+          image: ghcr.io/softwarity/meerkat:latest
           ports:
             - name: app
               containerPort: 8080
@@ -176,11 +177,13 @@ spec:
         - name: data
           emptyDir: {}
 ```
+:::
 
 ## Two Services, because there are two planes
 
 Port 8080 is the data plane - your applications, the sign-in pages, the live channel. Port 9090 is the control plane - the admin console, the admin API and the MCP endpoint an agent talks to. Only the first belongs on the internet, and they are two Services for exactly that reason: an Ingress in front of your applications must not be able to reach the console by accident, and a single Service with two ports is one annotation away from doing so.
 
+::: details Both Services
 ```yaml
 # The data plane: what your users reach.
 apiVersion: v1
@@ -212,6 +215,7 @@ spec:
       port: 9090
       targetPort: admin
 ```
+:::
 
 How an operator reaches the console then, in order of preference: kubectl port-forward service/meerkat-admin 9090:9090 for occasional work; a second Ingress on an internal-only controller, or on the same one restricted by source address and client certificate, when a team needs it daily. What you should not do is put it on the same public host as the applications.
 
@@ -221,6 +225,7 @@ Two things a default Ingress gets wrong for this gateway. It proxies WebSockets,
 
 And the scheme. Meerkat can terminate TLS itself (-tls-addr, -admin-tls-addr, with ACME issuance serialised by an advisory lock so N nodes ask for one certificate rather than N, the material and the challenge being rows every node can answer from). In Kubernetes you usually terminate at the Ingress instead, and both work. But whatever terminates in front must send X-Forwarded-Proto: the gateway reads the scheme from it as much as from the connection, and without it three things go wrong at once - session cookies lose their Secure attribute, the console announces http:// URLs, and the redirect to HTTPS loops for ever. nginx and Traefik both set it by default; anything hand-rolled in front has to be checked.
 
+::: details The full Ingress
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -251,37 +256,29 @@ spec:
                   name: app
 # Nothing here points at meerkat-admin, and that is the point.
 ```
+:::
 
-## What sits in front, and how not to make it the single point of failure
+## What sits in front
 
-A ClusterIP Service is reachable from inside the cluster only. Something in front must therefore own the address your users type - and that address is now the thing that can take the whole installation down. Three replicas behind a name that resolves to one machine is a one-machine cluster with extra steps, and this is the part of a Kubernetes deployment that is genuinely a decision rather than a manifest.
+A ClusterIP Service is only reachable from inside the cluster: something in
+front has to carry the address your users type. That address then becomes what
+can take the installation down - three replicas behind a name that resolves to
+one machine is a one-machine cluster with extra steps.
 
-On a managed cluster (EKS, GKE, AKS), there is nothing to solve: give the data-plane Service type: LoadBalancer and the provider gives you one stable address carried by its own highly available load balancer, health-checked and spread across zones. It is the right answer wherever it is available, and the trade is that the entry path is theirs, billed by the hour, and configured through annotations rather than by you.
+On a managed cluster (EKS, GKE, AKS): `type: LoadBalancer` on the data-plane
+Service, and the provider hands back a stable, load-balanced address.
 
-On bare metal there is no such provider, so type: LoadBalancer stays pending for ever unless you install something that implements it. Three usual answers, and they are not equivalent.
+On bare metal that provider does not exist and `type: LoadBalancer` stays
+pending. MetalLB (in L2 or BGP mode) or a keepalived VIP in front of an Ingress
+controller answer that need. It is an infrastructure decision, not a Meerkat
+setting: the gateway is reached the same way whichever answer you pick.
 
-- MetalLB in layer 2 mode takes a spare address on the network the nodes sit on and has one node answer the ARP requests for it. When that node dies, another takes the address over and shouts a gratuitous ARP so the switches relearn. That is real failover, in seconds - but it is not load spreading: every packet enters through one machine, which is a bandwidth ceiling and a single machine whose failure is visible, briefly, to everyone.
-- MetalLB in BGP mode has every node announce the same address to your router, which installs several equal-cost next hops and spreads flows over them. That is failover AND spreading, and it is the honest answer for a bare-metal cluster that has to hold a load. The price is not technical: it needs a BGP session on the router, so your network team is in the room, and the router hashing decides which node a flow lands on - a topology change can move flows that were already open.
-- keepalived, or any VRRP implementation, in front of an Ingress controller running as a DaemonSet with hostNetwork: the controller answers on every machine, and a virtual address floats between them by VRRP. Same trade as MetalLB layer 2 - failover yes, one machine at a time - with one more thing to run outside Kubernetes, and it is the answer where MetalLB cannot be installed or where a VRRP pair already exists.
-
-DNS round robin - several A records for one name - is often proposed as the cheap version, and on its own it is not a failover mechanism: a record keeps being handed out while the machine behind it is down, for as long as the TTL and the resolvers that ignore it. What rescues it is the clients: browsers and modern HTTP clients try the next address when a connection is refused. So it spreads sessions acceptably and fails over imperfectly, and it belongs on top of one of the rows above - several records, each pointing at an address that can itself move - rather than alone.
-
-| In front | Fails over | Spreads the load | Needs |
-| --- | --- | --- | --- |
-| Cloud LoadBalancer Service (EKS, GKE, AKS) | Yes, the provider owns it | Yes, across zones | One line in the manifest, and an hourly bill |
-| MetalLB, layer 2 | Yes, a few seconds while ARP caches relearn | No, one node carries everything | A spare address on the network the nodes sit on |
-| MetalLB, BGP | Yes, the router withdraws the dead next hop | Yes, ECMP over the nodes | A BGP session on the router: your network team is in the room |
-| keepalived (VRRP) over an Ingress controller DaemonSet | Yes, the VIP moves to another machine | No, the VIP is on one machine at a time | keepalived on the machines, outside Kubernetes |
-| DNS round robin | Partly, and only because clients retry the next address | Roughly, whatever resolvers cache | Several A records, and one of the rows above behind each |
-
-### We use Traefik. Does that not solve it?
-
-Half of it, and it is worth being precise because the two things share a name. Traefik - like nginx, HAProxy or Envoy - IS an Ingress controller: it is what reads the Ingress object above and does the routing, TLS termination and header work. In that sense it replaces the Ingress layer of these manifests entirely, and you would write an IngressRoute instead. Fine.
-
-What it does not replace is what stands in FRONT of it, because Traefik runs on machines too. Its pods are pods: they are scheduled somewhere, and whatever address your users resolve has to reach them. On a managed cluster that address is the LoadBalancer Service in front of Traefik, and the provider makes it highly available. On bare metal, nothing does it by itself - so Traefik needs exactly the same MetalLB or VRRP address as the Ingress above. Deploying two Traefik replicas does not give you two entry addresses; it gives you two backends behind whatever single address you have not built yet.
-
-> [!NOTE]
-> The short form: the Ingress object and the Ingress controller are two different things, and a controller only removes the need for the first.
+> [!NOTE] Traefik only replaces half of it
+> Traefik - like nginx, HAProxy or Envoy - **is** an Ingress controller: it
+> replaces the Ingress object above, and you would write an IngressRoute
+> instead. But its pods are pods: on bare metal it needs exactly the same
+> highly available entry address. Two Traefik replicas do not give you two
+> entry addresses.
 
 ## The fragile part is the database
 
@@ -289,12 +286,15 @@ Replicas make the gateway survive a machine. They do nothing for the thing all o
 
 What happens when it goes is at least honest. /readyz answers 503 with the reason - the store is not answering - so Kubernetes takes those pods out of the Service endpoints while /healthz keeps saying UP and nothing gets restarted. The gateway stops serving rather than serving wrong answers, and it comes back by itself when the database does: no restart, no manual step, nothing to unwedge.
 
-So: a managed PostgreSQL with automatic failover, or an operator of the Patroni class with a synchronous standby, and MEERKAT_DATABASE_URL pointing at the name that follows the primary rather than at a host. Then measure the failover window, because that window is the one in which no node is ready - and test the restore, which is the only way to know a backup exists.
+So point `MEERKAT_DATABASE_URL` at a name that follows the primary rather than
+at a host, and measure your database's failover window: that window is the one
+in which no node is ready.
 
 ## Optional: let the route editor see the namespace
 
-The gateway can list the Services of its OWN namespace and offer them when somebody creates a route, so an upstream becomes a pick rather than a typed URL. There is no switch for it: what opens it is what the deployment grants. The ServiceAccount needs list on services in its own namespace and nothing else - no secret, no pod, no other namespace - and without the right the console says which one it lacks while free typing stays exactly as it was.
+The gateway can list the Services of its OWN namespace and offer them when somebody creates a route, so an upstream becomes a pick rather than a typed URL. There is no switch for it: what opens it is what the deployment grants. The ServiceAccount needs list on services in its own namespace and nothing else - no secret, no pod, no other namespace - and without the right the console says which one it lacks while free typing stays exactly as it was. The developer tunnel asks for more than this, and what it grants is set out on [Docker and Helm](/docs/deploy/one-gateway).
 
+::: details The Role and its binding
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -326,6 +326,7 @@ subjects:
 # And name it in the pod spec:
 #   serviceAccountName: meerkat
 ```
+:::
 
 ## Before calling it done
 

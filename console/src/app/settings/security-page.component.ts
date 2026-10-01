@@ -11,6 +11,7 @@ import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, Settings } from '../api.service';
 import { DialogsService } from '../shared/dialogs.service';
 import { humanDuration } from '../shared/duration';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 const TRUST_TTL_CHOICES = ['P1D', 'P7D', 'P14D', 'P30D'];
 const SESSION_TTL_CHOICES = ['PT15M', 'PT30M', 'PT1H', 'PT2H', 'PT4H', 'PT8H', 'PT12H', 'P1D'];
@@ -58,6 +59,7 @@ export class SecurityPageComponent {
   protected readonly emailSignin = signal(false);
   protected readonly rlLogin = signal(10);
   protected readonly rlTotp = signal(5);
+  protected readonly rlReset = signal(5);
   protected readonly rlWindow = signal('PT15M');
   protected readonly rlWindows = ['PT5M', 'PT15M', 'PT1H'];
   protected readonly passkeysAllowed = signal(true);
@@ -112,6 +114,16 @@ export class SecurityPageComponent {
 
 
   constructor() {
+    this.load();
+    // Somebody else's write (CONSOLE-13). OFFERED and not applied: this screen
+    // is a form, and reloading it under somebody typing would throw their work
+    // away for news they did not ask for. The same bargain the 409 does from
+    // the other end - see stale.interceptor.ts.
+    const live = inject(LiveChangesService);
+    live.on('settings', (change) => live.offer(change, () => this.load()));
+  }
+
+  private load(): void {
     this.api.settings().subscribe({
       next: (s) => {
         this.settings.set(s);
@@ -120,6 +132,7 @@ export class SecurityPageComponent {
         this.emailSignin.set(s.emailSignin);
         this.rlLogin.set(s.rateLimit?.loginAttempts ?? 10);
         this.rlTotp.set(s.rateLimit?.totpAttempts ?? 5);
+        this.rlReset.set(s.rateLimit?.resetAttempts || 5);
         this.rlWindow.set(s.rateLimit?.loginWindow || 'PT15M');
         this.passkeysAllowed.set(s.passkeysAllowed);
         this.apiTokens.set(s.apiTokens);
@@ -176,7 +189,12 @@ export class SecurityPageComponent {
         mfaRequired: this.mfaRequired(),
         mfaEmailOtp: this.mfaEmailOtp(),
         emailSignin: this.emailSignin(),
-        rateLimit: { loginAttempts: this.rlLogin(), loginWindow: this.rlWindow(), totpAttempts: this.rlTotp() },
+        rateLimit: {
+          loginAttempts: this.rlLogin(),
+          loginWindow: this.rlWindow(),
+          totpAttempts: this.rlTotp(),
+          resetAttempts: this.rlReset(),
+        },
         passkeysAllowed: this.passkeysAllowed(),
         apiTokens: this.apiTokens(),
         trustedBrowser: { allowed: this.trustAllowed(), ttl: this.trustTtl() },

@@ -18,6 +18,7 @@ import { TreeGuide, TreePrefixComponent } from '../../shared/tree-prefix.compone
 import { filterRoleTree } from '../../shared/role-tree';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { RoleEditorComponent } from '../role-editor/role-editor.component';
+import { LiveChangesService } from '../../shared/live-changes.service';
 
 // One row of the flattened tree: the role plus the guide glyphs materializing
 // its position in the hierarchy. A NULL role is the catalogue root, the one row
@@ -152,10 +153,14 @@ export class RolesPageComponent {
 
   constructor() {
     this.load();
+    // Somebody else's write (CONSOLE-13): this list follows what other
+    // operators do, quietly - a spinner replacing a list nobody asked to
+    // reload takes the screen away from whoever is reading it.
+    inject(LiveChangesService).on('role', () => this.load(true));
   }
 
-  load(): void {
-    this.loading.set(true);
+  load(quiet = false): void {
+    if (!quiet) this.loading.set(true);
     this.api.listRoles().subscribe({
       next: (roles) => {
         this.roles.set(roles);

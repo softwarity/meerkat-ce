@@ -88,6 +88,10 @@ type Tenant struct {
 	OwnerName     string `json:"ownerName,omitempty"`
 	CreatedAt     int64  `json:"createdAt"`
 	UpdatedAt     int64  `json:"updatedAt"`
+	// Rev is the revision this row was READ at, carried back by a save so a
+	// write built on a version somebody has replaced is refused. Zero means "I
+	// read no version" and still wins - see rev.go.
+	Rev int64 `json:"rev,omitempty"`
 }
 
 // The tenancy modes. Single is the default and the only one a community
@@ -168,6 +172,10 @@ type UserTenant struct {
 
 // SaveTenant inserts or replaces a tenant by ID.
 func (s *Store) SaveTenant(ctx context.Context, t Tenant) error {
+	// See rev.go: a write built on a version somebody has replaced is refused.
+	if err := s.checkRev(ctx, "tenants", "organisation", t.ID, t.Rev); err != nil {
+		return err
+	}
 	// Same trap one level up: an organisation created without opening hours
 	// used to OVERRIDE the global ones with nothing, so the installation's
 	// window stopped applying to it.
@@ -181,13 +189,13 @@ func (s *Store) SaveTenant(ctx context.Context, t Tenant) error {
 	// the tenant (it is stamped once at creation). owner_id IS updatable (the
 	// caller carries it forward on a plain update, or changes it on transfer).
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO tenants (id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO tenants (id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, description = excluded.description, enabled = excluded.enabled,
 		   business_access = excluded.business_access, session_ttl = excluded.session_ttl,
 		   group_mode = excluded.group_mode, owner_id = excluded.owner_id,
-		   updated_at = excluded.updated_at`,
+		   updated_at = excluded.updated_at, rev = tenants.rev + 1`,
 		t.ID, t.Name, t.Description, t.Enabled, string(ba), t.SessionTTL, t.GroupMode, t.CreatedBy, t.OwnerID, now, now)
 	if err != nil {
 		return fmt.Errorf("store: save tenant %q: %w", t.Name, err)
@@ -200,9 +208,9 @@ func (s *Store) GetTenant(ctx context.Context, id string) (Tenant, error) {
 	var t Tenant
 	var ba string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at
+		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev
 		 FROM tenants WHERE id = ?`, id).
-		Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &t.CreatedAt, &t.UpdatedAt)
+		Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &t.CreatedAt, &t.UpdatedAt, &t.Rev)
 	if err != nil {
 		return Tenant{}, fmt.Errorf("store: get tenant %q: %w", id, err)
 	}
@@ -215,7 +223,7 @@ func (s *Store) GetTenant(ctx context.Context, id string) (Tenant, error) {
 // ListTenants returns every tenant ordered by name.
 func (s *Store) ListTenants(ctx context.Context) ([]Tenant, error) {
 	return s.listTenants(ctx,
-		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at
+		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev
 		 FROM tenants ORDER BY name ASC`)
 }
 
@@ -224,7 +232,7 @@ func (s *Store) ListTenants(ctx context.Context) ([]Tenant, error) {
 // sees exactly these; root uses ListTenants instead.
 func (s *Store) ListTenantsAdministeredBy(ctx context.Context, userID string) ([]Tenant, error) {
 	return s.listTenants(ctx,
-		`SELECT t.id, t.name, t.description, t.enabled, t.business_access, t.session_ttl, t.group_mode, t.created_by, t.owner_id, t.created_at, t.updated_at
+		`SELECT t.id, t.name, t.description, t.enabled, t.business_access, t.session_ttl, t.group_mode, t.created_by, t.owner_id, t.created_at, t.updated_at, t.rev
 		 FROM tenants t
 		 LEFT JOIN memberships m ON m.tenant_id = t.id AND m.user_id = ?
 		 WHERE t.owner_id = ? OR (m.type = 'ADMIN' AND m.enabled = ?)
@@ -241,7 +249,7 @@ func (s *Store) listTenants(ctx context.Context, query string, args ...any) ([]T
 	for rows.Next() {
 		var t Tenant
 		var ba string
-		if err := rows.Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan tenant: %w", err)
 		}
 		if err := json.Unmarshal([]byte(ba), &t.BusinessAccess); err != nil {
@@ -406,11 +414,6 @@ const (
 	SettingBusinessAccess = "business_access"
 	SettingSessionTTL     = "session_ttl"
 	SettingBranding       = "branding"
-	// SettingLanguages is the APPLICATION's locale pool (I18N): free BCP 47
-	// tags. It is the master list - routes pick from it, and the flow pages
-	// speak its intersection with the languages Meerkat embeds (fallback
-	// English). Empty by default: the integrator declares their app's locales.
-	SettingLanguages = "languages"
 	// SettingMFARequired is the gateway-wide second-factor policy (MFA-04): when
 	// true, every user must enrol a TOTP before the flow completes. A per-user
 	// override on the user record may force it on/off (MFARequiredForUser).
@@ -440,6 +443,10 @@ const (
 	// PortalConfig. Global, ships OFF - an installation that upgrades keeps its
 	// per-route user buttons until someone builds a portal.
 	SettingPortal = "portal"
+	// SettingTelemetry is where this gateway's traces go and how much of them
+	// (OBS-04): the collector's address, the credential as a vault reference,
+	// the sampling rate and the ceiling. Delivered off, Enterprise.
+	SettingTelemetry = "telemetry"
 	// SettingTLS is which HTTPS doors are open and whether an authority issues
 	// certificates on its own (certs.Settings). The MATERIAL lives in its own
 	// table - this holds only the switches, so turning HTTPS off never risks
@@ -487,6 +494,18 @@ const (
 	// nobody asked for should not appear on an upgrade. A token of scope
 	// metrics is still required either way; this says the door exists at all.
 	SettingMetricsEndpoint = "metrics_endpoint"
+	// SettingMetricsTokenRequired says whether the METRICS port asks a scraper
+	// for a token. Off by default, which is how PostgreSQL's and RabbitMQ's
+	// exporters ship: that port is never published, so what keeps it private
+	// is the network, and a credential in a scrape configuration is one more
+	// secret to rotate for nothing. The control plane's /metrics asks for one
+	// whatever this says - that port is the one an ingress may put in front of
+	// a browser.
+	SettingMetricsTokenRequired = "metrics_token_required"
+	// SettingMetricsPort is the port the gateway opens for scrapers while the
+	// exposition is on, chosen in the console when it is switched on.
+	// DefaultMetricsPort when nothing was chosen.
+	SettingMetricsPort = "metrics_port"
 	// SettingTenancy records the mode this installation was FIRST started in:
 	// TenancySingle (one implicit organisation, the notion never surfaces) or
 	// TenancyMulti. It is chosen at startup and never changes afterwards -
@@ -591,9 +610,6 @@ func (s *Store) seedDefaultSettings() error {
 		// AUTH-10: the eight characters the code used to demand in four
 		// places, now in one, and raisable.
 		SettingPasswordPolicy: string(pwPolicy),
-		// The application locale pool ships EMPTY - the integrator declares
-		// their app's languages (flow pages then fall back to English).
-		SettingLanguages: `[]`,
 		// Empty: the visitor decides, which is right until an integrator tells
 		// us their application only knows one look.
 		SettingPagesScheme: `""`,
@@ -704,7 +720,7 @@ func (s *Store) SetTenancy(ctx context.Context, mode string) error {
 // would mean more.
 func (s *Store) PrimaryTenant(ctx context.Context) (Tenant, error) {
 	list, err := s.listTenants(ctx,
-		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at
+		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev
 		 FROM tenants
 		 ORDER BY created_at ASC, CASE WHEN id = ? THEN 0 ELSE 1 END, id ASC LIMIT 1`, DefaultTenantID)
 	if err != nil {

@@ -8,7 +8,7 @@ summary: Secrets chiffrés et valeurs en clair dans un seul espace de noms, les 
 # Le coffre
 
 Le coffre est le seul endroit que le reste de la configuration désigne au lieu de porter une valeur en
-ligne (VAULT-01). Il tient deux genres d'entrée dans **un seul espace de noms** :
+ligne. Il tient deux genres d'entrée dans **un seul espace de noms** :
 
 | Genre | Au repos | À la relecture |
 |---|---|---|
@@ -36,8 +36,8 @@ password: "$smtp-password"
 - `$nom` et `${nom}` sont la même référence ; les accolades lui permettent de coller à ce qui suit.
 - `$$` est un `$` littéral.
 - Un nom qui ne résout pas est laissé **tel quel** et signalé, donc une faute de frappe se voit
-  elle-même. La transformer silencieusement en chaîne vide produirait un amont vide ou un mot de passe
-  vide, qui échouent de façons beaucoup plus déroutantes.
+ elle-même. La transformer silencieusement en chaîne vide produirait un amont vide ou un mot de passe
+ vide, qui échouent de façons beaucoup plus déroutantes.
 
 Pour un **secret** il y a une règle de plus : seule une valeur qui est *entièrement* une référence compte
 comme une référence. Un amont se construit autour de ses références, donc un fragment y est normal ; un
@@ -64,7 +64,7 @@ une valeur globale sans pouvoir l'éditer, et l'ombrer en déclarant la sienne s
 ## Un champ sensible passe toujours par le coffre
 
 Un champ qui porte un secret a quatre états dans la console, et la saisie bloque l'enregistrement jusqu'à
-ce que la valeur soit rangée (VAULT-05). Un littéral hérité d'un fichier d'amorçage ou d'un ancien
+ce que la valeur soit rangée. Un littéral hérité d'un fichier d'amorçage ou d'un ancien
 enregistrement est déplacé **côté serveur** : le navigateur envoie un nom, pas une valeur - il n'a jamais
 reçu ce littéral et ne pourrait pas le ranger lui-même.
 
@@ -94,7 +94,7 @@ passent par elle aussi.
 
 ## Le coffre comme fichier
 
-L'exact inverse d'un export de configuration, sur tous les points (VAULT-03). Il porte les valeurs
+L'exact inverse d'un export de configuration, sur tous les points. Il porte les valeurs
 elles-mêmes, il est chiffré par une phrase de passe que la passerelle ne stocke jamais, et ce n'est **pas**
 quelque chose à versionner : il existe pour amorcer un environnement ou déménager une passerelle, puis pour
 être supprimé.
@@ -111,7 +111,7 @@ Une passerelle peut en ingérer un au démarrage : `-vault`, avec la phrase de p
 ## Les dates de rappel
 
 Une entrée peut porter une **date de rappel** : le jour où son secret expire à sa source - un jeton, un
-certificat (VAULT-06).
+certificat.
 
 C'est purement un rappel et ça ne change rien. La passerelle ne peut pas savoir qu'un jeton a été renouvelé
 chez le fournisseur, donc la référence `$nom` continue de résoudre. La date ne fait que nourrir le digest
@@ -119,9 +119,9 @@ quotidien, qui liste ce qui approche et ce qui vient de passer, jamais la valeur
 
 ## Ce qui manque
 
-- **La rotation de la clé maîtresse** (VAULT-02) : il n'y a pas de ré-encryption globale, donc il n'y a pas
-  de rotation.
-- **Un backend externe** (VAULT-04) : ni HashiCorp Vault, ni secrets Kubernetes ou Docker comme source
-  alternative.
-- **Les secrets TOTP ne sont pas chiffrés au repos** (SEC-06). Ils ne passent pas par le coffre ; c'est
-  écrit comme un manque connu, pas comme un détail.
+- **La rotation de la clé maîtresse** : il n'y a pas de ré-encryption globale, donc il n'y a pas
+ de rotation.
+- **Un backend externe** : ni HashiCorp Vault, ni secrets Kubernetes ou Docker comme source
+ alternative.
+- **Les secrets TOTP ne sont pas chiffrés au repos**. Ils ne passent pas par le coffre ; c'est
+ écrit comme un manque connu, pas comme un détail.

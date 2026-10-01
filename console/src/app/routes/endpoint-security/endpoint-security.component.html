@@ -10,10 +10,26 @@
       }
     </h2>
     @if (data(); as d) {
+      <!-- Two numbers that look alike and answer different questions: the
+           FORMAT this document is written in (OpenAPI 3.0.0), and the version
+           the API declares for ITSELF (info.version). Side by side and bare,
+           "3.0.0 v0.0.1" read as one thing versioned twice. Naming them is the
+           whole fix - a tooltip on top would be explaining a label. -->
       <span class="meta">
         @if (d.title) {<span>{{ d.title }}</span>}
-        @if (d.format) {<span class="badge">{{ d.format }}</span>}
-        @if (d.version) {<span class="badge">v{{ d.version }}</span>}
+        @if (d.format) {
+          <span class="badge" i18n="@@OpenAPI_format_badge">OpenAPI {{ d.format }}</span>
+        }
+        @if (d.version) {
+          <span class="badge" i18n="@@API_version_badge">API {{ d.version }}</span>
+        }
+        <!-- The route's own prefix, which every path below carries and which is
+             therefore the same on every line. Said once here; the column shows
+             what differs. The rules still store the whole path - it is the
+             coordinate the gateway compares. -->
+        @if (prefix(); as p) {
+          <span class="badge prefix"><code>{{ p }}</code></span>
+        }
       </span>
     }
   </div>
@@ -130,7 +146,7 @@
       <ng-container matColumnDef="path">
         <th mat-header-cell *matHeaderCellDef mat-sort-header i18n="@@Path">Path</th>
         <td mat-cell *matCellDef="let o">
-          <span class="path">{{ o.path }}</span>
+          <span class="path">{{ shortPath(o.path) }}</span>
         </td>
       </ng-container>
 
@@ -190,6 +206,36 @@
       <span class="count" i18n="@@endpoints_secured_summary">
         {{ (data()?.operations)?.length || 0 }} operations, {{ securedCount() }} secured
       </span>
+      <!-- Deny-unlisted: what nobody wrote a rule for is closed, so an
+           endpoint the service ships tomorrow stays shut until decided. -->
+      <mat-slide-toggle
+        [checked]="denyUnlisted()"
+        (change)="setDenyUnlisted($event.checked)"
+        i18n-matTooltip="@@Deny_unlisted_tooltip"
+        matTooltip="An operation with no rule of its own is refused to everyone instead of following the route's rule - including an endpoint the service adds later."
+      >
+        <span i18n="@@Deny_unlisted">Only listed operations are reachable</span>
+      </mat-slide-toggle>
+      <!-- The table repeats the ROUTE's rule on every line, which is what gates
+           each operation and reads as if fifteen rules had been set by hand. So
+           the split is said here: what the route gates, and what was decided
+           per endpoint. -->
+      @if (overriddenCount(); as n) {
+        <span class="count"
+          i18n-matTooltip="@@Overridden_tooltip"
+          matTooltip="These operations carry a rule of their own. The others are gated by the route's rule, shown greyed on each line."
+          i18n="@@endpoints_secured_split"
+        >{{ byRouteCount() }} by the route, {{ n }} overridden</span>
+      }
+    }
+    <!-- Rules the spec no longer has an operation for. They are kept - a save
+         must not drop policy silently - and they are the one thing this screen
+         cannot show in its table, so it says so here. -->
+    @if (strayCount(); as n) {
+      <span class="count stray"
+        i18n-matTooltip="@@Stray_rules_tooltip"
+        matTooltip="Saved rules whose method and path match no operation of this spec. They are kept, and they gate nothing that is listed here: the spec has probably moved under them."
+      >{{ n }} rule(s) matching no operation</span>
     }
     <span class="spacer"></span>
     @switch (saveState()) {

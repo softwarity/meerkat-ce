@@ -7,19 +7,20 @@
 # other services keep talking to it as if it were still deployed. It is the
 # plug agent (https://github.com/softwarity/plug) compiled INTO the gateway.
 #
-# Two things have to be true for it to open, and neither is a setting to
-# remember:
+# Three things have to be true for it to open:
 #
-#   1. developer mode is on (Application > General in the console - it is on by
-#      default, and MEERKAT_PRODUCTION below closes it for good);
-#   2. the gateway can reach an orchestrator AND is a container that
+#   1. the tunnel is switched on (Infra, Plug in the console - it ships OFF;
+#      the page also hands out the install commands per OS);
+#   2. developer mode is on (Application, General - it is on by default, and
+#      MEERKAT_PRODUCTION below closes it for good);
+#   3. the gateway can reach an orchestrator AND is a container that
 #      orchestrator knows - which is what the socket below grants.
 #
 # Where it cannot work, it does not open a port: it writes one line saying
 # which resource it lacks, and the gateway serves as usual.
 services:
   meerkat:
-    image: ghcr.io/softwarity/meerkat-ee:latest
+    image: ghcr.io/softwarity/meerkat:latest
     ports:
       - "8080:8080" # application plane
       - "9090:9090" # control plane (admin console) - keep this one internal

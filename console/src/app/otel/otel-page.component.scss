@@ -1,0 +1,134 @@
+// Minimal, on the system tokens. As a page it sets its own reading width and
+// padding, which the drawer's body used to give it.
+:host {
+  display: block;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+}
+.banner h1 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+.content {
+  padding: 0 24px 24px;
+  max-width: 720px;
+}
+
+.lead {
+  margin: 0 0 16px;
+  line-height: 1.5;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.hint {
+  margin: 0 0 14px;
+  line-height: 1.5;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+// app-form-field is an inline-block, so alone it takes the width of what it
+// holds - an address field two thirds as wide as the pair beneath it. The one
+// that stands on its own line takes the line.
+.wide {
+  display: block;
+}
+
+// Two fields that belong together read as one line until the page is narrow.
+//
+// The gap between two rows is STATED, not borrowed from the empty subscript a
+// field reserves under itself - the same trap the mail relay page hit: the
+// moment one field has something to say there (a stored secret says so), its
+// text lands on the row beneath. And each field keeps its own height, so a
+// neighbour does not grow an empty box to match.
+// A GRID, not a flex row, and that is what makes the two rows line up. The
+// secret field is display:contents by design - the field inside it becomes
+// this container's own child, so it takes a grid cell like any other - and in
+// a flex row it took its natural width instead, leaving the value field
+// narrower than its neighbour and out of line with the row beneath.
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 620px) {
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 20px;
+  flex-wrap: wrap;
+}
+
+.failed {
+  margin: 0 0 12px;
+  color: var(--mat-sys-error);
+  line-height: 1.5;
+}
+
+// Saved, but nothing is leaving: a state worth a colour, and not an error -
+// the setting did stick.
+.warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  color: var(--mat-sys-tertiary);
+}
+
+// The collector answered. Same shape as .warn, on the primary note: it is an
+// answer, not a state of the setting.
+.ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  color: var(--mat-sys-primary);
+}
+
+code {
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  font-size: 0.85em;
+}
+
+// The group heading above the platform panels, on the same note as the rest of
+// the drawer: a label, not a title.
+.group {
+  margin: 22px 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+mat-expansion-panel {
+  background: transparent;
+}
+
+// The link to the other door for metrics, readable in a hint.
+.hint a {
+  color: var(--mat-sys-primary);
+}

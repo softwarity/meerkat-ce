@@ -88,7 +88,7 @@ func TestTheFramedArrangementIsDecidedByTheBrowser(t *testing.T) {
 func TestThePreviewIsNotSomebodyElsesFrame(t *testing.T) {
 	rec := httptest.NewRecorder()
 	WriteThemePreview(rec, store.DefaultTheme(), store.DefaultBranding(), "dark",
-		store.PageLayout{Name: store.LayoutSplit, Side: "left"})
+		store.PageLayout{Name: store.LayoutSplit, Side: "left"}, "en")
 	body, _ := io.ReadAll(rec.Result().Body)
 	page := string(body)
 

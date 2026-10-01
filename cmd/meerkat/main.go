@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -31,11 +32,14 @@ import (
 	"github.com/softwarity/meerkat/internal/expiry"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/live"
+	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
+	"github.com/softwarity/meerkat/internal/scheduler"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/tracing"
 	"github.com/softwarity/meerkat/internal/version"
 )
 
@@ -48,13 +52,6 @@ func main() {
 	// gateway down with it. The community image has no verbs to answer.
 	if len(os.Args) > 1 && os.Args[1] == devtunnel.VerbArg {
 		devtunnel.RunVerb()
-		return
-	}
-	// The anonymous account a developer reaches before they have a client:
-	// `ssh get@gateway install | sh`. This gateway has no client to hand out,
-	// and says so in the one place the person is looking.
-	if len(os.Args) > 1 && os.Args[1] == devtunnel.DownloadArg {
-		devtunnel.PrintDownloadNotice()
 		return
 	}
 
@@ -95,18 +92,69 @@ func main() {
 	production := flag.Bool("production", envOr("MEERKAT_PRODUCTION", "") != "",
 		"declare this gateway production: the developer surface (tooling, API docs, tunnel) stays closed whatever the settings say")
 	// The developer tunnel's SSH port (DEV-11). Always has one - turning the
-	// tunnel off is done by closing the developer surface, not by withholding
-	// a port. Above 1024 because binding a privileged port would want root or
+	// tunnel off is done by its switch (Infra, Plug) or by closing the
+	// developer surface, not by withholding a port. Above 1024 because binding a privileged port would want root or
 	// CAP_NET_BIND_SERVICE, against the grain of the rest of the image; which
 	// port is PUBLISHED outside the cluster is a deployment decision anyway.
 	plugAddr := flag.String("plug-addr", envOr("MEERKAT_PLUG_ADDR", devtunnel.DefaultAddr),
-		"developer tunnel (plug) listen address, Enterprise only; it opens only where developer mode is on and a cluster is reachable")
+		"developer tunnel (plug) listen address, Enterprise only; it opens only once switched on (console: Infra, Plug), with developer mode on and an orchestrator reachable")
+	// What this gateway's own output looks like (OBS-03). Until these existed
+	// Go's default stood - text, at Info, unchangeable. The level sits behind a
+	// slog.LevelVar so it can be turned at run time; nothing does yet.
+	logLevel := flag.String("log-level", envOr("MEERKAT_LOG_LEVEL", "info"),
+		"how much the gateway says about itself: debug, info, warn, error")
+	logFormat := flag.String("log-format", envOr("MEERKAT_LOG_FORMAT", ""),
+		"json or text; empty picks json for a production gateway and text elsewhere")
+	// One line per request, and off unless asked: at four hundred requests a
+	// second this is thirty-five million lines a day, and an operator reading
+	// the container's log for a startup problem should not have to opt out.
+	accessLog := flag.Bool("access-log", envOr("MEERKAT_ACCESS_LOG", "") != "",
+		"write one line per request crossing the front door, on standard output, typed \"access\"")
+	// Where the gateway's own spans go (OBS-04), Enterprise. Empty means
+	// nowhere, which is the default and costs nothing: the trace context still
+	// travels and its identifier is still in the access log.
+	otlpEndpoint := flag.String("otlp-endpoint", envOr("MEERKAT_OTLP_ENDPOINT", ""),
+		"collector to export traces to, such as http://otel-collector:4318 (Enterprise)")
+	otlpSample := flag.String("otlp-sample", envOr("MEERKAT_OTLP_SAMPLE", "0.1"),
+		"share of the journeys this gateway opens that get recorded, 0 to 1; a caller's own decision is always respected")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("meerkat %s (commit %s, built %s)\n", version.Version, version.Commit, version.Date)
 		return
 	}
+
+	// Before anything else says anything: a startup line written under Go's
+	// default handler and then a switch to JSON would give a collector two
+	// shapes for the same stream.
+	format := logging.Setup(logging.Options{
+		Format: logging.Format(*logFormat), Level: *logLevel, Production: *production,
+	})
+	if *accessLog {
+		logging.EnableAccessLog(format)
+	}
+	if *otlpEndpoint != "" {
+		sample, err := strconv.ParseFloat(*otlpSample, 64)
+		if err != nil {
+			slog.Warn("otlp-sample is not a number between 0 and 1, using 0.1", "got", *otlpSample)
+			sample = 0.1
+		}
+		stop, err := tracing.Start(tracing.Config{
+			Endpoint: *otlpEndpoint, Service: "meerkat",
+			Version: version.Version, Sample: sample,
+		})
+		if err != nil {
+			// Named rather than silent: an operator who set an endpoint and
+			// sees no traces must find out which of the two reasons it is.
+			slog.Warn("traces are not being exported", "endpoint", *otlpEndpoint, "why", err)
+		} else {
+			defer stop()
+			slog.Info("traces", "endpoint", *otlpEndpoint, "sample", sample)
+		}
+	}
+	// Not "level": slog writes the RECORD's level under that name, and a JSON
+	// object with the same key twice is a line a collector reads at random.
+	slog.Info("logs", "threshold", *logLevel, "format", string(format), "access_log", *accessLog)
 
 	if err := run(options{
 		addr: *addr, adminAddr: *adminAddr, tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
@@ -179,16 +227,11 @@ func run(o options) error {
 		return err
 	}
 	// Then the configuration file (CFG-03): it seeds an empty gateway and is
-	// ignored by a configured one. When it does seed, the demo routes stay
-	// away - the operator has said what this gateway serves.
-	seeded, err := config.Seed(ctx, st, configFile, time.Now().Unix())
-	if err != nil {
+	// ignored by a configured one. Without one the gateway starts EMPTY: what
+	// it serves is the operator's to say, and demonstration routes pointing at
+	// somebody else's website were ours, not theirs.
+	if _, err := config.Seed(ctx, st, configFile, time.Now().Unix()); err != nil {
 		return err
-	}
-	if !seeded {
-		if err := seedDemoRoute(ctx, st); err != nil {
-			return err
-		}
 	}
 	if err := auth.SeedAdmin(ctx, st); err != nil {
 		return err
@@ -209,6 +252,19 @@ func run(o options) error {
 	// on every stored session - the two ports never share a browser session.
 	sessions := session.NewManager(st)
 	adminSessions := session.NewManager(st, session.ForAdminPlane())
+	defer tracing.Stop()
+
+	// The wordings this installation corrected or added (I18N), pushed into
+	// the data plane before a single page is served. Missed, every built-in
+	// page would speak the strings we ship until somebody opened the editor
+	// and saved - which is the kind of bug that only shows after a restart.
+	if layer, err := st.LocaleOverrides(ctx); err != nil {
+		slog.Warn("locale corrections not loaded, the built-in pages speak the shipped wordings", "err", err)
+	} else if len(layer) > 0 {
+		auth.SetLocaleOverrides(layer)
+		slog.Info("locale corrections", "languages", len(layer))
+	}
+
 	router := gateway.New(st, sessions)
 	router.AdminAddr = adminAddr         // CORS for the admin console's Try it out
 	router.AdminSessions = adminSessions // authorizes identity simulation (Try it out)
@@ -414,13 +470,49 @@ func run(o options) error {
 	// and fetching it while compiling routes would make a reload wait on a
 	// service. See (*admin.API).RefreshOperations.
 	go adminAPI.RefreshOperations(ctx)
-	// One socket for the whole console, with a source per screen. The traffic
-	// curves are the first; the audit trail and the issue list are the obvious
-	// next ones, and they will register here rather than open sockets of their
-	// own.
-	liveServer := live.New()
-	liveServer.Register(live.TrafficTopic, live.NewTraffic(window))
-	adminAPI.Live = liveServer
+	// One socket for the whole console, with a source per screen - and a
+	// REGISTRY per perimeter, because what a caller may watch is decided at the
+	// upgrade and cannot be checked inside a source (see internal/live).
+	//
+	// The journal of administrative writes is served to every administrator: it
+	// is what tells a screen that what it is showing moved (CONSOLE-13). The
+	// traffic curves answer the routing plane, the scheduled calls the
+	// application's - the same perimeters their own APIs answer.
+	changes := live.NewChanges()
+	traffic := live.NewTraffic(window)
+	schedules := live.NewSchedules(st)
+	liveServer := live.New(func(p live.Perimeter) live.Sources {
+		sources := live.Sources{
+			live.ChangesTopic: changes.For(p.Named, p.Quiet),
+		}
+		if p.Traffic {
+			sources[live.TrafficTopic] = traffic
+		}
+		if p.Schedules {
+			// The scheduler screen watches a run start, advance and finish
+			// (SCHED-01).
+			sources[live.SchedulesTopic] = schedules
+		}
+		return sources
+	})
+	adminAPI.Live = func(p admin.LivePerimeter, w http.ResponseWriter, r *http.Request) {
+		liveServer.ServeFor(live.Perimeter{
+			Key: p.Key, Named: p.Named, Quiet: p.Quiet,
+			Traffic: p.RoutingPlane, Schedules: p.ApplicationPlane,
+		}, w, r)
+	}
+	// Every administrative write passes through the audit funnel, which is what
+	// makes this complete without an emission at forty call sites.
+	adminAPI.Changes = changes
+	// And a write taken by ANOTHER node reaches the consoles this one holds
+	// open. A signal rather than a topic: there is no table to re-read behind
+	// it - the screens ask the API - so losing one costs a late screen and
+	// never a wrong write, which the row's revision refuses anyway.
+	bus.OnSignal(store.TopicChanged, func(arg string) {
+		if ev, ok := admin.DecodeChange(arg); ok {
+			changes.Record(ev)
+		}
+	})
 	adminAPI.Register(adminMux)
 	if err := admin.RegisterConsole(adminMux, consoleURL, st, adminSessions); err != nil {
 		return err
@@ -455,11 +547,41 @@ func run(o options) error {
 	// inactivity rather than time since sign-in. Outermost on purpose - the
 	// healthz handler and the flow pages are requests like the others, and a
 	// deadline that only moved on SOME paths would end sessions at random.
+	dataPlane := sessions.Sliding(afterWrites(mux, "/", identityChanged))
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           sessions.Sliding(afterWrites(mux, "/", identityChanged)),
+		Handler:           dataPlane,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+
+	// Scheduled calls (SCHED-01). The scheduler is given the data plane's own
+	// handler, not an address: a scheduled call enters by the front door, in
+	// process, so it meets the predicates, the filters, the route's rule and
+	// the per-endpoint rules exactly as a person does - and no port, no
+	// certificate and no redirect sit between the gateway and itself.
+	sched := scheduler.New(scheduler.Deps{
+		Store: st,
+		Plane: dataPlane,
+		// Which node claimed a run, for the console and for a log line. The
+		// hostname is what an operator recognises in a cluster; a pod's name
+		// IS its hostname.
+		Node: hostname(),
+		// A node that stops hands its calls in flight back, and says so, so
+		// that another sends them again now rather than when their lease ends.
+		Announce: func(ctx context.Context) { bus.Announce(ctx, store.TopicSchedules) },
+	})
+	// Written from the control plane - that is where the API lives - so it is
+	// the admin side that rings this node's own scheduler.
+	adminAPI.Scheduler = sched
+	// The doorbell: a schedule written on another node is a reason to look
+	// now. The table is still the truth - see store/changes.go.
+	bus.Register(store.TopicSchedules, func(context.Context) error {
+		sched.Wake()
+		return nil
+	})
+	schedCtx, stopSchedules := context.WithCancel(context.Background())
+	defer stopSchedules()
+	go sched.Run(schedCtx)
 	adminSrv := &http.Server{
 		Addr:              adminAddr,
 		Handler:           adminSessions.Sliding(afterWrites(adminMux, "", identityChanged)),
@@ -487,6 +609,29 @@ func run(o options) error {
 	tlsSup.SerialiseIssuance(st.WithLock)
 	adminAPI.TLS = tlsSup
 	bus.Register(store.TopicCertificates, tlsSup.Reload)
+	// The metrics port (OBS-05), a third door and the only one chosen in the
+	// console: open while the exposition is on, on the port picked with the
+	// switch, and moved on every node when that changes.
+	adminAPI.ServeMetricsPort()
+	// Where the spans and the pushed counters go (OBS-04, OBS-05), from the
+	// STORED setting: an operator who switched it on in the console must find
+	// it on again after a restart - and on every node when it changes. Only
+	// when it is ON at startup: -otlp-endpoint, set by a manifest, still works
+	// for an installation that never touched the screen.
+	if st.RawTelemetry(ctx).Enabled {
+		adminAPI.ApplyTelemetry(ctx)
+	}
+	bus.Register(store.TopicTelemetry, func(ctx context.Context) error {
+		adminAPI.ApplyTelemetry(ctx)
+		return nil
+	})
+	defer metrics.StopPush()
+	bus.Register(store.TopicMetricsPort, adminAPI.ReloadMetricsPort)
+	if err := adminAPI.ReloadMetricsPort(ctx); err != nil {
+		// Not fatal, for the same reason as a taken HTTPS port: the counters
+		// are not worth the gateway.
+		slog.Error("metrics port", "err", err)
+	}
 	if err := tlsSup.Reload(ctx); err != nil {
 		// Not fatal: a taken HTTPS port must not keep the gateway from serving
 		// the plain one, or a typo in an address would take the whole
@@ -547,12 +692,28 @@ func run(o options) error {
 		slog.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		// The scheduler first stops TAKING, then gets a few seconds for the
+		// calls it has made - through the data plane, in process, so closing
+		// the listeners does not cut them. What is still waiting after that
+		// is handed back, for a node that is staying to send it again.
+		stopSchedules()
+		drained := make(chan struct{})
+		go func() {
+			defer close(drained)
+			drainCtx, stopDrain := context.WithTimeout(shutdownCtx, 5*time.Second)
+			defer stopDrain()
+			sched.Drain(drainCtx)
+		}()
+		defer func() { <-drained }()
 		err := srv.Shutdown(shutdownCtx)
 		if aerr := adminSrv.Shutdown(shutdownCtx); err == nil {
 			err = aerr
 		}
 		if terr := tlsSup.Stop(shutdownCtx); err == nil {
 			err = terr
+		}
+		if merr := adminAPI.StopMetricsPort(shutdownCtx); err == nil {
+			err = merr
 		}
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			return err
@@ -636,85 +797,6 @@ func readyz(st *store.Store, router *gateway.Router) http.HandlerFunc {
 	}
 }
 
-// seedDemoRoute gives a fresh instance one visible route, so `docker run` +
-// one curl shows the whole chain (matching, strip, proxy, head injection).
-// It only ever runs on an empty routes table.
-func seedDemoRoute(ctx context.Context, st *store.Store) error {
-	n, err := st.CountRoutes(ctx)
-	if err != nil || n > 0 {
-		return err
-	}
-	slog.Info("first start: seeding demo routes", "public", "/demo", "authenticated", "/secure", "trap", "/**")
-	if err := st.SaveRoute(ctx, store.Route{
-		ID:       "demo",
-		Name:     "demo",
-		Order:    100,
-		Enabled:  true,
-		IsUI:     true,
-		Upstream: demoUpstream(),
-		Predicates: []routing.Spec{
-			{Type: "path", Args: map[string]any{"patterns": []any{"/demo/**"}}},
-		},
-		Filters: []routing.Spec{
-			{Type: "strip-prefix", Args: map[string]any{"parts": 1}},
-		},
-		// Link names it in the user's applications menu (UIF-03): a UI route
-		// without one is reachable but unlisted, which is not what a demo is for.
-		UI: &store.RouteUI{
-			Link:     "Demo",
-			CustomJS: `console.log("injected by meerkat, the sentinel is watching")`,
-		},
-	}); err != nil {
-		return err
-	}
-	if err := st.SaveRoute(ctx, store.Route{
-		ID:       "demo-secure",
-		Name:     "demo-secure",
-		Order:    101,
-		Enabled:  true,
-		Access:   store.Access{Level: store.AccessAuth},
-		IsUI:     true,
-		Upstream: demoUpstream(),
-		Predicates: []routing.Spec{
-			{Type: "path", Args: map[string]any{"patterns": []any{"/secure/**"}}},
-		},
-		Filters: []routing.Spec{
-			{Type: "strip-prefix", Args: map[string]any{"parts": 1}},
-		},
-		UI: &store.RouteUI{
-			Link:     "Demo (secure)",
-			CustomJS: `console.log("authenticated, meerkat let you in")`,
-		},
-	}); err != nil {
-		return err
-	}
-	// The TRAP (ROUTE-10) is an ordinary route: a "/**" catch-all ordered LAST,
-	// so whatever the routes above did not match - "/" included - lands there.
-	return st.SaveRoute(ctx, store.Route{
-		ID:       "trap",
-		Name:     "trap",
-		Order:    900,
-		Enabled:  true,
-		Upstream: demoUpstream(),
-		Predicates: []routing.Spec{
-			{Type: "path", Args: map[string]any{"patterns": []any{"/**"}}},
-		},
-	})
-}
-
-// demoUpstream is what the seeded demo routes point at. httpbin.org by
-// default, because a first start should show something working without asking
-// anyone to run a container - and an ADDRESS in env, because a test bench must
-// not depend on somebody else's website being up. The e2e suite runs its own
-// httpbin and names it here; without that, three tests failed on i/o timeouts
-// that said nothing about this product.
-func demoUpstream() string {
-	if u := os.Getenv("MEERKAT_DEMO_UPSTREAM"); u != "" {
-		return u
-	}
-	return "https://httpbin.org"
-}
-
 // settleTenancy seeds the mode on a first start and gets out of the way after.
 //
 // The flag is for BOOTSTRAP - a first boot, a seeded install, GitOps - and the
@@ -787,6 +869,16 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+// hostname names this node for the schedules it claims. Unknown rather than
+// empty when the OS will not say: a run claimed by "" reads as a bug.
+func hostname() string {
+	h, err := os.Hostname()
+	if err != nil || h == "" {
+		return "unknown"
+	}
+	return h
+}
+
 // purge is one round of TTL upkeep. Extracted from the loop above so the lock
 // wraps a call rather than a block: what runs under a lock should be readable
 // as one thing.
@@ -811,10 +903,30 @@ func purge(ctx context.Context, sessions *session.Manager, st *store.Store) {
 	if _, err := st.PurgeExpiredAPITokens(ctx, time.Now().Unix()); err != nil {
 		slog.Error("api token purge failed", "err", err)
 	}
-	if n, err := st.PurgeAuditEventsBefore(ctx, time.Now().Add(-admin.AuditRetention).Unix()); err != nil {
+	// The retention is root's to choose (AUD-02), read at every pass: shortened
+	// today, the older events go at the next one.
+	retention := time.Duration(st.AuditRetentionDays(ctx)) * 24 * time.Hour
+	if n, err := st.PurgeAuditEventsBefore(ctx, time.Now().Add(-retention).Unix()); err != nil {
 		slog.Error("audit purge failed", "err", err)
 	} else if n > 0 {
 		slog.Debug("purged old audit events", "count", n)
+	}
+	// The delayed actions that have been and gone (SCHED-02). Kept a while so
+	// an operator can see that they went out, swept when nobody is looking at
+	// them any more - the retention is root's, like the trail's.
+	kept := time.Duration(st.ScheduleRetentionDays(ctx)) * 24 * time.Hour
+	if n, err := st.PurgeFinishedSchedules(ctx, time.Now().Add(-kept).Unix()); err != nil {
+		slog.Error("finished schedule purge failed", "err", err)
+	} else if n > 0 {
+		slog.Debug("purged finished schedules", "count", n)
+	}
+	// And the history of what each turn did (SCHED-03), on the same
+	// retention: it is the same question - how long does this gateway
+	// remember what it did.
+	if n, err := st.PurgeScheduleRuns(ctx, time.Now().Add(-kept).Unix()); err != nil {
+		slog.Error("schedule history purge failed", "err", err)
+	} else if n > 0 {
+		slog.Debug("purged old schedule runs", "count", n)
 	}
 	// The brute-force rows, past the longest window any policy can name. A day
 	// rather than the configured window: the policy is editable, and a purge

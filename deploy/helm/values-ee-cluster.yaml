@@ -3,7 +3,8 @@
 #   kubectl create secret generic meerkat-state \
 #     --from-literal=database-url='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require' \
 #     --from-literal=vault-key="$(openssl rand -hex 32)"
-#   helm install meerkat ./meerkat -f values-ee-cluster.yaml \
+#   helm repo add meerkat https://www.softwarity.io/deploy
+#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-cluster.yaml \
 #     --set admin.password='choose-one'
 #
 # What makes three pods ONE gateway is the shared database, and nothing else:
@@ -14,7 +15,7 @@
 # Sessions live in the database too, so no session affinity is needed at the
 # load balancer and a rolling update takes nobody's session with it.
 image:
-  repository: ghcr.io/softwarity/meerkat-ee
+  repository: ghcr.io/softwarity/meerkat
   tag: ""
   pullSecrets:
     - ghcr

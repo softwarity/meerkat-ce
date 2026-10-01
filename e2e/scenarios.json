@@ -175,6 +175,27 @@
       }
     },
     {
+      "id": "api-app-locales",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/locales"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Correct and add the built-in pages' languages",
+        "fr": "Corriger et ajouter les langues des pages intégrées"
+      },
+      "description": {
+        "en": "The wordings of the sign-in page are the PRODUCT speaking, so they sit in application scope beside its theme and its brand. The same right covers correcting a shipped catalogue and adding a language the binary does not carry.",
+        "fr": "Les libellés de la page de connexion sont le PRODUIT qui parle : ils sont donc du périmètre application, à côté de son thème et de sa marque. Le même droit couvre la correction d'un catalogue livré et l'ajout d'une langue que le binaire ne porte pas."
+      }
+    },
+    {
       "id": "api-app-users",
       "domain": "application",
       "kind": "api",
@@ -412,6 +433,96 @@
       }
     },
     {
+      "id": "api-app-data-tokens",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/data-tokens"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "List every account's application tokens",
+        "fr": "Lister les jetons d'application de chaque compte"
+      },
+      "description": {
+        "en": "The tokens each person created on their profile to call the applications' APIs (AUTH-09), with their owner: what an application administrator needs to find the one a departed colleague's script still carries, or the one that leaked.",
+        "fr": "Les jetons que chacun a créés sur son profil pour appeler les API des applications (AUTH-09), avec leur propriétaire : ce qu'il faut à un administrateur d'application pour retrouver celui qu'un script d'un collègue parti porte encore, ou celui qui a fuité."
+      }
+    },
+    {
+      "id": "api-app-data-token-revoke",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "DELETE",
+        "path": "/api/data-tokens/no-such-token",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Revoke an account's application token",
+        "fr": "Révoquer le jeton d'application d'un compte"
+      },
+      "description": {
+        "en": "Ends it at its next call, and writes token.revoke to the owner's line of the trail. An administrator ends a token here, never mints one: a credential is only created by its owner.",
+        "fr": "Le termine à son prochain appel, et écrit token.revoke au journal, sur la ligne du propriétaire. Un administrateur termine un jeton ici, n'en crée jamais : une crédentiale n'est créée que par son propriétaire."
+      }
+    },
+    {
+      "id": "api-app-sessions",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/sessions"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "List the live sessions",
+        "fr": "Lister les sessions en cours"
+      },
+      "description": {
+        "en": "Who is signed in where, right now (CONSOLE-08), with filters and pages. Root reads both planes; an application administrator the applications' sessions only, since who runs the console is root's business.",
+        "fr": "Qui est connecté où, en ce moment (CONSOLE-08), avec filtres et pages. Root lit les deux plans ; un administrateur d'application les sessions des applications seulement, puisque qui fait tourner la console est l'affaire de root."
+      }
+    },
+    {
+      "id": "api-app-session-revoke",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "DELETE",
+        "path": "/api/sessions/0000000000000000",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "End a session",
+        "fr": "Mettre fin à une session"
+      },
+      "description": {
+        "en": "Signs one session out on every gateway (SEC-07), and writes session.revoke to the trail. A console session is root's alone: under an application administrator's eyes it reads as absent.",
+        "fr": "Déconnecte une session sur toutes les passerelles (SEC-07), et écrit session.revoke au journal. Une session de console est l'affaire de root seul : sous les yeux d'un administrateur d'application, elle se lit comme absente."
+      }
+    },
+    {
       "id": "api-app-audit",
       "domain": "application",
       "kind": "api",
@@ -432,6 +543,50 @@
       "description": {
         "en": "The audit trail is a transverse section scoped by capability (RBAC-05): root sees all, infra-admin the routing plane (routes, themes), app-admin the identity (users, roles, settings), a tenant admin only their tenants' events. Anyone who administers nothing is refused.",
         "fr": "La piste d'audit est une section transverse cadrée par capacité (RBAC-05) : root voit tout, l'admin gateway le plan de routage (routes, thèmes), l'admin appli l'identité (utilisateurs, rôles, réglages), un admin de tenant seulement les événements de ses tenants. Quiconque n'administre rien est refusé."
+      }
+    },
+    {
+      "id": "api-app-audit-export",
+      "domain": "application",
+      "kind": "api",
+      "edition": "ee",
+      "probe": {
+        "method": "GET",
+        "path": "/api/audit/export?kind=security"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin"
+      ],
+      "title": {
+        "en": "Export the audit trail",
+        "fr": "Exporter le journal d'audit"
+      },
+      "description": {
+        "en": "The trail as a CSV file (STORE-06): the filters of the screen and the perimeter of the caller, never more than the screen shows. Enterprise, and audited - the file carries addresses and names, and who took it out is a question somebody will ask.",
+        "fr": "Le journal en fichier CSV (STORE-06) : les filtres de l'écran et le périmètre de l'appelant, jamais plus que ce que l'écran montre. Enterprise, et audité - le fichier porte des adresses et des noms, et qui l'a sorti est une question que quelqu'un posera."
+      }
+    },
+    {
+      "id": "api-app-audit-retention",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/audit"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "How long the audit trail keeps an event",
+        "fr": "Combien de temps le journal d'audit garde un événement"
+      },
+      "description": {
+        "en": "The retention of the trail (AUD-02), from three months to five years. Root's alone: whoever may shorten the trail may erase their own traces with it.",
+        "fr": "La rétention du journal (AUD-02), de trois mois à cinq ans. Réservée à root : qui peut raccourcir le journal peut y effacer ses propres traces."
       }
     },
     {
@@ -513,15 +668,17 @@
       },
       "allowed": [
         "root",
-        "infra-admin"
+        "infra-admin",
+        "app-admin",
+        "tenant-admin"
       ],
       "title": {
         "en": "Subscribe to what a screen shows",
         "fr": "S abonner a ce qu un ecran montre"
       },
       "description": {
-        "en": "One websocket for the whole console, with a source per screen - the traffic curves first, the audit trail and the issue list next. It is mounted BEHIND the same funnel as every API call, so a subscription passes the same checks: session, pending login, token perimeter, narrowing to the token's domain. A plain GET is not an upgrade, so an allowed caller is refused by the protocol rather than by the perimeter, which is the point of the probe.",
-        "fr": "Un seul websocket pour toute la console, avec une source par ecran - les courbes de trafic d abord, le journal d audit et les incidents ensuite. Il est monte DERRIERE le meme entonnoir que chaque appel d API, donc un abonnement passe les memes controles : session, connexion en attente, perimetre du jeton, reduction au domaine du jeton. Un GET simple n est pas une montee en version, donc un appelant autorise est refuse par le protocole et non par le perimetre, ce qui est justement ce que la sonde verifie."
+        "en": "One websocket for the whole console, with a source per screen: the traffic curves, the scheduled calls, and the journal of administrative writes every screen watches to learn that what it is showing moved. It answers every ADMINISTRATOR - the routing plane's, the application's, an organisation's - and WHAT each may watch is decided at the upgrade, from the audit trail's own partition, then handed to the socket as a registry holding those sources and nothing else. A source cannot check it: the library shares one read between the subscribers of a topic. It is mounted BEHIND the same funnel as every API call, so a subscription passes the same checks: session, pending login, token perimeter, narrowing to the token's domain. A plain GET is not an upgrade, so an allowed caller is refused by the protocol rather than by the perimeter, which is the point of the probe.",
+        "fr": "Un seul websocket pour toute la console, avec une source par ecran : les courbes de trafic, les appels planifies, et le journal des ecritures d administration que chaque ecran surveille pour apprendre que ce qu il montre a bouge. Il repond a tout ADMINISTRATEUR - celui du plan de routage, celui de l application, celui d une organisation - et CE que chacun peut surveiller est decide a la montee en version, a partir du cloisonnement du journal d audit, puis remis au socket sous la forme d un registre qui ne tient que ces sources. Une source ne peut pas le verifier : la bibliotheque partage une lecture entre les abonnes d un sujet. Il est monte DERRIERE le meme entonnoir que chaque appel d API, donc un abonnement passe les memes controles : session, connexion en attente, perimetre du jeton, reduction au domaine du jeton. Un GET simple n est pas une montee en version, donc un appelant autorise est refuse par le protocole et non par le perimetre, ce qui est justement ce que la sonde verifie."
       }
     },
     {
@@ -686,15 +843,17 @@
         "path": "/api/admin-tokens"
       },
       "allowed": [
-        "root"
+        "root",
+        "infra-admin",
+        "app-admin"
       ],
       "title": {
         "en": "List control-plane access tokens",
         "fr": "Lister les tokens d'accès control-plane"
       },
       "description": {
-        "en": "Control-plane tokens grant headless access to the admin port: this is what connects an agent (MCP-01). Minting and listing them is root-only; the tokens authenticate on the admin plane only, never the data plane, and each carries a perimeter (readonly or full).",
-        "fr": "Les tokens control-plane donnent un accès sans navigateur au port d'administration : c'est ce qui branche un agent (MCP-01). Leur création et leur liste sont réservées à root ; ils authentifient sur le plan admin uniquement, jamais le plan data, et chacun porte un périmètre (readonly ou full)."
+        "en": "Control-plane tokens grant headless access to the admin port: this is what connects an agent (MCP-01). Anybody who administers a domain (root, infra-admin, app-admin) mints and lists their OWN: a token acts with its owner's capabilities, read again on every call, so it never hands out more than the person holds. The tokens authenticate on the admin plane only, never the data plane, and each carries a perimeter (readonly or full).",
+        "fr": "Les tokens control-plane donnent un accès sans navigateur au port d'administration : c'est ce qui branche un agent (MCP-01). Quiconque administre un domaine (root, infra-admin, app-admin) crée et liste les SIENS : un token agit avec les capacités de son titulaire, relues à chaque appel, donc il ne donne jamais plus que ce que la personne détient. Ils authentifient sur le plan admin uniquement, jamais le plan data, et chacun porte un périmètre (readonly ou full)."
       }
     },
     {
@@ -706,7 +865,8 @@
         "path": "/api/settings/agent"
       },
       "allowed": [
-        "root"
+        "root",
+        "infra-admin"
       ],
       "title": {
         "en": "The agent endpoint's switch",
@@ -715,6 +875,33 @@
       "description": {
         "en": "The MCP endpoint ships OFF (MCP-01) and only root may open it: a control-plane token is required either way, but the door's existence is a decision somebody takes, not something inherited from an upgrade.",
         "fr": "L'endpoint MCP est livré ÉTEINT (MCP-01) et seul root peut l'ouvrir : un token control-plane reste nécessaire de toute façon, mais l'existence de la porte est une décision que quelqu'un prend, pas un héritage de mise à jour."
+      }
+    },
+    {
+      "id": "api-app-tenancy",
+      "domain": "app",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/settings/tenancy",
+        "body": {
+          "tenancy": "no-such-mode"
+        },
+        "allowedStatus": [
+          422
+        ]
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Choose between one organisation and several",
+        "fr": "Choisir entre une organisation et plusieurs"
+      },
+      "description": {
+        "en": "The shape of the identity - who belongs where - so it is the app-admin's decision, not root's alone. The probe sends a mode that does not exist, refused after the guard, so the run never switches the installation it is testing.",
+        "fr": "La forme de l'identité - qui appartient à quoi -, donc la décision de l'app-admin et pas seulement de root. La sonde envoie un mode qui n'existe pas, refusé après la garde, pour que le passage ne bascule jamais l'installation qu'il teste."
       }
     },
     {
@@ -730,15 +917,17 @@
         ]
       },
       "allowed": [
-        "root"
+        "root",
+        "infra-admin",
+        "app-admin"
       ],
       "title": {
         "en": "Change what a token may do",
         "fr": "Changer ce qu un jeton a le droit de faire"
       },
       "description": {
-        "en": "A token is editable for everything that is NOT in the token. The secret is a hash in a column and encodes no perimeter, no domain, no address, no expiry and no name, so none of them has to be reissued to be changed - and whoever holds the key keeps holding the same key. Which is what makes NARROWING cheap, and that is the reason this exists: a read-only token in a monitoring stack's scrape config should become a metrics one without minting a second and editing another team's repository, because that friction is why the safer move does not get made. Widening is possible too, and the audit records the before and after of every field. Root only, like every other control-plane token operation.",
-        "fr": "Un jeton est editable pour tout ce qui n est PAS dans le jeton. Le secret est un hache dans une colonne et n encode ni perimetre, ni domaine, ni adresse, ni expiration, ni nom : rien de tout cela n a besoin d etre reemis pour changer, et celui qui detient la cle detient toujours la meme cle. C est ce qui rend le RETRECISSEMENT bon marche, et c est la raison d etre de cet endpoint : un jeton read-only dans la config de scrape d une stack de supervision doit pouvoir devenir un jeton metrics sans en frapper un second et modifier le depot d une autre equipe, parce que cette friction est justement pourquoi le geste le plus sur ne se fait pas. L elargissement est possible aussi, et le journal d audit enregistre l avant et l apres de chaque champ. Root seulement, comme toute operation sur un jeton du plan de controle."
+        "en": "A token is editable for everything that is NOT in the token. The secret is a hash in a column and encodes no perimeter, no domain, no address, no expiry and no name, so none of them has to be reissued to be changed - and whoever holds the key keeps holding the same key. Which is what makes NARROWING cheap, and that is the reason this exists: a read-only token in a monitoring stack's scrape config should become a metrics one without minting a second and editing another team's repository, because that friction is why the safer move does not get made. Widening is possible too, and the audit records the before and after of every field. Open to whoever may mint one - root, infra-admin, app-admin - on their own tokens only: another person's answers not found.",
+        "fr": "Un jeton est editable pour tout ce qui n est PAS dans le jeton. Le secret est un hache dans une colonne et n encode ni perimetre, ni domaine, ni adresse, ni expiration, ni nom : rien de tout cela n a besoin d etre reemis pour changer, et celui qui detient la cle detient toujours la meme cle. C est ce qui rend le RETRECISSEMENT bon marche, et c est la raison d etre de cet endpoint : un jeton read-only dans la config de scrape d une stack de supervision doit pouvoir devenir un jeton metrics sans en frapper un second et modifier le depot d une autre equipe, parce que cette friction est justement pourquoi le geste le plus sur ne se fait pas. L elargissement est possible aussi, et le journal d audit enregistre l avant et l apres de chaque champ. Ouvert a qui peut en frapper un - root, infra-admin, app-admin - sur ses propres jetons seulement : celui d un autre repond introuvable."
       }
     },
     {
@@ -754,15 +943,17 @@
         ]
       },
       "allowed": [
-        "root"
+        "root",
+        "infra-admin",
+        "app-admin"
       ],
       "title": {
         "en": "Give a token a new secret",
         "fr": "Donner un nouveau secret a un jeton"
       },
       "description": {
-        "en": "A rotation, and what it KEEPS is why it is not simply minting a second one: the name, the perimeter, the domain, the addresses and the expiry all stay, so the audit keeps one history for one credential and the only thing to change anywhere is the value in one configuration file. The old secret stops working the moment this answers - which is what a rotation is, and why the console asks first. The new value travels exactly once, in this response, like a freshly minted one. Root only.",
-        "fr": "Une rotation, et ce qu elle GARDE est ce qui la distingue d un second jeton frappe : le nom, le perimetre, le domaine, les adresses et l expiration restent, donc le journal d audit garde une seule histoire pour une seule cle et la seule chose a changer ou que ce soit est la valeur dans un fichier de configuration. L ancien secret cesse de fonctionner des que cette reponse part - c est ce qu est une rotation, et c est pourquoi la console demande d abord. La nouvelle valeur voyage exactement une fois, dans cette reponse, comme celle d un jeton neuf. Root seulement."
+        "en": "A rotation, and what it KEEPS is why it is not simply minting a second one: the name, the perimeter, the domain, the addresses and the expiry all stay, so the audit keeps one history for one credential and the only thing to change anywhere is the value in one configuration file. The old secret stops working the moment this answers - which is what a rotation is, and why the console asks first. The new value travels exactly once, in this response, like a freshly minted one. Whoever may mint one, on their own tokens only.",
+        "fr": "Une rotation, et ce qu elle GARDE est ce qui la distingue d un second jeton frappe : le nom, le perimetre, le domaine, les adresses et l expiration restent, donc le journal d audit garde une seule histoire pour une seule cle et la seule chose a changer ou que ce soit est la valeur dans un fichier de configuration. L ancien secret cesse de fonctionner des que cette reponse part - c est ce qu est une rotation, et c est pourquoi la console demande d abord. La nouvelle valeur voyage exactement une fois, dans cette reponse, comme celle d un jeton neuf. Qui peut en frapper un, sur ses propres jetons seulement."
       }
     },
     {
@@ -774,15 +965,87 @@
         "path": "/api/settings/metrics"
       },
       "allowed": [
-        "root"
+        "root",
+        "infra-admin"
       ],
       "title": {
         "en": "The Prometheus exposition's switch",
         "fr": "L'interrupteur de l'exposition Prometheus"
       },
       "description": {
-        "en": "Whether this gateway exposes /metrics for a monitoring stack to scrape (OBS-05), and whether this image can at all. Enterprise, and the split is deliberate: the counters and the built-in curves are in BOTH editions - that is the promise a community image makes, a gateway you can see with nothing to install - what is sold is externalising them into the stack a customer already runs. Ships OFF and only root may open it: a token is required either way, but the door's existence is a decision somebody takes.",
-        "fr": "Si cette gateway expose /metrics pour qu une stack de supervision le scrape (OBS-05), et si cette image en est capable. Enterprise, et le decoupage est voulu : les compteurs et les courbes integrees sont dans LES DEUX editions - c est la promesse de l image communautaire, une gateway qu on voit sans rien installer - ce qui se vend, c est de les externaliser vers la stack que le client a deja. Livre ETEINT et seul root peut l ouvrir : un jeton reste necessaire de toute facon, mais l existence de la porte est une decision que quelqu un prend."
+        "en": "Whether this gateway exposes /metrics for a monitoring stack to scrape (OBS-05), and whether this image can at all. Enterprise, and the split is deliberate: the counters and the built-in curves are in BOTH editions - that is the promise a community image makes, a gateway you can see with nothing to install - what is sold is externalising them into the stack a customer already runs. Ships OFF, and switching it on opens a port of its own on every node, chosen here with the switch (9091 unless something already uses it), serving /metrics and nothing else. That port asks for no token by default, as PostgreSQL's and RabbitMQ's exporters do: it is never published, so the network is the lock. A second switch makes it ask for a metrics token, checked by the control plane's own funnel. A port this node cannot open is refused with the reason, and nothing is saved.",
+        "fr": "Si cette gateway expose /metrics pour qu une stack de supervision le scrape (OBS-05), et si cette image en est capable. Enterprise, et le decoupage est voulu : les compteurs et les courbes integrees sont dans LES DEUX editions - c est la promesse de l image communautaire, une gateway qu on voit sans rien installer - ce qui se vend, c est de les externaliser vers la stack que le client a deja. Livre ETEINT, et l allumer ouvre un port a part sur chaque noeud, choisi ici avec l interrupteur (9091 sauf s il est deja pris), qui sert /metrics et rien d autre. Ce port ne demande pas de jeton par defaut, comme les exporteurs de PostgreSQL et RabbitMQ : il n est jamais publie, c est le reseau qui ferme. Un second interrupteur lui fait exiger un jeton metrics, verifie par l entonnoir du plan de controle. Un port que ce noeud ne peut pas ouvrir est refuse avec la raison, et rien n est enregistre."
+      }
+    },
+    {
+      "id": "api-gw-plug",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/plug"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "The developer tunnel (plug)",
+        "fr": "Le tunnel developpeur (plug)"
+      },
+      "description": {
+        "en": "Whether the developer tunnel is open (DEV-11), the address developers type to reach it, what it is doing on this node, and who holds the developer capability with or without a deposited key - by fingerprint, never the key. Infrastructure, beside developer mode rather than under it: developer mode is a configuration of what the installation offers its developers, this opens a port into the cluster and uses the deployment's rights over it. The tunnel runs only when both say so, ships OFF, and the page where a developer deposits a key exists only while it is open.",
+        "fr": "Si le tunnel developpeur est ouvert (DEV-11), l adresse que les developpeurs tapent pour le joindre, ce qu il fait sur ce noeud, et qui detient la capacite developpeur avec ou sans cle deposee - par empreinte, jamais la cle. De l infrastructure, a cote du mode developpeur et non dessous : le mode developpeur est une configuration de ce que l installation offre a ses developpeurs, ceci ouvre un port dans le cluster et exerce les droits du deploiement dessus. Le tunnel ne tourne que si les deux le disent, il est livre ETEINT, et la page ou un developpeur depose sa cle n existe que tant qu il est ouvert."
+      }
+    },
+    {
+      "id": "api-gw-telemetry-endpoint",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/telemetry"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Where this gateway's traces go",
+        "fr": "Ou partent les traces de cette gateway"
+      },
+      "description": {
+        "en": "The collector this gateway exports its spans to (OBS-04), and whether this image can export at all. Whoever edits routes - this is infrastructure, like TLS or the mail relay - and Enterprise to turn on - the same split as the Prometheus switch: the trace context TRAVELS in both editions, and an identifier is put on every request whether or not anybody is tracing, because that identifier is what joins a line of the access log to a service's own business audit. What is sold is putting Meerkat on the trace: its inbound span, the span of the upstream call, and the gap between the two, which is the gateway's own time and the one number nobody else in the cluster can produce. What comes back is RAW: a header value of $otlp-token is the reference as written, never the secret behind it - the exporter resolves it at the moment of the call, so the credential is not in this answer, not in the audit trail and not on the screen.",
+        "fr": "Le collecteur vers lequel cette gateway exporte ses spans (OBS-04), et si cette image sait exporter tout court. Root uniquement, et Enterprise pour l allumer - meme decoupage que l interrupteur Prometheus : le contexte de trace TRAVERSE dans les deux editions, et un identifiant est pose sur chaque requete que quelqu un trace ou non, parce que cet identifiant est ce qui joint une ligne du journal d acces a l audit metier d un service. Ce qui se vend, c est de mettre Meerkat sur la trace : son span d entree, celui de l appel amont, et l ecart entre les deux qui est le temps propre de la passerelle - le seul chiffre que personne d autre dans le cluster ne peut produire. Ce qui revient est BRUT : une valeur d en-tete a $otlp-token est la reference telle qu ecrite, jamais le secret derriere - l exportateur la resout au moment de l appel, donc la credentiale n est ni dans cette reponse, ni dans le journal d audit, ni a l ecran."
+      }
+    },
+    {
+      "id": "api-gw-telemetry-test",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/settings/telemetry/test",
+        "body": {
+          "endpoint": "http://collector.e2e.test:4318"
+        },
+        "allowedStatus": [
+          200,
+          422,
+          502
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Ask the collector whether it answers",
+        "fr": "Demander au collecteur s'il repond"
+      },
+      "description": {
+        "en": "Posts an EMPTY OTLP batch to the address on screen, before anybody saves it: the whole path is exercised - name resolution, network, TLS, the credential, the collector's own answer - and no span is recorded anywhere. Gateway scope, like the setting it tests, because it makes this gateway call an address somebody hands it; the answer carries the status and the time it took, never the body.",
+        "fr": "Envoie un lot OTLP VIDE a l'adresse affichee, avant meme de l'enregistrer : tout le chemin est exerce - resolution du nom, reseau, TLS, la credentiale, la reponse du collecteur - et aucun span n'est enregistre nulle part. Perimetre passerelle, comme le reglage qu'il teste, puisqu'il fait appeler par la gateway une adresse qu'on lui donne ; la reponse porte le statut et le temps, jamais le corps."
       }
     },
     {
@@ -1164,6 +1427,23 @@
       }
     },
     {
+      "id": "flow-scheduler",
+      "domain": "gateway",
+      "kind": "flow",
+      "spec": "flow-pages",
+      "allowed": [
+        "user"
+      ],
+      "title": {
+        "en": "A service schedules a call to itself, and the gateway makes it",
+        "fr": "Un service planifie un appel vers lui-même, et la passerelle le fait"
+      },
+      "description": {
+        "en": "Scheduled calls (SCHED-01): root mints a schedules-perimeter token, a backend creates a schedule on the control plane - saying which ROLES its call must carry, in the singular or the plural - finds it again by its own metadata, and the gateway calls the named route through its front door as \"meerkat\" holding them; the run closes with what answered. No account behind the call, and the token opens nothing else on that port. The history (SCHED-03) keeps every turn that ended, and a turn is asked for again by name - a new run carrying today's payload, which says in the history which one it replays.",
+        "fr": "Appels planifiés (SCHED-01) : root frappe un jeton de périmètre schedules, un backend crée une tâche sur le plan de contrôle - en disant quels RÔLES son appel doit porter, au singulier ou au pluriel - la retrouve par ses propres métadonnées, et la passerelle appelle la route nommée par sa porte d'entrée sous le nom \"meerkat\" muni de ces rôles ; l'exécution se clôt avec ce qui a répondu. Aucun compte derrière l'appel, et le jeton n'ouvre rien d'autre sur ce port. L'historique (SCHED-03) garde chaque tour terminé, et un tour se redemande par son nom - une nouvelle exécution qui porte le payload d'aujourd'hui et dit dans l'historique lequel elle rejoue."
+      }
+    },
+    {
       "id": "flow-select-group",
       "domain": "tenant",
       "kind": "flow",
@@ -1324,6 +1604,29 @@
       "description": {
         "en": "Which HTTPS doors are open, and whether an ACME authority issues on its own. The external-account HMAC key follows the vault rule: a literal never travels back.",
         "fr": "Quelles portes HTTPS sont ouvertes, et si une autorité ACME émet toute seule. La clé HMAC de compte externe suit la règle du coffre : un littéral ne revient jamais."
+      }
+    },
+    {
+      "id": "api-gw-configuration-compare",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/configurations/no-such/compare/other",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Compare two saved configurations",
+        "fr": "Comparer deux configurations enregistrées"
+      },
+      "description": {
+        "en": "What changes going from one saved configuration to another, object by object, without looking at what runs (CFG-04): the question asked of a customer's configuration and the template it was made from, before touching either. Root only, like every configuration.",
+        "fr": "Ce qui change en passant d'une configuration enregistrée à une autre, objet par objet, sans regarder ce qui tourne (CFG-04) : la question qu'on pose à la configuration d'un client et au modèle dont elle est partie, avant de toucher à l'une ou l'autre. Root seulement, comme toute configuration."
       }
     }
   ]

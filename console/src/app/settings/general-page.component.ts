@@ -11,6 +11,7 @@ import { MeService } from '../me.service';
 import { DialogsService } from '../shared/dialogs.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
 import { BusinessAccessFormComponent } from '../identity/business-access-form.component';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 // Application-level General settings (root only): the GLOBAL working hours, the
 // value every tenant inherits unless it overrides. A full PUT of /api/settings -
@@ -54,6 +55,16 @@ export class GeneralPageComponent {
   protected readonly devLocked = signal(false);
 
   constructor() {
+    this.load();
+    // Somebody else's write (CONSOLE-13). OFFERED and not applied: this screen
+    // is a form, and reloading it under somebody typing would throw their work
+    // away for news they did not ask for. The same bargain the 409 does from
+    // the other end - see stale.interceptor.ts.
+    const live = inject(LiveChangesService);
+    live.on('settings', (change) => live.offer(change, () => this.load()));
+  }
+
+  private load(): void {
     this.api.settings().subscribe({
       next: (s) => {
         this.settings.set(s);

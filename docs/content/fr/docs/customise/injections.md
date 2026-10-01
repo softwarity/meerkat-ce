@@ -8,7 +8,7 @@ summary: Ce que la passerelle injecte déjà dans une page proxifiée, et où at
 # CSS et JavaScript par route
 
 Meerkat réécrit le HTML des routes UI qu'il proxifie, pour y ajouter le peu de lui-même dont le visiteur a
-besoin - et pour y ajouter ce que vous écrivez sur la route (UIF-02, UIF-06, SAUTH-03).
+besoin - et pour y ajouter ce que vous écrivez sur la route.
 
 Seules les réponses HTML sont touchées, et seulement sur les routes **UI**. Le JSON d'une route API n'est
 jamais réécrit.
@@ -84,9 +84,9 @@ anonymes ne mettent jamais rien en tampon.
 
 ## Ce qui manque
 
-- **La réécriture de `<base href>`** en cohérence avec un préfixe retiré (UIF-01) : rien ne le réécrit, ce
-  qui est pourquoi l'injection prend soin de ne jamais fermer le head.
-- **Un crochet post-authentification** et des presets pour les outils courants (SAUTH-03) : le bloc
-  JavaScript est là, le crochet qui tournerait à la connexion ne l'est pas.
-- **La réécriture des specs OpenAPI dans les réponses proxifiées** (UIF-07) : seul le portail de
-  documentation pour développeurs réécrit la spec qu'il sert.
+- **La réécriture de `<base href>`** en cohérence avec un préfixe retiré : rien ne le réécrit, ce
+ qui est pourquoi l'injection prend soin de ne jamais fermer le head.
+- **Un crochet post-authentification** et des presets pour les outils courants : le bloc
+ JavaScript est là, le crochet qui tournerait à la connexion ne l'est pas.
+- **La réécriture des specs OpenAPI dans les réponses proxifiées** : seul le portail de
+ documentation pour développeurs réécrit la spec qu'il sert.

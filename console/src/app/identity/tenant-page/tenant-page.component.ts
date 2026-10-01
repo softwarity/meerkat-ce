@@ -11,6 +11,7 @@ import { filter, map } from 'rxjs';
 import { ApiService } from '../../api.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { TenantScope } from '../tenant-scope';
+import { LiveChangesService } from '../../shared/live-changes.service';
 
 // One tenant's administration - a routed LAYOUT: every section is a child
 // route (/tenants/:id/general|groups|members|danger), so deep links work and
@@ -68,6 +69,14 @@ export class TenantPageComponent {
     // The id input is router-bound: it changes when navigating from one tenant
     // to another - reload, and drop the previous tenant's search.
     effect(() => this.load(this.id()));
+    // Somebody else's write (CONSOLE-13), and only this organisation's.
+    // OFFERED and not applied: the sections under here are forms, and one of
+    // them is where somebody is typing.
+    const live = inject(LiveChangesService);
+    live.on('tenant', (change) => {
+      if (change.targetId && change.targetId !== this.id()) return;
+      live.offer(change, () => this.load(this.id()));
+    });
     effect(() => {
       this.section();
       this.scope.filter.set('');

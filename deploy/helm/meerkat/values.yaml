@@ -55,10 +55,25 @@ production: false
 
 # The developer tunnel (Enterprise only): plug, compiled into the gateway.
 #
-# It needs one right - manage Services in this namespace - and that grant is
-# the whole contract. On, the chart grants it; off, it grants nothing.
+# On, the chart grants what the agent needs in THIS namespace: Services and
+# their Endpoints and EndpointSlices (point a cluster name at somebody's
+# machine, and put it back), the Deployment (its own rolling restart), pods and pods/exec (the
+# plugged process inherits the workload's resolved environment), and a helper
+# pod with the workload's claim for the live mount. The list is plug's own
+# (deploy/plug-k8s.yaml in that repository) - see templates/rbac.yaml.
+#
+# It follows `production` above rather than standing on its own: a production
+# gateway closes the developer surface, opens no tunnel, and is granted none of
+# this - a right nobody exercises is surface for nothing. Anywhere else the
+# grant is made, so the tunnel CAN open - it does once an infrastructure
+# administrator switches it on (console: Infra, Plug; it ships off) while
+# developer mode is on (Application, General; it ships on).
+#
+# Setting it to false refuses the grant outright - for an installation that
+# wants the developer surface without the tunnel. It does not close the tunnel:
+# that is `production: true`, the Infra, Plug switch, or developer mode.
 plug:
-  enabled: false
+  enabled: true
   port: 22222
   service:
     # ClusterIP, NodePort or LoadBalancer. How your developers reach the
@@ -67,9 +82,25 @@ plug:
     nodePort: ""
 
 service:
+  # How the APPLICATION plane is reached: ClusterIP, NodePort or LoadBalancer.
   type: ClusterIP
   appPort: 8080   # application plane: what your users reach
+  nodePort: ""    # pin the NodePort instead of taking the one k8s draws
   adminPort: 9090 # control plane: the admin console, keep it internal
+  # How the CONTROL plane is reached. Its own setting, and ClusterIP by default,
+  # because publishing the console is a decision and not a side effect of
+  # publishing the application. Set it to LoadBalancer or NodePort where the
+  # console has to be reachable: a port-forward is tied to ONE pod, so every
+  # rollout kills it - which is a tunnel to relaunch instead of a bookmark to
+  # open. On Docker Desktop, LoadBalancer publishes it on localhost.
+  adminType: ClusterIP
+  adminNodePort: ""
+
+metrics:
+  # The port the gateway opens for Prometheus while the exposition is on
+  # (console: Infra, Metrics endpoint). It is CHOSEN IN THE CONSOLE; this only
+  # declares it on the pod and on a ClusterIP Service, so the two must match.
+  port: 9091
 
 persistence:
   # Everything the gateway knows lives here: routes, accounts, the sealed

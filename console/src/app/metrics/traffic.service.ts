@@ -48,6 +48,41 @@ export interface TrafficRoute {
 // wrong, and how long it took. The endpoints keep a coarser history than the
 // curves do - one point a minute - so the finer analysis is what a Prometheus
 // is for.
+// The histogram's upper bounds, in seconds - the same eleven the gateway
+// counts with (internal/metrics.Buckets), plus the overflow past the last.
+export const LATENCY_BOUNDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
+
+// A percentile, in seconds, read from bucket counts (one count per bucket, not
+// cumulative) the way Prometheus's histogram_quantile reads them: find the
+// bucket the rank falls in and interpolate linearly inside it. An estimate -
+// the true value is somewhere in that bucket - which is why the screen says
+// "p95" beside a figure and never pretends to the millisecond past it. A rank
+// in the overflow answers the last bound: "slower than ten seconds" is all
+// the histogram knows. Null when nothing was counted.
+export function quantile(buckets: number[], q: number): number | null {
+  const total = buckets.reduce((a, b) => a + b, 0);
+  if (total === 0) return null;
+  const rank = q * total;
+  let below = 0;
+  for (let i = 0; i < buckets.length; i++) {
+    const n = buckets[i] ?? 0;
+    if (n > 0 && below + n >= rank) {
+      if (i >= LATENCY_BOUNDS.length) return LATENCY_BOUNDS[LATENCY_BOUNDS.length - 1];
+      const lower = i === 0 ? 0 : LATENCY_BOUNDS[i - 1];
+      return lower + (LATENCY_BOUNDS[i] - lower) * ((rank - below) / n);
+    }
+    below += n;
+  }
+  return LATENCY_BOUNDS[LATENCY_BOUNDS.length - 1];
+}
+
+// The buckets of several routes (or samples), added up.
+export function sumBuckets(routes: TrafficRoute[]): number[] {
+  const out = new Array<number>(LATENCY_BOUNDS.length + 1).fill(0);
+  for (const r of routes) r.buckets.forEach((n, i) => (out[i] += n));
+  return out;
+}
+
 export interface EndpointTotals {
   routeId: string;
   method: string;

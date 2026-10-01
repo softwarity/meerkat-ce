@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,9 +20,7 @@ func TestSignInPageCarriesTheWritingDirection(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	if err := st.SetSetting(context.Background(), store.SettingLanguages, []string{"ar", "en"}); err != nil {
-		t.Fatal(err)
-	}
+	speaks(t, st, "ar", "en")
 
 	mux := http.NewServeMux()
 	New(st, session.NewManager(st)).Register(mux)

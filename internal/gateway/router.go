@@ -36,6 +36,7 @@ import (
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/signing"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/tracing"
 	"github.com/softwarity/meerkat/internal/vault"
 )
 
@@ -51,6 +52,14 @@ type Router struct {
 	// metrics counts what passes through (OBS-01). Each compiled route holds a
 	// pointer into it, so the request path never looks anything up.
 	metrics *metrics.Registry
+	// traceExport and traceSample are the tracing setting as the last reload
+	// read it, baked into the fragment injected in the pages of the routes
+	// that asked for it (OBS-04). The rate is the gateway's own: a page opens
+	// the journey instead of this gateway, it does not open a different KIND
+	// of journey.
+	// Written under the reload, read while compiling in the same call.
+	traceExport bool
+	traceSample float64
 
 	// lottery draws the per-request value consumed by weight predicates
 	// (canary). Overridable in tests for determinism.
@@ -80,8 +89,11 @@ type Router struct {
 	// New puts here is only what a router with no usable store falls back on.
 	simTokenKey []byte
 
-	mu       sync.RWMutex
-	routes   []compiledRoute
+	mu     sync.RWMutex
+	routes []compiledRoute
+	// problems is why each route that is NOT in routes was left out, by route
+	// id. Written by Reload under the same lock, read by Problems.
+	problems map[string]string
 	needDraw bool // at least one route uses weight predicates
 
 	// uiSims holds the running UI tests (uisim.go): a developer session
@@ -141,6 +153,11 @@ type compiledRoute struct {
 	// meant the first one always won and the second was unreachable.
 	access store.Access
 	isUI   bool
+	// noTrace is the route's own tracing switch, off: this route is not one
+	// the installation asked to follow, so the gateway opens no span for it
+	// and injects no bundle into its pages. Read at COMPILE time like
+	// everything else a request must not look up.
+	noTrace bool
 	// counters are this route's own, resolved at COMPILE time so answering a
 	// request costs an atomic add and no lookup.
 	counters *metrics.Route
@@ -182,14 +199,31 @@ func (rt *Router) Reload(ctx context.Context) error {
 	// The application locale pool feeds every route (each may exclude some).
 	// It may be EMPTY (no declared app locale) - then routes forward no locale
 	// and the user button shows no language submenu.
-	var appLangs []string
-	_ = rt.st.GetSetting(ctx, store.SettingLanguages, &appLangs)
 	// The navigation portal (PORTAL-01), read once here and baked into every
 	// UI route's injection: on, the route wears the portal bar (which carries
 	// the account button) instead of the standalone user button. Changing the
 	// setting reloads the router, exactly as changing the branding does - both
 	// are compiled into the routes below.
-	portalOn := rt.st.Portal(ctx).Enabled
+	portalOn := rt.st.Portal(ctx).Mode == store.PortalModePortal
+	// The tracing setting (OBS-04), read here for the same reason: it is baked
+	// into the injection of every route that asked for one, so changing the
+	// setting reloads the router exactly as changing the branding does. WHICH
+	// routes carry the bundle is the routes' own answer, read below.
+	tel := rt.st.RawTelemetry(ctx)
+	rt.traceExport = tel.ExportsTraces()
+	rt.traceSample = tel.Sample
+	// Which routes start their journeys in the page is what opens the relay
+	// (OBS-04). Read from the routes on every reload rather than from a
+	// setting: adding the first such route opens the path, removing the last
+	// one closes it, and nobody has to remember a second switch.
+	wantsBrowser := false
+	for _, r := range stored {
+		if r.Enabled && r.IsUI && !noTracing(r) && r.TelemetryUI {
+			wantsBrowser = true
+			break
+		}
+	}
+	tracing.SetBrowserWanted(wantsBrowser)
 	// Vault values feed the $name expansion below. A vault that cannot be read
 	// is not a reason to stop serving: routes without references still work,
 	// and the ones with references will report their unresolved names.
@@ -214,6 +248,9 @@ func (rt *Router) Reload(ctx context.Context) error {
 	filtering.SetMaxRewritableBody(int64(limits.BodyRewriteMiB) << 20)
 	rt.defaultTimeouts = limits.Timeouts
 
+	// What each route that will NOT be served says for itself. Replaced whole on
+	// every reload, so a route that was mended stops being listed.
+	problems := map[string]string{}
 	compiled := make([]compiledRoute, 0, len(stored))
 	var allPreds []*routing.CompiledPredicates
 	needDraw := false
@@ -223,7 +260,12 @@ func (rt *Router) Reload(ctx context.Context) error {
 		}
 		r, missing, err := ExpandRoute(raw, values)
 		if err != nil {
-			return fmt.Errorf("gateway: route %q: %w", raw.Name, err)
+			// Left out, not fatal - see the compile error below, which is the
+			// same decision for the same reason.
+			problems[raw.ID] = err.Error()
+			slog.Error("route left out: its references could not be expanded",
+				"route", raw.Name, "err", err)
+			continue
 		}
 		if len(missing) > 0 {
 			// Left OUT rather than compiled. A route whose references do not
@@ -232,13 +274,37 @@ func (rt *Router) Reload(ctx context.Context) error {
 			// route down with it. That is the normal state of a gateway just
 			// seeded from a file (CFG-03): the configuration is in place, the
 			// vault is not filled yet, and it has to start anyway.
+			problems[raw.ID] = "references vault entries that hold nothing: " + strings.Join(missing, ", ")
 			slog.Warn("route left out: it references vault entries that hold nothing",
 				"route", raw.Name, "names", missing)
 			continue
 		}
-		cr, err := rt.compile(r, appLangs, specs[raw.ID], portalOn)
+		cr, err := rt.compile(r, specs[raw.ID], portalOn)
 		if err != nil {
-			return fmt.Errorf("gateway: route %q: %w", r.Name, err)
+			// LEFT OUT rather than fatal. A route is refused at save time, so a
+			// stored one that no longer compiles came from somewhere else: a
+			// configuration imported from another version, a restore, an image
+			// rolled back past the brick a route names. Taking the whole
+			// gateway down then - every other route with it, on a boot that
+			// never completes - is the worst possible answer to one bad line.
+			// The route does not serve, the reason is logged, and it is MARKED:
+			// a route silently missing is the second worst answer.
+			problems[raw.ID] = err.Error()
+			slog.Error("route left out: it does not compile", "route", raw.Name, "err", err)
+			// It would have MATCHED, though, so it does not hand its traffic to
+			// the next route in silence. Falling through is the right answer to
+			// an ACCESS refusal - two routes on the same paths for two
+			// audiences is a shape this product offers - and the wrong one to a
+			// configuration defect: the caller would land somewhere nobody
+			// meant, and the defect would show up as somebody else's 404. So
+			// the route keeps matching, with its own access rule, and answers
+			// the unavailable page. Only when its PREDICATES are what failed is
+			// it gone entirely, because then there is nothing left to match on.
+			if broken, ok := rt.brokenRoute(r); ok {
+				compiled = append(compiled, broken)
+				allPreds = append(allPreds, &compiled[len(compiled)-1].preds)
+			}
+			continue
 		}
 		compiled = append(compiled, cr)
 		allPreds = append(allPreds, &compiled[len(compiled)-1].preds)
@@ -301,6 +367,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 
 	rt.mu.Lock()
 	rt.routes = compiled
+	rt.problems = problems
 	rt.needDraw = needDraw
 	rt.signing = sset
 	rt.maintenance, rt.maintenancePage = maint, renderMaintenance(maint)
@@ -309,8 +376,21 @@ func (rt *Router) Reload(ctx context.Context) error {
 	}
 	rt.mu.Unlock()
 	rt.loaded.Store(true)
-	slog.Info("routes reloaded", "count", len(compiled))
+	slog.Info("routes reloaded", "count", len(compiled), "left out", len(problems))
 	return nil
+}
+
+// Problems answers, for each route the gateway is NOT serving, why. The console
+// reads it: a route that quietly stopped existing is a support call, and the
+// operator has to see the defect where they see the route.
+func (rt *Router) Problems() map[string]string {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	out := make(map[string]string, len(rt.problems))
+	for id, msg := range rt.problems {
+		out[id] = msg
+	}
+	return out
 }
 
 // Ready reports whether this router has ever finished a reload.
@@ -343,6 +423,13 @@ func record(w http.ResponseWriter) (*watched, time.Time) {
 // the heap, which is a second allocation on the path of every request for the
 // convenience of writing `defer` at the call site.
 func observed(r *compiledRoute, req *http.Request, ww *watched, start time.Time) {
+	// Whatever this route answered - its upstream, a refusal, its unavailable
+	// page - it is the route the router chose, and a route that is not traced
+	// emits nothing. The handler said so already for the call out (see
+	// compile); this covers the refusals, which never reach a handler.
+	if r.noTrace {
+		dropSpan(req.Context())
+	}
 	status := ww.status
 	if status == 0 {
 		status = http.StatusOK
@@ -353,9 +440,16 @@ func observed(r *compiledRoute, req *http.Request, ww *watched, start time.Time)
 	// the request is ANSWERED rather than before it: it costs a handful of
 	// template comparisons, and paying them on the way out keeps them off the
 	// path of a request that is still waiting for its upstream.
+	endpoint := ""
 	if op := r.ops.of(req); op != nil {
 		op.Observe(status, took)
+		endpoint = op.Path
 	}
+	// The same exit writes the access line, refusals included: a 403 is the
+	// line an audit wants most, and it is the one the service behind can never
+	// write because it never saw the call (OBS-03).
+	writeAccess(req, r.name, endpoint, status, ww.bytes, took)
+	finishSpan(req, r.name, endpoint, status)
 }
 
 // adminOrigin reports whether origin is this gateway's own admin console: the
@@ -552,6 +646,24 @@ const JWKSPath = "/.well-known/jwks.json"
 // matched is a plain 404. The TRAP (ROUTE-10) is not a special case: it is an
 // ordinary catch-all route ("/**") the admin orders last.
 func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// A name for this request, before anything can refuse it (OBS-04). Here
+	// rather than in the proxy on purpose: a call turned away by an access
+	// rule never reaches an upstream, and that refusal is exactly the line an
+	// audit wants to be able to join to something.
+	sc := tracing.FromRequest(req)
+	req = req.WithContext(tracing.With(req.Context(), sc))
+	// And the gateway's own span, when somebody is exporting and this journey
+	// was sampled. Nothing is allocated otherwise (OBS-04).
+	req = withSpan(req, sc)
+	// And a place to write down who this turns out to be, filled below where
+	// the router resolves it anyway. Nil - and free - when nobody asked for an
+	// access log (OBS-03).
+	req = withAccess(req)
+	// And the caller gets the name of their own request back. This is the
+	// whole support gesture - "give me the identifier on the page", pasted
+	// into a search, landing on the line - and it costs one header. Not a
+	// secret: it is the name of a journey the caller is already on.
+	w.Header().Set(tracing.HeaderOut, tracing.ID(req.Context()))
 	// The JWKS is a gateway-internal endpoint: it wins over any route (a
 	// catch-all trap must never swallow it).
 	if req.Method == http.MethodGet && req.URL.Path == JWKSPath {
@@ -629,23 +741,31 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// person rather than on the identity under test.
 		r, hit := &routes[i], rt.applyUISim(req, routes[i].id)
 		if r.access.Empty() {
+			// A route with no rule is still a route that was chosen, and the
+			// span should say which one answered.
+			spanEvent(hit.Context(), "route_chosen", tracing.String("meerkat.route", r.name))
 			ww, start := record(w)
-			r.handler.ServeHTTP(ww, hit)
-			observed(r, hit, ww, start)
+			rt.answerOrRefuse(ww, hit, r, start, cand, candReq, candOK, candWho, candUserID)
 			return
 		}
 		d, ok := rt.sessionIdentity(hit)
+		noteIdentity(hit.Context(), d)
 		who := rt.caller(hit, d, ok)
 		if (ok && r.access.Grants(who)) || isSpecRead(hit.Context()) {
+			// Two instants worth naming inside the span, for the cost of two
+			// names: which route won, and that the door opened. A span apiece
+			// would be thousands per request.
+			spanEvent(hit.Context(), "route_chosen", tracing.String("meerkat.route", r.name))
+			spanEvent(hit.Context(), "access_granted")
 			ww, start := record(w)
-			r.handler.ServeHTTP(ww, hit)
-			observed(r, hit, ww, start)
+			rt.answerOrRefuse(ww, hit, r, start, cand, candReq, candOK, candWho, candUserID)
 			return
 		}
 		// A closed door stays closed. Falling through a "deny" to whatever
 		// matches next would turn the one rule written to shut a path into a
 		// rule that merely redirects it.
 		if r.access.Level == store.AccessDeny {
+			spanEvent(hit.Context(), "access_refused", tracing.String("meerkat.route", r.name))
 			ww, start := record(w)
 			rt.refuse(ww, hit, r.access, r.isUI, ok, who, d.UserID)
 			observed(r, hit, ww, start)
@@ -656,6 +776,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if cand != nil {
+		spanEvent(candReq.Context(), "access_refused", tracing.String("meerkat.route", cand.name))
 		ww, start := record(w)
 		rt.refuse(ww, candReq, cand.access, cand.isUI, candOK, candWho, candUserID)
 		observed(cand, candReq, ww, start)
@@ -665,10 +786,13 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// number of requests that match nothing is a misconfiguration somebody
 	// should see, and it belongs to no route by definition.
 	rt.metrics.Unmatched()
-	http.NotFound(w, req)
+	ww, start := record(w)
+	http.NotFound(ww, req)
+	writeAccess(req, "", "", ww.status, ww.bytes, time.Since(start))
+	finishSpan(req, "", "", ww.status)
 }
 
-func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, portalOn bool) (compiledRoute, error) {
+func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compiledRoute, error) {
 	preds, err := routing.CompilePredicates(r.Predicates)
 	if err != nil {
 		return compiledRoute{}, err
@@ -685,20 +809,20 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, po
 	if r.Locales != nil {
 		localeCfg = *r.Locales
 	}
-	// The route may EXCLUDE application locales its UI does not support:
-	// they leave the button's menu and the forwarding resolution.
-	localeCodes := make([]string, 0, len(appLangs))
-	for _, code := range appLangs {
-		if !slices.ContainsFunc(localeCfg.Disabled, func(d string) bool { return strings.EqualFold(d, code) }) {
-			localeCodes = append(localeCodes, code)
-		}
-	}
-	if len(localeCodes) > 0 {
+	// What this route SAYS IT SPEAKS, and nothing else. There is no pool to
+	// subtract from any more: the route is where the knowledge is, and the
+	// gateway's own offer is the union of these (store.SpokenLanguages).
+	//
+	// ALWAYS FITTED, declared languages or not. Accept-Language carrying the
+	// person's own language is the FLOOR - it is not one of the mechanisms,
+	// and an API route that declares nothing still serves somebody who chose a
+	// language. Guarding this on a non-empty list was how the pivot to Speaks
+	// quietly stopped promoting it on every route that had not been given one.
+	localeCodes := localeCfg.Speaks
+	filters.Request = append(filters.Request,
 		// The literal head of the route's path patterns is where the language
 		// gets inserted - see insertLocale.
-		filters.Request = append(filters.Request,
-			localeForwardFilter(localeCodes, localeCfg, routing.PathPrefixes(r.Predicates)))
-	}
+		localeForwardFilter(localeCodes, localeCfg, routing.PathPrefixes(r.Predicates)))
 
 	// What the gateway adds to a UI route's HTML pages, at the TOP OF THE BODY:
 	// a custom element inside <head> closes it where it stands, and everything
@@ -714,9 +838,13 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, po
 	// With a portal configured (PORTAL-01), the standalone user button gives
 	// way to the portal bar, which mounts the same button inside itself: the
 	// navigation and the account menu are one surface, not two corners.
-	frag := pageAgentFragment(r, localeCodes)
+	// The tracing bundle FIRST, before anything else we inject: it patches
+	// fetch and XMLHttpRequest, and a call made by one of our own scripts
+	// before that patch is in place is a call missing from the trace.
+	frag := rt.telemetryFragment(r)
+	frag += pageAgentFragment(r, localeCodes)
 	if portalOn && r.IsUI {
-		frag += portalFragment(r)
+		frag += portalFragment(r, localeCodes)
 	} else {
 		frag += userButtonFragment(r, localeCodes)
 	}
@@ -803,7 +931,7 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, po
 	} else {
 		unavailable := ""
 		if portalOn && r.IsUI {
-			unavailable = unavailablePage(pageAgentFragment(r, localeCodes) + portalFragment(r))
+			unavailable = unavailablePage(pageAgentFragment(r, localeCodes) + portalFragment(r, localeCodes))
 		}
 		handler, err = buildProxy(r, filters, rt.defaultTimeouts, unavailable)
 		if err != nil {
@@ -831,7 +959,8 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, po
 	// got to reopen anything. Per-operation rules live within one route by
 	// definition, so they were never what selection had to tell apart.
 	selectAccess := r.Access
-	hasOverrides := r.API != nil && r.API.Security != nil && len(r.API.Security.Endpoints) > 0
+	hasOverrides := r.API != nil && r.API.Security != nil &&
+		(len(r.API.Security.Endpoints) > 0 || r.API.Security.DenyUnlisted)
 	if hasOverrides {
 		selectAccess = store.Access{}
 		if rt.sm == nil {
@@ -886,6 +1015,34 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, po
 		}
 		handler = serveSpecFile(routeMatchPrefix(r)+"/"+spec.Path, served, handler)
 	}
+	// An application published under a path is entered by a URL people type,
+	// paste and bookmark, and the one they write is the prefix bare. The page
+	// comes back - a single trailing slash is ignored when the route matches -
+	// but the BROWSER then resolves every relative link in it against the parent
+	// directory: from /rmq, src="js/main.js" is /js/main.js, and the whole
+	// application 404s while the page that asked for it looks fine.
+	//
+	// Nothing on the server can answer that, because the page is not what is
+	// wrong: serving the slashed path instead would return the same bytes and
+	// leave the browser on the same URL, with the same idea of its own
+	// directory. Only a REDIRECT changes that, so it is a 3xx or nothing.
+	//
+	// Two conditions, and the second was learned from a test that broke:
+	//
+	//   - a UI ROUTE, because a service route's mount path is often a resource
+	//     of its own - GET /orders on /orders/** is the collection - and machine
+	//     callers do not all follow redirects;
+	//   - which STRIPS its prefix, because that is what republishing means: the
+	//     application behind sees / and writes its links relative to that, while
+	//     the gateway shows it under /rmq. A UI route that does NOT strip knows
+	//     its own prefix, its pages are already right, and the redirect would
+	//     only ask the upstream for a path it never published.
+	//
+	// Nothing below the prefix is touched, which is also what makes a loop
+	// impossible: the target is not the path that is answered.
+	if r.IsUI && stripsPrefix(r) {
+		handler = redirectToMountSlash(routeMatchPrefix(r), handler)
+	}
 	// Gates (ROUTE-04) go on LAST, so they sit outermost: what a route refuses
 	// to carry is decided before the access rule reads a session, before a
 	// modifier touches a header, and before a redirect sends the caller round
@@ -907,9 +1064,39 @@ func (rt *Router) compile(r store.Route, appLangs []string, deposited []byte, po
 	}
 	ops := rt.opsFor(r.ID)
 	ops.setBase(stripPrefixCount(r.Filters), baseOperations(r, deposited))
+	if noTracing(r) {
+		handler = dropTracing(handler)
+	}
 	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler, breaker: cfg,
-		access: selectAccess, isUI: r.IsUI, counters: rt.metrics.For(r.ID, r.Name),
+		access: selectAccess, isUI: r.IsUI, noTrace: noTracing(r), counters: rt.metrics.For(r.ID, r.Name),
 		ops: ops}, nil
+}
+
+// noTracing reads the route's tracing switch. A route that never mentioned the
+// subject is traced: an installation that turned the export on wants its
+// traffic traced, and leaves out what it does not want to follow.
+func noTracing(r store.Route) bool {
+	return r.Telemetry != nil && !*r.Telemetry
+}
+
+// brokenRoute is what is left of a route that does not compile: its predicates,
+// its access rule, and the unavailable page. See the call site for why it keeps
+// matching rather than disappearing. False when the predicates are themselves
+// what failed - there is then nothing to match on, and the route is simply gone.
+func (rt *Router) brokenRoute(r store.Route) (compiledRoute, bool) {
+	preds, err := routing.CompilePredicates(r.Predicates)
+	if err != nil {
+		return compiledRoute{}, false
+	}
+	return compiledRoute{
+		id: r.ID, name: r.Name, preds: preds,
+		handler:  http.HandlerFunc(rt.serveUnreachable),
+		access:   r.Access,
+		isUI:     r.IsUI,
+		noTrace:  noTracing(r),
+		counters: rt.metrics.For(r.ID, r.Name),
+		ops:      rt.opsFor(r.ID),
+	}, true
 }
 
 // Validate checks that a route would compile - same checks as Reload, minus
@@ -1011,10 +1198,14 @@ func validateRouteType(r store.Route) error {
 			return fmt.Errorf("locales mechanism %q is not allowed: allowed mechanisms are %s",
 				mode, strings.Join(store.LocaleMechanisms, ", "))
 		}
-		// The two that only mean something on a page: one puts the language in
-		// the URL it serves, the other runs in it.
-		if (mode == store.LocalePath || mode == store.LocaleScript) && !r.IsUI {
-			return fmt.Errorf("locales mechanism %q is only allowed on UI routes: a service route serves no page", mode)
+		// A SERVICE ROUTE HAS NO CHOICE, and that is not a restriction: an API
+		// reads Accept-Language, which every route carries anyway with the
+		// person's own language in front. Nobody puts a language in the path
+		// or the query string of an API, and a header of one's own is a UI
+		// application's convention rather than a service's.
+		if mode != store.LocaleAccept && mode != "" && !r.IsUI {
+			return fmt.Errorf("locales mechanism %q is only allowed on UI routes: a service route "+
+				"reads Accept-Language, which it already gets with the caller's language in front", mode)
 		}
 		if mode == store.LocaleCustom && !headerNameOK.MatchString(lc.Header) {
 			return fmt.Errorf("locales custom header %q is not allowed: letters, digits and - only", lc.Header)
@@ -1022,9 +1213,13 @@ func validateRouteType(r store.Route) error {
 		if lc.Param != "" && !headerNameOK.MatchString(lc.Param) {
 			return fmt.Errorf("locales query parameter %q is not allowed: letters, digits and - only", lc.Param)
 		}
-		for _, d := range lc.Disabled {
-			if !headerNameOK.MatchString(d) {
-				return fmt.Errorf("disabled locale %q is not allowed: letters, digits and - only", d)
+		if len(lc.Speaks) > 0 && !r.IsUI {
+			return fmt.Errorf("a service route declares no language: it serves no page, and the " +
+				"caller's own reaches it through Accept-Language")
+		}
+		for _, code := range lc.Speaks {
+			if !headerNameOK.MatchString(code) {
+				return fmt.Errorf("spoken locale %q is not allowed: letters, digits and - only", code)
 			}
 		}
 	}
@@ -1035,6 +1230,14 @@ func validateRouteType(r store.Route) error {
 		if s.Mechanism != "" && !slices.Contains(store.SchemeMechanisms, s.Mechanism) {
 			return fmt.Errorf("scheme mechanism %q is not allowed: allowed mechanisms are \"\" (color-scheme only), %s",
 				s.Mechanism, strings.Join(store.SchemeMechanisms, ", "))
+		}
+		if s.Mechanism == store.SchemeScript && strings.TrimSpace(s.Script) == "" {
+			return fmt.Errorf("the script mechanism needs a script: it is the body of a function " +
+				"called as function(colorScheme) with \"light\", \"dark\" or \"auto\"")
+		}
+		if len(s.Script) > store.SchemeScriptMax {
+			return fmt.Errorf("scheme script is %d characters: at most %d are allowed, since the gateway "+
+				"serves it to every page this route serves", len(s.Script), store.SchemeScriptMax)
 		}
 		if store.SchemeSetsAttribute(s.Mechanism) && !schemeTokenOK.MatchString(s.Attribute) {
 			return fmt.Errorf("scheme attribute %q is not allowed: letters, digits, - and _ only", s.Attribute)
@@ -1202,6 +1405,11 @@ type identityData struct {
 // memory between writes (identitycache.go).
 func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	if d, ok := simulatedIdentity(req.Context()); ok {
+		return d, true
+	}
+	// A scheduled call carries no session and no account: its identity is
+	// posed in the context by the scheduler, in process (scheduled.go).
+	if d, ok := rt.scheduledIdentity(req.Context()); ok {
 		return d, true
 	}
 	sess, err := rt.sm.Resolve(req.Context(), req)
@@ -1506,7 +1714,19 @@ func insertAfterHead(body, frag []byte) []byte {
 func localeForwardFilter(codes []string, lc store.LocalesConfig, prefixes []string) routing.RequestFilter {
 	return func(pr *httputil.ProxyRequest) {
 		loc := resolveLocale(pr.In, codes)
+		if loc == "" {
+			// Nobody expressed a language and the route declares none: there
+			// is nothing to promote, and an empty Accept-Language would be
+			// worse than the one the browser sent.
+			return
+		}
 		pr.Out.Header.Set("Accept-Language", promoteLocale(pr.In.Header.Get("Accept-Language"), loc))
+		if len(codes) == 0 {
+			// The three below put the language WHERE THE APPLICATION EXPECTS
+			// IT, which needs the list of languages that application serves.
+			// With none declared the header is all there is to carry.
+			return
+		}
 		switch lc.Mode() {
 		case store.LocalePath:
 			pr.Out.URL.Path = insertLocale(pr.Out.URL.Path, loc, codes, prefixes)
@@ -1590,6 +1810,44 @@ func localeSegment(path string, codes, prefixes []string) string {
 // Navigations only, and only GET or HEAD: an asset fetched by a page that was
 // itself just corrected has nothing to correct, and redirecting a POST would
 // drop what it carries.
+// stripsPrefix reports whether the route republishes its application under a
+// prefix the application does not know about.
+func stripsPrefix(r store.Route) bool {
+	for _, f := range r.Filters {
+		if f.Type == "strip-prefix" {
+			return true
+		}
+	}
+	return false
+}
+
+// redirectToMountSlash answers the bare mount path with the same path and its
+// final slash, so the pages of an application published under a prefix resolve
+// their relative links under it. Everything else passes through, the target
+// included - see the call site for why this is a redirect and not a rewrite.
+//
+// 308 rather than 301: it keeps the method, so the rare POST to an entry point
+// stays a POST, and browsers remember it as permanent, which it is for as long
+// as the application is published there.
+func redirectToMountSlash(mount string, next http.Handler) http.Handler {
+	mount = strings.TrimRight(mount, "/")
+	if mount == "" {
+		// Mounted at the root, or matched by host alone: no missing slash.
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != mount {
+			next.ServeHTTP(w, r)
+			return
+		}
+		target := mount + "/"
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, target, http.StatusPermanentRedirect)
+	})
+}
+
 func redirectToLocale(next http.Handler, codes, prefixes []string, inPath bool, param string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if (r.Method != http.MethodGet && r.Method != http.MethodHead) || !isNavigation(r) {
@@ -1691,6 +1949,22 @@ func promoteLocale(orig, loc string) string {
 // MEERKAT_LANG cookie first, then the best Accept-Language match (exact,
 // then same base language), then the first code.
 func resolveLocale(r *http.Request, codes []string) string {
+	if len(codes) == 0 {
+		// A route that declares no language is not choosing between any: it
+		// carries the person's own, which is their stored choice when there is
+		// one and what their browser asks for otherwise. This is the case of
+		// every API route, where Accept-Language is the only transport.
+		if c, err := r.Cookie(langCookie); err == nil && c.Value != "" {
+			return c.Value
+		}
+		for _, part := range strings.Split(r.Header.Get("Accept-Language"), ",") {
+			tag, _, _ := strings.Cut(strings.TrimSpace(part), ";")
+			if tag != "" && tag != "*" {
+				return tag
+			}
+		}
+		return ""
+	}
 	pick := func(tag string) string {
 		for _, code := range codes {
 			if strings.EqualFold(code, tag) {
@@ -1808,7 +2082,12 @@ func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Acces
 		uiSimRefusalPage(w, req)
 		return
 	}
-	if isUI {
+	// A BROWSER on a UI route gets a page it can act on. Anything else - a
+	// fetch, an API client, a scheduled call - gets the refusal itself: the
+	// same reason a signed-out fetch gets a 401 rather than the login page.
+	// Redirecting a machine to a page it cannot read turns "you may not" into
+	// "303 See Other", which is what the scheduler recorded before this.
+	if isUI && isNavigation(req) {
 		if offer := rt.switchWouldHelp(req.Context(), a, userID, a.Switchable(who)); len(offer) > 0 {
 			// WHY, carried to the page: an organisation chooser that reappears
 			// saying nothing is the reason someone switches back and forth
@@ -1832,6 +2111,36 @@ func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Acces
 		return
 	}
 	http.Error(w, refusalReason(a, who), http.StatusForbidden)
+}
+
+// answerOrRefuse lets a route answer, with one arbitration when a refusal is
+// pending: an ERROR from the route that answers means nobody had anything for
+// this caller, and the refusal kept aside is then the truthful answer. See
+// cover.go for why, and for what is held (the status, never the body).
+//
+// With no refusal pending it is the plain call it always was.
+func (rt *Router) answerOrRefuse(ww *watched, hit *http.Request, r *compiledRoute, start time.Time,
+	cand *compiledRoute, candReq *http.Request, candOK bool, candWho store.Caller, candUserID string) bool {
+	if cand == nil {
+		r.handler.ServeHTTP(ww, hit)
+		observed(r, hit, ww, start)
+		return true
+	}
+	cw := &coveringWriter{ResponseWriter: ww}
+	r.handler.ServeHTTP(cw, hit)
+	if !cw.covered {
+		observed(r, hit, ww, start)
+		return true
+	}
+	// Its headers went into the map before it chose its status: written now,
+	// they would dress the refusal in the other route's answer.
+	clear(ww.Header())
+	spanEvent(candReq.Context(), "access_refused", tracing.String("meerkat.route", cand.name))
+	slog.Info("refusal restored over an error from the next route",
+		"refused_by", cand.name, "answered_by", r.name, "path", hit.URL.Path)
+	rt.refuse(ww, candReq, cand.access, cand.isUI, candOK, candWho, candUserID)
+	observed(cand, candReq, ww, start)
+	return true
 }
 
 // switchWouldHelp keeps only the organisations where this caller would
@@ -1942,8 +2251,13 @@ func (rt *Router) endpointGuard(sec store.EndpointSecurity, routeAccess store.Ac
 	}
 	strip := stripPrefixCount(filters)
 	// The route's base Access is the default for any operation with no override
-	// (an empty Access passes through, delegating to the upstream).
-	routeGate := rt.accessGate(routeAccess, isUI, next)
+	// (an empty Access passes through, delegating to the upstream) - unless
+	// the route closes what it does not list, and then nobody passes.
+	fallback := routeAccess
+	if sec.DenyUnlisted {
+		fallback = store.Access{Level: store.AccessDeny}
+	}
+	routeGate := rt.accessGate(fallback, isUI, next)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		specPath := routing.StripSegments(req.URL.Path, strip)
@@ -1955,6 +2269,25 @@ func (rt *Router) endpointGuard(sec store.EndpointSecurity, routeAccess store.Ac
 		}
 		routeGate.ServeHTTP(w, req)
 	}), nil
+}
+
+// KeptPrefix is the part of a route's own path prefix that a request still
+// carries when the guard compares it: the prefix it matches on, minus the
+// segments its strip-prefix filters remove.
+//
+// It is the missing half of an operation's coordinate. The guard compares the
+// request path minus what the route strips, so an application published at
+// /otel-demo and mounted there itself - stripping nothing - has its operations
+// at /otel-demo/..., while one published at /demo and stripping that segment
+// has them at /... Reading the spec's paths as the coordinate is right only in
+// the second case, and the first is how a rule comes to name a path no request
+// ever has.
+//
+// Exported because the console lists the same operations and writes rules in
+// the same coordinates: two spellings of one operation is exactly the bug this
+// closes.
+func KeptPrefix(r store.Route) string {
+	return strings.TrimSuffix(routing.StripSegments(routeMatchPrefix(r), stripPrefixCount(r.Filters)), "/")
 }
 
 // stripPrefixCount sums the leading segments the route's strip-prefix filters
@@ -2002,23 +2335,36 @@ func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName str
 		}
 		return func(pr *httputil.ProxyRequest) {
 			pr.Out.Header.Del("Authorization")
-			d, ok := rt.sessionIdentity(pr.In)
+			// The gateway's own detail, when asked for (tracing.Step): the
+			// whole handover, then who the caller is and the signature inside
+			// it - the two halves that can cost, and whose split is the answer
+			// to "where did the gateway's time go".
+			ctx, endForward := tracing.Step(pr.In.Context(), "identity forward",
+				tracing.String("meerkat.identity.mechanism", cfg.Mechanism),
+				tracing.Int64("meerkat.identity.attributes", int64(len(cfg.Attributes))))
+			var ferr error
+			defer func() { endForward(ferr) }()
+
+			rctx, endResolve := tracing.Step(ctx, "identity resolve")
+			d, ok := rt.sessionIdentity(pr.In.WithContext(rctx))
+			endResolve(nil)
 			if !ok {
 				return
 			}
 			claims := identityClaims(cfg, routeName, d)
 			var tok string
-			var err error
 			if signed {
 				set := rt.currentSigning()
 				if set == nil {
 					return
 				}
-				tok, err = set.SignJWT(alg, claims)
+				_, endSign := tracing.Step(ctx, "identity sign", tracing.String("meerkat.identity.algorithm", alg))
+				tok, ferr = set.SignJWT(alg, claims)
+				endSign(ferr)
 			} else {
-				tok, err = mintUnsignedJWT(claims)
+				tok, ferr = mintUnsignedJWT(claims)
 			}
-			if err != nil {
+			if ferr != nil {
 				return
 			}
 			pr.Out.Header.Set("Authorization", "Bearer "+tok)
@@ -2038,7 +2384,11 @@ func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName str
 		for _, name := range remoteUserNames {
 			pr.Out.Header.Del(name)
 		}
-		d, ok := rt.sessionIdentity(pr.In)
+		ctx, endForward := tracing.Step(pr.In.Context(), "identity forward",
+			tracing.String("meerkat.identity.mechanism", "headers"),
+			tracing.Int64("meerkat.identity.attributes", int64(len(cfg.Attributes))))
+		defer endForward(nil)
+		d, ok := rt.sessionIdentity(pr.In.WithContext(ctx))
 		if !ok {
 			return
 		}
@@ -2263,11 +2613,33 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 	//
 	// So the mechanism is written whenever the route describes one, and
 	// data-scheme="select" says only whether this route offers the switch.
+	// An application with ONE look (no mechanism, and the route says which):
+	// the page is told what it wears, so the document carries that color-scheme
+	// and everything that inherits it - the portal bar first, whose colours are
+	// the document's - matches the application instead of the visitor's choice,
+	// which this application does not take anyway.
+	if s := r.UI.Scheme; s != nil && s.Mechanism == store.SchemeNone && (s.Button == "light" || s.Button == "dark") {
+		attrs += fmt.Sprintf(` data-scheme-wear="%s"`, s.Button)
+	}
 	if s := r.UI.Scheme; s != nil && s.Mechanism != store.SchemeNone {
 		if s.Select {
 			attrs += ` data-scheme="select"`
 		}
-		if s.Mechanism != "" {
+		// The application has no follow-the-system state, so the agent resolves
+		// the visitor's auto before applying it - see SchemeConfig.NoAuto.
+		if s.NoAuto {
+			attrs += ` data-scheme-no-auto="1"`
+		}
+		switch {
+		case s.Mechanism == store.SchemeScript:
+			// Only the NAME rides here. The body itself is served as its own
+			// same-origin file (/meerkat/scheme.js), because an application
+			// worth a gateway sends a Content-Security-Policy and the ordinary
+			// one - "script-src 'self'", which is RabbitMQ's - refuses
+			// new Function while allowing that script. Measured in a browser,
+			// against the real console, after the attribute had been written.
+			attrs += fmt.Sprintf(` data-scheme-mechanism="%s"`, store.SchemeScript)
+		case s.Mechanism != "":
 			// Tag included, always: the browser half applies the mechanism to
 			// what it names, and defaulting it there rather than here would be
 			// a second place where "which element" is decided.
@@ -2303,6 +2675,14 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 		}
 	}
 	agent := `<script defer src="/meerkat/page.js"` + attrs + `></script>`
+	// The route's own scheme script, before the agent so it is defined by the
+	// time the agent's catch-up calls it. The body's hash is in the URL: the
+	// answer is cacheable, and an edit reaches a browser holding the last one.
+	if s := r.UI.Scheme; s != nil && s.Mechanism == store.SchemeScript && s.Script != "" {
+		sum := sha256.Sum256([]byte(s.Script))
+		agent = fmt.Sprintf(`<script defer src="/meerkat/scheme.js?r=%s&amp;v=%x"></script>`,
+			url.QueryEscape(r.ID), sum[:4]) + agent
+	}
 	// The application owns its colour scheme, and the way to work WITH it is to
 	// speak its own storage, not to fight it on the document.
 	//
@@ -2379,6 +2759,11 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 	// the menu does not draw the switch whatever Select says.
 	if s := r.UI.Scheme; s != nil && s.Select && s.Mechanism != store.SchemeNone {
 		attrs += ` scheme="select"`
+		// Two states instead of three: an application that knows only light and
+		// dark must not be offered a switch with a position it cannot hold.
+		if s.NoAuto {
+			attrs += ` no-auto`
+		}
 	} else if s != nil && (s.Button == "light" || s.Button == "dark") {
 		// No switch here, so nothing for the button to follow: the route says
 		// what it wears. An application with one look otherwise gets a button
@@ -2404,13 +2789,55 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 // user-button.js loads BEFORE portal.js so the element the bar creates is
 // already defined when the bar mounts it; page.js (from pageAgentFragment)
 // comes first of all, so window.meerkatPage exists before either upgrades.
-func portalFragment(r store.Route) string {
+// schemeOf is a route's colour-scheme configuration, or nil. Two nils to walk
+// and both are ordinary: a route may serve pages without configuring any
+// injection at all.
+func schemeOf(r store.Route) *store.SchemeConfig {
+	if r.UI == nil {
+		return nil
+	}
+	return r.UI.Scheme
+}
+
+func portalFragment(r store.Route, localeCodes []string) string {
 	if !r.IsUI {
 		return ""
 	}
+	// THIS ROUTE's languages, like the standalone button's. The bar mounts the
+	// account button, and the language a menu offers is the one the page behind
+	// it is written in - not the gateway's whole offer, which is what the
+	// payload carries for want of knowing which page asked. A route written in
+	// a language Meerkat does not embed still offers it here, which is the
+	// point: the sign-in page cannot, and this page can.
+	attr := ""
+	if len(localeCodes) > 0 {
+		attr = ` languages="` + htmlEscape(strings.Join(localeCodes, ",")) + `"`
+	}
+	// Route-specific, like the languages above: the bar is global, the
+	// application behind THIS route is not. The bar mounts the user button, so
+	// what that button offers is decided per route here.
+	//
+	// r.UI may be nil: a route can serve pages without configuring any of the
+	// injections, and this one asked its Scheme before checking.
+	if s := schemeOf(r); s != nil && s.Mechanism == store.SchemeNone {
+		// NOTHING TO SWITCH. An application declared to have no colour scheme
+		// takes no choice, so a switch on top of it moves the bar and leaves
+		// the page as it was - a control that appears to do something and does
+		// not. What the route may still say is what the BAR wears there, so a
+		// bar does not float light over a page that is always dark.
+		if s.Button == "light" || s.Button == "dark" {
+			attr += ` scheme-wear="` + htmlEscape(s.Button) + `"`
+		} else {
+			attr += ` scheme="none"`
+		}
+	} else if s != nil && s.NoAuto {
+		// Two positions instead of three: an application that knows only light
+		// and dark must not be offered a position nothing behind it can hold.
+		attr += ` no-auto`
+	}
 	return `<script defer src="/meerkat/user-button.js"></script>` +
 		`<script defer src="/meerkat/portal.js"></script>` +
-		`<meerkat-portal-nav></meerkat-portal-nav>`
+		`<meerkat-portal-nav` + attr + `></meerkat-portal-nav>`
 }
 
 // unavailablePage is the HTML served when a UI route's upstream does not answer
@@ -2426,6 +2853,11 @@ func unavailablePage(fragment string) string {
 		`font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#5b5f66;">` +
 		`<h1 style="font-size:20px;font-weight:600;margin:0 0 8px;">This application is not responding</h1>` +
 		`<p style="margin:0;font-size:15px;">Use the menu to open another one.</p>` +
+		// The name of this request, for whoever ends up reporting it. The page
+		// is built once per route, so the identifier goes in at the moment it
+		// is written - a replacement on a 502 rather than on every request.
+		`<p style="margin:24px 0 0;font-size:12px;color:#9aa0a6;font-family:ui-monospace,monospace;">` +
+		tracing.Placeholder + `</p>` +
 		`</div></body></html>`
 }
 
@@ -2566,7 +2998,7 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 	}
 	proxy := &httputil.ReverseProxy{
 		BufferPool: proxyBuffers,
-		Transport:  cookieStrippingTransport{rt},
+		Transport:  tracedTransport{cookieStrippingTransport{rt}},
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetXForwarded()
 			// Whatever the caller sent under this name goes: it tells the
@@ -2576,6 +3008,14 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 			// without strip-prefix must not carry a stranger's idea of its
 			// own prefix either. Same reasoning as the identity headers.
 			pr.Out.Header.Del(routing.ForwardedPrefixHeader)
+			// The journey's name goes on, always (OBS-04). What the caller
+			// sent travels untouched - it is what stitches their spans to the
+			// service's - and when nobody sent anything we put ours, with the
+			// sampling bit off: the service can write the identifier in its
+			// own audit without anybody being asked to export a thing.
+			if tc, ok := tracing.From(pr.In.Context()); ok {
+				pr.Out.Header.Set(tracing.Header, tc.Header())
+			}
 			// Request filters transform the request path/headers first, THEN
 			// the upstream base path is prepended by SetURL - so strip-prefix
 			// and friends reason on the request path, never on the upstream's.
@@ -2624,10 +3064,15 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 				h.Set("Cache-Control", "no-store")
 				h.Set("Retry-After", "30")
 				w.WriteHeader(http.StatusBadGateway)
-				_, _ = io.WriteString(w, unavailable)
+				_, _ = io.WriteString(w,
+					strings.Replace(unavailable, tracing.Placeholder, tracing.ID(req.Context()), 1))
 				return
 			}
-			http.Error(w, "upstream unavailable", http.StatusBadGateway)
+			// The name of the request goes in the TEXT as well as the header:
+			// this is the 502 a person actually sees - in a curl, in a browser
+			// console, pasted into a ticket - and a header is invisible there.
+			http.Error(w, "upstream unavailable (request "+tracing.ID(req.Context())+")",
+				http.StatusBadGateway)
 		},
 	}
 	proxy.ModifyResponse = func(res *http.Response) error {
@@ -2859,4 +3304,45 @@ func specFileHandler(body []byte) http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeContent(w, r, "openapi.json", time.Time{}, bytes.NewReader(body))
 	})
+}
+
+// telemetryFragment is what puts a trace at the CLICK rather than at the front
+// door (OBS-04): the configuration inline, then the bundle this gateway serves
+// itself.
+//
+// INLINE RATHER THAN FETCHED, and that is the whole reason the configuration
+// is not a second endpoint: a round trip for it would happen while the page is
+// already firing its first calls, and those are exactly the ones worth
+// measuring. The bundle stays immutable and cacheable; this weighs a line.
+//
+// The propagate list is NOT written here. The page's own origin depends on the
+// host it was asked for, and one gateway serves several - so the bundle works
+// it out from location.origin, and what travels from here is only the extra
+// names this gateway answers to that a page could not guess.
+func (rt *Router) telemetryFragment(r store.Route) string {
+	// Three answers, and all three have to be yes: this gateway exports at
+	// all, this route is in the telemetry, and this route asked for the
+	// journey to start in its pages.
+	if !rt.traceExport || !r.IsUI || noTracing(r) || !r.TelemetryUI {
+		return ""
+	}
+	cfg, err := json.Marshal(map[string]any{
+		// The relay, not the collector: a page never learns where the
+		// collector is, and never carries its credential.
+		"endpoint":   "/meerkat/telemetry",
+		"sample":     rt.traceSample,
+		"service":    "browser",
+		"sameOrigin": true,
+	})
+	if err != nil {
+		return ""
+	}
+	// DEFERRED, and injected FIRST. Deferred so 25 KB never block the first
+	// paint; first so that among the deferred scripts - which run in document
+	// order, and an application's own bundle is one of them - fetch and
+	// XMLHttpRequest are patched before the app makes its first call. What
+	// this cannot catch is a call made by an INLINE script while the document
+	// is still parsing, which is the price of not blocking the paint.
+	return `<script>window.__MEERKAT_OTEL__=` + string(cfg) + `</script>` +
+		`<script defer src="/meerkat/telemetry.js"></script>`
 }

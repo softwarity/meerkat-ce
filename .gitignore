@@ -22,6 +22,10 @@ coverage.out
 # compiling when no console has been built)
 /internal/admin/ui/dist/*
 !/internal/admin/ui/dist/.gitkeep
+/ee/telemetry/dist/*
+!/ee/telemetry/dist/.gitkeep
+/telemetry/node_modules/
+/telemetry/dist/
 
 # local db folder
 data

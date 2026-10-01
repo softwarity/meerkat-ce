@@ -1,0 +1,592 @@
+<mat-drawer-container>
+  <mat-drawer-content>
+    <div class="banner">
+      <h1 i18n="@@Scheduler">Scheduler</h1>
+      <!-- The three filters live in the banner, like the routes' search: they
+       narrow the list below, and a list that narrows keeps its header. -->
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-label i18n="@@Organization">Organization</mat-label>
+        <mat-select
+          [value]="tenant()"
+          (selectionChange)="tenant.set($event.value); subscribe()"
+        >
+          <mat-option value="" i18n="@@All">All</mat-option>
+          @for (t of tenants(); track t.id) {
+            <mat-option [value]="t.id">{{ t.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-label i18n="@@Service">Service</mat-label>
+        <mat-select
+          [value]="route()"
+          (selectionChange)="route.set($event.value); subscribe()"
+        >
+          <mat-option value="" i18n="@@All">All</mat-option>
+          @for (r of routes(); track r.id) {
+            <mat-option [value]="r.id">{{ r.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <!-- The service's own filing system, asked for in its own terms: one
+           token serves a fleet, so this is what tells one schedule from a
+           thousand. The house shape - a leading icon, an example as the
+           placeholder, the explanation on an info icon rather than a line of
+           hint hanging under the banner. -->
+      <app-form-field
+        class="meta"
+        icon="sell"
+        subscriptSizing="dynamic"
+        [error]="metaError()"
+        i18n-info="@@Metadata_filter_info"
+        info="Narrow by what the service filed its schedules under: key=value, or key=~expression. Several conditions are all required."
+      >
+        <input
+          matInput
+          [value]="meta()"
+          (change)="meta.set($any($event.target).value); subscribe()"
+          placeholder="station=42"
+        />
+      </app-form-field>
+      <!-- Two columns carry dates, so the switch belongs to the screen rather than
+       to one header. It offers ONE thing - UTC: the other state is the hours
+       of whoever is reading, which needs no label. The snackbar names the zone
+       you land in, which is the half a toggle cannot say. -->
+      <mat-slide-toggle
+        class="utc"
+        [checked]="utc()"
+        [disabled]="zoneIsUtc()"
+        [matTooltip]="zoneHint()"
+        (change)="switchZone($event.checked)"
+        >UTC</mat-slide-toggle
+      >
+      @if (me.isRoot() && retentionChoices().length) {
+        <!-- Housekeeping, root's alone (SCHED-02): how long a delayed action
+             that has gone stays before the sweep takes it. -->
+        <mat-form-field class="short" subscriptSizing="dynamic">
+          <mat-label i18n="@@Keep_finished_for">Keep finished for</mat-label>
+          <mat-select
+            [value]="retention()"
+            (selectionChange)="setRetention($event.value)"
+          >
+            @for (d of retentionChoices(); track d) {
+              <mat-option [value]="d">{{ retentionLabel(d) }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+      @if (finishedCount()) {
+        <mat-slide-toggle
+          class="utc"
+          [checked]="hideFinished()"
+          (change)="hideFinished.set($event.checked)"
+          i18n="@@Hide_finished"
+          >Hide finished</mat-slide-toggle
+        >
+      }
+      <button
+        matButton="outlined"
+        (click)="openHowto()"
+        i18n-matTooltip="@@How_a_service_schedules"
+        matTooltip="How a service schedules a call"
+      >
+        <mat-icon>terminal</mat-icon>
+        <ng-container i18n="@@API">API</ng-container>
+      </button>
+    </div>
+
+    <div class="body">
+      @if (list().length === 0) {
+        <div class="empty" i18n="@@No_schedules">
+          Nothing is scheduled here. A service asks for its own calls through
+          the application plane, as itself: a route, a path, a cadence.
+        </div>
+      } @else {
+        <!-- The frame goes on what SCROLLS, and the header is sticky: a header
+         that scrolls away takes the meaning of every column with it. No
+         pagination - a gateway has schedules, not a log of them. -->
+        <div class="table-wrap">
+          <mat-table [dataSource]="list()">
+            <ng-container matColumnDef="name">
+              <mat-header-cell *matHeaderCellDef i18n="@@Name"
+                >Name</mat-header-cell
+              >
+              <mat-cell *matCellDef="let s" [class.off]="s.paused">
+                <span class="lines">
+                  <span class="name">{{ s.name }}</span>
+                  <span class="muted">
+                    @if (rolesOf(s); as roles) {
+                      <ng-container i18n="@@Calls_with"
+                        >calls with</ng-container
+                      >
+                      {{ roles }}
+                    } @else {
+                      <ng-container i18n="@@No_role">no role</ng-container>
+                    }
+                  </span>
+                </span>
+                @if (s.paused) {
+                  <mat-icon
+                    class="paused"
+                    i18n-matTooltip="@@Paused"
+                    matTooltip="Paused"
+                    >pause_circle</mat-icon
+                  >
+                }
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="calls">
+              <mat-header-cell *matHeaderCellDef i18n="@@Calls"
+                >Calls</mat-header-cell
+              >
+              <mat-cell *matCellDef="let s">
+                <span class="lines">
+                  <span class="mono">{{ s.method }} {{ s.path }}</span>
+                  <span class="muted">{{ named(s) }}</span>
+                </span>
+              </mat-cell>
+            </ng-container>
+
+            <!-- A cadence and a calendar answer the same question, so they share
+             one column. The zone goes under the expression: "3 h" is only an
+             hour once you know whose. -->
+            <ng-container matColumnDef="every">
+              <mat-header-cell *matHeaderCellDef i18n="@@When"
+                >When</mat-header-cell
+              >
+              <mat-cell *matCellDef="let s">
+                <span class="lines">
+                  @if (s.at) {
+                    <!-- A single date is read in the hours of whoever is
+                     looking, like every other date on this screen. -->
+                    <span>{{ momentOf(s) | zoned: zone() }}</span>
+                    <span class="muted" i18n="@@Once">once</span>
+                  } @else {
+                    <span class="mono">{{ s.cron || s.every }}</span>
+                    @if (s.cron && s.timezone) {
+                      <span class="muted">{{ s.timezone }}</span>
+                    }
+                  }
+                </span>
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="next">
+              <mat-header-cell *matHeaderCellDef i18n="@@Next_run"
+                >Next run</mat-header-cell
+              >
+              <!-- Nothing more is owed while a run is in flight: its close arms
+               the next turn, counted from then. The row's own nextAt is the
+               turn being run, which is not the next one. -->
+              <mat-cell *matCellDef="let s">
+                @if (s.paused) {
+                  <span class="muted">&mdash;</span>
+                } @else if (running(s)) {
+                  <span class="muted" i18n="@@After_this_run"
+                    >after this run</span
+                  >
+                } @else if (finished(s)) {
+                  <span class="muted" i18n="@@Finished">finished</span>
+                } @else {
+                  {{ s.nextAt | zoned: zone() }}
+                }
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="state">
+              <mat-header-cell *matHeaderCellDef i18n="@@State"
+                >State</mat-header-cell
+              >
+              <mat-cell *matCellDef="let s">
+                @if (running(s)) {
+                  <span class="lines running">
+                    <mat-progress-bar
+                      [mode]="s.progress > 0 ? 'determinate' : 'indeterminate'"
+                      [value]="s.progress"
+                    />
+                    <!-- Calling is a call nobody answered yet, accepted is
+                     work the service took (a 202). A second attempt means a
+                     gateway stopped before the answer: worth seeing. A call
+                     handed back by a stopping node has no claimant until
+                     another takes it. -->
+                    <span class="muted">
+                      @if (s.runState === "accepted") {
+                        <ng-container i18n="@@Run_accepted"
+                          >accepted</ng-container
+                        >
+                      } @else {
+                        <ng-container i18n="@@Run_calling"
+                          >calling</ng-container
+                        >
+                      }
+                      @if (s.attempts > 1) {
+                        -
+                        <ng-container i18n="@@Attempt_n"
+                          >attempt {{ s.attempts }}</ng-container
+                        >
+                      }
+                      @if (s.claimedBy) {
+                        -
+                        <ng-container i18n="@@Claimed_by"
+                          >claimed by</ng-container
+                        >
+                        {{ s.claimedBy }}
+                      }
+                    </span>
+                  </span>
+                } @else {
+                  <span class="muted" i18n="@@Idle">idle</span>
+                }
+              </mat-cell>
+            </ng-container>
+
+            <!-- The last result and the row's actions share the last column: a
+             column of buttons is a column of nothing most of the time. -->
+            <ng-container matColumnDef="last">
+              <mat-header-cell *matHeaderCellDef i18n="@@Last_run"
+                >Last run</mat-header-cell
+              >
+              <mat-cell *matCellDef="let s">
+                <!-- lastAt, not lastState: a claim writes "running" the moment it
+                 takes a turn, and a run that has not ENDED has no moment to
+                 show - printing one gave the epoch. -->
+                @if (s.lastAt > 0) {
+                  <span class="lines">
+                    <span
+                      class="result"
+                      [class.failed]="s.lastState !== 'done'"
+                      [matTooltip]="s.lastDetail"
+                    >
+                      <span class="dot"></span>{{ s.lastState }}
+                    </span>
+                    <span class="muted">{{ s.lastAt | zoned: zone() }}</span>
+                  </span>
+                } @else {
+                  <span class="muted" i18n="@@Never_run">never run</span>
+                }
+                <span rowActions="tonal">
+                  @if (s.paused) {
+                    <button
+                      matIconButton
+                      (click)="resume(s)"
+                      i18n-matTooltip="@@Resume"
+                      matTooltip="Resume"
+                      i18n-aria-label="@@Resume"
+                      aria-label="Resume"
+                    >
+                      <mat-icon>play_arrow</mat-icon>
+                    </button>
+                  } @else {
+                    <button
+                      matIconButton
+                      (click)="pause(s)"
+                      i18n-matTooltip="@@Pause"
+                      matTooltip="Pause"
+                      i18n-aria-label="@@Pause"
+                      aria-label="Pause"
+                    >
+                      <mat-icon>pause</mat-icon>
+                    </button>
+                    <!-- Not under a run in flight: that turn is the run's own
+                     until it closes, and the API refuses it. -->
+                    <button
+                      matIconButton
+                      (click)="runNow(s)"
+                      [disabled]="running(s)"
+                      i18n-matTooltip="@@Run_now"
+                      matTooltip="Run now"
+                      i18n-aria-label="@@Run_now"
+                      aria-label="Run now"
+                    >
+                      <mat-icon>bolt</mat-icon>
+                    </button>
+                  }
+                  <button
+                    matIconButton
+                    (click)="remove(s)"
+                    i18n-matTooltip="@@Delete"
+                    matTooltip="Delete"
+                    i18n-aria-label="@@Delete"
+                    aria-label="Delete"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </span>
+              </mat-cell>
+            </ng-container>
+
+            <mat-header-row
+              *matHeaderRowDef="columns; sticky: true"
+            ></mat-header-row>
+            <mat-row
+              *matRowDef="let row; columns: columns"
+              class="clickable"
+              (click)="open(row)"
+            ></mat-row>
+          </mat-table>
+        </div>
+      }
+    </div>
+  </mat-drawer-content>
+
+  <!-- One surface, two panels. The schedule: what the row cannot hold - the
+       body sent, the three settings that explain why a turn was skipped, and
+       the FULL text of a failure, which a row can only carry in a tooltip and
+       a tooltip is not where somebody reads an error at two in the morning.
+       And the API: this screen creates nothing, so whoever arrives asking how
+       to GET a schedule needs the call their service makes. -->
+  <mat-drawer
+    position="end"
+    mode="over"
+    [class.wide]="howto()"
+    [opened]="selected() !== null || howto()"
+    (closedStart)="closePanel()"
+  >
+    @if (howto()) {
+      <div class="drawer">
+        <div class="drawer-head">
+          <h2 i18n="@@Scheduled_calls">Scheduled calls</h2>
+          <button
+            matIconButton
+            (click)="closePanel()"
+            i18n-aria-label="@@Close"
+            aria-label="Close"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <app-scheduler-api />
+      </div>
+    } @else if (selected(); as s) {
+      <div class="drawer">
+        <div class="drawer-head">
+          <h2>{{ s.name }}</h2>
+          <button
+            matIconButton
+            (click)="closePanel()"
+            i18n-aria-label="@@Close"
+            aria-label="Close"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <dl>
+          <dt i18n="@@Calls_as">Calls as</dt>
+          <dd>
+            meerkat
+            @if (rolesOf(s); as roles) {
+              <span class="muted"> - {{ roles }}</span>
+            }
+          </dd>
+          <dt i18n="@@Calls">Calls</dt>
+          <dd>
+            <span class="mono">{{ s.method }} {{ s.path }}</span> &mdash;
+            {{ named(s) }}
+          </dd>
+          <dt i18n="@@When">When</dt>
+          @if (s.at) {
+            <dd>
+              {{ momentOf(s) | zoned: zone() : "long" }}
+              <span class="muted" i18n="@@Once_delayed_action"
+                >- once, then finished</span
+              >
+            </dd>
+          } @else {
+            <dd class="mono">{{ s.cron || s.every }}</dd>
+          }
+          @if (s.cron) {
+            <dt i18n="@@Timezone">Timezone</dt>
+            <dd>{{ s.timezone || "UTC" }}</dd>
+          }
+          <dt i18n="@@Next_run">Next run</dt>
+          <dd>
+            @if (s.paused) {
+              <span class="muted" i18n="@@Paused">Paused</span>
+            } @else if (running(s)) {
+              <span class="muted" i18n="@@After_this_run_long"
+                >When this run closes, counted from then</span
+              >
+            } @else if (finished(s)) {
+              <span class="muted" i18n="@@Finished_long"
+                >Nothing more: this was a single date, and it has gone</span
+              >
+            } @else {
+              {{ s.nextAt | zoned: zone() : "long" }}
+            }
+          </dd>
+          @if (s.tenantId) {
+            <dt i18n="@@Organization">Organization</dt>
+            <dd>{{ s.tenantId }}</dd>
+          }
+          @if (s.createdBy) {
+            <dt i18n="@@Created_by">Created by</dt>
+            <dd>{{ s.createdBy }}</dd>
+          }
+        </dl>
+
+        @if (hasMeta(s)) {
+          <h3 i18n="@@Metadata">Metadata</h3>
+          <dl>
+            @for (entry of s.metadata | keyvalue; track entry.key) {
+              <dt>{{ entry.key }}</dt>
+              <dd class="mono">{{ entry.value }}</dd>
+            }
+          </dl>
+        }
+
+        @if (running(s)) {
+          <h3 i18n="@@Run_in_flight">Run in flight</h3>
+          <mat-progress-bar
+            [mode]="s.progress > 0 ? 'determinate' : 'indeterminate'"
+            [value]="s.progress"
+          />
+          <dl>
+            <dt i18n="@@State">State</dt>
+            <dd>
+              @if (s.runState === "accepted") {
+                <ng-container i18n="@@Run_accepted_long"
+                  >Accepted - the service took the work and reports on
+                  it</ng-container
+                >
+              } @else {
+                <ng-container i18n="@@Run_calling_long"
+                  >Calling - waiting for the answer</ng-container
+                >
+              }
+            </dd>
+            <dt i18n="@@Started">Started</dt>
+            <dd>{{ s.runStarted | zoned: zone() : "long" }}</dd>
+            @if (s.attempts > 1) {
+              <dt i18n="@@Attempt">Attempt</dt>
+              <dd i18n="@@Attempt_of">
+                {{ s.attempts }} - a gateway stopped before the answer, and
+                another sent it again
+              </dd>
+            }
+            <dt i18n="@@Claimed_by">claimed by</dt>
+            <dd>
+              @if (s.claimedBy) {
+                {{ s.claimedBy }}
+              } @else {
+                <span class="muted" i18n="@@Handed_back"
+                  >handed back, for the next gateway to send again</span
+                >
+              }
+            </dd>
+            <dt i18n="@@Run">Run</dt>
+            <dd class="mono">{{ s.runId }}</dd>
+          </dl>
+        }
+
+        @if (s.lastAt > 0) {
+          <h3 i18n="@@Last_run">Last run</h3>
+          <dl>
+            <dt i18n="@@Result">Result</dt>
+            <dd>
+              <span class="result" [class.failed]="s.lastState !== 'done'">
+                <span class="dot"></span>{{ s.lastState }}
+              </span>
+            </dd>
+            <dt i18n="@@When">When</dt>
+            <dd>{{ s.lastAt | zoned: zone() : "long" }}</dd>
+            @if (s.lastDetail) {
+              <dt i18n="@@Detail">Detail</dt>
+              <dd class="detail">{{ s.lastDetail }}</dd>
+            }
+          </dl>
+        }
+
+        <!-- What each turn did (SCHED-03). The row above says how the LAST
+             one ended; this is where "since when is it failing" lives, and
+             where a turn that never went out is asked for again. -->
+        @if (runs().length) {
+          <h3 i18n="@@Runs">Runs</h3>
+          <ul class="runs">
+            @for (run of runs(); track run.id) {
+              <li>
+                <span class="result" [class.failed]="run.state !== 'done'">
+                  <span class="dot"></span>{{ run.state }}
+                </span>
+                <span class="when">{{ run.endedAt | zoned: zone() }}</span>
+                <span class="muted">
+                  @if (run.status) {
+                    {{ run.status }}
+                  }
+                  @if (took(run); as d) {
+                    - {{ d }}
+                  }
+                  @if (run.attempt && run.attempt > 1) {
+                    -
+                    <ng-container i18n="@@Attempt_n"
+                      >attempt {{ run.attempt }}</ng-container
+                    >
+                  }
+                  @if (chainOf(run); as chain) {
+                    - {{ chain }}
+                  }
+                </span>
+                @if (detailOf(run); as detail) {
+                  <span class="detail">{{ detail }}</span>
+                }
+                @if (replayable(run)) {
+                  <button
+                    matIconButton
+                    (click)="replay(s, run)"
+                    [disabled]="running(s) || s.paused"
+                    i18n-matTooltip="@@Replay"
+                    matTooltip="Run this turn again"
+                    i18n-aria-label="@@Replay"
+                    aria-label="Run this turn again"
+                  >
+                    <mat-icon>replay</mat-icon>
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        }
+
+        <!-- What it was written as, folded away: the fields a row cannot
+             show, and a worked example for whoever writes the next one. -->
+        @if (payload(); as body) {
+          <mat-expansion-panel class="payload">
+            <mat-expansion-panel-header>
+              <mat-panel-title i18n="@@Payload">Payload</mat-panel-title>
+            </mat-expansion-panel-header>
+            <ng-template matExpansionPanelContent>
+              <app-snippet filename="schedule.json" [content]="body" />
+            </ng-template>
+          </mat-expansion-panel>
+        }
+
+        <div class="drawer-actions">
+          @if (s.paused) {
+            <button matButton="tonal" (click)="resume(s)">
+              <mat-icon>play_arrow</mat-icon>
+              <ng-container i18n="@@Resume">Resume</ng-container>
+            </button>
+          } @else {
+            <button matButton="tonal" (click)="pause(s)">
+              <mat-icon>pause</mat-icon>
+              <ng-container i18n="@@Pause">Pause</ng-container>
+            </button>
+            <button
+              matButton="tonal"
+              (click)="runNow(s)"
+              [disabled]="running(s)"
+            >
+              <mat-icon>bolt</mat-icon>
+              <ng-container i18n="@@Run_now">Run now</ng-container>
+            </button>
+          }
+          <button matButton (click)="remove(s); closePanel()" class="danger">
+            <mat-icon>delete</mat-icon>
+            <ng-container i18n="@@Delete">Delete</ng-container>
+          </button>
+        </div>
+      </div>
+    }
+  </mat-drawer>
+</mat-drawer-container>

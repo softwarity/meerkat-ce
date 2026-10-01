@@ -136,22 +136,13 @@ const apiTokensBody = `    <style>
         box-shadow: none;
       }
       .tk-ghost:hover { border-color: var(--mk-primary); filter: none; box-shadow: none; }
-      /* the copy button sits INSIDE the token box, top-right */
+      /* the copy button (the chrome's [data-copy]) sits INSIDE the token box, top-right */
       .tk-copy { position: relative; margin: 4px 0 12px; }
       .tk-copy code {
-        display: block; font-family: var(--mk-mono); font-size: .8rem; word-break: break-all;
+        display: block; font-family: var(--mk-mono); font-size: .8rem; word-break: break-all; text-align: start;
         padding: 8px 42px 8px 10px; border-radius: var(--mk-radius-small);
         background: var(--mk-surface); border: 1px solid var(--mk-outline);
       }
-      .tk-copy-btn {
-        position: absolute; top: 5px; right: 5px; margin: 0; width: 28px; height: 28px; padding: 0;
-        border: 1px solid transparent; border-radius: var(--mk-radius-small);
-        background: var(--mk-surface-container-high);
-        color: var(--mk-on-surface-variant); cursor: pointer; display: grid; place-items: center; box-shadow: none;
-      }
-      .tk-copy-btn:hover { color: var(--mk-primary); border-color: var(--mk-outline); filter: none; box-shadow: none; }
-      .tk-copy-btn:active { transform: none; }
-      .tk-copy-btn.ok { color: var(--mk-primary); border-color: var(--mk-primary); }
       .tk-warn { margin: 0 0 4px; font-size: .76rem; color: var(--mk-on-surface-variant); text-align: start; }
     </style>
     <p class="lead">{{.T.apiTokens}}</p>
@@ -183,10 +174,7 @@ const apiTokensBody = `    <style>
     <dialog id="tk-reveal-dlg" class="tk-dlg">
       <h3>{{.T.tokenCreatedLead}}</h3>
       <div class="tk-copy">
-        <code id="tk-value">{{.Created}}</code>
-        <button type="button" class="tk-copy-btn" id="tk-copy" title="{{.T.copy}}" aria-label="{{.T.copy}}">
-          <svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true" width="16" height="16"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-520q0-17 11.5-28.5T160-720q17 0 28.5 11.5T200-680v520h400q17 0 28.5 11.5T640-120q0 17-11.5 28.5T600-80H200Zm160-240v-480 480Z"/></svg>
-        </button>
+        <code id="tk-value" data-copy>{{.Created}}</code>
       </div>
       <p class="tk-warn">{{.T.tokenCreatedWarn}}</p>
       <div class="tk-dlg-actions">
@@ -260,19 +248,6 @@ const apiTokensBody = `    <style>
         reveal.showModal();
         const done = document.getElementById('tk-done');
         if (done) done.addEventListener('click', () => reveal.close());
-        const copy = document.getElementById('tk-copy');
-        const val = document.getElementById('tk-value');
-        if (copy && val) copy.addEventListener('click', async () => {
-          try { await navigator.clipboard.writeText(val.textContent); }
-          catch (e) {
-            const rg = document.createRange(); rg.selectNodeContents(val);
-            const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg);
-            try { document.execCommand('copy'); } catch (e2) {}
-            sel.removeAllRanges();
-          }
-          copy.classList.add('ok');
-          setTimeout(() => copy.classList.remove('ok'), 1200);
-        });
       }
     })();
     </script>
@@ -334,7 +309,7 @@ func (h *Handler) renderTokens(w http.ResponseWriter, r *http.Request, sess stor
 		data.Context = h.tr(r, "tokenContextNone")
 		data.NoTenant = true
 	}
-	t := messages[prefsOf(r, h.offeredLanguages()).Lang]
+	t := catalogue(prefsOf(r, h.offeredLanguages()).Lang)
 	for _, d := range apiTokenDurations {
 		data.Durations = append(data.Durations, durationOption{Days: d.Days, Label: t[d.Label]})
 	}
@@ -392,8 +367,18 @@ func (h *Handler) doTokens(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case "revoke":
-		_, _ = h.st.RevokeAPIToken(r.Context(), sess.UserID, r.PostFormValue("id"))
-		h.sm.TokenChanged(r.PostFormValue("id"))
+		id := r.PostFormValue("id")
+		// Named BEFORE it goes: a revoked token is no longer listed.
+		name := id
+		for _, t := range h.userTokens(r, sess.UserID) {
+			if t.ID == id {
+				name = t.Name
+			}
+		}
+		if ok, _ := h.st.RevokeAPIToken(r.Context(), sess.UserID, id); ok {
+			h.securityOf(r, secTokenRevoke, sess.UserID, name)
+		}
+		h.sm.TokenChanged(id)
 	}
 	http.Redirect(w, r, "/profile/tokens", http.StatusSeeOther)
 }
@@ -437,6 +422,7 @@ func (h *Handler) createToken(w http.ResponseWriter, r *http.Request, sess store
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.securityOf(r, secTokenCreate, sess.UserID, name)
 	h.renderTokens(w, r, sess, token, "", http.StatusOK)
 }
 

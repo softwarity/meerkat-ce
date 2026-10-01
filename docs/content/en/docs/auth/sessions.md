@@ -39,9 +39,12 @@ them to notice that the session ended, or came back in another tab, without
 polling an endpoint. They hold a deadline and nothing else.
 
 > [!NOTE]
-> No `Domain` attribute is set, so the cookie is host-only. A session is **not
-> shared between sub-domains** today - `app.acme.io` and `admin.acme.io` sign in
-> separately. FEATURES.md lists this as the missing half of the session cookie.
+> No `Domain` attribute is set, so the cookie is host-only, and that is a
+> choice. A `Domain` would send the session to **every** sub-domain, including
+> the ones Meerkat does not serve - a marketing site hosted elsewhere, a SaaS
+> behind a CNAME, a staging host - and any one of them compromised would receive
+> everybody's session. So `app.acme.io` and `admin.acme.io` sign in separately;
+> applications under one host name share the session.
 
 A session from one plane is never accepted on the other. The answer to a
 data-plane cookie on the admin port is not "forbidden", it is "no session".
@@ -89,6 +92,9 @@ the installation-wide lifetime, because the organisation is not known yet.
 | Idle expiry | that session | yes, refused on the wall clock |
 | A password reset from the e-mailed link | **every** session of that account, on every gateway | yes |
 | Deleting the account | every session of that account | yes |
+| **Disabling** the account | every session of that account, on both planes | yes |
+| **Sign out** on the profile's *Active sessions*, or *Sign out everywhere else* | that session, or every other one of that person | yes |
+| **Sign out** on the console's *Application, Sessions* screen | that session | yes |
 
 Logout is a `POST` - there is no `GET /logout` - and it deletes the row rather
 than merely clearing the cookie, then clears both cookies and tells the other
@@ -99,19 +105,21 @@ person keep theirs, and the console and the application are independent.
 
 This list matters more than the previous one:
 
-- **Disabling an account does not end its sessions.** The row stays. What happens instead is that every gate re-reads the account, so the disabled person stops passing route rules and stops being admitted by the admin API. But the gateway's own pages - `/profile` and the rest - still answer them until the session expires.
-- **Changing a password does not.** Neither the voluntary change in the profile, nor the forced change at sign-in, nor an administrator's reset. Only the e-mailed reset link revokes sessions, because that is the flow that exists for an account someone else may be holding.
+- **Changing a password does not.** Neither the voluntary change in the profile, nor the forced change at sign-in, nor an administrator's reset. Only the e-mailed reset link revokes sessions - with the account's API tokens and trusted browsers - because that is the flow that exists for an account someone else may be holding.
 - **"Must change password" does not.** The flag is read at the *next* sign-in.
 - **Role, group and membership changes do not.** They take effect within seconds: the remembered identity is dropped, the session is kept, which is why being added to an organisation can take effect without signing out. Removing a role works the same way.
 - **Disabling an organisation does not.**
 - **On the control plane, an account's validity window is not re-checked** on a cookie session: it is checked at sign-in and on every token call, but a console session already open runs until it expires.
 
-## What is missing
+## Seeing the sessions
 
-There is **no list of active sessions** and **no "sign out everywhere"** - not
-for a person on their own account, and not for an administrator. The table
-exists and revocation by account exists in the code; what is missing is a screen,
-a button, and a call to that revocation when an account is disabled.
+A person reads their own on the profile, **Security, Active sessions**: each
+browser signed in to the applications, when and from which address, *This
+browser* marked; **Sign out** on any other one, or **Sign out everywhere else**.
+Another account's session is never theirs to close, whatever id a form carries.
 
-Until then, the honest way to get someone out of everything is to reset their
-password through the e-mail flow, or delete the account.
+Administrators read them on **Application, Sessions**: who, which browser and
+address, which plane, since when - filtered by account, paged. Root reads both
+planes; an application administrator the applications' sessions only, since who
+runs the console, and from where, is root's business. Ending one writes
+`session.revoke` to the [audit trail](/docs/operations/audit).

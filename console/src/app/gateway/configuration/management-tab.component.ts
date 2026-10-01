@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { httpResource } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
@@ -14,12 +15,14 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable, firstValueFrom } from 'rxjs';
 import { RowActionsDirective } from '@softwarity/row-actions';
-import { ApiService, ConfigPlan, CurrentConfiguration, SavedConfiguration } from '../../api.service';
+import { ApiService, ConfigPlan, CurrentConfiguration, Edition, SavedConfiguration } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { ConfigurationYamlComponent } from './configuration-yaml.component';
+import { CompareDialogComponent } from './compare-dialog.component';
 import { ExportDialogComponent } from './export-dialog.component';
 import { ImportDialogComponent, VaultHolesDialogComponent } from './import-dialog.component';
+import { LiveChangesService } from '../../shared/live-changes.service';
 
 // One row per configuration, and the CURRENT one is the first of them.
 //
@@ -76,6 +79,17 @@ type Row = SavedConfiguration & { current?: boolean };
         width: min(760px, 96vw);
         border-left: 1px solid var(--mat-sys-outline-variant);
         background: var(--mat-sys-surface-container-high);
+      }
+      .shelf {
+        font-size: 0.8rem;
+        color: var(--mat-sys-on-surface-variant);
+        white-space: nowrap;
+      }
+      .shelf.full {
+        color: var(--mat-sys-error);
+      }
+      .shelf .ee {
+        margin-left: 4px;
       }
       .top {
         display: flex;
@@ -178,6 +192,16 @@ type Row = SavedConfiguration & { current?: boolean };
             duplicating and deleting one changes nothing about what is served. Click a row to read
             its file.
           </p>
+          <!-- The size of the shelf, said before it is reached: a cap found by
+               being refused is a trap, a cap announced is a price. -->
+          @if (cap(); as n) {
+            <span class="shelf" [class.full]="saved().length >= n">
+              <ng-container i18n="@@Configurations_shelf">{{ saved().length }} of {{ n }} saved</ng-container>
+              <span class="ee" i18n="@@Configurations_shelf_ee">- no limit in Enterprise</span>
+            </span>
+          } @else if (edition.hasValue()) {
+            <span class="shelf" i18n="@@Configurations_shelf_unlimited">{{ saved().length }} saved - no limit</span>
+          }
           <button matButton="outlined" ee-feature="configurations" [disabled]="busy()" (click)="picker.click()">
             <mat-icon>upload_file</mat-icon>
             <ng-container i18n="@@Import_a_file">Import a file</ng-container>
@@ -302,6 +326,18 @@ type Row = SavedConfiguration & { current?: boolean };
                   >
                     <mat-icon>content_copy</mat-icon>
                   </button>
+                  @if (saved().length > 1) {
+                    <button
+                      matIconButton
+                      (click)="$event.stopPropagation(); compare(c)"
+                      i18n-matTooltip="@@Compare_with"
+                      matTooltip="Compare with another saved configuration"
+                      i18n-aria-label="@@Compare_with"
+                      aria-label="Compare with another saved configuration"
+                    >
+                      <mat-icon>compare_arrows</mat-icon>
+                    </button>
+                  }
                   <button
                     matIconButton
                     (click)="$event.stopPropagation(); download(c)"
@@ -365,6 +401,9 @@ export class ConfigurationManagementComponent {
   private readonly route = inject(ActivatedRoute);
 
   protected readonly saved = signal<SavedConfiguration[]>([]);
+  protected readonly edition = httpResource<Edition>(() => '/api/edition');
+  // 0 (Enterprise) reads as no limit.
+  protected readonly cap = computed(() => this.edition.value()?.configurationCap ?? 0);
   protected readonly current = signal<CurrentConfiguration | null>(null);
   protected readonly busy = signal(false);
   protected readonly columns = ['name', 'description', 'updated'];
@@ -451,6 +490,10 @@ export class ConfigurationManagementComponent {
 
   constructor() {
     this.reload();
+    // Somebody else's write (CONSOLE-13): a configuration saved, switched,
+    // imported or restored anywhere shows up here without a click.
+    inject(LiveChangesService).on('configuration', () => this.reload());
+    inject(LiveChangesService).on('config', () => this.reload());
     // The document follows the URL, not the click: opening the drawer from a
     // pasted link (or reloading on one) must load what clicking the row loads.
     // Fetching it in the click handler alone left a deep link showing an EMPTY
@@ -704,6 +747,14 @@ export class ConfigurationManagementComponent {
         this.busy.set(false);
         this.fail(err);
       },
+    });
+  }
+
+  // Two saved configurations against each other, what runs left out (CFG-04).
+  protected compare(c: SavedConfiguration): void {
+    this.dialog.open(CompareDialogComponent, {
+      data: { from: c, others: this.saved().filter((o) => o.id !== c.id) },
+      width: '680px',
     });
   }
 

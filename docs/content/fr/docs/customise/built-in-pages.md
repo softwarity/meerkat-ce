@@ -9,7 +9,7 @@ summary: Quelles pages la passerelle sert elle-même, comment elles sont dispos�
 
 Ce sont les pages auxquelles Meerkat répond lui-même, devant vos applications. C'est du HTML rendu par
 le serveur - pas de framework, pas de bundle, rien récupéré d'un CDN - et elles lisent les jetons du
-thème, donc elles suivent votre palette sans recompilation (PAGE-01).
+thème, donc elles suivent votre palette sans recompilation.
 
 | Page | Où elle apparaît |
 |---|---|
@@ -36,7 +36,7 @@ galerie de dispositions.
 
 ## La disposition
 
-Un catalogue fermé de gabarits, chacun étant un bloc de CSS livré avec le produit (PAGE-02) :
+Un catalogue fermé de gabarits, chacun étant un bloc de CSS livré avec le produit :
 
 | Gabarit | À quoi ça ressemble |
 |---|---|
@@ -64,7 +64,7 @@ qu'elle ne peut plus quitter.
 
 ## Clair, sombre, ou le choix du visiteur
 
-L'intégrateur tranche d'abord, en décochant un schéma sur l'aperçu (THEME-05) :
+L'intégrateur tranche d'abord, en décochant un schéma sur l'aperçu :
 
 | Réglage | Ce que les pages font |
 |---|---|
@@ -84,25 +84,26 @@ reposé sur un navigateur qui ne l'a jamais vu - exactement comme sa langue. Voi
 
 Vingt catalogues sont embarqués dans le binaire, un fichier JSON par langue : arabe, allemand, anglais,
 espagnol, français, hébreu, hindi, indonésien, italien, japonais, coréen, néerlandais, polonais,
-portugais, russe, thaï, turc, ukrainien, vietnamien et chinois simplifié (I18N-01).
+portugais, russe, thaï, turc, ukrainien, vietnamien et chinois simplifié.
 
 L'anglais fait référence : chaque autre catalogue lui est comparé au démarrage, et une clé qu'un
 catalogue ne porte pas retombe sur l'anglais plutôt que d'afficher un blanc. Les messages d'erreur du
-backend sont localisés de la même façon (I18N-02).
+backend sont localisés de la même façon.
 
 La langue vient du choix du visiteur - un cookie et son compte - et sinon de ce que son navigateur
-demande. Les langues *offertes* se règlent sous **Application > Locales**, et une route UI déclare
-lesquelles de cette réserve elle sert.
+demande. Les langues *offertes* sont l'union de ce que les routes UI
+déclarent parler (**Routes > une route > Locales**) : il n'y a pas de réserve à élargir, une route
+apporte les siennes.
 
 > [!WARNING]
-> La console, elle, est **en anglais uniquement**, et c'est une décision plutôt qu'un manque (I18N-03) :
+> La console, elle, est **en anglais uniquement**, et c'est une décision plutôt qu'un manque :
 > c'est un outil d'exploitant. Les pages ci-dessus sont celles que vos utilisateurs voient, et
 > celles-là sont traduites.
 
 ## Ce qui manque
 
 - **Votre propre HTML.** La disposition est un catalogue ; remplacer le balisage d'une page par votre
-  gabarit est l'autre moitié de PAGE-02 et n'est pas construit.
-- **Des catalogues surchargeables** (PAGE-03) : ajouter une langue reste une recompilation.
-- La page de sélection de variante du développeur (DEV-06), qui n'a de sens qu'une fois la portée des
-  substitutions par développeur construite.
+ gabarit n'est pas construit.
+- **Des catalogues surchargeables** : ajouter une langue reste une recompilation.
+- La page de sélection de variante du développeur, qui n'a de sens qu'une fois la portée des
+ substitutions par développeur construite.

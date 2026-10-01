@@ -23,11 +23,13 @@ package expiry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
@@ -155,7 +157,14 @@ func (d *Digest) sendToday(ctx context.Context, cfg store.ExpiryDigest, now time
 	if err != nil {
 		return err
 	}
-	if len(ending) == 0 && len(ended) == 0 && len(secretsEnding) == 0 && len(secretsEnded) == 0 {
+	// Certificates (SSL-04), the same two windows. The console shows the
+	// countdown, but nobody reads a countdown on a screen they have no reason
+	// to open - which is the whole problem with a certificate: it works
+	// silently until the morning it does not.
+	certsEnding := d.certificatesBetween(ctx, start.Unix(), horizon.Unix())
+	certsEnded := d.certificatesBetween(ctx, since.Unix(), start.Unix())
+	if len(ending) == 0 && len(ended) == 0 && len(secretsEnding) == 0 && len(secretsEnded) == 0 &&
+		len(certsEnding) == 0 && len(certsEnded) == 0 {
 		// Nothing to say: the day is recorded all the same, or every tick for
 		// the rest of the day would ask the database the same question.
 		return d.st.MarkExpiryDigestSent(ctx, today)
@@ -167,10 +176,11 @@ func (d *Digest) sendToday(ctx context.Context, cfg store.ExpiryDigest, now time
 	if len(admins) == 0 {
 		slog.Warn("expiry digest: nobody to tell",
 			"accounts", len(ending)+len(ended), "secrets", len(secretsEnding)+len(secretsEnded),
+			"certificates", len(certsEnding)+len(certsEnded),
 			"why", "no enabled root, app-admin or infra-admin account carries an e-mail address")
 		return d.st.MarkExpiryDigestSent(ctx, today)
 	}
-	msg := d.message(ctx, cfg, ending, ended, secretsEnding, secretsEnded)
+	msg := d.message(ctx, cfg, notice{ending, ended, secretsEnding, secretsEnded, certsEnding, certsEnded})
 	// One message per administrator rather than one with everybody in To: a
 	// list of colleagues is not a secret, but it is not this message's news
 	// either, and a bounce for one address should not lose the others.
@@ -192,16 +202,41 @@ func (d *Digest) sendToday(ctx context.Context, cfg store.ExpiryDigest, now time
 		// silently dropped.
 		return lastErr
 	}
-	slog.Info("expiry digest sent", "recipients", sent, "accounts", len(ending)+len(ended), "secrets", len(secretsEnding)+len(secretsEnded))
+	slog.Info("expiry digest sent", "recipients", sent, "accounts", len(ending)+len(ended),
+		"secrets", len(secretsEnding)+len(secretsEnded), "certificates", len(certsEnding)+len(certsEnded))
 	return d.st.MarkExpiryDigestSent(ctx, today)
 }
 
 // message writes the notice. English, like the console: its readers are the
 // people who administer this gateway, and the pages a visitor sees are the
 // translated surface (the catalogue in internal/auth).
-func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, ended []store.User, secretsEnding, secretsEnded []vault.Entry) mail.Message {
+// notice is everything one digest names.
+type notice struct {
+	ending, ended               []store.User
+	secretsEnding, secretsEnded []vault.Entry
+	certsEnding, certsEnded     []expiringCert
+}
+
+func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, n notice) mail.Message {
+	ending, ended, secretsEnding, secretsEnded := n.ending, n.ended, n.secretsEnding, n.secretsEnded
 	app := appName(ctx, d.st)
 	var groups []mail.Group
+	// Certificates first: of everything here, an expiring certificate is the
+	// one that takes a whole application down at once.
+	if len(n.certsEnding) > 0 {
+		items := make([]string, len(n.certsEnding))
+		for i, c := range n.certsEnding {
+			items[i] = fmt.Sprintf("%s - expires %s%s", certName(c), day(c.NotAfter), certNote(c))
+		}
+		groups = append(groups, mail.Group{Title: fmt.Sprintf("Certificates expiring within %s", days(cfg.Days)), Items: items})
+	}
+	if len(n.certsEnded) > 0 {
+		items := make([]string, len(n.certsEnded))
+		for i, c := range n.certsEnded {
+			items[i] = fmt.Sprintf("%s - expired %s", certName(c), day(c.NotAfter))
+		}
+		groups = append(groups, mail.Group{Title: "Certificates that have expired", Items: items})
+	}
 	if len(ending) > 0 {
 		items := make([]string, len(ending))
 		for i, u := range ending {
@@ -235,14 +270,15 @@ func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, ending, en
 	// of the app behind it (NOTIF-01, NOTIF-04). So Meerkat's own mark and
 	// palette, never the data plane's theme - the app name still rides in the
 	// subject, to say which installation this is about.
-	line := headline(ending, ended, secretsEnding, secretsEnded, cfg.Days)
+	line := headline(n, cfg.Days)
 	return mail.Compose("", consoleBrand(), consolePalette(), mail.Spec{
 		Subject:   fmt.Sprintf("%s: %s", app, line),
 		Preheader: line,
 		Heading:   "Daily digest",
 		Groups:    groups,
 		Outro: []string{
-			"An account outside its window is refused at the next sign-in, with the date - nobody " +
+			"An expired certificate is refused by every browser: renew or replace it under Infra, TLS. " +
+				"An account outside its window is refused at the next sign-in, with the date - nobody " +
 				"is signed out mid-work. A vault entry's date is a REMINDER only: it never stops a " +
 				"reference from resolving, since the gateway cannot know the secret was rotated at its " +
 				"source. Change either under the console.",
@@ -273,8 +309,15 @@ func consolePalette() map[string]string {
 
 // headline is the subject's news, which has to survive being read in a list of
 // forty subjects: how many, and how soon.
-func headline(ending, ended []store.User, secretsEnding, secretsEnded []vault.Entry, horizon int) string {
+func headline(nt notice, horizon int) string {
+	ending, ended, secretsEnding, secretsEnded := nt.ending, nt.ended, nt.secretsEnding, nt.secretsEnded
 	var parts []string
+	if n := len(nt.certsEnding); n > 0 {
+		parts = append(parts, fmt.Sprintf("%s expiring within %s", certificates(n), days(horizon)))
+	}
+	if n := len(nt.certsEnded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%s expired", certificates(n)))
+	}
 	if n := len(ending); n > 0 {
 		parts = append(parts, fmt.Sprintf("%s lose access within %s", accounts(n), days(horizon)))
 	}
@@ -330,4 +373,73 @@ func appName(ctx context.Context, st *store.Store) string {
 		return b.AppName
 	}
 	return "Meerkat"
+}
+
+// expiringCert is one certificate as the digest names it.
+type expiringCert struct {
+	Host     string
+	Plane    string
+	Source   string
+	NotAfter int64
+}
+
+// certificatesBetween lists the certificates whose end falls in [from, to):
+// the ones deposited here (imported, self-signed, answered signing requests)
+// and the ones an authority issued through ACME. An ACME certificate is renewed
+// weeks before its end, so one that reaches this window is one whose renewal
+// has been failing - exactly what needs a human.
+func (d *Digest) certificatesBetween(ctx context.Context, from, to int64) []expiringCert {
+	var out []expiringCert
+	in := func(t int64) bool { return t >= from && t < to }
+	if rows, err := d.st.ListCertificates(ctx); err == nil {
+		for _, c := range rows {
+			if c.Pending() || !in(c.Info.NotAfter) {
+				continue
+			}
+			out = append(out, expiringCert{Host: c.Host, Plane: c.Plane, Source: c.Source, NotAfter: c.Info.NotAfter})
+		}
+	} else {
+		slog.Warn("expiry digest: certificates not read", "err", err)
+	}
+	cfg := d.st.TLSSettings(ctx)
+	if cfg.ACME.Enabled {
+		cache := certs.StoreCache{S: d.st, Missing: func(err error) bool { return errors.Is(err, store.ErrNoRows) }}
+		for _, host := range cfg.ACME.Domains {
+			host = strings.ToLower(strings.TrimSpace(host))
+			if info, ok := certs.CachedInfo(ctx, cache, host); ok && in(info.NotAfter) {
+				out = append(out, expiringCert{Host: host, Source: "acme", NotAfter: info.NotAfter})
+			}
+		}
+	}
+	return out
+}
+
+func certificates(n int) string {
+	if n == 1 {
+		return "1 certificate"
+	}
+	return fmt.Sprintf("%d certificates", n)
+}
+
+// certName reads the way the TLS screen lists it: the host, and which plane.
+func certName(c expiringCert) string {
+	switch c.Plane {
+	case store.PlaneConsole:
+		return c.Host + " (console)"
+	case store.PlaneApp:
+		return c.Host + " (applications)"
+	}
+	return c.Host
+}
+
+// certNote says what to do about it when the answer depends on where it came
+// from: an automatic one should already have been renewed.
+func certNote(c expiringCert) string {
+	switch c.Source {
+	case "acme":
+		return " - issued automatically, and its renewal has not succeeded"
+	case store.CertSourceSelfSigned:
+		return " - self-signed"
+	}
+	return ""
 }

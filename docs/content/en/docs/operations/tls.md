@@ -66,8 +66,28 @@ that refuses every visitor.
 On the **data plane only**, the plain port can redirect to the HTTPS one (SSL-06). The two
 health probes are exempt: a `308` reads as "not ready".
 
-`HSTS` exists as a per-route response header (SEC-03); there is no global switch for it
-yet.
+With the redirect on, every HTTPS answer of the data plane also carries **HSTS**
+(`Strict-Transport-Security: max-age=...`). The redirect cannot protect the
+request it redirects: that first one leaves in clear, and whoever sits on the
+network - a public Wi-Fi, a compromised proxy - can answer it themselves and
+never pass the redirect on, keeping the visitor on plain HTTP while they talk
+HTTPS to the gateway (SSL stripping). With HSTS the browser remembers, and
+rewrites `http://` to `https://` itself before sending anything.
+
+It follows the redirect rather than being a switch of its own: forcing HTTPS is
+already the commitment - a `301` is remembered by browsers too. Only the
+**duration** is chosen, a day by default, up to two years. It retreats with the
+redirect when every certificate has expired. It is never sent to `localhost`
+(the promise covers every port of a host name, so a development gateway would
+force HTTPS on all its developer's local applications) nor to an IP address
+(browsers ignore it there), never over a value a service or a route's
+[security-headers](/docs/filters/security-headers) filter already set, and
+without `includeSubDomains`.
+
+> [!WARNING]
+> A browser keeps the promise for the whole duration, even if the certificates
+> are taken away, and no longer offers to continue past a bad certificate. Start
+> at a day; lengthen once HTTPS is settled.
 
 ## ACME is not Let's Encrypt
 
@@ -116,10 +136,14 @@ avoid an event that happens twice a year.
 
 A certificate written on one node is reloaded by the others through the change bus.
 
+## Before a certificate expires
+
+The console shows each certificate's countdown, and the
+[daily digest](/docs/console/mail-relay) mails it to the administrators: the
+certificates expiring within its horizon, then the ones that have expired. An
+automatic one that reaches that window is one whose renewal has been failing.
+
 ## What is missing
 
-- **The expiry notification** (SSL-04). The console shows the countdown; nothing writes to
-  you about it.
-- **A global HSTS setting** (SSL-06): the header exists per route only.
 - **HTTP/3** (SSL-07): it would need a QUIC dependency outside the standard library, a UDP
-  listener and `Alt-Svc`.
+ listener and `Alt-Svc`.

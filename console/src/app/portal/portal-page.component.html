@@ -15,16 +15,48 @@
       <div class="row">
         <mat-icon>apps</mat-icon>
         <div class="grow">
-          <h2 class="title" i18n="@@Portal">Portal</h2>
+          <h2 class="title" i18n="@@Portal">Applications</h2>
           <p class="hint text-muted" i18n="@@Portal_enable_hint">
-            One bar to move between the applications; each visitor sees only what their access allows.
+            The applications this gateway offers, and how they are offered. Each visitor sees only
+            what their access allows - the list says what exists, the route says who may open it.
           </p>
         </div>
-        <mat-slide-toggle [checked]="enabled()" (change)="setEnabled($event.checked)" />
       </div>
+      <div class="modes">
+      <mat-button-toggle-group [value]="mode()" (change)="setMode($event.value)"
+        hideSingleSelectionIndicator>
+        <mat-button-toggle value="none">
+          <mat-icon>block</mat-icon><span i18n="@@Portal_mode_none">None</span>
+        </mat-button-toggle>
+        <mat-button-toggle value="links">
+          <mat-icon>list</mat-icon><span i18n="@@Portal_mode_links">Links</span>
+        </mat-button-toggle>
+        <mat-button-toggle value="portal">
+          <mat-icon>toolbar</mat-icon><span i18n="@@Portal_mode_portal">Portal</span>
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+      </div>
+      <p class="mode-hint text-muted">
+        @switch (mode()) {
+          @case ('none') {
+            <ng-container i18n="@@Portal_mode_none_hint">No list anywhere. The user button and the
+              built-in pages show your application name and nothing to click - which is the right
+              answer for an installation with one application.</ng-container>
+          }
+          @case ('links') {
+            <ng-container i18n="@@Portal_mode_links_hint">The list below, offered in the user
+              button's Applications menu and on the pages Meerkat serves itself.</ng-container>
+          }
+          @case ('portal') {
+            <ng-container i18n="@@Portal_mode_portal_hint">A navigation bar on every page of every
+              application, carrying the account button. The built-in pages then offer one way back
+              in rather than a list: the bar is the navigation.</ng-container>
+          }
+        }
+      </p>
     </mat-card>
 
-    @if (enabled()) {
+    @if (isBar()) {
       <div class="arrange">
         <div class="opt">
           <span class="opt-label" i18n="@@Portal_layout">Primary navigation</span>
@@ -54,11 +86,45 @@
             <mat-button-toggle value="label" i18n="@@Portal_display_label">Label</mat-button-toggle>
           </mat-button-toggle-group>
         </div>
+        <!-- The branding logo at the head of the bar, in or out. -->
         <div class="opt">
-          <span class="opt-label" i18n="@@Portal_appname">App name</span>
-          <mat-slide-toggle [checked]="showAppName()" (change)="setShowAppName($event.checked)"
-            i18n="@@Portal_appname_toggle">Show beside the logo</mat-slide-toggle>
+          <span class="opt-label" i18n="@@Portal_logo_in_bar">Logo in bar</span>
+          <div class="opt-row">
+            <mat-slide-toggle
+              [checked]="showLogo()"
+              (change)="setShowLogo($event.checked)"
+              [disabled]="!brandLogo()"
+              i18n-aria-label="@@Portal_logo_in_bar"
+              aria-label="Logo in bar"
+            ></mat-slide-toggle>
+            <!-- Greyed rather than gone: a control that vanishes moves the row
+                 under the hand that just pressed the toggle. -->
+            <mat-slider min="0" max="50" step="2" discrete [disabled]="!showLogo() || !brandLogo()">
+              <input
+                matSliderThumb
+                [value]="logoRadius()"
+                (valueChange)="setLogoRadius($event)"
+                i18n-aria-label="@@Portal_logo_radius"
+                aria-label="Corner radius"
+              />
+            </mat-slider>
+          </div>
+          @if (!brandLogo()) {
+            <p class="hint text-muted" i18n="@@Portal_logo_none">Branding carries no logo.</p>
+          }
         </div>
+        <div class="opt">
+          <span class="opt-label" i18n="@@Portal_appname_in_bar">App name in bar</span>
+          <div class="opt-row">
+            <mat-slide-toggle
+              [checked]="showAppName()"
+              (change)="setShowAppName($event.checked)"
+              i18n-aria-label="@@Portal_appname_in_bar"
+              aria-label="App name in bar"
+            ></mat-slide-toggle>
+          </div>
+        </div>
+
       </div>
 
       <!-- The canvas: the REAL bar in edit mode. Click a module to edit it in
@@ -82,13 +148,49 @@
           <mat-icon>add</mat-icon><span i18n="@@Portal_add_module">Add a module</span>
         </button>
       </div>
-      @if (!parents().length) {
+      @if (!entries().length) {
         <p class="empty text-muted" i18n="@@Portal_empty">
           No module yet. Add one for each application the bar should reach.
         </p>
       }
       <iframe #frame class="preview-frame" [src]="previewUrl" [style.max-width.px]="previewWidth() || null"
         title="Portal preview" i18n-title="@@Portal_preview"></iframe>
+    }
+
+    <!-- Links mode has no bar to preview, so the catalogue shows as what it
+         is: an ordered list. The SAME list the bar reads, edited in the same
+         drawer - switching mode must not cost the work. -->
+    @if (hasCatalogue() && !isBar()) {
+      <div class="canvas-head">
+        <span class="text-muted" i18n="@@Portal_links_hint">Offered in this order</span>
+        <span class="grow"></span>
+        <button matButton="filled" (click)="addParent()">
+          <mat-icon>add</mat-icon><span i18n="@@Portal_add_app">Add an application</span>
+        </button>
+      </div>
+      @if (!entries().length) {
+        <p class="empty text-muted" i18n="@@Portal_empty_links">
+          No application yet. Add one for each UI the menu should offer.
+        </p>
+      } @else {
+        <mat-card appearance="outlined" class="links">
+          @for (e of entries(); track $index; let i = $index) {
+            <div class="link-row" [class.off]="e.disabled">
+              <span class="pos">{{ i + 1 }}</span>
+              <span class="grow">
+                <b>{{ e.label || routeNameOf(e.routeId) }}</b>
+                <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
+              </span>
+              <button matIconButton [disabled]="i === 0" (click)="moveEntry(i, -1)"
+                matTooltip="Move up" i18n-matTooltip="@@Move_up"><mat-icon>arrow_upward</mat-icon></button>
+              <button matIconButton [disabled]="i === entries().length - 1" (click)="moveEntry(i, 1)"
+                matTooltip="Move down" i18n-matTooltip="@@Move_down"><mat-icon>arrow_downward</mat-icon></button>
+              <button matIconButton (click)="editParent(i)"
+                matTooltip="Edit" i18n-matTooltip="@@Edit"><mat-icon>edit</mat-icon></button>
+            </div>
+          }
+        </mat-card>
+      }
     }
   </div>
     </mat-drawer-content>

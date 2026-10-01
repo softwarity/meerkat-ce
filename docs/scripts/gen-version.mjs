@@ -4,7 +4,7 @@
 // no API rate limit. Runs on every build (local and CI). CI must check out with
 // fetch-depth: 0 so the tags are present.
 import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,6 +23,13 @@ function latestTag() {
     if (t) return t;
   } catch {
     /* no git / no tags reachable → fall back */
+  }
+  // The public mirror has no tags: mirror-ce.yml writes the latest one here.
+  try {
+    const t = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../.release-version'), 'utf8').trim();
+    if (t) return t;
+  } catch {
+    /* not on the mirror */
   }
   return FALLBACK;
 }

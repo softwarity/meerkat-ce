@@ -39,6 +39,14 @@ func TestNothingReloadsBehindTheBusBack(t *testing.T) {
 				t.Errorf("%s:%d reloads the routes directly - call a.reloadRouting, "+
 					"which also tells the other nodes:\n  %s", name, i+1, strings.TrimSpace(line))
 			}
+			// The store's own Announce is a bare NOTIFY: it bumps no version,
+			// and a node reacts to the version. The schedules rang it from
+			// every write, and the other nodes heard a bell with nothing
+			// behind it. What announces goes through the bus (a.announce).
+			if strings.Contains(line, "a.st.Announce(") || strings.Contains(line, "a.st.Signal(") {
+				t.Errorf("%s:%d notifies the other nodes behind the bus's back - call a.announce, "+
+					"which records the version they react to:\n  %s", name, i+1, strings.TrimSpace(line))
+			}
 		}
 	}
 }

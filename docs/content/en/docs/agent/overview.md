@@ -47,6 +47,9 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `save_route`, `delete_route` | Write a route and apply it at once. |
 | `list_route_bricks` | The catalogue of predicates and filters, with their parameters. |
 | `list_users`, `list_tenants` | The accounts and the organisations. |
+| `list_services` | What the gateway sees running around it. |
+| `list_schedules` | The scheduled calls: what runs at night, how often, as whom, and how the last run ended. |
+| `pause_schedule`, `run_schedule` | Stop a scheduled call, let it fire again, or bring its next turn forward to now. |
 | `read_traffic` | What is passing through right now. |
 | `read_audit` | The audit trail, within the caller's own scope. |
 | `get_settings`, `save_portal` | The global settings, and the navigation portal. |

@@ -9,10 +9,9 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pb33f/libopenapi v0.38.7
 	github.com/softwarity/livewire/go v0.4.0
-	github.com/softwarity/plug/agent v0.0.0-20260906220815-c526d427fcca
+	github.com/softwarity/plug/agent v0.0.0-20261001041253-19fae58846ea
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
-	golang.org/x/crypto v0.56.0
-	golang.org/x/text v0.41.0
+	golang.org/x/crypto v0.57.0
 	modernc.org/sqlite v1.58.0
 	rsc.io/qr v0.2.0
 	software.sslmate.com/src/go-pkcs12 v0.7.3
@@ -43,8 +42,9 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	modernc.org/libc v1.75.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect

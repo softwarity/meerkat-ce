@@ -45,8 +45,11 @@ refused.
 ## Daily digest
 
 Once a day, the administrators who carry an e-mail address are told which
-accounts are about to lose access, which just did, and which vault entries are
-about to reach their reminder date.
+accounts are about to lose access, which just did, which vault entries are
+about to reach their reminder date - and, first, which **certificates** are about
+to expire or have expired. A certificate issued automatically (ACME) is renewed
+weeks before its end, so one that shows up here is one whose renewal has been
+failing, and the line says so.
 
 - **Hour** - read in the gateway's own clock, which the field prints under it (time and zone).
 - **Look ahead** - how many days forward to report, one to ninety.

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/store/dbtest"
@@ -333,5 +334,35 @@ func TestDigestReportsExpiringVaultEntries(t *testing.T) {
 	// The stored value never rides into the inbox.
 	if strings.Contains(m.Text, "npm_xxx") || strings.Contains(m.HTML, "npm_xxx") {
 		t.Errorf("the secret's value leaked into the digest")
+	}
+}
+
+// A certificate close to its end is named in the digest, and leads its subject
+// (SSL-04): the console shows a countdown, but nobody reads a countdown on a
+// screen they have no reason to open.
+func TestItNamesTheCertificateBeforeItExpires(t *testing.T) {
+	st, sent, d := fixture(t)
+	if err := st.SaveCertificate(context.Background(), store.Certificate{
+		ID: "c1", Plane: store.PlaneApp, Host: "shop.example.com", Source: store.CertSourceImport,
+		KeyPEM: "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----", CertPEM: "x",
+		Info: certs.Info{NotAfter: lastDay("2026-09-13")},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	d.Now = func() time.Time { return at("2026-09-10T07:05:00Z") }
+	if err := d.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(*sent) != 1 {
+		t.Fatalf("messages: %d", len(*sent))
+	}
+	m := (*sent)[0]
+	for _, want := range []string{"shop.example.com (applications)", "2026-09-13"} {
+		if !strings.Contains(m.Text, want) {
+			t.Errorf("the message never says %q:\n%s", want, m.Text)
+		}
+	}
+	if !strings.Contains(m.Subject, "1 certificate expiring") {
+		t.Errorf("the subject does not lead with it: %q", m.Subject)
 	}
 }

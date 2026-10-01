@@ -76,16 +76,16 @@ The old file is kept: a restore one regrets must have a way back.
 
 One document, in YAML: routes, the role catalogue, organisations and their groups,
 the authorities people sign in through, the mail relay, the themes and the gateway
-settings (CONSOLE-05, CFG-05).
+settings.
 
 What it does **not** carry is as much of the design as what it does:
 
 - **no account**, no membership, no session - they carry credentials, second-factor
-  secrets and passkeys;
+ secrets and passkeys;
 - **no certificate**, no signing key, no simulation key - they are generated where
-  they are used;
+ they are used;
 - **no secret value.** A declared secret field travels as its `$name` reference or
-  not at all.
+ not at all.
 
 So an export is **public by construction**. It goes into a ticket, a mail to
 support or a git repository without anyone having to wonder what is inside - and the
@@ -103,14 +103,14 @@ place alone.
 
 ## Restore points: the tape
 
-The gateway keeps its own tape (CFG-06). A point is written whenever a change moves
+The gateway keeps its own tape. A point is written whenever a change moves
 the configuration's **fingerprint** - not whenever an endpoint is called, which is
 what makes it affordable and complete at the same time:
 
 - an endpoint added later is covered without anyone remembering to;
 - a save that changes nothing writes nothing;
 - what is not configuration - creating an account, filling the vault, opening a
-  session - leaves no trace here at all.
+ session - leaves no trace here at all.
 
 A point has an hour, an author and the sentence the audit trail wrote at the same
 second. Nobody asks for one and nobody names one: that is the whole difference with
@@ -126,7 +126,7 @@ would only make the product riskier where it is used most.
 
 ## Named configurations
 
-Several configurations coexist and exactly one is active (CFG-01, CFG-02). The
+Several configurations coexist and exactly one is active. The
 console diffs them - objects added, removed, changed - and shows that same diff when
 a file is imported, before anything is written. An agent can file the current state
 under a name in one call, which is what a careful admin asks for in words before a

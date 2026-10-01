@@ -19,6 +19,7 @@ import {
   required,
   validate,
 } from "@angular/forms/signals";
+import { MatAutocompleteModule } from "@angular/material/autocomplete";
 import { MatButtonModule } from "@angular/material/button";
 import { MatDialog } from "@angular/material/dialog";
 import { MatCheckboxModule } from "@angular/material/checkbox";
@@ -29,9 +30,11 @@ import { MatMenuModule } from "@angular/material/menu";
 import { MatInputModule } from "@angular/material/input";
 import { MatListModule } from "@angular/material/list";
 import { MatSelectModule } from "@angular/material/select";
+import { MatSlideToggleModule } from "@angular/material/slide-toggle";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { Router, RouterLink } from "@angular/router";
 import { firstValueFrom } from "rxjs";
+import { DialogsService } from "../../shared/dialogs.service";
 import { LOCALE_ID } from "@angular/core";
 import {
   Access,
@@ -89,6 +92,8 @@ import {
 } from "../predicates/args";
 import { missingArgs, upstreamProblem } from "./gaps";
 import { PredicatesComponent } from "../predicates/predicates.component";
+import { COMMON_LOCALES } from "../../shared/common-locales";
+import { canonicalTag, languageName } from "../../shared/language-name";
 
 // What an empty language script opens on. A sentence describing an argument
 // is read once and forgotten; a line of code that runs names it, shows its
@@ -99,6 +104,14 @@ const LOCALE_SCRIPT_SEED = `// The language arrives in \`locale\` ("fr", "en-US"
 // Called on every change, and once when a page loads.
 // Apply it in place - do not reload.
 myApp.setLocale(locale);
+`;
+
+// Same idea for the colour scheme: the argument is named by working code, and
+// the one case nobody thinks of - "auto" - is written down where it is read.
+const SCHEME_SCRIPT_SEED = `// The choice arrives in \`colorScheme\`: "light", "dark" or "auto".
+// Called on every change, and once when a page loads.
+// On "auto", put the application BACK on the system - do not pick a side.
+myApp.setTheme(colorScheme);
 `;
 
 // The locale mechanisms, each with what it looks like on the wire. The example
@@ -138,16 +151,17 @@ const LOCALE_MECHANISMS: {
   },
 ];
 
-// The three code blocks a route can carry, and the draft field each edits.
+// The four code blocks a route can carry, and the draft field each edits.
 // One map, so the dialog, the line count and the save all name the same field.
-type CodeKind = "css" | "js" | "onLocaleChange";
+type CodeKind = "css" | "js" | "onLocaleChange" | "onSchemeChange";
 const CODE_FIELD: Record<
   CodeKind,
-  "customCss" | "customJs" | "localesOnChange"
+  "customCss" | "customJs" | "localesOnChange" | "schemeScript"
 > = {
   css: "customCss",
   js: "customJs",
   onLocaleChange: "localesOnChange",
+  onSchemeChange: "schemeScript",
 };
 
 type Section =
@@ -159,11 +173,13 @@ type Section =
   | "modout"
   | "limits"
   | "identity"
+  | "authforward"
   | "scheme"
   | "button"
   | "locales"
   | "userinfo"
-  | "inject";
+  | "tracing"
+  | "custom";
 
 // Every section the drawer knows. A url naming anything else - an old
 // bookmark on the General section that no longer exists - lands on Target
@@ -174,19 +190,21 @@ const SECTIONS: Section[] = [
   "gates",
   "limits",
   "target",
+  "identity",
+  "tracing",
   "modin",
   "modout",
-  "identity",
+  "authforward",
   "scheme",
   "button",
   "locales",
   "userinfo",
-  "inject",
+  "custom",
 ];
 
 // Sections that only make sense for one route type - they show disabled (not
 // hidden) when the other type is selected.
-const UI_SECTIONS: Section[] = ["scheme", "button", "userinfo", "inject"];
+const UI_SECTIONS: Section[] = ["locales", "scheme", "button", "userinfo", "custom"];
 
 // Sections a route that answers BY ITSELF has no use for. This is not a
 // tidying preference: CompileFilters drops every request filter when the route
@@ -194,7 +212,7 @@ const UI_SECTIONS: Section[] = ["scheme", "button", "userinfo", "inject"];
 // itself, nothing is proxied") and identity forwarding compiles down to one.
 // Editing them on a redirect wrote settings the gateway throws away without
 // telling anyone but its log.
-const PROXY_SECTIONS: Section[] = ["modin", "identity"];
+const PROXY_SECTIONS: Section[] = ["modin", "identity", "authforward"];
 
 // What the drawer calls each section, for the list of what is missing: a gap
 // has to say WHERE, and "predicates" is not what the reader sees on the left.
@@ -207,11 +225,13 @@ const SECTION_LABEL: Record<Section, string> = {
   modin: $localize`:@@Incoming:Incoming`,
   modout: $localize`:@@Outgoing:Outgoing`,
   identity: $localize`:@@Section_identity:Identity`,
+  authforward: $localize`:@@Section_auth_forward:Auth forward`,
   scheme: $localize`:@@Section_color_scheme:Color scheme`,
   button: $localize`:@@Section_user_button:User button`,
   locales: $localize`:@@Section_locales:Locales`,
   userinfo: $localize`:@@Section_user_info:User info`,
-  inject: $localize`:@@Section_injections:Injections`,
+  tracing: $localize`:@@Section_tracing:OpenTelemetry`,
+  custom: $localize`:@@Section_custom:Custom`,
 };
 
 // Where a brick's gap is edited, from the phase the catalogue gives it.
@@ -354,6 +374,8 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     schemeMechanism: r?.ui?.scheme?.mechanism ?? "",
     schemeTag: r?.ui?.scheme?.tag || "html",
     schemeAttribute: r?.ui?.scheme?.attribute ?? "",
+    schemeScript: r?.ui?.scheme?.script ?? "",
+    schemeNoAuto: r?.ui?.scheme?.noAuto ?? false,
     schemeLight: r?.ui?.scheme?.light ?? "",
     schemeDark: r?.ui?.scheme?.dark ?? "",
     schemeButton: r?.ui?.scheme?.button ?? "",
@@ -376,13 +398,15 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     userInfoMode: (r?.ui?.userInfo?.mechanism || "attribute") as
       "attribute" | "meta",
     userInfoTag: r?.ui?.userInfo?.tag || "body",
-    // One row per stampable fact, ALL selected by default on a fresh route;
-    // the name defaults to the field itself (username stamps as username).
+    // One row per stampable fact, ALL exposed by default on a fresh route.
+    // The name defaults to what Identity calls the fact, and to the field
+    // itself when Identity renames nothing - username stamps as username.
     userInfoFields: Object.fromEntries(
       [...PAGE_USER_FIELDS, ...custom].map((f) => {
         const stored = r?.ui?.userInfo?.fields;
         const enabled = stored ? f in stored : true;
-        return [f, { enabled, name: stored?.[f] || f }];
+        const as = r?.identity?.attributes?.find((a) => a.field === f)?.as;
+        return [f, { enabled, name: stored?.[f] || as || f }];
       }),
     ) as Record<string, { enabled: boolean; name: string }>,
     btnEnabled: r?.ui?.userButton?.enabled ?? false,
@@ -394,7 +418,7 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     btnPadY: r?.ui?.userButton?.padY ?? 12,
     btnInFrame: r?.ui?.userButton?.inFrame ?? false,
     localeMechanism: (r?.locales?.mechanism || "accept") as LocaleMechanism,
-    localesDisabled: r?.locales?.disabled ?? [],
+    localesSpeaks: r?.locales?.speaks ?? [],
     localesHeader: r?.locales?.header ?? "",
     localesParam: r?.locales?.param ?? "",
     localesOnChange: r?.locales?.onChange ?? "",
@@ -402,7 +426,12 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     customJs: r?.ui?.customJs ?? "",
     // The app's menu label: when set, the route shows in the user's apps menu
     // (subject to access). Empty = the app is reachable but not listed.
-    uiLink: r?.ui?.link ?? "",
+    // The route's place in the telemetry (OBS-04). Two answers: whether this
+    // route is reported on at all, and whether the journey starts in its pages
+    // rather than at the gateway. Both live on the ROUTE, not in its ui block -
+    // being traced is not a UI matter, only starting from the page is.
+    telemetry: r?.telemetry ?? true,
+    telemetryUi: r?.telemetryUi ?? false,
     identityMechanism: r?.identity?.mechanism ?? "",
     identityTtl: r?.identity?.ttl || "PT2M",
     identityAlgorithm: r?.identity?.algorithm || "ES256",
@@ -435,6 +464,7 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
   selector: "app-route-editor",
   imports: [
     FormField,
+    MatAutocompleteModule,
     MatButtonModule,
     MatCheckboxModule,
     MatDividerModule,
@@ -444,6 +474,7 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     MatListModule,
     MatMenuModule,
     MatSelectModule,
+    MatSlideToggleModule,
     MatTooltipModule,
     RouterLink,
     PredicatesComponent,
@@ -482,6 +513,7 @@ export class RouteEditorComponent {
   private readonly dialog = inject(MatDialog);
   private readonly lazy = inject(Lazy);
   private readonly router = inject(Router);
+  private readonly dialogs = inject(DialogsService);
 
   protected readonly filterEntries = () =>
     this.catalog().filter((e) => e.kind === "filter");
@@ -676,15 +708,24 @@ export class RouteEditorComponent {
       ? $localize`:@@Frozen_single_mode:This instance runs in single-organisation mode: the value would be the same on every request. The mode is in Application, General.`
       : $localize`:@@Frozen_single_mode_ce:This instance serves one organisation, so the value would be the same on every request. Several organisations is an Enterprise feature - see Application, General.`,
   );
-  protected readonly pageUserFields = computed(() => [
-    ...PAGE_USER_FIELDS,
-    ...this.customFields(),
-  ]);
+  // WHAT IDENTITY DECLARED, minus the roles. The page used to carry its own
+  // list of facts, ticked separately from the identity one - the same eight
+  // names, chosen twice, in two screens. Identity says what this route knows
+  // about the caller; this section only says where those land on a page.
+  //
+  // Roles are out on purpose: they go through their own block above (class,
+  // attribute or meta, always the plain list), and never through the shaping
+  // expression, which writes a header.
+  protected readonly pageUserFields = computed(() => {
+    const declared = this.draft().identityAttrs;
+    return [...PAGE_USER_FIELDS, ...this.customFields()].filter(
+      (f) => f !== "roles" && declared[f]?.selected,
+    );
+  });
   // The scheme the built-in pages impose, if any: offering a switch on the
   // application's pages while its own sign-in page has none would promise
   // something the gateway will not honour.
   protected readonly imposedScheme = signal<"" | "light" | "dark">("");
-  protected readonly appLanguages = signal<string[]>([]);
   // Roles, users and organisations feed the Security section's access editor.
   // All three are app-scoped, so a pure infra-admin may get empty lists
   // (tolerated: the rule can still be set to a level that names nothing).
@@ -696,6 +737,14 @@ export class RouteEditorComponent {
   });
 
   constructor() {
+    // Whether the installation exports traces, for the OpenTelemetry section.
+    // Silent on failure and OPTIMISTIC: a state that could not be read must
+    // not grey out two switches somebody came to set, so the section draws as
+    // it would with the export on.
+    this.api.telemetrySetting().subscribe({
+      next: (s) => this.telemetryOn.set(s.enabled && s.traces),
+      error: () => {},
+    });
     // What the runtime can route to. Silent on failure: an installation with
     // no runtime to ask still types an upstream by hand, and a red box in
     // front of a working field would be the wrong trade.
@@ -714,9 +763,15 @@ export class RouteEditorComponent {
     });
     this.api.settings().subscribe({
       next: (s) => {
-        this.appLanguages.set(s.languages ?? []);
         this.imposedScheme.set(s.pagesScheme ?? "");
       },
+    });
+    // What the built-in pages can be rendered in. Silent on failure: a route
+    // still declares what it speaks by typing it, and a red box in front of a
+    // list of checkboxes would be the wrong trade.
+    this.api.locales().subscribe({
+      next: (l) => this.builtInLocales.set(l.map((x) => x.code)),
+      error: () => {},
     });
     this.api.listRoles().subscribe({ next: (r) => this.roles.set(r) });
     this.api
@@ -807,13 +862,6 @@ export class RouteEditorComponent {
   // Dropping it saves it on every request - 320 roles is 1600 bytes of the
   // same five characters - and it is opt-in: a service testing for ROLE_ADMIN
   // has to keep receiving it.
-  // Why the Link field is greyed, said where a greyed field can still speak.
-  protected readonly linkHint = computed(() =>
-    this.draft().isUi
-      ? $localize`:@@Link_hint:Empty: reachable, but not listed - the portal's own case.`
-      : $localize`:@@Link_needs_ui_hint:Needs the UI option, ticked in the list on the left.`,
-  );
-
   protected readonly defaultRoleExpr = '{{join "," .Roles}}';
   // The expression under the row is coloured like the editor colours it.
   protected readonly SYNTAX = ROLE_SYNTAX;
@@ -897,9 +945,15 @@ export class RouteEditorComponent {
       case "tenantid":
         return "tnt_123";
       case "timezone":
-        return "Europe/Paris";
+        return u?.timezone || "Europe/Paris";
+      case "locale":
+        return u?.locale || "fr";
     }
-    return "";
+    // A CUSTOM field (Infra > Model): its value is whatever the account
+    // carries, so the reader's own is the honest sample. Without this the two
+    // rows that are not built in showed an empty example, which reads as "this
+    // one sends nothing".
+    return u?.fields?.[field] || "value";
   }
   // Everything that has to be true before the gateway will take this route.
   //
@@ -1055,15 +1109,52 @@ export class RouteEditorComponent {
     }));
   }
 
+  // Whether the installation exports at all (OBS-04). Both switches on this
+  // section are answers to a question nobody is asking while the export is off,
+  // so they are DISABLED rather than hidden or silently flipped: what the route
+  // holds stays exactly as it is, and the section says where to turn it on.
+  protected readonly telemetryOn = signal(true);
+
+  // Why the second switch is disabled, where the question is rather than in a
+  // paragraph above it.
+  protected readonly uiTraceTip = computed(() => {
+    if (!this.telemetryOn())
+      return $localize`:@@Route_tracing_ui_needs_export:This installation exports no traces yet.`;
+    if (!this.draft().telemetry)
+      return $localize`:@@Route_tracing_ui_needs_push:This route pushes no traces, so there is no journey for its pages to start.`;
+    if (!this.draft().isUi)
+      return $localize`:@@Route_tracing_ui_needs_ui:Only a UI route has pages to inject the bundle into. Turn UI on first.`;
+    return '';
+  });
+
+  // The way from a route's section to the screen that turns the export on.
+  // Leaving the editor closes it, so unsaved work is asked about first - the
+  // same question the drawer's own Close asks, because it is the same loss.
+  protected async openTelemetrySettings() {
+    if (this.dirty()) {
+      const ok = await this.dialogs.confirm({
+        title: $localize`:@@Leave_editor_title:Leave this route?`,
+        message: $localize`:@@Leave_editor_message:This route has changes that are not saved. Going to the OpenTelemetry settings closes the editor and loses them.`,
+        confirmLabel: $localize`:@@Leave_and_lose:Leave and lose them`,
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    void this.router.navigate(['/infra/opentelemetry']);
+  }
+
   protected setFlag(
     flag:
       | "enabled"
       | "schemeSelect"
+      | "schemeNoAuto"
       | "schemeStorageOverride"
       | "rolesEnabled"
       | "userInfoEnabled"
       | "btnEnabled"
-      | "btnInFrame",
+      | "btnInFrame"
+      | "telemetry"
+      | "telemetryUi",
     value: boolean,
   ): void {
     this.draft.update((d) => ({ ...d, [flag]: value }));
@@ -1122,21 +1213,119 @@ export class RouteEditorComponent {
     return this.draft().localeMechanism === m;
   }
 
-  // A route may exclude application locales its UI does not support.
-  protected isLocaleDisabled(code: string): boolean {
-    return this.draft().localesDisabled.some(
+  // What this route SAYS IT SPEAKS. It used to uncheck languages from a
+  // gateway-wide pool; there is no pool any more, and the gateway's own offer
+  // is the union of what its routes declare here.
+  // What rides along with a fact, under names of its own. Said in the field's
+  // own hint rather than in a column at the end of the row: it is about what
+  // THIS row sends, and a column of its own left every other row with an empty
+  // one.
+  protected readonly remoteUserWhy = $localize`:@@Remote_user_why:No header is standardised for the signed-in account (REMOTE_USER is a CGI variable). Meerkat writes both conventions: Spring's, and its dashed form, since an underscore in a header name is dropped by default by nginx. Inbound ones are purged.`;
+
+  protected alsoSends(field: string): string {
+    return field === "username" && this.draft().identityMechanism === "headers"
+      ? "+ REMOTE_USER, X-Remote-User"
+      : "";
+  }
+
+  protected readonly newLocale = signal("");
+  protected readonly localeError = signal("");
+  // What MEERKAT can render for its own built-in pages: the twenty it ships,
+  // plus any an integrator added in Built-in pages > Locale. These are the
+  // languages a sign-in page can be shown in, so they are the ones a route can
+  // tick rather than type.
+  protected readonly builtInLocales = signal<string[]>([]);
+
+  // The list as this pane draws it: every language Meerkat knows, ticked when
+  // this route speaks it, and after them whatever the route declares that
+  // Meerkat does not know - which is allowed, and worth a word.
+  protected readonly localeRows = computed(() => {
+    const speaks = this.draft().localesSpeaks;
+    const has = (c: string) => speaks.some((x) => x.toLowerCase() === c.toLowerCase());
+    const known = this.builtInLocales();
+    const is = (c: string) => known.some((k) => k.toLowerCase() === c.toLowerCase());
+    const rows = known.map((code) => ({ code, on: has(code), known: true, via: "" }));
+    // Declared here and not among them. A VARIANT of one that is - ja-JP where
+    // Meerkat has ja - is not a problem: the built-in pages fall back to the
+    // base, and saying so is more useful than warning about it. A tag with no
+    // base to fall back on is the one that leaves them in English.
+    const extra = speaks
+      .filter((c) => !is(c))
+      .map((code) => {
+        const base = code.includes("-") ? code.split("-")[0] : "";
+        const via = base && is(base) ? base : "";
+        return { code, on: true, known: !!via, via };
+      });
+    return [...extra, ...rows];
+  });
+
+  protected readonly localeOptions = computed(() => {
+    const q = this.newLocale().trim().toLowerCase();
+    const taken = new Set(this.draft().localesSpeaks.map((c) => c.toLowerCase()));
+    const base = COMMON_LOCALES.filter((c) => !taken.has(c.toLowerCase()));
+    const matches = q
+      ? base.filter(
+          (c) =>
+            c.toLowerCase().startsWith(q) ||
+            this.localeName(c).toLowerCase().includes(q),
+        )
+      : base;
+    // A tag the browser can name but the seed does not carry: offered first,
+    // since somebody typing it knows what they want better than the seed does.
+    const canon = canonicalTag(q);
+    const extra =
+      canon &&
+      languageName(canon, "en") &&
+      !taken.has(canon.toLowerCase()) &&
+      !matches.some((c) => c.toLowerCase() === canon.toLowerCase())
+        ? [canon]
+        : [];
+    return [...extra, ...matches].slice(0, 12);
+  });
+
+  protected speaksLocale(code: string): boolean {
+    return this.draft().localesSpeaks.some(
       (c) => c.toLowerCase() === code.toLowerCase(),
     );
   }
 
-  protected toggleLocale(code: string, enabled: boolean): void {
+  protected addLocale(code?: string): void {
+    const raw = (code ?? this.newLocale()).trim();
+    if (!raw) return;
+    const canon = canonicalTag(raw);
+    if (!canon || !languageName(canon, "en")) {
+      this.localeError.set(
+        $localize`:@@CODE_is_not_a_valid_ISO_code:"${raw}:CODE:" is not a valid ISO code`,
+      );
+      return;
+    }
+    if (this.speaksLocale(canon)) {
+      this.localeError.set(
+        $localize`:@@CODE_is_already_listed:"${canon}:CODE:" is already listed`,
+      );
+      return;
+    }
+    this.localeError.set("");
+    this.newLocale.set("");
+    this.draft.update((d) => ({ ...d, localesSpeaks: [...d.localesSpeaks, canon] }));
+  }
+
+  protected toggleLocale(code: string, on: boolean): void {
+    if (on) {
+      if (!this.speaksLocale(code)) {
+        this.draft.update((d) => ({ ...d, localesSpeaks: [...d.localesSpeaks, code] }));
+      }
+      return;
+    }
+    this.removeLocale(code);
+  }
+
+  protected removeLocale(code: string): void {
     this.draft.update((d) => ({
       ...d,
-      localesDisabled: enabled
-        ? d.localesDisabled.filter(
-            (c) => c.toLowerCase() !== code.toLowerCase(),
-          )
-        : [...d.localesDisabled, code],
+      localesSpeaks: d.localesSpeaks.filter(
+        (c) => c.toLowerCase() !== code.toLowerCase(),
+      ),
     }));
   }
 
@@ -1160,6 +1349,16 @@ export class RouteEditorComponent {
     }));
   }
 
+  // The mechanisms that WRITE on an element, and so have a tag and two values
+  // to name. Asked as a list rather than as "is there a mechanism", because
+  // "none" is a mechanism - it is this UI saying it has no colour scheme at all
+  // - and a truthiness test let it keep showing three fields nothing reads.
+  protected schemeWritesOnTag(): boolean {
+    return ["attribute", "add-attribute", "class"].includes(
+      this.draft().schemeMechanism,
+    );
+  }
+
   // Switching the scheme mechanism DROPS the two values when they stop meaning
   // the same kind of thing. "set attribute" takes VALUES for one named
   // attribute - theme-dark="true" reads perfectly there; the other two take
@@ -1167,13 +1366,35 @@ export class RouteEditorComponent {
   // called "true", which is what shipped to a live Grafana. Between the two
   // name mechanisms nothing moves: a class name and a bare attribute name are
   // the same word, and someone switching between them wants it kept.
+  // What the Mechanism list shows. An application with ONE look is stored as
+  // "no mechanism, and the button wears this" - two fields that were two
+  // controls in two sections, the second one hidden in User button. It is one
+  // choice for whoever describes the application: it is always light, or
+  // always dark.
+  protected readonly schemeChoice = computed(() => {
+    const d = this.draft();
+    if (d.schemeMechanism !== "none") return d.schemeMechanism;
+    return d.schemeButton === "light" || d.schemeButton === "dark" ? `fixed:${d.schemeButton}` : "";
+  });
+
   protected setSchemeMechanism(value: string): void {
+    if (value.startsWith("fixed:")) {
+      const look = value.slice("fixed:".length) as "light" | "dark";
+      this.draft.update((d) => ({
+        ...d,
+        schemeMechanism: "none",
+        schemeButton: look,
+        schemeLight: "",
+        schemeDark: "",
+      }));
+      return;
+    }
     this.draft.update((d) => {
       const names = (m: string) => m === "class" || m === "add-attribute";
       const kept = names(d.schemeMechanism) === names(value);
       return {
         ...d,
-        schemeMechanism: value as "" | "none" | "attribute" | "add-attribute" | "class",
+        schemeMechanism: value as "" | "none" | "attribute" | "add-attribute" | "class" | "script",
         schemeLight: kept ? d.schemeLight : "",
         schemeDark: kept ? d.schemeDark : "",
       };
@@ -1339,7 +1560,6 @@ export class RouteEditorComponent {
   protected patch(
     key:
       | "specPath"
-      | "uiLink"
       | "upstream"
       | "identityTtl"
       | "identityAlgorithm"
@@ -1349,6 +1569,7 @@ export class RouteEditorComponent {
       | "schemeMechanism"
       | "schemeTag"
       | "schemeAttribute"
+      | "schemeScript"
       | "schemeLight"
       | "schemeDark"
       | "schemeButton"
@@ -1428,7 +1649,16 @@ export class RouteEditorComponent {
     // The language script is handed the choice; it has to be told under what
     // name, or it is written by guesswork.
     const data =
-      kind === "onLocaleChange"
+      kind === "onSchemeChange"
+        ? {
+            code: this.codeOf(kind) || SCHEME_SCRIPT_SEED,
+            language,
+            // The signature IS the explanation: a body whose argument nobody
+            // names is a body written by guesswork.
+            title: $localize`:@@On_scheme_change:function (colorScheme: "light" | "dark" | "auto")`,
+            hint: $localize`:@@Scheme_script_hint2:Called on every change, and once when a page loads - before the page is parsed and again once it is, so it must survive finding nothing. On "auto", put the application back on the system rather than picking a side.`,
+          }
+        : kind === "onLocaleChange"
         ? {
             // Empty opens on the example, so the variable is named by working
             // code rather than by a sentence about it.
@@ -1469,6 +1699,11 @@ export class RouteEditorComponent {
     const d = this.draft();
     const route: Route = {
       id: this.route()?.id ?? crypto.randomUUID(),
+      // What this screen was opened on. The server refuses the save if the
+      // route has moved since - this editor carries over the blocks it does
+      // not edit (the endpoint policies, the deposited spec), and carrying
+      // over a copy loaded before somebody else wrote is how those disappear.
+      rev: this.route()?.rev,
       name: d.name.trim(),
       order: this.route()?.order ?? 0,
       enabled: d.enabled,
@@ -1476,6 +1711,12 @@ export class RouteEditorComponent {
       // Never stored ON when the answer could not carry a page: the checkbox
       // shows that, and what is saved has to agree with what is shown.
       isUi: d.isUi && this.uiPossible(),
+      // Sent as it stands rather than only when false: a route that says yes
+      // out loud reads the same in an export as one that says no.
+      telemetry: d.telemetry,
+      // Starting from the page is a UI privilege: a route that stops being one
+      // must not keep a switch the gateway would ignore.
+      telemetryUi: d.telemetryUi && d.telemetry && d.isUi && this.uiPossible(),
       upstream: d.upstream.trim(),
       // Two cleaners, because the two answer different questions: a predicate
       // with nothing in it is a row somebody started and left, a filter with
@@ -1515,6 +1756,9 @@ export class RouteEditorComponent {
       route.api = { ...(route.api ?? {}), security };
     }
     if (d.isUi && this.uiPossible()) {
+      const writesOnTag = ["attribute", "add-attribute", "class"].includes(
+        d.schemeMechanism,
+      );
       route.ui = {
         scheme: {
           select: d.schemeSelect,
@@ -1522,17 +1766,29 @@ export class RouteEditorComponent {
           storage: d.schemeStorage.trim(),
           storageLight: d.schemeStorageLight.trim(),
           storageDark: d.schemeStorageDark.trim(),
-          storageAuto: d.schemeStorageAuto.trim(),
+          // Nothing to store for a state this application does not have.
+          storageAuto: d.schemeNoAuto ? "" : d.schemeStorageAuto.trim(),
           mechanism: d.schemeMechanism as
-            "" | "none" | "attribute" | "add-attribute" | "class",
-          tag: d.schemeTag.trim(),
+            "" | "none" | "attribute" | "add-attribute" | "class" | "script",
+          // Same rule as the attribute below: a tag left over from a mechanism
+          // the route no longer uses is a value nothing reads and everything
+          // exports.
+          tag: writesOnTag ? d.schemeTag.trim() : "",
           // Only the mechanism that has an attribute of its own keeps one: a
           // name left over from a previous mode is a value nothing reads and
           // everything exports.
           attribute:
             d.schemeMechanism === "attribute" ? d.schemeAttribute.trim() : "",
-          light: d.schemeLight.trim(),
-          dark: d.schemeDark.trim(),
+          // Same rule for the body: kept only by the mechanism that runs it.
+          // Trailing blanks go, the inside is the integrator's code and is not
+          // ours to tidy.
+          script: d.schemeMechanism === "script" ? d.schemeScript.trim() : "",
+          // An application with no system mode: the agent resolves the
+          // visitor's auto before applying it, and the switch offers two
+          // positions. Meaningless where the route has no scheme at all.
+          noAuto: d.schemeMechanism === "none" ? false : d.schemeNoAuto,
+          light: writesOnTag ? d.schemeLight.trim() : "",
+          dark: writesOnTag ? d.schemeDark.trim() : "",
           // Only read when the switch is off - a button that offers it has to
           // show the choice - so it is not saved when the switch is on.
           button: d.schemeSelect
@@ -1567,7 +1823,6 @@ export class RouteEditorComponent {
         },
         customCss: d.customCss,
         customJs: d.customJs,
-        link: d.uiLink.trim(),
       };
     }
     const identity = this.buildIdentity();
@@ -1576,7 +1831,7 @@ export class RouteEditorComponent {
       mechanism: d.localeMechanism,
       header: d.localesHeader.trim(),
       param: d.localesParam.trim(),
-      disabled: d.localesDisabled,
+      speaks: d.localesSpeaks,
       // The hook only exists for pages, and only pages get it injected.
       onChange: d.isUi ? d.localesOnChange : "",
     };

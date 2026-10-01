@@ -14,8 +14,8 @@ thing at all:
 |---|---|---|
 | For | calling your applications **through** the gateway | calling the gateway's **admin API**, or connecting an agent |
 | Works on | the data plane port | the admin port only |
-| Minted by | anybody signed in, from their profile | **root only**, from the console |
-| Managed in | `/profile/tokens` on the data plane | **Infra > Access tokens** |
+| Minted by | anybody signed in, from their profile | anybody who administers a domain (root, infra-admin, app-admin), from the console, for themselves |
+| Managed in | `/profile/tokens` on the data plane; seen and revoked by application administrators on **Access tokens** | **Access tokens**, under Infra or Application |
 | Carries | the organisation and group of the session that minted it | a perimeter: how far, over what, from where |
 
 Both are presented the same way, and only that way:
@@ -61,23 +61,32 @@ to a token minted today, and a role withdrawn stops applying at once.
 Either takes effect across every gateway within seconds. A token also stops the
 moment its owner is disabled, falls outside their access window, or is deleted.
 
+Those who administer the applications (root, app-admin) also see **everyone's**
+application tokens on the console's **Access tokens** screen, with their owner,
+organisation and last use, and revoke one from its drawer: the token a departed
+colleague's script still carries, or the one that leaked. They never create one
+there - a credential is only minted by its owner. The revocation is a
+`token.revoke` line of the [audit trail](/docs/operations/audit), on the owner.
+
 > [!WARNING]
 > Signing out does **not** revoke your tokens, and neither does changing your
-> password. A token is an independent credential with its own lifetime - revoke
+> password from the profile - only a reset through the e-mailed link does. A token is an independent credential with its own lifetime - revoke
 > it explicitly.
 
 ## Control-plane tokens
 
-These open the administration API and the agent endpoint. Only root can mint
-them, because a token acts with its owner's capabilities, and handing out
-control-plane access is a root decision.
+These open the administration API and the agent endpoint. Anybody who
+administers a domain mints their **own**, and sees only their own: a token acts
+with its owner's capabilities, read again on every call, and its perimeter only
+ever takes away - so it never hands out more than its owner holds.
 
-The screen is **Infra > Access tokens**. Tokens that belong to a connected agent
+The screen is **Access tokens** (under Infra or Application, the same one): one
+table for both kinds, the details and the actions in the drawer of a row. Tokens that belong to a connected agent
 do not appear there: an agent's connection is managed in the **MCP** section,
 which mints the same kind of token through a consent flow instead of a copied
 secret.
 
-### The perimeter, on three axes
+### The perimeter, on two axes
 
 A perimeter only ever **takes away**. It never grants what the owner does not
 already have.
@@ -87,17 +96,21 @@ already have.
 | Scope | What it opens |
 |---|---|
 | `metrics` | the `/metrics` exposition and nothing else: a scraper's credential |
+| `schedules` | `/api/schedules` and nothing else: the credential of a service managing its [scheduled calls](/docs/operations/scheduler) |
 | `readonly` | reads, and the testers. What counts as a read is decided per endpoint, not by the HTTP verb |
 | `full` | everything its owner may do |
 
 An empty scope reads as `readonly`: the safe value when nothing was said.
 
-**Over what** - the domain: the routing plane (`gateway`), the application's
-identity (`app`), or everything (empty). The domain masks the bearer's own
-capabilities, and **root is dropped** rather than kept - a domain that left root
-standing would confine nothing. So a gateway-domain token minted by root drives
-routes and nothing else, administers no organisation, and cannot mint further
-tokens.
+The two narrow scopes exist for the same reason: those tokens live in a
+configuration file or a deployment manifest, often in another team's
+repository, and they are the ones nobody remembers to rotate. What they open
+when they leak has to fit on one line.
+
+A token on this plane is an ADMINISTRATOR's token: it acts with the powers of
+whoever minted it, and it is minted for oneself. To give an account fine-grained
+access to the APPLICATIONS, this is not the place: that is a data-plane token,
+minted from that account's own profile, with that account's own rights.
 
 **From where** - a list of CIDR ranges, empty meaning anywhere. It is judged on
 the **TCP peer address**, never on a forwarded header.
@@ -109,7 +122,7 @@ the **TCP peer address**, never on a forwarded header.
 
 ### Living with them
 
-A token's name, scope, domain, ranges and expiry can all be edited **without
+A token's name, scope, ranges and expiry can all be edited **without
 changing the secret**. *Renew* does the opposite: it rotates the secret and keeps
 everything else, and the old secret dies the moment it is next used.
 
@@ -118,5 +131,5 @@ account - `admin, via claude-desktop`, not `admin` - so a change an agent made i
 attributable after the fact.
 
 Neither the *Allow personal API tokens* switch nor anything else on the
-application's Security screen affects them: a control-plane token is a root
-capability, not part of that policy.
+application's Security screen affects them: a control-plane token is an
+administrator's credential, not part of that policy.

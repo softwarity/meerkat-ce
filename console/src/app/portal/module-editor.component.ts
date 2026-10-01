@@ -28,6 +28,10 @@ export interface ModuleFormData {
   module: ModuleDraft;
   routes: Route[];
   isParent: boolean;
+  // Whether a BAR is being drawn. An icon, a home label and sub-modules are
+  // things a bar has; a flat menu has a name and an order, so offering the
+  // rest there would be offering settings nothing reads.
+  bar: boolean;
   // Set when editing an EXISTING module (not a new one): enables the quick
   // actions (reorder, disable, add sub-module, delete). null while adding.
   existing: boolean;

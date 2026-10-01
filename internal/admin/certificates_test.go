@@ -395,3 +395,22 @@ func TestCertificatesAreInfrastructure(t *testing.T) {
 }
 
 func isNoRows(err error) bool { return errors.Is(err, store.ErrNoRows) }
+
+// The gateway-wide HSTS (SSL-06) is kept, and a lifetime past two years - or
+// below zero - is refused by a sentence that says what is allowed: a typo in a
+// promise browsers keep for its whole length is not one to store.
+func TestHSTSIsKeptAndBounded(t *testing.T) {
+	f := setup(t)
+	code, out := f.call(t, "PUT", "/api/settings/tls",
+		`{"consoleName":"localhost","appNames":[],"hstsMaxAge":86400,"acme":{}}`, f.rootC)
+	if code != http.StatusOK || !strings.Contains(out, `"hstsMaxAge":86400`) {
+		t.Fatalf("a day: %d %s", code, out)
+	}
+	for _, bad := range []string{"-1", "999999999"} {
+		code, out = f.call(t, "PUT", "/api/settings/tls",
+			`{"consoleName":"localhost","appNames":[],"hstsMaxAge":`+bad+`,"acme":{}}`, f.rootC)
+		if code != http.StatusUnprocessableEntity || !strings.Contains(out, "two years") {
+			t.Fatalf("hstsMaxAge %s: %d %s", bad, code, out)
+		}
+	}
+}

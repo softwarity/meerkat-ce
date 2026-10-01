@@ -1,99 +1,129 @@
+@use '../../styles/table';
+
+:host {
+  display: block;
+  height: 100%;
+}
+mat-drawer-container {
+  height: 100%;
+  background: transparent;
+}
+mat-drawer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
 .banner {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 24px;
+  padding: 12px 24px 0;
 }
 .banner h1 {
   font-size: 1.15rem;
   font-weight: 500;
   margin: 0;
+}
+.spacer {
   flex: 1;
 }
-.content {
-  padding: 0 24px 24px;
-  display: grid;
-  gap: 16px;
-  max-width: 820px;
+.hint {
+  margin: 4px 24px 0;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+  max-width: 100ch;
 }
-.planned {
+.toolbar {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 16px;
-  border: 1px dashed color-mix(in srgb, var(--mat-sys-primary) 45%, transparent);
-  border-radius: 10px;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.85rem;
-}
-.planned mat-icon {
-  color: var(--mat-sys-primary);
-  /* Keep the icon at full size in the flex row: without this the long
-     text shrinks the box and the glyph gets clipped. */
-  flex-shrink: 0;
-  overflow: visible;
-}
-.token {
-  display: grid;
-  /* Name, then one column per control. The count is the count: an edit button
-     was added without it and the delete fell to a line of its own. */
-  grid-template-columns: 1fr auto auto auto auto;
   align-items: center;
-  gap: 4px 16px;
-  padding: 12px 16px 12px 18px;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 10px;
-  position: relative;
-  overflow: hidden;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
 }
-.token::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--mat-sys-primary);
-  opacity: 0.7;
+.filter {
+  flex: 1 1 220px;
+  max-width: 360px;
 }
-.token .name {
-  font-weight: 500;
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  padding: 0 24px 24px;
 }
-.token .prefix {
-  font-family: var(--mk-mono);
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.85rem;
-}
-.token .meta {
-  grid-column: 1 / -1;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.8rem;
-}
-.token.off {
-  opacity: 0.55;
+.table-wrap {
+  @include table.frame;
 }
 .empty {
+  padding: 48px;
   color: var(--mat-sys-on-surface-variant);
-  font-size: 0.9rem;
-  padding: 8px 0;
 }
-
-// The perimeter, on the line: what a token may do is the first thing to read
-// about it, before its prefix and its dates.
-.token .meta .scope {
-  padding: 0 6px;
-  border-radius: 10px;
-  background: var(--mat-sys-tertiary-container);
-  color: var(--mat-sys-on-tertiary-container);
-
-  &.ro {
-    background: var(--mat-sys-surface-container-highest);
-    color: var(--mat-sys-on-surface-variant);
-  }
-
-  // The second axis, beside the first: what the token acts on, and where from.
-  &.domain {
-    margin-left: 4px;
-    background: var(--mat-sys-secondary-container);
-    color: var(--mat-sys-on-secondary-container);
-  }
+.id {
+  display: grid;
+  gap: 2px;
 }
-
+.muted {
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.plane {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+}
+mat-cell.off {
+  opacity: 0.55;
+}
+mat-row.clickable {
+  cursor: pointer;
+}
+mat-drawer {
+  width: min(460px, 96vw);
+  border-left: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-high);
+}
+.drawer {
+  padding: 16px 20px 24px;
+  display: grid;
+  gap: 16px;
+}
+.drawer header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.drawer h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+dt {
+  color: var(--mat-sys-on-surface-variant);
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.danger {
+  color: var(--mat-sys-error);
+}
+.note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--mat-sys-on-surface-variant);
+}

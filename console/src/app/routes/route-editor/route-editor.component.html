@@ -22,6 +22,22 @@
       <span i18n="@@Section_target">Target</span>
       <span class="req">*</span>
     </mat-list-option>
+    <!-- IDENTITY, second: what this route knows about the caller is the next
+         thing one settles after where it goes, and two other sections spend
+         it - Auth forward sends it to the service, User info puts it on the
+         page. Outside the groups, like Target, because it is not a filter, a
+         modifier or a forwarder: it is what there is to forward. -->
+    <mat-list-option value="identity" [selected]="section() === 'identity'"
+      [disabled]="!proxies()" [matTooltip]="proxies() ? '' : notProxiedTip">
+      <span i18n="@@Section_identity">Identity</span>
+    </mat-list-option>
+    <!-- Outside the groups too, and on every route: whether this gateway
+         reports on what the route answers is not a filter, a modifier or a UI
+         extra. Only its second switch - the journey starting in the page - is
+         a UI matter, and it says so itself. -->
+    <mat-list-option value="tracing" [selected]="section() === 'tracing'">
+      <span i18n="@@Section_tracing">OpenTelemetry</span>
+    </mat-list-option>
     <!-- The three that decide a request's FATE, before anything transforms it.
          They do not decide it the same way, and each panel says so: a predicate
          that does not match and an access rule that does not grant both let the
@@ -82,17 +98,16 @@
         ({{ n }})
       }
     </mat-list-option>
-    <!-- A forwarder carries upstream what only the GATEWAY knows: who the
-         caller is, which language they asked for. A modifier retouches what
-         passes; these two add something the service could not have found on
-         its own. Both compile down to request filters, which is why they sat
-         under Modifiers - the mechanism, not the subject. -->
-    <div matSubheader i18n="@@Forwarders">Forwarders</div>
-    <mat-list-option value="identity" [selected]="section() === 'identity'"
+    <!-- Under Modifiers, and no group of its own. That group used to make the
+         distinction the code makes - a forwarder ADDS what only the gateway
+         knows, a modifier retouches what passes - and it held two members.
+         Locales went to UI and the facts went to Identity, which left a
+         heading over a single line. Here it sits on the mechanism it shares
+         with the two above: all three compile down to request filters. -->
+    <mat-list-option value="authforward" [selected]="section() === 'authforward'"
       [disabled]="!proxies()" [matTooltip]="proxies() ? '' : notProxiedTip">
-      <span i18n="@@Section_identity">Identity</span>
+      <span i18n="@@Section_auth_forward">Auth forward</span>
     </mat-list-option>
-    <mat-list-option value="locales" [selected]="section() === 'locales'" i18n="@@Section_locales">Locales</mat-list-option>
     <!-- UI extras (ROUTE-02): visible but DISABLED until the toggle turns them
          on - a route is always a service, UI comes on top. The switch sits on
          the group it commands: in the header it read as a detail of the name,
@@ -106,10 +121,15 @@
         (change)="setIsUi($event.checked)"
       >UI</mat-checkbox>
     </div>
+    <!-- Locales is a UI subject, whole. An API reads Accept-Language, which
+         every route already carries with the caller's own language in front -
+         there is nothing for a service route to choose, so the section had
+         nothing to say to one. -->
+    <mat-list-option value="locales" [selected]="section() === 'locales'" [disabled]="!draft().isUi" i18n="@@Section_locales">Locales</mat-list-option>
     <mat-list-option value="scheme" [selected]="section() === 'scheme'" [disabled]="!draft().isUi" i18n="@@Section_color_scheme">Color scheme</mat-list-option>
     <mat-list-option value="button" [selected]="section() === 'button'" [disabled]="!draft().isUi" i18n="@@Section_user_button">User button</mat-list-option>
     <mat-list-option value="userinfo" [selected]="section() === 'userinfo'" [disabled]="!draft().isUi" i18n="@@Section_user_info">User info</mat-list-option>
-    <mat-list-option value="inject" [selected]="section() === 'inject'" [disabled]="!draft().isUi" i18n="@@Section_injections">Injections</mat-list-option>
+    <mat-list-option value="custom" [selected]="section() === 'custom'" [disabled]="!draft().isUi" i18n="@@Section_custom">Custom</mat-list-option>
   </mat-selection-list>
 
   <!-- Flush for the sections whose content is a palette drawer: the drawer
@@ -316,23 +336,6 @@
             }
           }
         }
-        <!-- Not under User button: it names the application for the apps menu
-             wherever that menu is drawn - the injected button, and the built-in
-             pages, which have one too. Shown even on a service route, DISABLED:
-             a field that vanishes teaches nothing about why it is not there. -->
-        <h3 class="sub" i18n="@@In_the_apps_menu">In the apps menu</h3>
-        <p class="section-hint" i18n="@@Apps_menu_hint">
-          The name this application takes wherever the apps menu is drawn: the injected user button,
-          and the built-in pages.
-        </p>
-        <app-form-field i18n-label="@@Link" label="Link" [hint]="linkHint()">
-          <input
-            matInput
-            [disabled]="!draft().isUi"
-            [value]="draft().uiLink"
-            (input)="patch('uiLink', $any($event.target).value)"
-          />
-        </app-form-field>
       }
       @case ('security') {
         <p class="section-hint" i18n="@@Route_security_hint">
@@ -379,9 +382,77 @@
         <app-filters [formField]="f.filters" [entries]="filterEntries()" phase="response" />
       }
       @case ('identity') {
-        <p class="section-hint" i18n="@@Identity_section_hint">
-          Forwards the signed-in caller to the service behind this route. Pick a transport, then
-          choose which facts travel and, optionally, the name each one takes on the way out.
+        <p class="section-hint" i18n="@@Identity_section_hint2">
+          What this route knows about the signed-in caller, and the name each fact travels under.
+          Two sections spend it: Auth forward sends it to the service, User info puts it on the
+          page. Everything is included by default.
+        </p>
+          <div class="id-attrs">
+            @for (field of identityFields(); track field) {
+              <!-- A single-organisation instance still SHOWS the two
+                   organisation facts, frozen: hiding them left them ticked,
+                   so they travelled while the screen said nothing. -->
+              <div
+                class="id-attr"
+                [class.off]="frozen(field) || !draft().identityAttrs[field].selected"
+                [attr.ee-feature]="frozen(field) ? 'multi-tenant' : null"
+              >
+                <!-- ONE cell for the name and its cap. They used to be two
+                     children of the row, and the cap was lifted out of the
+                     flow to stop it widening the two frozen rows - which the
+                     table makes unnecessary, since a column is as wide as its
+                     widest cell for every row at once. Out of the flow it
+                     also needed the row as its containing block, and a row
+                     that is display:contents cannot be one: the two caps piled
+                     up above the table. -->
+                <span class="id-name">
+                  <mat-checkbox
+                    class="id-field"
+                    [checked]="!frozen(field) && draft().identityAttrs[field].selected"
+                    [disabled]="frozen(field)"
+                    [matTooltip]="frozen(field) ? frozenTip() : ''"
+                    (change)="toggleAttr(field, $event.checked)"
+                  >{{ field }}</mat-checkbox>
+                  @if (frozen(field)) {
+                    <app-ee-lock
+                      feature="multi-tenant"
+                      i18n-why="@@Multi_tenant_ee_why"
+                      why="Isolate tenants, each with its own groups, members and hours."
+                    />
+                  }
+                </span>
+                <!-- The two headers that ride with the username live in this
+                     field's own hint: they are about what THIS row sends, and
+                     a column of their own at the end of the row left every
+                     other row with an empty one. -->
+                <app-form-field
+                  class="id-map"
+                  subscriptSizing="dynamic"
+                  i18n-label="@@As"
+                  label="As"
+                  [hint]="alsoSends(field)"
+                  [info]="alsoSends(field) ? remoteUserWhy : ''"
+                >
+                  <input
+                    matInput
+                    [placeholder]="field"
+                    [disabled]="frozen(field) || !draft().identityAttrs[field].selected"
+                    [value]="draft().identityAttrs[field].as"
+                    (input)="setAttrAs(field, $any($event.target).value)"
+                  />
+                </app-form-field>
+                <span class="id-eq">=</span>
+                <code class="id-sample">{{ mappedExample(field) }}</code>
+
+              </div>
+            }
+          </div>
+      }
+      @case ('authforward') {
+        <p class="section-hint" i18n="@@Auth_forward_hint">
+          How the caller reaches the service behind this route: which transport carries the facts
+          the Identity section declares. WHICH facts and under what names is settled there - this
+          is the envelope, not the contents.
         </p>
         <div class="btn-row">
           <mat-form-field class="position-field">
@@ -400,32 +471,70 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
+          <!-- Beside the mechanism: it shows what the transport SENDS, for every
+               transport, rather than belonging to one of the blocks below. -->
           @if (draft().identityMechanism) {
-            <!-- Shown as soon as a transport is picked, DISABLED when it does
-                 not apply: the reader sees the whole contract, not a form that
-                 grows and shrinks. -->
-            <mat-form-field class="position-field">
-              <mat-label i18n="@@Signature_algorithm">Signature algorithm</mat-label>
-              <mat-select
-                [value]="draft().identityAlgorithm"
-                [disabled]="draft().identityMechanism !== 'signed-jwt'"
-                (selectionChange)="patch('identityAlgorithm', $event.value)"
-              >
-                <mat-option value="ES256">ES256</mat-option>
-                <mat-option value="EdDSA">EdDSA</mat-option>
-                <mat-option value="RS256">RS256</mat-option>
-              </mat-select>
-            </mat-form-field>
+            <button matButton="tonal" type="button" (click)="openIdentityPreview()">
+              <mat-icon>visibility</mat-icon>
+              <span i18n="@@Preview">Preview</span>
+            </button>
           }
         </div>
 
-        @if (draft().identityMechanism) {
+        @if (draft().identityMechanism === 'signed-jwt') {
+          <!-- Its own block, explanation FIRST: the choice has a cost paid on
+               every request, and the reader should know it before picking
+               rather than find it under the control afterwards. Only for the
+               signed transport - the others sign nothing, and a paragraph on
+               signature cost there would be noise. -->
+          <h3 class="sub" i18n="@@Signature_algorithm">Signature algorithm</h3>
+          <p class="section-hint id-hint" i18n="@@Signature_algorithm_cost">
+            <b>The algorithm is paid on every request</b>, because each call gets a freshly signed
+            token. <b>ES256</b> is the one to choose: fast, and verified by every JWT library.
+            <b>EdDSA</b> is about as fast, but some older libraries cannot verify it. <b>RS256</b>
+            costs about fifteen times more per signature - measured at 1.5 ms instead of 0.1 ms on
+            a real installation - so keep it for a backend that verifies RSA and nothing else.
+          </p>
+          <div class="btn-row">
+            <mat-form-field class="position-field">
+              <mat-label i18n="@@Algorithm">Algorithm</mat-label>
+              <mat-select
+                [value]="draft().identityAlgorithm"
+                (selectionChange)="patch('identityAlgorithm', $event.value)"
+              >
+                <mat-option value="ES256">ES256 <span class="soon" i18n="@@recommended">(recommended)</span></mat-option>
+                <mat-option value="EdDSA">EdDSA</mat-option>
+                <mat-option value="RS256">RS256 <span class="soon" i18n="@@slowest">(slowest)</span></mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          @if (draft().identityAlgorithm === 'RS256') {
+            <p class="section-hint id-hint warn" i18n="@@Signature_algorithm_rs256_warn">
+              This route signs with RS256: every request pays the slowest signature. If the backend
+              reads the JWKS, switching to ES256 needs nothing on its side.
+            </p>
+          }
+          <p class="section-hint id-hint" i18n="@@Signed_jwt_hint">
+            The gateway signs each token; backends verify it against the published JWKS. Manage the
+            keys with "Signing keys" on the Routes page.
+          </p>
+        }
+
+        @if (draft().identityMechanism === 'jwt' || draft().identityMechanism === 'signed-jwt') {
+          <!-- A token has a lifetime; headers have none, so the block is only
+               drawn where there is a token to live. Explanation first, as for
+               the algorithm above. -->
+          <h3 class="sub" i18n="@@Token_lifetime">Token lifetime</h3>
+          <p class="section-hint id-hint" i18n="@@Token_lifetime_hint">
+            How long a token stays valid once issued - its <code>exp</code>. Each request gets a
+            fresh one, so a short lifetime costs nothing: it only has to outlast the trip to the
+            service, clock drift included, and it bounds what a leaked token is worth.
+          </p>
           <div class="ttl-row">
             <mat-form-field class="position-field" subscriptSizing="dynamic">
               <mat-label i18n="@@Token_TTL">Token TTL</mat-label>
               <mat-select
                 [value]="draft().identityTtl"
-                [disabled]="draft().identityMechanism === 'headers'"
                 (selectionChange)="patch('identityTtl', $event.value)"
               >
                 @for (c of ttlChoices(); track c) {
@@ -433,91 +542,38 @@
                 }
               </mat-select>
             </mat-form-field>
-            <button matButton="tonal" type="button" (click)="openIdentityPreview()">
-              <mat-icon>visibility</mat-icon>
-              <span i18n="@@Preview">Preview</span>
-            </button>
           </div>
-        }
-        @if (draft().identityMechanism === 'signed-jwt') {
-          <p class="section-hint id-hint" i18n="@@Signed_jwt_hint">
-            The gateway signs each token; backends verify it against the published JWKS. Manage the
-            keys with "Signing keys" on the Routes page.
-          </p>
         }
 
         @if (draft().identityMechanism) {
-          <p class="section-hint id-hint" i18n="@@Identity_include_hint">
-            What to include in the payload (everything by default):
+          <!-- The roles, and only here: the expression shapes a HEADER or a
+               claim, which is a question about sending rather than about what
+               a role is. The page injection never uses it - roles land there
+               as the plain list (see the Roles block in User info). -->
+          <h3 class="sub" i18n="@@Shape_of_the_roles">Shape of the roles</h3>
+          <p class="section-hint id-hint" i18n="@@Roles_shape_hint">
+            Roles travel as one value. Three hundred of them is nine kilobytes on every request for
+            a service that reads three, so their shape is worth a look.
           </p>
-          <div class="id-attrs">
-            @for (field of identityFields(); track field) {
-              <!-- A single-organisation instance still SHOWS the two
-                   organisation facts, frozen: hiding them left them ticked,
-                   so they travelled while the screen said nothing. -->
-              <div
-                class="id-attr"
-                [class.off]="frozen(field) || !draft().identityAttrs[field].selected"
-                [attr.ee-feature]="frozen(field) ? 'multi-tenant' : null"
+          <div class="btn-row">
+            <button
+              matButton="tonal"
+              type="button"
+              [disabled]="!draft().identityAttrs['roles'].selected"
+              (click)="openRoleExpr()"
+            >
+              <mat-icon>wand_shine</mat-icon>
+              <span i18n="@@Shape_the_roles_btn">Shape the roles</span>
+            </button>
+            @if (!draft().identityAttrs['roles'].selected) {
+              <span class="section-hint" i18n="@@Roles_not_included"
+                >Roles are not included in Identity.</span
               >
-                <mat-checkbox
-                  class="id-field"
-                  [checked]="!frozen(field) && draft().identityAttrs[field].selected"
-                  [disabled]="frozen(field)"
-                  [matTooltip]="frozen(field) ? frozenTip() : ''"
-                  (change)="toggleAttr(field, $event.checked)"
-                >{{ field }}</mat-checkbox>
-                @if (frozen(field)) {
-                  <app-ee-lock
-                    feature="multi-tenant"
-                    i18n-why="@@Multi_tenant_ee_why"
-                    why="Isolate tenants, each with its own groups, members and hours."
-                  />
-                }
-                <app-form-field class="id-map" subscriptSizing="dynamic" i18n-label="@@Send_as" label="Send as">
-                  <input
-                    matInput
-                    [placeholder]="field"
-                    [disabled]="frozen(field) || !draft().identityAttrs[field].selected"
-                    [value]="draft().identityAttrs[field].as"
-                    (input)="setAttrAs(field, $any($event.target).value)"
-                  />
-                </app-form-field>
-                @if (field === 'roles') {
-                  <!-- Not a discreet icon among the fields: this is where a 9 KB
-                       header becomes a 26-byte one, and nobody finds it by
-                       accident. -->
-                  <button
-                    matIconButton
-                    type="button"
-                    class="id-shape"
-                    [disabled]="!draft().identityAttrs['roles'].selected"
-                    (click)="openRoleExpr()"
-                    i18n-matTooltip="@@Shape_the_roles"
-                    matTooltip="Which roles travel, under what names, in what shape"
-                  >
-                    <mat-icon>wand_shine</mat-icon>
-                  </button>
-                }
-                <span class="id-eq">=</span>
-                <code class="id-sample">{{ mappedExample(field) }}</code>
-                @if (field === 'username' && draft().identityMechanism === 'headers') {
-                  <!-- Said on the row it depends on: unticking username stops
-                       these two as well. -->
-                  <span
-                    class="id-also"
-                    i18n-matTooltip="@@Remote_user_why"
-                    matTooltip="No header is standardised for the signed-in account (REMOTE_USER is a CGI variable). Meerkat writes both conventions: Spring's, and its dashed form, since an underscore in a header name is dropped by default by nginx. Inbound ones are purged."
-                  >+ REMOTE_USER, X-Remote-User</span>
-                }
-              </div>
-              @if (field === 'roles' && draft().identityAttrs['roles'].selected) {
-                <p class="id-weight">
-                  <code [tpl]="draft().identityAttrs['roles'].expr || defaultRoleExpr" [syntax]="SYNTAX"></code>
-                </p>
-              }
             }
           </div>
+          <p class="id-weight">
+            <code [tpl]="draft().identityAttrs['roles'].expr || defaultRoleExpr" [syntax]="SYNTAX"></code>
+          </p>
         }
       }
       @case ('scheme') {
@@ -547,15 +603,19 @@
         <div class="btn-row">
             <mat-form-field class="position-field">
               <mat-label i18n="@@Mechanism">Mechanism</mat-label>
-              <mat-select [value]="draft().schemeMechanism" (selectionChange)="setSchemeMechanism($event.value)">
-                <mat-option value="none" i18n="@@scheme_no_scheme">none</mat-option>
+              <mat-select [value]="schemeChoice()" (selectionChange)="setSchemeMechanism($event.value)">
+                <!-- One look, and which: nothing to switch, and the page, the
+                     button and the portal bar all wear it. -->
+                <mat-option value="fixed:light" i18n="@@scheme_always_light">always light</mat-option>
+                <mat-option value="fixed:dark" i18n="@@scheme_always_dark">always dark</mat-option>
                 <mat-option value="" i18n="@@scheme_none">color-scheme only</mat-option>
                 <mat-option value="attribute" i18n="@@scheme_attribute">set attribute</mat-option>
                 <mat-option value="add-attribute" i18n="@@scheme_add_attribute">add attribute</mat-option>
                 <mat-option value="class" i18n="@@scheme_class">class</mat-option>
+                <mat-option value="script" i18n="@@scheme_script">script</mat-option>
               </mat-select>
             </mat-form-field>
-            @if (draft().schemeMechanism) {
+            @if (schemeWritesOnTag()) {
               <app-form-field class="height-field wide" i18n-label="@@Tag_name" label="Tag name">
                 <input matInput placeholder="html" [value]="draft().schemeTag" (input)="patch('schemeTag', $any($event.target).value)" />
               </app-form-field>
@@ -565,7 +625,7 @@
                 <input matInput placeholder="data-theme" [value]="draft().schemeAttribute" (input)="patch('schemeAttribute', $any($event.target).value)" />
               </app-form-field>
             }
-            @if (draft().schemeMechanism) {
+            @if (schemeWritesOnTag()) {
               <app-form-field class="height-field wide" i18n-label="@@Light_value" label="Light value">
                 <input matInput [placeholder]="draft().schemeMechanism === 'attribute' ? 'light' : 'empty'" [value]="draft().schemeLight" (input)="patch('schemeLight', $any($event.target).value)" />
               </app-form-field>
@@ -575,9 +635,66 @@
             }
         </div>
 
+        <!-- Some applications know light and dark and nothing else - Jaeger is
+             the one that named this. The visitor's "auto" then has to be
+             resolved before it reaches them, and the switch has to stop
+             offering a third position. -->
+        @if (draft().schemeMechanism !== 'none') {
+          <div class="flags">
+            <mat-checkbox [checked]="!draft().schemeNoAuto" (change)="setFlag('schemeNoAuto', !$event.checked)">
+              <ng-container i18n="@@Has_a_system_mode">This application has a system mode</ng-container>
+            </mat-checkbox>
+          </div>
+          @if (draft().schemeNoAuto) {
+            <p class="section-hint" i18n="@@No_system_mode_hint">
+              The visitor's choice of "follow my system" is resolved to light or dark before it
+              reaches this application, and it keeps following the system as that changes. The
+              switch in the user button offers two positions here instead of three.
+            </p>
+          }
+        }
+
+        <!-- The escape hatch. Every mechanism above writes ONE thing on ONE
+             element, and the next application always consumes light and dark
+             one notch outside that: RabbitMQ swaps the media attribute of two
+             stylesheet links, another dispatches an event, another calls a
+             global its bundle exported. Naming each one would be a setting per
+             vendor forever, so here the integrator writes the body instead. -->
+        @if (draft().schemeMechanism === 'script') {
+          <p class="section-hint" i18n="@@Scheme_script_line">
+            Called with the choice in <code>colorScheme</code> on every change and once when a page
+            loads.
+            @if (draft().schemeNoAuto) {
+              It holds "light" or "dark": with no system mode, "auto" is resolved before it gets
+              here.
+            } @else {
+              It holds "light", "dark" or "auto" - on "auto", put the application back on the system
+              rather than picking a side.
+            }
+          </p>
+          <div class="css-row">
+            <button matButton="tonal" (click)="editCode('onSchemeChange')">
+              <mat-icon>contrast</mat-icon>
+              @if (codeLines('onSchemeChange')) {
+                <ng-container i18n="@@Edit_the_script">Edit the script</ng-container>
+              } @else {
+                <ng-container i18n="@@Add_a_script">Add a script</ng-container>
+              }
+            </button>
+            @if (codeLines('onSchemeChange'); as n) {
+              <span class="css-size" i18n="@@N_lines">{{ n }} lines</span>
+            }
+          </div>
+        }
+
         <!-- The application's own memory of the choice. It reads this key at
              boot and dresses itself from it, so writing the visitor's choice
-             here is how a theme that owns its color-scheme follows along. -->
+             here is how a theme that owns its color-scheme follows along.
+             Behind the mechanism, like everything else here: an application
+             declared to have NO colour scheme has no stored theme to override,
+             and a checkbox that stays clickable there is a setting nothing
+             reads. -->
+        @if (draft().schemeMechanism !== 'none') {
         <h3 class="sub" i18n="@@Override_localstorage">Override localStorage</h3>
         <p class="section-hint" i18n="@@Override_localstorage_hint">
           If the application remembers its theme in localStorage, name the key and what it writes
@@ -595,9 +712,11 @@
           <app-form-field class="height-field wide" i18n-label="@@Storage_key" label="Key">
             <input matInput placeholder="theme" [value]="draft().schemeStorage" (input)="patch('schemeStorage', $any($event.target).value)" />
           </app-form-field>
-            <app-form-field class="height-field wide" i18n-label="@@Value_system" label="System">
-              <input matInput placeholder="system" [value]="draft().schemeStorageAuto" (input)="patch('schemeStorageAuto', $any($event.target).value)" />
-            </app-form-field>
+            @if (!draft().schemeNoAuto) {
+              <app-form-field class="height-field wide" i18n-label="@@Value_system" label="System">
+                <input matInput placeholder="system" [value]="draft().schemeStorageAuto" (input)="patch('schemeStorageAuto', $any($event.target).value)" />
+              </app-form-field>
+            }
             <app-form-field class="height-field wide" i18n-label="@@Value_dark" label="Dark">
               <input matInput placeholder="dark" [value]="draft().schemeStorageDark" (input)="patch('schemeStorageDark', $any($event.target).value)" />
             </app-form-field>
@@ -605,6 +724,7 @@
               <input matInput placeholder="light" [value]="draft().schemeStorageLight" (input)="patch('schemeStorageLight', $any($event.target).value)" />
             </app-form-field>
         </div>
+        }
         }
       }
       @case ('button') {
@@ -631,10 +751,9 @@
           </mat-checkbox>
         </div>
         @if (draft().schemeMechanism === 'none') {
-          <p class="section-hint" i18n="@@Scheme_none_no_switch">
-            This UI declares no colour scheme (Color scheme section), so there is nothing to switch
-            between here. Under a portal, the bar offers whatever light/dark the data plane itself
-            offers.
+          <p class="section-hint" i18n="@@Scheme_one_look_no_switch">
+            This application has one look (Color scheme section), so there is nothing to switch here:
+            the button and the portal bar wear that look.
           </p>
         }
         @if (draft().btnEnabled) {
@@ -751,7 +870,7 @@
         }
 
 
-        @if (!draft().schemeSelect) {
+        @if (!draft().schemeSelect && draft().schemeMechanism !== 'none') {
           <p class="section-hint" i18n="@@Button_scheme_hint">
             No switch here, so nothing for the button to follow: it wears whatever the visitor chose
             elsewhere, which on an application that has one look means light chrome floating on a
@@ -778,27 +897,77 @@
         <div class="locales-pane">
         <div class="locale-list">
         <h3 class="sub" i18n="@@Locales">Locales</h3>
-        <p class="section-hint" i18n="@@Locales_section_hint">
-          The application's locale offer, managed in Application General. Uncheck the ones this
-          UI does not support: they leave the button's menu and the forwarding.
+        <p class="section-hint" i18n="@@Locales_section_hint3">
+          The languages this UI is written in. They fill the account menu on its pages, and the
+          sign-in page offers every language the routes of this gateway speak - so a route that
+          arrives speaking one adds it, and a route that leaves takes it away.
         </p>
-        @for (code of appLanguages(); track code) {
-          <div class="locale-row" [class.off-locale]="isLocaleDisabled(code)">
-            <mat-checkbox
-              [checked]="!isLocaleDisabled(code)"
-              (change)="toggleLocale(code, $event.checked)"
-            />
-            <code class="lc">{{ code }}</code>
-            <span>{{ localeName(code) }}</span>
-            <span class="ln">{{ localeNative(code) }}</span>
-          </div>
+        <mat-form-field class="add-locale">
+          <mat-label i18n="@@Add_a_locale">Add a locale</mat-label>
+          <input
+            matInput
+            placeholder="fr, pt-BR"
+            [value]="newLocale()"
+            (input)="newLocale.set($any($event.target).value)"
+            (keydown.enter)="addLocale()"
+            [matAutocomplete]="langAuto"
+          />
+        </mat-form-field>
+        <mat-autocomplete #langAuto (optionSelected)="addLocale($any($event).option.value)">
+          @for (o of localeOptions(); track o) {
+            <mat-option [value]="o">{{ o }} - {{ localeName(o) }}</mat-option>
+          }
+        </mat-autocomplete>
+        @if (localeError()) {
+          <p class="lang-error">{{ localeError() }}</p>
         }
+        <!-- Every language Meerkat can render, ticked or not: these are the
+             ones a sign-in page can be shown in, so they are chosen rather
+             than typed, and none of them can be deleted - removing a language
+             from THIS route is unticking it, not taking it out of the
+             product. A language the route declares that Meerkat does not know
+             sits above them, marked: it works, and the built-in pages cannot
+             follow until it is added to them. -->
+        <fieldset class="locale-set">
+          <legend i18n="@@Spoken_here">Spoken here</legend>
+          @for (row of localeRows(); track row.code) {
+            <div class="locale-row" [class.unknown]="!row.known">
+              <mat-checkbox
+                [checked]="row.on"
+                (change)="toggleLocale(row.code, $event.checked)"
+              />
+              <code class="lc">{{ row.code }}</code>
+              <span>{{ localeName(row.code) }}</span>
+              <span class="ln">{{ localeNative(row.code) }}</span>
+              @if (row.via) {
+                <!-- A variant of a language Meerkat has: its own pages follow
+                     the base, so this is information rather than a warning. -->
+                <span class="via-note" i18n="@@Built_in_pages_use">Built-in pages use {{ row.via }}</span>
+              } @else if (!row.known) {
+                <span class="warn-note">
+                  <mat-icon>warning</mat-icon>
+                  <span i18n="@@Locale_not_built_in"
+                    >The built-in pages cannot speak it. Add it in</span
+                  >
+                  <a routerLink="/application/built-in-pages/locale" i18n="@@Built_in_pages"
+                    >Built-in pages</a
+                  >
+                </span>
+              }
+            </div>
+          }
+        </fieldset>
         </div>
-
         <div class="forwarding">
         <h3 class="sub" i18n="@@Forwarding">Forwarding</h3>
-        <p class="section-hint" i18n="@@Locales_forwarding_hint">
-          How the language reaches the application, and how a page follows a change.
+        <!-- The floor, said because it is what every route gets for free and
+             what nobody should have to configure. The mechanism below is for
+             an application that reads the language somewhere else. -->
+        <p class="section-hint" i18n="@@Locales_forwarding_hint2">
+          Accept-Language always reaches the application with the person's own language in front -
+          their stored choice, or what their browser asks for. Nothing to declare for that. The
+          mechanism below is for an application that reads the language somewhere else, and for how
+          a page follows a change.
         </p>
         <div class="btn-row">
           <mat-form-field class="mech-field">
@@ -918,10 +1087,11 @@
         }
 
         <h3 class="sub" i18n="@@User_info">User info</h3>
-        <p class="section-hint" i18n="@@User_info_hint">
-          Exposes the selected user facts to the PAGE, as attributes on a tag of your choice or
-          as meta tags. To send the user to the service itself, use the Identity section: both
-          apply at once.
+        <p class="section-hint" i18n="@@User_info_hint2">
+          Where the facts the Identity section declares land on the PAGE: attributes on a tag of
+          your choice, or meta tags. Untick one to keep it out - a page's attributes are readable
+          by every script on it, which a header to the service is not, so "send it and do not
+          publish it" is a posture worth keeping.
         </p>
         <div class="flags">
           <mat-checkbox [checked]="draft().userInfoEnabled" (change)="setFlag('userInfoEnabled', $event.checked)">
@@ -948,6 +1118,11 @@
               </app-form-field>
             }
           </div>
+          @if (!pageUserFields().length) {
+            <p class="section-hint" i18n="@@Identity_declares_nothing">
+              The Identity section declares no fact to put on the page.
+            </p>
+          }
           @for (field of pageUserFields(); track field) {
             <div class="field-row" [attr.ee-feature]="frozen(field) ? 'multi-tenant' : null">
               <mat-checkbox
@@ -977,7 +1152,77 @@
           }
         }
       }
-      @case ('inject') {
+      @case ('tracing') {
+        <!-- Its own section rather than a heading inside Custom: what this
+             toggle governs is OUR bundle, and Custom is where an operator's
+             own code lives. One panel for both filed a product feature under
+             the drawer people keep their CSS in. -->
+        <p class="section-hint" i18n="@@Route_tracing_hint">
+          Two questions, and the second only follows the first. Where the traces go is set once for
+          the installation, in <b>Infra, OpenTelemetry</b>; what this route contributes is here.
+        </p>
+        @if (!telemetryOn()) {
+          <!-- The switches keep whatever this route holds: an installation that
+               turns the export back on finds its routes as it left them. They
+               are disabled rather than hidden, and the reason carries the way
+               to fix it. -->
+          <p class="section-hint off-note">
+            <mat-icon inline>info</mat-icon>
+            <span i18n="@@Route_tracing_export_off"
+              >This installation exports no traces yet, so neither switch does anything. What this
+              route holds is kept as it is.</span
+            >
+            <button matButton type="button" (click)="openTelemetrySettings()">
+              <ng-container i18n="@@Open_telemetry_settings">OpenTelemetry settings</ng-container>
+            </button>
+          </p>
+        }
+        <!-- Shown whatever the installation's tracing setting says: a field
+             that vanishes teaches nothing about why it is not there. Offered on
+             every route, not only the UI ones - a service route has the
+             gateway's own spans just as a page does. -->
+        <mat-slide-toggle
+          [checked]="draft().telemetry"
+          [disabled]="!telemetryOn()"
+          (change)="setFlag('telemetry', $event.checked)"
+        >
+          <ng-container i18n="@@Route_tracing_toggle"
+            >Push traces of this route to OpenTelemetry</ng-container
+          >
+        </mat-slide-toggle>
+        <p class="section-hint" i18n="@@Route_tracing_push_hint">
+          Meerkat records <b>its own spans</b> for what this route answers: the time it spent
+          choosing the route, checking access and calling your service, which is a gap in the trace
+          otherwise. Off, this route produces nothing at all and the context a caller sent travels
+          on untouched - for what you have no reason to measure, an admin interface you proxy, a
+          probe.
+        </p>
+        <!-- The second switch needs the first AND a UI route: it injects a
+             script into pages, and a service route has none. Disabled rather
+             than hidden, so the reason is where the question is. -->
+        <mat-slide-toggle
+          [checked]="draft().telemetryUi && draft().telemetry && draft().isUi"
+          [disabled]="!telemetryOn() || !draft().telemetry || !draft().isUi"
+          [matTooltip]="uiTraceTip()"
+          (change)="setFlag('telemetryUi', $event.checked)"
+        >
+          <ng-container i18n="@@Route_tracing_ui_toggle">Start the trace from the UI</ng-container>
+        </mat-slide-toggle>
+        <p class="section-hint" i18n="@@Route_tracing_ui_hint">
+          The OpenTelemetry bundle is injected into this application's pages, so the journey starts
+          at the <b>click</b> rather than at this gateway: you see the network before us, the
+          browser's queueing, the rendering, and the calls that <b>never reach us at all</b>. The
+          bundle is served by Meerkat, never by a CDN, and it carries trace context to this
+          gateway's own routes and to nobody else. Leave it off for an application that already
+          carries its own agent: two on one page produce two traces for one click, and neither is
+          the whole story.
+        </p>
+      }
+      @case ('custom') {
+        <p class="section-hint" i18n="@@Custom_hint">
+          Your own CSS and JavaScript, injected into this application's pages. What the gateway adds
+          on its own account is elsewhere: Tracing, User button, Color scheme.
+        </p>
         <h3 class="sub" i18n="@@Custom_CSS">Custom CSS</h3>
         <p class="section-hint" i18n="@@Custom_CSS_hint">
           A style block injected into the pages: tweak the application's look from the gateway.
@@ -1024,7 +1269,7 @@
 
 <footer>
   <!-- What is missing, next to the button it disables. A greyed Save that says
-       nothing sends the reader through eleven sections looking for the field
+       nothing sends the reader through fourteen sections looking for the field
        it wants; each line here names the section and jumps to it. -->
   @if (gaps().length) {
     <button matButton class="gaps" type="button" [matMenuTriggerFor]="gapMenu">

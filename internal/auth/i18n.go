@@ -13,6 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/tracing"
 )
 
 // Flow-page localization (I18N): the language and the color scheme are USER
@@ -75,16 +76,18 @@ func matchAcceptLanguage(header string, offered []string) string {
 	return "en"
 }
 
-// offeredLanguages is what the FLOW PAGES speak: the RIGHT JOIN of the
-// application's locale pool (SettingLanguages) with the languages Meerkat
-// actually embeds (the messages catalogue). An app locale Meerkat does not
-// embed (e.g. vi) never reaches the flow pages; an empty pool falls back to
-// English. Cached alongside the theme (same 5s staleness budget).
+// offeredLanguages is what the FLOW PAGES speak: every language this gateway's
+// ROUTES say they are written in, kept to the ones Meerkat can actually render.
+// Nothing to declare anywhere - deploy a route that speaks Polish and the
+// sign-in page offers Polish; retire it and the offer shrinks with it. A
+// language no route speaks never reaches the flow pages, and a gateway with no
+// route speaking anything falls back to English. Cached alongside the theme
+// (same 5s staleness budget).
 //
-// The ADMIN plane is out of it, in English like the console it leads to. The
-// pool belongs to the INTEGRATOR's application: letting it decide the language
-// of Meerkat's own sign-in page meant an operator could be greeted in a
-// language chosen for someone else's end users, one click before a console
+// The ADMIN plane is out of it, in English like the console it leads to. These
+// languages belong to the INTEGRATOR's applications: letting them decide the
+// language of Meerkat's own sign-in page meant an operator could be greeted in
+// a language chosen for someone else's end users, one click before a console
 // that speaks English anyway.
 func (h *Handler) offeredLanguages() []string {
 	if h.adminPlane {
@@ -95,12 +98,37 @@ func (h *Handler) offeredLanguages() []string {
 	if time.Since(h.langsReadAt) < 5*time.Second && len(h.langsCache) > 0 {
 		return h.langsCache
 	}
-	var appLangs []string
-	_ = h.st.GetSetting(context.Background(), store.SettingLanguages, &appLangs)
+	appLangs, err := h.st.SpokenLanguages(context.Background())
+	if err != nil {
+		appLangs = nil
+	}
+	known := make(map[string]bool, len(messages))
+	for _, l := range KnownLanguages() {
+		known[l] = true
+	}
 	out := make([]string, 0, len(appLangs))
-	for _, l := range appLangs {
-		if _, ok := messages[l]; ok {
+	seen := map[string]bool{}
+	add := func(l string) {
+		if !seen[l] {
+			seen[l] = true
 			out = append(out, l)
+		}
+	}
+	for _, l := range appLangs {
+		// Known, not embedded: a language an integrator added by overriding
+		// is one this gateway can render, and refusing it here would hide
+		// their work behind the list the binary happened to ship with.
+		if known[l] {
+			add(l)
+			continue
+		}
+		// AND ITS BASE. An application written in ja-JP is a Japanese
+		// application: its own pages say ja-JP because that is the catalogue
+		// it ships, and Meerkat has ja. Refusing the pair outright would
+		// leave the sign-in page in English in front of a Japanese
+		// application, which is the one place this matters.
+		if base, _, cut := strings.Cut(l, "-"); cut && known[base] {
+			add(base)
 		}
 	}
 	if len(out) == 0 {
@@ -182,11 +210,19 @@ type flowChrome struct {
 	// preview lost its background and every layout looked identical, which is
 	// exactly what it was reported as.
 	Preview bool
-	Brand   brandView
-	Title   string
-	Lang    string   // <html lang>
-	Dir     string   // <html dir>: rtl for Arabic and Hebrew, ltr otherwise
-	Langs   []string // the offered languages (switcher hidden when 1)
+	// PreviewErrors is every refusal the previewed page can give, stacked into
+	// one string (the .error block keeps newlines). Empty on a served page.
+	//
+	// A page shows one refusal at a time and a preview shows the page once, so
+	// without this the thirty error strings of this product had no screen they
+	// could be read on - and a wording nobody can see rendered is a wording
+	// nobody corrects. Same call as the sign-in page's, generalised.
+	PreviewErrors string
+	Brand         brandView
+	Title         string
+	Lang          string   // <html lang>
+	Dir           string   // <html dir>: rtl for Arabic and Hebrew, ltr otherwise
+	Langs         []string // the offered languages (switcher hidden when 1)
 	// Scheme drives the CSS (:root color-scheme); SchemeSwitch shows the
 	// buttons. The ADMIN plane is Meerkat's console: dark only, no choice -
 	// the theme/scheme options only ever concern the DATA plane's pages.
@@ -211,6 +247,14 @@ type flowChrome struct {
 	// the constants above - never spelt out in a template.
 	MarkText string
 	MarkURL  string
+	// TraceID names THIS request (OBS-04). Written at the foot of every served
+	// page, because the support gesture is somebody reading it off their
+	// screen and pasting it into a search - and a response header, which they
+	// also get, is invisible to a person looking at a page.
+	//
+	// No label, and that is deliberate: an identifier needs no translation,
+	// and a word beside it would need twenty-one.
+	TraceID string
 	// List widens the page: a sign-in form is two fields and deserves to be
 	// narrow, a list of browsers is not and does not.
 	List bool
@@ -237,8 +281,13 @@ func (h *Handler) flowData(r *http.Request, titleKey string) flowChrome {
 	css, brand, layout := h.chrome()
 	offered := h.offeredLanguages()
 	p := prefsOf(r, offered)
-	t := messages[p.Lang]
+	t := catalogue(p.Lang)
 	chrome := flowChrome{
+		// The name of this request, from the front door (OBS-04). Empty on a
+		// page rendered outside a request that crossed it - the console's
+		// preview - which is the honest answer rather than an identifier that
+		// joins nothing.
+		TraceID:      tracing.ID(r.Context()),
 		ThemeCSS:     css,
 		Layout:       layout,
 		LayoutCSS:    template.CSS(layoutCSS(layout)), //nolint:gosec // a closed catalogue of built-in blocks
@@ -325,7 +374,7 @@ func listChrome(c flowChrome) flowChrome {
 
 // tr translates one key for the request's language.
 func (h *Handler) tr(r *http.Request, key string) string {
-	return messages[prefsOf(r, h.offeredLanguages()).Lang][key]
+	return catalogue(prefsOf(r, h.offeredLanguages()).Lang)[key]
 }
 
 // langNames are the endonyms shown by language pickers (never translated).
@@ -366,9 +415,14 @@ var langNames = map[string]string{
 //go:embed locales/*.json
 var localeFiles embed.FS
 
-var messages = loadMessages()
+// messages is every embedded catalogue, each one COMPLETE (see the backfill in
+// loadMessages). borrowed says which of those entries are English standing in
+// for a wording the language does not have - the difference between "this is
+// how Thai says it" and "nobody has said it in Thai yet", which the page cannot
+// see and the locale editor must.
+var messages, borrowed = loadMessages()
 
-func loadMessages() map[string]map[string]string {
+func loadMessages() (map[string]map[string]string, map[string]map[string]bool) {
 	entries, err := localeFiles.ReadDir("locales")
 	if err != nil {
 		panic("auth: no locales embedded: " + err.Error())
@@ -394,6 +448,13 @@ func loadMessages() map[string]map[string]string {
 	// (t := messages[lang]; t[key]), so a fallback in one accessor would leave
 	// the other half rendering an empty string - which is what a missing key
 	// used to do, silently, on the page nobody tested in Thai.
+	//
+	// What was borrowed is REMEMBERED. Filling the map made the pages right and
+	// the catalogues indistinguishable: eighteen of nineteen languages are
+	// missing fourteen keys, and after this loop every one of them looks
+	// complete. The editor needs the difference back, or its count of what is
+	// left to translate is zero for every language forever.
+	lent := map[string]map[string]bool{}
 	if en := out["en"]; en != nil {
 		for lang, m := range out {
 			if lang == "en" {
@@ -402,11 +463,15 @@ func loadMessages() map[string]map[string]string {
 			for key, text := range en {
 				if _, ok := m[key]; !ok {
 					m[key] = text
+					if lent[lang] == nil {
+						lent[lang] = map[string]bool{}
+					}
+					lent[lang][key] = true
 				}
 			}
 		}
 	}
-	return out
+	return out, lent
 }
 
 // rtl are the languages written right to left. The pages carry dir on <html>,

@@ -15,47 +15,105 @@
 // 6455, the half with the unmasking and the reassembly. Two mechanisms because
 // they answer two different problems, not because nobody looked.
 //
-// AUTHORISATION IS NOT DONE HERE. The handler is mounted BEHIND the control
-// plane's own funnel, so a subscription passes exactly the checks an API call
-// passes - session, pending login, token perimeter, narrowing to the token's
-// domain. Writing a second predicate here would be writing the security
-// boundary twice, and the second copy is the one that drifts.
+// AUTHORISATION IS NOT DECIDED HERE, IT IS APPLIED HERE. The handler is mounted
+// BEHIND the control plane's own funnel, so a subscription passes exactly the
+// checks an API call passes - session, pending login, token perimeter, narrowing
+// to the token's domain - and the funnel also says WHAT this caller may watch
+// (admin.livePerimeter, read from the audit trail's own partition). This package
+// turns that answer into a registry holding those sources and nothing else,
+// because a source cannot do it: the library shares one read between the
+// subscribers of a topic and hands it a context of its own, so by the time a
+// source runs there is no caller left to check. Deciding it twice - once in the
+// funnel, once in a predicate here - would be writing the boundary twice, and
+// the second copy is the one that drifts.
 package live
 
 import (
 	"log/slog"
 	"net/http"
+	"sort"
+	"sync"
 
 	livewire "github.com/softwarity/livewire/go"
 )
 
 // Server is the console's live channel.
+//
+// ONE REGISTRY PER PERIMETER, and the reason is in the library rather than in a
+// taste for indirection: a registry shares one read between every subscriber of
+// a topic and calls the source with a context of its own, so a source cannot
+// tell its readers apart. Authorising a subscription therefore has to happen
+// where the reader is still known - at the upgrade - and the way to say "this
+// reader may watch these sources" is to hand them a registry that holds those.
+//
+// Built on demand and kept, keyed by the perimeter: the console has a handful
+// of perimeters (root, one per capability, and the readers who administer an
+// organisation), not one per screen, so this is a map with four or five entries
+// in it and one read behind each.
 type Server struct {
-	registry *livewire.Registry
-	handler  http.Handler
+	// What every perimeter is built FROM, set once at wiring time.
+	sources func(Perimeter) Sources
+
+	mu       sync.Mutex
+	handlers map[string]http.Handler
 }
 
-// New returns a server with no sources yet.
-func New() *Server {
-	registry := livewire.NewRegistry(0)
-	return &Server{
-		registry: registry,
-		// Authorize is nil ON PURPOSE: the library takes that to mean the
-		// mount point has already authenticated, which is exactly the case -
-		// see the note on the package.
-		handler: livewire.NewServer(registry, livewire.Options{Logger: slog.Default()}),
+// Perimeter is one reader's view of the channel. It mirrors admin.LivePerimeter,
+// which main translates: the control plane decides who sees what, this package
+// decides which source serves it.
+type Perimeter struct {
+	// Key is what two readers must share to share one read.
+	Key string
+	// Named are the kinds whose last write may be described, Quiet the kinds the
+	// reader is only told moved.
+	Named []string
+	Quiet []string
+	// Whether this reader administers the routing plane (the traffic curves) and
+	// the application's (the scheduled calls).
+	Traffic   bool
+	Schedules bool
+}
+
+// Sources is what one perimeter may watch, by topic. An alias, so the wiring
+// names it without importing the library for one type.
+type Sources = map[string]livewire.Source
+
+// New returns a server whose perimeters are built by sources.
+func New(sources func(Perimeter) Sources) *Server {
+	return &Server{sources: sources, handlers: map[string]http.Handler{}}
+}
+
+// ServeFor upgrades a connection that may watch what the perimeter allows.
+func (s *Server) ServeFor(p Perimeter, w http.ResponseWriter, r *http.Request) {
+	s.handlerFor(p).ServeHTTP(w, r)
+}
+
+func (s *Server) handlerFor(p Perimeter) http.Handler {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if h, built := s.handlers[p.Key]; built {
+		return h
 	}
+	registry := livewire.NewRegistry(0)
+	for topic, source := range s.sources(p) {
+		registry.Register(topic, source)
+	}
+	// Authorize is nil ON PURPOSE: the library takes that to mean the mount
+	// point has already authenticated, which is exactly the case - and what it
+	// authenticated is now also WHICH registry this is - see the note on the
+	// package.
+	h := livewire.NewServer(registry, livewire.Options{Logger: slog.Default()})
+	s.handlers[p.Key] = h
+	return h
 }
 
-// Register puts a source on a topic. Called at wiring time, before serving.
-func (s *Server) Register(topic string, source livewire.Source) {
-	s.registry.Register(topic, source)
-}
-
-// Topics is what this server serves, for a status page and for a test that
-// wants to know nothing was dropped.
-func (s *Server) Topics() []string { return s.registry.Topics() }
-
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.handler.ServeHTTP(w, r)
+// Topics is what one perimeter serves, sorted - for a status page and for a test
+// that wants to know nothing was dropped.
+func (s *Server) Topics(p Perimeter) []string {
+	topics := make([]string, 0, 3)
+	for topic := range s.sources(p) {
+		topics = append(topics, topic)
+	}
+	sort.Strings(topics)
+	return topics
 }

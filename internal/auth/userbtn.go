@@ -20,6 +20,8 @@ func (h *Handler) registerUserButton(mux *http.ServeMux) {
 	mux.HandleFunc("GET /meerkat/user-button.js", h.userButtonJS)
 	mux.HandleFunc("GET /meerkat/user-button.json", h.userButtonJSON)
 	mux.HandleFunc("GET /meerkat/page.js", h.pageJS)
+	// One route's scheme script, named in the query - see schemeJS.
+	mux.HandleFunc("GET /meerkat/scheme.js", h.schemeJS)
 	mux.HandleFunc("POST /meerkat/locale", h.setLocale)
 	mux.HandleFunc("POST /meerkat/scheme", h.setScheme)
 }
@@ -43,10 +45,11 @@ func (h *Handler) setLocale(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := strings.TrimSpace(body.Locale)
-	var offered []string
-	_ = h.st.GetSetting(r.Context(), store.SettingLanguages, &offered)
-	if !containsFold(offered, code) {
-		http.Error(w, "not one of the application's languages", http.StatusUnprocessableEntity)
+	// Against what the ROUTES speak, which is the offer itself: the menu this
+	// came from was drawn from the same list, so anything else is a forged
+	// request rather than a stale page.
+	if !containsFold(h.offeredLanguages(), code) {
+		http.Error(w, "not one of the languages this gateway's routes speak", http.StatusUnprocessableEntity)
 		return
 	}
 	sess, err := h.sm.Resolve(r.Context(), r)
@@ -157,7 +160,10 @@ type userButtonPayload struct {
 	// DevKey says this developer has already deposited a public key (DEV-11).
 	// It carries a CHECK MARK in the menu and nothing else - never the key
 	// itself, which is public but has no business travelling to every page.
-	DevKey bool              `json:"devKey,omitempty"`
+	DevKey bool `json:"devKey,omitempty"`
+	// Plug says the developer tunnel is open (Infra, Plug), which is when the
+	// key entry means anything: a key for a closed door is not offered.
+	Plug   bool              `json:"plug,omitempty"`
 	Labels map[string]string `json:"labels"`
 	// ThemeCSS carries the ACTIVE theme's tokens rescoped to :host - the
 	// button wears the selected theme inside its shadow root, falling back to
@@ -185,10 +191,34 @@ type servedName struct {
 // userButtonJSON answers the component's data: who is signed in, which tenants
 // they may switch to, the offered languages and the menu labels - all in the
 // request's locale.
-func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
-	offered := h.offeredLanguages()
-	p := prefsOf(r, offered)
-	t := messages[p.Lang]
+// userButtonLabels is every string the account menu draws, in one place.
+//
+// In one place because there are two callers now - the served button and the
+// portal preview - and a menu whose preview knows fewer labels than the menu
+// renders half its rows blank, which is exactly the screen somebody would open
+// to translate them.
+func userButtonLabels(t map[string]string) map[string]string {
+	labels := userButtonMenuLabels(t)
+	for k, v := range userButtonIssueLabels(t) {
+		labels[k] = v
+	}
+	return labels
+}
+
+// userButtonMenuLabels is what the MENU draws: the rows, their submenus, and
+// the developer tools that hang off it.
+//
+// The developer rows are ENGLISH LITERALS, not catalogue lookups: the surfaces
+// they open - the test bar, the plug banner, the key page, the agent approval -
+// are a developer's tools, and a tool for whoever writes the service is not
+// addressed to the business. Keeping them translatable cost a translator a
+// tenth of the catalogue for screens they will never see.
+//
+// Split from the issue panel's own strings because the two are previewed
+// apart. Eighteen strings of a report form listed under the bar that carries
+// the button is a list where the six that name the bar are lost - and the
+// panel is a screen of its own, so it gets a screen of its own.
+func userButtonMenuLabels(t map[string]string) map[string]string {
 	labels := map[string]string{
 		"profile":      t["profile"],
 		"signIn":       t["signIn"],
@@ -198,22 +228,44 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 		"tenant":       t["tenant"],
 		"group":        t["group"],
 		"applications": t["applications"],
-		"developer":    t["developer"],
-		"apiDocs":      t["apiDocs"],
-		"schemeAuto":   t["schemeAuto"],
-		"schemeLight":  t["schemeLight"],
-		"schemeDark":   t["schemeDark"],
-		"cancel":       t["cancel"],
+		// The Developer submenu names itself in English, like everything it
+		// opens: see the note on userButtonMenuLabels.
+		"developer":   "Developer",
+		"apiDocs":     "OpenAPI docs",
+		"schemeAuto":  t["schemeAuto"],
+		"schemeLight": t["schemeLight"],
+		"schemeDark":  t["schemeDark"],
+		"cancel":      t["cancel"],
+		// The row that OPENS the panel is the menu's, not the panel's - though
+		// the panel wears it as its title too, so both previews carry it.
+		"openIssue": t["openIssue"],
 	}
-	for _, k := range []string{"openIssue", "issueDescription",
+	return labels
+}
+
+// userButtonIssueLabels is the report form (ISSUE-01), every string of it.
+func userButtonIssueLabels(t map[string]string) map[string]string {
+	labels := map[string]string{
+		// Its title, and the cross that shuts it: drawn by the panel, so a
+		// preview of the panel has to carry them.
+		"openIssue": t["openIssue"],
+		"cancel":    t["cancel"],
+	}
+	for _, k := range []string{"issueDescription",
 		"issueCaptureScreen", "issueCaptureHint", "issueIncludeConsole", "issueRecapture",
 		"issueCrop", "issueApply", "issueReset", "issueRemove", "issueSend", "issueSending",
 		"issueSent", "issueFailed", "issueTooLarge", "issueCaptureFailed",
-		"issueDescriptionRequired", "issueContextNote",
-		"devTools", "devUser", "devRoles", "devApply", "devExit", "devNote", "devFailed",
-		"pluggedTitle", "pluggedBy", "devKey", "devKeySet"} {
+		"issueDescriptionRequired", "issueContextNote"} {
 		labels[k] = t[k]
 	}
+	return labels
+}
+
+func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
+	offered := h.offeredLanguages()
+	p := prefsOf(r, offered)
+	t := catalogue(p.Lang)
+	labels := userButtonLabels(t)
 	css, _, _ := h.chrome()
 	// Lang/Labels are Meerkat's OWN strings, in a flow-page (embedded)
 	// language - a different level from the route's forwarded locales, which
@@ -251,8 +303,9 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 	// account holds the capability (DEV-01).
 	payload.DevDocs = h.st.DevAllowed(r.Context(), u)
 	if payload.DevDocs {
-		key, err := h.st.GetUserDevKey(r.Context(), sess.UserID)
-		payload.DevKey = err == nil && key != ""
+		keys, err := h.st.ListDevKeys(r.Context(), sess.UserID)
+		payload.DevKey = err == nil && len(keys) > 0
+		payload.Plug = h.st.Plug(r.Context()).Enabled
 	}
 	if avatar, err := h.st.GetUserAvatar(r.Context(), sess.UserID); err == nil {
 		payload.Avatar = avatar
@@ -509,9 +562,20 @@ const userButtonJS = `(() => {
         // The head IS the profile link (one entry saved), and the 3-state
         // scheme button rides ITS line (another entry saved): auto -> light
         // -> dark, same glyphs as the flow pages' switcher.
+        // Two states or three. An application with no follow-the-system state
+        // (no-auto) must not be offered a switch with a position nothing behind
+        // it can hold: the cycle becomes light <-> dark, and a choice of auto
+        // already made shows as what the system currently resolves it to.
+        const noAuto = this.hasAttribute('no-auto');
+        const shown = noAuto && data.scheme === 'auto'
+          ? (darkMedia.matches ? 'dark' : 'light')
+          : data.scheme;
+        const next = noAuto
+          ? (shown === 'dark' ? 'light' : 'dark')
+          : (SCHEME_NEXT[data.scheme] || 'light');
         const schemeBtn = this.getAttribute('scheme') === 'select' && !data.schemeImposed
-          ? '<button class="sw on" data-scheme-cycle="' + (SCHEME_NEXT[data.scheme] || 'light') +
-            '" title="' + esc(L.colorScheme) + '">' + schemeIcon(data.scheme) + '</button>'
+          ? '<button class="sw on" data-scheme-cycle="' + next +
+            '" title="' + esc(L.colorScheme) + '">' + schemeIcon(shown) + '</button>'
           : '';
         // Where we are travels with the link, so the profile can send someone
         // back HERE rather than to the application's front door - its
@@ -578,8 +642,10 @@ const userButtonJS = `(() => {
             // the person has no way to match against anything they hold. It
             // lived two levels down in the profile, which is where it was
             // never found.
-            '<a class="item" href="/profile/dev/key"><span>' + esc(L.devKey || 'plug key') + '</span>' +
-            (data.devKey ? mark() : '') + '</a>' +
+            (data.plug
+              ? '<a class="item" href="/profile/dev/key"><span>' + esc(L.devKey || 'plug key') + '</span>' +
+                (data.devKey ? mark() : '') + '</a>'
+              : '') +
             '<a class="item" href="/meerkat/apidocs/"><span>' + esc(L.apiDocs || 'OpenAPI docs') + '</span></a>' +
             (this.getAttribute('route')
               ? '<button class="item" id="devtools"><span>' + esc(L.devTools || 'UI test mode') + '</span>' +
@@ -777,11 +843,37 @@ const userButtonJS = `(() => {
       };
       this.shadowRoot.getElementById('toggle').addEventListener('click', (e) => {
         e.stopPropagation();
+        // A preview's menu is pinned open, so its own button does not shut it.
+        if (this.getAttribute('open') !== null) return;
         closeSubs();
         menu.classList.toggle('open');
         if (menu.classList.contains('open')) stampHere();
       });
-      document.addEventListener('click', () => { closeSubs(); menu.classList.remove('open'); });
+      // Open on arrival, when asked. A preview of the account menu with the
+      // menu shut is a preview of a round button: the rows, their labels and
+      // the submenus are the part a palette or a translation is judged on.
+      // open="issue" opens the report form instead - a screen of its own, with
+      // its own strings, and no way to reach it from a preview where clicking
+      // does nothing.
+      //
+      // Either way it stays open: the click-away that shuts a real menu would
+      // shut this one on the first click anywhere, and a preview one can empty
+      // by accident is a preview with a trap in it.
+      const openWith = this.getAttribute('open');
+      if (openWith === 'issue') {
+        openIssuePanel(this.shadowRoot, L, true);
+        // The button itself has no business here. This instance exists to host
+        // the panel - which is position: fixed, so it does not go with it - and
+        // an avatar floating beside a report form is a second subject on a
+        // screen that has one.
+        const w = this.shadowRoot.querySelector('.wrap');
+        if (w) w.style.display = 'none';
+      } else if (openWith !== null) {
+        menu.classList.add('open');
+        stampHere();
+      } else {
+        document.addEventListener('click', () => { closeSubs(); menu.classList.remove('open'); });
+      }
       menu.addEventListener('click', (e) => e.stopPropagation());
 
       // Flyout submenus: hover opens them (pure CSS); a click PINS them for
@@ -842,7 +934,9 @@ const userButtonJS = `(() => {
         }
         this.wearScheme(v);
         cyc.innerHTML = schemeIcon(v);
-        cyc.dataset.schemeCycle = SCHEME_NEXT[v] || 'light';
+        cyc.dataset.schemeCycle = this.hasAttribute('no-auto')
+          ? (v === 'dark' ? 'light' : 'dark')
+          : (SCHEME_NEXT[v] || 'light');
       });
       const out = this.shadowRoot.getElementById('logout');
       if (out) out.addEventListener('click', () => {
@@ -855,8 +949,13 @@ const userButtonJS = `(() => {
         });
       });
       // Open the issue panel: the menu closes, the panel floats free of it.
+      //
+      // Not in a preview. The row would shut the menu that was pinned open and
+      // cover the bar with a form that has a screen of its own - two subjects
+      // on one screen, and the pinned one gone. Drawn and inert, like Capture
+      // and Send inside the panel itself.
       const iss = this.shadowRoot.getElementById('issue');
-      if (iss) iss.addEventListener('click', () => {
+      if (iss && openWith === null) iss.addEventListener('click', () => {
         closeSubs();
         menu.classList.remove('open');
         openIssuePanel(this.shadowRoot, L);
@@ -914,16 +1013,15 @@ const userButtonJS = `(() => {
     const bar = document.createElement('div');
     bar.className = 'db' + (collapsed ? ' min' : '');
     bar.innerHTML =
-      '<button class="db-tab" title="' + esc(lb('devTools', 'UI test mode')) + '">' +
+      '<button class="db-tab" title="' + esc('UI test mode') + '">' +
       '<span class="db-badge">DEV</span><span class="db-chev">' + (collapsed ? '▾' : '▴') + '</span></button>' +
-      '<label><span>' + esc(lb('devUser', 'User')) + '</span>' +
+      '<label><span>' + esc('User') + '</span>' +
       '<input class="db-user" list="db-users" value="' + esc(active ? sim.user : (data.username || '')) + '"></label>' +
       '<datalist id="db-users"></datalist>' +
       '<div class="db-dd"><button class="db-roles-btn"></button><div class="db-pop"></div></div>' +
-      '<button class="db-apply">' + esc(lb('devApply', 'Apply')) + '</button>' +
-      '<button class="db-exit">' + esc(active ? lb('devExit', 'Exit test') : lb('cancel', 'Cancel')) + '</button>' +
-      '<p class="db-note">' + esc(lb('devNote',
-        'A developer lens, not a privilege: it needs the dev capability, applies only to your own session on this application, and every call is flagged as a test to the backend and logged under your real name.')) +
+      '<button class="db-apply">' + esc('Apply') + '</button>' +
+      '<button class="db-exit">' + esc(active ? 'Exit test' : lb('cancel', 'Cancel')) + '</button>' +
+      '<p class="db-note">' + esc('A developer lens, not a privilege: it needs the dev capability, applies only to your own session on this application, and every call is flagged as a test to the backend and logged under your real name.') +
       '</p><p class="db-err" hidden></p>';
     root.appendChild(bar);
     devBar = bar;
@@ -931,7 +1029,7 @@ const userButtonJS = `(() => {
     const q = (s) => bar.querySelector(s);
     const err = (text) => { const e = q('.db-err'); e.textContent = text; e.hidden = !text; };
     const rolesLabel = () => {
-      q('.db-roles-btn').textContent = lb('devRoles', 'Roles') + ' (' + checked.size + ') ▾';
+      q('.db-roles-btn').textContent = 'Roles' + ' (' + checked.size + ') ▾';
     };
     // The role checklist: the catalog first, plus any checked stragglers
     // (a role of the running test that left the catalog stays visible).
@@ -1045,7 +1143,7 @@ const userButtonJS = `(() => {
         location.reload();
       }).catch(e => {
         btn.disabled = false;
-        err((e && e.message) || lb('devFailed', 'Could not update the test mode.'));
+        err((e && e.message) || 'Could not update the test mode.');
       });
     };
     q('.db-apply').addEventListener('click', apply);
@@ -1105,7 +1203,10 @@ const userButtonJS = `(() => {
   // root. No backdrop - the page stays fully usable while it is open - and
   // the header drags it out of the way of the bug being reported.
   let issuePanel = null;
-  function openIssuePanel(root, L) {
+  // pinned: the panel cannot be shut. For a preview, where closing it leaves an
+  // empty page and no way back but a reload - and where the cross is part of
+  // what is being looked at, so it stays drawn and simply does nothing.
+  function openIssuePanel(root, L, pinned) {
     const lb = (k, d) => L[k] || d;
     if (issuePanel) { issuePanel.querySelector('.ip-desc').focus(); return; }
     const canCapture = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
@@ -1142,8 +1243,10 @@ const userButtonJS = `(() => {
     };
     const btn = (cls, label) => '<button class="' + cls + '">' + esc(label) + '</button>';
     const close = () => { p.remove(); issuePanel = null; };
-    q('.ip-x').addEventListener('click', close);
-    p.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    if (!pinned) {
+      q('.ip-x').addEventListener('click', close);
+      p.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    }
 
     // Drag by the header (pointer capture keeps events flowing off-panel);
     // clamped so at least a grabbable corner always stays on screen.
@@ -1217,7 +1320,11 @@ const userButtonJS = `(() => {
           esc(lb('issueCaptureHint', 'The capture stays in this panel until you send it; you can crop it to the relevant area first.')) +
           '</p>'
         : '';
-      if (canCapture) q('.ip-screen').addEventListener('click', capture);
+      // Drawn but inert when pinned: Capture asks the browser to share a
+      // screen, and a preview that opens a screen-sharing prompt at the person
+      // tuning a palette is worse than useless. The button and its hint are
+      // two of the strings being looked at, so they stay on the page.
+      if (canCapture && !pinned) q('.ip-screen').addEventListener('click', capture);
     };
 
     const renderPreview = () => {
@@ -1301,7 +1408,11 @@ const userButtonJS = `(() => {
       return null;
     };
 
-    send.addEventListener('click', () => {
+    // Send is inert when pinned, for the same reason as Capture: nothing in a
+    // preview should act. It would also strand the panel - the report goes out
+    // by fetch, and a preview's fetch never comes back, so it would sit on
+    // "Sending" for good.
+    if (!pinned) send.addEventListener('click', () => {
       const text = desc.value.trim();
       if (!text) { msg(lb('issueDescriptionRequired', 'A description is required.')); desc.focus(); return; }
       if (st.busy) return;
@@ -1346,6 +1457,46 @@ const userButtonJS = `(() => {
     });
 
     renderIdle();
+    // A PREVIEW SHOWS EVERY WORD THIS PANEL CAN SAY, at once.
+    //
+    // Eleven of its nineteen strings cannot be seen in any one state: the four
+    // red messages share a single line and replace each other, Sending and Sent
+    // overwrite the Send button for a second, and the four crop tools appear
+    // only once an image is in the panel and take the capture button's place.
+    // A preview of one state is a screen where eleven wordings cannot be
+    // judged - and judging a wording against a rendering is the whole reason
+    // this screen exists.
+    //
+    // So it lays them all out, in their own place and their own style. The
+    // layout is not a state the panel ever reaches, deliberately: this is the
+    // same call as the sign-in page, which previews WITH its refusal showing
+    // because a page that never fails teaches nothing about the one line on it
+    // that is not the primary colour.
+    if (pinned) {
+      tools.innerHTML = (canCapture
+        ? btn('ip-screen', lb('issueCaptureScreen', 'Capture the screen')) +
+          '<p class="ip-note ip-cap-hint">' +
+          esc(lb('issueCaptureHint', 'The capture stays in this panel until you send it; you can crop it to the relevant area first.')) +
+          '</p>'
+        : '') +
+        btn('ip-crop', lb('issueCrop', 'Crop')) +
+        btn('ip-reset', lb('issueReset', 'Reset')) +
+        btn('ip-retake', lb('issueRecapture', 'Retake')) +
+        btn('ip-remove', lb('issueRemove', 'Remove')) +
+        btn('ip-apply', lb('issueApply', 'Apply'));
+      q('.ip-actions').innerHTML =
+        btn('ip-send', lb('issueSend', 'Send')) +
+        btn('ip-send', lb('issueSending', 'Sending...')) +
+        btn('ip-send', lb('issueSent', 'Sent'));
+      msgEl.hidden = false;
+      msgEl.innerHTML = [
+        lb('issueDescriptionRequired', 'A description is required.'),
+        lb('issueTooLarge', 'The screenshot is too large to send.'),
+        lb('issueCaptureFailed', 'Screen capture failed.'),
+        lb('issueFailed', 'Sending failed. Please try again.')
+      ].map(esc).join('<br>');
+      return;
+    }
     desc.focus();
   }
 

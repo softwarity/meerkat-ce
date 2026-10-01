@@ -49,6 +49,11 @@ community image runs plug beside the gateway instead, which is plug's own
 default and needs nothing from Meerkat. What the whole thing is for is on the
 [Dev mode](/product/dev-mode) page.
 
+Deploying it opens nothing yet. The tunnel also has a switch of its own in the
+console, **Infra, Plug**, which ships off, beside developer mode; that page
+records the address developers use and hands them the commands to install plug
+on macOS, Linux and Windows. See [Plug](/docs/operations/plug).
+
 The Enterprise file is the one above plus three things: the Enterprise image, a
 port, and the socket that lets the agent give a name to a machine. The image
 lives in a private registry, and a commercial agreement is what opens it - see
@@ -57,7 +62,7 @@ lives in a private registry, and a commercial agreement is what opens it - see
 ```yaml
 services:
   meerkat:
-    image: ghcr.io/softwarity/meerkat-ee:latest
+    image: ghcr.io/softwarity/meerkat:latest
     ports:
       - "8080:8080"
       - "9090:9090"
@@ -86,21 +91,53 @@ part nobody writes down - how not to turn the entry point into a single point
 of failure.
 
 ```bash
-helm install meerkat ./deploy/helm/meerkat \
+helm repo add meerkat https://www.softwarity.io/deploy
+
+helm install meerkat meerkat/meerkat \
   --set admin.password='your-first-password'
 
-# Enterprise, with the tunnel open:
-helm install meerkat ./deploy/helm/meerkat \
-  --set image.repository=ghcr.io/softwarity/meerkat-ee \
+# Enterprise, with the tunnel open (`plug.enabled` is already true):
+helm install meerkat meerkat/meerkat \
+  --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
+  --set admin.password='your-first-password'
+
+# Enterprise in production: the developer surface is closed, and the chart
+# then grants nothing at all on the namespace.
+helm install meerkat meerkat/meerkat \
+  --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
   --set admin.password='your-first-password' \
-  --set plug.enabled=true
+  --set production=true
 ```
 
-`plug.enabled` is what grants this gateway's ServiceAccount the right to
-**manage Services in its own namespace** - and nothing else. That is what lets
-a session point a cluster name at a developer's machine and put it back
-afterwards. The agent cannot read a secret, touch a pod, or see another
-namespace. Off, the chart grants nothing at all.
+What the chart grants this gateway's ServiceAccount, **in its own namespace
+only**, is what the agent needs and nothing more:
+
+| on | for |
+|---|---|
+| `services`, `endpoints` | point a cluster name at a developer's machine, and put it back |
+| `endpointslices` (list, deletecollection) | drop the slice Kubernetes keeps for the deployed pod behind a Service with a named port - without it one request in two still reaches that pod |
+| `deployments` (get, patch) | its own restart, and the sweep that restores a parked Service |
+| `pods` (get, create, delete) | inherit the replaced service's environment, and run - for the length of a session - the pod that serves its volumes to the developer's machine |
+| `pods/exec` | read that environment inside the parked pod, the way mirrord does |
+| `persistentvolumeclaims` (get) | refuse a `ReadWriteOncePod` volume with a reason, rather than with a pod that never starts |
+
+`pods/exec` is the widest of the seven: in this namespace it amounts to running
+code in the pods, and reading an environment a pod has **already resolved** is
+reading the secrets it resolved. It is also why the agent never asks for
+`get secrets`. It sees no other namespace, and the list is plug's own
+(`deploy/plug-k8s.yaml` in that repository): a right the agent grew since would
+be discovered at the moment somebody uses the feature, which is the worst place
+to find out.
+
+The grant **follows the tunnel** rather than a switch of its own.
+`production: true` closes the developer surface: the gateway opens no tunnel,
+and the chart then grants strictly nothing - a right nobody exercises is
+surface for nothing. Otherwise the tunnel can open - it does once it is switched
+on under **Infra, Plug** - so the deployment grants what it may be asked to use, which is why `plug.enabled` defaults to
+**true**: the other way round - the tunnel open, the rights missing - is the one
+combination that cannot work, with an agent saying every minute that it cannot
+do its job. `plug.enabled: false` still refuses the grant outright, for an
+installation that wants the developer surface without the tunnel.
 
 ## Declaring a gateway production
 
@@ -130,6 +167,6 @@ why.
 | `MEERKAT_TLS_ADDR` / `MEERKAT_ADMIN_TLS_ADDR` | `:8443` / `:9443` | The HTTPS doors, opened when a certificate exists for a name. Having one IS the activation - there is no switch that could say "on" while nothing is served. |
 | `MEERKAT_DATABASE_URL` | - | An external PostgreSQL instead of the embedded store. Enterprise, and the prerequisite of a [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | a file under the data directory | The vault master key. It has to be supplied, and identical, on every node of a cluster. |
-| `MEERKAT_PLUG_ADDR` | `:22222` | Moves the developer tunnel's port. It does not turn it off: closing the developer surface does. |
+| `MEERKAT_PLUG_ADDR` | `:22222` | Moves the developer tunnel's port. It does not turn it off: the **Infra, Plug** switch does, and so does closing the developer surface. |
 | `MEERKAT_PRODUCTION` | unset | Declares this gateway production and closes the developer surface for good. |
 | `MEERKAT_TENANCY` | `single` | One implicit organisation, or several (Enterprise). Chosen once, at the first start; the console owns it afterwards. |

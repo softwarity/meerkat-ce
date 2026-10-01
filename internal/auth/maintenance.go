@@ -3,6 +3,7 @@ package auth
 import (
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -53,6 +54,16 @@ type maintenanceData struct {
 	// Continue is where an administrator goes to look anyway, or empty for
 	// everybody else, who has nowhere to go.
 	Continue template.URL
+	// Back is the page the visitor came FROM, when they came from one this
+	// gateway serves. Without it a closed door is a dead end: whoever followed
+	// a link out of another application has no way back but the browser's own
+	// button, and under a portal the bar is not there either - this page is
+	// answered by the gateway, not proxied from an application.
+	//
+	// Same HOST as the request, or nothing. The link is built from the
+	// referrer's PATH alone, so it cannot be turned into a way out of this
+	// site, and never points at the path that just failed.
+	Back template.URL
 	// SignedIn offers the way out. Only to somebody who HAS a session -
 	// showing "sign out" to a visitor who never signed in is an invitation to
 	// wonder what they are signed into.
@@ -63,6 +74,9 @@ const maintenanceBody = `    <p class="maint-lead">{{.T.maintenanceLead}}</p>
     {{if .Reason}}<p class="maint-msg">{{.Reason}}</p>{{end}}
     <p class="maint-when">{{.When}}</p>
     <div class="maint-dot" aria-hidden="true"></div>
+    {{if .Back}}
+    <p class="maint-go"><a href="{{.Back}}">{{.T.back}}</a></p>
+    {{end}}
     {{if .Continue}}
     <p class="maint-note">{{.T.maintenanceAdmin}}</p>
     <p class="maint-go"><a href="{{.Continue}}">{{.T.maintenanceContinue}}</a></p>
@@ -99,7 +113,7 @@ func reasonKey(reason string) string {
 // client has something to wait for.
 func (h *Handler) ServeMaintenance(w http.ResponseWriter, r *http.Request, reason string, until int64, continueURL string) {
 	chrome := h.flowData(r, "titleMaintenance")
-	t := messages[chrome.Lang]
+	t := catalogue(chrome.Lang)
 
 	said := ""
 	if k := reasonKey(reason); k != "" {
@@ -143,9 +157,38 @@ func (h *Handler) ServeMaintenance(w http.ResponseWriter, r *http.Request, reaso
 		flowChrome: chrome,
 		Reason:     said,
 		When:       when,
-		Continue:   template.URL(continueURL), //nolint:gosec // built here from the request path, never carried in
+		Continue:   template.URL(continueURL),        //nolint:gosec // built here from the request path, never carried in
+		Back:       template.URL(backFromReferer(r)), //nolint:gosec // same-host path only, see backFromReferer
 		SignedIn:   err == nil,
 	}, http.StatusServiceUnavailable)
+}
+
+// backFromReferer is the page to offer going back to, or "" when there is none
+// worth offering.
+//
+// The referrer is an untrusted header, so what is taken from it is the PATH and
+// the query and nothing else: the link that comes out is relative to this site
+// and cannot leave it, whatever the header said. Three refusals: another host
+// (the visitor did not come from a page we serve), the path that just failed
+// (the button would fail again, which reads as broken rather than closed), and
+// an unparsable value.
+func backFromReferer(r *http.Request) string {
+	ref := r.Header.Get("Referer")
+	if ref == "" {
+		return ""
+	}
+	u, err := url.Parse(ref)
+	if err != nil || u.Host != r.Host {
+		return ""
+	}
+	if u.Path == "" || u.Path == r.URL.Path {
+		return ""
+	}
+	back := u.Path
+	if u.RawQuery != "" {
+		back += "?" + u.RawQuery
+	}
+	return back
 }
 
 // MaintenanceStripe is the reminder the gateway injects into every page an
@@ -157,7 +200,7 @@ func (h *Handler) ServeMaintenance(w http.ResponseWriter, r *http.Request, reaso
 // may have any stylesheet and any z-index, so it brings its own and borrows
 // nothing.
 func (h *Handler) MaintenanceStripe(r *http.Request) string {
-	t := messages[prefsOf(r, h.offeredLanguages()).Lang]
+	t := catalogue(prefsOf(r, h.offeredLanguages()).Lang)
 	return `<style>
 #mk-maint{position:fixed;top:0;left:0;right:0;z-index:2147483647;` +
 		`display:flex;align-items:center;gap:10px;padding:5px 12px;` +

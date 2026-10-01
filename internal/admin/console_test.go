@@ -209,6 +209,9 @@ func TestConsoleIdentityStamp(t *testing.T) {
 		`class="root`,
 		`data-meerkat-user-id="root"`,
 		`data-meerkat-username="root"`,
+		// The zone the console's own screens render dates in: the scheduler
+		// reads it from here, so a missing stamp is an hour shown wrong.
+		`data-meerkat-timezone="UTC"`,
 		`data-meerkat-primary-tenant="default"`,
 	} {
 		if !strings.Contains(body, want) {

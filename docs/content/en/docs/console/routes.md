@@ -13,10 +13,10 @@ time on.
 
 ![The Routes screen: five routes in order, with their access badges, what they match and their upstream](img/console/routes-list.webp)
 
-Five routes in the order they are read. *Billing* and *Docs portal* carry the UI
-mark, *Orders API* shows an upstream that has been failing, *Inventory* is in
-maintenance, and *Catch-all* on `path: /**` sits last - a catch-all anywhere else
-would answer for everything under it.
+Five routes in the order they are read. *Billing*, *Docs portal* and *Inventory*
+carry the UI mark, *Billing* and *Orders API* require a session (`AUTH`),
+*Inventory* answers by itself in maintenance, and *Catch-all* on `path: /**`
+sits last - a catch-all anywhere else would answer for everything under it.
 
 ## The list
 
@@ -77,11 +77,17 @@ The name sits in the header. The left column lists the sections, grouped:
 
 | Group | Sections |
 |---|---|
-| - | **Target** |
+| - | **Target**, **Identity** |
 | Filters | Security, Predicates, Gates, Rate limits |
 | Modifiers | Incoming, Outgoing |
-| Forwarders | Identity, Locales |
-| UI | Color scheme, User button, User info, Injections |
+| Forwarders | Auth forward |
+| UI | Locales, Color scheme, User button, User info, Tracing, Custom |
+
+**Identity** sits beside Target rather than in a group: what a route knows about
+the caller is not a filter, a modifier or a forwarder - it is what there is to
+forward, and two sections spend it. **Auth forward** sends it to the service
+(headers or a JWT); **User info** puts it on the page. The facts and their names
+are settled once, in Identity.
 
 ### Reading the marks
 
@@ -99,7 +105,7 @@ The name sits in the header. The left column lists the sections, grouped:
 
 Save stays disabled until the route is valid **and** something has changed.
 Beside it, a red **N to fix** button lists every gap: each line names the
-section and jumps to it. There is no hunting through eleven sections for the
+section and jumps to it. There is no hunting through fourteen sections for the
 field that is wanted.
 
 Saving keeps the drawer open and applies the route at once. Closing with unsaved
@@ -115,7 +121,7 @@ close the drawer.
 A UI section once the box is ticked: here Color scheme, which says how the served
 application takes a light or dark choice.
 
-- **Incoming** and **Identity** are disabled when the route answers by itself
+- **Incoming**, **Identity** and **Auth forward** are disabled when the route answers by itself
   (redirect, maintenance, respond). This is not tidiness: the gateway drops
   every request filter on such a route, so editing them would write settings it
   throws away.
@@ -175,7 +181,7 @@ up or down.
   purpose.
 - **Two routes matching the same paths.** Perfectly legal, and the reason order
   exists. Use the Routing test rather than reasoning about it.
-- **Editing Incoming or Identity on a redirect.** The sections are disabled;
+- **Editing Incoming, Identity or Auth forward on a redirect.** The sections are disabled;
   what you want is probably Outgoing, which applies to every mode.
 - **Looking for endpoint rules with no spec.** Declare the OpenAPI spec on the
   route's Target section first.

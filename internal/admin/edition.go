@@ -15,7 +15,10 @@ import (
 // sources would drift.
 func (a *API) registerEdition(mux Mux) {
 	mux.Handle("GET /api/edition", a.authed(a.getEdition))
-	mux.Handle("PUT /api/settings/tenancy", a.rootOnly(a.putTenancy))
+	// App-admin: single or multi organisation is the SHAPE of the identity -
+	// who belongs where - and the capability that holds users, roles and
+	// organisations is the one that decides it.
+	mux.Handle("PUT /api/settings/tenancy", a.appAdmin(a.putTenancy))
 }
 
 // editionInfo is what the console needs to know before drawing anything.
@@ -40,6 +43,10 @@ type editionInfo struct {
 	// ever sees the admin one. It is the same answer the auth authorities are
 	// given for their callbacks, from the same place.
 	DataOrigin string `json:"dataOrigin"`
+	// ConfigurationCap is how many saved configurations this image keeps at
+	// once, 0 for no limit (CFG-01). Said up front - "2 of 3" - because a cap
+	// discovered by being refused is a trap, and a cap announced is a price.
+	ConfigurationCap int `json:"configurationCap"`
 }
 
 func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -49,6 +56,9 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 		Edition:    edition.Name,
 		Tenancy:    a.st.Tenancy(ctx),
 		DataOrigin: a.dataOrigin(r),
+	}
+	if !edition.Enterprise {
+		info.ConfigurationCap = FreeConfigurations
 	}
 	if primary, err := a.st.PrimaryTenant(ctx); err == nil {
 		info.PrimaryTenant = primary.ID
@@ -67,8 +77,8 @@ type tenancyPayload struct {
 	Tenancy string `json:"tenancy"`
 }
 
-// putTenancy switches the shape of the installation, live. Root only, and
-// audited like any other mutation.
+// putTenancy switches the shape of the installation, live. The app-admin's
+// decision (see the registration), and audited like any other mutation.
 //
 // Going to single with several organisations is ALLOWED and deletes nothing:
 // the others stop being served until someone switches back. That is a real

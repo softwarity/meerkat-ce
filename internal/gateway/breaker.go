@@ -185,6 +185,10 @@ func failedStatus(code int) bool {
 type watched struct {
 	http.ResponseWriter
 	status int
+	// bytes is what actually went back, for the access log (OBS-03). Counted
+	// here rather than in a second wrapper: one pass-through per request is
+	// already one too many, two would be silly.
+	bytes int64
 }
 
 func (w *watched) WriteHeader(code int) {
@@ -198,7 +202,9 @@ func (w *watched) Write(b []byte) (int, error) {
 	if w.status == 0 {
 		w.status = http.StatusOK
 	}
-	return w.ResponseWriter.Write(b)
+	n, err := w.ResponseWriter.Write(b)
+	w.bytes += int64(n)
+	return n, err
 }
 
 func (w *watched) Flush() {

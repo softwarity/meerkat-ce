@@ -130,6 +130,8 @@ type portalPayload struct {
 	Side          string            `json:"side"`
 	Display       string            `json:"display"`
 	ShowName      bool              `json:"showName,omitempty"`
+	HideLogo      bool              `json:"hideLogo,omitempty"`
+	LogoRadius    int               `json:"logoRadius,omitempty"`
 	Brand         portalBrand       `json:"brand"`
 	ThemeCSS      string            `json:"themeCss"`
 	Scheme        string            `json:"scheme"`
@@ -145,7 +147,7 @@ type portalPayload struct {
 func (h *Handler) portalJSON(w http.ResponseWriter, r *http.Request) {
 	offered := h.offeredLanguages()
 	p := prefsOf(r, offered)
-	t := messages[p.Lang]
+	t := catalogue(p.Lang)
 
 	css, brand, _ := h.chrome()
 	scheme, imposed := p.Scheme, false
@@ -184,13 +186,15 @@ func (h *Handler) portalJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg, parents := h.portalNav(r.Context(), caller)
-	payload.Enabled = cfg.Enabled
+	payload.Enabled = cfg.Mode == store.PortalModePortal
 	payload.Layout = cfg.Layout
 	payload.Side = cfg.Side
 	if cfg.Display != "" {
 		payload.Display = cfg.Display
 	}
 	payload.ShowName = cfg.ShowAppName
+	payload.HideLogo = cfg.HideLogo
+	payload.LogoRadius = cfg.LogoRadius
 	payload.Parents = parents
 
 	b, err := json.Marshal(payload)
@@ -211,7 +215,7 @@ func (h *Handler) portalJSON(w http.ResponseWriter, r *http.Request) {
 // what ENTERS the config; this guards what a stale reference does at READ.
 func (h *Handler) portalNav(ctx context.Context, caller store.Caller) (store.PortalConfig, []portalEntry) {
 	cfg := h.st.Portal(ctx)
-	if !cfg.Enabled || h.adminPlane {
+	if cfg.Mode != store.PortalModePortal || h.adminPlane {
 		return cfg, nil
 	}
 	routes, err := h.st.ListRoutes(ctx)
@@ -244,7 +248,7 @@ func (h *Handler) portalNav(ctx context.Context, caller store.Caller) (store.Por
 	}
 
 	var out []portalEntry
-	for _, p := range cfg.Parents {
+	for _, p := range cfg.Entries {
 		if p.Disabled { // turned off for everyone, kept in config but not served
 			continue
 		}
@@ -270,14 +274,17 @@ func (h *Handler) portalNav(ctx context.Context, caller store.Caller) (store.Por
 	return cfg, out
 }
 
-// portalLabel is the entry's label: the override when set, else the route's
-// own apps-menu label, else its name.
+// portalLabel is the name an entry is offered under: the catalogue's label
+// when set, else the route's name.
+//
+// TWO SOURCES, NOT THREE. A route used to carry its own menu label, which sat
+// between these two and meant the displayed name could come from any of three
+// places - so finding where a wrong word came from meant looking in all of
+// them. The catalogue is the one place a name is decided now, and the route's
+// name is what an entry falls back to when nobody decided.
 func portalLabel(override string, rt store.Route) string {
 	if override = strings.TrimSpace(override); override != "" {
 		return override
-	}
-	if rt.UI != nil && rt.UI.Link != "" {
-		return rt.UI.Link
 	}
 	return rt.Name
 }

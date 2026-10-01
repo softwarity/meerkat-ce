@@ -147,14 +147,17 @@ app-form-field.height-field {
 
 /* locales rows: on/off toggle, code, console-locale name, endonym */
 .locale-row {
+  /* Columns rather than a free flex row: with "Japanese (Japan)" beside a
+     note, a flex row squeezed the tag to two lines and the name to three. */
   display: grid;
-  grid-template-columns: 40px 110px 1fr 1fr;
+  grid-template-columns: 26px 72px minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 2px 0 2px 4px;
   border-bottom: 1px solid var(--mat-sys-outline-variant);
   max-width: 560px;
 }
+
 .locale-row .lc {
   font-family: monospace;
   font-size: 0.85rem;
@@ -162,12 +165,67 @@ app-form-field.height-field {
 .locale-row .ln {
   color: var(--mat-sys-on-surface-variant);
 }
-.locale-row.off-locale .lc,
-.locale-row.off-locale span {
-  opacity: 0.4;
-}
 .add-locale {
   align-self: center;
+  width: 100%;
+  max-width: 560px;
+}
+/* The languages take whatever height is left: twenty of them, and the field
+   above must not walk off the top when one scrolls to the twenty-first. */
+.locale-set {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 12px 8px;
+  max-width: 560px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-small, 8px);
+}
+.locale-set legend {
+  padding: 0 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mat-sys-on-surface-variant);
+}
+/* A language the route declares and the built-in pages cannot render. It
+   works - the account menu offers it - and the sign-in page cannot follow. */
+.locale-row.unknown {
+  color: var(--mat-sys-tertiary);
+}
+.locale-row span,
+.locale-row .lc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.via-note {
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.warn-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--mat-sys-tertiary);
+}
+.warn-note mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+.lang-error {
+  margin: 0 0 8px;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}
+.locale-list .empty {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.88rem;
+  max-width: 560px;
 }
 /* user-info per-field rows: checkbox + its attribute/meta name */
 .field-row {
@@ -191,21 +249,32 @@ app-form-field.height-field {
 
 /* Identity: one row per selected fact - its name, the mapping input, then a
    live example of what actually travels. */
+/* A TABLE, and it has to be one: the name column was 140px fixed, so
+   "employeeNumber" ran out of it and over the field beside it. A grid on the
+   LIST with each row as display:contents keeps every column the width of its
+   widest cell - the names line up, the fields line up, and nothing is clipped. */
 .id-attrs {
   margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  /* FOUR, and the count is not decoration: a row is display:contents, so its
+     children are placed one per column and a row that emits fewer than the
+     grid declares lets the next one continue in its leftovers. The wand that
+     held the fifth moved to Auth forward - with it gone and the count left at
+     five, every row after the first flowed into the one above. */
+  grid-template-columns: max-content max-content min-content 1fr;
+  /* CENTRED, like any table. It was aligned to the top with two margins
+     pushing the name and the equals sign down to meet the field - which held
+     while every row was the same height and fell apart on the one that carries
+     a hint. A row is as tall as its tallest cell; the rest sit in the middle
+     of it. */
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 6px;
 }
 .id-attr {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  position: relative;
+  display: contents;
 }
 .id-attr .id-field {
-  width: 140px;
   font-family: monospace;
   font-size: 0.85rem;
 }
@@ -221,9 +290,20 @@ app-form-field.height-field {
   color: var(--mat-sys-on-surface-variant);
   cursor: help;
 }
+/* One line: the hint names two headers, and wrapped it made the username row
+   half again as tall as every other. */
+.id-attr .id-map ::ng-deep mat-hint {
+  white-space: nowrap;
+}
 .id-attr .id-map {
-  width: 200px;
+  /* Wide enough for the hint the username row carries, which on 200px took two
+     lines and made that row taller than the rest. */
+  width: 272px;
   display: inline-block;
+}
+/* The roles template, under the row it belongs to, across the whole table. */
+.id-attrs .id-weight {
+  grid-column: 1 / -1;
 }
 /* Filled, not a plain icon among the fields: this is where a 9 KB header
    becomes a 26-byte one, and a flat icon in a row of inputs is not found.
@@ -360,6 +440,15 @@ mat-selection-list mat-list-option[aria-selected='true'] {
   color: var(--mat-sys-error);
 }
 
+// The section that cannot do anything yet, and the way to change that. An
+// aside rather than an error: nothing is wrong with this route.
+.section-hint.off-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 // The warning about modifiers a terminal mode cannot keep, with its way out.
 .warn-row {
   display: flex;
@@ -435,21 +524,21 @@ mat-selection-list .ui-toggle {
   color: var(--mat-sys-on-surface-variant);
 }
 
-/* The [Enterprise] cap sits ON the field it explains rather than beside it: in
-   the flow it widened the two frozen rows and broke the column every other row
-   lines up on. Centred over the input, which is inert underneath anyway.
-   The offsets are the columns declared above (checkbox width + the row gap). */
-.id-attr app-ee-lock,
+/* The [Enterprise] cap, beside the name it explains. It used to sit ON the
+   field, out of the flow, because in the flow it widened the two frozen rows
+   and broke the column the others lined up on - which a table settles: a
+   column is as wide as its widest cell, for every row at once. */
+.id-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .field-row app-ee-lock {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   justify-content: center;
   z-index: 1;
-}
-.id-attr app-ee-lock {
-  left: 150px;
-  width: 200px;
 }
 .field-row app-ee-lock {
   left: 144px;
@@ -466,10 +555,14 @@ mat-selection-list .ui-toggle {
   flex-direction: column;
   min-height: 0;
 }
+/* The list column no longer scrolls as a whole: the FIELDSET inside it does,
+   so the hint and the field one adds with stay where they were put and only
+   the twenty languages move. */
 .locales-pane .locale-list {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   padding-inline-end: 4px;
 }
 .locales-pane .forwarding {

@@ -63,27 +63,20 @@ portal).
 
 ## See traffic go through
 
-A gateway with no routes answers 404 to everything, so a fresh install seeds
-three demonstration routes pointing at `httpbin.org`:
+A fresh gateway starts **empty**: no route, so every path of the data plane
+answers 404 until you say what it serves. The sign-in pages are there already
+(`http://localhost:8080/login`): they belong to the gateway, not to a route.
 
-| Route | Matches | Access |
-|---|---|---|
-| `demo` | `/demo/**` | open to everyone |
-| `demo-secure` | `/secure/**` | any signed-in account |
-| `trap` | `/**` | open, ordered last - catches what nothing else matched |
+Add one in the console, **Infra, Routes**, or through the API - pointing at a
+public test service is enough to watch a call go through:
 
 ```bash
 curl -i http://localhost:8080/demo/get
 ```
 
-The `/demo` prefix is stripped before the call, so what answers is
-`https://httpbin.org/get`. Ask for `/secure/get` in a browser instead, and you
-land on the sign-in page the gateway serves itself.
-
-> [!TIP]
-> These three routes are ordinary routes, stored like any other. Delete them
-> once you have your own - starting with the catch-all, which is what makes a
-> fresh gateway answer something on every path.
+with a route matching `/demo/**`, stripping one segment, towards
+`https://httpbin.org`. [Your first route](/docs/start/first-route) walks
+through it.
 
 ## Next
 

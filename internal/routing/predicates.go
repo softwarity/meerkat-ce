@@ -189,10 +189,11 @@ func init() {
 	registerPredicate(predicateDef{
 		Type:    "path",
 		Doc:     "Matches the request path against one or more patterns.",
-		Details: "Patterns match path segments: {id} stands for any one segment, /orders/** is everything below, and every other segment is literal - a lone * matches a path that really contains a star, it is not a wildcard. Several patterns act as OR.",
+		Details: "Ant-style path patterns, the family of Spring's PathPattern, in a strict subset: a segment is literal, {id} stands for any one segment, and ** - last segment only - is everything below (/orders/** matches /orders too). No ? and no * wildcard: a lone * matches a path that really contains a star. A trailing slash is ignored, /demo and /demo/ are one route. Several patterns act as OR. There is no exclusion: to keep /api/internal/** out of every route that would catch it, give it a route of its own, above the others, that always refuses.",
 		Params: []Param{
 			{Name: "patterns", Kind: KindStringList, Required: true, Doc: "e.g. /api/users/{id}, /static/**"},
 		},
+		Ref: &Reference{Label: "Spring PathPattern (Ant style)", URL: "https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/util/pattern/PathPattern.html"},
 		compile: func(a decoded) (Predicate, error) {
 			raw := a.strs("patterns")
 			pats := make([]pathPattern, len(raw))

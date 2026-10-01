@@ -80,8 +80,20 @@ file refers to vault entries this gateway does not have, a second dialog lists
 them so you can fill them in straight away.
 
 > [!NOTE]
-> Enterprise edition: keeping several configurations and switching between them
-> (save, import, duplicate, set as current). Exporting is in both editions.
+> Every action works in both editions - save, import, duplicate, set as
+> current, export. What differs is the size of the shelf: the community edition
+> keeps **three** saved configurations at a time and says where you are beside
+> the Import button (*2 of 3 saved*), before the cap is reached; Enterprise keeps
+> as many as you like.
+
+### Comparing two saved configurations
+
+With two or more on the shelf, a saved row offers **Compare with another saved
+configuration**: choose the other one, and the dialog lists what changes going
+from the first to the second - added, updated, removed, object by object, with
+the fields that moved inside an update. What runs is left out: it is the question
+asked of a customer's configuration and the template it was made from, before
+touching either. `GET /api/configurations/{id}/compare/{other}`.
 
 ## History
 

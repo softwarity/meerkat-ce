@@ -498,12 +498,27 @@ func TestLoginPageOffersPublicUIRoutes(t *testing.T) {
 		return []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{pattern}}}}
 	}
 	save(store.Route{ID: "pub", Name: "docs", Order: 1, Enabled: true, IsUI: true,
-		UI: &store.RouteUI{Link: "docs"}, Upstream: "http://up", Predicates: pathPred("/docs/**")})
+		Upstream: "http://up", Predicates: pathPred("/docs/**")})
 	save(store.Route{ID: "api", Name: "openapi", Order: 2, Enabled: true,
 		Upstream: "http://up", Predicates: pathPred("/api/**")})
 	save(store.Route{ID: "sec", Name: "vault", Order: 3, Enabled: true,
 		Access: store.Access{Level: store.AccessAuth},
 		IsUI:   true, Upstream: "http://up", Predicates: pathPred("/secure/**")})
+
+	// The login page offers the catalogue, not "every UI route that carries a
+	// label": an entry is offered because somebody listed it (PORTAL-03).
+	portal := store.PortalConfig{Mode: store.PortalModeLinks,
+		Entries: []store.PortalEntry{{RouteID: "pub", Label: "docs"}, {RouteID: "sec", Label: "vault"}}}
+	routes, err := st.ListRoutes(ctx)
+	if err != nil {
+		t.Fatalf("ListRoutes: %v", err)
+	}
+	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+		t.Fatalf("SanitizePortalConfig: %v", err)
+	}
+	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {
+		t.Fatalf("SetSetting portal: %v", err)
+	}
 
 	mux := http.NewServeMux()
 	New(st, session.NewManager(st)).Register(mux)
@@ -547,5 +562,20 @@ func TestPasskeyStartEndpoints(t *testing.T) {
 	body := rec.Body.String()
 	if rec.Code != http.StatusOK || !strings.Contains(body, `"residentKey":"required"`) {
 		t.Fatalf("register start: %d %s", rec.Code, body)
+	}
+}
+
+// speaks declares a UI route written in these languages, which is now the only
+// way this gateway offers any: the pool an operator used to type into a screen
+// is gone, and the offer is the union of what the routes say (I18N-04).
+func speaks(t *testing.T, st *store.Store, codes ...string) {
+	t.Helper()
+	if err := st.SaveRoute(context.Background(), store.Route{
+		ID: "spoken", Name: "spoken", Order: 900, Enabled: true, IsUI: true,
+		Upstream:   "http://example.invalid",
+		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/spoken/**"}}}},
+		Locales:    &store.LocalesConfig{Speaks: codes},
+	}); err != nil {
+		t.Fatalf("a route that speaks %v: %v", codes, err)
 	}
 }

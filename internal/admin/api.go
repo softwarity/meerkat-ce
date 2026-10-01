@@ -48,6 +48,16 @@ type API struct {
 	// single-binary installation - see reload.go.
 	Bus cluster.Bus
 
+	// Scheduler is this node's own scheduler (SCHED-01), rung when a schedule
+	// is written here: the other nodes hear it on the bus, and this one
+	// sleeps until the next thing owed, so it has to be told. Wired by main;
+	// nil is fine.
+	Scheduler interface{ Wake() }
+
+	// metricsDoor is this node's metrics port (metricsport.go), nil until
+	// main asks for one.
+	metricsDoor *metricsDoor
+
 	st     *store.Store
 	sm     *session.Manager
 	router *gateway.Router
@@ -57,8 +67,54 @@ type API struct {
 	Metrics *metrics.Window
 	// Live is the console's live channel: one socket for the whole control
 	// plane, with a source per screen. Set by main. Nil leaves the endpoint
-	// unmounted rather than answering an upgrade nothing feeds.
-	Live http.Handler
+	// answering 503 rather than an upgrade nothing feeds.
+	//
+	// It is asked to serve FOR a caller rather than handed the request, because
+	// what a subscriber may watch is decided here and not inside the socket:
+	// the library shares one read between the subscribers of a topic and cannot
+	// tell them apart, so the perimeter is chosen at the upgrade - see
+	// live.Server.ServeFor.
+	Live LiveChannel
+	// Changes is the journal the console's screens watch (CONSOLE-13): every
+	// administrative write is recorded there by the audit funnel. Nil in the
+	// tests, and in a build with no live channel.
+	Changes ChangeJournal
+}
+
+// LiveChannel serves the console's socket for one caller.
+//
+// A function and not an interface, because the perimeter below is declared HERE:
+// an interface would force the transport to name this package's type, and the
+// transport has no business knowing what a capability is. main translates, which
+// is what main is for.
+type LiveChannel func(p LivePerimeter, w http.ResponseWriter, r *http.Request)
+
+// LivePerimeter is one caller's view of the channel: the key that makes two
+// callers the same reader, and the topics they may subscribe to.
+type LivePerimeter struct {
+	// Key is what two readers must share to share one read. It carries
+	// everything the sources below were built from, so two callers with the
+	// same key would receive byte for byte the same rows.
+	Key string
+	// Named are the kinds whose last write may be DESCRIBED to this reader -
+	// the action, the instance, who did it - and Quiet the kinds they are only
+	// told moved. The split is the trail's own partition (auditScope): a kind
+	// whose rows belong to an organisation is partitioned by organisation,
+	// which a shared read cannot check per subscriber, so it stays quiet.
+	Named []string
+	Quiet []string
+	// The planes this reader administers, which is what decides the topics
+	// BESIDES the changes journal. Named as capabilities rather than as topic
+	// names on purpose: which source serves a plane is the live package's
+	// business, and it is the one place that already knows.
+	RoutingPlane     bool
+	ApplicationPlane bool
+}
+
+// ChangeJournal is the live journal, as this package needs it: somewhere to put
+// one event. internal/live implements it.
+type ChangeJournal interface {
+	Record(ev store.AuditEvent)
 }
 
 // New builds the admin API. router receives a hot reload after every
@@ -100,6 +156,7 @@ func (a *API) Register(mux Mux) {
 	a.registerAuthProviders(mux)
 	a.registerIdentity(mux)
 	a.registerThemes(mux)
+	a.registerLocaleEditor(mux)
 	a.registerRBAC(mux)
 	a.registerGroupRules(mux)
 	a.registerAdminTokens(mux)
@@ -117,6 +174,11 @@ func (a *API) Register(mux Mux) {
 	a.registerConfigPoints(mux)
 	a.registerBackup(mux)
 	a.registerCertificates(mux)
+	a.registerSchedules(mux)
+	a.registerTelemetry(mux)
+	a.registerPlug(mux)
+	a.registerSessions(mux)
+	a.registerDataTokens(mux)
 	a.auditRegisterViewer(mux)
 }
 
@@ -130,16 +192,37 @@ func (a *API) catalog(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, routing.Catalog())
 }
 
+// routeOut is a stored route plus what the RUNNING gateway has to say about it.
+// The store holds what an operator wrote; the router holds whether it is being
+// served. A route left out because it no longer compiles - an imported
+// configuration, a restore, an image rolled back past a brick a route names -
+// is still in the store and answers nothing, and the one place that must not
+// hide it is the list where the operator looks for it.
+type routeOut struct {
+	store.Route
+	// Problem is why the gateway is not serving it, or empty.
+	Problem string `json:"problem,omitempty"`
+}
+
+func (a *API) withProblems(routes []store.Route) []routeOut {
+	problems := map[string]string{}
+	if a.router != nil {
+		problems = a.router.Problems()
+	}
+	out := make([]routeOut, 0, len(routes))
+	for _, r := range routes {
+		out = append(out, routeOut{Route: r, Problem: problems[r.ID]})
+	}
+	return out
+}
+
 func (a *API) listRoutes(w http.ResponseWriter, r *http.Request) {
 	routes, err := a.st.ListRoutes(r.Context())
 	if err != nil {
 		a.internal(w, err)
 		return
 	}
-	if routes == nil {
-		routes = []store.Route{}
-	}
-	writeJSON(w, http.StatusOK, routes)
+	writeJSON(w, http.StatusOK, a.withProblems(routes))
 }
 
 func (a *API) getRoute(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +231,7 @@ func (a *API) getRoute(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "route not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, route)
+	writeJSON(w, http.StatusOK, a.withProblems([]store.Route{route})[0])
 }
 
 // previewRespond renders a respond template against the witness caller, so the
@@ -244,6 +327,9 @@ func (a *API) putRoute(w http.ResponseWriter, r *http.Request, actor store.User)
 	route.ID = r.PathValue("id")
 	saved, err := a.saveRoute(r.Context(), actor, route)
 	if err != nil {
+		if conflict(w, err) {
+			return
+		}
 		if isInvalid(err) {
 			writeErr(w, http.StatusUnprocessableEntity, err.Error())
 			return
@@ -436,6 +522,22 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil && !errors.Is(err, http.ErrHandlerTimeout) {
 		slog.Error("admin api encode", "err", err)
 	}
+}
+
+// conflict answers 409 when a write lost a race with somebody else's, and says
+// so to the caller. It returns false for anything else, so a handler keeps its
+// own mapping: this is one case added in front, not a replacement.
+//
+// Its own status because it is its own thing: nothing is wrong with what was
+// sent except that the object moved under it. 409 is what tells a client to
+// read again rather than to fix its payload - and what the console turns into
+// one sentence and a Reload, on every screen at once.
+func conflict(w http.ResponseWriter, err error) bool {
+	if errors.Is(err, store.ErrStale) {
+		writeErr(w, http.StatusConflict, err.Error())
+		return true
+	}
+	return false
 }
 
 func writeErr(w http.ResponseWriter, status int, msg string) {

@@ -5,7 +5,19 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-09-19 : **le site GitHub Pages refait en entier** - voir la
+_Derniere mise a jour : 2026-09-30 : **le scheduler complete** - tache ponctuelle (SCHED-02),
+historique des executions et rejeu (SCHED-03), reprise automatique bornee (SCHED-04), report
+demande par le service (SCHED-05) : quatre commits sur main, **PAS pousses**, voir la section
+"Session 2026-09-30". Avant cela, 2026-09-26 : **la console vivante** (CONSOLE-13 - une ecriture
+quelque part met a jour les ecrans partout, en complement de la revision qui refuse
+l'ecriture perimee) - commite sur main, **PAS pousse**, voir la section
+"Session 2026-09-26". Avant cela, 2026-09-25 : **une langue se corrige, s'ajoute et se declare** (I18N-05
+et le virage I18N-04) - 51 commits sur main, **PAS pousses**, voir la section
+"Session 2026-09-24/25". Avant cela, 2026-09-23 : **un catalogue d'applications (PORTAL-03), la telemetrie a un seul taux, et les captures qui se refont en une commande** (non commite, PAS pousse), voir la section "Session 2026-09-23". Avant cela, 2026-09-22 :
+**le scheduler sans tic ni verrou, et au moins une fois pour de vrai** (SCHED-01, commité le
+2026-09-22 avec la correction OBS-04 à part, PAS poussé), voir la section
+"Session 2026-09-22". Avant cela, 2026-09-21 :
+**les appels planifies (SCHED-01)**, non commites, voir la section « Session 2026-09-21 ». Avant cela, 2026-09-19 : **le site GitHub Pages refait en entier** - voir la
 section « Session 2026-09-19 » plus bas. Avant cela, 2026-09-17 : **banc comparatif** (PERF-05, non commite, en attente de
 validation). `tools/bench/run.sh` (`make bench`) : Meerkat face a Kong 3.9.3 (DB-less),
 APISIX 3.18.0 (standalone) et Traefik v3.7.13, chacun epingle sur UN CPU (`--cpuset-cpus 0`,
@@ -273,6 +285,697 @@ B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste
 repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+
+## Session 2026-09-30 - le scheduler complete (SCHED-02 a SCHED-05)
+
+Quatre chantiers demandes par Francois, dans cet ordre, un commit chacun (non pousses). Point
+de depart : trois questions qu'on lui a posees sur les schedules (taches ponctuelles ?
+historique ? retenir un declenchement pendant une indisponibilite ?), dont deux se repondaient
+par "non, pas encore".
+
+**SCHED-02, la tache ponctuelle.** Une troisieme facon de dire QUAND : `at`, un instant RFC 3339
+avec son decalage. L'appel part la, une fois, et la tache est TERMINEE (`next_at = 0`,
+`Finished()`), pas armee a nouveau. `timezone` et `startAt` sont refuses a cote (la date porte
+son decalage ; une date unique est son propre premier tour). Une date passee part si `catchUp`
+le permet, sinon le tour est **abandonne** et la ligne le dit (`dropped`, nouvel etat).
+Retention reglable par root (`GET/PUT /api/settings/schedules`, 7/30/90/365 jours, 30 par
+defaut) et balayage dans la boucle `purge` de main.go. Piege trouve : `time.Time{}.Unix()` vaut
+l'an -44, d'ou `turnAt()` qui ecrit zero.
+
+**SCHED-03, l'historique et le rejeu.** Table `schedule_runs`, une ligne par tour TERMINE,
+ecrite **depuis le store lui-meme** (`FinishSchedule`, `AbandonRun`, `DropTurn`) pour qu'aucun
+appelant ne puisse l'oublier ; best effort, un historique qui n'ecrit pas ne fait pas echouer la
+cloture. `cause` + `of_run` = la CHAINE (turn / manual / replay / retry / asked). L'id de ligne
+porte le temps (`run-<nanos>-<alea>`) parce que `ended_at` est une seconde et que deux tours y
+tiennent. `GET /api/schedules/{id}/runs` ; rejeu par `POST /run {"replayOf": "<id>"}` (nouvelle
+execution, payload d'AUJOURD'HUI, 404 si l'id n'est pas de cette tache). Outil agent
+`list_schedule_runs`.
+
+**SCHED-04, la reprise automatique.** Trois tentatives par TOUR (le renvoi apres l'arret d'une
+passerelle compte dedans), 30 s puis 2 min, jamais au-dela du `catchUp`. Liste courte decidee
+par Francois : 401, 403, 404 et absence de reponse (502/503/504/timeout). **Pas le 500** : "ca ne
+doit pas arriver ou doit etre traite dans le service". Une reprise apres une REPONSE prend un
+NOUVEL identifiant d'execution (un service qui deduplique aurait jete un appel sur lequel il n'a
+rien fait) ; le compteur voyage dans `turn_try`, pose a l'armement, lu au claim
+(`attempts = turn_try + 1`).
+
+**SCHED-05, le report demande par le service.** Idee de Francois, et le bon code HTTP est le
+sien : **424 Failed Dependency + Retry-After** (pas 503, qui dit "je suis eteint" et que la
+reprise couvre deja). Meme chose sur le rapport d'un 202 : `retryIn` (duree ISO). La RAISON reste
+sur l'execution qui l'a donnee, le tour suivant pointe vers elle. Bornes **ramenees** plutot que
+refusees (1 min au plus tot, 1 jour au plus tard) et 5 reports consecutifs au maximum, apres quoi
+le tour est lache et la cadence reprend.
+
+**Verifie** : `make fmt lint test test-ee` a chaque etape, paquets touches aussi sur PostgreSQL
+(`make pg-up`, tags ee), et fumee sur des gateways JETABLES (ports 1858x/1859x, jamais celle
+d'air) : action differee partie a sa date puis terminee, tour trop tard abandonne, historique et
+rejeu chaines, 403 repris en tentative 2 sous un nouveau run id, 500 non repris, 424 qui repousse
+le tour de 60 s avec sa raison. Captures Playwright de l'ecran a chaque etape.
+
+**Reste ouvert** : `overlap: "run"` ne fait toujours rien (une ligne ne porte qu'un run) - a
+supprimer ou a redefinir ; et le code mort `RunCredentialID` / `IsRunCredential`.
+
+## Session 2026-09-27/28 - metriques, plug, et la securite des comptes dans l'audit
+
+**Etat : commits sur `main`, audit et scan doc compris
+RIEN pousse** (plus de credit CI : tout se teste en local - make fmt lint test,
+go test -race -tags ee, e2e 318/318, site de doc construit).
+
+### Livre
+
+- **Port des metriques** (OBS-05) : `/metrics` sur un port a lui (9091 par defaut, choisi
+  dans la console), jeton facultatif, ouvert/ferme a chaud sur chaque noeud (bus). Page
+  **Infra, Metrics endpoint** (sortie de l'ecran Traffic). Service Helm `-metrics`.
+- **Push OTLP des metriques** : `TelemetryConfig{Enabled, Traces, Metrics}`, cumulatif toutes
+  les 30 s, noms OTel qui se retraduisent vers les memes series que le scrape (verifie contre
+  un vrai otelcol-contrib). Le bouton Test sonde aussi `/v1/metrics` et nomme Jaeger qui ne
+  prend que les traces. Chaque page renvoie a l'autre.
+- **Plug** : page **Infra, Plug** (interrupteur livre ETEINT, adresse publiee, commandes par
+  OS qui suivent les champs, `plug rn`, lien vers la doc de plug). Deux conditions : Plug
+  allume ET mode developpeur. Plug eteint = pas de page de cle publique cote profil.
+- **Snippets shell colores** (CodeMirror legacy-modes), MCP et restauration convertis.
+- **AUD-01, securite des comptes** : meme table `audit_events` (colonne `ip`, schema v66),
+  deux genres `account` (app-admin) et `console` (root seul), ecrits par `internal/auth`
+  (`security.go`), jamais par l'entonnoir admin donc aucun ecran reveille. Actions : signin,
+  signin.refused (vraie raison), signin.locked (seule la tentative qui declenche le frein ecrit,
+  les suivantes rien), signout, password.*, mfa.*, passkey.*, email.change, token.*,
+  register*, devkey.set. Filtre `kind=admin|security` (API, MCP `read_audit`, console : toggle
+  All/Changes/Security). `NewEventID` devient monotone dans la milliseconde (sinon le refus
+  se lisait apres le verrouillage).
+- **Scan doc/code** : Helm/compose disaient que plug s'ouvre seul (il faut Infra, Plug) ;
+  "niveau de log reglable a chaud" etait faux partout (SetLevel n'est appele par personne) ;
+  flags log/OTLP et `MEERKAT_DEMO_UPSTREAM` documentes ; section Swagger dev manquait en
+  anglais ; OpenAPI de `/api/audit` annoncait from/to/q qui n'existent pas.
+
+### Decisions
+
+- **Audit du plan de donnees** : A (securite des comptes en base) FAIT ; B = **signal OTLP
+  Logs** (trois flux : operational, access, audit ; une COPIE, chacun reste ou il est ecrit).
+  Pas de table d'acces en base. Interrupteur par route pour le journal d'acces, distinct de
+  celui des traces, sans echantillonnage. Collecteur muet : lot perdu et compte, jamais
+  bloquant (pas de fail-closed).
+- **Jeton d'amorcage par variable d'env** : refuse par Francois ("le login est suffisant").
+
+### Reste
+
+- B : le signal OTLP Logs. Puis rattacher un tenant admin a la securite de ses membres.
+- Canopy : telemetrie encore a gatewayDetail true / sample 100 % ; plug sans hote publie.
+- Decisions en attente sur la matrice des droits (user-fields, GET /api/settings ouvert...).
+
+### Suite du 2026-09-28 au soir - on augmente les stats (109 -> 123 faits)
+
+Deploye sur canopy a chaque livraison (regle : [[deploy-canopy-each-time]]).
+
+- Audit : organisation sur les connexions (`signin.organisation`, deconnexion comprise),
+  affichee sur chaque ligne ; selecteur All / Changes / Data plane sign-ins / Console sign-ins.
+- DEV-02 : plusieurs cles plug par compte (table `dev_keys`, v67, empreinte unique sur
+  l'installation), `devkey.add` / `devkey.remove`.
+- ROUTE-10 : plus AUCUNE route semee au demarrage ; la suite e2e cree `/demo`, `/secure`
+  et le fourre-tout par l'API (seed.setup.ts). `MEERKAT_DEMO_UPSTREAM` supprime.
+- CFG-01 : "2 of 3 saved" (configurationCap sur /api/edition). OBS-01 : p95 trace.
+- SSL-06 : HSTS global (reglage TLS `hstsMaxAge`, eteint, 1 jour a l'allumage, jamais par
+  dessus la valeur d'un service ou d'une route, sans includeSubDomains).
+- SEC-05 : cout bcrypt unique `passwordCost`, re-hachage a la connexion sans toucher
+  l'historique ni la date de changement.
+- Clos par decision : AUTH-06, AUTH-08, LIFE-01 (pas de page de setup), QUAL-02,
+  DEPLOY-02, THEME-02, THEME-03 (console aux couleurs Meerkat). RBAC-08 SUPPRIME (un
+  interrupteur global ne retirerait pas les droits des services en amont).
+- En attente de Francois : SAUTH-04 (il ne voit pas l'interet ; argument : un emetteur
+  `iss` a connaitre en plus du JWKS, et les bibliotheques qui se configurent par
+  `issuer-uri`), ROUTE-21 garde pour plus tard. Prochain : la liste des 20 plus simples.
+
+### Nuit du 28 au 29 - sept de plus (deploiements ee-0013 a ee-0036)
+
+- RBAC-07 : `denyUnlisted` ("Only listed operations are reachable", pied de l'ecran de securite).
+- TENANT-02 : quitter son organisation depuis le profil (`/profile/leave`, `member.leave`),
+  4 cles dans les 20 catalogues.
+- SSL-04 : certificats en tete du digest quotidien (ACME dans la fenetre = renouvellement en echec).
+- AUTH-21 : le reset revoque jetons d'API et navigateurs de confiance ; pas de lien pour un compte
+  federe ; compteur `resetAttempts` a part (5 par defaut, jamais eteint).
+- AUTH-22 : changement d'adresse confirme par un lien a la NOUVELLE adresse (`/confirm-email`,
+  payload dans `email_tokens`, schema v68), l'ancienne prevenue ; duree 24 h / 48 h / 7 j
+  (choix, pas un nombre : chaque duree a sa phrase dans les 20 langues).
+- PERF-06 : ETag fort `mk-` sur les pages reecrites, 304 servi par la passerelle (verifie sur canopy).
+- HSTS suit Force HTTPS (plus d'interrupteur), jamais localhost ni IP ; ecran TLS : controles
+  toujours affiches, grises sans certificat. Import de config : l'audit liste les objets touches.
+- A expliquer a Francois : ROUTE-02 (description et tags sur une route). Reste de la liste : a
+  voir le 29 au matin.
+
+## Session 2026-09-26 - la console vivante (CONSOLE-13), socle + deux ecrans
+
+**Etat : commite sur `main`, RIEN pousse.** `make fmt lint test` vert en CE et en EE,
+console construite, verification a deux navigateurs passee (13 controles).
+
+### Le probleme
+
+La revision posee la veille sur sept tables rend la collision SANS DANGER (409 + le
+`stale.interceptor` qui le dit), mais elle arrive toujours : deux onglets, deux
+operateurs, et le second l'apprend au moment d'enregistrer, apres avoir saisi. Demande de
+Francois : "je save, tous les clients connectes recoivent la mise a jour, plus de probleme
+de collision" - **en complement de la revision, pas a sa place**.
+
+### Ce qui a ete livre
+
+1. **Une source d'invalidation, pas une replication** (`internal/live/changes.go`). Une
+   ligne par **ECRITURE** (genre, quelle ligne, quelle action, par qui), fenetre des
+   cinquante dernieres. L'ecran relit ensuite par son propre GET, deja cloisonne, et comme
+   l'ecriture NOMME la ligne il relit UNE ligne (`GET /api/routes/{id}`) et non la liste -
+   mesure par le script de verification : `/api/routes/alpha` et pas `/api/routes`.
+   Une ligne par genre (premiere version, corrigee le jour meme sur remarque de Francois)
+   perdait les identifiants des ecritures groupees : deux routes sauvees dans la meme
+   fenetre de coalescence s'effondraient en un seul id. Une ecriture qui ne nomme rien
+   (reordonnancement, import, mot de passe global) laisse l'id vide = "relis ta liste" ;
+   un ecran tombe de la fenetre (portable en veille) relit tout. **Zoneless** : une ligne
+   relue est reecrite en NOUVEAU tableau et NOUVEL objet dans le signal - muter en place ne
+   repeint rien (piege signale par Francois).
+   **Le panneau d'edition ouvert** (trois cas, les deux derniers trouves en mesurant sur
+   question de Francois) : (1) une autre ligne bouge -> relecture ciblee, l'editeur ne voit
+   rien ; (2) une autre ligne est CREEE -> la liste se recharge, et la liste est ce qui
+   nourrit l'editeur, donc la ligne ouverte garde son objet tant que la saisie est en
+   cours (`mindTheOpenEditor`) ; (3) la ligne ouverte est SUPPRIMEE -> ca passe avant le
+   garde de saisie, le tiroir se ferme et nomme qui l'a supprimee, sinon on travaille vers
+   un 409. Raison technique mesuree dans
+   la bibliotheque : `Registry.Watch` partage une lecture entre tous les abonnes d'une
+   meme cle et appelle `Read` avec un `context.Background()` detache - une source ne peut
+   PAS savoir qui lit, donc y repliquer des lignes metier serait ecrire la frontiere de
+   securite une seconde fois.
+2. **Le reveil vient de l'entonnoir d'audit** (`a.audit`, `internal/admin/audit.go`) :
+   toute mutation y passe deja, elle nomme le genre, et `auditUpdate` n'ecrit rien pour une
+   sauvegarde sans changement. Zero requete au repos, zero emission a recopier, complet
+   pour l'endpoint ajoute le mois prochain.
+3. **La table des genres** (`store.AuditTargets`, `internal/store/audit.go`) : chaque genre,
+   les capacites qui l'administrent, et s'il appartient a une organisation. Elle sert au
+   journal (RBAC-05) ET au live. `internal/admin/audit_targets_test.go` parcourt le source
+   en `go/ast` et refuse un genre ecrit mais non classe (et l'inverse).
+   **Effet de bord voulu** : les deux tranches locales nommaient 7 genres sur 19 et deux
+   etaient faux (un theme s'ecrit en app-admin, un jeton en root) - la classification est
+   desormais celle des entonnoirs reels.
+4. **Le socket ouvert a tout administrateur, autorise par topic** : `live.Server` tient un
+   registre memoise PAR PERIMETRE (`live.Perimeter`), `GET /api/live` passe de `infraAdmin`
+   a `authed` + `a.livePerimeter` (derive de `auditScope`). **Trou ferme au passage** : les
+   appels planifies repondent a un app-admin alors que leur ecran se peuple par ce socket -
+   il restait vide pour exactement la personne a qui l'API etait ouverte.
+5. **Cluster** : `store.TopicChanged`, signal porteur (l'evenement sans son diff),
+   `bus.OnSignal` dans main. En perdre un coute un ecran en retard, jamais une ecriture
+   fausse.
+6. **Console** : `shared/live-changes.service.ts` (abonnement paresseux, `on(kind, fn)`,
+   `last(kind)`), l'indicateur `lw-live-indicator` UNE fois dans le rail (celui du bandeau
+   du scheduler retire), les ecrans **routes** et **comptes** cables, les deux boutons
+   Refresh correspondants supprimes. L'editeur de route ouvert : rechargement silencieux
+   s'il est intouche, **bandeau collant** nommant l'acteur sinon - la saisie survit.
+7. **Correction annexe** : `rev` etait entre dans les diffs d'audit (sequelle de la
+   revision) - chaque modification affichait "rev: 1 -> 2" a cote du vrai changement.
+   Ajoute a `auditIgnore`.
+
+### Pieges rencontres
+
+- **`npm run build` ne suffit pas** : la console servie vient de `internal/admin/ui/dist`,
+  copie par **`make ui`**. Une heure perdue a chercher pourquoi aucun socket ne s'ouvrait,
+  sur une console du 25 septembre.
+- **Un genre absent de la premiere snapshot** : la regle "la premiere version d'un genre
+  sert de reference" avalait la PREMIERE ecriture de chaque genre sur une passerelle qui
+  vient de demarrer - c'est-a-dire exactement celle qu'on regarde. La reference est
+  desormais la premiere FRAME, pas la premiere version de chaque genre (`primed`).
+- **Le bandeau defilait** avec le contenu du tiroir : il sortait de l'ecran au moment ou
+  l'editeur sautait a l'erreur en bas du formulaire. `position: sticky`.
+
+### Les autres ecrans (meme journee, apres validation)
+
+**Deux reponses, selon ce que l'ecran est.** Une LISTE se recharge toute seule et sans
+spinner (`load(quiet = true)`) : roles, fournisseurs d'identite, jetons, agents MCP, coffre
+(via le service partage), certificats, configurations (les deux onglets), incidents,
+matrices groupes/membres, et le journal d'audit qui ecoute TOUTE ecriture (`onAny`) puisque
+ce qu'il montre EST les ecritures. Un FORMULAIRE ne se recharge jamais tout seul : il
+PROPOSE (`live.offer(change, reload)` -> snack "X changed this somewhere else / Reload") -
+reglages generaux et securite, relais mail, portail, modele de compte, pages integrees,
+page d'organisation. L'ecran TLS est mixte : seule la liste des certificats se rafraichit,
+le reste est un formulaire.
+
+Boutons Refresh retires partout ou l'ecran est vivant (routes, comptes, roles, fournisseurs
+d'identite, incidents, audit) - la regle de livewire est de ne pas livrer les deux.
+
+Pas encore fait : les sous-ecrans d'un compte (identites externes, historique), et la
+relecture d'UNE ligne la ou l'API n'a pas de GET par id (comptes, roles, themes) - ces
+ecrans relisent leur liste. `GET /api/routes/{id}` existait, d'ou le cible sur les routes.
+
+### Import de configuration par l'agent (fin de journee)
+
+Le manque trouve en preparant `understory/meerkat-conf` : un agent pouvait TOUT
+lire et presque tout ecrire, mais pas **initialiser** une installation - l'import
+d'une configuration n'existait que dans la console et dans l'API REST. Trois
+outils desormais (root seulement, `internal/admin/mcp_write.go`) :
+
+- `import_configuration` (document YAML/JSON, `prune`, `dryRun`) : fusionne par
+  defaut, aligne sur le document avec `prune`, rend le plan sans rien toucher
+  avec `dryRun`. Un ZIP est refuse en nommant la sortie (la console).
+- `activate_configuration` (par NOM) : bascule sur une configuration enregistree.
+  Piege trouve par le test : `ListConfigurations` ne charge PAS le document (une
+  liste ne trimballe pas des installations entieres), donc il faut relire par id
+  avec `GetConfiguration` - sinon "config: the file is empty".
+- `save_configuration` existait deja.
+
+Le chemin d'application est desormais **partage** avec l'endpoint de la console
+(`(*API).applyDocument` dans `internal/admin/config.go`) : Apply, `TokenChanged("*")`,
+audit, rechargement du plan de routage. Une seule implementation, donc les memes
+refus des deux cotes.
+
+Verifie en vrai : instance jetable + `/mcp`, `tools/list` donne 38 outils,
+`import_configuration` en dryRun puis en prune a pose le paquet understory
+(jaeger + rabbitmq + marque) sur une instance qui portait les routes de demo.
+
+### La suite (le gabarit est deux lignes par ecran)
+
+Les dix-huit autres ecrans : roles, organisations, groupes, adhesions, regles, themes,
+pages integrees, fournisseurs d'identite, jetons, coffre, certificats/TLS, configurations,
+relais mail, MCP, reglages, modele, portail, incidents, audit. Attention prevue : les
+matrices qui enregistrent au clic (`groups-matrix`, `members-matrix`) et les ecrans a
+onglets dont chaque onglet a son propre chargement.
+Puis les revisions manquantes (reglages, planifications, coffre, configurations, jetons,
+certificats, incidents, adhesions, regles de groupe, surcharges de langue) : ce qui devient
+vivant merite le meme filet.
+
+Script de verification a deux navigateurs (13 controles, captures) garde hors depot dans le
+scratchpad de la session : `check-live.mjs`, sur le modele de `e2e/scripts/capture-docs.mjs`.
+
+## Session 2026-09-24/25 - une langue se corrige, s'ajoute, et se declare
+
+**Etat : tout commite sur `main`, RIEN pousse (51 commits d'avance).** `make fmt lint test`
+vert en CE et en EE, Playwright 300/300.
+
+### Ce qui a ete livre
+
+1. **I18N-05 - l'onglet Locale** : les chaines d'un ecran a cote de l'ecran qui les rend.
+   Couche de surcharge en base (`locale_overrides`, v61) qui ne garde QUE ce qui differe -
+   une copie entiere figerait la langue au jour de la copie. Trois portees de retour
+   arriere (une chaine, un ecran, une langue), export/import, et un bouton d'ajout de
+   langue : le navigateur canonise le tag (`fr-ca` -> `fr-CA`) et le NOMME
+   (`Intl.DisplayNames` avec `fallback: 'none'` - sans ca le meme code etait accepte dans
+   un navigateur et refuse dans l'autre), duplication d'une langue existante pour une
+   variante.
+2. **Le repli est l'anglais, partout et en prod.** Le chargeur completait deja chaque
+   catalogue en anglais, ce qui les faisait tous paraitre COMPLETS : le compteur de
+   "reste a traduire" repondait zero pour les vingt langues. Ce qui est emprunte est
+   maintenant retenu (`borrowed` dans i18n.go, `OwnString`), les 14 trous sont redevenus
+   visibles - puis ont ete **traduits dans les 18 langues** (252 chaines, tout le courriel).
+   `TestWeShipNoHalfLanguage` refuse desormais une langue livree a moitie.
+3. **Une correction atteint toute chaine rendue.** Cinq endroits indexaient le catalogue
+   embarque directement (user-button, barre de portail, page et bandeau de maintenance,
+   page des jetons) : un test AST refuse le motif, pas le symptome.
+4. **Ce que le produit ne traduit PAS est une decision ecrite** : barre de test, bandeau
+   de plug, page de clef, approbation d'agent. 32 chaines quittent les catalogues (11 %
+   du travail d'un traducteur), le texte passe en clair dans les gabarits.
+   `englishOnlyPages` les nomme une a une.
+5. **Les apercus montrent ce qu'un ecran sait dire.** Orphelines : 185 -> 16. Titres,
+   courriels, refus (`previewErrors` + `TestEveryRefusalHasAScreen` qui LIT les
+   gestionnaires par l'AST), etats d'ecran (jeton cree, MFA imposee), branches jamais
+   prises (regles de mot de passe, captcha). Trouve au passage : cinq pages nommaient une
+   clef de titre inexistante, et l'historique cassait sa mise en page sur son propre
+   libelle le plus long.
+6. **La barre de portail et le formulaire de signalement sont previsualisables**
+   (`portal:header`, `portal:rail`, `portal:issue`), avec le menu de compte OUVERT et le
+   panneau EPINGLE. Rien n'y navigue ni n'emet : `fetch` bouchonne **ne se resout jamais**
+   (toute navigation de ces composants est dans un `.then`). Meme scellement sur les
+   pages de flux, derriere `.Preview`.
+7. **Un agent ecrit une langue ENTIERE** : `list_languages`, `read_language`,
+   `write_language`. Grossiers expres - une langue a la fois, jamais une chaine.
+8. **I18N-04, le virage** : `LocalesConfig.Disabled` -> `Speaks`. La route DECLARE ce
+   qu'elle parle, l'offre de la gateway est l'UNION (`store.SpokenLanguages`), et l'ecran
+   `Application > Locales` **a disparu** avec `SettingLanguages`. Neuf pages de doc
+   reecrites dans les deux langues.
+
+### Pieges rencontres, a ne pas reapprendre
+
+- **Un binaire CE ne dessine pas split/banner/drawer** (ils sont dans `ee/layouts`) : il
+  replie sur centre. Quatre mesures identiques = mauvaise edition, pas un bug de mise en
+  page. `go build -tags ee`.
+- **`{{.T.x}}` dans un `@if` Angular** atterrit dans le slot par defaut, pas dans
+  `matSuffix` : toujours rendre et masquer.
+- **La sonde de la carte des clefs** (`tokenmap.go`) rend la page contre un catalogue de
+  marqueurs. Elle ne voit que ce qui est DANS le document rendu - donc un pointeur
+  imprime en `%+v` (le bouton d'un courriel) cache son contenu : marshaller.
+- **`ScreenCount`** dit sur combien d'ecrans une chaine est partagee : 43 des 194 le sont,
+  et corriger `cancel` quelque part le corrige sur cinq autres ecrans.
+
+### Ce qui reste
+
+1. **Les 16 chaines orphelines** : deux erreurs repondues en texte brut, le digest de
+   l'operateur, le bandeau de maintenance injecte, et une dizaine d'etats alternatifs
+   (aucun e-mail, aucune connexion, formulaire ferme). Une liste "nulle part" dans
+   l'onglet Locale reste la bonne reponse pour elles.
+2. **Un test qui comparerait un jeu de donnees a son gabarit** : un champ ajoute a une
+   page et oublie dans son fixture rend une demi-page en silence. C'est le meme genre de
+   silence que les 14 trous, et il n'a pas encore son garde-fou.
+3. **Une locale par defaut declarable par route** (le reste de I18N-04).
+4. **Le push** : 51 commits sur `main`, en attente de credit de build.
+5. Deux fichiers `meerkat-presentation-*.html` non suivis a la racine, laisses a Francois.
+
+## Session 2026-09-23 - un catalogue d'applications, et la telemetrie a un seul taux
+
+**Non commite au moment ou ceci est ecrit, RIEN N'EST POUSSE.** `make fmt lint test` vert
+(38 paquets, 0 issue au lint), console rebuildee et stagee dans `internal/admin/ui/dist`,
+site reconstruit (132/132 par langue, 264 pages). La suite e2e passe 293/294 ; l'unique
+echec (`flow-access-levels`, un compte en attente qui recoit 403 au lieu d'un 303 vers
+`/account-pending`) EXISTE DEJA SUR HEAD - verifie en stashant tout le travail et en
+rejouant le test. Ce n'est pas de nous, mais c'est a corriger.
+
+### 1. PORTAL-03 : un catalogue, trois rendus
+
+Le nom d'une application pouvait venir de TROIS endroits (`portalLabel` : la surcharge du
+portail, le `Link` de la route, le nom de la route), et comme la liste etait DEDUITE des
+routes, `reachableLinks` devait deviner lesquelles etaient la meme application (dedup par
+chemin d'entree). Francois a vu la contradiction avant moi.
+
+Le modele est maintenant **une liste, un mode de rendu** :
+
+- `PortalConfig.Mode` remplace `Enabled` : `none` | `links` | `portal`.
+- `Parents []ModuleParent` -> `Entries []PortalEntry` (json `entries`), `ModuleChild` ->
+  `PortalSubEntry`.
+- `store.RouteUI.Link` est **supprime**. Le repli d'un libelle vide est le nom de la route,
+  et il n'y a plus de troisieme source.
+- `publicLinks` / `reachableLinks` marchent le catalogue via un `catalogue(ctx, grants)`
+  commun. Mode `none` -> rien ; `links` -> la liste ; `portal` -> UNE entree (la premiere
+  accessible), parce que la barre EST la navigation.
+- **L'acces n'a pas bouge** : le catalogue dit ce qui existe, `Access.Empty()` /
+  `Access.Grants(caller)` disent qui le voit.
+
+Console : l'ecran Portal porte un bouton a trois etats, une liste numerotee (fleches) en
+mode `links`, la maquette live de la barre en mode `portal` ; le tiroir d'edition masque
+icone / home label / sous-modules hors mode barre (`ModuleFormData.bar`). L'editeur de
+route perd le bloc *In the apps menu*.
+
+**Piege trouve en le faisant tourner** : le composant `meerkat-portal-nav` lit `d.parents`
+dans son payload. Renommer la cle cote console a vide la maquette sans une erreur. Le
+payload du navigateur garde `parents` (la barre parle de parents et d'enfants) ; c'est la
+CONFIG qui parle d'entrees. Les deux vocabulaires sont volontaires.
+
+Seeding : `cmd/meerkat/main.go` (premier demarrage) et `cmd/seed-demo` posent desormais le
+catalogue en mode `links`, sinon les menus seraient vides.
+
+### 2. OBS-04 : un seul pourcentage d'echantillonnage
+
+`BrowserSample` supprime. Il y en avait deux, et c'etait **incoherent** : `ShouldRecord`
+respecte une decision deja prise par l'appelant (`sc.Inbound`), donc des qu'une page est
+instrumentee, le taux « passerelle » n'est JAMAIS consulte pour ses requetes - le chiffre
+affiche decrivait une population a laquelle l'exploitant ne pensait pas.
+
+Le libelle « Page loads recorded » etait faux aussi : le sampler est un ratio sur tout span
+RACINE que la page ouvre (chargement + chaque appel qu'elle lance), pas sur les chargements.
+
+**Et j'avais laisse mes valeurs de test dans la base de Francois** (`sample: 1`,
+`browserSample: 1`, posees pour verifier la chaine contre Jaeger). Le defaut produit est
+0.1 / 200 / 0.1. Remis a la main dans `data/meerkat.db`. **A ne plus refaire : nettoyer la
+base apres une verification manuelle.**
+
+### 3. L'editeur de route : deux sections neuves
+
+`Injections` etait dans Target pour le toggle de tracing, ce qui n'avait rien a voir avec
+l'amont. Apres discussion (Francois a propose `Behaviors` puis `Add-ons`, tous deux ecartes :
+la roadmap dit explicitement qu'il n'y aura pas de systeme de plugins, et `Extensions`
+est reserve a ROUTE-21), le decoupage retenu est :
+
+- **Tracing** : le toggle `noTelemetry`, sa propre section.
+- **Custom** : le CSS et le JS de l'exploitant, ex-`Injections`.
+
+Quatorze sections maintenant, pas onze - le compte etait perime dans la doc et dans un
+commentaire du template.
+
+### 4. Les captures d'ecran se refont en une commande
+
+`e2e/scripts/capture-docs.mjs` (`make capture-docs`) : binaire construit depuis l'arbre,
+base jetable sur :18084/:19094, le jeu de donnees que les legendes decrivent (Billing, Docs
+portal, Orders API, Inventory (maintenance), Catch-all), navigateur a 1600x1000 en sombre,
+sortie webp par `cwebp`. Sept vues refaites. Elles etaient prises a la main jusqu'ici, ce
+qui est pourquoi elles avaient derive.
+
+### 5. Le cache : deux bugs qui n'en etaient pas
+
+Deux fois dans la nuit, un reglage coche dans la console ne se voyait pas dans la page.
+Les deux fois, c'etait le cache du navigateur. La gateway injecte dans le HTML qu'elle
+proxifie, et ce qu'elle injecte EST de la configuration ; l'amont (GitHub Pages ici,
+`max-age=600`) decrit un document qui ne portait rien de tout ca.
+
+`RewriteBody` jetait deja l'ETag sur un corps qu'elle avait change, avec exactement ce
+raisonnement ecrit dedans. Les regles de cache partent au meme endroit : `Rewritten()`
+pose `no-cache` et retire `Expires`, `Pragma`, `Last-Modified`. `Personal()` (no-store)
+reste plus fort et n'est jamais affaibli - il tourne en premier sur la meme reponse.
+
+**Une decision deliberee renversee** : `TestAStampedPageIsNeverCacheable` affirmait
+qu'une page anonyme garde le cache de l'application. Elle n'est toujours pas
+personnelle, mais elle est REECRITE, et c'est ce critere qui compte.
+
+**PERF-06** note la sortie propre : un ETag recalcule sur les octets produits, pour que
+la revalidation redevienne un 304 vide. Le remede actuel est permanent, le mal est rare
+(on ne bascule pas `links` -> `portal` toutes les cinq minutes) - c'est l'argument de
+Francois, et il est dans FEATURES.md.
+
+### 6. Le rail du portail, aligne sur @softwarity/rail-nav
+
+Mesure cote a cote sur une vraie page (une application qui utilise rail-nav, portant
+notre portail) : notre en-tete faisait 56 au lieu de 64, le burger etait 4px trop haut,
+les items 4px trop haut, les icones 3px trop a droite. Plus une regle absente : rail-nav
+donne au PREMIER item une marge haute plus petite, pour que l'ouverture ne le fasse pas
+glisser (8+16 replie = 0+24 deplie).
+
+**Le vrai bug etait la fermeture.** Le `.rhead` etait centre replie et `flex-start`
+deplie. Au repos les deux donnent 24px du bord, donc rien ne se voyait sur une capture.
+Mais a la fermeture la classe tombe d'un coup pendant que la largeur met 200ms : le
+burger se teleportait au milieu d'un rail encore large (128px) et revenait en glissant.
+L'ouverture ne le montrait jamais. Un bond de 100px sous un fondu croise, c'est ce que
+Francois lisait comme un clignotement. Correction : toujours `flex-start` avec 24px
+d'inset - un rail de 72 inset 24 laisse exactement les 24 du burger, donc flex-start EST
+le centrage replie.
+
+**Et j'avais introduit le ripple par-dessus le contenu** : un element positionne sans
+z-index peint au-dessus de ses freres, donc le lavis passait sur le glyphe. `z-index:0`
+sous un contenu en `z-index:1`, badge exclu et remonte en 2.
+
+### Ce qui reste
+
+- L'echec e2e pre-existant `flow-access-levels`.
+- L'atterrissage sur la premiere appli accessible (toujours pas construit).
+- Le glisser-deposer du catalogue.
+- **Le push**, que Francois valide.
+
+## Session 2026-09-22 - le scheduler sans tic ni verrou, et au moins une fois pour de vrai
+
+Commité le jour même avec tout SCHED-01 (un commit, plus un commit doc `[skip ci]` pour la
+correction OBS-04 qui traînait dans l'arbre) ; PAS poussé, François valide avant. Les deux
+présentations à la racine restent non versionnées. Parti d'une question de François ("si PG
+présent on utilise les notifications, sinon un process qui regarde ?") : non, il n'y avait
+qu'UN mécanisme, une boucle à tic de 20 s sur les deux bases ; PG n'apportait que le verrou
+consultatif et la sonnette. Relecture du code, quatre défauts, quatre corrections :
+
+1. **La sonnette ne sonnait jamais.** Les écritures appelaient `a.st.Announce` (NOTIFY brut)
+   au lieu du bus : aucune version bumpée dans `change_marks`, donc `catchUp` sur les autres
+   noeuds ne trouvait rien. Tout passe par `a.schedulesMoved(ctx)` (bus + réveil local), les
+   outils MCP compris (ils ne réveillaient pas le scheduler local). `reload_test.go` refuse
+   désormais `a.st.Announce(` / `a.st.Signal(` dans `internal/admin`.
+2. **Le verrou était tenu pendant les appels HTTP** : un seul noeud travaillait, en série, et
+   un timeout sans plafond pouvait geler tout le cluster. Plus de verrou du tout : le claim
+   conditionnel suffit, les appels partent dans des goroutines (16 par noeud,
+   `DefaultConcurrency`), un noeud plein laisse le reste dû. `timeout` plafonné à 2 min
+   (`store.MaxScheduleTimeout`), sous le bail de 5 min (un test l'impose).
+3. **Plus de tic** : `Run` dort jusqu'à `store.NextWake` (min des `next_at` dus, et des fins de
+   bail), borné entre 1 s et un filet d'1 min, réveillé par `Wake()`.
+4. **"Au moins une fois" était faux dans le code** (un run perdu n'était jamais renvoyé).
+   Colonnes `run_state` (`calling` / `accepted`) et `attempts`. Bail expiré sur `calling` :
+   `RetakeRun`, même run id, `Meerkat-Job-Attempt` +1, 3 tentatives max, dans le `catchUp`.
+   Sur `accepted` (202 ou rapport) : perdu, jamais renvoyé. Arrêt propre : `Drain` (5 s de
+   grâce dans `main.go`) coupe et rend les appels (`ReleaseRun`, `claimed_at = 0`) et annonce.
+
+Modèle qui en découle : **rien n'est dû tant qu'un run est ouvert** (`DueSchedules` exclut
+`run_id <> ''`), la clôture arme le tour suivant compté depuis la fin ; "run now" pendant un
+run = 409 (`ArmSchedule` conditionnel). `last_state` n'est plus écrasé au claim (corrige le
+"running" rouge dans la colonne Last run). Console : état calling/accepted, tentative,
+"after this run", Run now désactivé pendant un run ; aide API et doc FR/EN à jour.
+
+**À trancher par François** : `overlap: "run"` ("appeler quand même") n'a jamais marché - une
+ligne ne porte qu'un run - et se comporte comme `skip`. Le supprimer, ou le redéfinir en
+"le tour manqué part dès la clôture".
+
+**Décidé par François : le scheduler reste ENTIER en CE.** Question posée : "ne devrait-il
+pas être EE ?". Écarté, dans l'ordre :
+- une limite de nombre en CE (façon `FreeConfigurations = 3`) : ne tient pas face au code
+  source (la FSL autorise la modification pour usage interne), et surtout la création passe
+  par l'API, appelée par un PROGRAMME : le 11e refus tombe dans le log d'un service, la nuit,
+  selon ce que les autres services ont créé - un bug aléatoire, pas un prix ;
+- tout dans `ee/` : possible, mais la partie qui fait payer (plusieurs noeuds, reprise par un
+  autre noeud, sonnette) est DÉJÀ protégée par l'absence de `ee/pgdriver` et `ee/changebus`
+  en CE. Une gateway CE seule garde tout le reste, y compris le renvoi au redémarrage.
+"Toujours sympa dans une stack de ne pas avoir à se soucier de ça" (François).
+
+**Correction d'une réponse faite en session** : j'avais dit qu'un CronJob Kubernetes est
+moins fin car `every` accepte `PT30S` : faux, la cadence minimale est d'une minute.
+
+Vérifié : `make fmt lint test test-ee` verts ; paquets touchés aussi sur PostgreSQL
+(`make pg-up`, tags `ee`) ; `-race -count=5` sur le scheduler ; `ng build`. Fumée sur des
+gateways JETABLES (binaire dans le scratchpad, ports 1858x/1859x, jamais celle d'air) :
+appel ~30 ms après la création, 409 sur "run now" en vol ; à deux noeuds sur PG, un schedule
+écrit sur A puis A tué au `kill -9` est appelé par B à la seconde (la sonnette marche) ; un
+appel en vol sur A, SIGTERM de A, renvoyé par B 5 s plus tard, même run id, tentative 2.
+Capture de l'écran Scheduler (calling / accepted / attempt 2) faite avec Playwright.
+
+Le parcours e2e `flow-scheduler` (`e2e/tests/flow-pages.spec.ts`) attend désormais la fin du
+premier tour avant "run now" (sinon 409). **Piège** : `prettier` dans `e2e/` reformate tout
+le fichier (pas de config là, style guillemets simples) - ne pas le lancer sur `e2e/`.
+
+## Session 2026-09-21 - les appels planifies (SCHED-01)
+
+### Ce qui a ete livre (NON commite : Francois relit d'abord)
+
+Un scheduler dans la gateway. Le service demande qu'on l'appelle plus tard, et l'appel
+entre **par la porte d'entree du plan de donnees** : donc predicats, filtres, regle de
+route, regles par endpoint et horaires d'organisation s'appliquent comme a un humain.
+
+- `internal/store/schedule.go` : table `schedules` (schema v56). Prise de tour = `UPDATE`
+  conditionnel (`ClaimSchedule`), bail renouvele (`TouchSchedule`), `LapsedRuns` pour
+  fermer ce qu'un noeud mort a laisse ouvert. `progress` en **BIGINT** (le garde-fou de
+  dialecte refuse INTEGER, 32 bits sur PG).
+- `internal/scheduler/scheduler.go` : tic 20 s, verrou consultatif partage (`TryLock`),
+  `Pass` = reaper puis `fireDue`. L'appel porte un jeton **frappe pour le compte
+  proprietaire**, supprime au retour ; `Meerkat-Job` + `Meerkat-Job-Run` (au moins une
+  fois) ; **202 garde l'execution ouverte** et le service rapporte lui-meme.
+- `internal/auth/schedules.go` : API plan de donnees `/meerkat/schedules` (creer, lister,
+  editer, suspendre, lancer, rapporter). `internal/admin/schedules.go` : les actions de
+  l'exploitant. `internal/live/schedules.go` : topic `schedules` pour le canal live.
+- Console : `console/src/app/scheduler/`, entree de rail dans le groupe TRANSVERSE
+  (Vault, Audit | Scheduler, Metrics, Issues). Table Material, en-tete collant, pas de
+  pagination, sync livewire, ligne cliquable qui ouvre un tiroir (detail complet +
+  Pause / Run now / Delete).
+- MCP : `list_schedules` (lecture), `pause_schedule`, `run_schedule` - et la pause passe
+  desormais par `auditEvent` comme son equivalent HTTP.
+- Docs `/docs/operations/scheduler` FR+EN, tableau d'outils de `/docs/agent/overview`,
+  `FEATURES.md` (SCHED-01), README, `features.md` FR+EN, et les deux presentations a la
+  racine (socle, carte Exploitation, tableau « sans Meerkat »).
+
+### Decisions
+
+- **Creer une tache ne se fait pas depuis la console** : une tache tourne sous un COMPTE,
+  et les administrateurs qui lisent cet ecran ne sont pas ces comptes. Le service demande
+  sur le plan de donnees, comme lui-meme.
+- **Cadence ISO 8601** (`PT30M`, `P1D`), pas de cron : une ligne de cron est un second
+  langage a apprendre, a valider et a expliquer dans un refus.
+- **Kubernetes** : pas de client k8s dans le produit. Qui veut garder ses CronJob comme
+  horloge leur fait appeler `POST /meerkat/schedules/{id}/run` avec un jeton d'API - la
+  gateway garde l'identite, le confinement et la trace, sans aucun droit sur le cluster.
+- **NOTIFY PostgreSQL = sonnette, jamais verite** : la table tranche, une notification
+  perdue coute un tic.
+
+### Verifie en vrai (instance `air` de Francois, 8082 / 9092)
+
+Trois taches creees dessus, et elles y vivent encore : httpbin toutes les 5 min, un
+service ETEINT, et un appel lent borne a 3 s.
+
+- **Service eteint** : la gateway repond son propre 502, l'execution se ferme en echec,
+  le prochain tour est arme **a la cadence normale**. Pas de reprise en rafale, pas
+  d'execution figee, aucune contagion sur les autres taches.
+- **Depassement de delai** : ferme par nous et nomme comme tel
+  (« no answer within the 3s this schedule allows ») au lieu d'un 502 qu'on a provoque
+  en cessant d'attendre.
+
+### Piege corrige
+
+Le detail d'un echec enregistrait **200 caracteres de HTML** (la page d'erreur de la
+gateway, qui tient sur une ligne : `firstLine` n'y pouvait rien). `summarize()` strippe
+desormais les balises, garde la phrase qu'un humain lit, et le depassement de delai est
+detecte avant de lire la reponse.
+
+### Deuxieme passe (meme jour) : le tiroir API et le fuseau
+
+- **Bouton API en haut a droite de l'ecran Scheduler** : ouvre le MEME tiroir (plus large)
+  sur le mecanisme et l'API, en sept panneaux - jeton, creation, champs, CRUD, ce que le
+  service recoit, le 202, l'echec. Les commandes et le payload portent l'adresse du plan de
+  donnees de CETTE installation (`/api/edition`), parce que l'ecran ne cree rien et que la
+  marche suivante est un appel que le service fait lui-meme.
+  `console/src/app/scheduler/scheduler-api.component.*`.
+- **JSON colore** : `@codemirror/lang-json` ajoute, `shared/snippet.component.ts` le choisit
+  sur l'extension `.json` (comme `.yaml` deja).
+- **Fuseau horaire.** Le profil de la console offre desormais le selecteur de fuseau : il
+  etait masque par `{{if not .Console}}` avec pour raison « la console rend ses dates a la
+  maniere du navigateur ». Le scheduler a change ca. Le fuseau est STAMPE sur `<body>`
+  (`data-meerkat-timezone`, `internal/admin/console.go`) et lu par `MeService.timezone`.
+  Nouveau `shared/zoned-date.pipe.ts` (DatePipe d'Angular ne sait PAS lire un nom IANA :
+  son argument `timezone` prend un decalage, pas `Europe/Paris` - Intl si).
+- Un bouton du bandeau bascule entre le fuseau de l'exploitant et UTC, et AFFICHE celui qui
+  est montre ; desactive, avec l'explication en infobulle, quand le compte n'a pas choisi de
+  fuseau (il lirait deux fois UTC). Tests Go retournes en consequence
+  (`profileemail_test.go`, `console_test.go`).
+
+### Troisieme passe : le cron, puis l'API DEPLACEE sur le plan de controle
+
+**Le cron (SCHED-01).** `internal/cron` : parseur maison des cinq champs (listes, plages,
+pas, MON-SUN / JAN-DEC, @daily & co), regle Vixie du OU entre les deux champs de jour,
+recherche sur un CALENDRIER CIVIL puis construction du moment - c'est ce qui fait que
+l'heure qui n'existe pas au printemps decale au lieu de sauter, et que celle qui existe
+deux fois en automne ne tire qu'une fois. Une tache dit `every` OU `cron`, jamais les deux.
+`timezone` (nom IANA) par defaut = le fuseau du compte proprietaire, POSE sur la tache a la
+creation (changer son profil ne deplace pas une annee de travaux de nuit).
+
+**Puis Francois a tranche l'emplacement, et il avait raison** : la gestion des schedules
+n'a rien a faire sur le plan de donnees. C'est un service que rend la passerelle, comme
+l'exposition des metriques ; aucun navigateur ne l'appelle, c'est un BACKEND qui l'appelle.
+Donc :
+
+- **Tout est sur `/api/schedules`** (plan de controle). `internal/auth/schedules.go` ne
+  contient plus qu'un commentaire disant pourquoi il est vide.
+- **Jeton de perimetre `schedules`** (`store.ScopeSchedules`), applique dans l'entonnoir
+  unique `admin.authed` a cote de `metrics` : il n'ouvre que cette API sur ce port.
+- **Le jeton porte l'identite d'execution** : root le frappe POUR un compte de service
+  (champ `user` sur `POST /api/admin-tokens`, refuse pour un jeton `full`), et une tache
+  tourne avec ce compte. Plus de champ `owner`, donc plus d'emprunt d'identite possible.
+- **Un jeton par SERVICE, pas par tache** (correction de Francois) : le service NOMME ses
+  taches (`PUT /api/schedules/station-42` cree ou remplace - une boucle de reconciliation
+  ne duplique rien) et les retrouve par ses `metadata`, objet libre cle/valeur filtrable
+  `meta.k=v` ou `meta.k=~regexp` (RE2, donc pas de ReDoS ; filtre applique en Go apres la
+  requete SQL, portabilite SQLite/PG).
+- **La console voit TOUT et ne cree rien** : l'API refuse une session sans jeton de service,
+  avec la phrase qui le dit. Le filtre Metadata de l'ecran accepte la meme syntaxe.
+- Le rapport d'un 202 passe aussi par la (`PATCH /api/schedules/{id}/run`, jeton du
+  service) : le credential ephemere de l'appel ne sert plus qu'a entrer par la porte, et
+  meurt au retour.
+
+Schema v58 (colonnes `cron`, `timezone`, `metadata`). Tests : `internal/cron` (table de cas
++ DST Paris), `internal/admin/schedules_test.go` (perimetre, idempotence, metadonnees,
+isolation, refus de la console), `internal/session` (couper les jetons personnels n'arrete
+pas les appels planifies - `store.IsRunCredential`).
+
+**Piege d'environnement** : le `ng serve` de Francois (demarre a 1h52) a cesse de
+recompiler l'ecran scheduler en cours de route - probablement `.angular/cache` partage avec
+les `npm run build` lances a cote. Le build de production passe ; il faut relancer `ng serve`
+pour voir le filtre Metadata a l'ecran.
+
+### Quatrieme passe : l'ecran, et un vrai bug de diffusion
+
+- **Bug livewire trouve par Francois** (« une tache semblait tourner, Ctrl+R elle etait finie »).
+  La version d'une ligne etait `updated_at`, donc UNE SECONDE : un appel qui repond en
+  millisecondes est reclame ET clos dans la meme seconde, la version ne bougeait pas, et un
+  client qui avait attrape le « running » entre les deux ne recevait jamais la fin. Version
+  desormais composite (`updated_at|run_id|progress|last_at`) dans `internal/live/schedules.go`,
+  trois tests dans `schedules_test.go`.
+- **« Run now » attendait le tic de 20 s** : `announceSchedules` prevenait les autres noeuds,
+  pas le scheduler local. `a.wakeScheduler()` ajoute a run ET resume. Mesure : 8 s -> 1 s.
+- **Indicateur de socket** : `lw-live-indicator` existait deja dans `@softwarity/livewire`
+  (ne pas le reecrire), place a droite du titre, couleurs par custom properties.
+- **Ecran** : le toggle UTC est un `mat-slide-toggle` (un toggle Material n'est PAS un
+  button-toggle - reproche de Francois), il n'offre que UTC (l'autre etat est la locale du
+  lecteur, pas de libelle), et un snackbar nomme le fuseau ou l'on atterrit. Format de date
+  unique et non ambigu : `2026-09-21 13:27`, avec ` Z` en UTC (`shared/zoned-date.pipe.ts`).
+  Filtre Metadata en `app-form-field` (icone + placeholder + infobulle info, PAS de hint sous
+  le bandeau). Les metadonnees ne sont PAS dans la ligne du tableau : le tiroir est fait pour
+  ca.
+- **Ecran des jetons** : perimetre « Scheduled calls only », champ « Acts as » (compte de
+  service), et « Acts on » masque pour metrics/schedules - un reglage sans effet sur un
+  perimetre qui ouvre un endpoint.
+- **Prettier** : le depot n'a PAS de config prettier et la plupart des fichiers ne suivent pas
+  son defaut. Ne lancer `prettier --write` que sur les fichiers qu'on vient de creer, sinon il
+  reformate 600 lignes d'`api.service.ts` pour rien (fait et annule une fois).
+
+### Reste a faire
+
+Historique des executions (une ligne par tour, pas seulement la derniere), expressions
+creation depuis la console (volontairement absente). Et supprimer les taches de demonstration sur
+l'instance `air` quand elles auront servi (le compte admin y a pris Europe/Paris pour la
+demonstration du fuseau).
 
 ## Session 2026-09-19 - le site refait en entier (bigbang)
 

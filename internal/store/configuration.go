@@ -43,6 +43,11 @@ type Configuration struct {
 // strings.
 var ErrConfigurationNotFound = errors.New("store: configuration not found")
 
+// FreeConfigurations is how many saved configurations the community image
+// holds at once (CFG-01). Here rather than in the console's package, because a
+// file offered at startup (CFG-03) is shelved under the same limit.
+const FreeConfigurations = 3
+
 // DigestOf fingerprints a configuration document. Exported because the LIVE
 // state has to be fingerprinted the same way to be compared with a saved one -
 // two hashes computed by two functions are two answers waiting to disagree.

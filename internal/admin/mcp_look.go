@@ -33,6 +33,28 @@ func (a *API) lookTools() []mcp.Tool {
 			Call:   a.toolGetSettings,
 		},
 		{
+			Name: "list_languages", Allow: administersIdentity, Title: "List the languages", ReadOnly: true,
+			Description: "Every language the built-in pages can be served in - sign-in, profile, the " +
+				"transactional mails - with how many of their strings are still English standing in. " +
+				"Twenty ship with the product; an installation can add any BCP 47 tag on top. " +
+				"Start here before read_language.",
+			Schema: noArgs(),
+			Call:   a.toolListLanguages,
+		},
+		{
+			Name: "read_language", Allow: administersIdentity, Title: "Read a language", ReadOnly: true,
+			Description: "Every string of the built-in pages in one language, with the English beside it: " +
+				"the key, what English says, what this language says today, whether that is a real " +
+				"translation or English standing in, and how many screens share the wording. " +
+				"This is what a whole language is translated FROM. A code nobody has added yet reads as " +
+				"an empty language, which is how a new one starts.",
+			Schema: object(map[string]any{
+				"code": str("A BCP 47 tag: fr, pt-BR, zh-Hans. Any tag, shipped or not."),
+				"only": str(`Pass "missing" for the strings left to translate and nothing else.`),
+			}, "code"),
+			Call: a.toolReadLanguage,
+		},
+		{
 			Name: "get_branding", Allow: a.administersSomething, Title: "Read the branding", ReadOnly: true,
 			Description: "The identity the built-in pages wear: the application's name and tagline, the logo " +
 				"size, and the page background - its fit, its dim, and whether light and dark share one " +
@@ -58,16 +80,16 @@ func (a *API) toolGetSettings(ctx context.Context, _ json.RawMessage) (any, erro
 	if err != nil {
 		return nil, fmt.Errorf("the settings could not be read: %w", err)
 	}
-	// A portal module keeps its icon as the SVG itself - a kilobyte of path
-	// data each, and a bar of ten modules would be ten kilobytes of drawing
+	// A catalogue entry keeps its icon as the SVG itself - a kilobyte of path
+	// data each, and a bar of ten entries would be ten kilobytes of drawing
 	// instructions in the middle of the settings. Said in a line instead; what
-	// an agent needs to know is that a module HAS an icon, and save_settings
+	// an agent needs to know is that an entry HAS an icon, and save_settings
 	// takes the Material Symbols name rather than the drawing anyway.
-	for i := range p.Portal.Parents {
-		parent := &p.Portal.Parents[i]
-		parent.Icon = describeSVG(parent.Icon)
-		for j := range parent.Children {
-			parent.Children[j].Icon = describeSVG(parent.Children[j].Icon)
+	for i := range p.Portal.Entries {
+		entry := &p.Portal.Entries[i]
+		entry.Icon = describeSVG(entry.Icon)
+		for j := range entry.Children {
+			entry.Children[j].Icon = describeSVG(entry.Children[j].Icon)
 		}
 	}
 	return p, nil

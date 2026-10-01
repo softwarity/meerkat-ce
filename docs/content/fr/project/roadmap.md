@@ -34,7 +34,8 @@ ensuite.
 - **TLS** : certificats et émission ACME, sérialisée pour qu'un cluster demande
   une seule fois.
 - **Audit** : chaque changement d'administration avec son auteur et un diff
-  champ par champ.
+  champ par champ, et la sécurité des comptes - chaque connexion, chaque refus
+  avec sa raison et son adresse, chaque moyen d'entrer changé par son titulaire.
 - **La console** : toute l'administration, sur son propre port, avec le partage
   de capacités qui décide qui voit quelle moitié.
 - **L'endpoint agent** : MCP sur le plan de contrôle, sous les mêmes règles
@@ -63,7 +64,8 @@ ligne, ce qui manque à chacun.
   qui nomme ce qui est substitué et par qui, et un bandeau le redit pendant
   qu'on travaille. Ce qui manque est la portée d'une substitution - elle vaut
   aujourd'hui pour tout le trafic - puis l'écran de console qui liste les
-  sessions en cours, et l'audit.
+  sessions en cours, et l'audit de chaque substitution (une clé déposée est
+  déjà auditée).
 - **Notifications** : le relais SMTP est livré, avec un gabarit unique aux
   couleurs du thème, et le résumé quotidien des accès qui se ferment part tout
   seul. Ce qui manque est un gabarit par événement, et traduit.
@@ -86,6 +88,28 @@ ligne, ce qui manque à chacun.
 - **SAML**, pour les entreprises dont le fournisseur d'identité ne parle pas
   OpenID Connect. Il est enregistrable aujourd'hui et refuse à la fabrique, ce
   qui est honnête et pas encore utile.
+- **Ses sessions ouvertes, et se déconnecter de partout** : la liste des
+  appareils connectés sur son propre compte, avec le bouton qui les ferme tous.
+- **Se connecter en tant que** : ce qu'un support fait tous les jours, et qui
+  aujourd'hui se fait en demandant son mot de passe à quelqu'un.
+- **Un cache de réponse**, parce que la passerelle est déjà le seul endroit qui
+  voit passer la même requête deux fois.
+- **Servir une application sous un sous-chemin sans la reconstruire** : le
+  préfixe est retiré à l'aller, il reste à réécrire ce que l'application renvoie.
+- **gRPC pour de bon** : métriques qui lisent `grpc-status`, sécurité par
+  méthode, et gRPC-Web. Aujourd'hui un appel gRPC en échec se lit comme sain.
+- **Le portail par organisation** : icône, titre et arrangement propres à chaque
+  client. Ce serait la première surcharge visuelle par tenant du produit.
+- **HTTP/3**, quand le gain se mesurera plutôt qu'il ne se racontera.
+- **Un coffre externe** : HashiCorp Vault, les secrets de Kubernetes et ceux de
+  Docker, pour les installations qui en ont déjà un et n'en veulent pas un
+  second.
+- **La rotation de la clé maîtresse du coffre**, qui n'existe pas et qui est la
+  question que pose toute équipe sécurité.
+- **Les anomalies poussées vers GitHub, GitLab ou Jira**, plutôt que lues dans
+  un écran de plus.
+- **Les notifications Web Push**, pour ce qu'un exploitant doit savoir sans
+  avoir l'onglet ouvert.
 
 ## Pas sur la liste
 

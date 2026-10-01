@@ -114,8 +114,20 @@ Four things must all hold for that page to exist at all:
 What a sign-up produces is deliberately useless: the account exists, it is
 unusable until the address is confirmed, and it reaches nothing until an
 administrator places it in an organisation and grants roles. The confirmation
-link is a one-shot token valid for twenty-four hours. Someone who signs in
+link is a one-shot token valid for 24 hours, 48 hours or 7 days - **Confirmation
+links valid for**, beside the self-registration switch. Someone who signs in
 before confirming gets the link sent again rather than an explanation.
+
+## Changing one's address
+
+The address is where a password reset lands, so it is a way into the account.
+When a mail relay is configured, changing it from the profile does **not**
+change it yet: a link goes to the **new** address, and the change is made when
+that link comes back - valid for the same lifetime as a sign-up's. The **old**
+address is told at once, which is the owner's alarm when it was not them. A
+session somebody else got hold of is therefore no longer enough to point the
+account's recovery at their own mailbox. Without a relay nothing could carry a
+confirmation, and the address changes at once, as before.
 
 A username or an address already taken lands on the **same** page as a
 successful sign-up, and nothing is created: the form does not tell a stranger
@@ -123,15 +135,19 @@ who already has an account here. The picture code is on by default and can be
 turned off per authority; it is consumed whether the answer was right or wrong,
 so a second try means a new image.
 
-The write endpoints nobody has signed in to yet - `/register` and
-`/forgot-password` - carry their own fixed throttle of five tries per client
-address per fifteen minutes, which no screen changes.
+The write endpoints nobody has signed in to yet carry throttles per client
+address: `/register` five tries per fifteen minutes, fixed; `/forgot-password`
+its own counter, **Reset requests** under the rate limits (five by default,
+within the sign-in window, and never off). The two no longer share one: a busy
+sign-up page used to throttle resets, and a flood of resets closed sign-up.
 
 ## A forgotten password
 
 `/forgot-password` exists as soon as a mail relay is configured and local
 passwords are accepted; it does not wait for self-registration to be open. The
-outcome page is the same whether the address is known or not.
+outcome page is the same whether the address is known or not. An account born at
+an authority (OIDC, LDAP, GitHub) has no local password and is sent no link: one
+would open a second door the authority knows nothing about.
 
 The link is valid for one hour and is spent on use. The new password is checked
 against the policy, including the no-reuse rule, and the change **destroys
@@ -139,5 +155,7 @@ every live session of that account** on every gateway - whoever held one,
 including an intruder, signs in again or is out. The owner is told by e-mail
 that their password changed.
 
-Two things a reset does *not* do yet: it does not revoke that account's API
-tokens, and it does not forget its trusted browsers.
+It also closes the other doors the old password could have opened: the
+account's **API tokens** are revoked and its **trusted browsers** forgotten. A
+reset is often the answer to "somebody else had my password", and that somebody
+may have minted a token with it.

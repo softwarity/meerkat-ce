@@ -53,3 +53,14 @@ rail-nav-content {
   color: var(--mat-sys-on-surface-variant);
   font-size: 0.85rem;
 }
+
+// The live indicator sits in the rail, above the user menu: the rail is a
+// column of centred icons, and the indicator is a dot that would otherwise
+// hang on its left edge.
+.rail-live {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+  --lw-live: var(--mat-sys-primary);
+  --lw-down: var(--mat-sys-error);
+}

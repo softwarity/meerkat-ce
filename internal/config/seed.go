@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -55,9 +57,10 @@ func Seed(ctx context.Context, st *store.Store, path string, now int64) (bool, e
 			slog.Debug("configuration file already seeded, ignoring", "file", path)
 			return false, nil
 		}
-		slog.Info("the configuration file has changed since it seeded this gateway, ignoring it: "+
-			"the console is the source of truth from the first start on",
+		slog.Info("the configuration file has changed since it seeded this gateway: "+
+			"the console is the source of truth from the first start on, so it is not applied",
 			"file", path, "seeded", mark.At)
+		offerFile(ctx, st, path, body, now)
 		return false, nil
 	}
 
@@ -66,9 +69,10 @@ func Seed(ctx context.Context, st *store.Store, path string, now int64) (bool, e
 		return false, err
 	}
 	if routes > 0 {
-		slog.Info("this gateway is already configured, the configuration file is ignored: "+
+		slog.Info("this gateway is already configured, the configuration file is not applied: "+
 			"a file seeds an EMPTY gateway and never overwrites one",
 			"file", path, "routes", routes)
+		offerFile(ctx, st, path, body, now)
 		return false, nil
 	}
 
@@ -94,4 +98,63 @@ func Seed(ctx context.Context, st *store.Store, path string, now int64) (bool, e
 			"name", m.Name, "kind", m.Kind, "used by", m.Used)
 	}
 	return true, nil
+}
+
+// offerFile shelves a configuration file the gateway did not apply (CFG-03,
+// LIFE-02): a file that changed since it seeded this gateway, or one handed to
+// a gateway already configured. Applying it would overwrite what the console
+// made; ignoring it, as before, left it a line in a log that nobody reads, and
+// the operator who edited the file believing it would land found nothing.
+// Shelved, it is a SAVED CONFIGURATION on the Configuration screen: compared
+// with what runs, set as current by someone who decides to, and never applied
+// behind anyone's back.
+//
+// Offered once per content: a file already on the shelf, byte for byte once
+// normalised, is not added twice. Best effort - a start never fails because a
+// file could not be shelved; the reason is logged instead.
+func offerFile(ctx context.Context, st *store.Store, path string, body []byte, now int64) {
+	doc, err := Unmarshal(body)
+	if err != nil {
+		slog.Warn("the configuration file is not a configuration, it was not shelved", "file", path, "err", err)
+		return
+	}
+	normal, err := Marshal(doc)
+	if err != nil {
+		slog.Warn("the configuration file could not be shelved", "file", path, "err", err)
+		return
+	}
+	digest := store.DigestOf(string(normal))
+	shelf, err := st.ListConfigurations(ctx)
+	if err != nil {
+		slog.Warn("the configuration file could not be shelved", "file", path, "err", err)
+		return
+	}
+	for _, c := range shelf {
+		if c.Digest == digest {
+			slog.Debug("the configuration file is already on the shelf", "file", path, "as", c.Name)
+			return
+		}
+	}
+	if !edition.Enterprise && len(shelf) >= store.FreeConfigurations {
+		slog.Warn("the configuration file differs from what runs, and the shelf is full: delete a saved "+
+			"configuration to have it offered at the next start",
+			"file", path, "saved", len(shelf), "limit", store.FreeConfigurations)
+		return
+	}
+	c := store.Configuration{
+		ID:   store.NewEventID(),
+		Name: fmt.Sprintf("%s (%s)", filepath.Base(path), digest[:8]),
+		Description: "Offered at startup from " + path + ": it differs from what this gateway runs. " +
+			"Compare it, or set it as current.",
+		Document: string(normal),
+	}
+	if err := st.SaveConfiguration(ctx, &c); err != nil {
+		slog.Warn("the configuration file could not be shelved", "file", path, "err", err)
+		return
+	}
+	_ = st.AddAuditEvent(ctx, store.AuditEvent{
+		At: now, Action: "configuration.offer", Target: "configuration", TargetID: c.ID, TargetName: c.Name,
+		Detail: "from " + path,
+	})
+	slog.Info("the configuration file was shelved as a saved configuration", "file", path, "as", c.Name)
 }

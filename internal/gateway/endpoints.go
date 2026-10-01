@@ -231,8 +231,10 @@ func baseOperations(r store.Route, deposited []byte) []Operation {
 	var out []Operation
 	if len(deposited) > 0 {
 		if spec, err := openapi.Parse(deposited); err == nil {
+			// The same coordinate the guard compares against - see KeptPrefix.
+			kept := KeptPrefix(r)
 			for _, op := range spec.Operations {
-				out = append(out, Operation{Method: op.Method, Path: op.Path})
+				out = append(out, Operation{Method: op.Method, Path: kept + op.Path})
 			}
 		}
 	}

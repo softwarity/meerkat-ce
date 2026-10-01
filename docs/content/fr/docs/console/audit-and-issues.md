@@ -2,7 +2,7 @@
 title: Audit et Issues
 section: La console
 order: 184
-summary: Les deux écrans que l'on lit après coup - qui a changé quoi, et ce que vos utilisateurs ont signalé.
+summary: Les deux écrans que l'on lit après coup - qui a changé quoi, qui s'est connecté, et ce que vos utilisateurs ont signalé.
 ---
 
 # Audit et Issues
@@ -14,7 +14,9 @@ routage, un app admin l'identité, un tenant admin ses propres organisations.
 ## Audit
 
 Chaque changement administratif, avec **les champs exacts qui ont bougé et leur avant et
-après**. En lecture seule.
+après**, et la sécurité des comptes : chaque connexion, chaque connexion refusée avec sa vraie
+raison et son adresse, chaque facteur, passkey, mot de passe ou jeton changé par son titulaire. En
+lecture seule.
 
 ![L'écran Audit : une liste d'événements, chacun avec son acteur et les champs qui ont bougé](img/console/audit.webp)
 
@@ -27,9 +29,19 @@ par champ en dessous. Là où un agent ou un script a agi, le nom du jeton appar
 celui du compte : *admin, via claude-desktop* plutôt que *admin*. Cette différence est toute
 la raison de le nommer.
 
-Trois filtres : le genre de **cible** (`tenant`, `user`, `membership`, `group`, `role`,
-`settings`, `route`, `theme`), la **période** (24 heures, 7 jours, 30 jours, tout), et une
-recherche libre qui restreint ce qui est déjà chargé.
+Une ligne de sécurité se lit de la même façon, avec son plan (**data plane** pour les comptes des
+applications, **console** pour cette console), la raison ou la méthode à côté, et l'adresse dessous. Une connexion
+refusée porte la couleur d'erreur : quand on cherche une attaque, ce sont les lignes à trouver sans
+lire. La liste complète des actions et des raisons est dans [le journal d'audit](/docs/operations/audit).
+
+Le sélecteur choisit la partie du journal : **All**, **Changes**, **Data plane sign-ins** (les
+comptes des applications) ou **Console sign-ins**. Sous **Changes**, un genre de **cible** restreint
+encore. Puis la **période** (24 heures, 7 jours, 30 jours, tout), et une recherche libre qui restreint
+ce qui est déjà chargé, raisons et adresses comprises.
+
+En haut, **Export CSV** (Enterprise) télécharge ce que les filtres sélectionnent, et - pour root
+seul - **Keep events for** règle combien de temps le journal garde un événement. Voir [le journal
+d'audit](/docs/operations/audit).
 
 - Les secrets sont masqués : la trace dit qu'un champ a changé, pas vers quoi.
 - Un compte supprimé laisse une trace anonymisée plutôt qu'un trou.
@@ -64,8 +76,9 @@ Il n'y a pas de connecteur vers GitHub, GitLab ou Jira : un signalement vit ici.
 ## Pièges
 
 - **Audit n'est pas un journal de requêtes.** Il enregistre les changements
-  administratifs. Ce qui a traversé la passerelle est dans
-  [Metrics](/docs/console/traffic).
+  administratifs et les moyens d'entrer dans les comptes. Ce qui a traversé la passerelle est
+  dans [Metrics](/docs/console/traffic), et chaque requête est une ligne du
+  [journal d'accès](/docs/operations/logs).
 - **Vous voyez votre propre périmètre.** Deux administrateurs peuvent lire le même écran et
   compter un nombre d'événements différent ; c'est le cadrage, pas un défaut.
 - **Une liste Issues vide peut vouloir dire que la collecte est éteinte.** Vérifiez

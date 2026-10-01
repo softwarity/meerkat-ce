@@ -96,12 +96,40 @@ type RegistrationPolicy struct {
 	// create one is each authority's own AutoCreate, the local sign-up form
 	// included - the question was always the same one, asked per door.
 	Enabled bool `json:"enabled"`
+	// ConfirmHours is how long a mailed confirmation link lives - the one
+	// that finishes a sign-up and the one that confirms a new address
+	// (AUTH-22). One of ConfirmChoices: each has its own sentence in every
+	// language, since "48 hours" is not "24 hours" with another number in all
+	// of them. 0 reads as the default.
+	ConfirmHours int `json:"confirmHours,omitempty"`
+}
+
+// ConfirmChoices are the lifetimes a confirmation link may be given, in hours.
+var ConfirmChoices = []int{24, 48, 168}
+
+// DefaultConfirmHours is a day: long enough for a mail read the next morning.
+const DefaultConfirmHours = 24
+
+// SanitizeRegistration refuses a lifetime that has no sentence to say it.
+func SanitizeRegistration(p *RegistrationPolicy) error {
+	if p.ConfirmHours == 0 {
+		return nil
+	}
+	for _, h := range ConfirmChoices {
+		if p.ConfirmHours == h {
+			return nil
+		}
+	}
+	return fmt.Errorf("confirmHours %d: expected one of %v", p.ConfirmHours, ConfirmChoices)
 }
 
 // GetRegistrationPolicy reads the policy; a missing key means all closed.
 func (s *Store) GetRegistrationPolicy(ctx context.Context) RegistrationPolicy {
 	var p RegistrationPolicy
 	_ = s.GetSetting(ctx, SettingRegistration, &p)
+	if SanitizeRegistration(&p) != nil || p.ConfirmHours == 0 {
+		p.ConfirmHours = DefaultConfirmHours
+	}
 	return p
 }
 
@@ -120,16 +148,29 @@ type RateLimitPolicy struct {
 	// TotpAttempts: wrong TOTP codes tolerated per account within the login
 	// window before the challenge answers 429.
 	TotpAttempts int `json:"totpAttempts"`
+	// ResetAttempts: password-reset requests tolerated per IP within the login
+	// window (AUTH-21). Its own counter: it used to share the registration's,
+	// fixed at five, so a busy sign-up page throttled resets and the other way
+	// round. 0 is not "off" - a form that mails a link always has a limit - and
+	// reads as the default.
+	ResetAttempts int `json:"resetAttempts,omitempty"`
 }
+
+// DefaultResetAttempts is the reset requests allowed per address and window
+// when nobody chose.
+const DefaultResetAttempts = 5
 
 // GetRateLimitPolicy reads the policy, filling defaults for missing pieces.
 func (s *Store) GetRateLimitPolicy(ctx context.Context) RateLimitPolicy {
-	p := RateLimitPolicy{LoginAttempts: 10, LoginWindow: "PT15M", TotpAttempts: 5}
+	p := RateLimitPolicy{LoginAttempts: 10, LoginWindow: "PT15M", TotpAttempts: 5, ResetAttempts: DefaultResetAttempts}
 	var stored RateLimitPolicy
 	if err := s.GetSetting(ctx, SettingRateLimit, &stored); err == nil {
 		p = stored
 		if p.LoginWindow == "" {
 			p.LoginWindow = "PT15M"
+		}
+		if p.ResetAttempts <= 0 {
+			p.ResetAttempts = DefaultResetAttempts
 		}
 	}
 	return p
@@ -139,9 +180,15 @@ func (s *Store) GetRateLimitPolicy(ctx context.Context) RateLimitPolicy {
 
 // PutEmailToken stores a one-shot token by HASH for a user and purpose.
 func (s *Store) PutEmailToken(ctx context.Context, tokenHash, userID, purpose string, expiresAt int64) error {
+	return s.PutEmailTokenWith(ctx, tokenHash, userID, purpose, "", expiresAt)
+}
+
+// PutEmailTokenWith stores a token carrying a payload - the new address of a
+// change waiting for its confirmation (AUTH-22).
+func (s *Store) PutEmailTokenWith(ctx context.Context, tokenHash, userID, purpose, payload string, expiresAt int64) error {
 	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)`,
-		tokenHash, userID, purpose, expiresAt); err != nil {
+		`INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at, payload) VALUES (?, ?, ?, ?, ?)`,
+		tokenHash, userID, purpose, expiresAt, payload); err != nil {
 		return fmt.Errorf("store: put email token for %q: %w", userID, err)
 	}
 	return nil
@@ -311,4 +358,24 @@ func (s *Store) SetUserEmail(ctx context.Context, userID, email string) error {
 	return s.execUser(ctx, userID,
 		`UPDATE users SET email = ?, email_verified = ?, updated_at = ? WHERE id = ?`,
 		strings.TrimSpace(email), false, time.Now().Unix(), userID)
+}
+
+// TakeEmailTokenPayload consumes a token and returns its account and payload.
+// Spent even when expired, like TakeEmailToken: a link is used once, or not.
+func (s *Store) TakeEmailTokenPayload(ctx context.Context, tokenHash, purpose string, now int64) (string, string, error) {
+	var userID, payload string
+	var expires int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT user_id, payload, expires_at FROM email_tokens WHERE token_hash = ? AND purpose = ?`,
+		tokenHash, purpose).Scan(&userID, &payload, &expires)
+	if err != nil {
+		return "", "", fmt.Errorf("store: email token: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM email_tokens WHERE token_hash = ?`, tokenHash); err != nil {
+		return "", "", fmt.Errorf("store: email token: %w", err)
+	}
+	if expires < now {
+		return "", "", fmt.Errorf("store: email token: expired")
+	}
+	return userID, payload, nil
 }

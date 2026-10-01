@@ -16,9 +16,10 @@ package devtunnel
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
+	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/edition"
@@ -267,19 +268,13 @@ var ErrNoResources = errors.New("the developer tunnel has no access to the resou
 type Deps struct {
 	Store    *store.Store
 	Registry *Registry
-	// Addr is where the tunnel listens (MEERKAT_PLUG_ADDR). EMPTY MEANS OFF,
-	// and that is the switch: the tunnel plugs a developer's machine into a
-	// CLUSTER, so it only makes sense where a cluster is - and naming its port
-	// is the deployment saying so.
+	// Addr is where the tunnel listens (MEERKAT_PLUG_ADDR), DefaultAddr when
+	// empty. It is not the switch: that is developer mode and the tunnel's own
+	// setting (store.PlugOpen). A gateway run from a working tree is stopped
+	// by Available instead - it cannot identify its own container.
 	//
-	// It matters most for the case that is not a deployment at all: a gateway
-	// run from a working tree (make dev). There the agent cannot identify its
-	// own container, so it cannot provision a single name whatever Docker is
-	// doing on that laptop - it would open a port for nothing and log an
-	// orchestrator failure at every reload.
-	//
-	// Above 1024 when it is named: binding a privileged port would want root
-	// or CAP_NET_BIND_SERVICE, against the grain of the rest of the image.
+	// Above 1024: binding a privileged port would want root or
+	// CAP_NET_BIND_SERVICE, against the grain of the rest of the image.
 	Addr string
 }
 
@@ -296,6 +291,8 @@ type Hooks struct {
 	// answer and unacceptable inside a gateway - hence a subprocess, and
 	// hence this entry point, reached by re-exec'ing the gateway's own binary.
 	Verb func()
+	// Version is the plug client this image carries, "" when it carries none.
+	Version func() string
 }
 
 var hooks Hooks
@@ -303,33 +300,20 @@ var hooks Hooks
 // Register is called from the Enterprise package's init.
 func Register(h Hooks) { hooks = h }
 
+// ClientVersion is the plug client this image hands out, "" when none.
+func ClientVersion() string {
+	if hooks.Version == nil {
+		return ""
+	}
+	return hooks.Version()
+}
+
 // Linked reports whether this binary carries an agent at all.
 func Linked() bool { return hooks.Run != nil }
 
 // VerbArg is the hidden first argument that turns a gateway process into one
 // verb answer. Hidden because nobody types it: the agent builds the command.
 const VerbArg = "__plug-verb"
-
-// DownloadArg answers the ANONYMOUS `get` account, the one a developer reaches
-// with `ssh get@gateway install | sh` before they have a client at all.
-//
-// Standalone plug hands back its own binaries from a script in its image. A
-// gateway has none to hand back - it embeds the agent, not the client - and
-// left to the default it fork/execs a path that does not exist and says
-// "no such file or directory", which tells nobody anything.
-//
-// So it answers a script instead. It is piped straight into a shell, so what
-// it prints IS the answer: a line naming where the client lives, and a
-// non-zero exit so nothing downstream believes an install happened.
-const DownloadArg = "__plug-download"
-
-// PrintDownloadNotice writes that script. Kept in the trunk rather than beside
-// the agent because the sentence is about this PRODUCT, not about the tunnel.
-func PrintDownloadNotice() {
-	fmt.Println(`echo "This gateway runs the plug agent, but it does not distribute the plug client." >&2`)
-	fmt.Println(`echo "Install it from https://github.com/softwarity/plug (releases), then point it here." >&2`)
-	fmt.Println(`exit 1`)
-}
 
 // RunVerb answers a verb and never returns. Called before anything else in
 // main, from a process the agent started.
@@ -350,6 +334,70 @@ func Run(ctx context.Context, d Deps) error {
 		return errors.New("devtunnel: no agent was linked into this Enterprise build")
 	}
 	return hooks.Run(ctx, d)
+}
+
+// The tunnel's state as the supervisor last saw it, for the console page
+// that shows the switch - a switch that says ON in front of a port that is not
+// open is the screen lying about the product.
+const (
+	StateOff         = "off"         // a switch is off
+	StateUnavailable = "unavailable" // on, but this gateway cannot run it here
+	StateRunning     = "running"     // the agent is serving
+	StateAbsent      = "absent"      // this image carries no agent
+)
+
+// Status is that state, and why.
+type Status struct {
+	State string `json:"state"`
+	Why   string `json:"why,omitempty"`
+	// Port is the port the tunnel listens on in the container.
+	Port string `json:"port,omitempty"`
+}
+
+var (
+	status atomic.Pointer[Status]
+	// looked counts the supervisor's passes, so a caller who woke it can
+	// tell when it has looked since.
+	looked atomic.Uint64
+	wake   = make(chan struct{}, 1)
+)
+
+func setStatus(s Status) { status.Store(&s) }
+
+// CurrentStatus is the last state the supervisor recorded on THIS node.
+func CurrentStatus() Status {
+	if !Linked() {
+		return Status{State: StateAbsent, Why: "this image carries no developer tunnel"}
+	}
+	if s := status.Load(); s != nil {
+		return *s
+	}
+	return Status{State: StateOff, Why: "not started yet"}
+}
+
+// Wake makes the supervisor look at the switches now rather than at its next
+// tick: the node that saved the setting answers at once, the others within
+// pollEvery.
+func Wake() {
+	select {
+	case wake <- struct{}{}:
+	default:
+	}
+}
+
+// WakeAndWait wakes the supervisor and waits, at most for timeout, until it
+// has looked at the switches again - so a screen that just flipped one reads
+// what the tunnel does now, not what it did before the click.
+func WakeAndWait(timeout time.Duration) {
+	if !Linked() {
+		return // no agent, no supervisor: nobody to wait for
+	}
+	before := looked.Load()
+	Wake()
+	deadline := time.Now().Add(timeout)
+	for looked.Load() == before && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // pollEvery is how often the developer-mode switch is re-read. Rarely flipped,
@@ -419,10 +467,20 @@ func Supervise(ctx context.Context, d Deps) {
 			default:
 			}
 		}
+		_, port, _ := net.SplitHostPort(d.Addr)
 		switch {
 		case !d.Store.DevMode(ctx):
 			stop("developer mode is off")
 			retryAfter, nextTry, lastSaid = 0, time.Time{}, ""
+			why := "developer mode is off (Application, General)"
+			if store.Production() {
+				why = "this gateway is declared production (MEERKAT_PRODUCTION)"
+			}
+			setStatus(Status{State: StateOff, Why: why})
+		case !d.Store.Plug(ctx).Enabled:
+			stop("the tunnel is switched off")
+			retryAfter, nextTry, lastSaid = 0, time.Time{}, ""
+			setStatus(Status{State: StateOff, Why: "the tunnel is switched off (Infra, Plug)"})
 		case cancel == nil && time.Now().After(nextTry):
 			// Asked first, so the answer is known before anything is
 			// announced. On a workstation this is where it stops, every time,
@@ -430,6 +488,7 @@ func Supervise(ctx context.Context, d Deps) {
 			if err := hooks.Available(); err != nil {
 				retryAfter = min(max(2*retryAfter, pollEvery), retryCap)
 				nextTry = time.Now().Add(retryAfter)
+				setStatus(Status{State: StateUnavailable, Why: err.Error(), Port: port})
 				// Said ONCE per reason, not once per attempt: a workstation
 				// will never grow a cluster, and repeating the same paragraph
 				// all day is how a log stops being read.
@@ -444,6 +503,7 @@ func Supervise(ctx context.Context, d Deps) {
 				break
 			}
 			lastSaid = ""
+			setStatus(Status{State: StateRunning, Port: port})
 			runCtx, done := context.WithCancel(ctx)
 			ended := make(chan struct{})
 			cancel, finished = done, ended
@@ -452,6 +512,7 @@ func Supervise(ctx context.Context, d Deps) {
 				defer close(ended)
 				if err := Run(runCtx, d); err != nil && runCtx.Err() == nil {
 					slog.Error("developer tunnel stopped", "err", err)
+					setStatus(Status{State: StateUnavailable, Why: err.Error(), Port: port})
 				}
 			}()
 			// Nothing announced here on purpose: the agent says "ready" on
@@ -460,10 +521,12 @@ func Supervise(ctx context.Context, d Deps) {
 			// is one line too many, and the wrong one is the one that only
 			// knows what was asked for.
 		}
+		looked.Add(1)
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+		case <-wake:
 		}
 	}
 }

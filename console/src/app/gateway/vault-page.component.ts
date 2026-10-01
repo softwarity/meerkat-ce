@@ -13,6 +13,7 @@ import { DialogsService } from '../shared/dialogs.service';
 import { VaultEntryFormComponent, VaultEntryFormData } from '../shared/vault-entry-form.component';
 import { VaultService } from '../shared/vault.service';
 import { VaultFileDialogComponent, VaultFileDialogData } from './vault-file-dialog.component';
+import { LiveChangesService } from '../shared/live-changes.service';
 
 // The vault (VAULT-01/02): every named value the configuration refers to, in
 // one place. Secrets are encrypted at rest and never shown again; plain values
@@ -51,6 +52,11 @@ export class VaultPageComponent {
 
   constructor() {
     void this.vault.reload().then(() => this.loading.set(false));
+    // Somebody else's write (CONSOLE-13). Through the SHARED service, which is
+    // what every field offering the vault picker reads: an entry created on
+    // another screen must not still be missing from the picker two screens
+    // away.
+    inject(LiveChangesService).on('vault', () => void this.vault.reload());
   }
 
   // The encrypted vault file: taking the values somewhere else, or bringing

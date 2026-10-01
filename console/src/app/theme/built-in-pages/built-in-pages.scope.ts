@@ -1,7 +1,8 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ApiService, Background, LogoSize, PageLayout, Settings, Theme } from '../../api.service';
+import { ApiService, Background, LogoSize, LocaleView, PageLayout, PreviewCategory, PreviewTemplate, Settings, Theme } from '../../api.service';
 import { CSS_VARS } from '../theme-tokens';
+import { PRESET_PREFIX } from '../theme-carousel/theme-carousel.component';
 
 type Fit = 'cover' | 'contain' | 'tile';
 
@@ -28,12 +29,64 @@ export class BuiltInPagesScope {
   // ── themes ────────────────────────────────────────────────────────────────
   readonly themes = signal<Theme[]>([]);
   readonly presets = signal<Theme[]>([]);
+  // What the preview renders, and in which language. The catalogue is
+  // served: adding a template must not mean editing the console too.
+  readonly templates = signal<PreviewTemplate[]>([]);
+  readonly categories = signal<PreviewCategory[]>([]);
+  // Which categories are being asked for. EMPTY MEANS ALL: nothing is selected
+  // until somebody selects something, and selecting nothing is not a way to
+  // reach an empty list - it is how one goes back to the whole set. Asking for
+  // every category comes to the same thing as asking for none, which is the
+  // only reading under which a filter needs no rule about its last toggle.
+  readonly only = signal<Set<string>>(new Set());
+  readonly shownTemplates = computed(() => {
+    const only = this.only();
+    return only.size ? this.templates().filter((t) => only.has(t.category)) : this.templates();
+  });
+  readonly template = signal('');
+  readonly previewLocale = signal('en');
+  // Every language this gateway can render, with the count of strings it has
+  // no wording for. That count is what sends somebody to the editor.
+  readonly locales = signal<LocaleView[]>([]);
   readonly selectedId = signal('');
   readonly name = signal('');
   readonly flat = signal(false);
   readonly dark = signal<Record<string, string>>({});
   readonly light = signal<Record<string, string>>({});
-  readonly selected = computed(() => this.themes().find((t) => t.id === this.selectedId()) ?? null);
+  // A built-in palette: shown, duplicated, never edited or deleted. Nothing
+  // forbids it - there is simply no row to write to. The ring hands it over
+  // under a namespaced id, because a copy keeps its source's id and the two
+  // must stay two pills.
+  readonly readOnly = computed(() => this.selectedId().startsWith(PRESET_PREFIX));
+
+  // The ring carries the presets too, so "selected" has to look in both.
+  readonly selected = computed(() => {
+    const id = this.selectedId();
+    if (id.startsWith(PRESET_PREFIX)) {
+      const p = this.presets().find((t) => PRESET_PREFIX + t.id === id);
+      return p ? { ...p, id, active: false } : null;
+    }
+    return this.themes().find((t) => t.id === id) ?? null;
+  });
+
+  // What is on screen against what was loaded. Navigating replaces the palette
+  // signals, and the arrows now sit two centimetres from the colour pickers -
+  // without this, three tweaks and a click on "next" lose the three tweaks
+  // without a word.
+  readonly dirty = computed(() => {
+    const t = this.selected();
+    if (!t || this.readOnly()) return false;
+    const same = (a: Record<string, string>, b: Record<string, string>) => {
+      const ka = Object.keys(a), kb = Object.keys(b);
+      return ka.length === kb.length && ka.every((k) => a[k] === b[k]);
+    };
+    return (
+      this.name().trim() !== t.name ||
+      this.flat() !== !!t.flat ||
+      !same(this.dark(), t.dark) ||
+      !same(this.light(), t.light)
+    );
+  });
 
   // Hovered token (Theme tab) -> the CSS var the preview blinks.
   private readonly hoverKey = signal('');
@@ -75,6 +128,16 @@ export class BuiltInPagesScope {
   constructor() {
     this.loadThemes();
     this.api.listPresets().subscribe({ next: (p) => this.presets.set(p) });
+    this.reloadLocales();
+    this.api.previewTemplates().subscribe({
+      next: (c) => {
+        this.templates.set(c.templates);
+        this.categories.set(c.categories);
+        // Land on the first one rather than on a name written in the console:
+        // the catalogue is served, so what it starts with is its business.
+        if (!this.template() && c.templates.length) this.template.set(c.templates[0].key);
+      },
+    });
     this.api.settings().subscribe({
       next: (s) => {
         this.settings = s;
@@ -176,13 +239,17 @@ export class BuiltInPagesScope {
   createFrom(): void {
     const base = this.selected();
     if (!base) return;
-    this.create(
-      this.uniqueName(`${base.name} copy`),
-      { ...this.dark() },
-      { ...this.light() },
-      this.flat(),
-      base.createdAt,
-    );
+    // A copy of a BUILT-IN takes its name plain: "Forest" rather than "Forest
+    // copy", because there is no editable Forest for it to be a copy of.
+    const name = this.readOnly() ? this.uniqueName(base.name) : this.uniqueName(`${base.name} copy`);
+    this.create(name, { ...this.dark() }, { ...this.light() }, this.flat(), base.createdAt);
+  }
+
+  // Delete what is selected, which is the only thing the menu can name. A
+  // built-in has no row and the menu item is disabled on it.
+  removeSelected(): void {
+    const t = this.selected();
+    if (t && !this.readOnly() && !t.active) this.removeTheme(t);
   }
 
   createFromPreset(p: Theme): void {
@@ -282,6 +349,62 @@ export class BuiltInPagesScope {
   // Both are written as soon as they are clicked: a checkbox and a picked
   // thumbnail ARE the setting, so a Save button beside them would be asking
   // twice.
+  // Turning a category off may hide what is on screen; step to the first one
+  // still shown rather than leave the panes on something the arrows can no
+  // longer reach.
+  setCategories(keys: string[]): void {
+    this.only.set(new Set(keys));
+    const shown = this.shownTemplates();
+    if (shown.length && !shown.some((t) => t.key === this.template())) {
+      this.template.set(shown[0].key);
+    }
+  }
+
+  // Re-read the languages: their hole counts and their "edited" marks change
+  // every time a wording is saved or reset.
+  reloadLocales(): void {
+    this.api.locales().subscribe({ next: (l) => this.locales.set(l) });
+  }
+
+  // Add a language the binary does not ship. An empty one renders English until
+  // it is filled - that is the fallback on the data plane too - so creating one
+  // is never creating a broken page.
+  //
+  // Duplicating copies ONLY what the source actually says. Copying what it
+  // RENDERS would copy English into the fourteen keys German has no wording
+  // for, stored as though they were German: the copy would declare itself
+  // complete while carrying fourteen English sentences, and nothing would ever
+  // send anyone to translate them. A hole copied stays a hole, renders English
+  // like every other hole, and is counted.
+  addLocale(code: string, from: string): void {
+    const create = (entries: Record<string, string>) =>
+      this.api.saveLocale(code, entries, { full: true }).subscribe({
+        next: () => {
+          this.reloadLocales();
+          this.previewLocale.set(code);
+          this.version.update((v) => v + 1);
+        },
+        error: (e: { error?: { error?: string } }) =>
+          this.snack.open(
+            e.error?.error ?? $localize`:@@Language_add_failed:The language could not be added.`,
+            undefined,
+            { duration: 8000 },
+          ),
+      });
+    if (!from) {
+      create({});
+      return;
+    }
+    this.api.localeStrings(from).subscribe({
+      next: (r) => {
+        const entries: Record<string, string> = {};
+        for (const s of r.strings) if (s.value) entries[s.key] = s.value;
+        create(entries);
+      },
+      error: () => create({}),
+    });
+  }
+
   setPagesScheme(value: '' | 'light' | 'dark'): void {
     this.pagesScheme.set(value);
     this.pushSettings({ pagesScheme: value });

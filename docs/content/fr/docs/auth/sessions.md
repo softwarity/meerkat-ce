@@ -41,10 +41,12 @@ onglet, sans interroger un point d'entrée. Ils portent une échéance et rien
 d'autre.
 
 > [!NOTE]
-> Aucun attribut `Domain` n'est posé : le cookie est lié à l'hôte. Une session
-> n'est donc **pas partagée entre sous-domaines** aujourd'hui - `app.acme.io` et
-> `admin.acme.io` se connectent séparément. FEATURES.md liste cela comme la moitié
-> manquante du cookie de session.
+> Aucun attribut `Domain` n'est posé : le cookie est lié à l'hôte, et c'est un
+> choix. Un `Domain` enverrait la session à **tous** les sous-domaines, y compris
+> ceux que Meerkat ne sert pas - un site vitrine hébergé ailleurs, un SaaS derrière
+> un CNAME, une préproduction - et un seul compromis recevrait la session de tout
+> le monde. `app.acme.io` et `admin.acme.io` se connectent donc séparément ; des
+> applications sous un même nom d'hôte partagent la session.
 
 Une session d'un plan n'est jamais acceptée sur l'autre. La réponse à un cookie du
 plan de données sur le port d'administration n'est pas "interdit", c'est "pas de
@@ -93,6 +95,9 @@ pas encore connue.
 | Expiration par inactivité | cette session | oui, refusée sur l'horloge |
 | Une réinitialisation de mot de passe par le lien envoyé par courriel | **toutes** les sessions de ce compte, sur toutes les passerelles | oui |
 | La suppression du compte | toutes les sessions de ce compte | oui |
+| La **désactivation** du compte | toutes les sessions de ce compte, sur les deux plans | oui |
+| **Sign out** dans *Active sessions* du profil, ou *Sign out everywhere else* | cette session, ou toutes les autres de cette personne | oui |
+| **Sign out** sur l'écran *Application, Sessions* de la console | cette session | oui |
 
 La déconnexion est un `POST` - il n'y a pas de `GET /logout` - et elle supprime la
 ligne plutôt que d'effacer seulement le cookie, puis efface les deux cookies et
@@ -104,20 +109,22 @@ l'application sont indépendantes.
 
 Cette liste compte plus que la précédente :
 
-- **Désactiver un compte ne termine pas ses sessions.** La ligne reste. Ce qui se passe, c'est que chaque garde relit le compte : la personne désactivée cesse de passer les règles de route et cesse d'être admise par l'API d'administration. Mais les pages propres à la gateway - `/profile` et les autres - continuent de lui répondre jusqu'à l'expiration.
-- **Changer un mot de passe non plus.** Ni le changement volontaire dans le profil, ni le changement forcé à la connexion, ni la réinitialisation par un administrateur. Seul le lien de réinitialisation par courriel révoque les sessions, parce que c'est le flux qui existe pour un compte que quelqu'un d'autre tient peut-être.
+- **Changer un mot de passe non plus.** Ni le changement volontaire dans le profil, ni le changement forcé à la connexion, ni la réinitialisation par un administrateur. Seul le lien de réinitialisation par courriel révoque les sessions - avec les jetons d'API et les navigateurs de confiance du compte -, parce que c'est le flux qui existe pour un compte que quelqu'un d'autre tient peut-être.
 - **"Mot de passe à changer" non plus.** Le drapeau est lu à la connexion *suivante*.
 - **Les changements de rôle, de groupe et d'appartenance non plus.** Ils prennent effet en quelques secondes : l'identité mémorisée est jetée, la session est gardée, ce qui est précisément pourquoi être ajouté à une organisation prend effet sans se déconnecter. Retirer un rôle marche pareil.
 - **Désactiver une organisation non plus.**
 - **Sur le plan de contrôle, la fenêtre de validité d'un compte n'est pas revérifiée** sur une session cookie : elle l'est à la connexion et à chaque appel par jeton, mais une session de console déjà ouverte court jusqu'à son expiration.
 
-## Ce qui manque
+## Voir les sessions
 
-Il n'y a **aucune liste des sessions actives** et **aucun "me déconnecter
-partout"** - ni pour une personne sur son propre compte, ni pour un
-administrateur. La table existe et la révocation par compte existe dans le code ;
-ce qui manque est un écran, un bouton, et un appel à cette révocation quand un
-compte est désactivé.
+Une personne lit les siennes dans son profil, **Security, Active sessions** : chaque
+navigateur connecté aux applications, quand et depuis quelle adresse, *This browser*
+signalé ; **Sign out** sur n'importe quel autre, ou **Sign out everywhere else**. La
+session d'un autre compte n'est jamais la sienne à fermer, quel que soit l'identifiant
+qu'un formulaire porte.
 
-D'ici là, la façon honnête de sortir quelqu'un de partout est de réinitialiser son
-mot de passe par le flux courriel, ou de supprimer le compte.
+Les administrateurs les lisent dans **Application, Sessions** : qui, quel navigateur et
+quelle adresse, quel plan, depuis quand - filtrées par compte, par pages. Root lit les
+deux plans ; un administrateur d'application les sessions des applications seulement,
+puisque qui fait tourner la console, et d'où, est l'affaire de root. En fermer une écrit
+`session.revoke` au [journal d'audit](/docs/operations/audit).

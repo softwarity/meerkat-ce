@@ -45,10 +45,12 @@
         <mat-icon>code</mat-icon>
         <div class="grow">
           <div class="title"><ng-container i18n="@@Developer_mode">Developer mode</ng-container></div>
-          <p class="hint text-muted" i18n="@@Developer_mode_hint">
+          <p class="hint text-muted" i18n="@@Developer_mode_hint_plug">
             On, accounts holding the developer capability get their tooling on the applications this
             gateway serves: the Developer menu in the user button, the UI test mode and the routes'
             API docs. Off, none of it is there at all - however many accounts carry the capability.
+            The developer tunnel (plug) needs this AND its own switch, which is infrastructure's:
+            it opens a port into the cluster.
           </p>
           @if (devLocked()) {
             <p class="hint text-muted" i18n="@@Developer_mode_locked">

@@ -57,24 +57,35 @@
   }
 }
 
-// The nav block: centred on the pills row, tall enough to straddle both panes.
+// The nav block: one row, the two arrows flanking the palette they move
+// through - "< ( o o o o ) >". The pill used to ride ABOVE a block of four
+// buttons; with add and delete gone to the palette's own menu there is nothing
+// left to straddle, so the three sit side by side.
 .nav {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mat-sys-surface-container-high) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--mat-sys-outline-variant);
+
+  .mat-mdc-icon-button {
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+  }
 }
 
-// Current theme's palette as a pill - SAME size as the strip pills, so it hides
-// little of the controls it straddles.
+// The selected palette, between the arrows - SAME swatch size as the ring.
 .current-pill {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translateX(-50%);
-  margin-bottom: -11px;
-  z-index: 1;
+  position: relative;
   display: inline-flex;
   gap: 3px;
   padding: 5px 8px;
@@ -89,24 +100,34 @@
   }
 }
 
-.controls {
-  display: flex;
-  align-items: center;
-  padding: 5px 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--mat-sys-surface-container-high) 92%, transparent);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--mat-sys-outline-variant);
-
-  .mat-mdc-icon-button {
-    width: 36px;
-    height: 36px;
-    padding: 6px;
-  }
+/* The centre pill is the activate control, so it has to say when the theme
+   under it is NOT what visitors see - otherwise the gap between "what I am
+   editing" and "what is served" is invisible, and an admin leaves believing
+   they shipped. (THEME-06) */
+.current-pill.warn {
+  outline: 2px solid var(--mat-sys-tertiary, #b58b00);
+  outline-offset: 2px;
 }
 
-.preset-swatches {
-  display: inline-flex;
-  gap: 3px;
-  margin-right: 10px;
+.current-pill.warn::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mat-sys-tertiary, #b58b00);
+  border: 1px solid var(--mat-sys-surface);
+}
+
+/* A built-in palette reads as a lighter presence in the ring: it is there to
+   be seen and copied, not owned. */
+.pill.preset {
+  opacity: 0.72;
+}
+
+.pill.preset:hover,
+.pill.preset.centered {
+  opacity: 1;
 }

@@ -36,6 +36,7 @@ jobs:
   preflight:
     name: Registry credentials
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       publish: ${{ steps.check.outputs.publish }}
     steps:
@@ -55,6 +56,7 @@ jobs:
     name: Build ${{ matrix.platform }}
     needs: preflight
     runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 30
     permissions:
       contents: read
       # A reusable workflow's job permissions REPLACE the caller's, so
@@ -139,6 +141,7 @@ jobs:
   merge:
     name: Merge manifest list
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [preflight, build]
     if: needs.preflight.outputs.publish == 'true'
     permissions:
@@ -160,8 +163,15 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE }}
+          # ONE moving tag outside a release, and it is `latest`. A branch tag
+          # (`main`) named the same thing twice and nobody pulled it.
+          #
+          # Worth knowing before expecting this to save room: a tag is a
+          # POINTER. Pushing `latest` again moves it and leaves the manifest it
+          # named stored, untagged - which is how ninety-eight of them
+          # accumulated. What removes those is the weekly prune
+          # (prune-packages.yml), not the push.
           tags: |
-            type=ref,event=branch
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

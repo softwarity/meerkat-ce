@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -49,6 +50,9 @@ func (a *API) createRole(w http.ResponseWriter, r *http.Request, actor store.Use
 	}
 	role.ID = newID()
 	if err := a.st.SaveRole(r.Context(), role); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -69,8 +73,22 @@ func (a *API) updateRole(w http.ResponseWriter, r *http.Request, actor store.Use
 		return
 	}
 	if err := a.st.SaveRole(r.Context(), role); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	// A rename FOLLOWS its references. An access rule names roles by name, and
+	// so does a scheduled call, so a rename used to leave rules pointing at a
+	// name nobody holds - which grants nobody, silently, on routes nobody
+	// thought they had touched. See roleref.go.
+	if moved, err := a.renameRoleReferences(r.Context(), old.Name, role.Name); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	} else if moved > 0 {
+		a.auditEvent(r.Context(), actor, "role.rename", "role", role.ID, role.Name, "",
+			fmt.Sprintf("%d rules rewritten from %q", moved, old.Name))
 	}
 	if saved, err := a.st.GetRole(r.Context(), role.ID); err == nil {
 		a.auditUpdate(r.Context(), actor, "role.update", "role", saved.ID, saved.Name, "", old, saved)
@@ -81,6 +99,15 @@ func (a *API) updateRole(w http.ResponseWriter, r *http.Request, actor store.Use
 func (a *API) deleteRole(w http.ResponseWriter, r *http.Request, actor store.User) {
 	id := r.PathValue("id")
 	role, _ := a.st.GetRole(r.Context(), id) // capture the name before it is gone
+	// What still names it. Deleting anyway fails CLOSED - a rule naming a role
+	// nobody holds grants nobody - but it fails closed on a route somebody else
+	// owns, days later, and nothing in the database would say why.
+	if refs, err := a.roleReferences(r.Context(), role.Name); err == nil && len(refs) > 0 {
+		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"role %q is still named by %d rule(s): %s. Change them first, or nobody will pass them.",
+			role.Name, len(refs), refLabels(refs, 5)))
+		return
+	}
 	ok, err := a.st.DeleteRole(r.Context(), id)
 	if err != nil {
 		// A system role is protected - the store reports why.
@@ -127,6 +154,9 @@ func (a *API) createGroup(w http.ResponseWriter, r *http.Request, actor store.Us
 	g.ID = newID()
 	g.TenantID = r.PathValue("id")
 	if err := a.st.SaveGroup(r.Context(), g); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -148,6 +178,9 @@ func (a *API) updateGroup(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	if err := a.st.SaveGroup(r.Context(), g); err != nil {
+		if conflict(w, err) {
+			return
+		}
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -214,7 +247,7 @@ func (a *API) putMemberGroups(w http.ResponseWriter, r *http.Request, actor stor
 			name = u.Username
 		}
 		a.audit(r.Context(), store.AuditEvent{
-			At: time.Now().Unix(), ActorID: actor.ID, Action: "member.groups", Target: "membership",
+			At: time.Now().Unix(), ActorID: actor.ID, ActorName: actor.Username, Action: "member.groups", Target: "membership",
 			TargetID: userID, TargetName: name, TenantID: tenantID,
 			Changes: []store.FieldChange{{
 				Field: "groups",

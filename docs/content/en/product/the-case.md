@@ -39,6 +39,7 @@ This is the list as it shows up in security questionnaires and tenders.
 | **Observability** | traffic, latency, errors, per route and per endpoint |
 | **High availability** | several nodes, no session lost |
 | **Announced maintenance** | a proper page instead of a 502 |
+| **Scheduled work** | closings, reminders, purges, the morning report |
 | **User feedback** | report a problem with a screenshot and context |
 | **Developer tooling** | test against the cluster from your own machine |
 
@@ -66,6 +67,7 @@ as a commercial offer.
 | Issue reporting with a screenshot | self-hosted Sentry | Marker.io, Jam, Userback, BugHerd | included |
 | Developer workstation to cluster | plug, mirrord OSS, Telepresence, Gefyra | mirrord Team, Okteto | built in, Enterprise |
 | Versioned configurations, rollback | a GitOps pipeline to set up | a GitOps pipeline to set up | included |
+| Scheduled calls to your services | cron, Kubernetes CronJob, or Quartz and Celery in every service | Temporal Cloud, Inngest, Trigger.dev, EventBridge Scheduler | included |
 | Driven by an AI agent | community MCP servers | Kong Konnect, SaaS only | included |
 
 Two of those rows have no product behind them at all: the user menu and portal
@@ -88,16 +90,17 @@ its upgrades and its security advisories. The same front door, built both ways,
 with the instance counts each product's own documentation recommends for
 production.
 
-| Building block | Product | Production instances | State to operate |
-| --- | --- | --- | --- |
-| Identity | Keycloak | 3 pods | PostgreSQL |
-| API gateway | Kong OSS, database-less | 3 nodes | Redis, for shared rate limits |
-| Authentication proxy | oauth2-proxy | 2 pods | Redis, for sessions |
-| Certificates | cert-manager | 7 pods | - |
-| Secrets vault | OpenBao or Vault | 5 Raft nodes | its own Raft storage |
-| Monitoring | Prometheus, Grafana | 8 pods | its own series database |
-| Audit | Retraced | 5 pods | PostgreSQL and Elasticsearch |
-| Workstation to cluster | mirrord Operator | 1 pod, plus one job per session | - |
+| Building block | Product | Production instances | State to operate | Recommended memory |
+| --- | --- | --- | --- | --- |
+| Identity | Keycloak | 3 pods, the documentation's own example | PostgreSQL | 1,250 MB per pod |
+| API gateway | Kong OSS, database-less | 3 nodes | Redis, for shared rate limits | 2 to 4 GB per node |
+| Authentication proxy | oauth2-proxy | 2 pods | Redis, for sessions | not published |
+| Certificates | cert-manager | 7 pods, the recommended practice | - | not published |
+| Secrets vault | OpenBao or Vault | 5 Raft nodes | Raft, and the unseal shares | 8 to 16 GB per node |
+| Monitoring | kube-prometheus-stack | 5 pods, plus 1 per node | its own series database | 512 MB minimum for Grafana |
+| Audit | Retraced | 5 services | PostgreSQL, Elasticsearch and NSQ | not published |
+| Workstation to cluster | mirrord Operator | 1 pod, plus one job per session | a Team licence is required | not published |
+| **The whole baseline** | **Meerkat** | **1 pod, or 3 clustered** | **embedded database, or PostgreSQL** | **22 MB at rest** |
 
 ::: figure stack
 The same front door, both ways. On the left a request crosses two products
@@ -167,6 +170,11 @@ are winning.
 What one more customer with its own single sign-on adds, every month.
 :::
 
+The quotas included before that meter starts: **five connections at Stytch and
+Descope, three on Auth0 Essentials, one at Clerk, none at WorkOS**. Past that
+threshold every customer arriving with their own Entra ID or Okta is billed,
+and the amount has nothing to do with what they consume.
+
 ## What it costs in time
 
 The heaviest cost of an assembled foundation is not the licence, it is
@@ -188,24 +196,97 @@ Person-days to reach the same scope, from the low estimate to the high one.
 | Certificates and secrets vault | 6 to 13 | 3 to 6 | 0.5 to 1 |
 | Monitoring and dashboards | 4 to 8 | 2 to 4 | 0 to 0.5 |
 | Cross-cutting audit of administrative actions | 8 to 15 | 5 to 10 | 0 |
-| **Total** | **83 to 165 days** | **48 to 101 days** | **5.5 to 12 days** |
+| User menu and portal inside the applications | 8 to 15 | 8 to 15 | 0.5 to 1 |
+| Issue reporting | 1 to 3 | 1 to 2 | 0 to 0.5 |
+| A developer's machine into the cluster | 2 to 5 | 1 to 3 | 0.5 to 1 |
+| Versioned configurations, rollback | 5 to 10 | 3 to 6 | 0 |
+| End-to-end acceptance testing | 8 to 15 | 5 to 10 | 1 to 2 |
+| **Setting it up** | **83 to 165 days** | **48 to 101 days** | **5.5 to 12 days** |
+| At 650 EUR a day, before tax | 54 to 107 k | 31 to 66 k | 3.6 to 7.8 k |
+| Maintenance, person-days a year | 20 to 40 | 10 to 20 | 2 to 5 |
 
 The SaaS stack skips installing servers but keeps the integration, the wiring
 between products, and the development that no product covers.
 
 ## Where these figures come from
 
-Prices and product facts were gathered in **September 2026** from public
-documentation and public price lists. The memory figure is measured by this
-project's own CI; the pod counts are the ones each product's documentation
-recommends for production; the person-days are estimates, given as a range
-because that is what they are.
+A figure without its method is worth nothing, so here is the method, and the
+sources with it.
+
+**What is measured.** Memory and throughput come from this project's own CI
+bench (`tools/bench`), last run on **17 September 2026** on the GitHub x64 and
+arm64 runners, with the container's memory read at rest **and under load**. The
+state of each feature is read from the code rather than from a plan: [the
+repository's public inventory](/product/features) on **16 September 2026**
+gives 106 features delivered, 87 delivered in part and 21 to come.
+
+**What is gathered.** The prices are the PUBLIC prices, in US dollars before
+tax, read from the official pages on **16 September 2026**, with no negotiated
+discount - a buyer who negotiates will pay less, which is exactly why the
+comparison is made at list price. The pod counts and the recommended memory are
+the ones each product's documentation gives for production.
+
+**What is estimated.** The person-days are Softwarity's estimate, given as a
+range because that is what it is. The conversion into euros uses **650 EUR a
+day, before tax**, for an experienced DevOps or security engineer.
+
+::: details The sources, one by one
+**Identity**
+
+- auth0.com/pricing
+- workos.com/pricing
+- clerk.com/pricing
+- descope.com/pricing
+- stytch.com/pricing
+- keycloak.org, memory and CPU sizing
+
+**Gateways and proxies**
+
+- konghq.com/pricing, and Kong's sizing guidance
+- Kong: which versions are still entirely open source
+- api7.ai/pricing
+- gravitee.io/pricing
+- Traefik Hub on AWS Marketplace, and its offline mode
+- pomerium.com/pricing and Cloudflare Zero Trust
+
+**Cluster, vault, monitoring, audit, tooling**
+
+- cert-manager, its deployment best practices
+- Vault, the Raft reference architecture, and OpenBao, integrated storage
+- HCP Vault, Infisical, Doppler
+- grafana.com/pricing, and the kube-prometheus-stack chart
+- Retraced
+- softwarity/plug and mirrord
+- Userback, Marker.io, Jam
+:::
 
 Prices move. If a line here is out of date, it is the line that is wrong - tell
-us and we will correct it. What does not move is the shape of the argument: one
-product instead of eight, one process instead of thirty-eight pods, and a
-foundation that is already there instead of one to assemble.
+us and we will correct it.
+
+## What you get instead
+
+What does not move is the shape of the argument: **one product instead of
+eight, one process instead of thirty-eight pods, a foundation that is already
+there instead of one to assemble.**
+
+For the team that will live with it, that means:
+
+- **One thing to operate.** One image, one console, one audit trail, one
+  backup. Not eight products to keep updated, each with its own security
+  bulletins and its own release cadence.
+- **A baseline that passes the questionnaires on day one.** Two-factor,
+  passkeys, customer single sign-on, audit, TLS, vault: all of it is in the
+  free edition, so a tender stops being a project.
+- **Your developers given back to your product.** Five to twelve days of setup
+  instead of eighty-three to a hundred and sixty-five - and, more to the point,
+  instead of the twenty to forty person-days a year the assembled stack asks
+  for again every year.
+- **The right to change your mind.** The Community edition is complete and will
+  stay that way; the code turns Apache 2.0 after two years. You are not betting
+  your front door on our survival.
 
 What is actually built, and what is not, is
-[one table read from the code](/project/roadmap). What the two editions carry
-is on [editions](/product/editions).
+[one table read from the code](/project/roadmap) - the same transparency as the
+figures above. What the two editions carry is on
+[editions](/product/editions), and if you would rather see before deciding, the
+[showcase](/showcase/index) has the screens.

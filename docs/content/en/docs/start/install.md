@@ -13,12 +13,13 @@ prerequisite.
 
 ## Docker image
 
-Two images, built from the same commit:
+Two images, built from the same commit and carrying the same name: the
+**registry** is what says the edition.
 
 | Image | Edition |
 |---|---|
-| `docker.io/softwarity/meerkat:latest` | community |
-| `ghcr.io/softwarity/meerkat-ee:latest` | Enterprise (private registry) |
+| `docker.io/softwarity/meerkat:latest` | community, public |
+| `ghcr.io/softwarity/meerkat:latest` | Enterprise, private registry |
 
 ```yaml
 services:
@@ -102,13 +103,13 @@ address costs one door, not the installation.
 | Variable | What |
 |---|---|
 | `MEERKAT_ADMIN_PASSWORD` | the first administrator's password, read only while there is no account at all |
-| `MEERKAT_CONFIG_FILE` (`-config`) | a YAML or JSON configuration seeding an **empty** gateway; a configured one ignores it |
+| `MEERKAT_CONFIG_FILE` (`-config`) | a YAML or JSON configuration seeding an **empty** gateway. A configured one does not apply it: when the file differs from what runs, it is shelved as a **saved configuration** (named after the file), to compare and set as current from the Configuration screen |
 | `MEERKAT_VAULT_FILE` (`-vault`) | an encrypted vault file, ingested once |
 | `MEERKAT_VAULT_PASSPHRASE`, `MEERKAT_VAULT_PASSPHRASE_FILE` | the passphrase for that file |
 | `MEERKAT_TENANCY` (`-tenancy`) | `single` or `multi`, settled on the first start; afterwards the console owns it |
 
-A gateway seeded from a configuration file does not get the demonstration
-routes: the operator has said what this gateway serves.
+Without a configuration file the gateway starts empty - no route - and the
+administrator's account is the only thing it creates.
 
 `-tenancy` is for bootstrap - a first boot, a seeded install, GitOps. Once the
 mode has been chosen the flag is ignored, with a line in the log saying so
@@ -128,6 +129,25 @@ single-tenant, and says that too.
 reason: the stored switch travels. A configuration export, a restored backup or
 a database copied from staging can each carry developer mode into production,
 and nobody notices until there is a tunnel port in front of customers.
+
+### Logs and traces
+
+| Flag | Variable | Default | What |
+|---|---|---|---|
+| `-log-level` | `MEERKAT_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`; a typo falls back to `info` rather than stopping the start |
+| `-log-format` | `MEERKAT_LOG_FORMAT` | empty | `json` or `text`; empty picks JSON on a production gateway and text elsewhere |
+| `-access-log` | `MEERKAT_ACCESS_LOG` | off | one line per request crossing the front door, on standard output - see [Logs](/docs/operations/logs) |
+| `-otlp-endpoint` | `MEERKAT_OTLP_ENDPOINT` | empty | a collector to export traces to from the first second, such as `http://otel-collector:4318` (Enterprise) |
+| `-otlp-sample` | `MEERKAT_OTLP_SAMPLE` | `0.1` | the share of the journeys this gateway opens that get recorded, 0 to 1 |
+
+The level is set at startup; changing it means a restart.
+
+The two `otlp` settings are for a gateway that must trace before anybody has
+opened the console - an image started by a pipeline, say. The console's own
+setting (**Infra, OpenTelemetry**) is the one to use otherwise: it adds the
+metrics, the credential in the vault, the per-route choice and the Test button.
+While it has never been switched on, the startup exporter runs; once it is, it
+takes over, and switching it off again stops the export until the next start. See [Traces](/docs/operations/tracing).
 
 ## Probes
 

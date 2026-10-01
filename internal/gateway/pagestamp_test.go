@@ -175,15 +175,24 @@ func TestAStampedPageIsNeverCacheable(t *testing.T) {
 	srv := httptest.NewServer(rt)
 	t.Cleanup(srv.Close)
 
-	// Anonymous: nothing was written into the page, so the application's own
-	// caching stands - a landing page must stay cacheable.
+	// Anonymous: nobody's name was written in, so the page is not PERSONAL.
+	// It is still rewritten, though - a UI route carries the page agent, and
+	// that fragment names the locales this route offers and how the
+	// application takes light and dark. Those are settings, and a page kept
+	// for ten minutes under the application's own max-age is ten minutes of
+	// the PREVIOUS ones.
+	//
+	// So it must be revalidated, not stored away: no-cache, which still lets
+	// the browser keep the copy and keeps the back/forward cache working.
+	// no-store is reserved for the stamped page below, where the bytes belong
+	// to one person.
 	res, err := http.Get(srv.URL + "/demo/page")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = res.Body.Close()
-	if got := res.Header.Get("Cache-Control"); got != "public, max-age=300" {
-		t.Errorf("an anonymous page lost the application's caching: %q", got)
+	if got := res.Header.Get("Cache-Control"); got != "no-cache" {
+		t.Errorf("a rewritten page kept the application's caching: %q", got)
 	}
 
 	// Signed in: the page now names somebody.
