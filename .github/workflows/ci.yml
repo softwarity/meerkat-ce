@@ -22,11 +22,6 @@ on:
     branches-ignore: ["dependabot/**", "bench"]
   pull_request:
   workflow_dispatch:
-  # Once a week for what no longer runs on every push: the OIDC directory.
-  # Tuesday, a day away from the package prune, so two schedules never explain
-  # each other's failures.
-  schedule:
-    - cron: '23 3 * * 2'
 
 # One pipeline per branch: only the newest commit needs blessing.
 concurrency:
@@ -53,51 +48,23 @@ jobs:
   #
   # Every job carries a timeout-minutes: GitHub's default is six HOURS, and a
   # hung server or browser holds a runner for every one of them.
-  scope:
-    name: What this push asks for
+  #
+  # Everything runs on every push. The minutes are free here, and a job that
+  # waited for its own code to move (the directory used to) answered its
+  # question late, on the push after the one that broke it.
+  gate:
+    name: On the mirror
     if: github.repository == 'softwarity/meerkat-ce'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    outputs:
-      # A scheduled run is NOT a pipeline: it exists for the slow check below
-      # and everything else stands down. One expression, read by the jobs
-      # rather than repeated in each of them.
-      full: ${{ github.event_name != 'schedule' }}
-      directories: ${{ steps.touched.outputs.directories }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          # Two commits: enough to see what this push changed.
-          fetch-depth: 2
-      # The directory suite starts a real server for code that moves rarely -
-      # minutes on every commit to answer a question only some commits ask. It
-      # runs when its own code moves, on a schedule, or by hand. The net is
-      # what its tests compile and start: the driver, the compose file, the
-      # module graph.
-      - id: touched
-        run: |
-          base="${{ github.event.before }}"
-          if [ "$base" = "0000000000000000000000000000000000000000" ] || [ -z "$base" ] \
-             || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            echo "directories=true" >> "$GITHUB_OUTPUT"
-            echo "no comparable commit: running them"
-            exit 0
-          fi
-          if git diff --name-only "$base" "${{ github.sha }}" \
-             | grep -qE '^(internal/idp/|test/ldap/|go\.(mod|sum)$|\.github/workflows/ci\.yml$)'; then
-            echo "directories=true" >> "$GITHUB_OUTPUT"
-            echo "this push touches what the directory exercises"
-          else
-            echo "directories=false" >> "$GITHUB_OUTPUT"
-            echo "nothing here reaches the directory: it runs on the schedule"
-          fi
+      - run: echo "this is the public tree, the pipeline runs"
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: scope
-    if: needs.scope.outputs.full == 'true'
+    needs: gate
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -111,8 +78,7 @@ jobs:
     name: Console
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: scope
-    if: needs.scope.outputs.full == 'true'
+    needs: gate
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -142,8 +108,7 @@ jobs:
     name: Doc site
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: scope
-    if: needs.scope.outputs.full == 'true'
+    needs: gate
     steps:
       - uses: actions/checkout@v7
         with:
@@ -173,8 +138,7 @@ jobs:
     name: Go - vet, tests, builds
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: scope
-    if: needs.scope.outputs.full == 'true'
+    needs: gate
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -209,7 +173,7 @@ jobs:
   bench:
     name: Benchmark (${{ matrix.arch }})
     timeout-minutes: 30
-    needs: scope
+    needs: gate
     if: >-
       (github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.runner }}
@@ -286,12 +250,7 @@ jobs:
     name: OIDC (Dex)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: scope
-    # What this exercises moves rarely: when its own code moves, when somebody
-    # asks, and once a week whatever happens.
-    if: >-
-      needs.scope.outputs.directories == 'true'
-      || github.event_name != 'push'
+    needs: gate
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -325,8 +284,7 @@ jobs:
     name: Integration (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [scope, console]
-    if: needs.scope.outputs.full == 'true'
+    needs: [gate, console]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -378,17 +336,14 @@ jobs:
   # the semver tags from ci-ee.yml, which is the one that knows the version:
   # this tree has no tags.
   #
-  # THE GATE. A skipped job skips its dependants, and some needs are skipped
-  # on purpose - the directory when its code did not move. So the condition
-  # names what must have PASSED and refuses any failure, rather than asking
-  # every need to have run.
+  # THE GATE: everything it needs has PASSED, on main or by hand.
   image:
     name: Build & publish image
-    needs: [scope, lint, unit, directory, e2e, console]
+    needs: [gate, lint, unit, directory, e2e, console]
     if: >-
-      !cancelled() && !contains(needs.*.result, 'failure')
+      !cancelled()
       && needs.lint.result == 'success' && needs.unit.result == 'success'
-      && needs.e2e.result == 'success'
+      && needs.directory.result == 'success' && needs.e2e.result == 'success'
       && ((github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read

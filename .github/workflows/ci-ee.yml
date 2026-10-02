@@ -33,11 +33,17 @@ name: CI - Enterprise
 #
 # WHO CAN START IT. A push to the private main: mirror-ce.yml publishes the
 # community tree, then sends a repository_dispatch here naming the commit. A
-# hand: workflow_dispatch, with or without a commit. The clock: once a week,
-# for the slow checks. Never a pull request - a fork's pull request receives
-# no secret, and pull_request_target, which would, is not listed. A fork of
-# the mirror inherits this file and none of the secrets, so the first job asks
-# the repository's name and the whole pipeline stands down anywhere else.
+# hand: workflow_dispatch, with or without a commit. Never a pull request - a
+# fork's pull request receives no secret, and pull_request_target, which
+# would, is not listed. A fork of the mirror inherits this file and none of
+# the secrets, so the first job asks the repository's name and the whole
+# pipeline stands down anywhere else.
+#
+# EVERYTHING RUNS ON EVERY COMMIT. The directories and the whole tree on
+# PostgreSQL used to wait for their own code to move, or for a weekly run,
+# because they cost minutes the private repository paid for. Here they cost
+# nothing, and a check that waits answers late: on the push after the one
+# that broke it.
 #
 # A RELEASE arrives as a dispatch carrying the version: release.yml tags the
 # private commit, mirror-ce.yml fires on the tag, and the two jobs at the end
@@ -57,11 +63,6 @@ on:
         description: Publish both images under this semver (no leading v). Empty publishes latest only.
         required: false
         default: ""
-  # Once a week for what no longer runs on every push: the whole tree on
-  # PostgreSQL and the three directories. Tuesday, a day away from the package
-  # prune, so two schedules never explain each other's failures.
-  schedule:
-    - cron: '23 3 * * 2'
 
 permissions:
   contents: read
@@ -85,13 +86,6 @@ jobs:
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
       version: ${{ steps.resolve.outputs.version }}
-      # A scheduled run is NOT a pipeline: it exists for the slow checks and
-      # everything else stands down.
-      full: ${{ github.event_name != 'schedule' }}
-      # The slow checks - the whole tree on PostgreSQL, the three directories.
-      # Weekly, by hand, and on a release; not on every push.
-      thorough: ${{ steps.resolve.outputs.thorough }}
-      directories: ${{ steps.resolve.outputs.directories }}
     steps:
       - id: token
         uses: actions/create-github-app-token@v2
@@ -108,31 +102,14 @@ jobs:
         run: |
           set -e
           # The API rather than a clone: this job has nothing to build, it
-          # needs the commit's full id and the files it touches.
+          # needs the commit's full id, whatever it was asked by.
           sha=$(gh api "repos/softwarity/meerkat/commits/${ASKED:-main}" --jq .sha)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           version="${VERSION#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          thorough=false
-          if [ "$GITHUB_EVENT_NAME" != "repository_dispatch" ] || [ -n "$version" ]; then
-            thorough=true
-          fi
-          echo "thorough=$thorough" >> "$GITHUB_OUTPUT"
-          # The directory suites start real servers for code that moves
-          # rarely - five minutes on every commit to answer a question only
-          # some commits ask. They run when their own code moves, and on the
-          # thorough runs. The net is what their tests compile and start: the
-          # two drivers, the compose file, the module graph.
-          directories=$thorough
-          if gh api "repos/softwarity/meerkat/commits/$sha" --jq '.files[].filename' \
-             | grep -qE '^(ee/directories/|internal/idp/|test/ldap/|go\.(mod|sum)$|\.github/workflows/ci-ee\.yml$)'; then
-            directories=true
-          fi
-          echo "directories=$directories" >> "$GITHUB_OUTPUT"
           {
             echo "Enterprise sources: softwarity/meerkat@${sha::7}"
             if [ -n "$version" ]; then echo "Release: $version"; fi
-            echo "Thorough: $thorough. Directories: $directories."
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Every job below opens with the same three steps: a token, the private
@@ -141,7 +118,6 @@ jobs:
   lint:
     name: Lint
     needs: source
-    if: needs.source.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: enterprise
@@ -182,7 +158,6 @@ jobs:
   unit:
     name: Go - vet, tests, builds
     needs: source
-    if: needs.source.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: enterprise
@@ -291,12 +266,9 @@ jobs:
       - name: The cluster, against a real server
         run: go test -tags ee ./ee/changebus/ ./internal/cluster/ ./internal/store/ -count=1
       # The WHOLE tree on PostgreSQL - the promise that the same suite runs
-      # twice, once on each storage. It answers a question about the DIALECT,
-      # and what changes between two commits is rarely the dialect: weekly, by
-      # hand, and on a release. No -race here: the point is the dialect, and
-      # the unit job already runs ee/ under the detector.
+      # twice, once on each storage. No -race here: the point is the dialect,
+      # and the unit job already runs ee/ under the detector.
       - name: The suite, on the other storage
-        if: needs.source.outputs.thorough == 'true'
         run: go test -tags ee ./... -count=1
 
   # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
@@ -314,7 +286,6 @@ jobs:
   directories:
     name: ${{ matrix.directory }}
     needs: source
-    if: needs.source.outputs.directories == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: enterprise
@@ -388,7 +359,6 @@ jobs:
   e2e:
     name: Integration (Playwright)
     needs: source
-    if: needs.source.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: enterprise
@@ -466,18 +436,15 @@ jobs:
   # pointer: what removes the manifests it stops naming is the weekly prune on
   # the private side (prune-packages.yml), not the push.
   #
-  # THE GATE. A skipped job skips its dependants, and some needs are skipped
-  # on purpose - the directories when their code did not move. So the
-  # condition names what must have PASSED and refuses any failure, rather
-  # than asking every need to have run.
+  # THE GATE: everything it needs has PASSED.
   image:
     name: Build & publish the Enterprise image
     needs: [source, lint, unit, postgres, directories, e2e]
     if: >-
-      !cancelled() && !contains(needs.*.result, 'failure')
+      !cancelled()
       && needs.lint.result == 'success' && needs.unit.result == 'success'
-      && needs.postgres.result == 'success' && needs.e2e.result == 'success'
-      && github.event_name != 'schedule'
+      && needs.postgres.result == 'success' && needs.directories.result == 'success'
+      && needs.e2e.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: enterprise
@@ -557,9 +524,10 @@ jobs:
     name: Build & publish the community image (release)
     needs: [source, lint, unit, postgres, directories, e2e]
     if: >-
-      !cancelled() && !contains(needs.*.result, 'failure')
+      !cancelled()
       && needs.lint.result == 'success' && needs.unit.result == 'success'
-      && needs.postgres.result == 'success' && needs.e2e.result == 'success'
+      && needs.postgres.result == 'success' && needs.directories.result == 'success'
+      && needs.e2e.result == 'success'
       && needs.source.outputs.version != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30

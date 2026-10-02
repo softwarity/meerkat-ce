@@ -297,7 +297,15 @@ ne fait que le miroir (`mirror-ce.yml`, 2-3 min facturees), la release (le tag) 
 hebdomadaire du paquet ghcr. TOUT le reste tourne sur `softwarity/meerkat-ce`, public, donc
 gratuit - y compris l'Enterprise, que le miroir clone a la volee.
 
-**Ce qui a bouge** (non commite au moment d'ecrire, voir `git status -- .github`) :
+**LIVRE ET VERIFIE le 2026-10-02** : commit `1b4375a` pousse, App `meerkat-ci` + environment
+`enterprise` crees par Francois, preflight vert sur les quatre, premier run par dispatch vert
+de bout en bout (clone, lint, unit, postgres, e2e multi-org, image EE sur ghcr). Deux defauts
+de lint sont sortis au passage, dans du code que personne ne lintait avant (le miroir n'avait
+jamais vu les 27 commits ; `internal/store/dbtest/driver_ee.go` est derriere le tag et le
+lint prive ne couvrait que `ee/`) : corriges en `3aac8d5` et `f5ca33b`. Le lint EE couvre
+maintenant `./...` avec le tag : attendre d'autres sorties de ce genre.
+
+**Ce qui a bouge** :
 - `ci.yml` : pipeline COMMUNAUTAIRE seul. Le job `edition` qui tatait `ee/` est devenu
   `scope`, garde par `if: github.repository == 'softwarity/meerkat-ce'` : cote prive tous les
   jobs sautent (un job saute ne demarre pas de runner, zero minute). Plus de `postgres`, plus
