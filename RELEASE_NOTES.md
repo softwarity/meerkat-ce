@@ -1,5 +1,9 @@
 # Release Notes
 
+## NEXT RELEASE
+
+---
+
 <!--
   Only the NEXT RELEASE section is written by hand.
 
@@ -13,7 +17,7 @@
   per feature, its state read from the code.
 -->
 
-## NEXT RELEASE
+## 1.0.0
 
 First public release.
 
