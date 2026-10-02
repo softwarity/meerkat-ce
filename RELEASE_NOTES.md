@@ -4,6 +4,10 @@
 
 ---
 
+## 1.0.1
+
+---
+
 <!--
   Only the NEXT RELEASE section is written by hand.
 
