@@ -5,10 +5,12 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-10-01 : **toute la CI sur le miroir public, l'Enterprise comprise** -
-le prive ne construit plus rien, `ci-ee.yml` clone `meerkat` depuis `meerkat-ce` avec un jeton
-d'App GitHub sur un environment `enterprise` ; non commite, et Francois doit creer l'App +
-l'environment avant que ca tourne, voir la section "Session 2026-10-01". Avant cela,
+_Derniere mise a jour : 2026-10-02 : **toute la CI sur le miroir public, l'Enterprise comprise,
+et la release par approbation** - le prive ne construit plus rien, `ci-ee.yml` clone `meerkat`
+depuis `meerkat-ce` avec un jeton d'App GitHub, tout tourne a chaque commit, et chaque run
+se termine sur un job `release` en attente d'approbation qui tamponne l'image testee (pas de
+rebuild) et coupe la version ; livre et pousse, Francois doit creer l'App `meerkat-release` +
+l'environment `release` (reviewer d'abord), voir la section "Session 2026-10-01". Avant cela,
 2026-09-30 : **le scheduler complete** - tache ponctuelle (SCHED-02),
 historique des executions et rejeu (SCHED-03), reprise automatique bornee (SCHED-04), report
 demande par le service (SCHED-05) : quatre commits sur main, **PAS pousses**, voir la section
@@ -366,9 +368,46 @@ peut restaurer le cache de la branche de base) ; le secret sur l'ENVIRONMENT, pa
    puis un premier `gh workflow run "CI - Enterprise" -R softwarity/meerkat-ce`.
 Cote prive : rien a creer, PAT_TOKEN (scope `repo`) suffit au dispatch.
 
-**Reste facture cote prive** : mirror-ce (~2 min/push), release, prune, et `plug-hosted.yml`
+**Reste facture cote prive** : mirror-ce (~45 s/push), prune, et `plug-hosted.yml`
 (le mardi, ~15 min, un Swarm) - celui-la pourrait aussi migrer, il ne tire que des images.
 arm64 a remettre dans `_docker.yml` ET dans `ci-ee.yml` ensemble.
+
+**Suite du 2026-10-02, deuxieme vague** :
+- **Tout tourne a chaque commit** (annuaires, suite PostgreSQL entiere) : Francois a tranche
+  "c'est gratuit, lance-les systematiquement". Plus de drapeaux `thorough`/`directories`, plus
+  de run du mardi, `scope` est devenu `gate` (ne fait que la garde du depot).
+- **La release = une approbation** (`ci-ee.yml`, job `release`). Chaque run sur main se
+  termine sur un job en attente sur l'environment `release` (reviewer requis). Approuver
+  release CE build : version calculee depuis les tags (meme arithmetique que release-flow),
+  image EE **tamponnee par digest** (`docker/Dockerfile.stamp` : `FROM @digest`, `ENV
+  MEERKAT_VERSION`, `LABEL version`) et taguee `1.2.3`/`1.2`/`1` sur ghcr, image CE tamponnee
+  depuis le `latest` Docker Hub si son label `revision` est le commit miroir de ce commit
+  (retrouve par `git log --grep meerkat@<sha7>`), sinon reconstruite ; puis **release-flow en
+  dernier** (notes, commit, tag, GitHub Release sur le prive) parce que son push declenche le
+  miroir, donc le run suivant, qui annule celui-ci (concurrency `ci-ee`, cancel-in-progress).
+  Le bump = le commentaire d'approbation (vide = patch, `minor`, `major`). Ne pas approuver ne
+  coute rien : le push suivant annule le run en attente, seul le dernier build vert est
+  releasable. 30 jours sans push = un run rouge.
+- **`internal/version` lit `MEERKAT_VERSION`** quand le binaire a ete compile en `dev` : une
+  image n'est jamais reconstruite pour sa version, elle est tamponnee. Verifie :
+  `MEERKAT_VERSION=9.9.9 go run ./cmd/meerkat -version` -> `meerkat 9.9.9`.
+- **Seconde App `meerkat-release`** (Contents: Read and write, installee sur meerkat seul),
+  cle UNIQUEMENT dans l'environment `release` (var `RELEASE_APP_ID`, secrets
+  `RELEASE_APP_PRIVATE_KEY` + `GH_WRITE_PACKAGE`). `meerkat-ci` reste en lecture. GARDE : le
+  job refuse de tourner sans approbation enregistree (GitHub cree un environment vide des
+  qu'un job le nomme ; sans reviewer, chaque push releaserait un patch).
+- `release.yml` (prive) SUPPRIME ; `mirror-ce` ne dispatche plus sur un tag (il n'ecrit que
+  `docs/.release-version`) ; `preflight-enterprise.yml` a un second job pour l'App de release
+  (prouve "peut ecrire" en frappant un jeton `permission-contents: write`, qui est refuse si
+  l'App ne l'a pas).
+- A FAIRE PAR FRANCOIS : creer `meerkat-release`, l'environment `release` AVEC le reviewer
+  AVANT d'y mettre les secrets, puis `gh workflow run "Preflight - Enterprise credentials" -R
+  softwarity/meerkat-ce` (les deux jobs), puis approuver un run pour la premiere release.
+- Pieges vus en ecrivant : `gh release create` resout le depot par l'`origin` du checkout
+  (`GH_REPO` pose en plus) ; release-flow pousse via les identifiants persistes du checkout
+  (`persist-credentials` par defaut) ; le checkout doit etre sur `main` (pas detache) et le
+  job verifie `HEAD == sha teste` (un push `[skip ci]` ne passe pas par le miroir et
+  decalerait main) ; shellcheck SC2209 sur `bump=patch` (patch est une commande : quoter).
 
 ## Session 2026-09-30 - le scheduler complete (SCHED-02 a SCHED-05)
 

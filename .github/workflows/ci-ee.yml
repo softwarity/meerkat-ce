@@ -550,8 +550,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          comment=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
-            --jq '[.[] | select(.state == "approved") | select(any(.environments[]; .name == "release"))] | last | .comment // ""')
+          approval=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq '[.[] | select(.state == "approved") | select(any(.environments[]; .name == "release"))] | last')
+          # No approval means the environment did not ask for one - GitHub
+          # creates an environment the moment a job names it, unprotected.
+          # A release job that nobody approved would release every push.
+          if [ -z "$approval" ] || [ "$approval" = "null" ]; then
+            echo "::error::nobody approved this release: the 'release' environment must require a reviewer (Settings > Environments > release)"
+            exit 1
+          fi
+          comment=$(jq -r '.comment // ""' <<<"$approval")
           bump=$(printf '%s' "$comment" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
           case "$bump" in
             "") bump="patch" ;;
