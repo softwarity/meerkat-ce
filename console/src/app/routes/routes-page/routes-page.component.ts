@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { httpResource } from '@angular/common/http';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -11,6 +11,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
+import { LiveTopic, LivewireClient } from '@softwarity/livewire';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { forkJoin } from 'rxjs';
 import { ApiService, CatalogEntry, Edition, Maintenance, Route, RouteHealth } from '../../api.service';
@@ -127,6 +128,14 @@ export class RoutesPageComponent {
     // fetched must not put a red box in front of them.
     this.api.maintenance().subscribe({ next: (m) => this.maintenance.set(m), error: () => {} });
     this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
+    // A route's target went up or down (SVC-04): the gateway checks them in
+    // the background and says so here, and the hearts are read again.
+    new LiveTopic(inject(LivewireClient), 'route-health')
+      .open(null)
+      .pipe(takeUntilDestroyed())
+      .subscribe(() =>
+        this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} }),
+      );
     // Whether traces leave at all, for the mark beside each traced route. Read
     // again when a setting moves, silently: it changes a mark, not a form, so
     // there is nothing to ask anybody.

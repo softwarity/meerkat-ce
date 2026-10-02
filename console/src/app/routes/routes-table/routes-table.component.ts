@@ -140,29 +140,14 @@ export class RoutesTableComponent {
     return last ? $localize`:@@Answered_by_FILTER:answered by ${last.type}:filter:` : '';
   }
 
-  // What to show beside a route's name, or null when there is nothing worth
-  // saying. Three states and no fourth: refusing, failing, and quiet.
-  protected trouble(r: Route): { icon: string; open: boolean; tip: string } | null {
+  // The heart beside a route's name, or null when there is nothing to say:
+  // unknown yet, no upstream, or the route is off.
+  protected heart(r: Route): { down: boolean; tip: string } | null {
     const h = this.health()[r.id];
-    if (!h) return null;
-    if (h.state !== 'closed') {
-      return {
-        icon: 'heart_broken',
-        open: true,
-        tip: $localize`:@@Not_answering_tip:Not answering: callers get the unavailable page. Last: ${
-          h.lastError || h.lastStatus || '?'
-        }:LAST:`,
-      };
-    }
-    if (h.failures) {
-      return {
-        icon: 'warning',
-        open: false,
-        tip: $localize`:@@Failing_tip:${h.failures}:COUNT: failed answers in a row. Last: ${
-          h.lastError || h.lastStatus || '?'
-        }:LAST:`,
-      };
-    }
-    return null;
+    if (!r.enabled || !h?.target) return null;
+    const why = h.targetWhy ?? '';
+    return h.target === 'up'
+      ? { down: false, tip: $localize`:@@Target_up_tip:Up: ${why}:WHY:` }
+      : { down: true, tip: $localize`:@@Target_down_tip:Down: ${why}:WHY:` };
   }
 }

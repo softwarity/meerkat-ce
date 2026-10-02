@@ -39,6 +39,10 @@ type API struct {
 	// admin features that must name the sibling plane (e.g. OIDC callbacks).
 	DataAddr string
 
+	// ReleaseNotes is RELEASE_NOTES.md as the binary carries it (the root
+	// package embeds it; main wires it). Empty in tests that do not ask.
+	ReleaseNotes string
+
 	// TLS is the live HTTPS state (SSL-01/02). Wired by main; nil in the tests
 	// that have no listener to open, where saving material still has to work.
 	TLS *certs.Supervisor
@@ -164,6 +168,7 @@ func (a *API) Register(mux Mux) {
 	a.registerServices(mux)
 	a.registerMetrics(mux)
 	a.registerEdition(mux)
+	a.registerReleaseNotes(mux)
 	a.registerUserModel(mux)
 	a.registerConfig(mux)
 	a.registerConfigurations(mux)

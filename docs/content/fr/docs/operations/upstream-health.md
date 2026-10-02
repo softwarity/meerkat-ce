@@ -73,21 +73,28 @@ rencontrer ça parce que quelqu'un l'a choisi.
 
 ## Ce que la console montre
 
-La liste des routes marque celles qui ne répondent plus et dit **pourquoi**. Ça ne
-coûte rien à collecter : le disjoncteur regarde déjà chaque réponse réelle, donc ceci rapporte ce
-qu'il sait plutôt que de sonder de son côté.
+Chaque route de la liste porte un **coeur** : vert quand sa cible est là, brisé et
+rouge quand elle ne l'est pas, et la raison dans l'infobulle.
 
-Une sonde séparée aurait été un second avis, formé sur du trafic que personne n'a envoyé, à propos
-d'un chemin que les vraies requêtes n'empruntent peut-être même pas. Le coût est qu'une route que
-personne n'a encore appelée n'a rien à dire - ce qui est honnête, et qui est exactement ce que la
-passerelle sait.
+La passerelle vérifie la cible de chaque route activée en arrière-plan, toutes les 30
+secondes, jamais sur le chemin des requêtes :
 
-Pas encore là : la **sonde active**, qui seule peut parler d'une route que personne
-n'appelle ; et un second niveau, le `/health` propre à un service.
+- un service que la découverte connaît (Docker, Swarm) est là dès qu'une réplique est
+  prête, absent à zéro ;
+- tout le reste - un hôte externe, un service Kubernetes - reçoit une simple connexion
+  TCP, avec 2 secondes de délai. Une connexion et rien de plus : aucune requête HTTP,
+  donc rien dans les journaux du service ni dans ses quotas. Derrière un `HTTP_PROXY`,
+  c'est le proxy qui est contacté ;
+- un circuit ouvert vaut cible absente, quoi qu'ait dit la connexion : le trafic réel
+  l'emporte.
+
+Un changement est poussé à l'écran ouvert aussitôt, sans recharger. Une route que
+personne n'appelle a désormais quelque chose à dire. Pas encore là : le `/health`
+propre à un service.
 
 ## En cluster
 
-L'état du disjoncteur est **par noeud**, et c'est le bon à garder. Deux passerelles peuvent réellement
+L'état du disjoncteur, comme la vérification des cibles, est **par noeud**, et c'est le bon à garder. Deux passerelles peuvent réellement
 ne pas être d'accord sur un amont - un chemin réseau, une réponse DNS, un sidecar - et un verdict
 partagé laisserait la mauvaise minute d'un noeud ouvrir un circuit pour tout le monde.
 

@@ -707,6 +707,30 @@
       }
     },
     {
+      "id": "api-console-release-notes",
+      "domain": "console",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/release-notes"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin",
+        "user"
+      ],
+      "title": {
+        "en": "Read what the running release brought",
+        "fr": "Lire ce que la version en service a apporté"
+      },
+      "description": {
+        "en": "The version under the account button, and the notes of the minor or major release it belongs to: 1.0.0 for 1.0.1, never a patch's. Any signed-in account reads it.",
+        "fr": "La version sous le bouton du compte, et les notes de la version mineure ou majeure dont elle fait partie : 1.0.0 pour 1.0.1, jamais celles d'un correctif. Tout compte connecté la lit."
+      }
+    },
+    {
       "id": "api-infra-metrics",
       "domain": "infra",
       "kind": "api",

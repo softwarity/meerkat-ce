@@ -119,6 +119,9 @@ type Router struct {
 	// the console reads to say whether a route is answering (SVC-04). Per
 	// node, deliberately - see internal/gateway/breaker.go.
 	breakers *breakers
+	// targets is whether each route's upstream is there at all, as the last
+	// round of the target check found it (targets.go). Per node too.
+	targets *targetStates
 
 	// opsSlots holds, per route id, WHICH operations its requests are
 	// attributed to (endpoints.go). Kept OUTSIDE the compiled routes on
@@ -169,6 +172,10 @@ type compiledRoute struct {
 	// breaker is the route's circuit configuration, kept on the compiled route
 	// so the health view can report against the same numbers the guard uses.
 	breaker store.CircuitBreaker
+	// upstream is where a proxying route sends its requests, vault references
+	// already expanded; empty for one that answers by itself. Read by the
+	// target check (targets.go).
+	upstream string
 }
 
 // New builds a Router over the store. sm may be nil when no route requires
@@ -184,7 +191,7 @@ func New(st *store.Store, sm *session.Manager) *Router {
 		panic(err) // the OS entropy source is gone; nothing sensible remains
 	}
 	return &Router{st: st, sm: sm, lottery: rand.Float64, simTokenKey: key,
-		breakers: newBreakers(), metrics: metrics.NewRegistry()}
+		breakers: newBreakers(), targets: newTargetStates(), metrics: metrics.NewRegistry()}
 }
 
 // Reload compiles the enabled routes from the store and swaps them in
@@ -925,6 +932,10 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 		}))
 
 	var handler http.Handler
+	// Where the route sends its requests, kept for the target check
+	// (targets.go). Empty for a route that answers by itself: it has nothing
+	// behind it to be up or down.
+	upstream := ""
 	if filters.Terminal != nil {
 		handler = filters.Terminal
 		// Outgoing filters apply to what the route answers itself, exactly as
@@ -948,6 +959,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 		if err != nil {
 			return compiledRoute{}, err
 		}
+		upstream = r.Upstream
 		// The circuit sits around the PROXY and nothing else: a route that
 		// answers by itself - a redirect, the unavailable page, a template -
 		// has no upstream to stop calling.
@@ -1092,7 +1104,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 	}
 	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler, breaker: cfg,
 		access: selectAccess, isUI: r.IsUI, noTrace: noTracing(r), counters: rt.routeCounters(r),
-		ops: ops}, nil
+		ops: ops, upstream: upstream}, nil
 }
 
 // noTracing reads the route's tracing switch. A route that never mentioned the

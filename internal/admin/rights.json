@@ -376,6 +376,11 @@
   },
   {
     "method": "GET",
+    "path": "/api/release-notes",
+    "guard": "authed"
+  },
+  {
+    "method": "GET",
     "path": "/api/roles",
     "guard": "appAdmin"
   },

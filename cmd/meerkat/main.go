@@ -21,6 +21,7 @@ import (
 	"time"
 	_ "time/tzdata" // IANA zones for business-access windows, even on distroless
 
+	"github.com/softwarity/meerkat"
 	"github.com/softwarity/meerkat/internal/admin"
 	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/certs"
@@ -322,6 +323,7 @@ func run(o options) error {
 	adminAPI := admin.New(st, adminSessions, router)
 	adminAPI.Mailer = mailer
 	adminAPI.DataAddr = addr
+	adminAPI.ReleaseNotes = meerkat.ReleaseNotes
 	// The change bus (STORE-03): what this node reloads after a write, the
 	// others reload too. Registered here rather than inside each package
 	// because this is the only file that knows there are exactly two things a
@@ -483,12 +485,20 @@ func run(o options) error {
 	changes := live.NewChanges()
 	traffic := live.NewTraffic(window)
 	schedules := live.NewSchedules(st)
+	// Whether each route's target is there at all (SVC-04): checked in the
+	// background every gateway.TargetInterval, per node like the breaker, and
+	// a flip is pushed to the routes screen. Stops with ctx.
+	routeHealth := live.NewRouteHealth()
+	go router.WatchTargets(ctx, gateway.DefaultTargetCheck(routeHealth.Flipped))
 	liveServer := live.New(func(p live.Perimeter) live.Sources {
 		sources := live.Sources{
 			live.ChangesTopic: changes.For(p.Named, p.Quiet),
 		}
 		if p.Traffic {
 			sources[live.TrafficTopic] = traffic
+			// The routing plane's readers are who GET /api/routes/health
+			// answers, so they are who hear that a target flipped.
+			sources[live.RouteHealthTopic] = routeHealth
 		}
 		if p.Schedules {
 			// The scheduler screen watches a run start, advance and finish

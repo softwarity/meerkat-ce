@@ -127,3 +127,13 @@ The bottom of the rail is you. The line with your name opens `/profile` - the
 gateway's own profile pages, the same ones your users get: photo, password,
 second factor, passkeys, personal API tokens. Sign out is underneath, and it
 signs out every console tab at once.
+
+### Version and release notes
+
+![The release notes window: Meerkat 1.0.1, its patch notes, then 1.0.0](img/console/release-notes.webp)
+
+The account menu says which version runs: **Meerkat 1.0.1**. Click it for the
+release notes, newest first, from that version down to its minor release - the
+same text as the GitHub release. A development build shows the last release it
+carries, with what is coming under **Next release** on top; an empty section
+says *Missing information*.

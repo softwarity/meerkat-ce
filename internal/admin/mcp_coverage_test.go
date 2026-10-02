@@ -64,6 +64,7 @@ var agentCovers = map[string][]string{
 // it.
 var agentIgnores = map[string]string{
 	"me":             "who the caller is, for the console's own chrome; an agent is told by describe_gateway",
+	"release-notes":  "what the running release brought, prose for a person under the console's account button",
 	"data-tokens":    "every account's application tokens: an agent holding one token has no business listing or revoking other people's",
 	"sessions":       "who is signed in where, and ending a person's session: a decision about a human in front of a screen, taken by a human in front of the console",
 	"apidocs":        "the developer documentation pages, served to a browser",

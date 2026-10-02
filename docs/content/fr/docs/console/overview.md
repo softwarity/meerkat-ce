@@ -130,3 +130,13 @@ Le bas du rail, c'est vous. La ligne à votre nom ouvre `/profile` : les pages d
 profil de la passerelle, celles-là mêmes que vos utilisateurs obtiennent - photo,
 mot de passe, second facteur, passkeys, jetons d'API personnels. La déconnexion est
 en dessous, et elle déconnecte tous les onglets de la console d'un coup.
+
+### Version et notes de version
+
+![La fenêtre des notes de version : Meerkat 1.0.1, les notes du correctif, puis 1.0.0](img/console/release-notes.webp)
+
+Le menu du compte dit quelle version tourne : **Meerkat 1.0.1**. Un clic ouvre
+les notes de version, de la plus récente à la plus ancienne, de cette version
+jusqu'à sa version mineure - le même texte que la release GitHub. Une build de
+développement affiche la dernière version qu'elle porte, avec ce qui arrive sous
+**Next release** en tête ; une section vide indique *Missing information*.

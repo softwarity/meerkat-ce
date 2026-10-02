@@ -73,20 +73,26 @@ meet that because somebody chose it.
 
 ## What the console shows
 
-The Routes list marks the routes that are no longer answering and says **why**. It costs nothing to collect: the breaker already watches every
-real answer, so this reports what it knows rather than probing on its own.
+Each route in the Routes list carries a **heart**: green when its target is up,
+broken and red when it is down, and the reason in the tooltip.
 
-A separate prober would have been a second opinion, formed on traffic nobody sent,
-about a path the real requests may not even take. The cost is that a route nobody has
-called yet has nothing to say - which is honest, and is exactly what the gateway
-knows.
+The gateway checks every enabled route's target in the background, every 30
+seconds, never on the request path:
 
-Not there yet: an **active probe**, which alone could speak about
-a route no one calls; and a second level, a service's own `/health`.
+- a service that discovery knows (Docker, Swarm) is up when at least one replica is
+  ready, and down at zero;
+- anything else - an external host, a Kubernetes service - gets a plain TCP connect
+  with a 2 second timeout. A connect and nothing more: no HTTP request, so nothing
+  lands in the service's logs or counts against its limits. Behind an `HTTP_PROXY`,
+  the proxy is what gets dialled;
+- an open circuit is a target down, whatever the connect said: real traffic wins.
+
+A change is pushed to the open screen at once, no reload needed. A route nobody calls
+now has something to say. Not there yet: a service's own `/health`.
 
 ## In a cluster
 
-The breaker's state is **per node**, and that is the right one to keep. Two gateways
+The breaker's state, and the target check, are **per node**, and that is the right one to keep. Two gateways
 may genuinely disagree about an upstream - a network path, a DNS answer, a sidecar -
 and a shared verdict would let one node's bad minute close a circuit for everybody.
 

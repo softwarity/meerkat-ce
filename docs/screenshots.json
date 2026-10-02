@@ -4,8 +4,8 @@
     "build": "CGO_ENABLED=0 go build -tags ee -o /tmp/meerkat-doc ./cmd/meerkat",
     "console": "the binary must EMBED the console, or the admin port answers a JSON status page: make ui first, or stage console/dist/console/browser into internal/admin/ui/dist",
     "edition": "Enterprise (-tags ee): the console's EE badges and the Enterprise screens are part of what is shown",
-    "upstream": "node scripts/screenshots-upstream.mjs  (keeps running on 127.0.0.1:8099): the instance reaches the routes' services - http://docs:8080 and http://orders-api:8080, names of a stack - through it, as HTTP_PROXY",
-    "run": "HTTP_PROXY=http://127.0.0.1:8099 MEERKAT_TENANCY=multi MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8086 -admin-addr 127.0.0.1:9096 -data /tmp/docdata",
+    "upstream": "node scripts/screenshots-upstream.mjs  (keeps running on 127.0.0.1:8099): the instance reaches the routes' services - http://docs:8080 and http://orders-api:8080, names of a stack - through it, as HTTP_PROXY; Billing is left out of the proxy on purpose (NO_PROXY), so the routes list shows a target that is down",
+    "run": "MEERKAT_VERSION=1.0.1 HTTP_PROXY=http://127.0.0.1:8099 NO_PROXY=billing.svc.acme.internal MEERKAT_TENANCY=multi MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8086 -admin-addr 127.0.0.1:9096 -data /tmp/docdata",
     "seed": "node scripts/screenshots-seed.mjs  (once, on an EMPTY data directory)",
     "ports": "8086/9096 and 8087/9097 on purpose: this repository's own dev instance runs on 8082 and 9092 and must never be disturbed",
     "admin": "http://gateway.acme.example:9096",
@@ -18,7 +18,8 @@
       "admin": "http://127.0.0.1:9096",
       "data": "http://127.0.0.1:8086",
       "why": "what the seed and the traffic use: Node resolves no made-up name"
-    }
+    },
+    "version": "MEERKAT_VERSION=1.0.1: the binary is built as dev, and the account menu and the release notes then read as a release, not as a development build"
   },
   "convert": "cwebp -quiet -q 82 -resize 1600 0 <shot>.png -o public/<file>  (done by screenshots.mjs --shoot)",
   "shots": [
@@ -359,18 +360,6 @@
       ]
     },
     {
-      "file": "img/console/opentelemetry.webp",
-      "plane": "admin",
-      "path": "/infra/opentelemetry",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/tracing"
-      ]
-    },
-    {
       "file": "img/console/opentelemetry-collector.webp",
       "plane": "admin",
       "path": "/infra/opentelemetry",
@@ -382,6 +371,18 @@
           "wait": 800
         }
       ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/operations/tracing"
+      ]
+    },
+    {
+      "file": "img/console/opentelemetry.webp",
+      "plane": "admin",
+      "path": "/infra/opentelemetry",
       "viewport": [
         1600,
         1000
@@ -415,6 +416,32 @@
         "docs/console/portal",
         "docs/customise/portal",
         "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/release-notes.webp",
+      "plane": "admin",
+      "path": "/infra/routes",
+      "steps": [
+        {
+          "click": "app-user-menu rail-nav-item"
+        },
+        {
+          "click": ".mat-mdc-menu-panel button:has-text(\"Meerkat\")"
+        },
+        {
+          "waitFor": "h3.part"
+        },
+        {
+          "wait": 500
+        }
+      ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/overview"
       ]
     },
     {
@@ -603,7 +630,7 @@
   "instances": {
     "single": {
       "why": "Application, Groups and Members exist only when the installation serves one organisation (singleTenantOnly); in multi mode the same tables live under each tenant, with the tenant's own navigation",
-      "run": "HTTP_PROXY=http://127.0.0.1:8099 MEERKAT_TENANCY=single MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8087 -admin-addr 127.0.0.1:9097 -data /tmp/docdata-single",
+      "run": "MEERKAT_VERSION=1.0.1 HTTP_PROXY=http://127.0.0.1:8099 NO_PROXY=billing.svc.acme.internal MEERKAT_TENANCY=single MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8087 -admin-addr 127.0.0.1:9097 -data /tmp/docdata-single",
       "seed": "node scripts/screenshots-seed.mjs --instance single",
       "admin": "http://gateway.acme.example:9097",
       "data": "http://gateway.acme.example:8087",

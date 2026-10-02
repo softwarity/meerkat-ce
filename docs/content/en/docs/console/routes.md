@@ -28,9 +28,11 @@ so the table is ordered, not sorted.
   on the whole list: with a search or a kind filter active the handle goes quiet
   and says why, because dragging row three above row one of a filtered view
   would move it above whatever really sits first.
-- **The dot** before the name says enabled or disabled. A second mark appears
-  for a **UI route** (one that serves pages in a browser), and a third when the
-  gateway has actually seen the upstream fail.
+- **The heart** before the name says whether the route's target is there: green
+  when it is up, broken and red when it is down, with the reason in its tooltip.
+  No heart while nothing is known yet, for a route that answers by itself, or for
+  a disabled one. A second mark appears for a **UI route** (one that serves pages
+  in a browser).
 - **The access badges** say what Meerkat itself requires: `AUTH` signed in,
   `ORG` in an organisation, `ORG-2` in one of two named ones, `DENY` nobody,
   a dash for delegated. A badge counting endpoints appears when the route
@@ -45,6 +47,22 @@ so the table is ordered, not sorted.
 **Duplicate** makes a copy with a fresh identity, **disabled**, placed right
 after the original. That is the intended way to try a variant: another upstream,
 another organisation's access, compared side by side without retyping.
+
+### Is the target up?
+
+The heart answers it for every route that sends to a service.
+
+| Heart | When |
+|---|---|
+| green | the service is found in the cluster with at least one replica ready, or an external target accepts a connection |
+| broken, red | no replica ready, the target refuses or does not resolve, or the circuit breaker is open |
+| none | not known yet, a route that answers by itself, or a disabled route |
+
+The gateway checks every 30 seconds, in the background: it reads the replica
+count Docker or Swarm declares, and opens a bare TCP connection to anything
+else. No HTTP request is sent, so the upstream sees no call, no sign-in and no
+line in its logs. Each node checks from where it stands. When a heart changes,
+the list follows without a reload.
 
 ## Three buttons in the banner
 

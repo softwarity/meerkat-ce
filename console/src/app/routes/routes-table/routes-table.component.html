@@ -15,7 +15,16 @@
           (click)="$event.stopPropagation()"
         >drag_indicator</mat-icon>
         <span class="name-cell" [class.off]="!r.enabled">
-          <span class="dot" [title]="r.enabled ? 'enabled' : 'disabled'"></span>
+          <!-- Whether the route's TARGET is there (SVC-04): the service
+               discovery counts, or a host that accepts a connection, and down
+               too when the circuit is open. The slot stays empty while nothing
+               is known, for a route that answers by itself, and for a disabled
+               one, so the names stay aligned. -->
+          <span class="heart-slot">
+            @if (heart(r); as h) {
+              <mat-icon class="heart" [class.down]="h.down" [matTooltip]="h.tip">{{ h.down ? 'heart_broken' : 'favorite' }}</mat-icon>
+            }
+          </span>
           <span class="name">{{ r.name }}</span>
           <!-- A route is always a service; UI comes on top (ROUTE-02), and it
                changes what the route can do - injections, the user button, path
@@ -31,14 +40,6 @@
                quietly stopped existing is a support call. -->
           @if (r.problem) {
             <mat-icon class="broken" [matTooltip]="r.problem">error</mat-icon>
-          }
-          <!-- Whether it is ANSWERING (SVC-04), which is the other half of the
-               dot beside it: that one says somebody enabled this route, this
-               one says the service behind it replied. Shown only when there is
-               something to say - a route nobody has called has nothing, and a
-               green tick over an unknown would be the worst of the three. -->
-          @if (trouble(r); as t) {
-            <mat-icon class="trouble" [class.open]="t.open" [matTooltip]="t.tip">{{ t.icon }}</mat-icon>
           }
         </span>
       </mat-cell>

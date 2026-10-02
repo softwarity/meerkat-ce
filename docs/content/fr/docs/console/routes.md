@@ -31,9 +31,11 @@ tableau est ordonné, pas trié.
   ou un filtre actif, elle se tait et dit pourquoi, car faire passer la ligne trois
   au-dessus de la ligne une d'une vue filtrée la placerait au-dessus de ce qui est
   réellement premier.
-- **Le point** devant le nom dit activée ou désactivée. Une deuxième marque
-  apparaît pour une **route UI** (celle qui sert des pages dans un navigateur), et
-  une troisième quand la passerelle a réellement vu l'amont échouer.
+- **Le coeur** devant le nom dit si la cible de la route est là : vert quand elle
+  répond, brisé et rouge quand elle ne répond pas, avec la raison dans l'infobulle.
+  Pas de coeur tant que rien n'est connu, pour une route qui répond elle-même, ou
+  pour une route désactivée. Une deuxième marque apparaît pour une **route UI**
+  (celle qui sert des pages dans un navigateur).
 - **Les pastilles d'accès** disent ce que Meerkat exige lui-même : `AUTH` connecté,
   `ORG` dans une organisation, `ORG-2` dans l'une de deux organisations nommées,
   `DENY` personne, un tiret pour délégué. Une pastille comptant les endpoints
@@ -48,6 +50,22 @@ tableau est ordonné, pas trié.
 **Dupliquer** fabrique une copie à l'identité neuve, **désactivée**, posée juste
 après l'originale. C'est la façon prévue d'essayer une variante : un autre amont,
 l'accès d'une autre organisation, comparés côte à côte sans tout retaper.
+
+### La cible répond-elle ?
+
+Le cœur le dit pour chaque route qui envoie vers un service.
+
+| Cœur | Quand |
+|---|---|
+| vert | le service est trouvé dans le cluster avec au moins un réplica prêt, ou une cible externe accepte une connexion |
+| brisé, rouge | aucun réplica prêt, la cible refuse ou ne se résout pas, ou le disjoncteur est ouvert |
+| aucun | rien de connu encore, une route qui répond elle-même, ou une route désactivée |
+
+La passerelle vérifie toutes les 30 secondes, en arrière-plan : elle lit le
+nombre de réplicas que Docker ou Swarm déclare, et ouvre une simple connexion
+TCP vers le reste. Aucune requête HTTP n'est envoyée : l'upstream ne voit ni
+appel, ni connexion, ni ligne dans ses journaux. Chaque nœud vérifie depuis là
+où il est. Quand un cœur change, la liste suit sans rechargement.
 
 ## Trois boutons dans la bannière
 

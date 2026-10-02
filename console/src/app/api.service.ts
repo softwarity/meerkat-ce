@@ -584,6 +584,13 @@ export interface RouteHealth {
   lastError?: string;
   lastAt?: number;
   lastOkAt?: number;
+  // Whether the service behind the route is there: from the runtime's replica
+  // count when discovery knows it, a TCP connect otherwise, and down whenever
+  // the circuit is open. Absent while unknown, and for a route with no
+  // upstream.
+  target?: 'up' | 'down';
+  targetWhy?: string;
+  targetAt?: number;
 }
 
 export interface Param {

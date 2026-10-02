@@ -218,10 +218,12 @@ func (w *watched) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 // Health is what the console reads to say whether a route is answering
 // (SVC-04, ROUTE-11).
 //
-// It costs NOTHING to collect: the breaker already knows, because it watches
-// every answer to decide whether to keep calling. A separate prober would have
-// been a second opinion, formed on traffic nobody sent, about a path the real
-// requests may not even take.
+// Two halves. The breaker's, which costs nothing to collect: it already
+// watches every answer to decide whether to keep calling. And the target's
+// (targets.go): whether the service behind the route is there at all, which a
+// route nobody has called could not otherwise say. When they disagree the
+// breaker wins - real traffic failing is a target down, whatever a connect
+// found.
 //
 // A route with no breaker still reports: the circuit is what DECIDES, the
 // watching is what OBSERVES, and an operator asking "does this route work"
@@ -245,6 +247,22 @@ func (rt *Router) Health() map[string]RouteHealth {
 			LastAt:     h.LastAt,
 			LastOKAt:   h.LastOKAt,
 		}
+		if c.upstream == "" {
+			continue // answers by itself: no target to be up or down
+		}
+		rh := out[c.id]
+		if t, ok := rt.targets.get(c.id); ok {
+			rh.Target, rh.TargetWhy, rh.TargetAt = t.State, t.Why, t.At
+		}
+		// Read on the spot rather than waiting for the next round: a circuit
+		// that just opened is news now.
+		if h.State != circuitClosed {
+			rh.Target, rh.TargetWhy = TargetDown, "not answering (circuit open)"
+			if rh.TargetAt == 0 {
+				rh.TargetAt = now.Unix()
+			}
+		}
+		out[c.id] = rh
 	}
 	return out
 }
@@ -264,4 +282,11 @@ type RouteHealth struct {
 	LastError  string `json:"lastError,omitempty"`
 	LastAt     int64  `json:"lastAt,omitempty"`
 	LastOKAt   int64  `json:"lastOkAt,omitempty"`
+	// Target is whether the service behind the route is there: "up", "down",
+	// or empty when nothing is known yet - or never will be, for a route that
+	// answers by itself. TargetWhy says why in a few words, TargetAt when it
+	// was found out (unix seconds).
+	Target    string `json:"target,omitempty"`
+	TargetWhy string `json:"targetWhy,omitempty"`
+	TargetAt  int64  `json:"targetAt,omitempty"`
 }

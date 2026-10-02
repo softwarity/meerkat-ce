@@ -76,7 +76,7 @@ Une API gateway complète, pilotée depuis la console.
 - **Routes modifiées à chaud**, sans redémarrage, propagées à tous les nœuds en une seconde. `ROUTE-01`
 - **11 prédicats et 33 filtres** : chemin, hôte, en-tête, cookie, méthode, poids pour le canary, plage horaire ; réécriture des requêtes et réponses. `ROUTE-03 à 05`
 - **Limitation de débit** par route, utilisateur, jeton, organisation ou adresse, plusieurs bornes à la fois ; **quotas par endpoint** ; réponse 429 standard. `ROUTE-08 QUOTA-05`
-- **Disjoncteur, timeouts** à trois niveaux et état des services dans la console, observé sur le trafic réel. `ROUTE-07 ROUTE-09 SVC-04`
+- **Disjoncteur, timeouts** à trois niveaux et état des services dans la console : un coeur par route, d'après la découverte ou une connexion TCP, et le trafic réel. `ROUTE-07 ROUTE-09 SVC-04`
 - **WebSocket, gRPC et streaming** des corps de bout en bout. *partiel* `ROUTE-13 ROUTE-20`
 - **Découverte des services** Docker, Swarm et Kubernetes au moment de créer une route. *partiel* `SVC-02`
 - **Testeur de routage** : composer une requête fictive et voir quelle route la prend, et pourquoi. `ROUTE-15`

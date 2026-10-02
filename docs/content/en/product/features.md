@@ -76,7 +76,7 @@ Read more: [Routes](/docs/concepts/routes), and what a request costs in
 - **Routes changed live**, with no restart, propagated to every node within a second. `ROUTE-01`
 - **11 predicates and 33 filters**: path, host, header, cookie, method, weight for canaries, time window; request and response rewriting. `ROUTE-03 to 05`
 - **Rate limiting** per route, user, token, organization or address, several limits at once; **per-endpoint quotas**; standard 429 response. `ROUTE-08 QUOTA-05`
-- **Circuit breaker, timeouts** at three levels, and service health in the console, observed on real traffic. `ROUTE-07 ROUTE-09 SVC-04`
+- **Circuit breaker, timeouts** at three levels, and service health in the console: a heart per route, from discovery or a TCP check, and real traffic. `ROUTE-07 ROUTE-09 SVC-04`
 - **WebSocket, gRPC and body streaming** end to end. *partly* `ROUTE-13 ROUTE-20`
 - **Service discovery** for Docker, Swarm and Kubernetes when creating a route. *partly* `SVC-02`
 - **Routing tester**: compose a sample request and see which route takes it, and why. `ROUTE-15`

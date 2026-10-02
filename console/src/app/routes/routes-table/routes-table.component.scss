@@ -24,19 +24,24 @@ mat-row.clickable {
 mat-row.clickable:hover {
   background: var(--mat-sys-surface-container);
 }
-.dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 10px;
-  border-radius: 50%;
-  background: var(--mat-sys-secondary);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--mat-sys-secondary) 60%, transparent);
-  vertical-align: middle;
+/* Whether the route's target is there. The slot keeps its width when empty so
+   the names stay aligned. */
+.heart-slot {
+  display: inline-flex;
+  width: 16px;
+  margin-right: 8px;
+  flex: none;
 }
-.off .dot {
-  background: var(--mat-sys-outline);
-  box-shadow: none;
+.heart {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  /* M3 has no success token; this is the green the traffic screen already
+     draws "Answered" with. */
+  color: #4caf50;
+}
+.heart.down {
+  color: var(--mat-sys-error);
 }
 .name {
   font-weight: 500;
@@ -142,20 +147,6 @@ mat-row.clickable:hover {
   margin-left: 6px;
   color: var(--mat-sys-on-surface-variant);
   flex: none;
-}
-
-/* Whether the service behind a route ANSWERED - the other half of the dot that
-   says somebody enabled it. Only ever drawn when there is something to say. */
-.trouble {
-  font-size: 17px;
-  width: 17px;
-  height: 17px;
-  margin-left: 6px;
-  color: var(--mat-sys-tertiary);
-  flex: none;
-}
-.trouble.open {
-  color: var(--mat-sys-error);
 }
 
 /* A route the gateway refused to load. Error colour, because nothing about this

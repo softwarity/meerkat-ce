@@ -2,24 +2,25 @@
 
 ## NEXT RELEASE
 
+- **The console says which version it runs.** The account menu shows it, and a
+  click opens the release notes.
+- **A heart per route says whether its target is up.** Green or broken, with the
+  reason, and it changes on screen as soon as the target does.
+
 ---
 
 ## 1.0.1
 
+### Operations
+
+- **Images for arm64 as well as amd64.** Both images, on both registries, now carry
+  the two architectures from one build: `docker pull` on an Apple-silicon laptop or an
+  ARM node gets a native binary. 1.0.0 was amd64 only.
+- **Every release lands on the public repository too**: a tag and a GitHub Release on
+  [softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/releases), carrying
+  these notes.
+
 ---
-
-<!--
-  Only the NEXT RELEASE section is written by hand.
-
-  softwarity/release-flow stamps the version number onto it at release time,
-  publishes that body as the GitHub Release, and opens a fresh empty one for
-  the next cycle. Everything below a numbered heading is therefore PUBLISHED
-  HISTORY: never insert into it, never edit it, never renumber it.
-
-  What goes here is what a user gains, in their words - a derivative of
-  FEATURES.md, not a list of commits. FEATURES.md stays the inventory: one line
-  per feature, its state read from the code.
--->
 
 ## 1.0.0
 

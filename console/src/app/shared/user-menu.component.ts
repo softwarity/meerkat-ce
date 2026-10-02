@@ -1,4 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -8,6 +9,7 @@ import { SessionWatchService } from '../session';
 import { httpResource } from '@angular/common/http';
 import { ApiService } from '../api.service';
 import { MeService } from '../me.service';
+import { ReleaseNotes, ReleaseNotesDialogComponent } from './release-notes.component';
 
 // The rail's bottom entry: who you are (from the identity the gateway stamps
 // on <body>), the way to one's own profile, and sign out.
@@ -104,6 +106,19 @@ import { MeService } from '../me.service';
         </a>
         <mat-divider />
       }
+      @if (notes.value(); as n) {
+        <button
+          mat-menu-item
+          [disabled]="!n.parts?.length"
+          (click)="openNotes(n)"
+          i18n-matTooltip="@@Release_notes"
+          matTooltip="Release notes"
+          matTooltipPosition="right"
+        >
+          <mat-icon>new_releases</mat-icon>
+          <span i18n="@@Meerkat_VERSION">Meerkat {{ n.version }}</span>
+        </button>
+      }
       <button mat-menu-item (click)="logout()">
         <mat-icon>logout</mat-icon>
         <span i18n="@@Sign_out">Sign out</span>
@@ -128,6 +143,13 @@ export class UserMenuComponent {
     const parts = (u.fullname || u.username).trim().split(/\s+/);
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')).toUpperCase();
   });
+
+  // The running version, and the notes of what it brought (CONSOLE-15).
+  private readonly dialog = inject(MatDialog);
+  protected readonly notes = httpResource<ReleaseNotes>(() => '/api/release-notes');
+  protected openNotes(n: ReleaseNotes): void {
+    this.dialog.open(ReleaseNotesDialogComponent, { data: n, width: '720px', maxWidth: '92vw', autoFocus: false });
+  }
 
   protected logout(): void {
     // The other tabs of this console lose the session at the same instant, and
