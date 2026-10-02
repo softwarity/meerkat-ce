@@ -400,9 +400,21 @@ arm64 a remettre dans `_docker.yml` ET dans `ci-ee.yml` ensemble.
   `docs/.release-version`) ; `preflight-enterprise.yml` a un second job pour l'App de release
   (prouve "peut ecrire" en frappant un jeton `permission-contents: write`, qui est refuse si
   l'App ne l'a pas).
-- A FAIRE PAR FRANCOIS : creer `meerkat-release`, l'environment `release` AVEC le reviewer
-  AVANT d'y mettre les secrets, puis `gh workflow run "Preflight - Enterprise credentials" -R
-  softwarity/meerkat-ce` (les deux jobs), puis approuver un run pour la premiere release.
+- **PREMIERE RELEASE FAITE : `v1.0.0`, le 2026-10-02** (il n'y avait AUCUN tag avant ; le
+  premier commentaire d'approbation etait `major`, 0.0.0 -> 1.0.0). Tout est sorti du premier
+  coup : tag + GitHub Release sur le prive, commit `8717375 1.0.0` (notes renommees, chart
+  `version`/`appVersion` 1.0.0 via `helm-chart: deploy/helm/meerkat`), ghcr `1.0.0`/`1.0`/`1`
+  avec les CINQ COUCHES IDENTIQUES a `latest` (verifie par les DiffIDs), Docker Hub `1.0.0`
+  tamponne depuis son `latest` (le label revision correspondait au commit miroir),
+  `docs/.release-version` = 1.0.0 sur le miroir. Le chart a desormais `image.tag: ""` qui
+  retombe sur l'appVersion : un `helm install` nu deploie la version releasee, plus `latest`.
+- Reglage de l'environment `release` : le piege a ete le reviewer coche sans utilisateur
+  ajoute puis "Save protection rules" oublie ; verifier par l'API :
+  `gh api repos/softwarity/meerkat-ce/environments/release --jq '[.protection_rules[].type]'`
+  doit contenir `required_reviewers`. Sans lui le job tourne SANS attendre (la garde le fait
+  echouer, mais aucune release n'est possible).
+- Tester une image amd64 depuis le Mac : `docker run --rm --pull always --platform
+  linux/amd64 <image> -version` ; sans `--pull always` docker prend un vieux cache local.
 - Pieges vus en ecrivant : `gh release create` resout le depot par l'`origin` du checkout
   (`GH_REPO` pose en plus) ; release-flow pousse via les identifiants persistes du checkout
   (`persist-credentials` par defaut) ; le checkout doit etre sur `main` (pas detache) et le

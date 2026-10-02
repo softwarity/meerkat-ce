@@ -54,6 +54,11 @@ name: CI - Enterprise
 # rides in the approval's comment: empty is a patch, `minor` or `major` say
 # so. Not approving costs nothing: the next push cancels the waiting run, so
 # only the latest green build can ever be released.
+#
+# Two commits are never offered for release, and their run ends on a SKIPPED
+# gate rather than a waiting one: a commit whose message says `[skip release]`,
+# and the release's own commit (its subject is the bare version, as
+# release-flow writes it - mirror-ce.yml does not even dispatch that one).
 on:
   repository_dispatch:
     types: [enterprise]
@@ -86,6 +91,8 @@ jobs:
     environment: enterprise
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
+      # Whether the release gate is offered at the end, or skipped.
+      releasable: ${{ steps.resolve.outputs.releasable }}
     steps:
       - id: token
         uses: actions/create-github-app-token@v2
@@ -101,10 +108,25 @@ jobs:
         run: |
           set -e
           # The API rather than a clone: this job has nothing to build, it
-          # needs the commit's full id, whatever it was asked by.
-          sha=$(gh api "repos/softwarity/meerkat/commits/${ASKED:-main}" --jq .sha)
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Enterprise sources: softwarity/meerkat@${sha::7}" | tee -a "$GITHUB_STEP_SUMMARY"
+          # needs the commit's full id and its message, whatever it was asked by.
+          commit=$(gh api "repos/softwarity/meerkat/commits/${ASKED:-main}")
+          sha=$(jq -r .sha <<<"$commit")
+          message=$(jq -r .commit.message <<<"$commit")
+          subject=${message%%$'\n'*}
+          releasable=true
+          if [[ "$subject" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            releasable=false; why="this is the release's own commit"
+          elif [[ "$message" == *"[skip release]"* ]]; then
+            releasable=false; why="the commit asks not to be released"
+          fi
+          {
+            echo "sha=$sha"
+            echo "releasable=$releasable"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "Enterprise sources: softwarity/meerkat@${sha::7} - $subject"
+            if [ "$releasable" = false ]; then echo "No release gate: $why."; fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Every job below opens with the same three steps: a token, the private
   # tree at the resolved commit, Go without its cache. The token is minted
@@ -535,7 +557,7 @@ jobs:
   release:
     name: Release (approve to publish)
     needs: [source, image]
-    if: ${{ !cancelled() && needs.image.result == 'success' }}
+    if: ${{ !cancelled() && needs.image.result == 'success' && needs.source.outputs.releasable == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: release
