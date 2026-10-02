@@ -18,7 +18,7 @@
     "@angular/localize": "^22.1.5",
     "@angular/material": "^22.1.5",
     "@angular/platform-browser": "^22.0.0",
-    "@angular/router": "^22.1.5",
+    "@angular/router": "^22.2.0",
     "@catppuccin/codemirror": "^1.0.3",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-javascript": "^6.2.5",
