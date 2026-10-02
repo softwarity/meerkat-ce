@@ -56,11 +56,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # amd64 ONLY while the two-image split settles: an arm64 runner plus a
-        # manifest list doubles the build minutes of every push, and nothing
-        # being stabilised here is architecture-specific. Put linux/arm64 back
-        # when the pipeline is quiet - here and in ci-ee.yml together.
-        platform: [linux/amd64]
+        # Both, each on its native runner, and both free on the mirror. arm64
+        # was left out while the two-image split settled, on the private side
+        # where each runner billed; the first release went out amd64-only and
+        # would not pull on an Apple-silicon laptop or node.
+        platform: [linux/amd64, linux/arm64]
     steps:
       - uses: actions/checkout@v7
       - name: Prepare platform name

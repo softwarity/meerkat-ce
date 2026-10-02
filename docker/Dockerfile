@@ -16,16 +16,22 @@ ARG NODE_VERSION=24
 ARG PLUG_VERSION=2.20.2-hosted
 ARG EDITION=ce
 
+# ONE build for every architecture: the console and the binary are made on the
+# BUILD platform (Go cross-compiles for free, and a JavaScript bundle has no
+# architecture), and only the last stage, the image that ships, is per TARGET
+# platform. So `--platform linux/amd64,linux/arm64` runs no compiler under
+# emulation - only the two shell lines of the final stage.
+#
 # The console first: its production build is embedded in the Go binary, so the
 # image needs nothing but the binary itself.
-FROM node:${NODE_VERSION}-alpine AS console
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS console
 WORKDIR /console
 COPY console/package.json console/package-lock.json ./
 RUN npm ci
 COPY console/ ./
 RUN npm run build
 
-FROM golang:${GO_VERSION} AS build
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
 WORKDIR /src
 COPY go.* ./
 RUN go mod download
@@ -37,7 +43,11 @@ ARG BUILD_DATE=unknown
 # The edition, and the ONLY thing that separates the two images: empty builds
 # the community one (ee/ is not compiled in at all), "ee" the Enterprise one.
 ARG GO_TAGS=
-RUN CGO_ENABLED=0 go build -trimpath -tags "${GO_TAGS}" -ldflags "-s -w \
+# Where the binary will RUN, set by buildx from --platform; empty on a plain
+# `docker build`, where Go then builds for the machine it is on.
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -tags "${GO_TAGS}" -ldflags "-s -w \
       -X github.com/softwarity/meerkat/internal/version.Version=${VERSION} \
       -X github.com/softwarity/meerkat/internal/version.Commit=${GIT_REV} \
       -X github.com/softwarity/meerkat/internal/version.Date=${BUILD_DATE}" \
@@ -47,7 +57,7 @@ RUN CGO_ENABLED=0 go build -trimpath -tags "${GO_TAGS}" -ldflags "-s -w \
 # directory is built here and copied in — and Docker gives a fresh volume
 # mounted over it the SAME ownership, which is what lets a nonroot process
 # write to it.
-FROM busybox:stable AS datadir
+FROM --platform=$BUILDPLATFORM busybox:stable AS datadir
 RUN mkdir -p /seed/data
 
 # The plug client, for the anonymous `get` account: `ssh get@gateway install | sh`
@@ -64,8 +74,9 @@ RUN mkdir -p /seed/data
 # EE-only, selected by EDITION: an image with no agent has nobody to serve it,
 # and the community one resolves to scratch - nothing copied, nothing carried.
 FROM docker.io/softwarity/plug:${PLUG_VERSION} AS payload-ee
-# Empty, but a real filesystem: a COPY from scratch has nothing to match.
-FROM alpine:3.24 AS payload-ce
+# Empty, but a real filesystem: a COPY from scratch has nothing to match. Two
+# empty directories have no architecture either, hence the build platform.
+FROM --platform=$BUILDPLATFORM alpine:3.24 AS payload-ce
 RUN mkdir -p /opt/plug /usr/local/bin
 FROM payload-${EDITION} AS payload
 
