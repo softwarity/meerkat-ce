@@ -15,7 +15,7 @@ func TestTenantsAndGroupsTravel(t *testing.T) {
 	ctx := context.Background()
 	src := openTemp(t)
 
-	if err := src.SaveRole(ctx, store.Role{ID: "r1", Name: "reader"}); err != nil {
+	if err := src.SaveRole(ctx, store.Role{Name: "reader"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := src.CreateUser(ctx, store.User{ID: "u1", Username: "boss", Enabled: true, PasswordHash: "x"}); err != nil {
@@ -27,7 +27,7 @@ func TestTenantsAndGroupsTravel(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := src.SaveGroup(ctx, store.Group{
-		ID: "g1", TenantID: "acme", Name: "ROOT", RoleIDs: []string{"r1"},
+		ID: "g1", TenantID: "acme", Name: "ROOT", Roles: []string{"reader"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestTenantsAndGroupsTravel(t *testing.T) {
 	if err != nil || len(groups) != 1 {
 		t.Fatalf("group did not land: %v %v", groups, err)
 	}
-	if len(groups[0].RoleIDs) != 1 || groups[0].RoleIDs[0] != "r1" {
+	if len(groups[0].Roles) != 1 || groups[0].Roles[0] != "reader" {
 		t.Errorf("the group lost the roles it grants: %+v", groups[0])
 	}
 }

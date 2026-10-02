@@ -49,6 +49,7 @@
   "emailHint": "משמשת כדי להחזיר אתכם פנימה אם תשכחו את הסיסמה.",
   "emailNone": "לא הוגדרה",
   "errAccessEnded": "הגישה הזו הסתיימה ב-%s.",
+  "errTemporaryExpired": "תוקפה של הסיסמה הזמנית הזו פג. בקשו סיסמה חדשה ממנהל המערכת.",
   "errAccessNotOpen": "הגישה הזו נפתחת ב-%s.",
   "errAvatarSize": "התמונה חייבת להיות קטנה מ-200 KiB",
   "errAvatarType": "השתמש בתמונת png, jpeg או webp",

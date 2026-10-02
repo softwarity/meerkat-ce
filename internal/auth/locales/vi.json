@@ -49,6 +49,7 @@
   "emailHint": "Dung de dang nhap lai neu ban quen mat khau.",
   "emailNone": "chua dat",
   "errAccessEnded": "Quyền truy cập này đã kết thúc vào %s.",
+  "errTemporaryExpired": "Mật khẩu tạm thời này đã hết hạn. Hãy yêu cầu quản trị viên cấp mật khẩu mới.",
   "errAccessNotOpen": "Quyền truy cập này mở vào %s.",
   "errAvatarSize": "Ảnh phải nhỏ hơn 200 KiB",
   "errAvatarType": "Hãy dùng ảnh png, jpeg hoặc webp",

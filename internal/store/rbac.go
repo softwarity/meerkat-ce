@@ -21,12 +21,16 @@ const (
 // all its descendants. System roles are protected from deletion. Tags classify
 // them in the console. The catalogue is gateway-wide; per-org GROUPS assemble
 // subsets of it.
+//
+// THE NAME IS THE IDENTITY. There is no id beside it: an access rule names roles
+// by name, a JWT carries names, and a generated id only made a configuration
+// document unreadable (`parentId: d040c48d...`) and incomparable between two
+// installations that both have ROLE_ADMIN.
 type Role struct {
-	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
-	ParentID    string   `json:"parentId"` // "" = top-level
-	Tags        []string `json:"tags"`     // classification (e.g. per microservice)
+	Parent      string   `json:"parent"` // "" = top-level
+	Tags        []string `json:"tags"`   // classification (e.g. per microservice)
 	System      bool     `json:"system"`
 	CreatedAt   int64    `json:"createdAt"`
 	UpdatedAt   int64    `json:"updatedAt"`
@@ -40,13 +44,15 @@ type Role struct {
 // assigned groups PER TENANT, so the same user carries different roles in
 // different tenants.
 type Group struct {
-	ID          string   `json:"id"`
-	TenantID    string   `json:"tenantId"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	RoleIDs     []string `json:"roleIds"`
-	CreatedAt   int64    `json:"createdAt"`
-	UpdatedAt   int64    `json:"updatedAt"`
+	ID          string `json:"id"`
+	TenantID    string `json:"tenantId"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Roles are the catalogue roles this group grants, BY NAME - the only
+	// identity a role has.
+	Roles     []string `json:"roles"`
+	CreatedAt int64    `json:"createdAt"`
+	UpdatedAt int64    `json:"updatedAt"`
 	// Rev is the revision this row was READ at, carried back by a save so a
 	// write built on a version somebody has replaced is refused. Zero means "I
 	// read no version" and still wins - see rev.go.
@@ -58,18 +64,28 @@ type scanner interface{ Scan(dest ...any) error }
 
 // ── Roles (global catalogue) ─────────────────────────────────────────────────
 
-// SaveRole inserts or updates a role. It rejects a parent that would create a
-// cycle (a role can never be its own ancestor).
+// SaveRole inserts or updates a role, BY NAME. It rejects a parent that would
+// create a cycle (a role can never be its own ancestor).
+//
+// IT NEVER RENAMES, and nothing else does either: a role IS its name, and the
+// name is what leaves this gateway. A JWT carries it to every service behind
+// the gateway, a customer's configuration carries it in a git repository, and
+// their own code spells it out. Meerkat could rewrite its own rules and nothing
+// else, so a rename would be an operation that LOOKS complete and is not -
+// which is worse than one that is plainly a decision. Changing a role's name
+// means deleting it and declaring the new one, through the refusal that names
+// every rule still pointing at it.
 func (s *Store) SaveRole(ctx context.Context, r Role) error {
 	r.Name = strings.TrimSpace(r.Name)
 	if r.Name == "" {
 		return fmt.Errorf("store: role name is required")
 	}
-	if r.ParentID != "" {
-		if r.ParentID == r.ID {
+	r.Parent = strings.TrimSpace(r.Parent)
+	if r.Parent != "" {
+		if r.Parent == r.Name {
 			return fmt.Errorf("store: role %q cannot be its own parent", r.Name)
 		}
-		cyclic, err := s.roleReaches(ctx, r.ParentID, r.ID)
+		cyclic, err := s.roleReaches(ctx, r.Parent, r.Name)
 		if err != nil {
 			return err
 		}
@@ -78,40 +94,44 @@ func (s *Store) SaveRole(ctx context.Context, r Role) error {
 		}
 	}
 	// See rev.go: a write built on a version somebody has replaced is refused.
-	if err := s.checkRev(ctx, "roles", "role", r.ID, r.Rev); err != nil {
+	if err := s.checkRevBy(ctx, "roles", "name", "role", r.Name, r.Rev); err != nil {
 		return err
+	}
+	// [] rather than null when there are none: the column is read back into the
+	// API's answer, and a list the console indexes into must never arrive null.
+	if r.Tags == nil {
+		r.Tags = []string{}
 	}
 	tags, _ := json.Marshal(r.Tags)
 	var parent any
-	if r.ParentID != "" {
-		parent = r.ParentID
+	if r.Parent != "" {
+		parent = r.Parent
 	}
 	now := time.Now().Unix()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO roles (id, name, description, parent_id, tags, system, created_at, updated_at, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-		 ON CONFLICT(id) DO UPDATE SET
-		   name = excluded.name, description = excluded.description,
-		   parent_id = excluded.parent_id, tags = excluded.tags,
-		   system = excluded.system, updated_at = excluded.updated_at,
-		   rev = roles.rev + 1`,
-		r.ID, r.Name, r.Description, parent, string(tags), r.System, now, now)
+		`INSERT INTO roles (name, description, parent, tags, system, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+		 ON CONFLICT(name) DO UPDATE SET
+		   description = excluded.description, parent = excluded.parent,
+		   tags = excluded.tags, system = excluded.system,
+		   updated_at = excluded.updated_at, rev = roles.rev + 1`,
+		r.Name, r.Description, parent, string(tags), r.System, now, now)
 	if err != nil {
 		return fmt.Errorf("store: save role %q: %w", r.Name, err)
 	}
 	return nil
 }
 
-// GetRole returns one role by id.
-func (s *Store) GetRole(ctx context.Context, id string) (Role, error) {
+// GetRole returns one role by name.
+func (s *Store) GetRole(ctx context.Context, name string) (Role, error) {
 	return scanRole(s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, parent_id, tags, system, created_at, updated_at, rev FROM roles WHERE id = ?`, id))
+		`SELECT name, description, parent, tags, system, created_at, updated_at, rev FROM roles WHERE name = ?`, name))
 }
 
 // ListRoles returns the whole catalogue, ordered by name.
 func (s *Store) ListRoles(ctx context.Context) ([]Role, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, description, parent_id, tags, system, created_at, updated_at, rev FROM roles ORDER BY name ASC`)
+		`SELECT name, description, parent, tags, system, created_at, updated_at, rev FROM roles ORDER BY name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list roles: %w", err)
 	}
@@ -130,17 +150,17 @@ func (s *Store) ListRoles(ctx context.Context) ([]Role, error) {
 // DeleteRole removes a role. System roles are protected; children are re-parented
 // to the top level (ON DELETE SET NULL) and the role drops out of every group
 // (group_roles cascade).
-func (s *Store) DeleteRole(ctx context.Context, id string) (bool, error) {
-	r, err := s.GetRole(ctx, id)
+func (s *Store) DeleteRole(ctx context.Context, name string) (bool, error) {
+	r, err := s.GetRole(ctx, name)
 	if err != nil {
 		return false, nil //nolint:nilerr // absent = nothing to delete
 	}
 	if r.System {
 		return false, fmt.Errorf("store: role %q is a system role and cannot be deleted", r.Name)
 	}
-	res, err := s.db.ExecContext(ctx, `DELETE FROM roles WHERE id = ?`, id)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM roles WHERE name = ?`, name)
 	if err != nil {
-		return false, fmt.Errorf("store: delete role %q: %w", id, err)
+		return false, fmt.Errorf("store: delete role %q: %w", name, err)
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
@@ -150,18 +170,24 @@ func scanRole(row scanner) (Role, error) {
 	var r Role
 	var parent sql.NullString
 	var tags string
-	if err := row.Scan(&r.ID, &r.Name, &r.Description, &parent, &tags, &r.System, &r.CreatedAt, &r.UpdatedAt, &r.Rev); err != nil {
+	if err := row.Scan(&r.Name, &r.Description, &parent, &tags, &r.System, &r.CreatedAt, &r.UpdatedAt, &r.Rev); err != nil {
 		return Role{}, fmt.Errorf("store: get role: %w", err)
 	}
-	r.ParentID = parent.String
+	r.Parent = parent.String
 	if err := json.Unmarshal([]byte(tags), &r.Tags); err != nil {
-		return Role{}, fmt.Errorf("store: role %q: bad tags: %w", r.ID, err)
+		return Role{}, fmt.Errorf("store: role %q: bad tags: %w", r.Name, err)
+	}
+	// Rows written before the line above, and rows a document imported without
+	// tags at all, hold the four letters "null". The console indexes into this
+	// list; it must be a list.
+	if r.Tags == nil {
+		r.Tags = []string{}
 	}
 	return r, nil
 }
 
 // roleReaches reports whether target is on the ancestor chain of start (walking
-// parent_id upward) - used to reject hierarchy cycles.
+// parent upward) - used to reject hierarchy cycles.
 func (s *Store) roleReaches(ctx context.Context, start, target string) (bool, error) {
 	parents, err := s.roleParents(ctx)
 	if err != nil {
@@ -176,18 +202,18 @@ func (s *Store) roleReaches(ctx context.Context, start, target string) (bool, er
 }
 
 func (s *Store) roleParents(ctx context.Context) (map[string]string, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, COALESCE(parent_id, '') FROM roles`)
+	rows, err := s.db.QueryContext(ctx, `SELECT name, COALESCE(parent, '') FROM roles`)
 	if err != nil {
 		return nil, fmt.Errorf("store: load role parents: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	parents := map[string]string{}
 	for rows.Next() {
-		var id, p string
-		if err := rows.Scan(&id, &p); err != nil {
+		var name, p string
+		if err := rows.Scan(&name, &p); err != nil {
 			return nil, fmt.Errorf("store: scan role parent: %w", err)
 		}
-		parents[id] = p
+		parents[name] = p
 	}
 	return parents, rows.Err()
 }
@@ -224,9 +250,9 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 	if _, err = tx.ExecContext(ctx, `DELETE FROM group_roles WHERE group_id = ?`, g.ID); err != nil {
 		return fmt.Errorf("store: save group %q: %w", g.Name, err)
 	}
-	for _, rid := range g.RoleIDs {
+	for _, name := range g.Roles {
 		if _, err = tx.ExecContext(ctx,
-			`INSERT INTO group_roles (group_id, role_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, g.ID, rid); err != nil {
+			`INSERT INTO group_roles (group_id, role) VALUES (?, ?) ON CONFLICT DO NOTHING`, g.ID, name); err != nil {
 			return fmt.Errorf("store: save group %q roles: %w", g.Name, err)
 		}
 	}
@@ -242,11 +268,11 @@ func (s *Store) GetGroup(ctx context.Context, id string) (Group, error) {
 	if err != nil {
 		return Group{}, fmt.Errorf("store: get group %q: %w", id, err)
 	}
-	if g.RoleIDs, err = s.groupRoleIDs(ctx, []string{id}); err != nil {
+	if g.Roles, err = s.groupRoles(ctx, []string{id}); err != nil {
 		return Group{}, err
 	}
-	if g.RoleIDs == nil {
-		g.RoleIDs = []string{} // JSON [] - never null (the console indexes into it)
+	if g.Roles == nil {
+		g.Roles = []string{} // JSON [] - never null (the console indexes into it)
 	}
 	return g, nil
 }
@@ -262,9 +288,9 @@ func (s *Store) ListGroups(ctx context.Context, tenantID string) ([]Group, error
 	defer func() { _ = rows.Close() }()
 	var groups []Group
 	for rows.Next() {
-		// RoleIDs starts as an empty slice, never nil: a role-less group must
+		// Roles starts as an empty slice, never nil: a role-less group must
 		// serialise as [] (the console indexes into it).
-		g := Group{RoleIDs: []string{}}
+		g := Group{Roles: []string{}}
 		if err := rows.Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt, &g.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan group: %w", err)
 		}
@@ -279,19 +305,19 @@ func (s *Store) ListGroups(ctx context.Context, tenantID string) ([]Group, error
 		byID[groups[i].ID] = &groups[i]
 	}
 	rr, err := s.db.QueryContext(ctx,
-		`SELECT gr.group_id, gr.role_id FROM group_roles gr
+		`SELECT gr.group_id, gr.role FROM group_roles gr
 		 JOIN groups g ON g.id = gr.group_id WHERE g.tenant_id = ?`, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list group roles: %w", err)
 	}
 	defer func() { _ = rr.Close() }()
 	for rr.Next() {
-		var gid, rid string
-		if err := rr.Scan(&gid, &rid); err != nil {
+		var gid, name string
+		if err := rr.Scan(&gid, &name); err != nil {
 			return nil, fmt.Errorf("store: scan group role: %w", err)
 		}
 		if g := byID[gid]; g != nil {
-			g.RoleIDs = append(g.RoleIDs, rid)
+			g.Roles = append(g.Roles, name)
 		}
 	}
 	return groups, rr.Err()
@@ -307,7 +333,9 @@ func (s *Store) DeleteGroup(ctx context.Context, id string) (bool, error) {
 	return n > 0, nil
 }
 
-func (s *Store) groupRoleIDs(ctx context.Context, groupIDs []string) ([]string, error) {
+// groupRoles returns the role NAMES a set of groups grants directly, without
+// the hierarchy.
+func (s *Store) groupRoles(ctx context.Context, groupIDs []string) ([]string, error) {
 	if len(groupIDs) == 0 {
 		return nil, nil
 	}
@@ -317,20 +345,20 @@ func (s *Store) groupRoleIDs(ctx context.Context, groupIDs []string) ([]string, 
 	}
 	ph := strings.TrimSuffix(strings.Repeat("?,", len(groupIDs)), ",")
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT DISTINCT role_id FROM group_roles WHERE group_id IN (`+ph+`)`, args...)
+		`SELECT DISTINCT role FROM group_roles WHERE group_id IN (`+ph+`)`, args...)
 	if err != nil {
-		return nil, fmt.Errorf("store: group role ids: %w", err)
+		return nil, fmt.Errorf("store: group roles: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	var ids []string
+	var names []string
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("store: scan group role id: %w", err)
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("store: scan group role: %w", err)
 		}
-		ids = append(ids, id)
+		names = append(names, name)
 	}
-	return ids, rows.Err()
+	return names, rows.Err()
 }
 
 // ── Member ↔ groups (per tenant) ─────────────────────────────────────────────
@@ -498,87 +526,66 @@ func (s *Store) ExpandRoleNames(ctx context.Context, names []string) ([]string, 
 	if len(names) == 0 {
 		return nil, nil
 	}
-	roles, err := s.ListRoles(ctx)
+	children, err := s.roleChildren(ctx)
 	if err != nil {
 		return nil, err
 	}
-	children := map[string][]string{}
-	idOf := map[string]string{}
-	nameOf := map[string]string{}
-	for _, r := range roles {
-		idOf[r.Name] = r.ID
-		nameOf[r.ID] = r.Name
-		if r.ParentID != "" {
-			children[r.ParentID] = append(children[r.ParentID], r.ID)
-		}
-	}
-	out := map[string]bool{}
-	var stack []string
-	for _, n := range names {
-		out[n] = true
-		if id, ok := idOf[n]; ok {
-			stack = append(stack, id)
-		}
-	}
-	seen := map[string]bool{}
-	for len(stack) > 0 {
-		id := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		if seen[id] {
-			continue
-		}
-		seen[id] = true
-		out[nameOf[id]] = true
-		stack = append(stack, children[id]...)
-	}
-	expanded := make([]string, 0, len(out))
-	for n := range out {
-		expanded = append(expanded, n)
-	}
-	sort.Strings(expanded)
-	return expanded, nil
+	return walkDown(children, names), nil
 }
 
 // EffectiveRoleNames resolves the role NAMES a set of groups grants: the union
 // of the groups' roles, expanded DOWN the hierarchy (a role implies its
 // descendants). Sorted and unique - ready for the JWT (RBAC-09) and the session.
 func (s *Store) EffectiveRoleNames(ctx context.Context, groupIDs []string) ([]string, error) {
-	direct, err := s.groupRoleIDs(ctx, groupIDs)
+	direct, err := s.groupRoles(ctx, groupIDs)
+	if err != nil || len(direct) == 0 {
+		return nil, err
+	}
+	children, err := s.roleChildren(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(direct) == 0 {
-		return nil, nil
-	}
+	return walkDown(children, direct), nil
+}
+
+// roleChildren is the hierarchy by name: who each role implies.
+//
+// Since a role IS its name, this is the whole index the two expansions need -
+// where they used to carry a map from id to name and another from name to id,
+// and walk the first to answer in the second's terms.
+func (s *Store) roleChildren(ctx context.Context) (map[string][]string, error) {
 	roles, err := s.ListRoles(ctx)
 	if err != nil {
 		return nil, err
 	}
 	children := map[string][]string{}
-	name := map[string]string{}
 	for _, r := range roles {
-		name[r.ID] = r.Name
-		if r.ParentID != "" {
-			children[r.ParentID] = append(children[r.ParentID], r.ID)
+		if r.Parent != "" {
+			children[r.Parent] = append(children[r.Parent], r.Name)
 		}
 	}
+	return children, nil
+}
+
+// walkDown closes a set of names over the hierarchy, sorted and unique. A name
+// nobody declared is kept as it stands: it may belong to the application rather
+// than to this catalogue.
+func walkDown(children map[string][]string, from []string) []string {
 	seen := map[string]bool{}
-	stack := append([]string(nil), direct...)
+	stack := append([]string(nil), from...)
 	for len(stack) > 0 {
-		id := stack[len(stack)-1]
+		name := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		if seen[id] {
+		if seen[name] {
 			continue
 		}
-		seen[id] = true
-		stack = append(stack, children[id]...)
+		seen[name] = true
+		stack = append(stack, children[name]...)
 	}
-	names := make([]string, 0, len(seen))
-	for id := range seen {
-		if n, ok := name[id]; ok {
-			names = append(names, n)
-		}
+	out := make([]string, 0, len(seen))
+	for name := range seen {
+		out = append(out, name)
 	}
-	sort.Strings(names)
-	return names, nil
+	sort.Strings(out)
+	return out
 }

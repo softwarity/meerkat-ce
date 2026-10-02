@@ -139,11 +139,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	roles, err := c.ensureRoles()
-	if err != nil {
+	if err := c.ensureRoles(); err != nil {
 		return err
 	}
-	groups, err := c.ensureGroups(tenant, roles)
+	groups, err := c.ensureGroups(tenant)
 	if err != nil {
 		return err
 	}
@@ -193,32 +192,33 @@ func (c *client) pickTenant(want string) (string, error) {
 	return tenants[0].ID, nil
 }
 
-// ensureRoles returns name -> id, creating what is missing. Roles are global:
-// the catalogue belongs to the application, not to an organisation.
-func (c *client) ensureRoles() (map[string]string, error) {
-	var existing []struct{ ID, Name string }
+// ensureRoles creates what is missing. Roles are global: the catalogue belongs
+// to the application, not to an organisation.
+//
+// It returns nothing but an error, where it used to return name -> id: a role
+// IS its name now, so there was nothing left to look up.
+func (c *client) ensureRoles() error {
+	var existing []struct{ Name string }
 	if err := c.do("GET", "/api/roles", nil, &existing); err != nil {
-		return nil, fmt.Errorf("listing roles: %w", err)
+		return fmt.Errorf("listing roles: %w", err)
 	}
-	byName := map[string]string{}
+	have := map[string]bool{}
 	for _, r := range existing {
-		byName[r.Name] = r.ID
+		have[r.Name] = true
 	}
 	for _, want := range demoRoles {
-		if _, ok := byName[want.Name]; ok {
+		if have[want.Name] {
 			continue
 		}
-		var created struct{ ID, Name string }
 		body := map[string]any{"name": want.Name, "description": want.Description, "tags": []string{"demo"}}
-		if err := c.do("POST", "/api/roles", body, &created); err != nil {
-			return nil, fmt.Errorf("creating role %s: %w", want.Name, err)
+		if err := c.do("POST", "/api/roles", body, nil); err != nil {
+			return fmt.Errorf("creating role %s: %w", want.Name, err)
 		}
-		byName[created.Name] = created.ID
 	}
-	return byName, nil
+	return nil
 }
 
-func (c *client) ensureGroups(tenant string, roles map[string]string) (map[string]string, error) {
+func (c *client) ensureGroups(tenant string) (map[string]string, error) {
 	path := "/api/tenants/" + tenant + "/groups"
 	var existing []struct{ ID, Name string }
 	if err := c.do("GET", path, nil, &existing); err != nil {
@@ -235,7 +235,7 @@ func (c *client) ensureGroups(tenant string, roles map[string]string) (map[strin
 		var created struct{ ID, Name string }
 		body := map[string]any{
 			"name": want.Name, "description": want.Description,
-			"roleIds": []string{roles[want.Role]},
+			"roles": []string{want.Role},
 		}
 		if err := c.do("POST", path, body, &created); err != nil {
 			return nil, fmt.Errorf("creating group %s: %w", want.Name, err)

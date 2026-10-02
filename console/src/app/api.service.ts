@@ -837,15 +837,22 @@ export interface UserTenant {
 
 // A role in the GLOBAL catalogue (RBAC-01) - hierarchical, created at the
 // application level.
+//
+// THE NAME IS THE IDENTITY. There is no id beside it: an access rule names
+// roles by name, a JWT carries names, and a generated id only made a
+// configuration document unreadable and incomparable between installations.
 export interface Role {
-  id: string;
   name: string;
   description: string;
-  parentId: string;
+  // The role ABOVE, by name. "" for a top-level role.
+  parent: string;
   tags: string[];
   system: boolean;
   createdAt: number;
   updatedAt: number;
+  // Carried back on a save so a write built on a version somebody has replaced
+  // is refused.
+  rev?: number;
 }
 
 // A per-tenant group (RBAC-02): a named bundle of catalogue roles, managed by
@@ -855,7 +862,8 @@ export interface Group {
   tenantId: string;
   name: string;
   description: string;
-  roleIds: string[];
+  // The catalogue roles it grants, BY NAME.
+  roles: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -1021,6 +1029,8 @@ export interface Edition {
   tenancyLockWhy?: string;
   // How many saved configurations this image keeps, 0 for no limit.
   configurationCap: number;
+  // The Enterprise rows of FEATURES.md (CONSOLE-14).
+  features?: { id: string; status: 'done' | 'partial' | 'planned' | 'retired'; edition: string }[];
 }
 
 // One field's before/after inside an audit event (from/to are the decoded JSON
@@ -1538,6 +1548,8 @@ export interface PasswordPolicy {
   history: number;
   // Force a change after that many days (0 = never), checked at sign-in.
   expiryDays: number;
+  // How long a password an administrator issued works (0 = no limit).
+  temporaryHours?: number;
 }
 
 export interface Settings {
@@ -2410,7 +2422,7 @@ export class ApiService {
     });
   }
 
-  createUser(user: Partial<User>): Observable<{ user: User; password: string }> {
+  createUser(user: Partial<User>): Observable<{ user: User; password: string; validHours?: number }> {
     return this.http.post<{ user: User; password: string }>('/api/users', user);
   }
 
@@ -2432,7 +2444,7 @@ export class ApiService {
     return this.http.post<{ users: number }>('/api/users/must-change-password', null);
   }
 
-  resetPassword(id: string): Observable<{ password: string }> {
+  resetPassword(id: string): Observable<{ password: string; validHours?: number }> {
     return this.http.post<{ password: string }>(
       `/api/users/${encodeURIComponent(id)}/reset-password`,
       null,
@@ -2500,7 +2512,7 @@ export class ApiService {
 
   // Tenant-scoped reset (the target must be a member; resetting a root account
   // still requires root). Returns the one-time temporary password.
-  resetMemberPassword(tenantId: string, userId: string): Observable<{ password: string }> {
+  resetMemberPassword(tenantId: string, userId: string): Observable<{ password: string; validHours?: number }> {
     return this.http.post<{ password: string }>(
       `/api/tenants/${encodeURIComponent(tenantId)}/members/${encodeURIComponent(userId)}/reset-password`,
       null,
@@ -2521,11 +2533,14 @@ export class ApiService {
   createRole(role: Partial<Role>): Observable<Role> {
     return this.http.post<Role>('/api/roles', role);
   }
-  updateRole(role: Role): Observable<Role> {
-    return this.http.put<Role>(`/api/roles/${encodeURIComponent(role.id)}`, role);
+  // `was` is the name the role is stored under; role.name may differ, and that
+  // is a rename - the gateway moves the key and rewrites the access rules that
+  // named it.
+  updateRole(was: string, role: Role): Observable<Role> {
+    return this.http.put<Role>(`/api/roles/${encodeURIComponent(was)}`, role);
   }
-  deleteRole(id: string): Observable<void> {
-    return this.http.delete<void>(`/api/roles/${encodeURIComponent(id)}`);
+  deleteRole(name: string): Observable<void> {
+    return this.http.delete<void>(`/api/roles/${encodeURIComponent(name)}`);
   }
 
   // ── RBAC: groups (per tenant) ─────────────────────────────────────────────

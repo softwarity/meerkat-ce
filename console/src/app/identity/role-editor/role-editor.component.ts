@@ -81,7 +81,27 @@ export class RoleEditorComponent {
   // A system role's name is the contract the code checks against: describe it,
   // tag it, but never rename or delete it.
   protected readonly locked = computed(() => this.role()?.system ?? false);
-  protected readonly canSave = computed(() => this.name().trim().length > 0 && !this.saving());
+  // Save lights up when there is something TO save. It used to ask only
+  // whether the name was non-empty, so an untouched role offered a write that
+  // would have changed nothing - and a button that is always available stops
+  // meaning anything.
+  //
+  // Tags are compared as a SET: they are a classification, not a sequence, so
+  // dragging one past another is not an edit.
+  protected readonly dirty = computed(() => {
+    const r = this.role();
+    if (!r) return this.name().trim().length > 0;
+    return (
+      this.description().trim() !== (r.description ?? '').trim() ||
+      sameTags(this.tags(), r.tags ?? []) === false
+    );
+  });
+
+  protected readonly canSave = computed(() => this.dirty() && this.name().trim().length > 0 && !this.saving());
+
+  // Why the name cannot be edited once the role exists.
+  protected readonly renameInfo = () =>
+    $localize`:@@Role_name_is_identity:A role is its name, and the services behind this gateway read it out of a token - renaming it here would change this gateway's rules and nothing they hold. To change it: add the new role, point the rules at it, then delete this one.`;
 
   constructor() {
     // Rebind whenever the drawer switches role (the URL drives it, the page
@@ -132,9 +152,12 @@ export class RoleEditorComponent {
       description: this.description().trim(),
       tags: this.tags(),
     };
+    // The name the role is STORED under is the one it had when the drawer
+    // opened: renaming it is exactly changing payload.name, and the gateway
+    // moves the key and rewrites the rules that named it.
     const call = current
-      ? this.api.updateRole({ ...current, ...payload })
-      : this.api.createRole({ ...payload, parentId: this.parent()?.id ?? '' });
+      ? this.api.updateRole(current.name, { ...current, ...payload })
+      : this.api.createRole({ ...payload, parent: this.parent()?.name ?? '' });
     call.subscribe({
       next: (r) => {
         this.saving.set(false);
@@ -169,7 +192,7 @@ export class RoleEditorComponent {
       danger: true,
     });
     if (!ok) return;
-    this.api.deleteRole(current.id).subscribe({
+    this.api.deleteRole(current.name).subscribe({
       next: () => this.deleted.emit(current),
       error: (err: unknown) => this.fail(err),
     });
@@ -183,4 +206,12 @@ export class RoleEditorComponent {
       { duration: 4000 },
     );
   }
+}
+
+// Two tag sets, compared as sets: order is not information here.
+function sameTags(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.every((t, i) => t === right[i]);
 }

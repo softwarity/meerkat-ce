@@ -17,7 +17,15 @@
 </header>
 
 <div class="body">
-  <app-form-field i18n-label="@@Role_name" label="Role name">
+  <!-- Editable only while the role is being CREATED. A role is its name, and
+       the name is what left this gateway - in every token a service reads, in
+       every configuration held in a repository - so there is no rename to
+       offer. The info says what to do instead. -->
+  <app-form-field
+    i18n-label="@@Role_name"
+    label="Role name"
+    [info]="creating() ? '' : renameInfo()"
+  >
     <textarea
       matInput
       rows="1"
@@ -26,7 +34,7 @@
       autocapitalize="off"
       autocorrect="off"
       [value]="name()"
-      [disabled]="locked()"
+      [disabled]="locked() || !creating()"
       (input)="name.set($any($event.target).value)"
       (keydown.enter)="$event.preventDefault()"
     ></textarea>

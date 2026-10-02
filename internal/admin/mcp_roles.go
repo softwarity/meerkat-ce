@@ -40,17 +40,18 @@ func (a *API) roleTools() []mcp.Tool {
 		{
 			Name: "save_role", Allow: administersIdentity, Title: "Add a role, or edit what it says about itself",
 			Description: "Add a role to the catalogue, or change what it says about itself - its " +
-				"description, its tags, what implies it, its name. It works BY NAME: a name this " +
-				"catalogue does not hold is a new role, a name it holds is that role. Renaming goes " +
-				"through newName, and every rule that named the old one is rewritten, because an " +
-				"access rule names roles by name and a rename that did not follow them would leave " +
-				"rules granting nobody. What you pass is what changes: a field left out keeps its " +
-				"value. Granting a role to somebody is a group's business, per organisation, and no " +
-				"tool does it: who gets what is a decision, not a task.",
+				"description, its tags, what implies it. It works BY NAME: a name this catalogue " +
+				"does not hold is a new role, a name it holds is that role. What you pass is what " +
+				"changes: a field left out keeps its value. \n\nA ROLE CANNOT BE RENAMED. Its name " +
+				"is its identity, and it is what the services behind this gateway read out of a " +
+				"token - renaming it here would rewrite this gateway's own rules and nothing they " +
+				"hold, which looks complete and is not. Changing a name is declaring the new role " +
+				"and deleting the old one once the rules naming it have been changed; " +
+				"list_role_references says which those are. \n\nGranting a role to somebody is a " +
+				"group's business, per organisation, and no tool does it: who gets what is a " +
+				"decision, not a task.",
 			Schema: object(map[string]any{
 				"name": str("The role's name, exactly as the rules and the services spell it, e.g. ROLE_ADMIN."),
-				"newName": str("Rename it to this. Every rule that named the old one is rewritten to " +
-					"name this one - a rename that did not would leave rules granting nobody."),
 				"grantedBy": str("The role that also grants this one, by name. A role implies its " +
 					"descendants, so \"ROLE_ADMIN implies ROLE_USER\" is written on ROLE_USER as " +
 					"grantedBy: ROLE_ADMIN. Empty makes it top-level."),
@@ -92,14 +93,10 @@ func (a *API) toolListRoles(ctx context.Context, _ json.RawMessage) (any, error)
 	if err != nil {
 		return nil, err
 	}
-	name := make(map[string]string, len(roles))
-	for _, r := range roles {
-		name[r.ID] = r.Name
-	}
 	type line struct {
 		Name string `json:"name"`
-		// GrantedBy is the parent's NAME, not its id: an id is this
-		// installation's own hash and says nothing an agent can act on.
+		// GrantedBy is the role ABOVE - and it is a name like everything else
+		// here, because a role IS its name.
 		GrantedBy   string   `json:"grantedBy,omitempty"`
 		Description string   `json:"description,omitempty"`
 		Tags        []string `json:"tags,omitempty"`
@@ -108,7 +105,7 @@ func (a *API) toolListRoles(ctx context.Context, _ json.RawMessage) (any, error)
 	out := make([]line, 0, len(roles))
 	for _, r := range roles {
 		out = append(out, line{
-			Name: r.Name, GrantedBy: name[r.ParentID],
+			Name: r.Name, GrantedBy: r.Parent,
 			Description: r.Description, Tags: r.Tags, System: r.System,
 		})
 	}
@@ -126,7 +123,6 @@ func (a *API) toolSaveRole(ctx context.Context, args json.RawMessage) (any, erro
 	}
 	var in struct {
 		Name        string   `json:"name"`
-		NewName     string   `json:"newName"`
 		GrantedBy   string   `json:"grantedBy"`
 		Description string   `json:"description"`
 		Tags        []string `json:"tags"`
@@ -150,7 +146,7 @@ func (a *API) toolSaveRole(ctx context.Context, args json.RawMessage) (any, erro
 	}
 	role, existed := byName[in.Name]
 	if !existed {
-		role = store.Role{ID: newID(), Name: in.Name}
+		role = store.Role{Name: in.Name}
 	}
 	if role.System {
 		return nil, fmt.Errorf("role %q is one of this product's own: it is not an installation's to edit", in.Name)
@@ -165,59 +161,30 @@ func (a *API) toolSaveRole(ctx context.Context, args json.RawMessage) (any, erro
 		parent := strings.TrimSpace(in.GrantedBy)
 		if parent == "" {
 			// Cleared on purpose: the role becomes top-level.
-			role.ParentID = ""
+			role.Parent = ""
 		} else {
-			p, ok := byName[parent]
-			if !ok {
+			if _, ok := byName[parent]; !ok {
 				return nil, fmt.Errorf("no role is called %q: call list_roles for the names this "+
 					"catalogue holds, and remember grantedBy is the role ABOVE - the one that also "+
 					"grants this one", parent)
 			}
-			role.ParentID = p.ID
+			role.Parent = parent
 		}
-	}
-	// The rename, and the rules that have to follow it.
-	was := role.Name
-	if _, ok := given["newName"]; ok {
-		next := strings.TrimSpace(in.NewName)
-		if next == "" {
-			return nil, fmt.Errorf("newName is empty: a role without a name is a rule nobody can write")
-		}
-		if !existed {
-			return nil, fmt.Errorf("no role is called %q, so there is nothing to rename: pass name alone to create it", in.Name)
-		}
-		if other, taken, err := a.roleByName(ctx, next); err != nil {
-			return nil, err
-		} else if taken && other.ID != role.ID {
-			return nil, fmt.Errorf("a role is already called %q: names are unique, and merging two roles is not a rename", next)
-		}
-		role.Name = next
 	}
 	if err := a.st.SaveRole(ctx, role); err != nil {
 		return nil, err
-	}
-	moved := 0
-	if role.Name != was {
-		if moved, err = a.renameRoleReferences(ctx, was, role.Name); err != nil {
-			return nil, err
-		}
 	}
 	action := "role.update"
 	if !existed {
 		action = "role.create"
 	}
-	a.auditEvent(ctx, mcpActor(ctx), action, "role", role.ID, role.Name, "", "")
-	out := map[string]any{
+	a.auditEvent(ctx, mcpActor(ctx), action, "role", role.Name, role.Name, "", "")
+	return map[string]any{
 		"saved":     true,
 		"created":   !existed,
 		"name":      role.Name,
-		"grantedBy": byIDName(roles, role.ParentID),
-	}
-	if role.Name != was {
-		out["renamedFrom"] = was
-		out["rulesRewritten"] = moved
-	}
-	return out, nil
+		"grantedBy": role.Parent,
+	}, nil
 }
 
 func (a *API) toolRoleReferences(ctx context.Context, args json.RawMessage) (any, error) {
@@ -281,23 +248,13 @@ func (a *API) toolDeleteRole(ctx context.Context, args json.RawMessage) (any, er
 			"for all of them with the route ids to change, or nobody will pass them",
 			role.Name, len(refs), refLabels(refs, 5))
 	}
-	ok, err := a.st.DeleteRole(ctx, role.ID)
+	ok, err := a.st.DeleteRole(ctx, role.Name)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, fmt.Errorf("role %q was not deleted", role.Name)
 	}
-	a.auditEvent(ctx, mcpActor(ctx), "role.delete", "role", role.ID, role.Name, "", "")
+	a.auditEvent(ctx, mcpActor(ctx), "role.delete", "role", role.Name, role.Name, "", "")
 	return map[string]any{"deleted": true, "name": role.Name}, nil
-}
-
-// byIDName answers a role's name from the list already read, or "" for none.
-func byIDName(roles []store.Role, id string) string {
-	for _, r := range roles {
-		if r.ID == id {
-			return r.Name
-		}
-	}
-	return ""
 }

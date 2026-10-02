@@ -258,7 +258,7 @@ test('flow-select-group: exclusive mode asks which group at sign-in', async ({ b
     const forced = await root.put(`/api/tenants/${s.tenantId}`, { data: { ...tenant, groupMode: 'SINGLE' } });
     expect(forced.ok(), await forced.text()).toBeTruthy();
     for (const name of ['e2e-blue', 'e2e-red']) {
-      const res = await root.post(`/api/tenants/${s.tenantId}/groups`, { data: { name, roleIds: [] } });
+      const res = await root.post(`/api/tenants/${s.tenantId}/groups`, { data: { name, roles: [] } });
       expect([200, 201, 422]).toContain(res.status()); // 422 = already there from a previous run
     }
     const groups = (await (await root.get(`/api/tenants/${s.tenantId}/groups`)).json()) as { id: string; name: string }[];

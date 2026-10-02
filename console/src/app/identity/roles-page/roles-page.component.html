@@ -91,7 +91,7 @@
               <mat-header-cell *matHeaderCellDef i18n="@@Tags">Tags</mat-header-cell>
               <mat-cell *matCellDef="let n">
                 @if (n.role; as r) {
-                  @if (r.tags.length) {
+                  @if (r.tags?.length) {
                     <span class="flex flex-wrap gap-1">
                       @for (t of r.tags; track t) {
                         <span class="tag">{{ t }}</span>
@@ -146,9 +146,9 @@
               cdkDragLockAxis="y"
               cdkDragPreviewClass="drag-preview"
               [cdkDragData]="n.role"
-              [class.drop-target]="targetRoleId() === n.role.id"
-              [class.dragged]="dragged()?.id === n.role.id"
-              [class.selected]="editingRole()?.id === n.role.id"
+              [class.drop-target]="targetRoleName() === n.role.name"
+              [class.dragged]="dragged()?.name === n.role.name"
+              [class.selected]="editingRole()?.name === n.role.name"
               (cdkDragStarted)="dragStarted(n.role)"
               (cdkDragEnded)="dragEnded()"
               (mouseover)="hoverRow(n.role)"

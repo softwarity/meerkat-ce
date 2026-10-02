@@ -49,6 +49,7 @@
   "emailHint": "用于在您忘记密码时重新登录。",
   "emailNone": "未设置",
   "errAccessEnded": "此访问权限已于 %s 结束。",
+  "errTemporaryExpired": "此临时密码已过期。请向管理员索取新密码。",
   "errAccessNotOpen": "此访问权限于 %s 开放。",
   "errAvatarSize": "照片需小于 200 KiB",
   "errAvatarType": "请使用 png、jpeg 或 webp 图片",

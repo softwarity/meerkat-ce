@@ -49,6 +49,7 @@
   "emailHint": "يتيح لك استعادة الدخول إذا نسيت كلمة المرور.",
   "emailNone": "غير محدد",
   "errAccessEnded": "انتهى هذا الوصول في %s.",
+  "errTemporaryExpired": "انتهت صلاحية كلمة المرور المؤقتة هذه. اطلب كلمة مرور جديدة من أحد المسؤولين.",
   "errAccessNotOpen": "يبدأ هذا الوصول في %s.",
   "errAvatarSize": "يجب أن تقل الصورة عن 200 كيبيبايت",
   "errAvatarType": "استخدم صورة png أو jpeg أو webp",

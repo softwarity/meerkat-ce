@@ -58,7 +58,7 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 	if err != nil {
 		return nil, nil, err
 	}
-	sort.Slice(roles, func(i, j int) bool { return roles[i].ID < roles[j].ID })
+	sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
 	// The revision is this installation's bookkeeping - which write each row is
 	// on - and it means nothing in a document that travels. Carried, it would
 	// also turn every import into a STALE write against rows that do not exist

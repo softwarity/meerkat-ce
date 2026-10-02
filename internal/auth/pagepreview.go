@@ -121,7 +121,7 @@ var previewErrors = map[string][]string{
 	"login": {"errInvalidCreds", "errPasskey", "errTooManyAttempts", "errOutsideHours",
 		"errNotInvited", "errSignInExpired", "errSignInUnavailable",
 		// The access window closes on the sign-in page too, date and all.
-		"errAccessEnded", "errAccessNotOpen"},
+		"errAccessEnded", "errAccessNotOpen", "errTemporaryExpired"},
 	"totp":            {"errBadCode", "errTooManyAttempts"},
 	"totp-enroll":     {"errBadCodeRetry"},
 	"signin-code":     {"errBadEmail", "errTooManyAttempts"},

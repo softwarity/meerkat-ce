@@ -44,16 +44,16 @@ func run(dataDir string) error {
 
 	// ── role catalogue (global, hierarchical, RBAC-01) ──────────────────────
 	roles := []store.Role{
-		{ID: "demo-r-admin", Name: "app-admin-suite", Description: "Administration umbrella", Tags: []string{"demo"}},
-		{ID: "demo-r-billing", Name: "billing-admin", ParentID: "demo-r-admin", Description: "Invoices, payments", Tags: []string{"demo", "billing"}},
-		{ID: "demo-r-catalog", Name: "catalog-admin", ParentID: "demo-r-admin", Description: "Product catalogue", Tags: []string{"demo", "catalog"}},
-		{ID: "demo-r-ops", Name: "ops", Description: "Operations umbrella", Tags: []string{"demo", "ops"}},
-		{ID: "demo-r-ops-read", Name: "ops-read", ParentID: "demo-r-ops", Description: "Read dashboards", Tags: []string{"demo", "ops"}},
-		{ID: "demo-r-ops-write", Name: "ops-write", ParentID: "demo-r-ops", Description: "Act on incidents", Tags: []string{"demo", "ops"}},
-		{ID: "demo-r-sales", Name: "sales", Description: "Sales tools", Tags: []string{"demo", "sales"}},
-		{ID: "demo-r-support", Name: "support", Description: "Customer support", Tags: []string{"demo", "support"}},
-		{ID: "demo-r-auditor", Name: "auditor", Description: "Read-only compliance", Tags: []string{"demo", "audit"}},
-		{ID: "demo-r-reports", Name: "report-viewer", Description: "Business reports", Tags: []string{"demo"}},
+		{Name: "app-admin-suite", Description: "Administration umbrella", Tags: []string{"demo"}},
+		{Name: "billing-admin", Parent: "app-admin-suite", Description: "Invoices, payments", Tags: []string{"demo", "billing"}},
+		{Name: "catalog-admin", Parent: "app-admin-suite", Description: "Product catalogue", Tags: []string{"demo", "catalog"}},
+		{Name: "ops", Description: "Operations umbrella", Tags: []string{"demo", "ops"}},
+		{Name: "ops-read", Parent: "ops", Description: "Read dashboards", Tags: []string{"demo", "ops"}},
+		{Name: "ops-write", Parent: "ops", Description: "Act on incidents", Tags: []string{"demo", "ops"}},
+		{Name: "sales", Description: "Sales tools", Tags: []string{"demo", "sales"}},
+		{Name: "support", Description: "Customer support", Tags: []string{"demo", "support"}},
+		{Name: "auditor", Description: "Read-only compliance", Tags: []string{"demo", "audit"}},
+		{Name: "report-viewer", Description: "Business reports", Tags: []string{"demo"}},
 	}
 	for _, r := range roles {
 		if err := st.SaveRole(ctx, r); err != nil {
@@ -78,13 +78,13 @@ func run(dataDir string) error {
 
 	// ── groups per tenant ────────────────────────────────────────────────────
 	groups := []store.Group{
-		{ID: "demo-g-acme-support", TenantID: "demo-acme", Name: "Support", RoleIDs: []string{"demo-r-support", "demo-r-reports"}},
-		{ID: "demo-g-acme-sales", TenantID: "demo-acme", Name: "Sales", RoleIDs: []string{"demo-r-sales", "demo-r-reports"}},
-		{ID: "demo-g-acme-ops", TenantID: "demo-acme", Name: "Ops", RoleIDs: []string{"demo-r-ops-write"}},
-		{ID: "demo-g-glx-traders", TenantID: "demo-globex", Name: "Traders", RoleIDs: []string{"demo-r-sales"}},
-		{ID: "demo-g-glx-auditors", TenantID: "demo-globex", Name: "Auditors", RoleIDs: []string{"demo-r-auditor", "demo-r-reports"}},
-		{ID: "demo-g-glx-managers", TenantID: "demo-globex", Name: "Managers", RoleIDs: []string{"demo-r-billing", "demo-r-reports"}},
-		{ID: "demo-g-ini-staff", TenantID: "demo-initech", Name: "Staff", RoleIDs: []string{"demo-r-support"}},
+		{ID: "demo-g-acme-support", TenantID: "demo-acme", Name: "Support", Roles: []string{"support", "report-viewer"}},
+		{ID: "demo-g-acme-sales", TenantID: "demo-acme", Name: "Sales", Roles: []string{"sales", "report-viewer"}},
+		{ID: "demo-g-acme-ops", TenantID: "demo-acme", Name: "Ops", Roles: []string{"ops-write"}},
+		{ID: "demo-g-glx-traders", TenantID: "demo-globex", Name: "Traders", Roles: []string{"sales"}},
+		{ID: "demo-g-glx-auditors", TenantID: "demo-globex", Name: "Auditors", Roles: []string{"auditor", "report-viewer"}},
+		{ID: "demo-g-glx-managers", TenantID: "demo-globex", Name: "Managers", Roles: []string{"billing-admin", "report-viewer"}},
+		{ID: "demo-g-ini-staff", TenantID: "demo-initech", Name: "Staff", Roles: []string{"support"}},
 	}
 	for _, g := range groups {
 		if err := st.SaveGroup(ctx, g); err != nil {

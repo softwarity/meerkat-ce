@@ -29,10 +29,10 @@ func TestEveryEditedObjectCarriesARevision(t *testing.T) {
 	}{
 		{
 			name:   "role",
-			create: func() error { return s.SaveRole(ctx, Role{ID: "r", Name: "ops"}) },
-			read:   func() (int64, error) { r, err := s.GetRole(ctx, "r"); return r.Rev, err },
+			create: func() error { return s.SaveRole(ctx, Role{Name: "ops"}) },
+			read:   func() (int64, error) { r, err := s.GetRole(ctx, "ops"); return r.Rev, err },
 			write: func(rev int64) error {
-				return s.SaveRole(ctx, Role{ID: "r", Name: "ops", Description: "changed", Rev: rev})
+				return s.SaveRole(ctx, Role{Name: "ops", Description: "changed", Rev: rev})
 			},
 		},
 		{

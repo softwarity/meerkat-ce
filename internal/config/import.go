@@ -259,8 +259,8 @@ func check(doc *Document) error {
 		}
 	}
 	for _, r := range doc.Roles {
-		if strings.TrimSpace(r.ID) == "" {
-			return fmt.Errorf("config: a role has no id (%q)", r.Name)
+		if strings.TrimSpace(r.Name) == "" {
+			return fmt.Errorf("config: a role has no name, which is the only identity a role has")
 		}
 	}
 	for _, p := range doc.AuthProviders {
@@ -498,17 +498,17 @@ func importRoles(ctx context.Context, st *store.Store, doc *Document, plan *Plan
 	}
 	known := map[string]store.Role{}
 	for _, r := range existing {
-		known[r.ID] = r
+		known[r.Name] = r
 	}
 	seen := map[string]bool{}
 	// Parents before children: SaveRole refuses a parent it cannot find, and a
 	// file listing them the other way round is perfectly reasonable.
 	for _, r := range byDepth(doc.Roles) {
-		seen[r.ID] = true
-		before, had := known[r.ID]
+		seen[r.Name] = true
+		before, had := known[r.Name]
 		action := decide(had, before, r)
 		plan.Changes = append(plan.Changes, Change{
-			Kind: "role", ID: r.ID, Label: r.Name, Action: action,
+			Kind: "role", ID: r.Name, Label: r.Name, Action: action,
 		})
 		if commit && action != ActionSame {
 			if err := st.SaveRole(ctx, r); err != nil {
@@ -523,14 +523,14 @@ func importRoles(ctx context.Context, st *store.Store, doc *Document, plan *Plan
 	removable := byDepth(existing)
 	for i := len(removable) - 1; i >= 0; i-- {
 		r := removable[i]
-		if seen[r.ID] || r.System {
+		if seen[r.Name] || r.System {
 			continue // a system role is not the file's to remove
 		}
 		plan.Changes = append(plan.Changes, Change{
-			Kind: "role", ID: r.ID, Label: r.Name, Action: ActionRemove,
+			Kind: "role", ID: r.Name, Label: r.Name, Action: ActionRemove,
 		})
 		if commit {
-			if _, err := st.DeleteRole(ctx, r.ID); err != nil {
+			if _, err := st.DeleteRole(ctx, r.Name); err != nil {
 				return fmt.Errorf("config: remove role %q: %w", r.Name, err)
 			}
 		}
@@ -915,15 +915,15 @@ func presetByID(id string) (store.Theme, bool) {
 // byDepth orders roles parents-first. A role whose parent is not in the list is
 // treated as top-level: the parent already exists, or the save will say so.
 func byDepth(roles []store.Role) []store.Role {
-	byID := map[string]store.Role{}
+	byName := map[string]store.Role{}
 	for _, r := range roles {
-		byID[r.ID] = r
+		byName[r.Name] = r
 	}
 	depth := func(r store.Role) int {
-		d, seen := 0, map[string]bool{r.ID: true}
-		for r.ParentID != "" && !seen[r.ParentID] {
-			seen[r.ParentID] = true
-			parent, ok := byID[r.ParentID]
+		d, seen := 0, map[string]bool{r.Name: true}
+		for r.Parent != "" && !seen[r.Parent] {
+			seen[r.Parent] = true
+			parent, ok := byName[r.Parent]
 			if !ok {
 				break
 			}

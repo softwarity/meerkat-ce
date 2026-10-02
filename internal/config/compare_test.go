@@ -10,8 +10,8 @@ import (
 func TestCompareSaysWhatDiffersBetweenTwoDocuments(t *testing.T) {
 	from, err := Unmarshal([]byte(`version: 1
 roles:
-  - {id: ops, name: Ops}
-  - {id: sales, name: Sales}
+  - {name: ops}
+  - {name: sales}
 routes:
   - {id: api, name: api, enabled: true, upstream: "http://a.invalid", predicates: [{type: path, args: {patterns: ["/api/**"]}}]}
 settings:
@@ -22,7 +22,7 @@ settings:
 	}
 	to, err := Unmarshal([]byte(`version: 1
 roles:
-  - {id: ops, name: Ops}
+  - {name: ops}
 routes:
   - {id: api, name: api, enabled: true, upstream: "http://b.invalid", predicates: [{type: path, args: {patterns: ["/api/**"]}}]}
   - {id: web, name: web, enabled: true, upstream: "http://w.invalid", predicates: [{type: path, args: {patterns: ["/web/**"]}}]}

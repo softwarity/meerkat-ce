@@ -2279,6 +2279,15 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 			http.StatusForbidden)
 		return
 	}
+	// A password an administrator issued, never replaced by its owner, past
+	// the policy's limit (CONSOLE-07). Told plainly and only to someone holding
+	// it: they need to know whom to ask, and the password itself is proof
+	// enough that they were meant to get in.
+	if user.TemporaryPasswordExpired(h.passwordPolicy(r.Context()).TemporaryHours, time.Now()) {
+		h.security(r, secSigninRefused, user, refusedTemporary)
+		h.render(w, r, next, h.tr(r, "errTemporaryExpired"), http.StatusForbidden)
+		return
+	}
 	h.regLimit.reset(r.Context(), loginKey)
 	// The password is proved: the one moment a weak hash can be made strong.
 	h.rehashIfWeak(r, user, password)

@@ -49,6 +49,7 @@
   "emailHint": "Sifrenizi kaybederseniz geri girmenizi saglar.",
   "emailNone": "tanimlanmadi",
   "errAccessEnded": "Bu erişim %s tarihinde sona erdi.",
+  "errTemporaryExpired": "Bu geçici parolanın süresi doldu. Bir yöneticiden yenisini isteyin.",
   "errAccessNotOpen": "Bu erişim %s tarihinde açılıyor.",
   "errAvatarSize": "Fotoğraf 200 KiB'nin altında olmalı",
   "errAvatarType": "png, jpeg veya webp bir görsel kullanın",

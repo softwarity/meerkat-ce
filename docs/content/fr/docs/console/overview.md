@@ -122,9 +122,14 @@ Ces cinq-là retenues, la console ne surprend plus.
 - **[Scheduler](/docs/operations/scheduler)** - les appels planifiés et leurs exécutions.
 - **[Audit et Issues](/docs/console/audit-and-issues)** - la trace des changements, et les signalements.
 - **[Logs](/docs/operations/logs#dans-la-console)** - les lignes de la gateway, en direct, et son niveau. Un nœud à la fois.
-- **License** - quelle édition a répondu, et ce qu'achète chaque fonctionnalité
-  Enterprise. C'est le seul écran qui parle d'éditions : partout ailleurs, un
-  contrôle verrouillé porte sa pastille et renvoie ici.
+- **License** - quelle édition a répondu, et chaque fonction Enterprise : ce
+  qu'elle fait, où elle en est, et l'écran où elle vit, ou qu'elle n'en a pas
+  (le cluster actif/actif, les fichiers de déploiement). La liste est lue dans le
+  contrat des fonctions du produit, donc elle ne peut pas s'en écarter. C'est le
+  seul écran qui parle d'éditions : partout ailleurs, un contrôle verrouillé porte
+  sa pastille et renvoie ici.
+
+![L'écran License : l'édition, puis chaque fonction Enterprise avec où elle en est et l'écran où elle vit](img/console/license.webp)
 
 ## Votre propre compte
 

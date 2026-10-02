@@ -172,12 +172,12 @@ export class UserCreateComponent {
         validUntil: this.validUntil(),
       })
       .subscribe({
-        next: ({ user, password }) => {
+        next: ({ user, password, validHours }) => {
           this.saving.set(false);
           // Shown once and never again: the generated password exists in this
           // response and nowhere else.
           this.dialog.open(PasswordDialogComponent, {
-            data: { username: user.username, password },
+            data: { username: user.username, password, validHours },
           });
           this.created.emit(user);
         },

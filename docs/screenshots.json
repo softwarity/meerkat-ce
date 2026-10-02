@@ -191,6 +191,26 @@
       ]
     },
     {
+      "file": "img/console/license.webp",
+      "plane": "admin",
+      "path": "/license",
+      "steps": [
+        {
+          "waitFor": ".feature"
+        },
+        {
+          "wait": 500
+        }
+      ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/overview"
+      ]
+    },
+    {
       "file": "img/console/auth-providers.webp",
       "plane": "admin",
       "path": "/infra/auth-providers",
@@ -324,6 +344,26 @@
       "usedBy": [
         "docs/console/application",
         "showcase/index"
+      ]
+    },
+    {
+      "file": "img/console/security.webp",
+      "plane": "admin",
+      "path": "/application/security",
+      "steps": [
+        {
+          "scrollTo": "text=\"Temporary (hours)\""
+        },
+        {
+          "wait": 500
+        }
+      ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/application"
       ]
     },
     {

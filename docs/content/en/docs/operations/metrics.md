@@ -56,6 +56,11 @@ And the gateway itself:
 A route with **Include this route in OpenTelemetry** off has no series of its
 own. Its requests still count in the two `meerkat_gateway_` totals.
 
+A gRPC call always answers `200` and puts its verdict in `grpc-status`. It is
+counted by that verdict, translated the way gRPC maps its codes to HTTP:
+`UNAVAILABLE` is a `5xx`, `NOT_FOUND` or `PERMISSION_DENIED` a `4xx`. The caller
+still receives its `200` and its trailer.
+
 Labels are bounded by construction: a route id and name, a status class, a bucket,
 an operation template, and a `source` saying whether that template was `declared`
 or `deduced`. Never a user, never an address, never a raw path.
@@ -93,7 +98,5 @@ datasources (the dashboard reads Prometheus, uid `meerkat-prometheus`).
 
 - Nothing about one request in particular: that is the other half, and it has its own page
  ([traces](/docs/operations/tracing)). A counter detects and scopes; a trace explains one case.
-- `grpc-status` is not read, so every gRPC call counts as `2xx` and a gRPC route's
- failure rate reads zero.
 - Nothing about WHO called: no label is ever a user, which is what bounds the cardinality. That
  question is answered in the [access log](/docs/operations/logs).

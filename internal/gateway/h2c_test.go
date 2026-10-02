@@ -266,3 +266,55 @@ func TestH2CTransportsArePooled(t *testing.T) {
 		t.Error("routes with different bounds shared a transport")
 	}
 }
+
+// The metrics count a gRPC call by its grpc-status, not by the 200 it rides
+// on (ROUTE-20): a failing gRPC route used to read zero failures.
+func TestAGRPCFailureIsCountedAsOne(t *testing.T) {
+	for _, tc := range []struct {
+		status string
+		class  int
+	}{{"0", 2}, {"14", 5}, {"5", 4}} {
+		up := grpcish(t, tc.status)
+		rt := newRouter(t, h2cRoute("grpc", up.URL))
+		gw := unencrypted(t, rt)
+
+		res, err := h2cClient().Get(gw.URL + "/pkg.Service/Method")
+		if err != nil {
+			t.Fatalf("calling through the gateway: %v", err)
+		}
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("the caller got %d: what it receives must not change", res.StatusCode)
+		}
+		var counted [6]uint64
+		for _, r := range rt.Metrics().Snapshot().Routes {
+			if r.ID == "grpc" {
+				counted = r.ByClass
+			}
+		}
+		if counted[tc.class] != 1 {
+			t.Errorf("grpc-status %s: want one request in class %dxx, got %v", tc.status, tc.class, counted)
+		}
+	}
+}
+
+func TestGRPCAwareLeavesOtherAnswersAlone(t *testing.T) {
+	h := http.Header{}
+	h.Set("Grpc-Status", "14")
+	if got := grpcAware(h, http.StatusOK); got != http.StatusOK {
+		t.Errorf("not a gRPC response, yet counted as %d", got)
+	}
+	h.Set("Content-Type", "application/grpc+proto")
+	if got := grpcAware(h, http.StatusOK); got != http.StatusServiceUnavailable {
+		t.Errorf("grpc-status 14 counted as %d, want 503", got)
+	}
+	if got := grpcAware(h, http.StatusBadGateway); got != http.StatusBadGateway {
+		t.Errorf("a gateway's own 502 was rewritten to %d", got)
+	}
+	h.Del("Grpc-Status")
+	h.Set(http.TrailerPrefix+"Grpc-Status", "16")
+	if got := grpcAware(h, http.StatusOK); got != http.StatusUnauthorized {
+		t.Errorf("an unannounced trailer counted as %d, want 401", got)
+	}
+}

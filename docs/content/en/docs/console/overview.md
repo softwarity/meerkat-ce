@@ -119,9 +119,14 @@ Learn these five and the console stops surprising you.
 - **[Scheduler](/docs/operations/scheduler)** - the scheduled calls and their runs.
 - **[Audit and Issues](/docs/console/audit-and-issues)** - the trail of changes, and the reports.
 - **[Logs](/docs/operations/logs#in-the-console)** - the gateway's own lines, live, and its level. One node at a time.
-- **License** - which edition answered, and what each Enterprise feature buys. It
-  is the only screen that talks about editions: everywhere else a locked control
-  carries its cap and links here.
+- **License** - which edition answered, and every Enterprise feature: what it
+  does, how far it is built, and the screen it lives on, or that it has none
+  (the active/active cluster, the deployment files). The list is read from the
+  product's own feature contract, so it cannot drift from it. It is the only
+  screen that talks about editions: everywhere else a locked control carries its
+  cap and links here.
+
+![The License screen: the edition, then every Enterprise feature with how far it is built and the screen it lives on](img/console/license.webp)
 
 ## Your own account
 

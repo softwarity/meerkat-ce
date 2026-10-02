@@ -49,6 +49,7 @@
   "emailHint": "Used to get you back in if you lose your password.",
   "emailNone": "not set",
   "errAccessEnded": "This access ended on %s.",
+  "errTemporaryExpired": "This temporary password has expired. Ask an administrator for a new one.",
   "errAccessNotOpen": "This access opens on %s.",
   "errAvatarSize": "Keep the photo under 200 KiB",
   "errAvatarType": "Use a png, jpeg or webp image",

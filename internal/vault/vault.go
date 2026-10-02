@@ -225,10 +225,33 @@ func ExpandAny(v any, lookup func(string) (string, bool)) (any, []string) {
 // Cipher seals secret values with AES-256-GCM. The nonce is random per seal and
 // stored with the ciphertext, so re-sealing the same value never yields the
 // same blob.
-type Cipher struct{ aead cipher.AEAD }
+//
+// It seals with ONE key and opens with that key or the previous one (SEC-06):
+// rotating the master key is giving the new key and the old one together,
+// letting every node re-seal what the old one sealed, then dropping the old
+// one. A blob neither opens fails, as a wrong key always has.
+type Cipher struct {
+	aead     cipher.AEAD
+	previous cipher.AEAD // nil outside a rotation
+}
 
-// NewCipher builds a Cipher from a 32-byte key.
-func NewCipher(key []byte) (*Cipher, error) {
+// NewCipher builds a Cipher from a 32-byte key and, during a rotation, the key
+// it replaces.
+func NewCipher(key []byte, previous ...[]byte) (*Cipher, error) {
+	aead, err := newAEAD(key)
+	if err != nil {
+		return nil, err
+	}
+	c := &Cipher{aead: aead}
+	if len(previous) > 0 && previous[0] != nil {
+		if c.previous, err = newAEAD(previous[0]); err != nil {
+			return nil, fmt.Errorf("vault: previous key: %w", err)
+		}
+	}
+	return c, nil
+}
+
+func newAEAD(key []byte) (cipher.AEAD, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("vault: master key must be 32 bytes, got %d", len(key))
 	}
@@ -240,8 +263,11 @@ func NewCipher(key []byte) (*Cipher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("vault: gcm: %w", err)
 	}
-	return &Cipher{aead: aead}, nil
+	return aead, nil
 }
+
+// Rotating says a previous key was given: what it sealed is to be re-sealed.
+func (c *Cipher) Rotating() bool { return c.previous != nil }
 
 // Seal encrypts a plain value into base64(nonce||ciphertext).
 func (c *Cipher) Seal(plain string) (string, error) {
@@ -253,22 +279,49 @@ func (c *Cipher) Seal(plain string) (string, error) {
 	return base64.StdEncoding.EncodeToString(sealed), nil
 }
 
-// Open decrypts what Seal produced. It fails on a wrong key or tampered blob
-// (GCM authenticates), which is exactly what we want a rotation mistake to do.
+// Open decrypts what Seal produced, under the current key or the previous
+// one. It fails on a wrong key or tampered blob (GCM authenticates), which is
+// exactly what we want a rotation mistake to do.
 func (c *Cipher) Open(blob string) (string, error) {
+	plain, _, err := c.OpenStale(blob)
+	return plain, err
+}
+
+// OpenStale is Open, and says whether the blob was sealed by the PREVIOUS key
+// - so needs sealing again under the current one.
+func (c *Cipher) OpenStale(blob string) (plain string, stale bool, err error) {
 	raw, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
-		return "", fmt.Errorf("vault: bad ciphertext encoding: %w", err)
+		return "", false, fmt.Errorf("vault: bad ciphertext encoding: %w", err)
 	}
 	n := c.aead.NonceSize()
 	if len(raw) < n {
-		return "", errors.New("vault: ciphertext too short")
+		return "", false, errors.New("vault: ciphertext too short")
 	}
-	plain, err := c.aead.Open(nil, raw[:n], raw[n:], nil)
+	if out, err := c.aead.Open(nil, raw[:n], raw[n:], nil); err == nil {
+		return string(out), false, nil
+	}
+	if c.previous != nil {
+		if out, err := c.previous.Open(nil, raw[:n], raw[n:], nil); err == nil {
+			return string(out), true, nil
+		}
+	}
+	return "", false, errors.New("vault: cannot decrypt (wrong master key?)")
+}
+
+// PreviousKeyEnv names the key a rotation replaces.
+const PreviousKeyEnv = "MEERKAT_VAULT_KEY_PREVIOUS"
+
+// LoadPreviousKey reads the key a rotation replaces, nil when none is given.
+func LoadPreviousKey(envValue string) ([]byte, error) {
+	if envValue = strings.TrimSpace(envValue); envValue == "" {
+		return nil, nil
+	}
+	key, err := decodeKey(envValue)
 	if err != nil {
-		return "", fmt.Errorf("vault: cannot decrypt (wrong master key?): %w", err)
+		return nil, fmt.Errorf("vault: %s: %w", PreviousKeyEnv, err)
 	}
-	return string(plain), nil
+	return key, nil
 }
 
 // KeyFileName is where the master key lands when none is supplied.

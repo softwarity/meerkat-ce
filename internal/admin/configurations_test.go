@@ -213,7 +213,7 @@ func TestSeveralConfigurations(t *testing.T) {
 	})
 
 	t.Run("a file can be taken in without being applied", func(t *testing.T) {
-		file := "version: 1\nroles:\n  - id: r-taken\n    name: taken\n"
+		file := "version: 1\nroles:\n  - name: taken\n"
 		code, body := f.call(t, "POST", "/api/configurations/import?name=From%20a%20file", file, f.rootC)
 		if code != http.StatusCreated {
 			t.Fatalf("import: %d %s", code, body)
@@ -228,7 +228,7 @@ func TestSeveralConfigurations(t *testing.T) {
 	// which of the two happened.
 	t.Run("a file can replace what a name already holds", func(t *testing.T) {
 		code, body := f.call(t, "POST", "/api/configurations/import?name=Replaceable",
-			"version: 1\nroles:\n  - id: r-first\n    name: first\n", f.rootC)
+			"version: 1\nroles:\n  - name: first\n", f.rootC)
 		if code != http.StatusCreated {
 			t.Fatalf("import: %d %s", code, body)
 		}
@@ -238,7 +238,7 @@ func TestSeveralConfigurations(t *testing.T) {
 			t.Fatalf("re-importing under the same name = %d %s, want 409", code, body)
 		}
 		if code, body := f.call(t, "PUT", "/api/configurations/"+target+"/document",
-			"version: 1\nroles:\n  - id: r-second\n    name: second\n", f.rootC); code != http.StatusOK {
+			"version: 1\nroles:\n  - name: second\n", f.rootC); code != http.StatusOK {
 			t.Fatalf("replace: %d %s", code, body)
 		}
 		_, after := f.call(t, "GET", "/api/configurations/"+target, "", f.rootC)

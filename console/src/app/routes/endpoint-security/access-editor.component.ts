@@ -165,7 +165,7 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
               </mat-chip-set>
               }
             </mat-select-trigger>
-            @for (r of roles(); track r.id) {
+            @for (r of roles(); track r.name) {
               <mat-option [value]="r.name">
                 <span class="opt-main">{{ r.name }}</span>
                 @if (r.description) {

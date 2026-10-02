@@ -85,9 +85,13 @@
           <mat-label i18n="@@Expires_after_days">Expires after (days)</mat-label>
           <input matInput type="number" min="0" max="3650" [value]="pwExpiry()" (input)="pwExpiry.set(+$any($event.target).value)" />
         </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Temporary_password_hours">Temporary (hours)</mat-label>
+          <input matInput type="number" min="0" max="8760" [value]="pwTemporary()" (input)="pwTemporary.set(+$any($event.target).value)" />
+        </mat-form-field>
       </div>
       <p class="hint text-muted" i18n="@@Password_history_hint">
-        Expiry is checked at sign-in: an expired password leads to the change page.
+        Checked at sign-in: an expired password leads to the change page, an expired temporary one is refused. 0 means no limit.
       </p>
       @if (pwLength() < pwSum()) {
         <p class="hint text-error" i18n="@@Password_length_raised">

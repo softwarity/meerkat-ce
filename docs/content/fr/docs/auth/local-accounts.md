@@ -37,6 +37,7 @@ organisations.
 | Lowercase, Uppercase, Digits, Special characters | compte minimum de chaque genre | `0` |
 | No reuse of the last | combien de mots de passe précédents sont refusés | `0` |
 | Expires after (days) | force un changement au bout de tant de jours | `0`, jamais |
+| Temporary (hours) | combien de temps marche un mot de passe émis par un administrateur | `72` |
 
 Un zéro veut dire *peu importe* : la règle n'est ni vérifiée ni affichée. Ce
 qui est livré n'exige donc qu'une longueur, et c'est délibéré - relever la
@@ -59,9 +60,17 @@ connexion suivante, qui atterrit alors sur la page de changement de mot de
 passe. Le même écran porte un bouton *Force a change for everyone*
 pour le jour où il faudra.
 
-Les mots de passe sont hachés en bcrypt. Une empreinte ancienne n'est pas
-réencodée quand vous montez le coût : Meerkat n'a pas encore de réencodage
-transparent à la connexion.
+**Un mot de passe temporaire s'épuise.** Le mot de passe qu'émet un
+administrateur, à la création ou à une réinitialisation, marche pendant
+*Temporary (hours)*, jusqu'à ce que son titulaire choisisse le sien.
+Au-delà, la connexion est refusée avec une phrase qui dit d'en demander un
+nouveau à un administrateur. Il voyage par mail, messagerie ou téléphone, et un
+mot de passe que personne n'a utilisé ne doit pas rester une porte d'entrée.
+*Force a change* n'est pas concerné : le mot de passe reste celui de son titulaire.
+
+Les mots de passe sont hachés en bcrypt. Une empreinte d'un coût inférieur est
+refaite à la connexion suivante de son titulaire, seul moment où le mot de passe
+est connu en clair.
 
 ## Un étranglement, jamais un verrouillage
 

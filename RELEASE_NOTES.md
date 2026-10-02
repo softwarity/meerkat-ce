@@ -36,6 +36,36 @@
   a wrong one as the same authentication failure.
 - **The startup line says which product it is**: "Meerkat Enterprise edition",
   where it used to say the word edition three times.
+- **A role is its name.** The generated id beside it is gone: it identified
+  nothing the name did not - names were already unique - and it made a
+  configuration file unreadable (`parent: d040c48d...`) and incomparable
+  between two installations that both have ROLE_ADMIN.
+- **A role can no longer be renamed**, and that follows from the same thing.
+  The name leaves this gateway - services read it out of a token, a customer's
+  configuration holds it in a repository - so renaming it here would have
+  rewritten our own rules and nothing they hold: an operation that looks
+  complete and never is. Changing a name means adding the new role, pointing
+  the rules at it, and deleting the old one, through the refusal that names
+  every rule still pointing at it.
+- **A value the gateway refuses is answered as such.** A rate limit keyed on
+  something that does not exist, saved on a route, came back as "internal
+  error"; it is a 422 now, with the sentence that says what is allowed.
+- **A failing gRPC call counts as a failure.** It answers 200 with its verdict
+  in `grpc-status`; the traffic screen, the metrics and the access log now read
+  that verdict, so a gRPC route in trouble no longer looks healthy.
+- **A temporary password runs out.** The one an administrator issues works for
+  72 hours by default (Application, Security, *Temporary password*), then
+  signing in with it is refused with a sentence that says whom to ask. Only
+  passwords issued from now on are concerned.
+- **TOTP secrets are sealed at rest** with the vault's master key, like the
+  vault's own secrets; those stored before are sealed at the first start.
+- **The master key can rotate.** Restart with the new key in
+  `MEERKAT_VAULT_KEY` and the old one in `MEERKAT_VAULT_KEY_PREVIOUS`
+  (`vault.previousKey` in the Helm chart): everything is sealed again under the
+  new key, then the old one goes.
+- **The License screen lists every Enterprise feature**, from the product's own
+  contract: what each does, how far it is built, and the screen it lives on -
+  or that it has none, like the active/active cluster.
 
 ---
 

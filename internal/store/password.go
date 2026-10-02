@@ -29,6 +29,11 @@ type PasswordPolicy struct {
 	// is at SIGN-IN, not by a clock: a password expiring at three in the
 	// morning would sign nobody out, it would only refuse the next login.
 	ExpiryDays int `json:"expiryDays"`
+	// TemporaryHours is how long a password an administrator issued works
+	// before its owner has replaced it (CONSOLE-07; 0 = no limit). A
+	// temporary password travels by mail, chat or phone, and one nobody used
+	// is a key left under the mat for as long as nobody notices.
+	TemporaryHours int `json:"temporaryHours"`
 }
 
 // DefaultPasswordPolicy is the eight characters the code asked for before
@@ -36,7 +41,7 @@ type PasswordPolicy struct {
 // everyone at once, on an upgrade, locks people out of a password change they
 // were in the middle of. The administrator raises it, and knows they did.
 func DefaultPasswordPolicy() PasswordPolicy {
-	return PasswordPolicy{MinLength: 8}
+	return PasswordPolicy{MinLength: 8, TemporaryHours: 72}
 }
 
 // PasswordRuleKind names a rule for the catalogue and for the browser: the
@@ -147,6 +152,7 @@ func (p PasswordPolicy) Sanitize() PasswordPolicy {
 	// of service someone typed into a settings box.
 	p.History = clamp(p.History, 24)
 	p.ExpiryDays = clamp(p.ExpiryDays, 3650)
+	p.TemporaryHours = clamp(p.TemporaryHours, 8760)
 	// A length below the sum of the parts is not a policy, it is a promise the
 	// checklist could never keep: four kinds at 2 each need eight characters.
 	if sum := p.MinLower + p.MinUpper + p.MinDigits + p.MinSpecial; p.MinLength < sum {
@@ -158,13 +164,27 @@ func (p PasswordPolicy) Sanitize() PasswordPolicy {
 // GetPasswordPolicy reads the policy, falling back to the default on an
 // unset or unreadable setting - a password is never left unchecked.
 func (s *Store) GetPasswordPolicy(ctx context.Context) PasswordPolicy {
-	var p PasswordPolicy
-	if err := s.GetSetting(ctx, SettingPasswordPolicy, &p); err != nil {
+	// TemporaryHours read apart, as a pointer: a policy saved before the field
+	// existed has no limit written down, which is not the same as asking for
+	// none. It gets the default - safely, because the passwords issued before
+	// were never marked temporary, so none of them can expire by it.
+	var stored struct {
+		PasswordPolicy
+		TemporaryHours *int `json:"temporaryHours"`
+	}
+	if err := s.GetSetting(ctx, SettingPasswordPolicy, &stored); err != nil {
 		return DefaultPasswordPolicy()
 	}
+	p := stored.PasswordPolicy
+	if stored.TemporaryHours != nil {
+		p.TemporaryHours = *stored.TemporaryHours
+	}
 	if p.MinLength <= 0 && p.MinLower <= 0 && p.MinUpper <= 0 && p.MinDigits <= 0 &&
-		p.MinSpecial <= 0 && p.History <= 0 && p.ExpiryDays <= 0 {
+		p.MinSpecial <= 0 && p.History <= 0 && p.ExpiryDays <= 0 && p.TemporaryHours <= 0 {
 		return DefaultPasswordPolicy()
+	}
+	if stored.TemporaryHours == nil {
+		p.TemporaryHours = DefaultPasswordPolicy().TemporaryHours
 	}
 	return p.Sanitize()
 }

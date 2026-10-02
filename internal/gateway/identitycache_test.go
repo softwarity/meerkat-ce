@@ -39,11 +39,11 @@ func TestIdentityIsRememberedUntilAWriteForgetsIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, role := range []string{"ROLE_A", "ROLE_B"} {
-		if err := st.SaveRole(ctx, store.Role{ID: role, Name: role}); err != nil {
+		if err := st.SaveRole(ctx, store.Role{Name: role}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := st.SaveGroup(ctx, store.Group{ID: "g1", TenantID: "t1", Name: "G", RoleIDs: []string{"ROLE_A"}}); err != nil {
+	if err := st.SaveGroup(ctx, store.Group{ID: "g1", TenantID: "t1", Name: "G", Roles: []string{"ROLE_A"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetMemberGroups(ctx, "t1", "u1", []string{"g1"}); err != nil {
@@ -81,7 +81,7 @@ func TestIdentityIsRememberedUntilAWriteForgetsIt(t *testing.T) {
 	if got := call(); got != "ROLE_A" {
 		t.Fatalf("first call: got %q, want ROLE_A", got)
 	}
-	if err := st.SaveGroup(ctx, store.Group{ID: "g1", TenantID: "t1", Name: "G", RoleIDs: []string{"ROLE_B"}}); err != nil {
+	if err := st.SaveGroup(ctx, store.Group{ID: "g1", TenantID: "t1", Name: "G", Roles: []string{"ROLE_B"}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := call(); got != "ROLE_A" {

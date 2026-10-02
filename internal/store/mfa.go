@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/mfa"
@@ -35,6 +36,12 @@ func (s *Store) GetUserTOTP(ctx context.Context, userID string) (TOTPState, erro
 			return TOTPState{}, fmt.Errorf("store: user %q: bad scratch codes: %w", userID, err)
 		}
 	}
+	if st.Secret, err = s.openTOTP(st.Secret); err != nil {
+		return TOTPState{}, fmt.Errorf("store: user %q: TOTP secret: %w", userID, err)
+	}
+	if st.Pending, err = s.openTOTP(st.Pending); err != nil {
+		return TOTPState{}, fmt.Errorf("store: user %q: pending TOTP secret: %w", userID, err)
+	}
 	st.Enrolled = st.Secret != ""
 	return st, nil
 }
@@ -44,6 +51,10 @@ func (s *Store) GetUserTOTP(ctx context.Context, userID string) (TOTPState, erro
 // pending secret (starting enrolment over) but leaves an already-confirmed
 // secret untouched until EnableUserTOTP commits.
 func (s *Store) SetUserTOTPPending(ctx context.Context, userID, pending string) error {
+	pending, err := s.sealTOTP(pending)
+	if err != nil {
+		return fmt.Errorf("store: user %q: seal TOTP secret: %w", userID, err)
+	}
 	return s.execUser(ctx, userID,
 		`UPDATE users SET totp_pending = ?, updated_at = ? WHERE id = ?`,
 		pending, time.Now().Unix(), userID)
@@ -56,6 +67,9 @@ func (s *Store) EnableUserTOTP(ctx context.Context, userID, secret string, scrat
 	scratch, err := json.Marshal(scratchHashes)
 	if err != nil {
 		return fmt.Errorf("store: user %q: encode scratch codes: %w", userID, err)
+	}
+	if secret, err = s.sealTOTP(secret); err != nil {
+		return fmt.Errorf("store: user %q: seal TOTP secret: %w", userID, err)
 	}
 	return s.execUser(ctx, userID,
 		`UPDATE users SET totp_secret = ?, totp_pending = '', totp_scratch = ?, updated_at = ? WHERE id = ?`,
@@ -268,4 +282,75 @@ func (s *Store) PurgeExpiredTrustedBrowsers(ctx context.Context, now int64) (int
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// TOTP secrets at rest (SEC-06).
+//
+// A TOTP secret is a password that never changes: whoever reads it computes
+// every code the account will ever accept, and the account's owner has no
+// way to know. So it is sealed with the vault's key, like a vault secret,
+// and a copied database - a snapshot, a backup, a dump - holds codes nobody
+// can compute. The marker tells a sealed value from one written before.
+
+// sealedTOTP prefixes a sealed secret.
+const sealedTOTP = "sealed:"
+
+func (s *Store) sealTOTP(secret string) (string, error) {
+	if secret == "" || strings.HasPrefix(secret, sealedTOTP) {
+		return secret, nil
+	}
+	blob, err := s.vaultCipher.Seal(secret)
+	if err != nil {
+		return "", err
+	}
+	return sealedTOTP + blob, nil
+}
+
+func (s *Store) openTOTP(stored string) (string, error) {
+	blob, sealed := strings.CutPrefix(stored, sealedTOTP)
+	if !sealed {
+		return stored, nil
+	}
+	return s.vaultCipher.Open(blob)
+}
+
+// sealStoredTOTP seals every secret still stored in clear: those written
+// before secrets were sealed. Run at every start, once the key is known; a
+// row is only rewritten if it still holds the value read, so two nodes
+// starting together do not seal one secret twice.
+func (s *Store) sealStoredTOTP(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, totp_secret, totp_pending FROM users
+		 WHERE (totp_secret != '' AND totp_secret NOT LIKE 'sealed:%')
+		    OR (totp_pending != '' AND totp_pending NOT LIKE 'sealed:%')`)
+	if err != nil {
+		return fmt.Errorf("store: find TOTP secrets in clear: %w", err)
+	}
+	type inClear struct{ id, secret, pending string }
+	var found []inClear
+	for rows.Next() {
+		var c inClear
+		if err := rows.Scan(&c.id, &c.secret, &c.pending); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		found = append(found, c)
+	}
+	_ = rows.Close()
+	for _, c := range found {
+		secret, err := s.sealTOTP(c.secret)
+		if err != nil {
+			return err
+		}
+		pending, err := s.sealTOTP(c.pending)
+		if err != nil {
+			return err
+		}
+		if _, err := s.db.ExecContext(ctx,
+			`UPDATE users SET totp_secret = ?, totp_pending = ? WHERE id = ? AND totp_secret = ? AND totp_pending = ?`,
+			secret, pending, c.id, c.secret, c.pending); err != nil {
+			return fmt.Errorf("store: seal TOTP secret of user %q: %w", c.id, err)
+		}
+	}
+	return nil
 }

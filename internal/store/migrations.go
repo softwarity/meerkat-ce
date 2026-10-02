@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // The ledger: what a CREATE cannot say.
@@ -21,13 +22,14 @@ import (
 // halfway resumes where it stopped rather than starting over on a database
 // that is already part way there.
 //
-// WHY THE LEDGER IS EMPTY, AND WHY THAT IS NOT A HOLE. It opens at the schema
-// this build carries, and it opens there because no version of this product
-// has ever shipped: there is no database in the world older than the current
-// schema except a developer's own, and a developer's own is disposable. From
-// the first release on, every change that is not additive is a step here, and
-// the day one lands this comment stops being true - which is the point of
-// writing it down rather than leaving the slice bare.
+// THE DAY HAS COME. This comment used to say the ledger was empty because no
+// version had ever shipped, and that every non-additive change would be a step
+// here from the first release on. v1.0.0 shipped on 2026-10-02 and v71 is the
+// first such change, so the first step is below.
+//
+// The two halves run in this order: the build's own DDL, then the ledger, then
+// the additive top-up (see migrate). A step that rebuilds a table has to come
+// before anything tries to add columns to the shape it is replacing.
 type migration struct {
 	// Version is what the database is stamped with once this step has run. It
 	// must be greater than the schemaVersion of the build that shipped before
@@ -39,7 +41,75 @@ type migration struct {
 	Up   func(ctx context.Context, tx *transaction) error
 }
 
-var migrations []migration
+var migrations = []migration{
+	{Version: 71, Name: "a role is its name", Up: rolesKeyedByName},
+}
+
+// rolesKeyedByName rebuilds the catalogue around the name (v71).
+//
+// Before: roles(id PK, name UNIQUE, parent_id -> roles.id) and
+// group_roles(group_id, role_id -> roles.id). After: roles(name PK, parent ->
+// roles.name) and group_roles(group_id, role -> roles.name), both cascading on
+// update so a rename stays one statement.
+//
+// The classic rebuild, because neither SQLite nor a primary key change is
+// something ALTER can do: move the old tables aside, create the new shape,
+// copy through the id->name join, drop the old ones. The DDL is written out
+// here rather than taken from schemaSQL on purpose - a step describes the
+// schema AT ITS OWN version, and borrowing the current one would make this
+// step produce whatever shape a later version invents.
+//
+// The order of the drops matters with foreign keys on (the DSN turns them on,
+// and PRAGMA cannot be changed inside a transaction): group_roles_old goes
+// first, so that nothing references roles_old when it goes.
+func rolesKeyedByName(ctx context.Context, tx *transaction) error {
+	steps := []string{
+		`ALTER TABLE group_roles RENAME TO group_roles_old`,
+		`ALTER TABLE roles RENAME TO roles_old`,
+		`CREATE TABLE roles (
+		   name        TEXT PRIMARY KEY,
+		   description TEXT NOT NULL DEFAULT '',
+		   parent      TEXT REFERENCES roles(name) ON DELETE SET NULL,
+		   tags        TEXT NOT NULL DEFAULT '[]',
+		   system      BOOLEAN NOT NULL DEFAULT FALSE,
+		   created_at  BIGINT NOT NULL DEFAULT 0,
+		   updated_at  BIGINT NOT NULL DEFAULT 0,
+		   rev         BIGINT NOT NULL DEFAULT 0
+		 )`,
+		// The parent comes through a self-join on the OLD table: what was an id
+		// is now the name that id pointed at. A parent whose row is gone lands
+		// NULL, which is what ON DELETE SET NULL meant anyway.
+		`INSERT INTO roles (name, description, parent, tags, system, created_at, updated_at, rev)
+		 SELECT r.name, r.description, p.name, r.tags, r.system, r.created_at, r.updated_at, r.rev
+		   FROM roles_old r LEFT JOIN roles_old p ON p.id = r.parent_id`,
+		`CREATE TABLE group_roles (
+		   group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+		   role     TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
+		   PRIMARY KEY (group_id, role)
+		 )`,
+		// An INNER join: a link to a role that no longer exists granted nothing
+		// and cannot be expressed any more.
+		`INSERT INTO group_roles (group_id, role)
+		 SELECT gr.group_id, r.name FROM group_roles_old gr JOIN roles_old r ON r.id = gr.role_id`,
+		`DROP TABLE group_roles_old`,
+		`DROP TABLE roles_old`,
+	}
+	for _, q := range steps {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("%w (running: %s)", err, firstLine(q))
+		}
+	}
+	return nil
+}
+
+// firstLine names the statement that failed without printing a whole CREATE.
+func firstLine(q string) string {
+	q = strings.TrimSpace(q)
+	if i := strings.IndexByte(q, '\n'); i > 0 {
+		return q[:i] + " ..."
+	}
+	return q
+}
 
 // pending returns the steps a database at version `from` has not run, in the
 // order they have to run in.

@@ -77,7 +77,7 @@ Une API gateway complète, pilotée depuis la console.
 - **11 prédicats et 33 filtres** : chemin, hôte, en-tête, cookie, méthode, poids pour le canary, plage horaire ; réécriture des requêtes et réponses. `ROUTE-03 à 05`
 - **Limitation de débit** par route, utilisateur, jeton, organisation ou adresse, plusieurs bornes à la fois ; **quotas par endpoint** ; réponse 429 standard. `ROUTE-08 QUOTA-05`
 - **Disjoncteur, timeouts** à trois niveaux et état des services dans la console : un coeur par route, d'après la découverte ou une connexion TCP, et le trafic réel. `ROUTE-07 ROUTE-09 SVC-04`
-- **WebSocket, gRPC et streaming** des corps de bout en bout. *partiel* `ROUTE-13 ROUTE-20`
+- **WebSocket, gRPC et streaming** des corps de bout en bout ; un appel gRPC est compté par son `grpc-status`, pas par le 200 qui le porte. *partiel* `ROUTE-13 ROUTE-20`
 - **Découverte des services** Docker, Swarm et Kubernetes au moment de créer une route. *partiel* `SVC-02`
 - **Testeur de routage** : composer une requête fictive et voir quelle route la prend, et pourquoi. `ROUTE-15`
 - **Page de maintenance** par route ou pour toute la plateforme d'un seul geste, traduite, avec une porte pour les administrateurs. `LIFE-05`
@@ -102,7 +102,7 @@ Les briques qu'on installe d'habitude à côté.
 À lire : [Le coffre](/docs/operations/vault).
 
 - **Certificats TLS** par nom, émis et renouvelés par ACME auprès de Let's Encrypt ou de votre autorité interne, ports HTTPS ouverts à chaud. `SSL-01 SSL-05 SSL-08`
-- **Coffre intégré** : secrets chiffrés AES-256-GCM, références par nom depuis la configuration, export chiffré, rappel avant expiration. `VAULT-01 à 06`
+- **Coffre intégré** : secrets chiffrés AES-256-GCM, références par nom depuis la configuration, export chiffré, rappel avant expiration. La même clé scelle les clés TLS et les secrets TOTP, et tourne par un redémarrage. `VAULT-01 à 06 SEC-06`
 - **En-têtes de sécurité** HSTS, CSP, X-Frame-Options, Referrer-Policy, et protection CSRF de la console. `SEC-01 SEC-03`
 - **Console sur un port séparé** du trafic applicatif : l'administration n'est jamais exposée avec l'application. `CONSOLE-11`
 - **Fonctionne sans internet** : aucune ressource chargée à l'extérieur, adapté aux environnements isolés. `DEPLOY-03`

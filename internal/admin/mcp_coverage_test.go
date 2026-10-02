@@ -220,7 +220,7 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"POST /api/identity/signing-keys/renew": true,
 		"POST /api/issues/{id}/comments":        true, "PUT /api/issues/{id}/status": true,
 		"DELETE /api/issues/{id}": true,
-		"POST /api/roles":         true, "PUT /api/roles/{id}": true, "DELETE /api/roles/{id}": true,
+		"POST /api/roles":         true, "PUT /api/roles/{name}": true, "DELETE /api/roles/{name}": true,
 		"POST /api/routes/reorder": true, "PUT /api/routes/{id}": true,
 		"DELETE /api/routes/{id}": true, "PUT /api/routes/{id}/security": true, "PUT /api/routes/{id}/audit": true,
 		"PUT /api/routes/{id}/spec": true, "DELETE /api/routes/{id}/spec": true,

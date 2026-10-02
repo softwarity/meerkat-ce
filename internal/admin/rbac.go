@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/store"
@@ -16,8 +17,8 @@ import (
 func (a *API) registerRBAC(mux Mux) {
 	mux.Handle("GET /api/roles", a.appAdmin(a.listRoles))
 	mux.Handle("POST /api/roles", a.appAdmin(a.createRole))
-	mux.Handle("PUT /api/roles/{id}", a.appAdmin(a.updateRole))
-	mux.Handle("DELETE /api/roles/{id}", a.appAdmin(a.deleteRole))
+	mux.Handle("PUT /api/roles/{name}", a.appAdmin(a.updateRole))
+	mux.Handle("DELETE /api/roles/{name}", a.appAdmin(a.deleteRole))
 
 	mux.Handle("GET /api/tenants/{id}/groups", a.tenantScoped(a.listGroups))
 	mux.Handle("POST /api/tenants/{id}/groups", a.tenantScoped(a.createGroup))
@@ -48,7 +49,12 @@ func (a *API) createRole(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusBadRequest, "malformed role: "+err.Error())
 		return
 	}
-	role.ID = newID()
+	// No id is invented: a role IS its name. Creating one that exists would be
+	// an update, so it is refused by name rather than silently merged.
+	if _, err := a.st.GetRole(r.Context(), strings.TrimSpace(role.Name)); err == nil {
+		writeErr(w, http.StatusConflict, "a role called "+role.Name+" already exists")
+		return
+	}
 	if err := a.st.SaveRole(r.Context(), role); err != nil {
 		if conflict(w, err) {
 			return
@@ -56,8 +62,8 @@ func (a *API) createRole(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	a.auditEvent(r.Context(), actor, "role.create", "role", role.ID, role.Name, "", "")
-	a.writeRole(w, r, role.ID)
+	a.auditEvent(r.Context(), actor, "role.create", "role", role.Name, role.Name, "", "")
+	a.writeRole(w, r, role.Name)
 }
 
 func (a *API) updateRole(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -66,12 +72,25 @@ func (a *API) updateRole(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusBadRequest, "malformed role: "+err.Error())
 		return
 	}
-	role.ID = r.PathValue("id")
-	old, err := a.st.GetRole(r.Context(), role.ID)
+	// The PATH names the role. A body naming a DIFFERENT one is refused rather
+	// than obeyed: a role is its name, and the name is what left this gateway -
+	// in every token a service reads, in every configuration in a repository,
+	// in their own code. Meerkat could rewrite its own rules and nothing else,
+	// so a rename would be an act that looks complete and never is.
+	name := r.PathValue("name")
+	old, err := a.st.GetRole(r.Context(), name)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "role not found")
 		return
 	}
+	if given := strings.TrimSpace(role.Name); given != "" && given != name {
+		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"a role cannot be renamed: %s is its identity, and it is what the services behind this "+
+				"gateway read out of a token. Declare %s and remove %s once the rules naming it are changed",
+			name, given, name))
+		return
+	}
+	role.Name = name
 	if err := a.st.SaveRole(r.Context(), role); err != nil {
 		if conflict(w, err) {
 			return
@@ -79,26 +98,15 @@ func (a *API) updateRole(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	// A rename FOLLOWS its references. An access rule names roles by name, and
-	// so does a scheduled call, so a rename used to leave rules pointing at a
-	// name nobody holds - which grants nobody, silently, on routes nobody
-	// thought they had touched. See roleref.go.
-	if moved, err := a.renameRoleReferences(r.Context(), old.Name, role.Name); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	} else if moved > 0 {
-		a.auditEvent(r.Context(), actor, "role.rename", "role", role.ID, role.Name, "",
-			fmt.Sprintf("%d rules rewritten from %q", moved, old.Name))
+	if saved, err := a.st.GetRole(r.Context(), name); err == nil {
+		a.auditUpdate(r.Context(), actor, "role.update", "role", saved.Name, saved.Name, "", old, saved)
 	}
-	if saved, err := a.st.GetRole(r.Context(), role.ID); err == nil {
-		a.auditUpdate(r.Context(), actor, "role.update", "role", saved.ID, saved.Name, "", old, saved)
-	}
-	a.writeRole(w, r, role.ID)
+	a.writeRole(w, r, name)
 }
 
 func (a *API) deleteRole(w http.ResponseWriter, r *http.Request, actor store.User) {
-	id := r.PathValue("id")
-	role, _ := a.st.GetRole(r.Context(), id) // capture the name before it is gone
+	name := r.PathValue("name")
+	role, _ := a.st.GetRole(r.Context(), name)
 	// What still names it. Deleting anyway fails CLOSED - a rule naming a role
 	// nobody holds grants nobody - but it fails closed on a route somebody else
 	// owns, days later, and nothing in the database would say why.
@@ -108,7 +116,7 @@ func (a *API) deleteRole(w http.ResponseWriter, r *http.Request, actor store.Use
 			role.Name, len(refs), refLabels(refs, 5)))
 		return
 	}
-	ok, err := a.st.DeleteRole(r.Context(), id)
+	ok, err := a.st.DeleteRole(r.Context(), name)
 	if err != nil {
 		// A system role is protected - the store reports why.
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
@@ -118,12 +126,12 @@ func (a *API) deleteRole(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusNotFound, "role not found")
 		return
 	}
-	a.auditEvent(r.Context(), actor, "role.delete", "role", id, role.Name, "", "")
+	a.auditEvent(r.Context(), actor, "role.delete", "role", name, role.Name, "", "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (a *API) writeRole(w http.ResponseWriter, r *http.Request, id string) {
-	saved, err := a.st.GetRole(r.Context(), id)
+func (a *API) writeRole(w http.ResponseWriter, r *http.Request, name string) {
+	saved, err := a.st.GetRole(r.Context(), name)
 	if err != nil {
 		a.internal(w, err)
 		return

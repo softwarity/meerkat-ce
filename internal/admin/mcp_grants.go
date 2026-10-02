@@ -146,14 +146,6 @@ func (a *API) toolListGroups(ctx context.Context, args json.RawMessage) (any, er
 	if err != nil {
 		return nil, err
 	}
-	roles, err := a.st.ListRoles(ctx)
-	if err != nil {
-		return nil, err
-	}
-	name := map[string]string{}
-	for _, r := range roles {
-		name[r.ID] = r.Name
-	}
 	type line struct {
 		Name        string   `json:"name"`
 		Description string   `json:"description,omitempty"`
@@ -161,12 +153,7 @@ func (a *API) toolListGroups(ctx context.Context, args json.RawMessage) (any, er
 	}
 	out := make([]line, 0, len(groups))
 	for _, g := range groups {
-		rs := make([]string, 0, len(g.RoleIDs))
-		for _, id := range g.RoleIDs {
-			if n := name[id]; n != "" {
-				rs = append(rs, n)
-			}
-		}
+		rs := append([]string(nil), g.Roles...)
 		sort.Strings(rs)
 		out = append(out, line{Name: g.Name, Description: g.Description, Roles: rs})
 	}
@@ -220,20 +207,24 @@ func (a *API) toolSaveGroup(ctx context.Context, args json.RawMessage) (any, err
 		if err != nil {
 			return nil, err
 		}
-		byName := map[string]string{}
+		known := map[string]bool{}
 		for _, r := range roles {
-			byName[r.Name] = r.ID
+			known[r.Name] = true
 		}
-		ids := make([]string, 0, len(in.Roles))
+		// The names are kept as they are - a group holds roles BY NAME - but
+		// they are still CHECKED: a group granting a role nobody declared
+		// grants nothing, and finding that out at sign-in is finding it out
+		// too late.
+		names := make([]string, 0, len(in.Roles))
 		for _, want := range in.Roles {
-			id, ok := byName[strings.TrimSpace(want)]
-			if !ok {
+			want = strings.TrimSpace(want)
+			if !known[want] {
 				return nil, fmt.Errorf("no role is called %q: call list_roles for the catalogue, "+
 					"or save_role to add it - a group granting a role nobody holds grants nothing", want)
 			}
-			ids = append(ids, id)
+			names = append(names, want)
 		}
-		group.RoleIDs = ids
+		group.Roles = names
 	}
 	if _, ok := given["newName"]; ok {
 		next := strings.TrimSpace(in.NewName)
@@ -255,7 +246,7 @@ func (a *API) toolSaveGroup(ctx context.Context, args json.RawMessage) (any, err
 	a.auditEvent(ctx, mcpActor(ctx), action, "group", group.ID, group.Name, tenant.ID, "")
 	return map[string]any{
 		"saved": true, "created": !existed,
-		"tenant": tenant.Name, "name": group.Name, "roles": len(group.RoleIDs),
+		"tenant": tenant.Name, "name": group.Name, "roles": len(group.Roles),
 	}, nil
 }
 
@@ -579,6 +570,9 @@ func (a *API) toolSaveUser(ctx context.Context, args json.RawMessage) (any, erro
 		out["password"] = password
 		out["passwordMustChange"] = true
 		out["note"] = "Give this to them by a channel you trust. It works once: the next sign-in asks for a new one."
+		if hours := a.st.GetPasswordPolicy(ctx).TemporaryHours; hours > 0 {
+			out["validHours"] = hours
+		}
 	}
 	action := "user.update"
 	if created {

@@ -451,12 +451,12 @@
   },
   {
     "method": "DELETE",
-    "path": "/api/roles/{id}",
+    "path": "/api/roles/{name}",
     "guard": "appAdmin"
   },
   {
     "method": "PUT",
-    "path": "/api/roles/{id}",
+    "path": "/api/roles/{name}",
     "guard": "appAdmin"
   },
   {

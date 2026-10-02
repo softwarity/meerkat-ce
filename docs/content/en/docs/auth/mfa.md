@@ -40,10 +40,10 @@ Enrolling again, or turning the second factor off, **forgets every trusted
 browser** of that account. That is deliberate: the old challenge is gone, and
 so is anything that was allowed to skip it.
 
-> [!WARNING]
-> TOTP secrets are stored **unencrypted** in the database. The vault's
-> encryption at rest covers vault secrets, TLS private keys and the developer
-> plug key - not these. Treat a database dump accordingly.
+> [!NOTE]
+> TOTP secrets are **sealed** in the database with the vault's master key, like
+> vault secrets and TLS private keys: a database dump holds no secret anybody
+> could compute codes from. See [the master key](/docs/operations/vault#the-master-key).
 
 ## A code by e-mail, as a fallback
 

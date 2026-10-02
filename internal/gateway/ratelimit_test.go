@@ -347,8 +347,8 @@ func TestANarrowBoundLeavesTheRestAlone(t *testing.T) {
 	must(st.CreateUser(ctx, store.User{ID: "u-trial", Username: "trial", PasswordHash: "x", Enabled: true}))
 	must(st.CreateUser(ctx, store.User{ID: "u-partner", Username: "partner", PasswordHash: "x", Enabled: true}))
 	must(st.SaveTenant(ctx, store.Tenant{ID: "t1", Name: "acme", Enabled: true}))
-	must(st.SaveRole(ctx, store.Role{ID: "r-trial", Name: "trial"}))
-	must(st.SaveGroup(ctx, store.Group{ID: "g-trial", TenantID: "t1", Name: "Trial", RoleIDs: []string{"r-trial"}}))
+	must(st.SaveRole(ctx, store.Role{Name: "trial"}))
+	must(st.SaveGroup(ctx, store.Group{ID: "g-trial", TenantID: "t1", Name: "Trial", Roles: []string{"trial"}}))
 	for _, u := range []string{"u-trial", "u-partner"} {
 		must(st.SaveMembership(ctx, store.Membership{UserID: u, TenantID: "t1", Type: store.MemberUser,
 			Enabled: true, BusinessAccess: store.BusinessAccess{Inherited: true}}))

@@ -42,7 +42,7 @@ func TestSaveRoleWorksByNameAndCannotRename(t *testing.T) {
 	for _, r := range roles {
 		byName[r.Name] = r
 	}
-	if byName["ROLE_USER"].ParentID != byName["ROLE_ADMIN"].ID {
+	if byName["ROLE_USER"].Parent != "ROLE_ADMIN" {
 		t.Errorf("ROLE_USER should hang under ROLE_ADMIN, got %+v", byName["ROLE_USER"])
 	}
 
@@ -92,11 +92,14 @@ func roleAPI(t *testing.T) (*API, context.Context) {
 	return a, ctx
 }
 
-// TestRenameFollowsTheRulesThatNameTheRole: a rule names a role BY NAME, so a
-// rename that did not follow them would leave rules granting nobody - silently,
-// on routes nobody thought they had touched. That was the reason the catalogue
-// stayed shut; it is now the reason this code exists.
-func TestRenameFollowsTheRulesThatNameTheRole(t *testing.T) {
+// A role cannot be renamed through the agent's door either, and what it answers
+// instead is the way out: declare the new one, change the rules, remove the old.
+//
+// The tool used to take a newName and rewrite every rule that said the old one.
+// It rewrote THIS GATEWAY'S half: the services behind it read the name out of a
+// token, and a customer's configuration holds it in a repository, and neither
+// was ever in reach - so the rename looked complete and never was.
+func TestARoleCannotBeRenamedByTheAgent(t *testing.T) {
 	a, ctx := roleAPI(t)
 	if _, err := a.toolSaveRole(ctx, json.RawMessage(`{"name":"ROLE_OLD"}`)); err != nil {
 		t.Fatal(err)
@@ -104,40 +107,30 @@ func TestRenameFollowsTheRulesThatNameTheRole(t *testing.T) {
 	route := store.Route{
 		ID: "r1", Name: "shop", Order: 1, Enabled: true, Upstream: "http://up",
 		Access: store.Access{Level: "auth", Roles: []string{"ROLE_OLD", "other"}},
-		API: &store.RouteAPI{Security: &store.EndpointSecurity{Endpoints: []store.EndpointPolicy{
-			{Method: "POST", Path: "/things", Access: store.Access{Level: "auth", Roles: []string{"ROLE_OLD"}}},
-		}}},
 	}
 	if err := a.st.SaveRoute(ctx, route); err != nil {
 		t.Fatal(err)
 	}
-
-	out, err := a.toolSaveRole(ctx, json.RawMessage(`{"name":"ROLE_OLD","newName":"ROLE_NEW"}`))
-	if err != nil {
-		t.Fatalf("rename: %v", err)
+	// newName is not a field any more: the strict decoder refuses it rather
+	// than accepting it and quietly doing nothing, which would be worse.
+	if _, err := a.toolSaveRole(ctx, json.RawMessage(`{"name":"ROLE_OLD","newName":"ROLE_NEW"}`)); err == nil {
+		t.Error("newName was accepted: a rename has to be refused, not ignored")
 	}
-	if m := out.(map[string]any); m["rulesRewritten"] != 2 {
-		t.Errorf("want 2 rules rewritten, got %+v", m)
-	}
+	// And the rule still names what it named.
 	saved, err := a.st.GetRoute(ctx, "r1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !namesRole(saved.Access.Roles, "ROLE_NEW") || namesRole(saved.Access.Roles, "ROLE_OLD") {
-		t.Errorf("the route's rule did not follow: %v", saved.Access.Roles)
-	}
-	if !namesRole(saved.Access.Roles, "other") {
-		t.Errorf("a role that was not renamed was touched: %v", saved.Access.Roles)
-	}
-	if got := saved.API.Security.Endpoints[0].Roles; !namesRole(got, "ROLE_NEW") {
-		t.Errorf("the endpoint's rule did not follow: %v", got)
+	if !namesRole(saved.Access.Roles, "ROLE_OLD") {
+		t.Errorf("the route's rule moved under a refused rename: %v", saved.Access.Roles)
 	}
 
-	// And deleting it while a rule still names it is refused, with what to
-	// change first: it would otherwise fail closed days later, elsewhere.
-	_, err = a.toolDeleteRole(ctx, json.RawMessage(`{"name":"ROLE_NEW"}`))
+	// Deleting it while a rule still names it is refused, with what to change
+	// first: it would otherwise fail closed days later, elsewhere. That refusal
+	// IS the way a name changes now.
+	_, err = a.toolDeleteRole(ctx, json.RawMessage(`{"name":"ROLE_OLD"}`))
 	if err == nil {
-		t.Fatal("a role two rules still name was deleted")
+		t.Fatal("a role a rule still names was deleted")
 	}
 	if !strings.Contains(err.Error(), "shop") {
 		t.Errorf("the refusal does not say what names it: %v", err)

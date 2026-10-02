@@ -8,7 +8,7 @@ export interface RoleTreeRow {
   guides: TreeGuide[];
 }
 
-// Depth-first flatten of the parentId hierarchy, siblings in name order, with
+// Depth-first flatten of the parent hierarchy, siblings in name order, with
 // the guides materializing each branch.
 //
 // Shared by the roles page and the groups matrix, because two screens drawing
@@ -16,7 +16,7 @@ export interface RoleTreeRow {
 // to distrust both. Sorting inside a level rather than globally is what makes
 // two loads give the same order.
 //
-// An orphaned parentId (a parent deleted mid-flight) degrades to top level: an
+// An orphaned parent (one deleted mid-flight) degrades to top level: an
 // orphan has to stay reachable, or nobody can fix it from the screen.
 //
 // The list is taken AS GIVEN: a caller that filters passes the surviving set,
@@ -46,42 +46,42 @@ export function filterRoleTree(roles: Role[], query: string, tag: string): Filte
     const matchQ =
       !q || r.name.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q);
     const matchTag = !tag || (r.tags ?? []).includes(tag);
-    if (matchQ && matchTag) matches.add(r.id);
+    if (matchQ && matchTag) matches.add(r.name);
   }
 
-  const parentOf = new Map(roles.filter((r) => r.parentId).map((r) => [r.id, r.parentId!]));
+  const parentOf = new Map(roles.filter((r) => r.parent).map((r) => [r.name, r.parent]));
   const visible = new Set(matches);
-  for (const id of matches) {
+  for (const name of matches) {
     const seen = new Set<string>();
-    let cur = parentOf.get(id);
+    let cur = parentOf.get(name);
     while (cur && !seen.has(cur)) {
       seen.add(cur); // a cycle would otherwise walk forever
       visible.add(cur);
       cur = parentOf.get(cur);
     }
   }
-  return flattenRoles(roles.filter((r) => visible.has(r.id))).map((row) => ({
+  return flattenRoles(roles.filter((r) => visible.has(r.name))).map((row) => ({
     ...row,
-    context: !matches.has(row.role.id),
+    context: !matches.has(row.role.name),
   }));
 }
 
 export function flattenRoles(roles: Role[]): RoleTreeRow[] {
-  const ids = new Set(roles.map((r) => r.id));
+  const names = new Set(roles.map((r) => r.name));
   const byParent = new Map<string, Role[]>();
   for (const r of roles) {
-    const key = r.parentId && ids.has(r.parentId) ? r.parentId : '';
+    const key = r.parent && names.has(r.parent) ? r.parent : '';
     byParent.set(key, [...(byParent.get(key) ?? []), r]);
   }
   for (const children of byParent.values()) children.sort((a, b) => a.name.localeCompare(b.name));
 
   const out: RoleTreeRow[] = [];
-  const walk = (parentId: string, prefix: TreeGuide[]): void => {
-    const children = byParent.get(parentId) ?? [];
+  const walk = (parent: string, prefix: TreeGuide[]): void => {
+    const children = byParent.get(parent) ?? [];
     children.forEach((r, i) => {
       const last = i === children.length - 1;
       out.push({ role: r, guides: [...prefix, last ? 'attach-end' : 'attach-continue'] });
-      walk(r.id, [...prefix, last ? 'empty' : 'continue']);
+      walk(r.name, [...prefix, last ? 'empty' : 'continue']);
     });
   };
   walk('', []);

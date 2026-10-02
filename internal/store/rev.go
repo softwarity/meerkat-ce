@@ -36,18 +36,28 @@ var ErrStale = errors.New("stale write")
 // request: it is a constant in the line above each call, which is what keeps
 // this one string interpolation honest.
 func (s *Store) checkRev(ctx context.Context, table, what, id string, rev int64) error {
+	return s.checkRevBy(ctx, table, "id", what, id, rev)
+}
+
+// checkRevBy is checkRev for a table whose key is not called "id" - the role
+// catalogue is keyed by NAME, because a role's name is the only identity it has
+// that anybody can read (RBAC-01).
+//
+// The column name is interpolated and never comes from a request: the two
+// callers pass a constant.
+func (s *Store) checkRevBy(ctx context.Context, table, keyCol, what, key string, rev int64) error {
 	if rev == 0 {
 		return nil
 	}
 	var current int64
-	err := s.db.QueryRowContext(ctx, `SELECT rev FROM `+table+` WHERE id = ?`, id).Scan(&current)
+	err := s.db.QueryRowContext(ctx, `SELECT rev FROM `+table+` WHERE `+keyCol+` = ?`, key).Scan(&current)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		// Gone since it was read. Writing it back would resurrect what somebody
 		// deleted, which is the same surprise seen from the other side.
 		return fmt.Errorf("%w: this %s no longer exists - it was deleted since you read it", ErrStale, what)
 	case err != nil:
-		return fmt.Errorf("store: %s %q: %w", what, id, err)
+		return fmt.Errorf("store: %s %q: %w", what, key, err)
 	case current != rev:
 		return fmt.Errorf("%w: this %s changed since you read it (you have revision %d, it is now at %d) - read it again and apply your change to that",
 			ErrStale, what, rev, current)

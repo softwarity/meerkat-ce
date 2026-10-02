@@ -34,6 +34,7 @@ nothing about organisations.
 | Lowercase, Uppercase, Digits, Special characters | minimum count of each kind | `0` |
 | No reuse of the last | how many previous passwords are refused | `0` |
 | Expires after (days) | forces a change after that many days | `0`, never |
+| Temporary (hours) | how long a password an administrator issued works | `72` |
 
 A zero means *do not care*: the rule is neither checked nor shown. What ships
 therefore asks for a length and nothing else, deliberately - raising the bar
@@ -55,8 +56,15 @@ the morning signs nobody out; it refuses the next sign-in, which then lands on
 the password-update page. The same screen carries a *Force a change for
 everyone* button for the day you need it.
 
-Passwords are hashed with bcrypt. An old hash is not re-encoded when you raise
-the cost - Meerkat has no transparent re-hash on sign-in yet.
+**A temporary password runs out.** The password an administrator issues, at
+creation or on a reset, works for *Temporary (hours)*, until its owner
+sets their own. Past that, signing in with it is refused with a sentence that
+says to ask an administrator for a new one. It travels by mail, chat or phone,
+and one nobody used should not stay a way in. *Force a change* is not affected:
+the password stays its owner's own.
+
+Passwords are hashed with bcrypt. A hash made at a lower cost is re-hashed at
+its owner's next sign-in, the only moment the password is known in clear.
 
 ## Throttling, never a lockout
 

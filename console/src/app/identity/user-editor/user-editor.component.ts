@@ -90,9 +90,9 @@ export class UserEditorComponent {
 
   protected resetPassword(): void {
     this.api.resetPassword(this.user().id).subscribe({
-      next: ({ password }) =>
+      next: ({ password, validHours }) =>
         this.dialog.open(PasswordDialogComponent, {
-          data: { username: this.user().username, password },
+          data: { username: this.user().username, password, validHours },
         }),
     });
   }

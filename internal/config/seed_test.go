@@ -12,8 +12,8 @@ import (
 
 const seedFile = `version: 1
 roles:
-  - id: from-file
-    name: From the file
+  - name: from-file
+    description: From the file
 routes:
   - id: api
     name: api
@@ -163,8 +163,8 @@ func TestADifferingFileIsShelvedNotApplied(t *testing.T) {
 	if seeded, err := Seed(ctx, s, path, 2000); err != nil || seeded {
 		t.Fatalf("a changed file was applied: %v %v", seeded, err)
 	}
-	if r, _ := s.GetRole(ctx, "from-file"); r.Name != "From the file" {
-		t.Fatalf("what runs was changed: %q", r.Name)
+	if r, _ := s.GetRole(ctx, "from-file"); r.Description != "From the file" {
+		t.Fatalf("what runs was changed: %q", r.Description)
 	}
 	shelf, _ := s.ListConfigurations(ctx)
 	if len(shelf) != 1 || !strings.HasPrefix(shelf[0].Name, "meerkat.yaml (") {

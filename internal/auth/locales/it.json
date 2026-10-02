@@ -49,6 +49,7 @@
   "emailHint": "Serve a farti rientrare se perdi la password.",
   "emailNone": "non impostata",
   "errAccessEnded": "Questo accesso è terminato il %s.",
+  "errTemporaryExpired": "Questa password temporanea è scaduta. Chiedine una nuova a un amministratore.",
   "errAccessNotOpen": "Questo accesso si apre il %s.",
   "errAvatarSize": "La foto deve restare sotto i 200 KiB",
   "errAvatarType": "Usa un'immagine png, jpeg o webp",

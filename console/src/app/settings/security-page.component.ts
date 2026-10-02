@@ -80,6 +80,7 @@ export class SecurityPageComponent {
   // come back, and it does not last forever.
   protected readonly pwHistory = signal(0);
   protected readonly pwExpiry = signal(0);
+  protected readonly pwTemporary = signal(0);
 
   // The checklist as the sign-up, reset and profile pages will draw it. Shown
   // here because a policy is easy to write and hard to picture: four numbers
@@ -146,6 +147,7 @@ export class SecurityPageComponent {
         this.pwSpecial.set(s.passwordPolicy?.minSpecial ?? 0);
         this.pwHistory.set(s.passwordPolicy?.history ?? 0);
         this.pwExpiry.set(s.passwordPolicy?.expiryDays ?? 0);
+        this.pwTemporary.set(s.passwordPolicy?.temporaryHours ?? 0);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -207,6 +209,7 @@ export class SecurityPageComponent {
           minSpecial: this.pwSpecial(),
           history: this.pwHistory(),
           expiryDays: this.pwExpiry(),
+          temporaryHours: this.pwTemporary(),
         },
       })
       .subscribe({

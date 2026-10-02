@@ -57,6 +57,8 @@ inherits unless it defines its own.
 The policies every account lives under. One Save button at the bottom for the
 whole screen.
 
+![The Security screen on the password policy: the kinds of characters, history, expiry and how long a temporary password works](img/console/security.webp)
+
 - **Two-factor** - require a second factor for everyone; organisations and
   members can override it. Beside it, **a one-time code by e-mail** as a
   fallback for an enrolled user who cannot reach their authenticator: it needs a
@@ -73,6 +75,9 @@ whole screen.
   - **Expires after (days)** - checked at sign-in, not by a clock: an expired
     password sends the person to the change page rather than ending a session they
     are working in. A password whose age is unknown never expires.
+  - **Temporary (hours)** - how long a password an administrator issued
+    works before its owner replaces it. Past that, signing in with it is refused.
+    The dialog that shows the password says how long it works.
   - **Force a change for everyone** (root) makes every local account change at
     its next sign-in, yours excepted. One account at a time is on
     [Users](/docs/console/users).

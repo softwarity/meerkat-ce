@@ -22,12 +22,12 @@ func rbacStore(t *testing.T) (*Store, context.Context) {
 func seedHierarchy(ctx context.Context, t *testing.T, s *Store) {
 	t.Helper()
 	for _, r := range []Role{
-		{ID: "admin", Name: "admin"},
-		{ID: "editor", Name: "editor", ParentID: "admin"},
-		{ID: "viewer", Name: "viewer", ParentID: "editor"},
+		{Name: "admin"},
+		{Name: "editor", Parent: "admin"},
+		{Name: "viewer", Parent: "editor"},
 	} {
 		if err := s.SaveRole(ctx, r); err != nil {
-			t.Fatalf("SaveRole %s: %v", r.ID, err)
+			t.Fatalf("SaveRole %s: %v", r.Name, err)
 		}
 	}
 }
@@ -40,7 +40,7 @@ func TestEffectiveRolesClosure(t *testing.T) {
 	}
 	// A group granting "editor" must resolve to editor + viewer (its descendant),
 	// not admin (its ancestor).
-	if err := s.SaveGroup(ctx, Group{ID: "g1", TenantID: "t1", Name: "staff", RoleIDs: []string{"editor"}}); err != nil {
+	if err := s.SaveGroup(ctx, Group{ID: "g1", TenantID: "t1", Name: "staff", Roles: []string{"editor"}}); err != nil {
 		t.Fatalf("SaveGroup: %v", err)
 	}
 	got, err := s.EffectiveRoleNames(ctx, []string{"g1"})
@@ -51,7 +51,7 @@ func TestEffectiveRolesClosure(t *testing.T) {
 		t.Fatalf("effective roles = %v, want %v", got, want)
 	}
 	// "admin" pulls the whole chain.
-	if err := s.SaveGroup(ctx, Group{ID: "g2", TenantID: "t1", Name: "ops", RoleIDs: []string{"admin"}}); err != nil {
+	if err := s.SaveGroup(ctx, Group{ID: "g2", TenantID: "t1", Name: "ops", Roles: []string{"admin"}}); err != nil {
 		t.Fatalf("SaveGroup: %v", err)
 	}
 	got, _ = s.EffectiveRoleNames(ctx, []string{"g2"})
@@ -64,26 +64,76 @@ func TestRoleCycleRejected(t *testing.T) {
 	s, ctx := rbacStore(t)
 	seedHierarchy(ctx, t, s)
 	// admin is viewer's ancestor -> making admin a child of viewer is a cycle.
-	err := s.SaveRole(ctx, Role{ID: "admin", Name: "admin", ParentID: "viewer"})
+	err := s.SaveRole(ctx, Role{Name: "admin", Parent: "viewer"})
 	if err == nil {
 		t.Fatal("expected a cycle error, got nil")
 	}
 	// Self-parenting is also rejected.
-	if err := s.SaveRole(ctx, Role{ID: "editor", Name: "editor", ParentID: "editor"}); err == nil {
+	if err := s.SaveRole(ctx, Role{Name: "editor", Parent: "editor"}); err == nil {
 		t.Fatal("expected self-parent to be rejected")
 	}
 }
 
 func TestSystemRoleProtected(t *testing.T) {
 	s, ctx := rbacStore(t)
-	if err := s.SaveRole(ctx, Role{ID: "sys", Name: "authenticated", System: true}); err != nil {
+	if err := s.SaveRole(ctx, Role{Name: "authenticated", System: true}); err != nil {
 		t.Fatalf("SaveRole: %v", err)
 	}
-	if _, err := s.DeleteRole(ctx, "sys"); err == nil {
+	if _, err := s.DeleteRole(ctx, "authenticated"); err == nil {
 		t.Fatal("expected system role deletion to be refused")
 	}
-	if _, err := s.GetRole(ctx, "sys"); err != nil {
+	if _, err := s.GetRole(ctx, "authenticated"); err != nil {
 		t.Fatalf("system role should still exist: %v", err)
+	}
+}
+
+// A role cannot be renamed, and this is where that is pinned.
+//
+// The store has no rename and SaveRole keys on the name, so saving under a new
+// one DECLARES A SECOND ROLE and leaves the first standing. That is the whole
+// decision: a name is what leaves this gateway - in every token a service
+// reads, in every configuration held in a repository - so moving it here would
+// rewrite our half and none of theirs.
+func TestARoleCannotBeRenamedThroughSave(t *testing.T) {
+	s, ctx := rbacStore(t)
+	seedHierarchy(ctx, t, s)
+	if err := s.SaveTenant(ctx, Tenant{ID: "t1", Name: "acme", Enabled: true}); err != nil {
+		t.Fatalf("SaveTenant: %v", err)
+	}
+	if err := s.SaveGroup(ctx, Group{ID: "g1", TenantID: "t1", Name: "staff", Roles: []string{"editor"}}); err != nil {
+		t.Fatalf("SaveGroup: %v", err)
+	}
+	editor, err := s.GetRole(ctx, "editor")
+	if err != nil {
+		t.Fatalf("GetRole editor: %v", err)
+	}
+	// Writing the row BACK under another name is refused by the revision guard,
+	// and that is the honest answer: a revision belongs to a row, and under the
+	// new name there is no row to have read.
+	moved := editor
+	moved.Name = "redactor"
+	if err := s.SaveRole(ctx, moved); err == nil {
+		t.Error("a role read at a revision was written back under another name")
+	}
+	// Declaring the new name outright is allowed - it is a new role, and that
+	// is the point: the old one stays until somebody removes it on purpose.
+	if err := s.SaveRole(ctx, Role{Name: "redactor", Description: editor.Description}); err != nil {
+		t.Fatalf("SaveRole: %v", err)
+	}
+	if _, err := s.GetRole(ctx, "editor"); err != nil {
+		t.Error("declaring another name took the original away: that would be a rename")
+	}
+	if _, err := s.GetRole(ctx, "redactor"); err != nil {
+		t.Error("declaring another name created nothing")
+	}
+	// And what pointed at the old name still does - which is why the console
+	// refuses this outright rather than letting it read as a rename.
+	g, err := s.GetGroup(ctx, "g1")
+	if err != nil {
+		t.Fatalf("GetGroup: %v", err)
+	}
+	if !reflect.DeepEqual(g.Roles, []string{"editor"}) {
+		t.Errorf("the group no longer names what it named: %v", g.Roles)
 	}
 }
 
@@ -98,8 +148,8 @@ func TestDeletedRoleReparentsChildren(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRole viewer: %v", err)
 	}
-	if v.ParentID != "" {
-		t.Fatalf("viewer should be top-level after its parent is deleted, got parent %q", v.ParentID)
+	if v.Parent != "" {
+		t.Fatalf("viewer should be top-level after its parent is deleted, got parent %q", v.Parent)
 	}
 }
 
@@ -115,10 +165,10 @@ func TestMemberGroupsPerTenant(t *testing.T) {
 		}
 	}
 	// Different groups (hence different roles) per tenant for the same user.
-	if err := s.SaveGroup(ctx, Group{ID: "g-t1", TenantID: "t1", Name: "admins", RoleIDs: []string{"admin"}}); err != nil {
+	if err := s.SaveGroup(ctx, Group{ID: "g-t1", TenantID: "t1", Name: "admins", Roles: []string{"admin"}}); err != nil {
 		t.Fatalf("SaveGroup t1: %v", err)
 	}
-	if err := s.SaveGroup(ctx, Group{ID: "g-t2", TenantID: "t2", Name: "readers", RoleIDs: []string{"viewer"}}); err != nil {
+	if err := s.SaveGroup(ctx, Group{ID: "g-t2", TenantID: "t2", Name: "readers", Roles: []string{"viewer"}}); err != nil {
 		t.Fatalf("SaveGroup t2: %v", err)
 	}
 	if err := s.SetMemberGroups(ctx, "t1", "u1", []string{"g-t1"}); err != nil {

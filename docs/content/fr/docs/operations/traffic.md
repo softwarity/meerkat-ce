@@ -60,8 +60,6 @@ tout ce qui dépasse partageant un seul seau.
  requête, il faut [les traces](/docs/operations/tracing).
 - **Qui a appelé.** Aucune étiquette n'est jamais un utilisateur, une adresse ou un chemin brut.
  C'est ce qui borne la cardinalité.
-- **Le verdict d'un appel gRPC.** Un appel gRPC répond toujours `200` et met son verdict dans
- `grpc-status`, que les compteurs ne lisent pas : une route gRPC en échec se lit donc comme saine ici.
 
 ## La rétention
 

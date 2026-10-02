@@ -2,8 +2,10 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, Edition } from '../api.service';
+import { EE_FEATURES } from './ee-features';
 
 // What this installation IS, in one place - and the only screen that talks
 // about editions at all. Everywhere else, an Enterprise control simply carries
@@ -18,11 +20,14 @@ interface FeatureRow {
   label: string;
   what: string;
   on: boolean;
+  status: 'done' | 'partial' | 'planned';
+  where?: string;
+  whereLabel?: string;
 }
 
 @Component({
   selector: 'app-license-page',
-  imports: [MatCardModule, MatIconModule, MatTooltipModule, LoadingIndicatorComponent],
+  imports: [MatCardModule, MatIconModule, MatTooltipModule, LoadingIndicatorComponent, RouterLink],
   template: `
     <div class="banner">
       <h1 i18n="@@License">License</h1>
@@ -67,15 +72,36 @@ interface FeatureRow {
         }
 
         <mat-card appearance="outlined">
-          <h3 i18n="@@Features">Features</h3>
+          <h3>
+            @if (e.enterprise) {
+              <ng-container i18n="@@EE_features_bought">What the Enterprise edition carries</ng-container>
+            } @else {
+              <ng-container i18n="@@EE_features_offer">What the Enterprise edition adds</ng-container>
+            }
+          </h3>
           <div class="features">
             @for (f of rows(); track f.key) {
               <div class="feature" [class.on]="f.on">
-                <mat-icon>{{ f.on ? 'check_circle' : 'lock' }}</mat-icon>
+                <mat-icon>{{ f.status === 'planned' ? 'schedule' : f.on ? 'check_circle' : 'lock' }}</mat-icon>
                 <div class="grow">
-                  <div class="name">{{ f.label }}</div>
-                  <div class="what">{{ f.what }}</div>
+                  <div class="name">
+                    {{ f.label }}
+                    @if (f.status === 'partial') {
+                      <span class="state" i18n="@@Feature_partial">partly built</span>
+                    } @else if (f.status === 'planned') {
+                      <span class="state" i18n="@@Feature_planned">planned</span>
+                    }
+                  </div>
+                  <div class="what">
+                    {{ f.what }}
+                    @if (f.where) {
+                      <a [routerLink]="f.where">{{ f.whereLabel }}</a>
+                    } @else if (f.status !== 'planned') {
+                      <span class="noscreen" i18n="@@Feature_no_screen">No screen: it is in the image.</span>
+                    }
+                  </div>
                 </div>
+                <span class="id">{{ f.key }}</span>
               </div>
             }
           </div>
@@ -182,6 +208,29 @@ interface FeatureRow {
         font-size: 0.82rem;
         color: var(--mat-sys-on-surface-variant);
       }
+      .what a {
+        margin-left: 6px;
+        color: var(--mat-sys-primary);
+      }
+      .noscreen {
+        margin-left: 6px;
+        font-style: italic;
+      }
+      .state {
+        margin-left: 8px;
+        padding: 0 6px;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        font-weight: 400;
+        color: var(--mat-sys-on-surface-variant);
+        border: 1px solid var(--mat-sys-outline-variant);
+      }
+      .id {
+        flex-shrink: 0;
+        font-family: var(--mk-mono, monospace);
+        font-size: 0.72rem;
+        color: var(--mat-sys-outline);
+      }
     `,
   ],
 })
@@ -192,72 +241,27 @@ export class LicensePageComponent {
   protected readonly edition = signal<Edition | null>(null);
   protected readonly hidden = computed(() => this.edition()?.hiddenTenants ?? 0);
 
-  // What each key BUYS, in one sentence. Written here rather than served by the
-  // API because it is marketing copy in the console's language, and the server
-  // has no business holding translated prose.
-  private readonly copy: Record<string, { label: string; what: string }> = {
-    'multi-tenant': {
-      label: $localize`:@@Feature_multi_tenant:Several organisations`,
-      what: $localize`:@@Feature_multi_tenant_what:Isolate tenants, each with its own groups, members and hours.`,
-    },
-    directories: {
-      label: $localize`:@@Feature_directories:Directories`,
-      what: $localize`:@@Feature_directories_what:Connect LDAP, Active Directory or Kerberos and map their groups.`,
-    },
-    saml: {
-      label: $localize`:@@Feature_saml:SAML`,
-      what: $localize`:@@Feature_saml_what:Federate with a SAML identity provider.`,
-    },
-    scim: {
-      label: $localize`:@@Feature_scim:SCIM provisioning`,
-      what: $localize`:@@Feature_scim_what:Accounts created and deactivated automatically.`,
-    },
-    'business-hours': {
-      label: $localize`:@@Feature_business_hours:Working hours`,
-      what: $localize`:@@Feature_business_hours_what:Refuse access outside declared hours, gateway-wide, per organisation or per person.`,
-    },
-    cluster: {
-      label: $localize`:@@Feature_cluster:High availability`,
-      what: $localize`:@@Feature_cluster_what:Several instances behind the same database, with sessions shared between them.`,
-    },
-    'audit-export': {
-      label: $localize`:@@Feature_audit_export:Audit export`,
-      what: $localize`:@@Feature_audit_export_what:Continuous export to a SIEM and long retention.`,
-    },
-    'white-label': {
-      label: $localize`:@@Feature_white_label:White label`,
-      what: $localize`:@@Feature_white_label_what:Remove the Meerkat mark from the sign-in pages your users see.`,
-    },
-  };
-
-  // The offer, in the order it reads. It is a LIST OF WHAT THE EDITION
-  // INCLUDES, not a list of keys the server unlocks one by one: the product is
-  // sold whole, per production instance, so every line is on or every line is
-  // off, and which it is depends on nothing but the image that answered.
-  //
-  // The catalogue is written here rather than served because it is marketing
-  // copy in the console's language, and because a server that has no feature
-  // registry has nothing to enumerate.
-  private readonly offer = [
-    'multi-tenant',
-    'directories',
-    'saml',
-    'scim',
-    'business-hours',
-    'cluster',
-    'audit-export',
-    'white-label',
-  ];
-
+  // The Enterprise rows of FEATURES.md, sent with the edition (CONSOLE-14),
+  // named and placed by ee-features.ts. A row on the CE image is what the
+  // Enterprise one would add; on the Enterprise image, what it carries. A
+  // planned row is said to be one, rather than sold.
   protected readonly rows = computed<FeatureRow[]>(() => {
     const e = this.edition();
     if (!e) return [];
-    return this.offer.map((key) => ({
-      key,
-      label: this.copy[key]?.label ?? key,
-      what: this.copy[key]?.what ?? '',
-      on: e.enterprise,
-    }));
+    return (e.features ?? [])
+      .filter((f) => f.status !== 'retired')
+      .map((f) => {
+        const copy = EE_FEATURES[f.id];
+        return {
+          key: f.id,
+          label: copy?.label ?? f.id,
+          what: copy?.what ?? '',
+          where: copy?.where,
+          whereLabel: copy?.whereLabel,
+          status: f.status as FeatureRow['status'],
+          on: e.enterprise && f.status !== 'planned',
+        };
+      });
   });
 
   constructor() {

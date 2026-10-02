@@ -391,7 +391,6 @@
           "version": 1,
           "roles": [
             {
-              "id": "e2e-preview",
               "name": "E2E preview"
             }
           ]

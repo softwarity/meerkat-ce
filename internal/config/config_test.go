@@ -38,10 +38,10 @@ func seed(t *testing.T, s *store.Store) {
 	}); err != nil {
 		t.Fatalf("SaveRoute: %v", err)
 	}
-	if err := s.SaveRole(ctx, store.Role{ID: "ops", Name: "Ops"}); err != nil {
+	if err := s.SaveRole(ctx, store.Role{Name: "Ops"}); err != nil {
 		t.Fatalf("SaveRole: %v", err)
 	}
-	if err := s.SaveRole(ctx, store.Role{ID: "ops-read", Name: "Ops read", ParentID: "ops"}); err != nil {
+	if err := s.SaveRole(ctx, store.Role{Name: "Ops read", Parent: "Ops"}); err != nil {
 		t.Fatalf("SaveRole: %v", err)
 	}
 	if err := s.SaveAuthProvider(ctx, store.AuthProvider{
@@ -348,11 +348,11 @@ func TestUnknownFieldIsNamed(t *testing.T) {
 // TestJSONReadsToo: YAML is a superset of JSON, so a body copied out of the
 // admin API imports without conversion.
 func TestJSONReadsToo(t *testing.T) {
-	doc, err := Unmarshal([]byte(`{"version":1,"roles":[{"id":"a","name":"A"}]}`))
+	doc, err := Unmarshal([]byte(`{"version":1,"roles":[{"name":"A"}]}`))
 	if err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
-	if len(doc.Roles) != 1 || doc.Roles[0].ID != "a" {
+	if len(doc.Roles) != 1 || doc.Roles[0].Name != "A" {
 		t.Fatalf("roles = %v", doc.Roles)
 	}
 }

@@ -49,6 +49,7 @@
   "emailHint": "Hiermee kom je weer binnen als je je wachtwoord kwijtraakt.",
   "emailNone": "niet ingesteld",
   "errAccessEnded": "Deze toegang is geëindigd op %s.",
+  "errTemporaryExpired": "Dit tijdelijke wachtwoord is verlopen. Vraag een beheerder om een nieuw.",
   "errAccessNotOpen": "Deze toegang begint op %s.",
   "errAvatarSize": "Houd de foto onder 200 KiB",
   "errAvatarType": "Gebruik een png-, jpeg- of webp-afbeelding",

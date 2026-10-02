@@ -116,30 +116,30 @@ export class RolesPageComponent {
   private readonly urlQuery = toSignal(this.ar.queryParamMap);
   protected readonly editing = computed<Role | 'new' | null>(() => {
     if (this.urlSegs()?.some((s) => s.path === 'new')) return 'new';
-    const id = this.params()?.get('id');
-    if (!id) return null;
-    return this.roles().find((r) => r.id === id) ?? null;
+    const name = this.params()?.get('id');
+    if (!name) return null;
+    return this.roles().find((r) => r.name === name) ?? null;
   });
   protected readonly editingRole = computed(() => {
     const e = this.editing();
     return e === null || e === 'new' ? null : e;
   });
-  // roles/new?parent=<id> - the + on a row creates UNDER that role, and the
-  // query param survives an F5 like the rest of the drawer. An id that no
+  // roles/new?parent=<name> - the + on a row creates UNDER that role, and the
+  // query param survives an F5 like the rest of the drawer. A name that no
   // longer exists degrades to a top-level creation.
   protected readonly newParent = computed(() => {
     if (this.editing() !== 'new') return null;
-    const id = this.urlQuery()?.get('parent');
-    return (id && this.roles().find((r) => r.id === id)) || null;
+    const name = this.urlQuery()?.get('parent');
+    return (name && this.roles().find((r) => r.name === name)) || null;
   });
 
   // Drag state: the role in flight, and the currently valid drop target
   // (a role = becomes its child; 'root' = becomes top-level).
   protected readonly dragged = signal<Role | null>(null);
   protected readonly target = signal<Role | 'root' | null>(null);
-  protected readonly targetRoleId = computed(() => {
+  protected readonly targetRoleName = computed(() => {
     const t = this.target();
-    return t && t !== 'root' ? t.id : null;
+    return t && t !== 'root' ? t.name : null;
   });
   // A drag ends with a click on the row underneath: swallow that one, or every
   // re-parenting would also open the drawer.
@@ -147,7 +147,7 @@ export class RolesPageComponent {
 
   private readonly parentOf = computed(() => {
     const map = new Map<string, string>();
-    for (const r of this.roles()) if (r.parentId) map.set(r.id, r.parentId);
+    for (const r of this.roles()) if (r.parent) map.set(r.name, r.parent);
     return map;
   });
 
@@ -174,7 +174,7 @@ export class RolesPageComponent {
 
   protected openRole(role: Role): void {
     if (this.suppressClick) return;
-    void this.router.navigate(['/application/roles', role.id]);
+    void this.router.navigate(['/application/roles', role.name]);
   }
 
   protected openNew(): void {
@@ -185,7 +185,7 @@ export class RolesPageComponent {
   // that role. Chaining several children keeps the parent (the form empties,
   // the URL does not move).
   protected newChild(parent: Role): void {
-    void this.router.navigate(['/application/roles', 'new'], { queryParams: { parent: parent.id } });
+    void this.router.navigate(['/application/roles', 'new'], { queryParams: { parent: parent.name } });
   }
 
   protected closeEditor(): void {
@@ -246,17 +246,17 @@ export class RolesPageComponent {
 
   protected hoverRoot(): void {
     const d = this.dragged();
-    if (d?.parentId) this.target.set('root');
+    if (d?.parent) this.target.set('root');
   }
 
   // A role cannot become a child of itself, of its current parent (no-op) or
   // of one of its own descendants (cycle).
   private validTarget(dragged: Role, over: Role): boolean {
-    if (over.id === dragged.parentId) return false;
-    let cur: string | undefined = over.id;
+    if (over.name === dragged.parent) return false;
+    let cur: string | undefined = over.name;
     const seen = new Set<string>();
     while (cur && !seen.has(cur)) {
-      if (cur === dragged.id) return false; // over IS dragged or sits in its subtree
+      if (cur === dragged.name) return false; // over IS dragged or sits in its subtree
       seen.add(cur);
       cur = this.parentOf().get(cur);
     }
@@ -268,9 +268,10 @@ export class RolesPageComponent {
     const target = this.target();
     this.clearDrag();
     if (!dragged || !target) return;
-    const parentId = target === 'root' ? '' : target.id;
-    this.api.updateRole({ ...dragged, parentId }).subscribe({
-      next: (saved) => this.roles.update((list) => list.map((r) => (r.id === saved.id ? saved : r))),
+    const parent = target === 'root' ? '' : target.name;
+    this.api.updateRole(dragged.name, { ...dragged, parent }).subscribe({
+      next: (saved) =>
+        this.roles.update((list) => list.map((r) => (r.name === saved.name ? saved : r))),
       error: (err) => {
         this.snack.open(errMsg(err), undefined, { duration: 4000 });
         this.load(); // a rejected cycle rolls the tree back to server truth

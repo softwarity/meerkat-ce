@@ -62,9 +62,6 @@ per route, everything past it sharing a single bucket.
  want [traces](/docs/operations/tracing).
 - **Who called.** No label is ever a user, an address or a raw path. That is what
  keeps the cardinality bounded.
-- **gRPC outcomes.** A gRPC call always answers `200` and puts its verdict in
- `grpc-status`, which the counters do not read - so a failing gRPC route reads as
- healthy here.
 
 ## Retention
 

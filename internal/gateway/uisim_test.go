@@ -54,9 +54,9 @@ func TestUISim(t *testing.T) {
 	}
 	// A small hierarchy: ops implies ops-read and ops-write (RBAC-01).
 	for _, role := range []store.Role{
-		{ID: "role-ops", Name: "ops"},
-		{ID: "role-ops-read", Name: "ops-read", ParentID: "role-ops"},
-		{ID: "role-ops-write", Name: "ops-write", ParentID: "role-ops"},
+		{Name: "ops"},
+		{Name: "ops-read", Parent: "ops"},
+		{Name: "ops-write", Parent: "ops"},
 	} {
 		if err := st.SaveRole(ctx, role); err != nil {
 			t.Fatal(err)

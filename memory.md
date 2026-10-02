@@ -5,7 +5,14 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-10-02 (2) : **CFG-07, les configurations dans un depot git** (EE) -
+_Derniere mise a jour : 2026-10-02 (4) : **un role EST son nom** (schema v71) - l'id engendre
+est parti (le nom etait deja UNIQUE, et l'id rendait un document illisible et incomparable entre
+deux plateformes, ce que CFG-07 a rendu impossible a ignorer), et **le renommage avec**, parce
+que le nom SORT de la passerelle (un JWT le porte aux services, un depot git le porte chez le
+client) : Meerkat ne reecrivait que sa moitie. **Premiere etape du registre de migrations**, et
+il a fallu corriger l'ordre - le registre tournait APRES la passe additive, qui echouait avant
+lui ; canopy est tombe dessus. Teste contre une base ecrite par le binaire precedent, et sur
+PostgreSQL. Voir la section "Session 2026-10-02 (4)". Avant cela, 2026-10-02 (2) : **CFG-07, les configurations dans un depot git** (EE) -
 emplacements nommes (depot + branche + repertoire), plusieurs par depot, un repertoire par
 plateforme ; un pull RANGE et n'applique rien, un push committe au nom de l'operateur, une
 branche qui a bouge est un refus avec son remede ; jeton en reference de coffre uniquement,
@@ -297,6 +304,133 @@ B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste
 repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+**Corrige le 2026-10-03** : le niveau d'acces etait deja un refus (422) ; restaient les limites
+de debit, non marquees, et les handlers qui appelaient `a.internal` sans `isInvalid`. `a.internal`
+repond desormais 422 a tout refus (`refusal_test.go`).
+
+## Nuit du 2 au 3 octobre 2026 - quatre fonctions et un bug (schema v72)
+
+- **Refus du store = 422 partout** : `a.internal` repond 422 a tout `isInvalid` ; les limites de
+  debit etaient le dernier refus non marque (`refusal_test.go`).
+- **ROUTE-20** : un appel gRPC est compte par son `grpc-status` (`gateway/grpcstatus.go`, table
+  google.rpc -> HTTP) dans compteurs, endpoints, journal d'acces et span ; l'appelant garde son 200.
+  Reste : securite par methode, gRPC-Web.
+- **CONSOLE-07** : colonne `users.password_temporary` (v72), posee quand un admin EMET un mot de
+  passe (creation, reset, outil MCP), jamais par "forcer un changement". Politique
+  `temporaryHours` (72 par defaut, aussi pour une politique enregistree avant : pointeur a la
+  lecture). Refus a la connexion avec `errTemporaryExpired` (20 langues). Reste : pagination
+  serveur, import en masse.
+- **SEC-06 [x]** : secrets TOTP scelles (`sealed:` + blob du coffre), ceux en clair scelles au
+  demarrage. Rotation de la cle maitresse : `MEERKAT_VAULT_KEY_PREVIOUS` (chart
+  `vault.previousKey`), le Cipher ouvre avec l'une ou l'autre, `store/rotate.go` rescelle les
+  cinq endroits (coffre, certificats, ACME, cle d'hote plug, TOTP) a l'ouverture.
+- **CONSOLE-14 [x]** : `FEATURES.md` embarque (`features.go`), lignes EE envoyees avec
+  `/api/edition` ; noms et liens dans `console/.../settings/ee-features.ts` ; `features_test.go`
+  refuse un ID EE sans nom ou un nom sans ligne EE.
+- Piege doc : les ancres du site suppriment les lettres accentuees (`la-cl-matresse`), un
+  defaut du generateur, a corriger un jour.
+
+## Session 2026-10-02 (3) - logs dans la console, decisions de perimetre, avant 1.1
+
+### Livre
+- **OBS-03 [x]** : ecran **Logs** (rail, sous Audit ; root et infra admin). Tampon en memoire de
+  5 000 lignes STRUCTUREES alimente par un handler slog en plus (`internal/logging/buffer.go`),
+  jamais relu sur stdout. Le topic live `logs` ne porte que le dernier numero de ligne, l'ecran
+  demande la suite a `GET /api/logs?after=`. Niveau a chaud `PUT /api/logs/level`, propage par le
+  signal `TopicLogLevel`, non stocke ; un niveau plus bavard que celui du demarrage revient seul
+  apres 30 min. Par noeud (nom = `HOSTNAME`, donc le pod). Outil MCP `read_logs`. Le journal
+  d'acces nomme maintenant le jeton d'API (`token`).
+- Audit d'endpoints exportable / importable dans l'editeur de route, et garde a l'enregistrement.
+- OpenTelemetry et Plug encadres comme Mail relay ; Configuration en bas du menu Infra.
+- Chart Helm : **startupProbe** (60 x 2 s) - le store est ouvert et migre AVANT les ports.
+- Canopy : Grafana a pour accueil le dashboard Canopy (`canopy-monitoring/values/grafana.yaml`),
+  et une route Meerkat `grafana-home` (ordre 130) redirige `/grafana` vers le mode kiosk.
+
+### Decisions (dans FEATURES.md)
+- SAUTH-04 [-] : pas de document de decouverte OIDC, le JWKS suffit (kid -> cle -> alg).
+  nestjs-granted 5.2.0 verifie avec l'alg de la cle JWKS ; otel-demo n'a plus JWT_ALGORITHM.
+- SCHED-01 [x] : pas de creation depuis la console, le service cree ses planifications par l'API.
+- ROUTE-11 [x] : pas de sonde HTTP, la readiness du service fait deja le travail.
+
+### Pieges
+- Un message de commit qui contient le texte `[skip ci]`, MEME dans le corps et meme pour dire
+  qu'on ne l'utilise pas, fait sauter tout le push : relancer `mirror-ce.yml` (et `ci.yml`) a la main.
+- Deux sessions dans le meme arbre : committer avec des chemins explicites ET verifier le diff
+  (une ligne de FEATURES.md ajoutee par l'autre session est partie dans un commit, rattrape avant push).
+- `/tmp/mk/deploy.sh` construit depuis l'arbre de travail : il embarque le code non commite des autres.
+
+## Session 2026-10-02 (4) - un role est son nom, et la premiere migration
+
+**Ce qui a declenche ca** : Francois a regarde le document de configuration d'une plateforme
+(CFG-07, livre le matin meme) et y a vu `parentId: d040c48df431b1e7bd...`. Son instinct etait
+juste, et le code ne faisait pas ce qu'il croyait : `createRole` posait `newID()`, alors que
+`roles.name` etait **deja `UNIQUE`**. L'id n'identifiait donc rien de plus que le nom, et il
+coutait : une hierarchie illisible dans le document, et deux installations ayant toutes deux
+`ROLE_ADMIN` lui donnant deux ids differents - donc comparer la configuration d'un client a
+celle d'un autre montrait **chaque role comme retire puis rajoute**.
+
+**Ce qui est livre** (schema **v71**, bigbang demande explicitement, « on utilise null part
+pour le moment ») :
+- `store.Role` perd `ID`, `ParentID` devient `Parent` et porte un nom ; `Group.RoleIDs` devient
+  `Roles` et porte des noms ; `roles.name` est cle primaire, `group_roles.role` reference le nom.
+- Les deux expansions (`ExpandRoleNames`, `EffectiveRoleNames`) perdent **deux tables de
+  traduction id<->nom** : c'est le gain le plus net, elles passaient leur temps a convertir.
+- `PUT|DELETE /api/roles/{name}`. Un doublon est un **409** sur les deux chemins (creation et
+  tentative de renommage), et la casse reste **significative** comme partout ailleurs.
+
+**ET LE RENOMMAGE EST PARTI**, apres que Francois a demande « tu es sur que cela a du sens de
+modifier le name qui est aussi l'ID ? ». La bonne reponse etait non, et l'argument n'est pas la
+coherence theorique : **la cascade n'atteint pas les services**. Un JWT porte le nom aux
+applications amont, un depot git le porte chez le client, leur code l'epelle. `roleref.go`
+reecrivait les regles de Meerkat et rien d'autre, donc le renommage **avait l'air complet sans
+jamais l'etre** - et le `ON UPDATE CASCADE` sous lui etait la clause qui le faisait paraitre
+sur. Partis avec : `RenameRole`, les cascades, `renameRoleReferences`, le `newName` de l'outil
+d'agent, et le handler en deux actes dont les moities n'etaient pas dans la meme transaction.
+Ce qui reste de `roleref.go` est « qui nomme encore ce role », dont la suppression se sert : ce
+refus EST desormais le chemin pour changer un nom.
+
+**LA PREMIERE ETAPE DU REGISTRE DE MIGRATIONS**, et elle a demande de corriger la machinerie.
+Le registre tournait **apres** `addMissingColumns`, qui ne sait qu'AJOUTER une colonne a la
+table qu'elle trouve : elle a essaye de visser une colonne `NOT NULL` sur l'ancienne forme et a
+echoue avant qu'aucune etape puisse tourner. **Canopy est tombe dessus** (remis sur l'image
+precedente en attendant). L'ordre est maintenant : la DDL du build cree ce qui est neuf, **le
+registre remodele ce qui a change**, puis la passe additive complete les colonnes que personne
+n'a remodelees. La discipline qui vient avec : une etape qui a besoin d'une colonne l'ajoute
+elle-meme, et porte **sa propre DDL litterale** (jamais celle de `schemaSQL`, qui derivera).
+
+**Et le commentaire du registre etait perime** : il disait « aucune version n'a jamais ete
+publiee ». Francois a coupe v1.0.0, v1.0.1 et v1.0.2 **le matin meme** - toutes trois portent
+`schemaVersion = 69` avec un registre **vide**. Donc : 69 versions de schema, zero migration,
+exactement la discipline voulue - et a partir de maintenant, toute modif non additive est une
+etape. La memoire [[design-mode-no-migrations]] a ete reecrite, elle etait devenue dangereuse.
+`schemaVersion` dit aussi a voix haute que c'est une VERSION et pas un compte, et qu'on ne peut
+pas la renumeroter (une base v1.0.2 est tamponnee 69, `checkNotNewer` refuserait).
+
+**Teste en le faisant tourner** : l'ancien binaire construit depuis `af64e213` dans un worktree,
+un parent, un enfant et un groupe crees avec les ids, puis la **meme base** ouverte par le
+nouveau - `parent=ROLE_ADMIN`, groupe a `['ROLE_BILLING']`. Puis sur la vraie base de canopy :
+29 roles, 15 groupes, zero perte. Et `make pg-up && make test-pg` **vert**, parce que
+`ON UPDATE CASCADE` est le genre de clause ou deux dialectes divergent.
+
+**Quatre defauts de prod trouves en revue** (un agent relisait les tests) : le seeder de la demo
+LDAP compilait et ne creait plus aucun groupe correct ; `rev` incremente deux fois ; un nom vide
+avale par le `PUT` ; et le renommage non atomique avec la reecriture des regles - ce dernier a
+disparu avec le renommage.
+
+**Deux bugs d'ecran corriges au passage**, signales par Francois :
+- `tags is null` cassait l'ecran des roles. Cote SERVEUR : un document importe sans `tags`
+  laissait la colonne a `"null"`, l'API repondait `null`, et la liste indexait dedans. Le store
+  repond `[]` (comme `Group.Roles` le faisait deja), et le gabarit ne lui fait plus confiance.
+- **`app-form-field` offrait la croix, le selecteur de coffre et le bouton d'action sur un
+  controle DESACTIVE** - « c'est pas la premiere fois que je vois ca ». Il lit maintenant
+  `disabled`/`readonly` et retire les outils qui ecrivent ; ceux qui lisent restent.
+- Et `Save` sur un role ne demandait que « le nom n'est pas vide » : il demande si quelque chose
+  a bouge, tags compares comme un ENSEMBLE.
+
+**Non pousse.** Cinq commits : `5d909caa` (le modele), `91beb6f0` (la migration + l'ordre),
+`6c012757` (le journal qui disait l'edition deux fois), `b446c9b5` (le retrait du renommage),
+`55df07db` (les deux ecrans).
+
 
 ## Session 2026-10-02 (2) - CFG-07 : les configurations dans un depot git (EE)
 

@@ -5,11 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/tracing"
-	"github.com/softwarity/meerkat/internal/vault"
 )
 
 // A thin wrapper over database/sql that rebinds the placeholders on the way
@@ -295,12 +293,7 @@ func openPostgres(dataDir, url string) (*Store, error) {
 	// The vault key stays a FILE beside the gateway even here, and that is
 	// deliberate: it seals what is in the database, so keeping it in the
 	// database would seal the door with the key in the lock.
-	key, err := vault.LoadOrCreateKey(dataDir, os.Getenv("MEERKAT_VAULT_KEY"))
-	if err != nil {
-		_ = raw.Close()
-		return nil, err
-	}
-	if s.vaultCipher, err = vault.NewCipher(key); err != nil {
+	if err := s.loadCipher(dataDir); err != nil {
 		_ = raw.Close()
 		return nil, err
 	}

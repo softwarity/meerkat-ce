@@ -334,6 +334,11 @@ func run(o options) error {
 	adminAPI.Mailer = mailer
 	adminAPI.DataAddr = addr
 	adminAPI.ReleaseNotes = meerkat.ReleaseNotes
+	// The Enterprise rows of the contract, for the License screen (CONSOLE-14).
+	for _, f := range meerkat.EnterpriseFeatures() {
+		adminAPI.EnterpriseFeatures = append(adminAPI.EnterpriseFeatures,
+			admin.EditionFeature{ID: f.ID, Status: f.Status, Edition: f.Edition})
+	}
 	// The change bus (STORE-03): what this node reloads after a write, the
 	// others reload too. Registered here rather than inside each package
 	// because this is the only file that knows there are exactly two things a
@@ -695,7 +700,10 @@ func run(o options) error {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	errc := make(chan error, 2)
 	go func() {
-		slog.Info("meerkat data plane listening", "addr", addr, "version", version.Version, "edition", edition.Name)
+		// The address, and nothing else: which product this is and which version
+		// it runs were said thirteen milliseconds earlier, and a line that
+		// repeats the line above it teaches people to stop reading the log.
+		slog.Info("meerkat data plane listening", "addr", addr)
 		errc <- srv.ListenAndServe()
 	}()
 	go func() {

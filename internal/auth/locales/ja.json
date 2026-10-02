@@ -49,6 +49,7 @@
   "emailHint": "パスワードを忘れたときに再びログインするために使います。",
   "emailNone": "未設定",
   "errAccessEnded": "このアクセスは %s に終了しました。",
+  "errTemporaryExpired": "この一時パスワードは有効期限が切れています。管理者に新しいパスワードを依頼してください。",
   "errAccessNotOpen": "このアクセスは %s に開始されます。",
   "errAvatarSize": "写真は 200 KiB 未満にしてください",
   "errAvatarType": "png、jpeg、webp のいずれかの画像を使用してください",

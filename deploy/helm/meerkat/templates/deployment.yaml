@@ -63,6 +63,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "meerkat.vaultSecretName" . }}
                   key: {{ .Values.vault.existingSecretKey }}
+            # The key a rotation replaces, read only while it is there.
+            - name: MEERKAT_VAULT_KEY_PREVIOUS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meerkat.vaultSecretName" . }}
+                  key: {{ .Values.vault.existingSecretPreviousKey }}
+                  optional: true
             {{- end }}
             {{- if or .Values.admin.password .Values.admin.existingSecret }}
             - name: MEERKAT_ADMIN_PASSWORD

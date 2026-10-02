@@ -54,6 +54,11 @@ Une route dont **Include this route in OpenTelemetry** est coupé n'a aucune
 série à elle. Ses requêtes comptent quand même dans les deux totaux
 `meerkat_gateway_`.
 
+Un appel gRPC répond toujours `200` et met son verdict dans `grpc-status`. Il est
+compté selon ce verdict, traduit comme gRPC traduit ses codes en HTTP :
+`UNAVAILABLE` est un `5xx`, `NOT_FOUND` ou `PERMISSION_DENIED` un `4xx`. L'appelant
+reçoit toujours son `200` et son trailer.
+
 Les étiquettes sont bornées par construction : un identifiant et un nom de route, une classe de
 statut, un seau, un gabarit d'opération, et un `source` qui dit si ce gabarit était `declared` ou
 `deduced`. Jamais un utilisateur, jamais une adresse, jamais un chemin brut.
@@ -89,7 +94,5 @@ Prometheus, Tempo et Loki (le tableau de bord lit Prometheus, uid `meerkat-prome
 - Rien sur une requête en particulier : c'est l'autre moitié, et elle a sa page
  ([les traces](/docs/operations/tracing)). Un compteur détecte et délimite, une trace explique un
  cas.
-- `grpc-status` n'est pas lu, donc tout appel gRPC compte en `2xx` et le taux d'échec d'une route gRPC
- lit zéro.
 - Rien sur QUI a appelé : aucune étiquette n'est jamais un utilisateur, et c'est ce qui borne la
  cardinalité. Cette question-là se répond dans le [journal d'accès](/docs/operations/logs).

@@ -84,8 +84,11 @@ database** - a backup, an export - and not a stolen data directory. Supplying th
 key by environment keeps it off the disk entirely, and the console says which of the
 two your installation does.
 
-The same key seals more than the vault: **certificate private keys** and the **ACME account
-key** go through it too.
+The same key seals more than the vault: **certificate private keys**, the **ACME account
+key**, the developer tunnel's **host key** and every account's **TOTP secret** go through it
+too. A TOTP secret is a password that never changes - whoever reads it computes every code the
+account will ever accept - so a copied database holds none in clear. Those written before are
+sealed at the next start.
 
 > [!WARNING]
 > **The key stays a local file even with an external database.** That is deliberate - it
@@ -94,6 +97,21 @@ key** go through it too.
 > on first start, and a node then cannot open what another sealed. The error names it - *the
 > private key cannot be unsealed - is this the vault key it was written with?* Set
 > `MEERKAT_VAULT_KEY` to the same value on every node, before the first start.
+
+### Rotating it
+
+A restart with two keys:
+
+1. Set the new key as `MEERKAT_VAULT_KEY` and the one it replaces as
+   `MEERKAT_VAULT_KEY_PREVIOUS` (with the generated file, its content is the old key).
+   The Helm chart has `vault.previousKey` for this.
+2. Restart the nodes. Each one reads both keys, and the first to start seals
+   everything again under the new one. The log says how many values it moved.
+3. Once every node runs with the new key, remove `MEERKAT_VAULT_KEY_PREVIOUS`.
+
+Nothing is unreadable in between. A node started with the new key alone, before
+the others moved, fails on the first sealed value it reads, with the same error
+as a wrong key.
 
 ## The vault as a file
 
@@ -122,9 +140,5 @@ which lists what is coming and what has just passed, never the value.
 
 ## What is missing
 
-- **Rotating the master key**: there is no global re-encryption, so there is no
- rotation.
 - **An external backend**: no HashiCorp Vault, no Kubernetes or Docker secrets as an
  alternative source.
-- **TOTP secrets are not encrypted at rest**. They do not go through the vault; that is
- written down as a known gap, not a detail.

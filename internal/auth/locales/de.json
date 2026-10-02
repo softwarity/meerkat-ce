@@ -49,6 +49,7 @@
   "emailHint": "Damit Sie wieder hineinkommen, wenn Sie Ihr Passwort verlieren.",
   "emailNone": "nicht gesetzt",
   "errAccessEnded": "Dieser Zugang endete am %s.",
+  "errTemporaryExpired": "Dieses temporäre Passwort ist abgelaufen. Bitten Sie einen Administrator um ein neues.",
   "errAccessNotOpen": "Dieser Zugang beginnt am %s.",
   "errAvatarSize": "Das Foto muss unter 200 KiB bleiben",
   "errAvatarType": "Verwenden Sie ein PNG-, JPEG- oder WebP-Bild",

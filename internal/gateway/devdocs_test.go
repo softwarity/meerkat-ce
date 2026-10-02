@@ -50,7 +50,7 @@ func TestDevDocs(t *testing.T) {
 		}
 	}
 	// A role catalogue and one tenant with one group, for the profile bar.
-	for _, r := range []store.Role{{ID: "admin", Name: "admin"}, {ID: "viewer", Name: "viewer", ParentID: "admin"}} {
+	for _, r := range []store.Role{{Name: "admin"}, {Name: "viewer", Parent: "admin"}} {
 		if err := st.SaveRole(ctx, r); err != nil {
 			t.Fatal(err)
 		}
@@ -58,7 +58,7 @@ func TestDevDocs(t *testing.T) {
 	if err := st.SaveTenant(ctx, store.Tenant{ID: "t1", Name: "acme", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SaveGroup(ctx, store.Group{ID: "g1", TenantID: "t1", Name: "staff", RoleIDs: []string{"admin"}}); err != nil {
+	if err := st.SaveGroup(ctx, store.Group{ID: "g1", TenantID: "t1", Name: "staff", Roles: []string{"admin"}}); err != nil {
 		t.Fatal(err)
 	}
 	// bob is a member of t1 in the staff group: "test as bob" must know his roles.

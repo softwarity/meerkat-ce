@@ -37,8 +37,12 @@ func TestMeReportsIdentityAndTenants(t *testing.T) {
 	if me.User.Username != "bob" || len(me.Tenants) != 1 || me.Tenants[0].Type != "ADMIN" {
 		t.Fatalf("me payload: %s", body)
 	}
-	if strings.Contains(body, "password") {
-		t.Fatalf("me must never leak password material: %s", body)
+	// Material, not the word: when a password was set is a date the console
+	// shows, its hash is what must never travel.
+	for _, leak := range []string{"passwordHash", "password_hash", "$2a$", "$2b$", "\"x\""} {
+		if strings.Contains(body, leak) {
+			t.Fatalf("me must never leak password material (%s): %s", leak, body)
+		}
 	}
 	if code, _ := f.call(t, "GET", "/api/me", "", nil); code != http.StatusUnauthorized {
 		t.Fatalf("anonymous me must 401")

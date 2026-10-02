@@ -24,8 +24,8 @@ func (a *API) registerEdition(mux Mux) {
 // editionInfo is what the console needs to know before drawing anything.
 type editionInfo struct {
 	// Which IMAGE this is, and nothing finer. Meerkat is priced per production
-	// instance, so there is no feature list to report: having the Enterprise
-	// image is having bought it.
+	// instance, so nothing is unlocked one by one: having the Enterprise image
+	// is having bought it. Features below only NAMES what that image carries.
 	Enterprise bool   `json:"enterprise"`
 	Edition    string `json:"edition"`
 	// Tenancy is the current mode, PrimaryTenant the organisation a single
@@ -47,6 +47,16 @@ type editionInfo struct {
 	// once, 0 for no limit (CFG-01). Said up front - "2 of 3" - because a cap
 	// discovered by being refused is a trap, and a cap announced is a price.
 	ConfigurationCap int `json:"configurationCap"`
+	// Features are the Enterprise rows of FEATURES.md, as the binary carries
+	// it (CONSOLE-14): the License screen names each and says where it lives.
+	Features []EditionFeature `json:"features"`
+}
+
+// EditionFeature is one Enterprise row of the contract.
+type EditionFeature struct {
+	ID      string `json:"id"`
+	Status  string `json:"status"`
+	Edition string `json:"edition"`
 }
 
 func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -56,6 +66,10 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 		Edition:    edition.Name,
 		Tenancy:    a.st.Tenancy(ctx),
 		DataOrigin: a.dataOrigin(r),
+		Features:   a.EnterpriseFeatures,
+	}
+	if info.Features == nil {
+		info.Features = []EditionFeature{}
 	}
 	if !edition.Enterprise {
 		info.ConfigurationCap = FreeConfigurations

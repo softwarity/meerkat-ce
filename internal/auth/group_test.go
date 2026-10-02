@@ -36,11 +36,11 @@ func groupSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store) {
 			BusinessAccess: store.BusinessAccess{Inherited: true},
 		}))
 	}
-	must(st.SaveRole(ctx, store.Role{ID: "r-ops", Name: "ops"}))
-	must(st.SaveRole(ctx, store.Role{ID: "r-sales", Name: "sales"}))
-	must(st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "t1", Name: "Operations", RoleIDs: []string{"r-ops"}}))
-	must(st.SaveGroup(ctx, store.Group{ID: "g-sales", TenantID: "t1", Name: "Sales", RoleIDs: []string{"r-sales"}}))
-	must(st.SaveGroup(ctx, store.Group{ID: "g-lone", TenantID: "t2", Name: "Everyone", RoleIDs: []string{"r-sales"}}))
+	must(st.SaveRole(ctx, store.Role{Name: "ops"}))
+	must(st.SaveRole(ctx, store.Role{Name: "sales"}))
+	must(st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "t1", Name: "Operations", Roles: []string{"ops"}}))
+	must(st.SaveGroup(ctx, store.Group{ID: "g-sales", TenantID: "t1", Name: "Sales", Roles: []string{"sales"}}))
+	must(st.SaveGroup(ctx, store.Group{ID: "g-lone", TenantID: "t2", Name: "Everyone", Roles: []string{"sales"}}))
 	must(st.SetMemberGroups(ctx, "t1", "u1", []string{"g-ops", "g-sales"}))
 	must(st.SetMemberGroups(ctx, "t2", "u1", []string{"g-lone"}))
 	for _, rt := range []store.Route{

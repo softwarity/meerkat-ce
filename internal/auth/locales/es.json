@@ -49,6 +49,7 @@
   "emailHint": "Sirve para recuperar el acceso si pierdes la contrasena.",
   "emailNone": "sin definir",
   "errAccessEnded": "Este acceso finalizó el %s.",
+  "errTemporaryExpired": "Esta contraseña temporal ha caducado. Pida una nueva a un administrador.",
   "errAccessNotOpen": "Este acceso se abre el %s.",
   "errAvatarSize": "La foto debe pesar menos de 200 KiB",
   "errAvatarType": "Usa una imagen png, jpeg o webp",

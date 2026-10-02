@@ -49,6 +49,7 @@
   "emailHint": "Sluzy do odzyskania dostepu, gdy zapomnisz hasla.",
   "emailNone": "nie ustawiono",
   "errAccessEnded": "Ten dostęp zakończył się %s.",
+  "errTemporaryExpired": "To tymczasowe hasło wygasło. Poproś administratora o nowe.",
   "errAccessNotOpen": "Ten dostęp otwiera się %s.",
   "errAvatarSize": "Zdjęcie musi mieć mniej niż 200 KiB",
   "errAvatarType": "Użyj obrazu png, jpeg lub webp",

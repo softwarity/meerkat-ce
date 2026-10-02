@@ -8,23 +8,21 @@ import (
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// What POINTS AT a role, and how a rename follows it.
+// What POINTS AT a role.
 //
-// A role is held by an id everywhere it is GRANTED - a group names roleIds - so
-// a rename never breaks that side. What it breaks is the other one: an access
-// rule names roles BY NAME (store.Access.Roles, on a route and on each endpoint
-// policy), and so does a scheduled call. Those are strings written next to the
-// name at a moment in time, and nothing in the database ties them back.
+// An access rule names roles BY NAME (store.Access.Roles, on a route and on
+// each endpoint policy), and so does a scheduled call. Those are strings
+// written next to the name at a moment in time, and nothing in the database
+// ties them back - no foreign key reaches inside a route's JSON.
 //
-// That was the reason the catalogue stayed out of an agent's reach, and it was
-// the wrong answer to the right observation: the console renames a role with
-// the same consequence, so what was missing was not a closed door but this - a
-// rename that follows its references, and a deletion that says what still names
-// the role rather than leaving rules that grant nobody.
+// So a deletion says what still names the role rather than leaving rules that
+// grant nobody. There used to be a rename here too, that rewrote them all; it
+// is gone with the rename itself, because what it rewrote was only this
+// gateway's half - the services that read the name out of a token, and the
+// customers who hold it in a repository, were never in reach.
 //
 // Names are compared EXACTLY. The gateway compares them exactly too, so a rule
-// naming "role_user" is not a rule naming "ROLE_USER" and must not be rewritten
-// as though it were.
+// naming "role_user" is not a rule naming "ROLE_USER".
 
 // roleReference is one place a role name is written, said the way an operator
 // would look for it.
@@ -77,59 +75,6 @@ func (a *API) roleReferences(ctx context.Context, name string) ([]roleReference,
 	return out, nil
 }
 
-// renameRoleReferences rewrites every rule that named from so it names to, and
-// answers how many places moved. The routing is reloaded when anything did:
-// a rule the gateway still holds in its compiled form would go on refusing the
-// people the rename was supposed to keep.
-func (a *API) renameRoleReferences(ctx context.Context, from, to string) (int, error) {
-	if from == "" || to == "" || from == to {
-		return 0, nil
-	}
-	routes, err := a.st.ListRoutes(ctx)
-	if err != nil {
-		return 0, err
-	}
-	moved := 0
-	for _, rt := range routes {
-		touched := false
-		if replaceRole(&rt.Access.Roles, from, to) {
-			touched, moved = true, moved+1
-		}
-		if rt.API != nil && rt.API.Security != nil {
-			for i := range rt.API.Security.Endpoints {
-				if replaceRole(&rt.API.Security.Endpoints[i].Roles, from, to) {
-					touched, moved = true, moved+1
-				}
-			}
-		}
-		if !touched {
-			continue
-		}
-		if err := a.st.SaveRoute(ctx, rt); err != nil {
-			return moved, fmt.Errorf("route %q: %w", rt.Name, err)
-		}
-	}
-	schedules, err := a.st.ListSchedules(ctx, store.ScheduleFilter{})
-	if err != nil {
-		return moved, err
-	}
-	for _, s := range schedules {
-		if !replaceRole(&s.Roles, from, to) {
-			continue
-		}
-		moved++
-		if err := a.st.UpdateSchedule(ctx, s); err != nil {
-			return moved, fmt.Errorf("schedule %q: %w", s.Name, err)
-		}
-	}
-	if moved > 0 {
-		if err := a.reloadRouting(ctx); err != nil {
-			return moved, fmt.Errorf("rules rewritten, but the reload failed: %w", err)
-		}
-	}
-	return moved, nil
-}
-
 func namesRole(list []string, name string) bool {
 	for _, r := range list {
 		if strings.TrimSpace(r) == name {
@@ -137,18 +82,6 @@ func namesRole(list []string, name string) bool {
 		}
 	}
 	return false
-}
-
-// replaceRole rewrites the name in place and says whether anything moved.
-func replaceRole(list *[]string, from, to string) bool {
-	changed := false
-	for i, r := range *list {
-		if strings.TrimSpace(r) == from {
-			(*list)[i] = to
-			changed = true
-		}
-	}
-	return changed
 }
 
 // refLabels is what a refusal or an answer shows of a reference list: a few,

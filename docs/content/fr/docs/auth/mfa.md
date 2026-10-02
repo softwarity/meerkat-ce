@@ -40,10 +40,10 @@ Se réenrôler, ou éteindre le second facteur, **oublie tous les navigateurs de
 confiance** du compte. C'est délibéré : l'ancien défi a disparu, et avec lui tout
 ce qui avait le droit de le sauter.
 
-> [!WARNING]
-> Les secrets TOTP sont stockés **en clair** dans la base. Le chiffrement au repos
-> couvre les secrets du coffre, les clés privées TLS et la clé de branchement des
-> développeurs - pas ceux-là. Traitez un export de base en conséquence.
+> [!NOTE]
+> Les secrets TOTP sont **scellés** dans la base avec la clé maîtresse du coffre,
+> comme les secrets du coffre et les clés privées TLS : un export de base ne contient
+> aucun secret dont on pourrait calculer des codes. Voir [la clé maîtresse](/docs/operations/vault#la-cl-matresse).
 
 ## Un code par courriel, en secours
 

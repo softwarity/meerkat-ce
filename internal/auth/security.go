@@ -75,6 +75,7 @@ const (
 	refusedDisabled    = "disabled"
 	refusedValidity    = "outside-validity"
 	refusedUnconfirmed = "unconfirmed"
+	refusedTemporary   = "temporary-expired"
 	refusedHours       = "outside-hours"
 	refusedCode        = "bad-code"
 	refusedThrottled   = "throttled"

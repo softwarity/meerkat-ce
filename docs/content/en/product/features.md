@@ -77,7 +77,7 @@ Read more: [Routes](/docs/concepts/routes), and what a request costs in
 - **11 predicates and 33 filters**: path, host, header, cookie, method, weight for canaries, time window; request and response rewriting. `ROUTE-03 to 05`
 - **Rate limiting** per route, user, token, organization or address, several limits at once; **per-endpoint quotas**; standard 429 response. `ROUTE-08 QUOTA-05`
 - **Circuit breaker, timeouts** at three levels, and service health in the console: a heart per route, from discovery or a TCP check, and real traffic. `ROUTE-07 ROUTE-09 SVC-04`
-- **WebSocket, gRPC and body streaming** end to end. *partly* `ROUTE-13 ROUTE-20`
+- **WebSocket, gRPC and body streaming** end to end; a gRPC call is counted by its `grpc-status`, not by the 200 it rides on. *partly* `ROUTE-13 ROUTE-20`
 - **Service discovery** for Docker, Swarm and Kubernetes when creating a route. *partly* `SVC-02`
 - **Routing tester**: compose a sample request and see which route takes it, and why. `ROUTE-15`
 - **Maintenance page** per route or for the whole platform in one move, translated, with a door for administrators. `LIFE-05`
@@ -102,7 +102,7 @@ The building blocks usually installed alongside.
 Read more: [The vault](/docs/operations/vault).
 
 - **TLS certificates** per name, issued and renewed through ACME with Let's Encrypt or your internal authority, HTTPS ports opened live. `SSL-01 SSL-05 SSL-08`
-- **Built-in vault**: secrets encrypted with AES-256-GCM, referenced by name from the configuration, encrypted export, reminder before expiry. `VAULT-01 to 06`
+- **Built-in vault**: secrets encrypted with AES-256-GCM, referenced by name from the configuration, encrypted export, reminder before expiry. The same key seals TLS keys and TOTP secrets, and rotates with a restart. `VAULT-01 to 06 SEC-06`
 - **Security headers** HSTS, CSP, X-Frame-Options, Referrer-Policy, and CSRF protection for the console. `SEC-01 SEC-03`
 - **Console on a separate port** from application traffic: administration is never exposed alongside the application. `CONSOLE-11`
 - **Runs without internet**: no resource loaded from outside, suited to air-gapped environments. `DEPLOY-03`

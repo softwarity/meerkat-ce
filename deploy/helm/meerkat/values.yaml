@@ -38,6 +38,11 @@ vault:
   key: ""
   existingSecret: ""
   existingSecretKey: vault-key
+  # Rotating the key: set the new one as `key` and the one it replaces here,
+  # roll the pods (they seal everything again under the new key), then empty
+  # this. With an existingSecret, add the old key under this name instead.
+  previousKey: ""
+  existingSecretPreviousKey: vault-key-previous
 
 # The FIRST admin account, created on the first start and never read again.
 # Either give a password here (the chart makes a Secret) or name a Secret you

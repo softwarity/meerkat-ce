@@ -49,6 +49,7 @@
   "emailHint": "Sert a vous laisser revenir si vous perdez votre mot de passe.",
   "emailNone": "non renseignee",
   "errAccessEnded": "Cet accès a pris fin le %s.",
+  "errTemporaryExpired": "Ce mot de passe temporaire a expiré. Demandez-en un nouveau à un administrateur.",
   "errAccessNotOpen": "Cet accès s'ouvre le %s.",
   "errAvatarSize": "Gardez la photo sous 200 Kio",
   "errAvatarType": "Utilisez une image png, jpeg ou webp",

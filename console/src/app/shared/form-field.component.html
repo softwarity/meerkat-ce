@@ -5,7 +5,7 @@
   <ng-content />
   @if (error()) {<mat-error>{{ error() }}</mat-error>}
   @else if (hint()) {<mat-hint align="end">{{ hint() }}</mat-hint>}
-  @if (actionIcon()) {<button
+  @if (actionIcon() && writable()) {<button
       matSuffix
       matIconButton
       type="button"
@@ -29,7 +29,7 @@
       i18n-aria-label="@@Copy"
       aria-label="Copy"
     ><mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon></button>}
-  @if (clearable() && !empty()) {<button
+  @if (clearable() && !empty() && writable()) {<button
       matSuffix
       matIconButton
       type="button"
@@ -37,7 +37,7 @@
       i18n-aria-label="@@Clear"
       aria-label="Clear"
     ><mat-icon>close</mat-icon></button>}
-  @if (vaultKinds().length) {<button
+  @if (vaultKinds().length && writable()) {<button
       matSuffix
       matIconButton
       type="button"

@@ -72,12 +72,12 @@ export class GroupsMatrixComponent {
   protected readonly roles = signal<Role[]>([]);
   protected readonly groups = signal<Group[]>([]);
 
-  // roleId -> its parent, to walk the ancestor chain: a role implied by an
-  // ancestor already in the group is checked AND locked (you cannot uncheck a
-  // child while its parent grants it).
+  // role name -> its parent's name, to walk the ancestor chain: a role implied
+  // by an ancestor already in the group is checked AND locked (you cannot
+  // uncheck a child while its parent grants it).
   private readonly parentOf = computed(() => {
     const map = new Map<string, string>();
-    for (const r of this.roles()) if (r.parentId) map.set(r.id, r.parentId);
+    for (const r of this.roles()) if (r.parent) map.set(r.name, r.parent);
     return map;
   });
 
@@ -147,21 +147,21 @@ export class GroupsMatrixComponent {
     return this.groups().find((g) => g.id === id);
   }
 
-  // A group's role set, null-safe: an older gateway serialises no-roles as null.
-  private roleIdsOf(groupId: string): string[] {
-    return this.groupById(groupId)?.roleIds ?? [];
+  // A group's role set, null-safe: a gateway serialises no-roles as null.
+  private rolesOf(groupId: string): string[] {
+    return this.groupById(groupId)?.roles ?? [];
   }
 
   // Checked = the role is in the group directly OR granted by an ancestor.
   protected roleChecked(role: Role, groupId: string): boolean {
-    const ids = this.roleIdsOf(groupId);
-    return ids.includes(role.id) || this.ancestorsOf(role.id).some((a) => ids.includes(a));
+    const held = this.rolesOf(groupId);
+    return held.includes(role.name) || this.ancestorsOf(role.name).some((a) => held.includes(a));
   }
 
   // Locked = an ancestor already grants it, so it cannot be toggled on its own.
   protected roleImplied(role: Role, groupId: string): boolean {
-    const ids = this.roleIdsOf(groupId);
-    return this.ancestorsOf(role.id).some((a) => ids.includes(a));
+    const held = this.rolesOf(groupId);
+    return this.ancestorsOf(role.name).some((a) => held.includes(a));
   }
 
   // ── the whole column ───────────────────────────────────────────────────────
@@ -186,29 +186,29 @@ export class GroupsMatrixComponent {
   protected toggleColumn(groupId: string, checked: boolean): void {
     const g = this.groupById(groupId);
     if (!g) return;
-    const visible = this.rows().map((r) => r.role.id);
-    const current = g.roleIds ?? [];
+    const visible = this.rows().map((r) => r.role.name);
+    const current = g.roles ?? [];
     if (!checked) {
-      this.save(g, current.filter((id) => !visible.includes(id)));
+      this.save(g, current.filter((name) => !visible.includes(name)));
       return;
     }
     // Reduced against the RESULT, not against what was there before: adding
     // ops and ops-read in the same click must still leave only ops.
     const target = new Set([...current, ...visible]);
-    this.save(g, [...target].filter((id) => !this.ancestorsOf(id).some((a) => target.has(a))));
+    this.save(g, [...target].filter((name) => !this.ancestorsOf(name).some((a) => target.has(a))));
   }
 
   protected toggle(role: Role, groupId: string, checked: boolean): void {
     const g = this.groupById(groupId);
     if (!g) return;
-    const current = g.roleIds ?? [];
-    this.save(g, checked ? [...current, role.id] : current.filter((r) => r !== role.id));
+    const current = g.roles ?? [];
+    this.save(g, checked ? [...current, role.name] : current.filter((r) => r !== role.name));
   }
 
   // One write path for a cell and for a whole column: the optimistic update and
   // the reload-on-failure have to behave the same either way.
-  private save(g: Group, roleIds: string[]): void {
-    this.api.updateGroup({ ...g, roleIds }).subscribe({
+  private save(g: Group, roles: string[]): void {
+    this.api.updateGroup({ ...g, roles }).subscribe({
       next: (saved) => this.groups.update((list) => list.map((x) => (x.id === saved.id ? saved : x))),
       error: (err) => {
         this.snack.open(errMsg(err), undefined, { duration: 4000 });
@@ -227,7 +227,7 @@ export class GroupsMatrixComponent {
         .afterClosed(),
     );
     if (!res) return;
-    this.api.createGroup(this.tenantId(), { name: res.name, description: res.description, roleIds: [] }).subscribe({
+    this.api.createGroup(this.tenantId(), { name: res.name, description: res.description, roles: [] }).subscribe({
       next: (g) => {
         this.groups.update((list) => [...list, g]);
         this.changed.emit();
@@ -252,7 +252,7 @@ export class GroupsMatrixComponent {
     );
     if (!res || (res.name === g.name && res.description === (g.description ?? ''))) return;
     this.api
-      .updateGroup({ ...g, name: res.name, description: res.description, roleIds: g.roleIds ?? [] })
+      .updateGroup({ ...g, name: res.name, description: res.description, roles: g.roles ?? [] })
       .subscribe({
         next: (saved) => {
           this.groups.update((list) => list.map((x) => (x.id === saved.id ? saved : x)));

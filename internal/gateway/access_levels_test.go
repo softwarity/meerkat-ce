@@ -274,10 +274,10 @@ func TestASwitchIsOfferedOnlyWhereItWouldHelp(t *testing.T) {
 
 	// Now give her the role in globex ALONE. From acme the switch is worth
 	// offering again, because this time it leads somewhere.
-	if err := st.SaveRole(ctx, store.Role{ID: "ops", Name: "ops"}); err != nil {
+	if err := st.SaveRole(ctx, store.Role{Name: "ops"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "globex", Name: "ops", RoleIDs: []string{"ops"}}); err != nil {
+	if err := st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "globex", Name: "ops", Roles: []string{"ops"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetMemberGroups(ctx, "globex", "u-alice", []string{"g-ops"}); err != nil {

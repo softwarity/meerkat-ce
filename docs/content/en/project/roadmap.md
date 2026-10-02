@@ -29,7 +29,8 @@ transform it, an access rule decides, and what happened is visible afterwards.
   from a service's OpenAPI description.
 - **Two-factor**: TOTP with trusted browsers, and passkeys.
 - **The vault**: secrets sealed at rest and plain values, both referenced by
-  name.
+  name. The same master key seals TLS keys and TOTP secrets, and it rotates
+  with a restart.
 - **TLS**: certificates and ACME issuance, serialised so a cluster asks once.
 - **Audit**: every administrative change with its author and a field-level
   diff, and the security of the accounts - every sign-in, every refusal with its
@@ -50,15 +51,18 @@ transform it, an access rule decides, and what happened is visible afterwards.
   console.
 - **OpenTelemetry export** (Enterprise): one collector address for traces,
   metrics, the audit trail and logs. See [traces](/docs/operations/tracing).
+- **Scheduled calls**: the gateway calls a service on a cadence, a cron
+  calendar or once, with retries and a run history. The service creates them
+  through the API, from its own screens; the console watches and steps in. See
+  [scheduled calls](/docs/operations/scheduler).
+- **The gateway's own log**, live in the console, with its level turned up for
+  half an hour from there. See [logs](/docs/operations/logs).
 
 ## Being finished
 
 These work and are not finished. The table in the repository says, line by
 line, what is missing from each.
 
-- **Scheduled calls** - the gateway calls a service on a cadence, a cron
-  calendar or once, with retries and a run history. What is missing is
-  creating one from the console. See [scheduled calls](/docs/operations/scheduler).
 - **Endpoint audit** (Enterprise) - one switch per operation sends its calls to
   the audit trail. What is missing is picking which body fields to keep, and
   auditing a refusal made before the operation is known.
@@ -103,15 +107,13 @@ line, what is missing from each.
 - **Serving an application under a sub-path without rebuilding it**: the prefix
   is stripped on the way in; what the application sends back is still to be
   rewritten.
-- **gRPC properly**: counters that read `grpc-status`, per-method security, and
-  gRPC-Web. Today a failing gRPC call reads as healthy.
+- **gRPC properly**: per-method security, and gRPC-Web. The counters already
+  read `grpc-status`.
 - **A per-organisation portal**: each customer's own icon, title and
   arrangement. It would be the product's first per-tenant visual override.
 - **HTTP/3**, once the gain can be measured rather than described.
 - **An external vault**: HashiCorp Vault, Kubernetes secrets and Docker
   secrets, for installations that already run one and do not want a second.
-- **Rotating the vault's master key**, which does not exist and which is the
-  question every security team asks.
 - **Issues pushed to GitHub, GitLab or Jira**, rather than read in one more
   screen.
 - **Web Push notifications**, for what an operator has to know without keeping

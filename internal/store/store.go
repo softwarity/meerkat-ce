@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -79,12 +78,7 @@ func openEmbedded(dataDir string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	key, err := vault.LoadOrCreateKey(dataDir, os.Getenv("MEERKAT_VAULT_KEY"))
-	if err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	if s.vaultCipher, err = vault.NewCipher(key); err != nil {
+	if err := s.loadCipher(dataDir); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -244,6 +238,11 @@ CREATE TABLE IF NOT EXISTS users (
   -- SIGN-IN, never by a clock: expiring at three in the morning would sign
   -- nobody out, it would only refuse the next login.
   password_changed_at  BIGINT NOT NULL DEFAULT 0,
+  -- The password was ISSUED by an administrator (a creation, a reset), not
+  -- chosen by its owner (CONSOLE-07): it works for a limited time, counted
+  -- from password_changed_at. Forcing a change at next sign-in does NOT set
+  -- it - that password is the owner's, and expiring it would lock them out.
+  password_temporary   BOOLEAN NOT NULL DEFAULT FALSE,
   -- The second factor (MFA-01). totp_secret is the confirmed base32 TOTP
   -- secret ('' = not enrolled); totp_pending holds a secret mid-enrolment,
   -- before the first code confirms it; totp_scratch is a JSON array of the
@@ -409,11 +408,28 @@ CREATE TABLE IF NOT EXISTS locale_overrides (
 
 -- RBAC (v8): a GLOBAL role catalogue (hierarchical), per-tenant groups bundling
 -- roles, and per-tenant member↔group assignments.
+--
+-- A ROLE IS ITS NAME (v71). It carried a generated id beside a name that was
+-- already UNIQUE, so the id identified nothing the name did not - and it cost
+-- more than it looks: a configuration document read "parentId:
+-- d040c48df431b1e7bd...", which nobody can follow, and two installations that
+-- both have ROLE_ADMIN gave it two different ids, so comparing one customer's
+-- configuration with another showed every role as removed and added again
+-- (CFG-07 is the feature that made that impossible to ignore). The name is also
+-- what everything else already uses: an access rule names roles by name, a JWT
+-- carries names, upstream services read names.
+--
+-- THERE IS NO RENAME, so there is no ON UPDATE CASCADE either. The name leaves
+-- this gateway: a JWT carries it to every service behind it, a customer's
+-- configuration carries it in a git repository, their own code spells it out.
+-- Meerkat can rewrite its own rules and nothing else, so a rename would look
+-- complete and never be - and a cascade here would be the clause that made it
+-- look safe. Changing a name is deleting the role and declaring the new one,
+-- through the refusal that names every rule still pointing at it.
 CREATE TABLE IF NOT EXISTS roles (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL UNIQUE,
+  name        TEXT PRIMARY KEY,
   description TEXT NOT NULL DEFAULT '',
-  parent_id   TEXT REFERENCES roles(id) ON DELETE SET NULL,
+  parent      TEXT REFERENCES roles(name) ON DELETE SET NULL,
   tags        TEXT NOT NULL DEFAULT '[]',
   system      BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  BIGINT NOT NULL DEFAULT 0,
@@ -444,8 +460,8 @@ CREATE INDEX IF NOT EXISTS groups_tenant ON groups(tenant_id);
 
 CREATE TABLE IF NOT EXISTS group_roles (
   group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-  role_id  TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  PRIMARY KEY (group_id, role_id)
+  role     TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
+  PRIMARY KEY (group_id, role)
 );
 
 -- source (v32) says who put this row here: '' placed by an administrator,
@@ -1020,10 +1036,18 @@ CREATE TABLE IF NOT EXISTS schedule_runs (
 CREATE INDEX IF NOT EXISTS idx_schedule_runs_of ON schedule_runs (schedule_id, ended_at);
 CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);`
 
-// v56 scheduled calls (SCHED-01): the schedules table. A row is what to call,
-// when, and as whom - and the lease columns are what let several gateways
-// share one schedule without running it twice or losing it when a node dies.
-const schemaVersion = 70
+// schemaVersion is a VERSION, not a count of migrations.
+//
+// It reads like "seventy-one migrations" and it is the opposite: the ledger was
+// empty until v71 (see migrations.go), because every change before the first
+// release was folded into the DDL above and this number simply moved. v1.0.0,
+// v1.0.1 and v1.0.2 all ship 69, with no step behind them.
+//
+// It cannot be renumbered down now that databases exist in the wild: a v1.0.2
+// installation is stamped 69, and checkNotNewer refuses to open a database
+// stamped higher than the build knows - so restarting the count at 1 would stop
+// every existing installation from starting.
+const schemaVersion = 72
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -1044,17 +1068,33 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(schemaSQL); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
-	// The columns a build added since this database was created: CREATE TABLE
-	// IF NOT EXISTS is silent on an existing table, so they are added here.
-	if err := s.addMissingColumns(); err != nil {
-		return err
-	}
-	// The steps a CREATE cannot express, in order, each once. Skipped on a
-	// fresh database for the reason above.
+	// THE ORDER IS: create what is new, RESHAPE what changed, then top up the
+	// columns nobody reshaped.
+	//
+	// The ledger used to run last, and that made a reshape impossible to
+	// express: v71 turned roles.id into roles.name and group_roles.role_id into
+	// group_roles.role, so the additive pass - which only knows how to ADD a
+	// column to the table it finds - tried to bolt a NOT NULL column onto the
+	// old shape and failed before any step could run. A step that rebuilds a
+	// table has to go first, by definition: nothing can usefully add columns to
+	// a table that is about to be replaced.
+	//
+	// The counterpart, and the discipline it imposes: a step that needs a
+	// column the additive pass would have added must add it itself. That is the
+	// ordinary rule of a migration ledger - a step describes the schema AT ITS
+	// OWN version and depends on nothing that runs after it.
+	//
+	// Skipped on a fresh database: its DDL above is already the end state, and
+	// running the steps would ask it to undo changes it never had.
 	if !fresh {
 		if err := s.runMigrations(migrations, v); err != nil {
 			return err
 		}
+	}
+	// The columns a build added since this database was created: CREATE TABLE
+	// IF NOT EXISTS is silent on an existing table, so they are added here.
+	if err := s.addMissingColumns(); err != nil {
+		return err
 	}
 	// Two leftovers from the design phase, run unconditionally on every start
 	// because there was nowhere to record that they had already run. They stay
@@ -1827,7 +1867,7 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 		return invalidf(err)
 	}
 	if err := SanitizeRateLimits(r.Limits); err != nil {
-		return err
+		return invalidf(err)
 	}
 	if err := SanitizeRouteTimeouts(r.Timeouts); err != nil {
 		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
@@ -2128,6 +2168,10 @@ type User struct {
 	// not 1970: an account whose password predates the column must not be
 	// expired at its next sign-in because the column says the epoch.
 	PasswordChangedAt int64 `json:"passwordChangedAt,omitempty"`
+	// PasswordTemporary: the password was issued by an administrator and has
+	// not been replaced by its owner yet (CONSOLE-07). It stops working after
+	// the policy's TemporaryHours.
+	PasswordTemporary bool `json:"passwordTemporary,omitempty"`
 	// Fields are the custom identity fields' values, by name. Read and written
 	// like any other column; validated against the definitions by the caller
 	// that saves, because only it knows what the settings say.
@@ -2144,7 +2188,7 @@ type User struct {
 const userCols = `id, username, password_hash, fullname, email, enabled,
 	root, dev, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
 	created_at, updated_at, last_connection_at, must_change_password, mfa_required,
-	email_verified, self_registered, password_changed_at, fields, valid_from, valid_until, rev`
+	email_verified, self_registered, password_changed_at, password_temporary, fields, valid_from, valid_until, rev`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
@@ -2152,7 +2196,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Fullname, &u.Email, &u.Enabled,
 		&u.Root, &u.Dev, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastConnectionAt, &u.MustChangePassword, &u.MFARequired,
-		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &fields, &u.ValidFrom, &u.ValidUntil, &u.Rev)
+		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &u.PasswordTemporary, &fields, &u.ValidFrom, &u.ValidUntil, &u.Rev)
 	u.Fields = decodeFields(fields)
 	// Derived here so every read carries it and no caller has to remember: the
 	// hash is json:"-", this boolean is what the console is allowed to know.
@@ -2173,12 +2217,16 @@ func (s *Store) CreateUser(ctx context.Context, u User) error {
 		`INSERT INTO users (id, username, password_hash, fullname, email, enabled,
 		   root, dev, tenant_creator, infra_admin, app_admin, locale, timezone,
 		   created_at, updated_at, must_change_password, mfa_required,
-		   email_verified, self_registered, fields, valid_from, valid_until, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+		   email_verified, self_registered, fields, valid_from, valid_until,
+		   password_changed_at, password_temporary, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
 		u.ID, u.Username, u.PasswordHash, u.Fullname, u.Email, u.Enabled,
 		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
 		now, now, u.MustChangePassword, u.MFARequired,
-		u.EmailVerified, u.SelfRegistered, encodeFields(u.Fields), u.ValidFrom, u.ValidUntil)
+		u.EmailVerified, u.SelfRegistered, encodeFields(u.Fields), u.ValidFrom, u.ValidUntil,
+		// A password set at creation has a known age from now on; and one an
+		// administrator issued (must change) is temporary (CONSOLE-07).
+		changedAt(u.PasswordHash, now), u.PasswordHash != "" && u.MustChangePassword)
 	if err != nil {
 		return fmt.Errorf("store: create user %q: %w", u.Username, err)
 	}
@@ -2226,6 +2274,29 @@ func (s *Store) RehashUserPassword(ctx context.Context, id, oldHash, newHash str
 	}
 	n, _ := res.RowsAffected()
 	return n == 1, nil
+}
+
+// changedAt is when a password set at creation was set: now, or not known
+// when there is none.
+func changedAt(hash string, now int64) int64 {
+	if hash == "" {
+		return 0
+	}
+	return now
+}
+
+// TemporaryPasswordExpired says whether an administrator-issued password has
+// outlived hours (CONSOLE-07). Checked at sign-in, like the age limit; zero
+// hours means a temporary password never expires.
+func (u User) TemporaryPasswordExpired(hours int, now time.Time) bool {
+	if !u.PasswordTemporary || hours <= 0 || u.PasswordHash == "" {
+		return false
+	}
+	issued := u.PasswordChangedAt
+	if issued <= 0 {
+		issued = u.CreatedAt
+	}
+	return now.Sub(time.Unix(issued, 0)) > time.Duration(hours)*time.Hour
 }
 
 // SetUserPassword replaces a user's password hash. mustChange marks the new
@@ -2283,8 +2354,8 @@ func (s *Store) SetUserPassword(ctx context.Context, id, passwordHash string, mu
 		}
 	}
 	res, err := tx.ExecContext(ctx,
-		`UPDATE users SET password_hash = ?, must_change_password = ?, password_changed_at = ?, updated_at = ? WHERE id = ?`,
-		passwordHash, mustChange, now, now, id)
+		`UPDATE users SET password_hash = ?, must_change_password = ?, password_temporary = ?, password_changed_at = ?, updated_at = ? WHERE id = ?`,
+		passwordHash, mustChange, mustChange, now, now, id)
 	if err != nil {
 		return fmt.Errorf("store: set password for user %q: %w", id, err)
 	}

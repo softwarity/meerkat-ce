@@ -1125,11 +1125,11 @@ func TestJoiningTakesEffectOnAnOpenSession(t *testing.T) {
 		BusinessAccess: store.BusinessAccess{Inherited: true}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SaveRole(ctx, store.Role{ID: "ROLE_A", Name: "ROLE_A"}); err != nil {
+	if err := st.SaveRole(ctx, store.Role{Name: "ROLE_A"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SaveGroup(ctx, store.Group{ID: "g1", TenantID: "t1", Name: "ROOT",
-		RoleIDs: []string{"ROLE_A"}}); err != nil {
+		Roles: []string{"ROLE_A"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetMemberGroups(ctx, "t1", "u1", []string{"g1"}); err != nil {

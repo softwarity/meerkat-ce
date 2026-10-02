@@ -61,7 +61,7 @@ func TestConfigPreviewWritesNothing(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 
-	file := "version: 1\nroles:\n  - id: ops\n    name: Ops\n"
+	file := "version: 1\nroles:\n  - name: ops\n"
 	code, out := f.call(t, "POST", "/api/config/preview", file, f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("preview: %d %s", code, out)
@@ -80,7 +80,7 @@ func TestConfigPreviewWritesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, r := range roles {
-		if r.ID == "ops" {
+		if r.Name == "ops" {
 			t.Fatal("the preview wrote the role it was only describing")
 		}
 	}

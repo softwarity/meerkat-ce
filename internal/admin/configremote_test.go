@@ -39,7 +39,7 @@ func TestAPullAppliesNothing(t *testing.T) {
 	// A document in the repository, written by somebody else: one role, and a
 	// route nothing here has ever heard of.
 	repo.Put("platforms/acme/"+confrepo.DocumentName, []byte(
-		"version: 1\nroles:\n  - id: from-git\n    name: From git\n"))
+		"version: 1\nroles:\n  - name: from-git\n"))
 
 	code, body := f.call(t, "POST", "/api/config-remotes",
 		`{"name":"Acme prod","url":"https://example.invalid/acme.git","branch":"main",`+

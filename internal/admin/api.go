@@ -41,7 +41,10 @@ type API struct {
 
 	// ReleaseNotes is RELEASE_NOTES.md as the binary carries it (the root
 	// package embeds it; main wires it). Empty in tests that do not ask.
-	ReleaseNotes string
+	// EnterpriseFeatures are the Enterprise rows of FEATURES.md (the root
+	// package embeds it), for the License screen (CONSOLE-14).
+	EnterpriseFeatures []EditionFeature
+	ReleaseNotes       string
 
 	// TLS is the live HTTPS state (SSL-01/02). Wired by main; nil in the tests
 	// that have no listener to open, where saving material still has to work.
@@ -515,6 +518,15 @@ func (a *API) dropRoute(ctx context.Context, actor store.User, id string) error 
 }
 
 func (a *API) internal(w http.ResponseWriter, err error) {
+	// A refusal that reached here is still a refusal: the store's sanitisers
+	// sit behind every writer, and a handler that forgot to ask isInvalid
+	// would hand the operator "internal error" while the sentence naming what
+	// IS allowed went to the log. Decided once, here, rather than at each of
+	// the call sites that can meet one.
+	if isInvalid(err) {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	slog.Error("admin api error", "err", err)
 	writeErr(w, http.StatusInternalServerError, "internal error")
 }

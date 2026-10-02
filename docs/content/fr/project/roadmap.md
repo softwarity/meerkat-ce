@@ -30,7 +30,8 @@ ensuite.
   endpoint lue dans la description OpenAPI d'un service.
 - **Second facteur** : TOTP avec navigateurs de confiance, et passkeys.
 - **Le coffre** : des secrets scellés au repos et des valeurs en clair, les deux
-  référencés par leur nom.
+  référencés par leur nom. La même clé maîtresse scelle les clés TLS et les
+  secrets TOTP, et elle tourne par un redémarrage.
 - **TLS** : certificats et émission ACME, sérialisée pour qu'un cluster demande
   une seule fois.
 - **Audit** : chaque changement d'administration avec son auteur et un diff
@@ -54,16 +55,18 @@ ensuite.
 - **Export OpenTelemetry** (Enterprise) : une adresse de collecteur pour les
   traces, les métriques, le journal d'audit et les journaux. Voir
   [les traces](/docs/operations/tracing).
+- **Appels planifiés** : la passerelle appelle un service selon une cadence,
+  un calendrier cron ou une seule fois, avec reprises et historique des
+  exécutions. Le service les crée par l'API, depuis ses propres écrans ; la
+  console observe et intervient. Voir [les appels planifiés](/docs/operations/scheduler).
+- **Le journal de la passerelle**, en direct dans la console, avec son niveau
+  monté pour une demi-heure depuis là. Voir [les journaux](/docs/operations/logs).
 
 ## En cours d'achèvement
 
 Ces sujets marchent et ne sont pas finis. Le tableau du dépôt dit, ligne par
 ligne, ce qui manque à chacun.
 
-- **Appels planifiés** : la passerelle appelle un service selon une cadence,
-  un calendrier cron ou une seule fois, avec reprises et historique des
-  exécutions. Ce qui manque est la création depuis la console. Voir
-  [les appels planifiés](/docs/operations/scheduler).
 - **Audit des endpoints** (Enterprise) : un interrupteur par opération envoie
   ses appels au journal d'audit. Ce qui manque est le choix des champs du body
   à garder, et l'audit d'un refus fait avant que l'opération soit connue.
@@ -108,16 +111,14 @@ ligne, ce qui manque à chacun.
   voit passer la même requête deux fois.
 - **Servir une application sous un sous-chemin sans la reconstruire** : le
   préfixe est retiré à l'aller, il reste à réécrire ce que l'application renvoie.
-- **gRPC pour de bon** : métriques qui lisent `grpc-status`, sécurité par
-  méthode, et gRPC-Web. Aujourd'hui un appel gRPC en échec se lit comme sain.
+- **gRPC pour de bon** : sécurité par méthode, et gRPC-Web. Les métriques
+  lisent déjà `grpc-status`.
 - **Le portail par organisation** : icône, titre et arrangement propres à chaque
   client. Ce serait la première surcharge visuelle par tenant du produit.
 - **HTTP/3**, quand le gain se mesurera plutôt qu'il ne se racontera.
 - **Un coffre externe** : HashiCorp Vault, les secrets de Kubernetes et ceux de
   Docker, pour les installations qui en ont déjà un et n'en veulent pas un
   second.
-- **La rotation de la clé maîtresse du coffre**, qui n'existe pas et qui est la
-  question que pose toute équipe sécurité.
 - **Les anomalies poussées vers GitHub, GitLab ou Jira**, plutôt que lues dans
   un écran de plus.
 - **Les notifications Web Push**, pour ce qu'un exploitant doit savoir sans

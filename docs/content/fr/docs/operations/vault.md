@@ -81,8 +81,11 @@ Le fichier généré est posé à côté de la base, donc il protège une **base
 sauvegarde, un export - et non un répertoire de données volé. Fournir la clé par l'environnement la garde
 entièrement hors du disque, et la console dit laquelle des deux fait votre installation.
 
-La même clé scelle plus que le coffre : les **clés privées des certificats** et la **clé de compte ACME**
-passent par elle aussi.
+La même clé scelle plus que le coffre : les **clés privées des certificats**, la **clé de compte ACME**,
+la **clé d'hôte** du tunnel développeur et le **secret TOTP** de chaque compte passent par elle aussi. Un
+secret TOTP est un mot de passe qui ne change jamais - qui le lit calcule tous les codes que le compte
+acceptera - donc une base copiée n'en contient aucun en clair. Ceux écrits avant sont scellés au
+démarrage suivant.
 
 > [!WARNING]
 > **La clé reste un fichier local même avec une base externe.** C'est délibéré : elle scelle ce qui est
@@ -91,6 +94,21 @@ passent par elle aussi.
 > peut alors pas ouvrir ce qu'un autre a scellé. L'erreur le nomme - *the private key cannot be unsealed -
 > is this the vault key it was written with?* Posez `MEERKAT_VAULT_KEY` à la même valeur sur tous les
 > noeuds, avant le premier démarrage.
+
+### La faire tourner
+
+Un redémarrage avec deux clés :
+
+1. Posez la nouvelle clé dans `MEERKAT_VAULT_KEY` et celle qu'elle remplace dans
+   `MEERKAT_VAULT_KEY_PREVIOUS` (avec le fichier généré, son contenu est l'ancienne clé).
+   Le chart Helm a `vault.previousKey` pour cela.
+2. Redémarrez les noeuds. Chacun lit les deux clés, et le premier qui démarre rescelle tout
+   sous la nouvelle. Le journal dit combien de valeurs il a déplacées.
+3. Quand tous les noeuds tournent avec la nouvelle clé, retirez `MEERKAT_VAULT_KEY_PREVIOUS`.
+
+Rien n'est illisible entre-temps. Un noeud démarré avec la nouvelle clé seule, avant que les
+autres aient bougé, échoue sur la première valeur scellée qu'il lit, avec la même erreur qu'une
+mauvaise clé.
 
 ## Le coffre comme fichier
 
@@ -119,9 +137,5 @@ quotidien, qui liste ce qui approche et ce qui vient de passer, jamais la valeur
 
 ## Ce qui manque
 
-- **La rotation de la clé maîtresse** : il n'y a pas de ré-encryption globale, donc il n'y a pas
- de rotation.
 - **Un backend externe** : ni HashiCorp Vault, ni secrets Kubernetes ou Docker comme source
  alternative.
-- **Les secrets TOTP ne sont pas chiffrés au repos**. Ils ne passent pas par le coffre ; c'est
- écrit comme un manque connu, pas comme un détail.

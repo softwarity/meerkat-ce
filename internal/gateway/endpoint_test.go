@@ -47,8 +47,8 @@ func TestEndpointSecurityEnforcement(t *testing.T) {
 		UserID: "u1", TenantID: "t1", Type: store.MemberUser, Enabled: true,
 		BusinessAccess: store.BusinessAccess{Inherited: true},
 	}))
-	must(st.SaveRole(ctx, store.Role{ID: "r-ops", Name: "ops"}))
-	must(st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "t1", Name: "Ops", RoleIDs: []string{"r-ops"}}))
+	must(st.SaveRole(ctx, store.Role{Name: "ops"}))
+	must(st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "t1", Name: "Ops", Roles: []string{"ops"}}))
 	must(st.SetMemberGroups(ctx, "t1", "u1", []string{"g-ops"}))
 
 	route := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,

@@ -334,8 +334,8 @@ export class MembersMatrixComponent {
     });
     if (!ok) return;
     this.api.resetMemberPassword(this.tenantId(), u.id).subscribe({
-      next: ({ password }) =>
-        this.dialog.open(PasswordDialogComponent, { data: { username: u.username, password } }),
+      next: ({ password, validHours }) =>
+        this.dialog.open(PasswordDialogComponent, { data: { username: u.username, password, validHours } }),
       error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
     });
   }
@@ -352,7 +352,7 @@ export class MembersMatrixComponent {
         .afterClosed(),
     );
     if (!res) return;
-    this.api.createGroup(this.tenantId(), { name: res.name, description: res.description, roleIds: [] }).subscribe({
+    this.api.createGroup(this.tenantId(), { name: res.name, description: res.description, roles: [] }).subscribe({
       next: (g) => {
         this.groups.update((list) => [...list, g]);
         this.changed.emit();
@@ -377,7 +377,7 @@ export class MembersMatrixComponent {
     );
     if (!res || (res.name === g.name && res.description === (g.description ?? ''))) return;
     this.api
-      .updateGroup({ ...g, name: res.name, description: res.description, roleIds: g.roleIds ?? [] })
+      .updateGroup({ ...g, name: res.name, description: res.description, roles: g.roles ?? [] })
       .subscribe({
         next: (saved) => {
           this.groups.update((list) => list.map((x) => (x.id === saved.id ? saved : x)));

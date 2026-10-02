@@ -6,6 +6,8 @@ import { MatIconModule } from '@angular/material/icon';
 interface DialogData {
   username: string;
   password: string;
+  // How long it works before its owner replaces it (absent or 0: no limit).
+  validHours?: number;
 }
 
 // One-time password display (user creation / reset): the secret is shown once,
@@ -40,6 +42,9 @@ interface DialogData {
     <h2 mat-dialog-title i18n="@@Temporary_password_for_USERNAME">Temporary password for "{{ data.username }}"</h2>
     <mat-dialog-content>
       <p class="hint" i18n="@@Shown_once_copy_it_now">Shown once: copy it now, it cannot be retrieved later.</p>
+      @if (data.validHours) {
+        <p class="hint" i18n="@@Temporary_password_valid_HOURS">It works for {{ data.validHours }} hours, until its owner sets their own.</p>
+      }
       <div class="secret">
         <code>{{ data.password }}</code>
         <button matIconButton (click)="copy()" i18n-aria-label="@@Copy" aria-label="Copy">

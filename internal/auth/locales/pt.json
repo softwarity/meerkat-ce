@@ -49,6 +49,7 @@
   "emailHint": "Serve para voltar a entrar se perder a palavra-passe.",
   "emailNone": "nao definido",
   "errAccessEnded": "Este acesso terminou a %s.",
+  "errTemporaryExpired": "Esta palavra-passe temporária expirou. Peça uma nova a um administrador.",
   "errAccessNotOpen": "Este acesso abre a %s.",
   "errAvatarSize": "A fotografia tem de ficar abaixo de 200 KiB",
   "errAvatarType": "Use uma imagem png, jpeg ou webp",

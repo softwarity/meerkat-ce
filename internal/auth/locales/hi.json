@@ -49,6 +49,7 @@
   "emailHint": "पासवर्ड भूल जाने पर वापस अंदर आने के लिए।",
   "emailNone": "सेट नहीं है",
   "errAccessEnded": "यह पहुँच %s को समाप्त हो गई।",
+  "errTemporaryExpired": "इस अस्थायी पासवर्ड की अवधि समाप्त हो गई है। किसी व्यवस्थापक से नया पासवर्ड माँगें।",
   "errAccessNotOpen": "यह पहुँच %s को शुरू होती है।",
   "errAvatarSize": "फ़ोटो 200 KiB से कम रखें",
   "errAvatarType": "png, jpeg या webp छवि का उपयोग करें",

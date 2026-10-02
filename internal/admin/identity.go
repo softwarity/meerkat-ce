@@ -412,8 +412,8 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		return
 	}
 	u.ID = newID()
-	// A generated one-time password, shown once in the response - the archway
-	// pattern; temporary-password expiry arrives with the password policy.
+	// A generated one-time password, shown once in the response, and working
+	// for the policy's TemporaryHours until its owner sets their own.
 	password, err := randomSecret()
 	if err != nil {
 		a.internal(w, err)
@@ -438,7 +438,8 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		return
 	}
 	a.auditEvent(r.Context(), actor, "user.create", "user", created.ID, created.Username, "", "")
-	writeJSON(w, http.StatusCreated, map[string]any{"user": created, "password": password})
+	writeJSON(w, http.StatusCreated, map[string]any{"user": created, "password": password,
+		"validHours": a.st.GetPasswordPolicy(r.Context()).TemporaryHours})
 }
 
 func (a *API) updateUser(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -664,7 +665,8 @@ func (a *API) writeResetPassword(w http.ResponseWriter, r *http.Request, actor s
 		name = u.Username
 	}
 	a.auditEvent(r.Context(), actor, "user.reset-password", "user", id, name, tenantID, "temporary password issued")
-	writeJSON(w, http.StatusOK, map[string]string{"password": password})
+	writeJSON(w, http.StatusOK, map[string]any{"password": password,
+		"validHours": a.st.GetPasswordPolicy(r.Context()).TemporaryHours})
 }
 
 func (a *API) deleteUser(w http.ResponseWriter, r *http.Request, actor store.User) {

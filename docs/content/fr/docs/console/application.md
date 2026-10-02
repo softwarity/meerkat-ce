@@ -58,6 +58,8 @@ hérite sauf si elle définit la sienne.
 Les politiques sous lesquelles vivent tous les comptes. Un bouton Save en bas pour tout
 l'écran.
 
+![L'écran Security sur la politique de mot de passe : les genres de caractères, l'historique, l'expiration et la durée d'un mot de passe temporaire](img/console/security.webp)
+
 - **Two-factor** - exiger un second facteur pour tout le monde ; les organisations et
   les membres peuvent surcharger. A côté, **un code à usage unique par courriel** comme
   secours pour un utilisateur enrôlé qui n'atteint pas son authentificateur : il faut un
@@ -76,6 +78,9 @@ l'écran.
     passe expiré envoie la personne sur la page de changement plutôt que de terminer une
     session dans laquelle elle travaille. Un mot de passe dont l'âge est inconnu n'expire
     jamais.
+  - **Temporary (hours)** - combien de temps marche un mot de passe émis par un
+    administrateur avant que son titulaire le remplace. Au-delà, la connexion est
+    refusée. La fenêtre qui affiche le mot de passe dit combien de temps il marche.
   - **Force a change for everyone** (root) fait changer chaque compte local à sa
     prochaine connexion, sauf le vôtre. Un compte à la fois se fait dans
     [Users](/docs/console/users).

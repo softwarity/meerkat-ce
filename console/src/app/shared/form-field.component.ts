@@ -188,6 +188,12 @@ export class FormFieldComponent {
   protected readonly revealed = signal(false);
   protected readonly copied = signal(false);
   protected readonly empty = signal(true);
+  // Whether the projected control can be WRITTEN to. A disabled or read-only
+  // field still offered its clear cross, its vault picker and its action - all
+  // of which write - so the screen promised an edit the control refuses. The
+  // tools that only READ (copy, reveal) stay: looking at a value you may not
+  // change is a legitimate thing to do.
+  protected readonly writable = signal(true);
 
   constructor() {
     effect(() => {
@@ -212,8 +218,12 @@ export class FormFieldComponent {
     effect((onCleanup) => {
       const control = this.control();
       if (!control) return;
-      this.empty.set(control.empty);
-      const sub = control.stateChanges.subscribe(() => this.empty.set(control.empty));
+      const read = () => {
+        this.empty.set(control.empty);
+        this.writable.set(!control.disabled && !control.readonly);
+      };
+      read();
+      const sub = control.stateChanges.subscribe(read);
       onCleanup(() => sub.unsubscribe());
     });
   }

@@ -441,6 +441,9 @@ func observed(r *compiledRoute, req *http.Request, ww *watched, start time.Time)
 	if status == 0 {
 		status = http.StatusOK
 	}
+	// A gRPC call answers 200 and says how it went in grpc-status: counted
+	// by that, or a failing gRPC route reads as healthy (grpcstatus.go).
+	status = grpcAware(ww.Header(), status)
 	took := time.Since(start)
 	r.counters.Observe(status, took)
 	// And the operation, when the route can name one. The lookup happens once
