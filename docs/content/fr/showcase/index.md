@@ -60,8 +60,7 @@ navigation viennent de la console.
 ## L'exploiter
 
 ::: gallery
-![Le trafic](img/console/traffic.webp) Ce qui est passé, par route, avec les échecs distingués du silence.
-![Les métriques](img/console/metrics.webp) Latence et classes de statut sur la dernière heure, sans pile de métriques à installer.
+![Le trafic](img/console/traffic.webp) Le trafic en direct, sans rien installer : requêtes par seconde, latence moyenne et p95, refus distingués des échecs, et les routes classées par lenteur, échecs ou coût.
 ![Le journal d'audit](img/console/audit.webp) Chaque changement d'administration, avec son auteur et un diff champ par champ.
 ![Le coffre](img/console/vault.webp) Des secrets scellés au repos et des valeurs en clair, les deux référencés par leur nom.
 ![TLS](img/console/tls.webp) Les certificats, leurs noms et leur expiration, émis ou déposés.

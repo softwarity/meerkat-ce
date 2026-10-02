@@ -4,15 +4,21 @@
     "build": "CGO_ENABLED=0 go build -tags ee -o /tmp/meerkat-doc ./cmd/meerkat",
     "console": "the binary must EMBED the console, or the admin port answers a JSON status page: make ui first, or stage console/dist/console/browser into internal/admin/ui/dist",
     "edition": "Enterprise (-tags ee): the console's EE badges and the Enterprise screens are part of what is shown",
-    "upstream": "node scripts/screenshots-upstream.mjs  (keeps running: 127.0.0.1:8099, the service behind Docs portal and Orders API)",
-    "run": "MEERKAT_TENANCY=multi MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr 127.0.0.1:8086 -admin-addr 127.0.0.1:9096 -data /tmp/docdata",
+    "upstream": "node scripts/screenshots-upstream.mjs  (keeps running on 127.0.0.1:8099): the instance reaches the routes' services - http://docs:8080 and http://orders-api:8080, names of a stack - through it, as HTTP_PROXY",
+    "run": "HTTP_PROXY=http://127.0.0.1:8099 MEERKAT_TENANCY=multi MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8086 -admin-addr 127.0.0.1:9096 -data /tmp/docdata",
     "seed": "node scripts/screenshots-seed.mjs  (once, on an EMPTY data directory)",
     "ports": "8086/9096 and 8087/9097 on purpose: this repository's own dev instance runs on 8082 and 9092 and must never be disturbed",
-    "admin": "http://127.0.0.1:9096",
-    "data": "http://127.0.0.1:8086",
+    "admin": "http://gateway.acme.example:9096",
+    "data": "http://gateway.acme.example:8086",
     "signIn": "admin / test1234",
-    "dataset": "Acme Corp (the primary organisation, renamed), its logo and tagline. Five routes: Billing, Docs portal, Orders API, Inventory (maintenance), Catch-all. A role tree of nine roles with tags under three top-level roles, five accounts besides admin (one app admin, one infra admin), three groups (Finance, Front desk, Warehouse), a vault with two secrets and a value that routes use, a portal bar, two self-signed certificates and three TLS names, three control-plane tokens and two application tokens, two saved configurations, three schedules (a cadence, a cron line, one date), an OpenTelemetry collector at http://opentelemetry:4318, and the few updates the Audit caption describes. Orders API carries a deposited OpenAPI spec of 14 operations, five endpoint rules (a closed operation with a named exception, two role rules, two rate limits) and two audited operations. All in scripts/screenshots-seed.mjs.",
-    "traffic": "the Metrics screen shows the last minute only: screenshots.mjs starts `screenshots-seed.mjs --traffic-only` itself for the shots marked traffic, and takes them last"
+    "dataset": "Acme Corp (the primary organisation, renamed), its logo and tagline. Five routes, their services named as in a stack: Billing, Docs portal, Orders API, Inventory (maintenance), Catch-all. A role tree of nine roles with tags under three top-level roles, five accounts besides admin (one app admin, one infra admin), three groups (Finance, Front desk, Warehouse), a vault with two secrets and a value that routes use, a portal bar, two self-signed certificates and three TLS names, three control-plane tokens and two application tokens, two saved configurations, three schedules (a cadence, a cron line, one date), an OpenTelemetry collector at http://opentelemetry:4318, and the few updates the Audit caption describes. Orders API carries a deposited OpenAPI spec of 14 operations, five endpoint rules (a closed operation with a named exception, two role rules, two rate limits) and two audited operations. All in scripts/screenshots-seed.mjs.",
+    "traffic": "the Metrics screen shows the last minute only: screenshots.mjs starts `screenshots-seed.mjs --traffic-only` itself for the shots marked traffic, and takes them last",
+    "host": "gateway.acme.example: the name the browser is shown, mapped to 127.0.0.1 by Chromium (--host-resolver-rules), so no capture says localhost. The data plane listens on :8086 without an address, so the console derives the applications' origin from that name",
+    "loopback": {
+      "admin": "http://127.0.0.1:9096",
+      "data": "http://127.0.0.1:8086",
+      "why": "what the seed and the traffic use: Node resolves no made-up name"
+    }
   },
   "convert": "cwebp -quiet -q 82 -resize 1600 0 <shot>.png -o public/<file>  (done by screenshots.mjs --shoot)",
   "shots": [
@@ -349,8 +355,7 @@
       ],
       "usedBy": [
         "docs/console/traffic",
-        "docs/operations/traffic",
-        "showcase/index"
+        "docs/operations/traffic"
       ]
     },
     {
@@ -598,10 +603,14 @@
   "instances": {
     "single": {
       "why": "Application, Groups and Members exist only when the installation serves one organisation (singleTenantOnly); in multi mode the same tables live under each tenant, with the tenant's own navigation",
-      "run": "MEERKAT_TENANCY=single MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr 127.0.0.1:8087 -admin-addr 127.0.0.1:9097 -data /tmp/docdata-single",
+      "run": "HTTP_PROXY=http://127.0.0.1:8099 MEERKAT_TENANCY=single MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8087 -admin-addr 127.0.0.1:9097 -data /tmp/docdata-single",
       "seed": "node scripts/screenshots-seed.mjs --instance single",
-      "admin": "http://127.0.0.1:9097",
-      "data": "http://127.0.0.1:8087"
+      "admin": "http://gateway.acme.example:9097",
+      "data": "http://gateway.acme.example:8087",
+      "loopback": {
+        "admin": "http://127.0.0.1:9097",
+        "data": "http://127.0.0.1:8087"
+      }
     }
   }
 }

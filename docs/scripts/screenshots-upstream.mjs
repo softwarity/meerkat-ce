@@ -10,6 +10,11 @@
 //
 //   node docs/scripts/screenshots-upstream.mjs        (keeps running)
 //
+// The routes name their services as a stack would (http://docs:8080,
+// http://orders-api:8080), and the documentation instance runs with
+// HTTP_PROXY pointing here: a proxied request arrives with its whole address,
+// and only its path matters to what is answered.
+//
 // No dependency: node:http only.
 import { createServer } from 'node:http';
 

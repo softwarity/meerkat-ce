@@ -196,7 +196,9 @@ export class PageComponent {
       return;
     }
     const found: Shot[] = [];
-    const nodes = Array.from(root.querySelectorAll<HTMLElement>('img, .mk-figure svg'));
+    // The mark is the product's logo, not something to look at closer: it
+    // stays out of the viewer.
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>('img, .mk-figure:not(.mk-figure-meerkat) svg'));
     for (const node of nodes) {
       const caption = node.closest('figure')?.querySelector('figcaption')?.textContent?.trim() ?? '';
       const index = found.length;

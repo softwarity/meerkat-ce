@@ -97,7 +97,10 @@ if (mode === 'shoot' && shots.some((s) => s.traffic)) {
   trafficSince = Date.now();
 }
 
-const browser = await chromium.launch();
+// The made-up host the captures show resolves to this machine, in Chromium
+// only: an address bar, a link, a command never reads localhost.
+const shownHost = new URL(manifest.instance.admin).hostname;
+const browser = await chromium.launch({ args: [`--host-resolver-rules=MAP ${shownHost} 127.0.0.1`] });
 
 // One signed-in browser per instance, plane and colour scheme, made when a
 // shot first needs it.

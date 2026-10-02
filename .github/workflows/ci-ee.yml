@@ -723,6 +723,9 @@ jobs:
         with:
           bump: ${{ steps.bump.outputs.bump }}
           token: ${{ steps.token.outputs.token }}
+          # The chart's version and appVersion follow the release: what canopy
+          # deploys says which Meerkat it is.
+          helm-chart: deploy/helm/meerkat
           commit-user-name: softwarity-bot
           commit-user-email: bot@softwarity.io
         env:

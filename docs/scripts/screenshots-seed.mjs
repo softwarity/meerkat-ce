@@ -36,8 +36,10 @@ const which = flag('--instance', '');
 const instance = which ? { ...manifest.instance, ...(manifest.instances || {})[which] } : manifest.instance;
 const trafficOnly = args.includes('--traffic-only');
 const trafficSeconds = Number(trafficOnly ? flag('--traffic-only', '600') : flag('--traffic', '0'));
-const ADMIN = instance.admin;
-const DATA = instance.data;
+// Loopback when the manifest has it: the names the browser is shown exist
+// only in Chromium's resolver.
+const ADMIN = instance.loopback?.admin ?? instance.admin;
+const DATA = instance.loopback?.data ?? instance.data;
 const [ROOT_USER, ROOT_PASSWORD] = instance.signIn.split(' / ');
 // The accounts' own password, once they have replaced the one-time one. A
 // throwaway instance on loopback, like the root one in screenshots.json.
@@ -67,7 +69,10 @@ async function ok(res, what) {
 
 // ---- the data -------------------------------------------------------------
 
-const UPSTREAM = 'http://127.0.0.1:8099';
+// Service names, as a stack would have them: the instance runs with
+// HTTP_PROXY pointing at screenshots-upstream.mjs, which answers for both.
+const DOCS_SERVICE = 'http://docs:8080';
+const ORDERS_SERVICE = 'http://orders-api:8080';
 
 // A mark for Acme: a rounded square, a peak. Plain SVG, so it scales anywhere
 // the pages put it.
@@ -135,7 +140,7 @@ const ROUTES = [
   },
   {
     id: 'docs-portal', name: 'Docs portal', order: 2, enabled: true, isUi: true,
-    upstream: UPSTREAM,
+    upstream: DOCS_SERVICE,
     access: {},
     predicates: [{ type: 'path', args: { patterns: ['/docs/**'] } }],
     filters: [{ type: 'strip-prefix', args: { parts: 1, announcePrefix: true } }],
@@ -144,7 +149,7 @@ const ROUTES = [
   },
   {
     id: 'orders-api', name: 'Orders API', order: 3, enabled: true,
-    upstream: UPSTREAM,
+    upstream: ORDERS_SERVICE,
     access: { level: 'auth', roles: ['orders-viewer', 'partner'], users: ['t.nakamura'] },
     timeouts: { connect: 'PT1S', response: 'PT20S' },
     breaker: { enabled: true, trip: 5, cool: 'PT1M' },
