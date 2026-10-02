@@ -96,7 +96,7 @@ func TestAScheduledCallIsACallerWithRoles(t *testing.T) {
 // endpoint's gate asked for a session, which a scheduled call never has, and
 // answered 401 whatever roles the schedule carried.
 func TestAScheduledCallPassesAnEndpointRule(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(upstream.Close)
