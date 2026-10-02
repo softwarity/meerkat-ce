@@ -63,12 +63,14 @@ spec:
                 secretKeyRef:
                   name: {{ include "meerkat.vaultSecretName" . }}
                   key: {{ .Values.vault.existingSecretKey }}
-            # The key a rotation replaces, read only while it is there.
+            # The key a rotation replaces, read only while it is there. Its
+            # name defaults HERE as well as in values.yaml: an upgrade with
+            # --reuse-values keeps the old values and skips the new defaults.
             - name: MEERKAT_VAULT_KEY_PREVIOUS
               valueFrom:
                 secretKeyRef:
                   name: {{ include "meerkat.vaultSecretName" . }}
-                  key: {{ .Values.vault.existingSecretPreviousKey }}
+                  key: {{ .Values.vault.existingSecretPreviousKey | default "vault-key-previous" }}
                   optional: true
             {{- end }}
             {{- if or .Values.admin.password .Values.admin.existingSecret }}
