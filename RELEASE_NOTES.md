@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.0.2
+
 - **The console says which version it runs.** The account menu shows it, and a
   click opens the release notes.
 - **A heart per route says whether its target is up.** Green or broken, with the
