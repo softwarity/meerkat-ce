@@ -544,7 +544,7 @@ figcaption b { color: var(--ink); font-weight: 500; }
             <li><span><b>Audit log</b> of every administrative action, with a field-by-field diff, append-only, browsable in the console.</span><span class="tags"><span class="fid">AUD-01 AUD-02</span></span></li>
             <li><span><b>Scheduled calls</b>: a service asks to be called at the hour it names, and the gateway makes the call <b>through its own front door</b>, carrying the roles the schedule asks for, so the same rules apply as to a person - and there is no service account to create. Long work answers 202 and reports its progress. Nothing to embed in the service, no broker to install.</span><span class="tags"><span class="part">partly</span><span class="fid">SCHED-01</span></span></li>
             <li><span><b>Built-in dashboards</b>: traffic, latency and failures per route and per endpoint, with nothing to install.</span><span class="tags"><span class="fid">OBS-01</span></span></li>
-            <li><span><b>Prometheus export</b> with a ready-made Grafana dashboard and files ready for Swarm and Kubernetes.</span><span class="tags"><span class="ee">EE</span><span class="fid">OBS-05</span></span></li>
+            <li><span><b>Metrics pushed over OTLP</b> to your collector, which writes them into Prometheus, with a ready-made Grafana dashboard.</span><span class="tags"><span class="ee">EE</span><span class="fid">OBS-06</span></span></li>
             <li><span><b>Structured logs</b>: the level changes while the gateway runs, and an access log - one line per request, refusals included, carrying the account <b>as the gateway itself authenticated it</b>. That is the half of an audit no service can write: it never saw the call it was refused.</span><span class="tags"><span class="fid">OBS-03</span></span></li>
             <li><span><b>Distributed tracing</b>: the W3C context travels in both editions and every request gets an identifier, which <b>joins a line of the gateway's to a service's own business audit</b>. In EE the gateway puts itself on the trace - its own time, between the client and the service, which nobody else can measure. OTLP export to whatever the customer already runs, and the OpenTelemetry bundle injectable into UI pages, served by us and never by a CDN.</span><span class="tags"><span class="ee">EE</span><span class="fid">OBS-04</span></span></li>
             <li><span><b>Active/active cluster</b> on PostgreSQL, with no session affinity and no primary node.</span><span class="tags"><span class="ee">EE</span><span class="fid">PERF-03 STORE-03</span></span></li>
@@ -1052,7 +1052,7 @@ figcaption b { color: var(--ink); font-weight: 500; }
             <li>Multi-organization</li>
             <li>LDAP, Active Directory, group rules; SAML and Kerberos coming</li>
             <li>Active/active cluster on PostgreSQL</li>
-            <li>Prometheus export and Grafana dashboard</li>
+            <li>Metrics pushed over OTLP and Grafana dashboard</li>
             <li>Built-in plug: no agent to deploy, one SSH key per developer, announcement on pages</li>
             <li>Access time windows, white label, page layouts</li>
           </ul>

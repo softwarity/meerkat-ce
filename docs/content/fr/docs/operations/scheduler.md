@@ -203,8 +203,8 @@ tâche reprend, et l'écran dit pourquoi.
 ## L'API, et où elle vit
 
 Sur le **plan de contrôle**, pas sur celui de vos applications. Une tâche
-planifiée est un service que rend la passerelle, au même titre que l'exposition
-des métriques : aucun navigateur ne l'appelle. C'est un **backend** qui
+planifiée est un service que rend la passerelle, au même titre que le point
+d'entrée des agents : aucun navigateur ne l'appelle. C'est un **backend** qui
 l'appelle, depuis l'intérieur du cluster, par le nom interne de la passerelle.
 
 ```
@@ -227,8 +227,7 @@ http://meerkat:9090/api/schedules
 
 C'est un jeton du plan de contrôle, de **périmètre `schedules`** : il ouvre
 cette API et rien d'autre sur ce port - ni la configuration, ni les comptes, ni
-les routes. Même forme que le jeton d'un collecteur de métriques, et pour la
-même raison : il vit dans un manifeste de déploiement, souvent dans le dépôt
+les routes. Étroit exprès : il vit dans un manifeste de déploiement, souvent dans le dépôt
 d'une autre équipe, et c'est celui que personne ne pense à faire tourner.
 
 **Ce que les appels atteignent** ne se décide pas là : c'est le champ `roles`
@@ -525,6 +524,8 @@ compte, organisation et service, mis à jour en direct : une exécution qui
 démarre, avance et se termine apparaît sans rien rafraîchir. Trois actions y
 vivent, et ce sont celles qu'on veut à deux heures du matin : suspendre,
 avancer le prochain tour, supprimer.
+
+![L'écran Scheduler : une cadence, une ligne cron et une date unique, chacune avec son prochain tour et le dernier](img/console/scheduler.webp)
 
 Une exécution en cours dit où elle en est - **calling**, en attente de la
 réponse, ou **accepted**, le service a pris le travail - et à quelle tentative

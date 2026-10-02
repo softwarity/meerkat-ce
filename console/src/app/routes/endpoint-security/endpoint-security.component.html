@@ -5,6 +5,8 @@
     <h2>
       @if (intent() === 'limits') {
         <ng-container i18n="@@Endpoint_rate_limits">Endpoint rate limits</ng-container>
+      } @else if (intent() === 'audit') {
+        <ng-container i18n="@@Endpoint_audit">Endpoint audit</ng-container>
       } @else {
         <ng-container i18n="@@Endpoint_security">Endpoint security</ng-container>
       }
@@ -43,17 +45,27 @@
     </mat-select>
   </mat-form-field>
 
-  @if (intent() === 'limits') {
+  @if (intent() === 'audit') {
+    <p class="intro" i18n="@@Endpoint_audit_intro">
+      Which operations leave an audit event, sent to the collector when the
+      <a routerLink="/infra/opentelemetry">OpenTelemetry</a> audit is on.
+    </p>
+    @if (!auditSent()) {
+      <!-- Said where the switches are: an operation ticked here while the
+           audit is not sent is a trail that looks kept and is not. -->
+      <p class="audit-off" i18n="@@Endpoint_audit_not_sent">
+        <mat-icon inline>warning</mat-icon>
+        Nothing is sent: the audit is off in
+        <a routerLink="/infra/opentelemetry">OpenTelemetry</a>, tab Audit.
+      </p>
+    }
+  } @else if (intent() === 'limits') {
     <p class="intro" i18n="@@Endpoint_limits_intro">
-      How much each operation may carry, straight from the route's OpenAPI spec. Put a ceiling on
-      the one expensive operation without touching the cheap ones beside it. An operation you
-      leave untouched is bounded by whatever the route carries, and by nothing of its own.
+      Bound an operation of the route's OpenAPI spec. One left untouched only has the route's limits.
     </p>
   } @else {
     <p class="intro" i18n="@@Endpoint_security_intro">
-      Who may call each operation, straight from the route's OpenAPI spec: prototype roles before
-      wiring them into the backend, centralize access control, or protect a backend you cannot
-      modify. An operation you leave untouched keeps being secured by the backend itself.
+      Who may call each operation of the route's OpenAPI spec. One left untouched follows the route's rule.
     </p>
   }
 </header>
@@ -66,7 +78,7 @@
   <div class="notice">
     <mat-icon>info</mat-icon>
     <span i18n="@@No_api_routes_with_spec">
-      No route exposes an OpenAPI spec yet. Add a Swagger URL to an API route, then come back here.
+      No route exposes an OpenAPI spec yet. Add a Swagger URL to an API route.
     </span>
     <a matButton [routerLink]="['/infra/routes']" i18n="@@Go_to_routes">Go to routes</a>
   </div>
@@ -99,7 +111,16 @@
                them two pages rather than one listed twice: an access rule has
                no business on the page about bounds, and a bound none on the
                page about who may call. -->
-          @if (intent() === 'limits') {
+          @if (intent() === 'audit') {
+            @if (auditOf(o); as a) {
+              <span class="bound" [matTooltip]="a.description || ''">
+                <mat-icon inline>fact_check</mat-icon>
+                {{ (a.fields?.length || 0) + (a.body ? 1 : 0) }}
+              </span>
+            } @else {
+              <span class="unbound">&mdash;</span>
+            }
+          } @else if (intent() === 'limits') {
             @if (stateOf(o).limits.length) {
               @for (l of stateOf(o).limits; track $index) {
                 <span class="bound" [matTooltip]="scopeTip(l)">
@@ -198,7 +219,11 @@
   </div>
 
   <footer class="foot">
-    @if (intent() === 'limits') {
+    @if (intent() === 'audit') {
+      <span class="count" i18n="@@endpoints_audited_summary">
+        {{ (data()?.operations)?.length || 0 }} operations, {{ auditedCount() }} audited
+      </span>
+    } @else if (intent() === 'limits') {
       <span class="count" i18n="@@endpoints_bounded_summary">
         {{ (data()?.operations)?.length || 0 }} operations, {{ boundCount() }} bounded
       </span>
@@ -212,7 +237,7 @@
         [checked]="denyUnlisted()"
         (change)="setDenyUnlisted($event.checked)"
         i18n-matTooltip="@@Deny_unlisted_tooltip"
-        matTooltip="An operation with no rule of its own is refused to everyone instead of following the route's rule - including an endpoint the service adds later."
+        matTooltip="An operation with no rule of its own is refused to everyone, including one added later."
       >
         <span i18n="@@Deny_unlisted">Only listed operations are reachable</span>
       </mat-slide-toggle>
@@ -223,7 +248,7 @@
       @if (overriddenCount(); as n) {
         <span class="count"
           i18n-matTooltip="@@Overridden_tooltip"
-          matTooltip="These operations carry a rule of their own. The others are gated by the route's rule, shown greyed on each line."
+          matTooltip="Operations with a rule of their own. The others follow the route's rule."
           i18n="@@endpoints_secured_split"
         >{{ byRouteCount() }} by the route, {{ n }} overridden</span>
       }
@@ -234,7 +259,7 @@
     @if (strayCount(); as n) {
       <span class="count stray"
         i18n-matTooltip="@@Stray_rules_tooltip"
-        matTooltip="Saved rules whose method and path match no operation of this spec. They are kept, and they gate nothing that is listed here: the spec has probably moved under them."
+        matTooltip="Saved rules matching no operation of this spec, probably left behind by a spec change. They are kept."
       >{{ n }} rule(s) matching no operation</span>
     }
     <span class="spacer"></span>
@@ -298,14 +323,81 @@
              entry is in the menu, one click away, on the same row. A page
              called Endpoint rate limits showing a security editor is the
              same drift the whole-route bar was, one floor down. -->
-        @if (intent() === 'limits') {
+        @if (intent() === 'audit') {
+<section id="sec-audit">
+          <h3 i18n="@@Audit">Audit</h3>
+          <mat-slide-toggle [checked]="!!auditOf(o)" (change)="setAudited(o, $event.checked)">
+            <span i18n="@@Audit_this_operation">Audit this operation's calls</span>
+          </mat-slide-toggle>
+          @if (auditOf(o); as a) {
+            <p class="hint" i18n="@@Audit_always_carried">
+              Always carried: the caller, the operation, the path, the status and the trace id.
+            </p>
+            <mat-form-field class="wide" subscriptSizing="dynamic">
+              <mat-label i18n="@@Audit_description">What the call means</mat-label>
+              <input matInput [value]="a.description ?? ''" (change)="patchAudit(o, { description: $any($event.target).value })" />
+            </mat-form-field>
+
+            <h4 i18n="@@Audit_fields">Taken from the call</h4>
+            @for (f of a.fields ?? []; track $index; let i = $index) {
+              <div class="audit-field">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label i18n="@@Audit_field_name">Name</mat-label>
+                  <input matInput [value]="f.name" (change)="setAuditField(o, i, { name: $any($event.target).value })" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label i18n="@@Audit_field_from">From</mat-label>
+                  <mat-select [value]="f.from" (selectionChange)="setAuditField(o, i, { from: $event.value })">
+                    @for (src of auditSources; track src.value) {
+                      <mat-option [value]="src.value">{{ src.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label i18n="@@Audit_field_key">Key</mat-label>
+                  <input
+                    matInput
+                    [value]="f.key"
+                    [placeholder]="f.from === 'body' ? '/order/id' : f.from === 'header' ? 'X-Client' : 'id'"
+                    (change)="setAuditField(o, i, { key: $any($event.target).value })"
+                  />
+                </mat-form-field>
+                <button matIconButton type="button" (click)="removeAuditField(o, i)" i18n-aria-label="@@Remove" aria-label="Remove">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            }
+            <button matButton type="button" (click)="addAuditField(o)">
+              <mat-icon>add</mat-icon>
+              <ng-container i18n="@@Audit_add_field">Add a field</ng-container>
+            </button>
+
+            <h4 i18n="@@Audit_body">Body</h4>
+            <mat-slide-toggle [checked]="!!a.body" (change)="patchAudit(o, { body: $event.checked })">
+              <span i18n="@@Audit_include_body">Include the JSON body</span>
+            </mat-slide-toggle>
+            @if (a.body) {
+              <mat-form-field class="wide" subscriptSizing="dynamic">
+                <mat-label i18n="@@Audit_mask">Masked fields</mat-label>
+                <input
+                  matInput
+                  [value]="(a.mask ?? []).join(', ')"
+                  [placeholder]="defaultMask"
+                  (change)="setAuditMask(o, $any($event.target).value)"
+                />
+              </mat-form-field>
+              <p class="hint" i18n="@@Audit_body_hint">
+                JSON only, 64 KB at most. These fields are masked at any depth; empty, the default list applies.
+              </p>
+            }
+          }
+        </section>
+        } @else if (intent() === 'limits') {
 <section id="sec-limits">
           <h3 i18n="@@Rate_limits">Rate limits</h3>
           <p class="sub" i18n="@@What_this_operation_may_carry">What this operation may carry</p>
           <p class="hint" i18n="@@Op_limits_hint">
-            On top of the route's own bounds, which still apply. Written here for the few
-            operations that need one, never as a default over the whole inventory: a bound is a
-            counter per operation and per caller.
+            On top of the route's own limits, which still apply.
           </p>
           <app-rate-limits
             scope="operation"

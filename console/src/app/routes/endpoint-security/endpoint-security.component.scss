@@ -489,3 +489,29 @@ mat-drawer {
   color: var(--mat-sys-error);
   cursor: help;
 }
+
+// Endpoint audit: one line per field taken from the call.
+.audit-field {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+#sec-audit .wide {
+  width: 100%;
+  margin: 8px 0;
+}
+#sec-audit h4 {
+  margin: 16px 0 8px;
+  font-weight: 500;
+}
+
+// The audit is not sent at all: said above the switches it makes moot.
+.audit-off {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--mat-sys-corner-small, 4px);
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}

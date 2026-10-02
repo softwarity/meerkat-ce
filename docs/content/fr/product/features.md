@@ -27,12 +27,13 @@ Les pages que vos utilisateurs voient, servies par la gateway, à vos couleurs.
 
 - **Pages de connexion servies** : login, mot de passe oublié, vérification d'e-mail, inscription en option, dans 20 langues, thème, logo et fond d'écran à votre marque. `AUTH-01 THEME-01`
 - **Mot de passe** avec politique configurable et historique, anti-force brute partagé par tous les nœuds, messages qui ne trahissent pas l'existence d'un compte. `AUTH-10 AUTH-11`
-- **Second facteur TOTP** avec QR code et codes de secours, repli par code e-mail, navigateurs de confiance, MFA obligatoire global, par autorité ou par utilisateur. `MFA-01 à 04`
+- **Second facteur TOTP** avec QR code et codes de secours, repli par code e-mail, navigateurs de confiance. `MFA-01 à 03`
+- **MFA obligatoire** global, par autorité ou par utilisateur. *partiel* `MFA-04`
 - **Passkeys WebAuthn** : clé physique, empreinte, Windows Hello, en premier facteur. *partiel* `AUTH-15`
 - **Fédération OIDC et GitHub** : Entra ID, Okta, Google, Keycloak ou tout IdP conforme, pour le premier facteur. `AUTH-04`
 - **LDAP et Active Directory**, et règles de groupe : un groupe d'annuaire, une équipe GitHub ou un claim OIDC devient une appartenance et des rôles. **Enterprise** `AUTH-03 RBAC-10`
 - **Connexion par code e-mail** : un code à usage unique à la place du mot de passe, lié au navigateur qui l'a demandé, dix minutes, jamais sur la console, et le second facteur tourne quand même derrière. Livré éteint. *partiel* `AUTH-16`
-- **Jetons d'API** personnels et machine à machine, secret affiché une seule fois. *partiel* `AUTH-09`
+- **Jetons d'API** personnels et machine à machine, secret affiché une seule fois. `AUTH-09`
 - **Comptes** avec fenêtre de validité en jours, champs propres à votre métier transmis aux applications, alerte e-mail sur connexion depuis un nouveau navigateur. `MODEL-01 MODEL-02 AUTH-23`
 
 ## Droits et organisations
@@ -88,7 +89,7 @@ Ce que la gateway ajoute aux pages qu'elle sert.
 À lire : [Ce que la passerelle injecte](/docs/concepts/data-plane-chrome).
 
 - **Bouton utilisateur** injecté : profil, déconnexion, changement d'organisation, langue, clair ou sombre. `UIF-03 UIF-05`
-- **Portail de navigation** entre vos applications, en barre ou en rail, qui ne montre que ce que les droits autorisent. *partiel* `PORTAL-01`
+- **Portail de navigation** entre vos applications, en barre ou en rail, qui ne montre que ce que les droits autorisent. `PORTAL-01`
 - **Masquer l'interface selon les rôles** en CSS pur : les rôles sont posés sur la page côté serveur. CSS et JavaScript injectables par route. `UIF-02 UIF-06`
 - **Signalement d'anomalies** : capture d'écran, console, contexte technique, suivi dans la console d'administration. `ISSUE-01 à 04`
 - **Canal temps réel** WebSocket vers les applications, sans intégration préalable. `UIF-04`
@@ -113,11 +114,14 @@ Une console qui remplace les fichiers YAML et les pipelines de configuration.
 À lire : [Exploitation](/docs/operations/overview).
 
 - **Configurations versionnées** : plusieurs versions nommées, une active, comparaison, export et import YAML, point de reprise automatique à chaque changement. `CFG-01 à 06`
-- **Journal d'audit** de chaque action d'administration, avec le diff champ par champ, et de la sécurité des comptes - chaque connexion, chaque connexion refusée avec sa vraie raison et son adresse, chaque facteur, passkey, mot de passe ou jeton changé par son titulaire. En ajout seul, consultable dans la console. `AUD-01 AUD-02`
+- **Journal d'audit** de chaque action d'administration, avec le diff champ par champ, et de la sécurité des comptes - chaque connexion, chaque connexion refusée avec sa vraie raison et son adresse, chaque facteur, passkey, mot de passe ou jeton changé par son titulaire. En ajout seul, consultable dans la console. *partiel* `AUD-01 AUD-02`
+- **Audit envoyé au collecteur** en OTLP : les événements de sécurité du plan de données, et les changements de la console aussi. **Enterprise** `AUD-03`
+- **Audit des endpoints** : un interrupteur par opération de la spec OpenAPI d'une route, et chaque appel devient un événement d'audit. **Enterprise** *partiel* `AUD-04`
+- **Export CSV** du journal d'audit. Parquet reste à livrer. **Enterprise** *partiel* `STORE-06`
 - **Tableaux de bord intégrés** : trafic, latence et échecs par route et par endpoint, sans rien installer. `OBS-01`
-- **Export Prometheus**, sur un port à lui avec un jeton facultatif, avec tableau de bord Grafana fourni et fichiers prêts pour Swarm et Kubernetes - et les mêmes compteurs **poussés en OTLP** vers le collecteur des traces. **Enterprise** `OBS-05`
-- **Journaux structurés**, en JSON ou en texte, et un **journal d'accès** - une ligne par requête franchissant la porte d'entrée, refus compris, avec le compte tel que la passerelle l'a authentifié. C'est la moitié de l'audit qu'aucun service ne peut écrire : il n'a jamais vu l'appel qu'on lui a refusé, et il ne sait de l'appelant que ce qu'on lui en a dit. `OBS-03`
-- **Traces distribuées** (W3C Trace Context) : le contexte traverse dans les deux éditions et un identifiant est posé sur chaque requête - rendu à l'appelant, écrit dans le journal, au pied des pages intégrées -, ce qui **joint une ligne de la passerelle à l'audit métier d'un service**. En Enterprise, la passerelle se déclare sur la trace : son span d'entrée, celui de l'appel amont, et l'écart entre les deux qui est son temps propre. Export **OTLP** vers l'OpenTelemetry Collector, Tempo, Jaeger ou un éditeur. Le paquet OpenTelemetry peut être injecté dans les pages UI - servi par Meerkat, jamais par un CDN - pour que la trace commence au clic. **Enterprise** `OBS-04`
+- **Métriques poussées en OTLP** vers le collecteur des traces, qui les écrit dans Prometheus - avec un tableau de bord Grafana fourni. **Enterprise** `OBS-06`
+- **Journaux structurés**, en JSON ou en texte, et un **journal d'accès** - une ligne par requête franchissant la porte d'entrée, refus compris, avec le compte tel que la passerelle l'a authentifié. C'est la moitié de l'audit qu'aucun service ne peut écrire : il n'a jamais vu l'appel qu'on lui a refusé, et il ne sait de l'appelant que ce qu'on lui en a dit. Les deux journaux peuvent s'écrire en JSON OpenTelemetry pour un agent Collector, ou être poussés au collecteur (**Enterprise**). *partiel* `OBS-03`
+- **Traces distribuées** (W3C Trace Context) : le contexte traverse dans les deux éditions et un identifiant est posé sur chaque requête - rendu à l'appelant, écrit dans le journal, au pied des pages intégrées -, ce qui **joint une ligne de la passerelle à l'audit métier d'un service**. En Enterprise, la passerelle se déclare sur la trace : son span d'entrée, celui de l'appel amont, et l'écart entre les deux qui est son temps propre. Export **OTLP** vers un OpenTelemetry Collector ou tout endpoint OTLP. Le paquet OpenTelemetry peut être injecté dans les pages UI - servi par Meerkat, jamais par un CDN - pour que la trace commence au clic. **Enterprise** *partiel* `OBS-04`
 - **Cluster actif/actif** sur PostgreSQL, sans affinité de session ni nœud primaire. **Enterprise** `PERF-03 STORE-03`
 - **E-mails transactionnels** aux couleurs du thème et résumé quotidien des comptes qui expirent. `NOTIF-01 NOTIF-04`
 - **Déploiement** : une image, base embarquée par défaut, Docker, Swarm ou Kubernetes avec chart Helm, sondes de vivacité et de disponibilité, amorçage par fichier. `DEPLOY-01 OBS-02 LIFE-02`

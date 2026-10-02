@@ -10,8 +10,12 @@ summary: Piloter Meerkat sans navigateur - un jeton pour un script, une connexio
 Trois écrans, un sujet : travailler sur cette passerelle depuis l'extérieur de la
 console.
 
-- **Infra > Access tokens** (root) frappe une clé pour un script ou un pipeline.
-- **Infra > MCP** (root) branche un assistant, et ne produit aucune clé.
+- **Access tokens** est sur les deux plans. Sous **Infra**, il frappe des jetons
+  de console pour un script ou un pipeline. Sous **Application**, il liste aussi
+  les jetons d'application : un admin d'application voit ceux de tout le monde
+  et peut les révoquer.
+- **Infra > MCP** (admins infra) branche un assistant, et ne produit aucune
+  clé.
 - **API** (rail) est la référence des appels que les deux font.
 
 ## Access tokens
@@ -20,18 +24,18 @@ Un jeton d'administration ouvre l'API de la console sans navigateur. Il agit **a
 propres pouvoirs**, restreints par son périmètre, et s'authentifie sur le port
 d'administration en `Authorization: Bearer mk_...`.
 
-![L'écran Access tokens : trois jetons avec leur périmètre, leur préfixe, leur date de création et leur expiration](img/console/access-tokens.webp)
+![L'écran Access tokens : trois jetons de console et deux jetons d'application, avec leur propriétaire, leur plan, leur périmètre et leur dernier usage](img/console/access-tokens.webp)
 
-Trois jetons : un full access sur le plan de routage, un read only sur l'identité
-applicative, et un read only restreint à `10.0.0.0/8`. Chaque ligne porte son
-interrupteur, l'édition, le nouveau secret et la révocation.
+Cinq jetons : trois pour la console - full access depuis `10.20.0.0/16` seulement,
+read only, et scheduled calls only - et deux jetons d'application créés par leurs
+propriétaires sur leur profil. Une ligne ouvre son tiroir.
 
 En créer un pose cinq questions :
 
 | Champ | Ce qu'il décide |
 |---|---|
 | **Token name** | Ce que vous reconnaîtrez dans la liste et dans le journal d'audit |
-| **Perimeter** | *Metrics only* n'ouvre que `/metrics` ; *Read only* lit et lance les testeurs ; *Full access* fait tout ce que vous pouvez faire |
+| **Perimeter** | *Scheduled calls only* n'ouvre que `/api/schedules` ; *Read only* lit et lance les testeurs ; *Full access* fait tout ce que vous pouvez faire |
 | **Acts on** | Le plan de routage, l'identité applicative, ou tout ce que vous pouvez faire |
 | **Used from** | Des adresses ou des plages CIDR, séparées par des virgules. Jugées sur l'adresse qui se connecte, jamais sur un en-tête transmis |
 | **Expiry** | Jamais, 30 jours, 90 jours, ou un an |
@@ -98,6 +102,6 @@ pilote.
   pouvoirs.
 - **Un agent branché n'est pas dans la liste des jetons.** C'est une connexion, et elle
   se voit et se coupe sous MCP.
-- **Le périmètre metrics existe pour les scrapers** : une crédentiale qui vit dans le
-  dépôt d'une stack de supervision est celle qui a le plus de chances de fuiter et le
-  moins d'être tournée. Voir [Metrics](/docs/console/traffic).
+- **Le périmètre des appels planifiés existe pour les services** : une crédentiale qui
+  vit dans un manifeste de déploiement est celle qui a le plus de chances de fuiter et le
+  moins d'être tournée. Voir [les appels planifiés](/docs/operations/scheduler).

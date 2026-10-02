@@ -198,7 +198,7 @@ own cadence takes over, and the screen says why.
 ## The API, and where it lives
 
 On the **control plane**, not on the one your applications answer. A scheduled
-call is a service the gateway provides, like the metrics exposition: no browser
+call is a service the gateway provides, like the agent endpoint: no browser
 calls it. A **backend** does, from inside the cluster, by the gateway's internal
 name.
 
@@ -222,8 +222,7 @@ http://meerkat:9090/api/schedules
 
 A control-plane token whose **perimeter is `schedules`**: it opens this API and
 nothing else on this port - not the configuration, not the accounts, not the
-routes. The same shape as a metrics scraper's token, and for the same reason:
-it lives in a deployment manifest, often in another team's repository, and it
+routes. Narrow on purpose: it lives in a deployment manifest, often in another team's repository, and it
 is the one nobody remembers to rotate.
 
 **What the calls may reach** is not decided here: it is the schedule's own
@@ -512,6 +511,8 @@ thing, you need a broker.
 organisation and service, updated live: a run starting, advancing and finishing
 appears without refreshing anything. Three actions live there, and they are the
 ones wanted at two in the morning: pause, bring the next turn forward, remove.
+
+![The Scheduler screen: a cadence, a cron line and one date, each with its next run and its last](img/console/scheduler.webp)
 
 A run in flight says where it stands - **calling**, waiting for the answer, or
 **accepted**, the service took the work - and which attempt it is when a

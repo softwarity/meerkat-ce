@@ -128,3 +128,6 @@ quelle adresse, quel plan, depuis quand - filtrées par compte, par pages. Root 
 deux plans ; un administrateur d'application les sessions des applications seulement,
 puisque qui fait tourner la console, et d'où, est l'affaire de root. En fermer une écrit
 `session.revoke` au [journal d'audit](/docs/operations/audit).
+
+![Application, Sessions : qui est connecté, depuis quel navigateur et quelle adresse, sur quel plan, et depuis quand](img/console/sessions.webp)
+

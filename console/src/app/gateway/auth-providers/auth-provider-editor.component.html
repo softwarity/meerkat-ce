@@ -25,8 +25,7 @@
   <p class="hint text-muted">
     @if (kind() === 'oidc') {
       <ng-container i18n="@@Kind_oidc_hint">
-        An identity provider the browser is sent to. The token it returns is verified against its
-        published keys, so nothing is taken on trust.
+        An identity provider the browser is sent to; its token is verified against its keys.
       </ng-container>
     } @else if (kind() === 'ldap') {
       <app-ee-lock
@@ -35,14 +34,13 @@
         why="Plug an LDAP directory or an Active Directory in straight, instead of going through an identity provider."
       />
       <ng-container i18n="@@Kind_ldap_hint">
-        A directory asked directly, with what the person typed in the ordinary sign-in form. No
-        button appears on the login page.
+        A directory checked with what the person typed in the sign-in form. No button on the
+        login page.
       </ng-container>
     } @else if (kind() === 'github') {
       <ng-container i18n="@@Kind_github_hint">
-        GitHub proves the account, but signs nothing: there is no token to verify, so the trust
-        rests on the exchange and on TLS. Restrict the organisations below unless you mean to open
-        the door to every GitHub account.
+        Sign in with a GitHub account. Restrict the organisations below, or any GitHub account
+        gets in.
       </ng-container>
     } @else {
       <ng-container i18n="@@Kind_saml_hint">Not available yet.</ng-container>
@@ -66,8 +64,7 @@
       }
       @if (kind() === 'github') {
         <p class="hint text-muted" i18n="@@Github_setup_hint">
-          Register an OAuth app on GitHub with these two addresses, then paste back the Client ID
-          and the secret it gives you.
+          Register an OAuth app on GitHub with these addresses, then paste its Client ID and secret.
         </p>
         <!-- Straight to the form rather than a path through four menus. -->
         <a matButton href="https://github.com/settings/applications/new" target="_blank" rel="noopener">
@@ -77,9 +74,8 @@
       }
       @if (localOrigin()) {
         <p class="hint text-muted" i18n="@@Local_origin_warning">
-          These addresses come from the one you reached this gateway by. In production, register
-          the public domain name instead: a vendor handed a localhost sends everyone back to a
-          machine that is not yours.
+          These addresses use the one you reached this gateway by. In production, register the
+          public domain name instead.
         </p>
       }
     </div>
@@ -173,8 +169,7 @@
     </app-form-field>
 
     <p class="hint text-muted" i18n="@@Allowed_orgs_groups_hint">
-      These organisations and teams also come back as groups - "org" for an organisation,
-      "org/team" for a team - which a tenant's group rule can turn into roles.
+      They also come back as groups ("org", "org/team"), which a tenant's group rule can map to roles.
     </p>
 
   }
@@ -239,8 +234,7 @@
       </mat-select>
     </mat-form-field>
     <p class="hint text-muted" i18n="@@Auto_create_hint">
-      A first sign-in through this authority creates the account. Refused, only people already
-      linked may come in.
+      A first sign-in creates the account. Refused, only accounts already linked get in.
     </p>
 
     <mat-form-field>

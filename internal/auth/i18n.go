@@ -61,8 +61,10 @@ func contains(list []string, v string) bool {
 }
 
 // matchAcceptLanguage picks the first OFFERED language of the header - enough
-// for a small catalogue, no full RFC 4647 machinery. Nothing matches -> the
-// integrator's first language.
+// for a small catalogue, no full RFC 4647 machinery. Nothing matches -> English
+// when a route speaks it, the first offered language otherwise: the offer is
+// sorted, and a visitor who said nothing was greeted in German because "de"
+// comes before "en".
 func matchAcceptLanguage(header string, offered []string) string {
 	for _, part := range strings.Split(header, ",") {
 		lang := strings.ToLower(strings.TrimSpace(strings.SplitN(part, ";", 2)[0]))
@@ -70,10 +72,10 @@ func matchAcceptLanguage(header string, offered []string) string {
 			return lang[:2]
 		}
 	}
-	if len(offered) > 0 {
-		return offered[0]
+	if len(offered) == 0 || contains(offered, "en") {
+		return "en"
 	}
-	return "en"
+	return offered[0]
 }
 
 // offeredLanguages is what the FLOW PAGES speak: every language this gateway's

@@ -113,7 +113,7 @@ Pour une requête, la langue est choisie dans cet ordre :
 
 1. le cookie `MEERKAT_LANG`, s'il nomme une langue que vous proposez ;
 2. `Accept-Language`, apparié sur l'étiquette de langue ;
-3. la première langue que vous proposez, et à défaut l'anglais.
+3. l'anglais si une route le parle, sinon la première langue proposée.
 
 Le choix d'une personne est écrit sur son compte et reposé dans le cookie quand elle
 se connecte : sa langue la suit sur un nouveau navigateur. L'arabe et l'hébreu sont

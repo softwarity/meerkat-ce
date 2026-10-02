@@ -27,7 +27,7 @@ func TestDeduceTemplate(t *testing.T) {
 		{"/blobs/5f2b8c1d9e4a7b3c6d8e0f1a2b3c4d5e", "/blobs/{id}"},
 		// Not the 8-4-4-4-12 dialect, and it must fold all the same: a strict
 		// UUID test let these through, and each one that gets through is a
-		// series of its own here AND in whatever scrapes this gateway.
+		// series of its own here AND in whatever collector receives the counters.
 		{"/anything/000001832bb2-4486-305d-7e5e-00007ffe02cb", "/anything/{id}"},
 		{"/t/9f86d081-884c-7d65-9a2f-eaa0c55ad015", "/t/{id}"},
 		// A dash-only segment names nothing: there has to be a hex digit.

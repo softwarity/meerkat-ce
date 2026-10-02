@@ -27,9 +27,10 @@ type TelemetryConfig struct {
 	// Traces sends this gateway's spans (OBS-04). Which routes produce any is
 	// still each route's own answer.
 	Traces bool `json:"traces"`
-	// Metrics pushes the same counters /metrics exposes, over OTLP, to the
-	// same collector (OBS-05): the other way out for an installation whose
-	// stack receives rather than scrapes. Cumulative, one resource per node.
+	// Metrics pushes the counters the console's Metrics screen draws, over
+	// OTLP, to the same collector (OBS-06): the one way they leave this
+	// gateway, for a collector to write into Prometheus or whatever the stack
+	// keeps them in. Cumulative, one resource per node.
 	Metrics bool `json:"metrics,omitempty"`
 	// Endpoint is the collector's BASE address. The /v1/traces path is added
 	// by the exporter: a caller writing it themselves writes it wrong once.
@@ -62,6 +63,26 @@ type TelemetryConfig struct {
 	// deepens the ones already sampled - but each of those weighs more in the
 	// collector.
 	GatewayDetail bool `json:"gatewayDetail,omitempty"`
+	// Caller names the signed-in caller on the spans: the account's and the
+	// organisation's ids and names. Off by default - a person in a trace is
+	// personal data leaving for a collector somebody else may run.
+	Caller bool `json:"caller,omitempty"`
+	// Logs writes the gateway's two logs - operational and access - in
+	// OpenTelemetry's JSON log format, on the same outputs. Nothing is pushed:
+	// a Collector running as a DaemonSet reads the containers' outputs. So it
+	// does not depend on Enabled, nor on a collector address.
+	Logs bool `json:"logs,omitempty"`
+	// LogsPush PUSHES both logs to the collector over OTLP instead (the other
+	// way out, for a node with no agent): the outputs keep the format chosen
+	// at startup. One or the other - both would deliver every line twice.
+	LogsPush bool `json:"logsPush,omitempty"`
+	// Audit sends the DATA PLANE's audit to the collector, as logs marked
+	// meerkat.stream=audit (AUD-03, AUD-04): the accounts' sign-ins and
+	// refusals, and the calls of the audited endpoints.
+	Audit bool `json:"audit,omitempty"`
+	// AuditConsole sends the console's audit too: its changes and its
+	// sign-ins. A copy: that trail stays in the database.
+	AuditConsole bool `json:"auditConsole,omitempty"`
 }
 
 // WHERE THE BROWSER HALF WENT. It used to be a switch here - "start traces in
@@ -95,8 +116,11 @@ func (c TelemetryConfig) ExportsMetrics() bool { return c.Enabled && c.Metrics }
 // SanitizeTelemetry refuses what cannot work, and names what is allowed.
 func SanitizeTelemetry(c *TelemetryConfig) error {
 	c.Endpoint = strings.TrimRight(strings.TrimSpace(c.Endpoint), "/")
-	if c.Enabled && !c.Traces && !c.Metrics {
-		return fmt.Errorf("the export is on and would send nothing: choose traces, metrics, or both")
+	if c.Logs && c.LogsPush {
+		return fmt.Errorf("the logs are either written for an agent or pushed to the collector, not both: every line would arrive twice")
+	}
+	if c.Enabled && !c.Traces && !c.Metrics && !c.Audit && !c.AuditConsole && !c.LogsPush {
+		return fmt.Errorf("the export is on and would send nothing: choose traces, metrics or the audit")
 	}
 	if c.Enabled && c.Endpoint == "" {
 		return fmt.Errorf("the export needs a collector to send to, such as http://otel-collector:4318")

@@ -484,28 +484,6 @@ const (
 	// exists at all, and it lives on the Access tokens screen, next to the
 	// tokens that open it.
 	SettingAgentEnabled = "agent_enabled"
-	// SettingMetricsEndpoint opens /metrics on the control plane (OBS-05), for
-	// a Prometheus to scrape. Enterprise: the counters and the built-in
-	// screens are in both editions - that is the zero-dependency promise, and
-	// the community image has curves with nothing to install - what is sold is
-	// EXTERNALISING them into the monitoring stack a customer already runs.
-	//
-	// Ships OFF, like the agent endpoint and for the same reason: a surface
-	// nobody asked for should not appear on an upgrade. A token of scope
-	// metrics is still required either way; this says the door exists at all.
-	SettingMetricsEndpoint = "metrics_endpoint"
-	// SettingMetricsTokenRequired says whether the METRICS port asks a scraper
-	// for a token. Off by default, which is how PostgreSQL's and RabbitMQ's
-	// exporters ship: that port is never published, so what keeps it private
-	// is the network, and a credential in a scrape configuration is one more
-	// secret to rotate for nothing. The control plane's /metrics asks for one
-	// whatever this says - that port is the one an ingress may put in front of
-	// a browser.
-	SettingMetricsTokenRequired = "metrics_token_required"
-	// SettingMetricsPort is the port the gateway opens for scrapers while the
-	// exposition is on, chosen in the console when it is switched on.
-	// DefaultMetricsPort when nothing was chosen.
-	SettingMetricsPort = "metrics_port"
 	// SettingTenancy records the mode this installation was FIRST started in:
 	// TenancySingle (one implicit organisation, the notion never surfaces) or
 	// TenancyMulti. It is chosen at startup and never changes afterwards -

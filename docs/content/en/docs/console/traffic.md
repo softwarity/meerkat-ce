@@ -11,11 +11,11 @@ The **Metrics** entry in the rail is what the gateway has really served. Every
 other screen shows what is **configured**, and in a configuration a route that is
 failing and a route nobody calls look identical.
 
-It is at `/traffic`, because `/metrics` on this port is the Prometheus exposition.
+It is at `/traffic`: outside `/api`, the paths of this port belong to the product.
 Root and infra admins only: the figures name every route and every service, which
 is a map of the installation.
 
-![The Metrics screen: four figures over the last minute, the traffic and latency curves, and the ranking of routes](img/console/traffic.webp)
+![The Metrics screen: five figures over the last minute, the traffic and latency curves, and the ranking of routes](img/console/traffic.webp)
 
 Requests per second, the refused-or-failed share, the mean answer, the p95 and
 what is in flight; under them the two curves, and the ranking with its three tabs - the
@@ -36,8 +36,9 @@ failing one carrying its count.
 
 ![The ranking of routes, scrolled: five routes with their requests, failures, mean answer and time spent](img/console/metrics.webp)
 
-Further down the same screen: the five routes over two minutes. *Inventory
-(maintenance)* answers every request in 0.4 ms and counts them all as refused -
+Further down the same screen: the five routes over the minutes the samples
+cover. *Inventory (maintenance)* answers every request in under a millisecond
+and counts them all as refused -
 which is exactly what a maintenance route does.
 
 A route **opens on its endpoints**, in the same table and over the same period, so
@@ -57,26 +58,24 @@ are two answers a reader has to be able to tell apart.
 > cluster, samples are summed over every node, and an endpoint is counted on the
 > node that answered - the screen says so where it matters.
 
-## Metrics endpoint
+## Keeping a history
 
-The button in the header carries the state of the scrape endpoint on its face -
-exposed or not - and leads to where it is configured: **Infra, Metrics
-endpoint**, beside OpenTelemetry. The switch, the port, the optional token and
-the files to write are there, and the same counters can also be pushed over OTLP
-from **Infra, OpenTelemetry**. See [metrics](/docs/operations/metrics).
+The counters leave the gateway one way: pushed over OTLP to a collector, from
+**Infra, OpenTelemetry**, tab **Metrics**, and written by the collector into
+Prometheus. See [metrics](/docs/operations/metrics).
 
 > [!NOTE]
-> Enterprise edition: getting the counters out, scraped or pushed. The counters
+> Enterprise edition: getting the counters out. The counters
 > and this screen are in both editions - curves with nothing to install is what
 > the community image promises; what is sold is externalising them into a stack
 > you already run.
 
 ## Traps
 
-- **Prometheus scrapes every node, not the service in front of them.** The
-  counters are per node, so a load balancer would hand a different one to each
-  scrape and draw a curve that is nobody's.
-- **A restart resets the curves**, not the counters Prometheus reads.
+- **The counters are per node.** Each node pushes its own, under its own
+  `service.instance.id`, and a dashboard sums them.
+- **A restart resets the curves.** The history is in Prometheus, when the
+  counters are pushed there.
 - **A route nobody has called has nothing to say**, and neither do its endpoints.
   That is not a failure.
 - **Deduced templates can be wrong.** Treat them as a hint until a spec is

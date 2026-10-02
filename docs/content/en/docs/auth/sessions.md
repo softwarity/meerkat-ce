@@ -123,3 +123,6 @@ address, which plane, since when - filtered by account, paged. Root reads both
 planes; an application administrator the applications' sessions only, since who
 runs the console, and from where, is root's business. Ending one writes
 `session.revoke` to the [audit trail](/docs/operations/audit).
+
+![Application, Sessions: who is signed in, from which browser and address, on which plane, and since when](img/console/sessions.webp)
+

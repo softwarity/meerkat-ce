@@ -80,6 +80,31 @@
       }
     },
     {
+      "id": "api-gw-route-audit",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/routes/no-such-route/audit",
+        "body": "{\"endpoints\":[]}",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Choose which operations of a route are audited",
+        "fr": "Choisir les opérations auditées d'une route"
+      },
+      "description": {
+        "en": "An audited operation's calls become audit events sent to the OpenTelemetry collector, with the caller, the status, the trace id and the fields the operation names. Choosing them belongs to the routing plane: root and infra-admin only, every other profile gets 403. The probe names a route that does not exist, so an allowed caller gets 404.",
+        "fr": "Les appels d'une opération auditée deviennent des événements d'audit envoyés au collecteur OpenTelemetry, avec l'appelant, le statut, le trace id et les champs que l'opération nomme. Les choisir appartient au plan de routage : root et l'admin gateway seulement, tout autre profil reçoit 403. La sonde nomme une route inexistante, donc un appelant autorisé reçoit 404."
+      }
+    },
+    {
       "id": "api-gw-route-spec-remove",
       "domain": "gateway",
       "kind": "api",
@@ -698,8 +723,8 @@
         "fr": "Lire ce qui est passe"
       },
       "description": {
-        "en": "Traffic per route over the last hour: requests by status class, latency, upstream failures (OBS-01). It tells a route that is failing from one nobody is calling - the two look identical in a configuration. Summed over every node of a cluster, and each interval says how many it covers, so a partial curve never passes for a total. In memory: a restart starts a new hour, and an installation wanting a year scrapes the Enterprise /metrics into the time-series database it already runs. With ?endpoints=1 it also answers WHICH endpoint of a route the time went to, over the period ?since asks for - the same one the caller is drawing, so a route's endpoints add up to the route rather than to a longer story nobody asked about. The unit is the template, never a raw path - one series per order is chosen by whoever sends the requests, which makes it a denial of service and not an imprecision. A name is either DECLARED (a deposited spec, the per-endpoint rules, or what the control plane resolved from the upstream) or DEDUCED from the shape of the paths seen, with identifier-looking segments folded to {id} and a per-route budget past which everything shares one bucket. Deduced lines are marked, because a shape can be read wrong.",
-        "fr": "Le trafic par route sur la derniere heure : requetes par classe de statut, latence, echecs d amont (OBS-01). Il distingue une route qui echoue d une route que personne n appelle - les deux se ressemblent dans une configuration. Somme sur tous les noeuds d un cluster, et chaque intervalle dit combien il en couvre, pour qu une courbe partielle ne passe jamais pour un total. En memoire : un redemarrage commence une nouvelle heure, et qui veut un an scrape le /metrics Enterprise vers la base de series temporelles qu il a deja. Avec ?endpoints=1 il repond aussi QUEL endpoint d une route a pris le temps, sur la periode que ?since demande - celle que l appelant dessine, pour que les endpoints d une route s additionnent a la route et non a une histoire plus longue que personne n a demandee. L unite est le gabarit, jamais un chemin brut - une serie par commande, c est celui qui envoie les requetes qui la choisit, donc un deni de service et pas une imprecision. Un nom est soit DECLARE (spec deposee, regles par endpoint, ou ce que le plan de controle a resolu depuis l amont), soit DEDUIT de la forme des chemins vus, les segments qui ressemblent a un identifiant plies en {id}, avec un plafond par route au-dela duquel tout partage un seul seau. Les lignes deduites sont marquees, parce qu une forme peut se lire de travers."
+        "en": "Traffic per route over the last hour: requests by status class, latency, upstream failures (OBS-01). It tells a route that is failing from one nobody is calling - the two look identical in a configuration. Summed over every node of a cluster, and each interval says how many it covers, so a partial curve never passes for a total. In memory: a restart starts a new hour, and an installation wanting a year pushes the counters over OTLP (Enterprise) to a collector that writes them into the time-series database it already runs. With ?endpoints=1 it also answers WHICH endpoint of a route the time went to, over the period ?since asks for - the same one the caller is drawing, so a route's endpoints add up to the route rather than to a longer story nobody asked about. The unit is the template, never a raw path - one series per order is chosen by whoever sends the requests, which makes it a denial of service and not an imprecision. A name is either DECLARED (a deposited spec, the per-endpoint rules, or what the control plane resolved from the upstream) or DEDUCED from the shape of the paths seen, with identifier-looking segments folded to {id} and a per-route budget past which everything shares one bucket. Deduced lines are marked, because a shape can be read wrong.",
+        "fr": "Le trafic par route sur la derniere heure : requetes par classe de statut, latence, echecs d amont (OBS-01). Il distingue une route qui echoue d une route que personne n appelle - les deux se ressemblent dans une configuration. Somme sur tous les noeuds d un cluster, et chaque intervalle dit combien il en couvre, pour qu une courbe partielle ne passe jamais pour un total. En memoire : un redemarrage commence une nouvelle heure, et qui veut un an pousse les compteurs en OTLP (Enterprise) vers un collecteur qui les ecrit dans la base de series temporelles qu il a deja. Avec ?endpoints=1 il repond aussi QUEL endpoint d une route a pris le temps, sur la periode que ?since demande - celle que l appelant dessine, pour que les endpoints d une route s additionnent a la route et non a une histoire plus longue que personne n a demandee. L unite est le gabarit, jamais un chemin brut - une serie par commande, c est celui qui envoie les requetes qui la choisit, donc un deni de service et pas une imprecision. Un nom est soit DECLARE (spec deposee, regles par endpoint, ou ce que le plan de controle a resolu depuis l amont), soit DEDUIT de la forme des chemins vus, les segments qui ressemblent a un identifiant plies en {id}, avec un plafond par route au-dela duquel tout partage un seul seau. Les lignes deduites sont marquees, parce qu une forme peut se lire de travers."
       }
     },
     {
@@ -911,7 +936,7 @@
       "probe": {
         "method": "PUT",
         "path": "/api/admin-tokens/no-such-token",
-        "body": "{\"name\":\"renamed\",\"scope\":\"metrics\",\"days\":0}",
+        "body": "{\"name\":\"renamed\",\"scope\":\"schedules\",\"days\":0}",
         "allowedStatus": [
           404
         ]
@@ -926,8 +951,8 @@
         "fr": "Changer ce qu un jeton a le droit de faire"
       },
       "description": {
-        "en": "A token is editable for everything that is NOT in the token. The secret is a hash in a column and encodes no perimeter, no domain, no address, no expiry and no name, so none of them has to be reissued to be changed - and whoever holds the key keeps holding the same key. Which is what makes NARROWING cheap, and that is the reason this exists: a read-only token in a monitoring stack's scrape config should become a metrics one without minting a second and editing another team's repository, because that friction is why the safer move does not get made. Widening is possible too, and the audit records the before and after of every field. Open to whoever may mint one - root, infra-admin, app-admin - on their own tokens only: another person's answers not found.",
-        "fr": "Un jeton est editable pour tout ce qui n est PAS dans le jeton. Le secret est un hache dans une colonne et n encode ni perimetre, ni domaine, ni adresse, ni expiration, ni nom : rien de tout cela n a besoin d etre reemis pour changer, et celui qui detient la cle detient toujours la meme cle. C est ce qui rend le RETRECISSEMENT bon marche, et c est la raison d etre de cet endpoint : un jeton read-only dans la config de scrape d une stack de supervision doit pouvoir devenir un jeton metrics sans en frapper un second et modifier le depot d une autre equipe, parce que cette friction est justement pourquoi le geste le plus sur ne se fait pas. L elargissement est possible aussi, et le journal d audit enregistre l avant et l apres de chaque champ. Ouvert a qui peut en frapper un - root, infra-admin, app-admin - sur ses propres jetons seulement : celui d un autre repond introuvable."
+        "en": "A token is editable for everything that is NOT in the token. The secret is a hash in a column and encodes no perimeter, no domain, no address, no expiry and no name, so none of them has to be reissued to be changed - and whoever holds the key keeps holding the same key. Which is what makes NARROWING cheap, and that is the reason this exists: a read-only token in a service's deployment manifest should become a schedules one without minting a second and editing another team's repository, because that friction is why the safer move does not get made. Widening is possible too, and the audit records the before and after of every field. Open to whoever may mint one - root, infra-admin, app-admin - on their own tokens only: another person's answers not found.",
+        "fr": "Un jeton est editable pour tout ce qui n est PAS dans le jeton. Le secret est un hache dans une colonne et n encode ni perimetre, ni domaine, ni adresse, ni expiration, ni nom : rien de tout cela n a besoin d etre reemis pour changer, et celui qui detient la cle detient toujours la meme cle. C est ce qui rend le RETRECISSEMENT bon marche, et c est la raison d etre de cet endpoint : un jeton read-only dans le manifeste de deploiement d un service doit pouvoir devenir un jeton schedules sans en frapper un second et modifier le depot d une autre equipe, parce que cette friction est justement pourquoi le geste le plus sur ne se fait pas. L elargissement est possible aussi, et le journal d audit enregistre l avant et l apres de chaque champ. Ouvert a qui peut en frapper un - root, infra-admin, app-admin - sur ses propres jetons seulement : celui d un autre repond introuvable."
       }
     },
     {
@@ -954,27 +979,6 @@
       "description": {
         "en": "A rotation, and what it KEEPS is why it is not simply minting a second one: the name, the perimeter, the domain, the addresses and the expiry all stay, so the audit keeps one history for one credential and the only thing to change anywhere is the value in one configuration file. The old secret stops working the moment this answers - which is what a rotation is, and why the console asks first. The new value travels exactly once, in this response, like a freshly minted one. Whoever may mint one, on their own tokens only.",
         "fr": "Une rotation, et ce qu elle GARDE est ce qui la distingue d un second jeton frappe : le nom, le perimetre, le domaine, les adresses et l expiration restent, donc le journal d audit garde une seule histoire pour une seule cle et la seule chose a changer ou que ce soit est la valeur dans un fichier de configuration. L ancien secret cesse de fonctionner des que cette reponse part - c est ce qu est une rotation, et c est pourquoi la console demande d abord. La nouvelle valeur voyage exactement une fois, dans cette reponse, comme celle d un jeton neuf. Qui peut en frapper un, sur ses propres jetons seulement."
-      }
-    },
-    {
-      "id": "api-gw-metrics-endpoint",
-      "domain": "gateway",
-      "kind": "api",
-      "probe": {
-        "method": "GET",
-        "path": "/api/settings/metrics"
-      },
-      "allowed": [
-        "root",
-        "infra-admin"
-      ],
-      "title": {
-        "en": "The Prometheus exposition's switch",
-        "fr": "L'interrupteur de l'exposition Prometheus"
-      },
-      "description": {
-        "en": "Whether this gateway exposes /metrics for a monitoring stack to scrape (OBS-05), and whether this image can at all. Enterprise, and the split is deliberate: the counters and the built-in curves are in BOTH editions - that is the promise a community image makes, a gateway you can see with nothing to install - what is sold is externalising them into the stack a customer already runs. Ships OFF, and switching it on opens a port of its own on every node, chosen here with the switch (9091 unless something already uses it), serving /metrics and nothing else. That port asks for no token by default, as PostgreSQL's and RabbitMQ's exporters do: it is never published, so the network is the lock. A second switch makes it ask for a metrics token, checked by the control plane's own funnel. A port this node cannot open is refused with the reason, and nothing is saved.",
-        "fr": "Si cette gateway expose /metrics pour qu une stack de supervision le scrape (OBS-05), et si cette image en est capable. Enterprise, et le decoupage est voulu : les compteurs et les courbes integrees sont dans LES DEUX editions - c est la promesse de l image communautaire, une gateway qu on voit sans rien installer - ce qui se vend, c est de les externaliser vers la stack que le client a deja. Livre ETEINT, et l allumer ouvre un port a part sur chaque noeud, choisi ici avec l interrupteur (9091 sauf s il est deja pris), qui sert /metrics et rien d autre. Ce port ne demande pas de jeton par defaut, comme les exporteurs de PostgreSQL et RabbitMQ : il n est jamais publie, c est le reseau qui ferme. Un second interrupteur lui fait exiger un jeton metrics, verifie par l entonnoir du plan de controle. Un port que ce noeud ne peut pas ouvrir est refuse avec la raison, et rien n est enregistre."
       }
     },
     {
@@ -1015,8 +1019,8 @@
         "fr": "Ou partent les traces de cette gateway"
       },
       "description": {
-        "en": "The collector this gateway exports its spans to (OBS-04), and whether this image can export at all. Whoever edits routes - this is infrastructure, like TLS or the mail relay - and Enterprise to turn on - the same split as the Prometheus switch: the trace context TRAVELS in both editions, and an identifier is put on every request whether or not anybody is tracing, because that identifier is what joins a line of the access log to a service's own business audit. What is sold is putting Meerkat on the trace: its inbound span, the span of the upstream call, and the gap between the two, which is the gateway's own time and the one number nobody else in the cluster can produce. What comes back is RAW: a header value of $otlp-token is the reference as written, never the secret behind it - the exporter resolves it at the moment of the call, so the credential is not in this answer, not in the audit trail and not on the screen.",
-        "fr": "Le collecteur vers lequel cette gateway exporte ses spans (OBS-04), et si cette image sait exporter tout court. Root uniquement, et Enterprise pour l allumer - meme decoupage que l interrupteur Prometheus : le contexte de trace TRAVERSE dans les deux editions, et un identifiant est pose sur chaque requete que quelqu un trace ou non, parce que cet identifiant est ce qui joint une ligne du journal d acces a l audit metier d un service. Ce qui se vend, c est de mettre Meerkat sur la trace : son span d entree, celui de l appel amont, et l ecart entre les deux qui est le temps propre de la passerelle - le seul chiffre que personne d autre dans le cluster ne peut produire. Ce qui revient est BRUT : une valeur d en-tete a $otlp-token est la reference telle qu ecrite, jamais le secret derriere - l exportateur la resout au moment de l appel, donc la credentiale n est ni dans cette reponse, ni dans le journal d audit, ni a l ecran."
+        "en": "The collector this gateway exports its spans to (OBS-04), and whether this image can export at all. Whoever edits routes - this is infrastructure, like TLS or the mail relay - and Enterprise to turn on: the trace context TRAVELS in both editions, and an identifier is put on every request whether or not anybody is tracing, because that identifier is what joins a line of the access log to a service's own business audit. What is sold is putting Meerkat on the trace: its inbound span, the span of the upstream call, and the gap between the two, which is the gateway's own time and the one number nobody else in the cluster can produce. What comes back is RAW: a header value of $otlp-token is the reference as written, never the secret behind it - the exporter resolves it at the moment of the call, so the credential is not in this answer, not in the audit trail and not on the screen.",
+        "fr": "Le collecteur vers lequel cette gateway exporte ses spans (OBS-04), et si cette image sait exporter tout court. Root uniquement, et Enterprise pour l allumer : le contexte de trace TRAVERSE dans les deux editions, et un identifiant est pose sur chaque requete que quelqu un trace ou non, parce que cet identifiant est ce qui joint une ligne du journal d acces a l audit metier d un service. Ce qui se vend, c est de mettre Meerkat sur la trace : son span d entree, celui de l appel amont, et l ecart entre les deux qui est le temps propre de la passerelle - le seul chiffre que personne d autre dans le cluster ne peut produire. Ce qui revient est BRUT : une valeur d en-tete a $otlp-token est la reference telle qu ecrite, jamais le secret derriere - l exportateur la resout au moment de l appel, donc la credentiale n est ni dans cette reponse, ni dans le journal d audit, ni a l ecran."
       }
     },
     {
@@ -1046,28 +1050,6 @@
       "description": {
         "en": "Posts an EMPTY OTLP batch to the address on screen, before anybody saves it: the whole path is exercised - name resolution, network, TLS, the credential, the collector's own answer - and no span is recorded anywhere. Gateway scope, like the setting it tests, because it makes this gateway call an address somebody hands it; the answer carries the status and the time it took, never the body.",
         "fr": "Envoie un lot OTLP VIDE a l'adresse affichee, avant meme de l'enregistrer : tout le chemin est exerce - resolution du nom, reseau, TLS, la credentiale, la reponse du collecteur - et aucun span n'est enregistre nulle part. Perimetre passerelle, comme le reglage qu'il teste, puisqu'il fait appeler par la gateway une adresse qu'on lui donne ; la reponse porte le statut et le temps, jamais le corps."
-      }
-    },
-    {
-      "id": "api-gw-metrics-exposition",
-      "domain": "gateway",
-      "kind": "api",
-      "edition": "ee",
-      "probe": {
-        "method": "GET",
-        "path": "/metrics"
-      },
-      "allowed": [
-        "root",
-        "infra-admin"
-      ],
-      "title": {
-        "en": "What a Prometheus scrapes",
-        "fr": "Ce qu un Prometheus scrape"
-      },
-      "description": {
-        "en": "The counters in Prometheus' text format: monotonic totals, never a window, because a scraper does its own differencing on its own schedule. Behind the SAME funnel as every other control-plane call, so a scraper authenticates the way an operator does - and a token minted with the metrics perimeter opens this path and nothing else, which is the point of having that perimeter: a scraper's credential lives in a monitoring stack's configuration, often another team's repository, the one place a token is most likely to leak and least likely to be rotated. Refuses with its reason when the image is the community one, or when the switch is off. Behind the same guard as the screen showing the same numbers: the counters name every route and every endpoint template, which is an operational map, and an application's user signing in through this gateway has no business reading it.",
-        "fr": "Les compteurs au format texte de Prometheus : des totaux monotones, jamais une fenetre, parce qu un scraper fait sa propre difference a son propre rythme. Derriere le MEME entonnoir que tout autre appel du plan de controle, donc un scraper s authentifie comme un exploitant - et un jeton frappe avec le perimetre metrics ouvre ce chemin et rien d autre, ce qui est tout l interet de ce perimetre : la crédentiale d un scraper vit dans la configuration d une stack de supervision, souvent le depot d une autre equipe, l endroit ou un jeton a le plus de chances de fuiter et le moins d etre tourne. Refuse en disant pourquoi quand l image est communautaire, ou quand l interrupteur est eteint. Derriere la meme garde que l ecran qui montre les memes chiffres : les compteurs nomment chaque route et chaque gabarit d endpoint, ce qui est une carte de l installation, et l utilisateur d une application qui se connecte a travers cette gateway n a rien a y lire."
       }
     },
     {

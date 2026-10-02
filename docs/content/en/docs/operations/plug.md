@@ -49,6 +49,8 @@ LoadBalancer, a published Docker port. So Infra, Plug records the **published**
 host and port, and every command on that page and on the developer's profile
 page carries them, ready to copy.
 
+![The Plug screen: the tunnel switch, the published host and port, and the commands for a developer's machine](img/console/plug.webp)
+
 The tunnel listens on **22222** in the container (`MEERKAT_PLUG_ADDR`).
 
 - **Docker Compose**: publish it, `22222:22222`.

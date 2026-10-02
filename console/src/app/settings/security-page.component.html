@@ -16,9 +16,7 @@
       </mat-slide-toggle>
 
       <p class="hint text-muted" i18n="@@MFA_email_otp_hint" style="margin-top:16px;">
-        Let an enrolled user who cannot reach their authenticator ask for a one-time code by
-        e-mail. A fallback, not a method: it needs a mail relay (Infra, Mail relay) and only
-        shows for accounts that carry an address and have already set up an authenticator.
+        A fallback for a user without their authenticator. Needs a mail relay (Infra, Mail relay).
       </p>
       <mat-slide-toggle [checked]="mfaEmailOtp()" (change)="mfaEmailOtp.set($event.checked)">
         <ng-container i18n="@@Allow_email_code">Allow a one-time code by e-mail</ng-container>
@@ -28,10 +26,8 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Sign_in_by_email">Sign in by e-mail</h3>
       <p class="hint text-muted" i18n="@@Email_signin_hint">
-        Let a user sign in with a one-time code mailed to their address, INSTEAD of a password.
-        It needs a mail relay (Infra, Mail relay). The code lasts ten minutes, works only in the
-        browser that asked for it, and replaces the password alone: a second factor, where one is
-        required, is still asked for. The admin console is never openable this way.
+        A one-time code by e-mail replaces the password, not the second factor. Needs a mail relay
+        (Infra, Mail relay); never opens the admin console.
       </p>
       <mat-slide-toggle [checked]="emailSignin()" (change)="emailSignin.set($event.checked)">
         <ng-container i18n="@@Allow_email_signin">Allow signing in with an e-mailed code</ng-container>
@@ -56,9 +52,7 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Passwords">Passwords</h3>
       <p class="hint text-muted" i18n="@@Password_policy_hint">
-        What a new password must contain. Applied wherever one is typed: sign-up, the forced
-        change at first login, the profile, and a reset link. Zero means the rule is not asked
-        for, and a rule that is not asked for is not shown either.
+        What a new password must contain. Zero means no rule.
       </p>
       <div class="rl-row">
         <mat-form-field class="rl-num">
@@ -93,10 +87,7 @@
         </mat-form-field>
       </div>
       <p class="hint text-muted" i18n="@@Password_history_hint">
-        Previous passwords are kept as hashes and compared when a new one is chosen, the one in
-        use included. Expiry is checked at sign-in, not by a clock: an expired password sends the
-        person to the change page instead of ending a session they are working in. A password
-        whose age is unknown never expires.
+        Expiry is checked at sign-in: an expired password leads to the change page.
       </p>
       @if (pwLength() < pwSum()) {
         <p class="hint text-error" i18n="@@Password_length_raised">
@@ -121,8 +112,7 @@
           <ng-container i18n="@@Force_a_change_for_everyone">Force a change for everyone</ng-container>
         </button>
         <span class="hint text-muted" i18n="@@Force_a_change_for_everyone_hint">
-          Every local account changes its password at its next sign-in, yours excepted. One
-          account at a time is in Users.
+          Every local account but yours, at its next sign-in.
         </span>
       </div>
     </mat-card>
@@ -130,9 +120,7 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Rate_limiting">Rate limiting</h3>
       <p class="hint text-muted" i18n="@@Rate_limiting_hint_reset">
-        Throttles brute-force attempts: failed sign-ins per address and account within the
-        window, and wrong two-factor codes per account. Zero disables those two. Reset requests
-        are counted per address on their own, and always limited.
+        Attempts allowed within the window. Zero disables a limit, except for reset requests.
       </p>
       <div class="rl-row">
         <mat-form-field class="rl-num">
@@ -171,8 +159,7 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@API_tokens">API tokens</h3>
       <p class="hint text-muted" i18n="@@API_tokens_hint">
-        Let users mint personal access tokens (Profile, Security) to call the API routes behind
-        the gateway without a browser session. A token acts with the user's context at creation.
+        Let users create tokens (Profile, Security) to call API routes without a browser.
       </p>
       <mat-slide-toggle [checked]="apiTokens()" (change)="apiTokens.set($event.checked)">
         <ng-container i18n="@@Allow_API_tokens">Allow personal API tokens</ng-container>

@@ -51,8 +51,7 @@ import { TenantsService } from '../../shared/tenants.service';
       <mat-card appearance="outlined" class="danger-card danger-zone">
         <h3 i18n="@@Transfer_ownership">Transfer ownership</h3>
         <p class="hint" i18n="@@Transfer_ownership_hint">
-          A tenant has a single owner. The chosen member becomes it. Ownership is independent of
-          membership, so the previous owner keeps their membership unchanged.
+          The chosen member becomes the single owner. The previous owner keeps their membership.
         </p>
         @if (currentOwnerName(); as owner) {
           <p class="hint">

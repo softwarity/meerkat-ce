@@ -98,8 +98,7 @@ export interface VaultEntryFormData {
       <p class="hint">
         @if (stashing()) {
           <ng-container i18n="@@Move_into_the_vault_hint">
-            The secret stays where it is until you confirm, then only its name remains in the
-            configuration. Give it a name you will recognise elsewhere.
+            Once confirmed, only its name remains in the configuration.
           </ng-container>
         } @else if (kind() === 'secret') {
           <ng-container i18n="@@Kind_secret_hint">

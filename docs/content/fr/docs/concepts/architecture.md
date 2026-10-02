@@ -76,12 +76,7 @@ Vos routes, et les pages que la gateway sert en son nom :
 - `/` - la console, une application Angular embarquée dans le binaire. En anglais uniquement, sans segment de langue : c'est un outil d'exploitant.
 - `/login`, `/logout` - la connexion propre à la console, pour que cette origine se suffise à elle-même.
 - `/mcp` - le point d'entrée auquel un agent se connecte.
-- `/metrics` - l'exposition Prometheus, quand elle est activée.
 - `/healthz`, `/readyz`.
-
-> [!NOTE]
-> Édition Enterprise, pour `/metrics`. Les compteurs eux-mêmes, et les tableaux
-> de bord que la console en tire, sont dans les deux images.
 
 ## Un binaire, aucune dépendance
 

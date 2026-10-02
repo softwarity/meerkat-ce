@@ -15,9 +15,9 @@ Il n'y a pas d'interrupteur *activer HTTPS*. **Avoir un certificat est ce qui ou
 porte**, et le retirer est ce qui la ferme. Un interrupteur qui peut être allumé sans
 rien derrière est un interrupteur qui ment.
 
-![L'écran TLS : le nom et le certificat de la console, deux noms applicatifs, l'interrupteur Force HTTPS et la carte ACME](img/console/tls.webp)
+![L'écran TLS : le nom et le certificat de la console, deux noms applicatifs, l'interrupteur Force HTTPS avec sa durée HSTS, et la carte ACME](img/console/tls.webp)
 
-Ici la console répond sur `localhost` avec un certificat auto-signé valable
+Ici la console répond sur `console.acme.example` avec un certificat auto-signé valable
 jusqu'en 2027, l'application sert deux noms - l'un encore en clair, l'autre avec
 son propre certificat - et Force HTTPS comme ACME sont éteints.
 

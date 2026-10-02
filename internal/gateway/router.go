@@ -403,7 +403,7 @@ func (rt *Router) Problems() map[string]string {
 // so. Never having asked is not.
 func (rt *Router) Ready() bool { return rt.loaded.Load() }
 
-// Metrics is what the console reads and what /metrics exposes.
+// Metrics is what the console reads and what the OTLP push sends.
 func (rt *Router) Metrics() *metrics.Registry { return rt.metrics }
 
 // record wraps the writer so a route learns what it answered and how long it
@@ -744,6 +744,12 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// A route with no rule is still a route that was chosen, and the
 			// span should say which one answered.
 			spanEvent(hit.Context(), "route_chosen", tracing.String("meerkat.route", r.name))
+			// And who called it, which nothing here needed to know. Only for a
+			// request being recorded, and only when the spans name the caller:
+			// the session lookup is not free.
+			if n := spanOf(hit.Context()); n != nil && !n.fromPage && tracing.Caller() {
+				rt.sessionIdentity(hit)
+			}
 			ww, start := record(w)
 			rt.answerOrRefuse(ww, hit, r, start, cand, candReq, candOK, candWho, candUserID)
 			return
@@ -789,7 +795,12 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ww, start := record(w)
 	http.NotFound(ww, req)
 	writeAccess(req, "", "", ww.status, ww.bytes, time.Since(start))
-	finishSpan(req, "", "", ww.status)
+	// Not traced: tracing is each route's answer, and no route answered. A
+	// 404 is nobody's journey - an asset a front end asks for at the root, a
+	// path that used to exist - and it was what filled the backend with
+	// traces from routes that had said no. It stays counted (Unmatched) and
+	// logged.
+	dropSpan(req.Context())
 }
 
 func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compiledRoute, error) {
@@ -974,6 +985,18 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 	} else if !r.Access.Empty() && rt.sm == nil {
 		return compiledRoute{}, fmt.Errorf("route poses security but no session manager is configured")
 	}
+	// Endpoint audit (AUD-04), around the guard: it sees the answer the caller
+	// got, refusals included, and decides nothing.
+	if r.API != nil && len(r.API.Audit) > 0 {
+		if err := store.ValidateAudit(r.API.Audit); err != nil {
+			return compiledRoute{}, err
+		}
+		auditor, err := rt.endpointAuditor(r.Name, r.API.Audit, r.Filters, handler)
+		if err != nil {
+			return compiledRoute{}, err
+		}
+		handler = auditor
+	}
 	// The route-level gate is NOT wrapped here any more: ServeHTTP evaluates it
 	// while choosing, so a caller the rule turns away can be served by the next
 	// route that matches. The endpoint guard above keeps its own copy of the
@@ -1068,13 +1091,23 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 		handler = dropTracing(handler)
 	}
 	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler, breaker: cfg,
-		access: selectAccess, isUI: r.IsUI, noTrace: noTracing(r), counters: rt.metrics.For(r.ID, r.Name),
+		access: selectAccess, isUI: r.IsUI, noTrace: noTracing(r), counters: rt.routeCounters(r),
 		ops: ops}, nil
 }
 
 // noTracing reads the route's tracing switch. A route that never mentioned the
 // subject is traced: an installation that turned the export on wants its
 // traffic traced, and leaves out what it does not want to follow.
+// routeCounters is the route's block in the registry, told whether its own
+// series leave: the route's OpenTelemetry switch covers its traces AND its
+// metrics. Still counted either way - the console's screen and the gateway's
+// totals include every route.
+func (rt *Router) routeCounters(r store.Route) *metrics.Route {
+	c := rt.metrics.For(r.ID, r.Name)
+	c.Exclude(noTracing(r))
+	return c
+}
+
 func noTracing(r store.Route) bool {
 	return r.Telemetry != nil && !*r.Telemetry
 }
@@ -1094,7 +1127,7 @@ func (rt *Router) brokenRoute(r store.Route) (compiledRoute, bool) {
 		access:   r.Access,
 		isUI:     r.IsUI,
 		noTrace:  noTracing(r),
-		counters: rt.metrics.For(r.ID, r.Name),
+		counters: rt.routeCounters(r),
 		ops:      rt.opsFor(r.ID),
 	}, true
 }
@@ -1386,6 +1419,8 @@ type identityData struct {
 	Locale     string
 	TenantID   string
 	Tenant     string
+	// Group is the session's chosen group (exclusive mode, RBAC-03), by name.
+	Group string
 	// Fields are the installation's own facts about this person (store's
 	// userfields.go). Carried beside the built-ins because to everything
 	// downstream they are the same kind of thing: one more fact about the
@@ -1405,11 +1440,13 @@ type identityData struct {
 // memory between writes (identitycache.go).
 func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	if d, ok := simulatedIdentity(req.Context()); ok {
+		spanPerson(req.Context(), d)
 		return d, true
 	}
 	// A scheduled call carries no session and no account: its identity is
 	// posed in the context by the scheduler, in process (scheduled.go).
 	if d, ok := rt.scheduledIdentity(req.Context()); ok {
+		spanPerson(req.Context(), d)
 		return d, true
 	}
 	sess, err := rt.sm.Resolve(req.Context(), req)
@@ -1432,6 +1469,7 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	if !e.owner.Enabled || !e.owner.ValidAt(now) {
 		return identityData{}, false
 	}
+	spanPerson(req.Context(), e.data)
 	return e.data.clone(), true
 }
 
@@ -1469,6 +1507,11 @@ func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityE
 		d.TenantID = tenantID
 		if t, err := rt.st.GetTenant(req.Context(), tenantID); err == nil {
 			d.Tenant = t.Name
+		}
+		if sess.GroupID != "" {
+			if g, err := rt.st.GetGroup(req.Context(), sess.GroupID); err == nil {
+				d.Group = g.Name
+			}
 		}
 		// SessionRoleNames applies the group mode (RBAC-03): cumulative =
 		// every group, exclusive = the session's chosen group only.
@@ -2233,23 +2276,6 @@ func (rt *Router) endpointGuard(sec store.EndpointSecurity, routeAccess store.Ac
 		path   routing.CompiledPath
 		gate   http.Handler
 	}
-	eps := make([]compiledEP, 0, len(sec.Endpoints))
-	for i, e := range sec.Endpoints {
-		cp, err := routing.CompilePath(e.Path)
-		if err != nil {
-			return nil, fmt.Errorf("endpoint %d (%s %s): %w", i, e.Method, e.Path, err)
-		}
-		// The operation's own bounds (QUOTA-05), OUTSIDE its access gate for
-		// the same reason the route's are outside the route's: a bound is
-		// there to refuse before work happens, and somebody hammering with
-		// credentials that do not work is exactly who it is for.
-		guarded := rt.accessGate(e.Access, isUI, next)
-		free, identified := compileLimits(e.Limits)
-		guarded = rt.rateGate(identified, guarded)
-		guarded = rt.rateGate(free, guarded)
-		eps = append(eps, compiledEP{method: strings.ToUpper(e.Method), path: cp, gate: guarded})
-	}
-	strip := stripPrefixCount(filters)
 	// The route's base Access is the default for any operation with no override
 	// (an empty Access passes through, delegating to the upstream) - unless
 	// the route closes what it does not list, and then nobody passes.
@@ -2257,6 +2283,29 @@ func (rt *Router) endpointGuard(sec store.EndpointSecurity, routeAccess store.Ac
 	if sec.DenyUnlisted {
 		fallback = store.Access{Level: store.AccessDeny}
 	}
+	eps := make([]compiledEP, 0, len(sec.Endpoints))
+	for i, e := range sec.Endpoints {
+		cp, err := routing.CompilePath(e.Path)
+		if err != nil {
+			return nil, fmt.Errorf("endpoint %d (%s %s): %w", i, e.Method, e.Path, err)
+		}
+		// An entry that poses no access rule (a bound alone) keeps the
+		// route's: matching it must not be a way around the route's rule.
+		access := e.Access
+		if e.Inherit {
+			access = fallback
+		}
+		// The operation's own bounds (QUOTA-05), OUTSIDE its access gate for
+		// the same reason the route's are outside the route's: a bound is
+		// there to refuse before work happens, and somebody hammering with
+		// credentials that do not work is exactly who it is for.
+		guarded := rt.accessGate(access, isUI, next)
+		free, identified := compileLimits(e.Limits)
+		guarded = rt.rateGate(identified, guarded)
+		guarded = rt.rateGate(free, guarded)
+		eps = append(eps, compiledEP{method: strings.ToUpper(e.Method), path: cp, gate: guarded})
+	}
+	strip := stripPrefixCount(filters)
 	routeGate := rt.accessGate(fallback, isUI, next)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -3242,8 +3291,11 @@ func (rt *Router) withIdentity(next http.Handler) http.Handler {
 func requireSession(sm *session.Manager, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// A simulated identity (simulate.go) IS the session for this request,
-		// and an internal spec read was authorized on the control plane.
-		if _, ok := simulatedIdentity(req.Context()); ok || isSpecRead(req.Context()) {
+		// so is a scheduled call's (scheduled.go), and an internal spec read
+		// was authorized on the control plane.
+		_, simulated := simulatedIdentity(req.Context())
+		_, scheduled := scheduledCaller(req.Context())
+		if simulated || scheduled || isSpecRead(req.Context()) {
 			next.ServeHTTP(w, req)
 			return
 		}

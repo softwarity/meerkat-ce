@@ -2644,6 +2644,12 @@ func (h *Handler) finishFlow(w http.ResponseWriter, r *http.Request, sess store.
 		method = withSecondFactor(method)
 	}
 	h.recordLogin(w, r, sess.UserID, sess.TenantID, method)
+	// The session was issued pending, before the steps, and nothing stamped
+	// it then: a first sign-in through a forced password change left the
+	// account "never connected".
+	if err := h.st.TouchLastConnection(r.Context(), sess.UserID); err != nil {
+		slog.Warn("last connection stamp failed", "user", sess.UserID, "err", err)
+	}
 	// The halt (DEV-11), when a developer's machine is answering for something:
 	// one screen, read once, before starting. AFTER the login is recorded, so
 	// walking past it cannot lose the record - and it is walkable past on

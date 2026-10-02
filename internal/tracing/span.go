@@ -11,8 +11,8 @@ import (
 // exporter plugs into (OBS-04).
 //
 // The model is here and the exporter is in ee/telemetry, for the same reason
-// the counters are in internal/metrics and the Prometheus format is in
-// ee/prometheus: the trunk describes, the Enterprise half ships it somewhere.
+// the counters are in internal/metrics and their OTLP push is in ee/telemetry:
+// the trunk describes, the Enterprise half ships it somewhere.
 // The community binary does not link the exporter, so Emit finds nobody home
 // and costs an atomic load.
 //
@@ -67,6 +67,10 @@ type Attr struct {
 	// IsInt picks the branch, because the zero value of Int is a real number
 	// somebody may want to record.
 	IsInt bool
+	// Strs is a list of texts - the roles a caller holds - and IsList picks
+	// that branch, for the same reason: an empty list is still an answer.
+	Strs   []string
+	IsList bool
 }
 
 // String makes a text attribute.
@@ -74,6 +78,9 @@ func String(key, value string) Attr { return Attr{Key: key, Str: value} }
 
 // Int64 makes a numeric one.
 func Int64(key string, value int64) Attr { return Attr{Key: key, Int: value, IsInt: true} }
+
+// Strings makes a list of texts.
+func Strings(key string, values []string) Attr { return Attr{Key: key, Strs: values, IsList: true} }
 
 // Event is a named INSTANT inside a span - "the route was chosen", "access was
 // granted". The cheap way to record a step: a few bytes on a span that already
@@ -251,6 +258,8 @@ type Config struct {
 	MaxPerSecond int64
 	// Detail adds the gateway's own steps to the recorded traces (step.go).
 	Detail bool
+	// Caller names the signed-in caller on the spans (person.go).
+	Caller bool
 }
 
 // starter is what ee/telemetry registers. Nil in the community binary, which
@@ -336,6 +345,7 @@ func Apply(cfg Config, enabled bool) error {
 	SetMaxPerSecond(cfg.MaxPerSecond)
 	SetRelayMaxPerSecond(relayBudget)
 	SetDetail(cfg.Detail)
+	SetCaller(cfg.Caller)
 	exporting.Store(enabled)
 	if !enabled {
 		return nil

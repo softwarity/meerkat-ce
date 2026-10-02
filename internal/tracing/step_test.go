@@ -51,6 +51,10 @@ func TestStepsNestUnderTheCrossing(t *testing.T) {
 	_, endInner := Step(outer, "SELECT users")
 	endInner(errors.New("no such row"))
 	endOuter(nil)
+	if len(c.spans) != 0 {
+		t.Fatalf("%d steps left before their crossing was settled", len(c.spans))
+	}
+	SendCurrent(ctx)
 
 	if len(c.spans) != 2 {
 		t.Fatalf("%d spans, want the two steps", len(c.spans))
@@ -94,5 +98,24 @@ func TestAnUntracedRouteSilencesItsSteps(t *testing.T) {
 	end(nil)
 	if len(c.spans) != 0 {
 		t.Errorf("%d spans emitted for a route that is not traced", len(c.spans))
+	}
+}
+
+// However deep, and even when the step ended before the route was chosen: the
+// session's queries were leaving as children of a crossing never reported.
+func TestAnUntracedRouteSilencesItsNestedSteps(t *testing.T) {
+	c := catch(t)
+	SetDetail(true)
+	ctx := WithCurrent(context.Background(), "trace", "server")
+	inner, endSession := Step(ctx, "session")
+	_, endQuery := Step(inner, "SELECT users")
+	endQuery(nil) // ended before the route was known
+	DropCurrent(ctx)
+	_, late := Step(inner, "SELECT roles")
+	late(nil)
+	endSession(nil)
+	SendCurrent(ctx)
+	if len(c.spans) != 0 {
+		t.Errorf("%d steps emitted under a route that is not traced", len(c.spans))
 	}
 }

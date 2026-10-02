@@ -1,0 +1,621 @@
+name: CI - Enterprise
+
+# The Enterprise pipeline, run on the PUBLIC mirror against the PRIVATE sources.
+#
+# GitHub bills every minute a private repository runs and none a public one
+# runs, and the Enterprise tree used to be tested and built on the private
+# side for one reason: it was the only tree that had ee/. This workflow turns
+# that around. It lives in both trees and runs in ONE - the mirror,
+# softwarity/meerkat-ce - where it clones the private repository at the commit
+# it is told about, and runs on it what the community pipeline (ci.yml) cannot:
+# everything built with the ee tag, the suite on PostgreSQL, the two
+# directories only the Enterprise driver talks to, the integration suite
+# driving the multi-organisation product, and the Enterprise image.
+#
+# WHAT A PUBLIC RUNNER MAKES PUBLIC, and what this file does about each:
+#
+#   the logs      readable by anyone. A failing build prints the line that
+#                 failed, a failing test its diff. Extracts, not the product:
+#                 accepted. No -v except where a count needs it.
+#   artifacts     downloadable by anyone, with no account. None is uploaded
+#                 here: not the console, not a Playwright report, not a digest.
+#   the cache     restorable by a pull request from a fork. The Go build cache
+#                 holds the compiled archives, the Docker layer cache the COPY
+#                 of the sources. Every cache of the tree is off in every job
+#                 below; what stays cached is public packages and a browser.
+#   the secret    the one that opens the private repository. It is a GitHub
+#                 App's private key, kept on the `enterprise` ENVIRONMENT:
+#                 visible to a job that names the environment, invisible to
+#                 every other workflow of this repository. The token minted
+#                 from it lives one hour, reads one repository, is revoked
+#                 when the job ends, and the checkout does not keep it in
+#                 .git/config for the steps that follow.
+#
+# WHO CAN START IT. A push to the private main: mirror-ce.yml publishes the
+# community tree, then sends a repository_dispatch here naming the commit. A
+# hand: workflow_dispatch, with or without a commit. The clock: once a week,
+# for the slow checks. Never a pull request - a fork's pull request receives
+# no secret, and pull_request_target, which would, is not listed. A fork of
+# the mirror inherits this file and none of the secrets, so the first job asks
+# the repository's name and the whole pipeline stands down anywhere else.
+#
+# A RELEASE arrives as a dispatch carrying the version: release.yml tags the
+# private commit, mirror-ce.yml fires on the tag, and the two jobs at the end
+# publish BOTH images under their semver tags from that very commit, once
+# everything else is green. docker-release.yml used to do that on the private
+# side after polling for the CI of the same commit; here the wait is a `needs`.
+on:
+  repository_dispatch:
+    types: [enterprise]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit of softwarity/meerkat to run on. Empty takes main.
+        required: false
+        default: ""
+      version:
+        description: Publish both images under this semver (no leading v). Empty publishes latest only.
+        required: false
+        default: ""
+  # Once a week for what no longer runs on every push: the whole tree on
+  # PostgreSQL and the three directories. Tuesday, a day away from the package
+  # prune, so two schedules never explain each other's failures.
+  schedule:
+    - cron: '23 3 * * 2'
+
+permissions:
+  contents: read
+
+# One pipeline for main, cancelled by the next push; a release keeps a group
+# of its own and nothing cancels it.
+concurrency:
+  group: ci-ee-${{ github.event.client_payload.version || inputs.version || 'main' }}
+  cancel-in-progress: ${{ !(github.event.client_payload.version || inputs.version) }}
+
+jobs:
+  # Which commit, and what it changes. ONE job resolves it so that every other
+  # one runs on the same commit: main moves while a pipeline runs, and a
+  # pipeline whose jobs each took "main" would test six different trees.
+  source:
+    name: Which commit
+    if: github.repository == 'softwarity/meerkat-ce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: enterprise
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      version: ${{ steps.resolve.outputs.version }}
+      # A scheduled run is NOT a pipeline: it exists for the slow checks and
+      # everything else stands down.
+      full: ${{ github.event_name != 'schedule' }}
+      # The slow checks - the whole tree on PostgreSQL, the three directories.
+      # Weekly, by hand, and on a release; not on every push.
+      thorough: ${{ steps.resolve.outputs.thorough }}
+      directories: ${{ steps.resolve.outputs.directories }}
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          ASKED: ${{ github.event.client_payload.sha || inputs.sha }}
+          VERSION: ${{ github.event.client_payload.version || inputs.version }}
+        run: |
+          set -e
+          # The API rather than a clone: this job has nothing to build, it
+          # needs the commit's full id and the files it touches.
+          sha=$(gh api "repos/softwarity/meerkat/commits/${ASKED:-main}" --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          version="${VERSION#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          thorough=false
+          if [ "$GITHUB_EVENT_NAME" != "repository_dispatch" ] || [ -n "$version" ]; then
+            thorough=true
+          fi
+          echo "thorough=$thorough" >> "$GITHUB_OUTPUT"
+          # The directory suites start real servers for code that moves
+          # rarely - five minutes on every commit to answer a question only
+          # some commits ask. They run when their own code moves, and on the
+          # thorough runs. The net is what their tests compile and start: the
+          # two drivers, the compose file, the module graph.
+          directories=$thorough
+          if gh api "repos/softwarity/meerkat/commits/$sha" --jq '.files[].filename' \
+             | grep -qE '^(ee/directories/|internal/idp/|test/ldap/|go\.(mod|sum)$|\.github/workflows/ci-ee\.yml$)'; then
+            directories=true
+          fi
+          echo "directories=$directories" >> "$GITHUB_OUTPUT"
+          {
+            echo "Enterprise sources: softwarity/meerkat@${sha::7}"
+            if [ -n "$version" ]; then echo "Release: $version"; fi
+            echo "Thorough: $thorough. Directories: $directories."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Every job below opens with the same three steps: a token, the private
+  # tree at the resolved commit, Go without its cache. The token is minted
+  # per job because a job's output cannot carry a secret - GitHub blanks it.
+  lint:
+    name: Lint
+    needs: source
+    if: needs.source.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: enterprise
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: ${{ needs.source.outputs.sha }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      # The whole tree under the tag. The mirror lints the same files without
+      # it, but the tag switches files on inside internal/ too, and a file
+      # nobody lints is a file that drifts.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          args: --build-tags ee ./...
+          # Its cache is the Go build cache under another name.
+          skip-cache: true
+
+  # The Go side in ONE job: vet, the tests, and the two static builds, each
+  # paying one checkout and one compilation of the graph.
+  #
+  # -race on ./ee/... only: ./internal runs under the detector on the mirror,
+  # on the very same files, and the concurrency in those packages is the same
+  # code on both sides. Here ./internal runs once WITH the tag and without
+  # -race, for the files the tag switches on.
+  unit:
+    name: Go - vet, tests, builds
+    needs: source
+    if: needs.source.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: enterprise
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: ${{ needs.source.outputs.sha }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - name: Vet
+        run: go vet -tags ee ./...
+      - name: Test
+        run: |
+          go test -tags ee ./internal/... ./cmd/...
+          go test -race -tags ee ./ee/...
+      # Static, no CGO, amd64 and arm64. Linux only, and that is the whole
+      # target - Meerkat ships as an image.
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+        run: |
+          for goarch in amd64 arm64; do
+            echo "building linux/$goarch -tags ee"
+            GOARCH=$goarch go build -trimpath -tags ee -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+          done
+
+  # The SAME suite, on the other database (QUAL-01).
+  #
+  # PostgreSQL is what a cluster runs on (STORE-03), and until this job existed
+  # the evidence that the product works on it was ONE smoke test. The first
+  # run of this job found two queries broken, one silently waiting for 2038.
+  #
+  # No second suite was written: internal/store/dbtest gives every test a
+  # private schema when MEERKAT_TEST_DATABASE_URL names a server, and returns
+  # nothing when it does not, so `go test ./...` on a laptop is untouched.
+  #
+  # Enterprise only: connecting to an external database is one of the two
+  # images' differences, so it is the only tree that can be pointed at a
+  # server. The community binary answers a database URL in words.
+  postgres:
+    name: The suite on PostgreSQL
+    needs: source
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: enterprise
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: meerkat
+          POSTGRES_PASSWORD: meerkat
+          POSTGRES_DB: meerkat
+        ports:
+          - 5432:5432
+        # Without this the first connection races the server's own startup,
+        # and the failure reads as a broken query rather than a missing server.
+        options: >-
+          --health-cmd "pg_isready -U meerkat"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MEERKAT_TEST_DATABASE_URL: postgres://meerkat:meerkat@localhost:5432/meerkat?sslmode=disable
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: ${{ needs.source.outputs.sha }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      # A suite that quietly fell back to the embedded database would be green
+      # about nothing, which is the failure this whole job exists to prevent.
+      # The smoke test SKIPS when the variable is unset, and a skip passes - so
+      # it is run alone, verbosely, and counted.
+      - name: Prove the server is actually reached
+        run: |
+          go test -tags ee ./internal/store/ -run TestAgainstARealPostgres -count=1 -v 2>&1 | tee out.txt
+          grep -q -- '--- PASS: TestAgainstARealPostgres' out.txt \
+            || { echo "the suite did not reach PostgreSQL"; exit 1; }
+      # What a real server changes and a single process cannot answer: two
+      # gateways against one database, agreeing. Cheap, and on every commit.
+      - name: The cluster, against a real server
+        run: go test -tags ee ./ee/changebus/ ./internal/cluster/ ./internal/store/ -count=1
+      # The WHOLE tree on PostgreSQL - the promise that the same suite runs
+      # twice, once on each storage. It answers a question about the DIALECT,
+      # and what changes between two commits is rarely the dialect: weekly, by
+      # hand, and on a release. No -race here: the point is the dialect, and
+      # the unit job already runs ee/ under the detector.
+      - name: The suite, on the other storage
+        if: needs.source.outputs.thorough == 'true'
+        run: go test -tags ee ./... -count=1
+
+  # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
+  # Active Directory and Dex; without them these tests SKIP, and a skip is
+  # silent - `ok internal/idp` was being reported for five tests that never
+  # ran.
+  #
+  # One job per directory rather than one for all three: "the directories
+  # failed" sends someone reading logs, while "Active Directory failed" names
+  # the thing. It also stops the slowest server from gating the others.
+  #
+  # Dex exercises the OIDC driver, community code the mirror's own pipeline
+  # already runs against Dex; it runs here too, deliberately, because the
+  # Enterprise binary is a different binary and the LDAP rows need the tag.
+  directories:
+    name: ${{ matrix.directory }}
+    needs: source
+    if: needs.source.outputs.directories == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: enterprise
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - directory: OpenLDAP
+            service: openldap
+            tests: 'TestLDAPDirectorySignIn|TestLDAPRefusesBadCredentials|TestLDAPNestedGroupsCanBeTurnedOff'
+            expect: 3
+          - directory: Active Directory
+            service: samba
+            tests: 'TestLDAPActiveDirectorySignIn'
+            expect: 1
+          - directory: OIDC (Dex)
+            service: dex
+            tests: 'TestOIDCAgainstDex'
+            expect: 1
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: ${{ needs.source.outputs.sha }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - name: Start ${{ matrix.directory }}
+        working-directory: test/ldap
+        run: docker compose up -d ${{ matrix.service }}
+      # The domain controller provisions itself before it answers, and it is
+      # the only one that needs seeding afterwards.
+      - name: Wait for the domain controller
+        if: matrix.service == 'samba'
+        run: |
+          for _ in $(seq 1 60); do
+            [ "$(docker inspect meerkat-samba-ad --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] && break
+            sleep 5
+          done
+          docker exec meerkat-samba-ad sh /seed.sh
+      # A skipped test PASSES, so counting is the only thing that tells "they
+      # ran" from "nothing answered and nobody noticed". The one place -v is
+      # needed: the count reads it.
+      - name: Run against it, and prove they ran
+        env:
+          EXPECT: ${{ matrix.expect }}
+        run: |
+          go test -tags ee ./ee/directories/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
+          ran=$(grep -c -- '--- PASS' out.txt)
+          echo "$ran of $EXPECT expected tests ran against ${{ matrix.directory }}"
+          [ "$ran" -eq "$EXPECT" ] || { echo "the server was not reached"; exit 1; }
+      - if: always()
+        working-directory: test/ldap
+        run: docker compose down -v
+
+  # Integration: a real gateway + the built console, driven by Playwright over
+  # the seeded profiles of e2e/scenarios.json (positive AND negative access).
+  # The suite asks the tree what it can build: with ee/ it drives the
+  # Enterprise product multi-organisation, and the scenarios marked
+  # `edition: "ee"` in scenarios.json run only here.
+  e2e:
+    name: Integration (Playwright)
+    needs: source
+    if: needs.source.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: enterprise
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: ${{ needs.source.outputs.sha }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          # npm's cache holds public packages and nothing of this tree.
+          cache: npm
+          cache-dependency-path: |
+            console/package-lock.json
+            e2e/package-lock.json
+      # The console, built HERE rather than taken from the community pipeline:
+      # an artifact on this repository is public, and fetching one across
+      # workflows needs a token and a run id, for files that take two minutes
+      # to make. Production, not development: it is what ships.
+      - name: Build the console
+        working-directory: console
+        run: |
+          npm ci
+          npm run build
+      # The browser is 130 MB downloaded on every single run, and it changes
+      # only when Playwright does - which the lock file says exactly. It is a
+      # browser: nothing of the tree is in it.
+      - name: Cache the browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      # Playwright transpiles the specs without checking them, so a suite can
+      # be green with a tsconfig that no longer compiles.
+      - name: Type-check the specs
+        working-directory: e2e
+        run: npx tsc --noEmit
+      # No report uploaded, on purpose: it would be a public download. A
+      # failure here is read in the log, or reproduced on a laptop.
+      - name: Run integration suite
+        working-directory: e2e
+        run: npx playwright test
+
+  # The Enterprise image, once everything is green. It is the artifact that IS
+  # the licence: what separates it from the community one is the code the
+  # linker put in it, not a flag it reads.
+  #
+  # Written out rather than calling _docker.yml: a reusable workflow checks
+  # out the repository that CALLS it, and the sources are in another one; and
+  # its jobs would need the environment, which a called workflow cannot be
+  # handed reliably. amd64 only while the two-image split settles, as the
+  # shared workflow does - put linux/arm64 back together with it.
+  #
+  # Every push to main publishes `latest`; a release publishes its semver tags
+  # and leaves `latest` to the next push, as docker-release.yml did. A tag is a
+  # pointer: what removes the manifests it stops naming is the weekly prune on
+  # the private side (prune-packages.yml), not the push.
+  #
+  # THE GATE. A skipped job skips its dependants, and some needs are skipped
+  # on purpose - the directories when their code did not move. So the
+  # condition names what must have PASSED and refuses any failure, rather
+  # than asking every need to have run.
+  image:
+    name: Build & publish the Enterprise image
+    needs: [source, lint, unit, postgres, directories, e2e]
+    if: >-
+      !cancelled() && !contains(needs.*.result, 'failure')
+      && needs.lint.result == 'success' && needs.unit.result == 'success'
+      && needs.postgres.result == 'success' && needs.e2e.result == 'success'
+      && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: enterprise
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: ${{ needs.source.outputs.sha }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      # A classic token with write:packages. This repository's own GITHUB_TOKEN
+      # cannot push to a package that belongs to another repository, and GH
+      # Packages does not document accepting an App's token.
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_WRITE_PACKAGE }}
+      - id: meta
+        env:
+          IMAGE: ghcr.io/softwarity/meerkat
+          VERSION: ${{ needs.source.outputs.version }}
+          SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          if [ -z "$VERSION" ]; then
+            tags="latest"
+          else
+            tags="$VERSION ${VERSION%.*} ${VERSION%%.*}"
+          fi
+          {
+            echo "tags=$(for t in $tags; do printf '%s:%s\n' "$IMAGE" "$t"; done | paste -sd, -)"
+            echo "version=${VERSION:-dev}"
+            echo "rev=${SHA::7}"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+      # No layer cache: on a public repository it is readable from a fork's
+      # pull request, and the build stage COPYs the sources into a layer.
+      #
+      # The labels name the PRIVATE repository, by hand: derived from this
+      # run they would name the mirror, and the source label is also what GH
+      # Packages reads to connect a package to a repository.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/softwarity/meerkat
+            org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            GIT_REV=${{ steps.meta.outputs.rev }}
+            BUILD_DATE=${{ steps.meta.outputs.date }}
+            GO_TAGS=ee
+            EDITION=ee
+      - run: echo "published ${{ steps.meta.outputs.tags }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The community image of a RELEASE, from the same commit. Every push to main
+  # publishes the community `latest` from the mirror's own pipeline (ci.yml),
+  # built from the public tree - the proof that it stands on its own. But the
+  # mirror has no tags and no way to know a version, so the semver tags are
+  # published here, from the private tree built WITHOUT the ee tag: the files
+  # under ee/ are behind the tag and the linker never sees them, so these are
+  # the same bytes the mirror would build.
+  image-community:
+    name: Build & publish the community image (release)
+    needs: [source, lint, unit, postgres, directories, e2e]
+    if: >-
+      !cancelled() && !contains(needs.*.result, 'failure')
+      && needs.lint.result == 'success' && needs.unit.result == 'success'
+      && needs.postgres.result == 'success' && needs.e2e.result == 'success'
+      && needs.source.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: enterprise
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: ${{ needs.source.outputs.sha }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      # Docker Hub is where the community image ships: `docker pull
+      # softwarity/meerkat` is what a reader types without being told about a
+      # registry first. The two secrets are this repository's, the same ones
+      # ci.yml publishes `latest` with.
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
+      - id: meta
+        env:
+          IMAGE: docker.io/softwarity/meerkat
+          VERSION: ${{ needs.source.outputs.version }}
+          SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          tags="$VERSION ${VERSION%.*} ${VERSION%%.*}"
+          {
+            echo "tags=$(for t in $tags; do printf '%s:%s\n' "$IMAGE" "$t"; done | paste -sd, -)"
+            echo "rev=${SHA::7}"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+      # No layer cache, for the same reason as above: the build stage holds
+      # the whole private tree, whatever the linker keeps of it.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/softwarity/meerkat-ce
+            org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.source.outputs.version }}
+          build-args: |
+            VERSION=${{ needs.source.outputs.version }}
+            GIT_REV=${{ steps.meta.outputs.rev }}
+            BUILD_DATE=${{ steps.meta.outputs.date }}
+            GO_TAGS=
+            EDITION=ce
+      - run: echo "published ${{ steps.meta.outputs.tags }}" | tee -a "$GITHUB_STEP_SUMMARY"

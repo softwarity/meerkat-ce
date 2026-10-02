@@ -1,14 +1,17 @@
-import { Component, input } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { Component, inject, input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 
-// The cap on a control this installation has not unlocked.
+// The mark of an Enterprise feature, in BOTH editions.
 //
-// Put it INSIDE the element that carries `ee-feature`, next to its label. The
-// CSS in styles/_modes.scss does the rest: the block goes inert and dims,
-// this badge stays lit and clickable, and the whole thing disappears once the
-// feature is on - a control someone paid for is just a control.
+// Put it INSIDE the element that carries `ee-feature`, next to its label. On
+// the community image it is the cap: the block goes inert and dims (CSS in
+// styles/_modes.scss), and this badge stays lit, says what the feature would
+// do, and leads to the licence. On the Enterprise image it shrinks to a quiet
+// "EE": everything is unlocked there, and without it nobody could tell what
+// the licence actually bought.
 //
 // It exists as a component rather than a CSS pseudo-element for one reason: a
 // ::after cannot carry a Material tooltip, and a native title attribute pops
@@ -17,10 +20,16 @@ import { RouterLink } from '@angular/router';
   selector: 'app-ee-lock',
   imports: [MatIconModule, MatTooltipModule, RouterLink],
   template: `
-    <a class="lock" routerLink="/license" [matTooltip]="why()" (click)="$event.stopPropagation()">
-      <mat-icon>workspace_premium</mat-icon>
-      <span i18n="@@Enterprise">Enterprise</span>
-    </a>
+    @if (enterprise) {
+      <span class="lock owned" i18n-matTooltip="@@Enterprise_edition_feature" matTooltip="Enterprise edition feature"
+        >EE</span
+      >
+    } @else {
+      <a class="lock" routerLink="/license" [matTooltip]="why()" (click)="$event.stopPropagation()">
+        <mat-icon>workspace_premium</mat-icon>
+        <span i18n="@@Enterprise">Enterprise</span>
+      </a>
+    }
   `,
   styles: [
     `
@@ -49,6 +58,17 @@ import { RouterLink } from '@angular/router';
       .lock:hover {
         background: color-mix(in srgb, var(--mk-ee-lock-color, var(--mat-sys-tertiary)) 14%, transparent);
       }
+      /* Owned: a label, not a call to action - quieter, and not a link. */
+      .lock.owned {
+        padding: 0 5px;
+        border-color: var(--mat-sys-outline-variant);
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.6rem;
+        cursor: default;
+      }
+      .lock.owned:hover {
+        background: none;
+      }
       .lock mat-icon {
         font-size: 14px;
         width: 14px;
@@ -68,4 +88,7 @@ export class EeLockComponent {
   // only says "Enterprise" tells someone they cannot have something without
   // ever saying what.
   readonly why = input('');
+  // Which image serves this console: the gateway stamps `ee` on <body> in the
+  // HTML it serves, so it is known before anything renders.
+  protected readonly enterprise = inject(DOCUMENT).body.classList.contains('ee');
 }

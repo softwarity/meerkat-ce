@@ -5,7 +5,7 @@
       <span class="scope text-muted">{{ scope.template() }}</span>
     </span>
     @if (holes()) {
-      <span class="holes" matTooltip="Strings this language has no wording for: the page shows the English there"
+      <span class="holes" matTooltip="Untranslated strings, shown in English"
         i18n-matTooltip="@@Locale_holes_hint4">{{ holes() }} <ng-container i18n="@@Missing">missing</ng-container></span>
     }
     <button matIconButton [matMenuTriggerFor]="more" matTooltip="More" i18n-matTooltip="@@More"
@@ -34,8 +34,7 @@
           <span i18n="@@Locale_delete">Delete this language</span>
         </button>
         <div class="menu-why" i18n="@@Locale_delete_hint">
-          This language was added here. It has no shipped version, so removing its wordings removes
-          the language.
+          Added here: this removes the language.
         </div>
       } @else {
         <button mat-menu-item (click)="resetAll()">
@@ -43,7 +42,7 @@
           <span i18n="@@Locale_reset_all">Reset this language</span>
         </button>
         <div class="menu-why" i18n="@@Locale_reset_hint">
-          Resetting drops every wording changed here and puts back the ones the product ships.
+          Puts back the wordings the product ships.
         </div>
       }
     </mat-menu>

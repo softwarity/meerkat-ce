@@ -198,8 +198,8 @@ export class AccessBadgesComponent {
     if (this.empty()) return this.delegatedTip;
     return ACCESS_LEVELS.find((l) => l.value === this.access().level)?.label ?? '';
   });
-  protected readonly delegatedTip = $localize`:@@Delegated_to_backend:No gateway rule - delegated to the API backend`;
-  protected readonly unguardedTip = $localize`:@@Nothing_gated_here:Meerkat gates nothing here, on the route or on any endpoint: the service decides alone.`;
+  protected readonly delegatedTip = $localize`:@@Delegated_to_backend:No gateway rule: the API backend decides`;
+  protected readonly unguardedTip = $localize`:@@Nothing_gated_here:Nothing gated here, on the route or any endpoint: the service decides.`;
   protected readonly pickable = this.clickable;
 
   protected pick(what: 'access' | 'limits', e: Event): void {
@@ -211,7 +211,7 @@ export class AccessBadgesComponent {
   protected readonly limitsTip = computed(() => {
     const n = this.limits() ?? 0;
     return n === 0
-      ? $localize`:@@No_bound_here:No bound of its own: whatever the route carries applies, and nothing more.`
+      ? $localize`:@@No_bound_here:No limit of its own: only the route's apply.`
       : $localize`:@@Bounds_here:${n}:count: bound(s) of its own, on top of the route's.`;
   });
 
@@ -233,7 +233,7 @@ export class AccessBadgesComponent {
       // Say it rather than hide it: the name is really in there, it will go on
       // the next save, and until then somebody looking at the data would
       // otherwise wonder which of the two screens is lying.
-      return $localize`:@@Users_listed_but_ignored:Listed but ignored - this rule poses no condition, so there is nothing to except anyone from: ${u.join(', ')}:USERS:`;
+      return $localize`:@@Users_listed_but_ignored:Ignored, this rule poses no condition: ${u.join(', ')}:USERS:`;
     }
     return u.length ? $localize`:@@Users:Users` + ': ' + u.join(', ') : $localize`:@@Users:Users`;
   });

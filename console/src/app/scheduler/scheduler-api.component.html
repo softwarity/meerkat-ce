@@ -46,10 +46,9 @@
         </tbody>
       </table>
       <p class="hint" i18n="@@Sched_api_where_2">
-        The token's perimeter is <b>schedules</b>: this API and nothing else on
-        this port. What the calls may REACH is in the schedule, not in the token
-        - see <code>roles</code> below - so one token schedules for as many
-        different endpoints as your backend serves.
+        The token reaches only this API. What the calls may reach is set by
+        each schedule's <code>roles</code>, so one token serves all your
+        endpoints.
       </p>
       <!-- The screen that mints one, one click away: an operator reading this
            has the console in front of them. Hidden for whoever cannot mint -
@@ -73,28 +72,22 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_write_1">
-        An ordinary create: <code>POST</code> hands back an id, and everything
-        else takes it. If you would rather not keep it, file the schedule under
-        your own <code>metadata</code> and ask for it back that way - which is
-        what a reconciliation loop does instead of naming its own ids.
+        <code>POST</code> returns an id. Or file the schedule under your own
+        <code>metadata</code> and find it that way.
       </p>
       <app-snippet filename="write-schedule.sh" [content]="writeCmd" />
       <p class="hint" i18n="@@Sched_api_write_2">
-        <b>A cadence</b> - every so often, counted from the end of the last run:
+        <b>A cadence</b>, counted from the end of the last run:
       </p>
       <app-snippet filename="schedule.jsonc" [content]="payload" />
       <p class="hint" i18n="@@Sched_api_write_3">
-        <b>Or a calendar</b> - cron, read in a zone - for what a duration cannot
-        say: every Monday at three, the first of the month, weekdays at eight.
-        One or the other, never both.
+        <b>Or a calendar</b>: cron, read in a timezone. One or the other, never
+        both.
       </p>
       <app-snippet filename="calendar.jsonc" [content]="calendar" />
       <p class="hint" i18n="@@Sched_api_write_4">
-        <b>Or one date</b> - a delayed action. The call goes out then, once, and
-        the schedule is finished: nothing is armed after it. That is what to
-        post when the trigger is something that happened - a basket left behind,
-        a booking made - rather than a position in a calendar. A date already
-        past still goes out if <code>catchUp</code> allows it.
+        <b>Or one date</b>: the call goes out once, then the schedule is
+        finished. A past date still goes out if <code>catchUp</code> allows it.
       </p>
       <app-snippet filename="delayed-action.jsonc" [content]="once" />
       <table class="fields">
@@ -102,35 +95,29 @@
           <tr>
             <th><code>name</code></th>
             <td i18n="@@Sched_field_name">
-              Required. What this screen lists and what a log line says.
+              Required. Shown on this screen and in logs.
             </td>
           </tr>
           <tr>
             <th><code>roles</code></th>
             <td i18n="@@Sched_field_roles">
-              The roles the CALL carries. There is no account behind a scheduled
-              call: it is made as <code>meerkat</code> holding these, and the
-              route's rule reads them like anybody else's. Say
-              <code>role</code> for one, <code>roles</code> for several - the
-              same field, never both at once. No role at all and the call
-              reaches only what is open to everyone.
+              The roles the call carries, as <code>meerkat</code>; the route's
+              rule checks them. <code>role</code> for one, <code>roles</code>
+              for several, never both. No role: only open endpoints.
             </td>
           </tr>
           <tr>
             <th><code>routeId</code></th>
             <td i18n="@@Sched_field_route">
-              Required. A route of this gateway - the id, not a URL. Unknown ids
-              are refused by name.
+              Required. A route id of this gateway, not a URL.
             </td>
           </tr>
           <tr>
             <th><code>method</code></th>
             <td i18n="@@Sched_field_method">
-              The verb of the outgoing call: <code>POST</code> by default, and
-              <code>PUT</code>, <code>PATCH</code> or <code>DELETE</code> for a
-              service whose endpoint reads that way. <code>GET</code> is
-              refused, a scheduled call being an action rather than a read
-              nobody looks at.
+              <code>POST</code> by default, or <code>PUT</code>,
+              <code>PATCH</code>, <code>DELETE</code>. <code>GET</code> is
+              refused.
             </td>
           </tr>
           <tr>
@@ -142,105 +129,79 @@
           <tr>
             <th><code>headers</code></th>
             <td i18n="@@Sched_field_headers">
-              Extra headers the call carries, ten at most. A value may be a
-              vault reference - <code>$name</code> - resolved at the moment of
-              the call: the schedule keeps the reference, so the secret is never
-              stored, never returned by this API and never drawn on this screen.
-              <code>Authorization</code> is refused because on this plane it IS
-              the account the schedule runs as, and the gateway writes it; so
-              are <code>Host</code> and the <code>Meerkat-*</code> headers.
+              Extra headers, ten at most. A value may be a vault reference
+              (<code>$name</code>), resolved at call time and never stored.
+              <code>Authorization</code>, <code>Host</code> and
+              <code>Meerkat-*</code> are refused.
             </td>
           </tr>
           <tr>
             <th><code>body</code></th>
             <td i18n="@@Sched_field_body">
-              JSON. An object or an array goes out as it stands, as
+              JSON. An object or array goes out as
               <code>application/json</code>; a JSON <b>string</b> goes out as
-              its content, which is how a form or an XML document is sent. An
-              explicit <code>contentType</code> wins either way.
+              its content (form, XML). <code>contentType</code> overrides.
             </td>
           </tr>
           <tr>
             <th><code>every</code></th>
             <td i18n="@@Sched_field_every">
-              A cadence, as an ISO 8601 duration - PT30M, PT6H, P1D. One minute
-              is the shortest. Counted from the END of the last run, which is
-              what keeps a slow job from firing again the instant it returns.
+              An ISO 8601 duration (PT30M, PT6H, P1D), one minute at least.
+              Counted from the end of the last run.
             </td>
           </tr>
           <tr>
             <th><code>cron</code></th>
             <td i18n="@@Sched_field_cron">
-              A calendar instead: the five standard fields (minute hour
-              day-of-month month day-of-week), with lists, ranges and steps, the
-              names MON-SUN and JAN-DEC, and the shortcuts &#64;hourly,
-              &#64;daily, &#64;weekly, &#64;monthly, &#64;yearly. As in every
-              crontab, a day matching either day field is a match when both are
-              restricted. Give <code>every</code> or <code>cron</code>, never
-              both.
+              Standard five-field cron, with lists, ranges, steps, MON-SUN,
+              JAN-DEC and &#64;hourly, &#64;daily, &#64;weekly, &#64;monthly,
+              &#64;yearly.
             </td>
           </tr>
           <tr>
             <th><code>at</code></th>
             <td i18n="@@Sched_field_at">
-              One date instead, RFC 3339 with its offset -
-              <code>2026-10-03T04:00:00Z</code>. The call goes out then, once,
-              and the schedule is finished. The date carries its own offset, so
-              <code>timezone</code> is refused beside it, and so is
-              <code>startAt</code>, which places the first turn of something
-              that repeats. Give <code>every</code>, <code>cron</code> or
-              <code>at</code>, never two.
+              One date, RFC 3339 with its offset
+              (<code>2026-10-03T04:00:00Z</code>). Refuses
+              <code>timezone</code> and <code>startAt</code>. Give
+              <code>every</code>, <code>cron</code> or <code>at</code>, never
+              two.
             </td>
           </tr>
           <tr>
             <th><code>timezone</code></th>
             <td i18n="@@Sched_field_timezone">
-              Where the calendar is read - an IANA name such as Europe/Paris,
-              UTC by default - because "three in the morning" is a question
-              about where. Daylight saving is followed: an hour that does not
-              exist that morning runs at the next one, and an hour that happens
-              twice fires once. Only a calendar has a zone; a duration is the
-              same length everywhere.
+              IANA name for reading the cron, UTC by default. Daylight saving
+              is followed.
             </td>
           </tr>
           <tr>
             <th><code>metadata</code></th>
             <td i18n="@@Sched_field_metadata">
-              Your own filing system: any keys you like, text values, which
-              Meerkat stores and matches on without knowing what they mean. It
-              is how one token serves a fleet - see below. Twenty keys at most.
-              Nothing here is sent with the call: it is how you find the
-              schedule again, and it is also where an owner goes if you want one
-              - <code>"owner": "stations-svc"</code> is a key like any other,
-              yours to name and yours to search on.
+              Your own keys and text values, twenty at most, to find schedules
+              again. Never sent with the call.
             </td>
           </tr>
           <tr>
             <th><code>overlap</code></th>
             <td i18n="@@Sched_field_overlap">
-              <code>skip</code> (the default) or <code>run</code>: what to do
-              with a turn that arrives while the previous run is still in
-              flight. Skipping lets it go: nothing more is owed until that run
-              closes, and its close arms the next turn - so a slow job never
-              finds one waiting in the past the instant it returns.
+              <code>skip</code> (default) or <code>run</code>: what to do with
+              a turn due while the previous run is still in flight.
             </td>
           </tr>
           <tr>
             <th><code>catchUp</code></th>
             <td i18n="@@Sched_field_catchup">
-              Seconds, <code>0</code> by default. How LATE a missed turn may
-              still go out: a gateway down all night fires the last hourly turn
-              on waking, or none - never twelve in a row.
-              <code>3600</code> means "still worth doing within the hour";
-              <code>0</code> means whenever, however late.
+              Seconds, <code>0</code> by default: how late a missed turn may
+              still go out (only the last one). <code>0</code> means however
+              late.
             </td>
           </tr>
           <tr>
             <th><code>timeout</code></th>
             <td i18n="@@Sched_field_timeout">
               ISO duration, 30 seconds by default, two minutes at most. It
-              bounds the ANSWER, not the work: that is what the 202 below is
-              for.
+              bounds the answer, not the work (see 202 below).
             </td>
           </tr>
         </tbody>
@@ -256,19 +217,13 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_protected_1">
-        <b>The gateway guards it</b> - a rule on the route, or a rule on that
-        one endpoint - and what the schedule adds is one line: the
-        <code>roles</code> the call must carry. It goes out as
-        <code>meerkat</code> holding them, and your service receives that the
-        way the route hands identity over: headers, <code>REMOTE_USER</code>, or
-        a signed JWT. Ask for the wrong role and the schedule fails every night
-        with a readable 403 on this screen - the rule is the same one that
-        refuses a person.
+        <b>Guarded by the gateway</b>: set the <code>roles</code> the call
+        needs. The service receives <code>meerkat</code> with them, as the
+        route hands identity over. A wrong role shows as a 403 here.
       </p>
       <p class="hint" i18n="@@Sched_api_protected_2">
-        <b>The service guards it with a secret of its own</b> - an API key, a
-        shared token - and that is what <code>headers</code> is for, with a
-        vault reference as the value. Never the secret in clear.
+        <b>Guarded by the service's own secret</b>: put it in
+        <code>headers</code> as a vault reference, never in clear.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -280,9 +235,9 @@
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_read_1">
         <code>meta.&lt;key&gt;=&lt;value&gt;</code> matches exactly,
-        <code>meta.&lt;key&gt;=~&lt;expression&gt;</code> by regular expression;
-        several conditions are all required. <code>tenant</code> and
-        <code>route</code> narrow too.
+        <code>meta.&lt;key&gt;=~&lt;expression&gt;</code> by regular
+        expression; all conditions apply. <code>tenant</code> and
+        <code>route</code> also filter.
       </p>
       <app-snippet filename="read-schedules.sh" [content]="readCmd" />
     </ng-template>
@@ -297,19 +252,15 @@
     <ng-template matExpansionPanelContent>
       <app-snippet filename="incoming-call.http" [content]="incoming()" />
       <p class="hint" i18n="@@Sched_api_incoming_1">
-        An ordinary request on the <b>application</b> port: it passed the route
-        and its rules on the way in, carrying the roles the schedule asked for.
-        <b>Keep the run identifier</b> and ignore one you have already acted on
-        - the call is made at least once, and that header is your half of it.
+        A normal request on the <b>application</b> port, through the route's
+        rules. <b>Keep the run identifier</b> and ignore a run you already
+        handled: delivery is at least once.
       </p>
       <p class="hint" i18n="@@Sched_api_incoming_2">
-        <b>When is it sent twice?</b> Only when the gateway making the call
-        stops before your answer comes - a crash, or a rolling deployment. Then
-        another gateway sends it again, same run identifier, with
-        <code>Meerkat-Job-Attempt</code> counting: three attempts at most, and
-        never later than the schedule's <code>catchUp</code>. A gateway that
-        stops cleanly hands its calls over at once; one that dies, after five
-        minutes. An answer you gave is never replayed, a failure included.
+        <b>Sent twice</b> only if the calling gateway stops before your answer:
+        another one resends it with the same run identifier,
+        <code>Meerkat-Job-Attempt</code> counting, three attempts at most. An
+        answer you gave is never replayed.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -322,19 +273,14 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_long_1">
-        The call starts the work, it does not wait for it. Answer
-        <code>202 Accepted</code> and the run stays open: you report your
-        progress, and eventually that it is done - which is what this screen
-        draws while it happens. Any other answer closes the run: 2xx done, the
-        rest failed.
+        Answer <code>202 Accepted</code> to keep the run open and report its
+        progress, then its end. Any other answer closes it: 2xx done, the rest
+        failed.
       </p>
       <app-snippet filename="report-run.sh" [content]="reportCmd" />
       <p class="hint" i18n="@@Sched_api_long_2">
-        The 202 is also how we know the work is <b>yours</b>: from then on the
-        call is never sent again, whatever happens to the gateway. Say nothing
-        for five minutes and the <b>lease</b> lapses: the run closes as lost and
-        the schedule gets its next turn, rather than staying "running" for ever.
-        Every report renews it.
+        After a 202 the call is never resent. Without a report for five
+        minutes, the run closes as lost. Every report renews the lease.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -347,24 +293,17 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_notnow_1">
-        Sometimes nothing is broken and the work simply cannot be done yet: the
-        extract is not published, the dependency has not answered. You know why,
-        and you know when to come back - the gateway cannot guess either. Answer
-        <code>424 Failed Dependency</code> with a <code>Retry-After</code>, in
-        seconds or as an HTTP date, and the turn comes back then. Not
-        <code>503</code>, which says "I am down" and is already covered by
-        trying again.
+        If the work cannot be done yet, answer
+        <code>424 Failed Dependency</code> with a <code>Retry-After</code>
+        (seconds or HTTP date): the turn comes back then. Not
+        <code>503</code>.
       </p>
       <app-snippet filename="not-yet.http" [content]="notYet" />
       <p class="hint" i18n="@@Sched_api_notnow_2">
-        For a job you accepted with a <code>202</code>, the same answer goes on
-        the report:
+        After a <code>202</code>, report
         <code>{{ "{" }}"state":"failed","retryIn":"PT10M"{{ "}" }}</code
-        >. Either way the REASON you give stays on that run, and the turn that
-        follows points back at it - the history reads "not published yet, put
-        off to 10:15, done". A minute at the soonest, a day at the furthest, and
-        five times in a row at most: past that the turn is let go and the
-        schedule's own cadence takes over.
+        >. The reason stays on the run. One minute to one day, five times in a
+        row at most.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -377,20 +316,14 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_history_1">
-        The schedule keeps the LAST result; every turn that ended is kept on its
-        own. It is what answers "since when is this failing" and "did last
-        night's close run": when it ended, how (<code>done</code>,
-        <code>failed</code>, <code>lost</code> when you took the work and went
-        quiet, <code>dropped</code> for a turn that never went out because it
-        came round too late), what answered, which node made the call, and which
-        attempt ended it.
+        Every finished run is kept: when, how (<code>done</code>,
+        <code>failed</code>, <code>lost</code>, <code>dropped</code> when too
+        late), the answer, the node and the attempt.
       </p>
       <app-snippet filename="schedule-runs.sh" [content]="runsCmd" />
       <p class="hint" i18n="@@Sched_api_history_2">
-        A turn that was dropped, or that failed for a reason since fixed, is
-        asked for again by name - it goes out as a NEW run with today's payload,
-        and the history says which one it replays. This screen has the same
-        button on each run in a schedule's drawer.
+        Replay a run by its id: it goes out as a new run with today's payload.
+        Same button on each run in the schedule's drawer.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -403,25 +336,15 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_fails_1">
-        A service that is down gets the gateway's own 502, and the run closes as
-        failed with the sentence that page carries. Nothing is stuck, and no
-        other schedule is affected - each call is made on its own, so a slow
-        service holds its own call and nobody else's. A call that outlasts the
-        schedule's timeout is closed by us and says so, rather than blaming your
-        service for a wait we walked away from.
+        A service that is down gets a 502 and the run fails; other schedules
+        are not affected. A call past the timeout is closed and says so.
       </p>
       <p class="hint" i18n="@@Sched_api_fails_2">
-        <b>Three attempts, then the next turn.</b> A few answers are usually a
-        moment rather than a verdict, because behind a schedule there is an
-        internal service: <code>401</code>, <code>403</code> and
-        <code>404</code> - not known yet, roles not loaded, a version still
-        coming up - and <code>502</code>, <code>503</code>, <code>504</code> or
-        no answer at all. Those are tried again 30 seconds later, then 2 minutes
-        later, and no more; never past the schedule's <code>catchUp</code>.
-        Anything else, and <code>500</code> first of all, waits for the next
-        turn: that is your service saying something, and it is handled where it
-        is said. Each attempt is a NEW run with its own identifier - you never
-        acted on the one that failed - and the history links them as one turn.
+        <b>Three attempts, then the next turn.</b> <code>401</code>,
+        <code>403</code>, <code>404</code>, <code>502</code>, <code>503</code>,
+        <code>504</code> or no answer are retried after 30 seconds, then 2
+        minutes, within <code>catchUp</code>. Anything else, <code>500</code>
+        included, waits for the next turn. Each attempt is a new run.
       </p>
     </ng-template>
   </mat-expansion-panel>

@@ -35,6 +35,9 @@ var accessLogger atomic.Pointer[slog.Logger]
 // this is thirty-five million lines a day, and an operator reading `docker
 // logs` for a startup problem should not have to opt OUT of that.
 func EnableAccessLog(format Format) {
+	if otelOn.Load() {
+		format = FormatOTel
+	}
 	accessLogger.Store(newAccessLogger(os.Stdout, format))
 }
 
@@ -49,11 +52,7 @@ func newAccessLogger(w io.Writer, format Format) *slog.Logger {
 	// Its OWN level, fixed: an access log is a record, not a severity. An
 	// operator who quiets the gateway to Error must not silently lose the
 	// audit trail as a side effect.
-	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
-	if format == FormatJSON {
-		return slog.New(slog.NewJSONHandler(w, opts))
-	}
-	return slog.New(slog.NewTextHandler(w, opts))
+	return slog.New(withPush(handlerFor(w, format, &slog.HandlerOptions{Level: slog.LevelInfo}), slog.LevelInfo))
 }
 
 // Access is one crossing of the front door.

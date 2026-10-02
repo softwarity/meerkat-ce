@@ -1,0 +1,84 @@
+name: Preflight - Enterprise credentials
+
+# Answers one question, on demand, on the MIRROR: can the Enterprise pipeline
+# (ci-ee.yml) actually reach what it needs? It runs there and nowhere else -
+# the `enterprise` environment and its secrets exist on softwarity/meerkat-ce,
+# and this file is mirrored like every other.
+#
+# A credential that merely EXISTS proves nothing: an App can be installed on
+# the wrong repository, a token can be scoped to read nothing. Every step
+# below authenticates for real and PUSHES NOTHING. Run it once after touching
+# a secret, or before trusting a release.
+#
+#   gh workflow run "Preflight - Enterprise credentials" -R softwarity/meerkat-ce
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  credentials:
+    name: Can the Enterprise pipeline run?
+    if: github.repository == 'softwarity/meerkat-ce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: enterprise
+    steps:
+      # The App: an installation token, minted for softwarity/meerkat alone.
+      - name: GitHub App (private sources)
+        id: app
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+
+      # The token has to READ the private repository: ls-remote asks the
+      # server without fetching an object.
+      - name: Read softwarity/meerkat with it
+        id: clone
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -e
+          [ -n "$GH_TOKEN" ] || { echo "no token was minted"; exit 1; }
+          git init -q probe && cd probe
+          git remote add ee "https://x-access-token:${GH_TOKEN}@github.com/softwarity/meerkat.git"
+          git ls-remote ee refs/heads/main
+          echo "the remote answers and the token is accepted"
+
+      - name: GH Packages (Enterprise image)
+        id: ghcr
+        continue-on-error: true
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_WRITE_PACKAGE }}
+
+      - name: Docker Hub (community image)
+        id: dockerhub
+        continue-on-error: true
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
+
+      - name: Verdict
+        run: |
+          {
+            echo "| credential | for | result |"
+            echo "|---|---|---|"
+            echo "| EE_APP_ID + EE_APP_PRIVATE_KEY (environment: enterprise) | minting a token | ${{ steps.app.outcome }} |"
+            echo "| that token | reading softwarity/meerkat | ${{ steps.clone.outcome }} |"
+            echo "| GH_WRITE_PACKAGE (environment: enterprise) | Enterprise image on ghcr.io | ${{ steps.ghcr.outcome }} |"
+            echo "| DOCKERHUB_USERNAME + DOCKERHUB_RW | community image on Docker Hub | ${{ steps.dockerhub.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          test "${{ steps.app.outcome }}" = success \
+            && test "${{ steps.clone.outcome }}" = success \
+            && test "${{ steps.ghcr.outcome }}" = success \
+            && test "${{ steps.dockerhub.outcome }}" = success

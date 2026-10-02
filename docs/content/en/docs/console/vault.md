@@ -21,7 +21,7 @@ is the point: promoting a value to a secret never touches what points at it.
 ![The Vault screen: three entries - two secrets and a value - with their kind, their value and what uses them](img/console/vault.webp)
 
 Two secrets reading *encrypted, never shown*, one value readable in the clear,
-and the *Used by* column naming the route that points at the first one.
+and the *Used by* column naming the route that points at each one.
 
 ## The list
 

@@ -46,7 +46,7 @@
         <ng-container *ngTemplateOutlet="entryBlock; context: { $implicit: e }"></ng-container>
       } @empty {
         <p class="empty" i18n="@@No_name_yet">
-          No name yet. Add the host this gateway answers to, then give it a certificate.
+          No name yet. Add a host, then give it a certificate.
         </p>
       }
 
@@ -68,14 +68,12 @@
       </div>
       @if (!state()?.app) {
         <p class="note" i18n="@@Force_https_no_door">
-          The applications' HTTPS door is not open: no application name above has a certificate
-          yet. Give one a certificate, and HTTPS can be forced.
+          Give an application name a certificate first.
         </p>
       } @else {
         <p class="note" i18n="@@Force_https_note">
-          Callers arriving on the plain port are sent to HTTPS. The console is never forced, and
-          neither is the liveness probe - and if every certificate expires this stands itself down
-          rather than sending callers to a door none of them will open.
+          Plain HTTP callers are redirected to HTTPS, except the console and the liveness probe.
+          It stands down if every certificate expires.
         </p>
       }
       <!-- HSTS follows the redirect: forcing HTTPS is already the commitment,
@@ -96,11 +94,8 @@
         </mat-form-field>
       </div>
       <p class="note" i18n="@@Hsts_note">
-        With HTTPS forced, every HTTPS answer of the applications also carries HSTS
-        (Strict-Transport-Security): the browser remembers to use HTTPS only, and stops sending
-        even the first request in clear - the one a redirect cannot protect. It keeps that promise
-        for the whole duration, even if the certificates go, so start short. Never sent to
-        localhost or an IP address; a route or a service that sets its own value keeps it.
+        With HTTPS forced, browsers are told to use HTTPS only for this duration, even if the
+        certificates go: start short. Not sent to localhost or an IP address.
       </p>
     </section>
 
@@ -113,15 +108,11 @@
     <section class="card">
       <h2 i18n="@@Automatic_certificates">Automatic certificates (ACME)</h2>
       <p class="note" i18n="@@ACME_note">
-        A certificate has to be signed by someone browsers trust, and it expires - ninety days with
-        Let's Encrypt. ACME is the gateway asking an authority for one directly: it proves it
-        controls the name, receives the certificate, and renews weeks before the expiry. Nobody
-        touches a file, and nobody has to remember.
+        The gateway gets certificates from an authority and renews them before they expire.
       </p>
       <p class="note" i18n="@@ACME_requires">
-        The proof is what sets the condition: the authority connects to the name itself, so a
-        public one only works for a name that resolves on the internet and reaches this gateway.
-        The exchange runs on the HTTPS port already held here - port 80 stays closed.
+        A public authority needs the name to reach this gateway from the internet. It uses the
+        HTTPS port; port 80 stays closed.
       </p>
       <mat-slide-toggle
         [checked]="acme().enabled"
@@ -133,9 +124,7 @@
       @if (acme().enabled) {
         <div class="acme">
           <p class="note" i18n="@@Authority_note">
-            A URL rather than a vendor list, so an internal step-ca or a company authority answers
-            here as well as a public one: a closed network gets automatic certificates for its own
-            names too.
+            Any ACME authority works, including an internal one such as step-ca.
           </p>
           <mat-form-field>
             <mat-label i18n="@@Authority">Authority</mat-label>
@@ -219,7 +208,7 @@
                 i18n-label="@@External_account_key_id"
                 label="External account key ID"
                 i18n-hint="@@EAB_hint"
-                hint="Issued as a pair by the authority. Most private ones require it."
+                hint="Issued with the HMAC key by the authority."
               >
                 <input
                   matInput
@@ -374,7 +363,7 @@
           &nbsp;-&nbsp;<span
             class="soon"
             i18n-matTooltip="@@No_chain_tooltip"
-            matTooltip="Without the intermediates, this works in curl and fails in a browser that has never met them."
+            matTooltip="Without intermediates, some browsers will reject it."
             i18n="@@No_intermediate"
             >No intermediate</span
           >

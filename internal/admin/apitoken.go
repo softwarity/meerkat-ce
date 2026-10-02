@@ -51,7 +51,7 @@ func (a *API) createAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 	var body struct {
 		Name  string `json:"name"`
 		Days  int    `json:"days"`  // 0 = never expires
-		Scope string `json:"scope"` // full | readonly | metrics | schedules
+		Scope string `json:"scope"` // full | readonly | schedules
 		From  string `json:"from"`  // CIDR ranges, empty = anywhere
 	}
 	if err := decodeStrict(r, &body); err != nil {
@@ -170,8 +170,8 @@ func (a *API) revokeAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 // whoever holds the key keeps holding the same key.
 //
 // Which is what makes NARROWING cheap, and that is the reason this endpoint
-// exists. A read-only token sitting in a monitoring stack's scrape config
-// should become a metrics one without minting a second and editing another
+// exists. A read-only token sitting in a service's deployment manifest
+// should become a schedules one without minting a second and editing another
 // team's repository: that friction is precisely why the safer move does not
 // get made. Widening is possible too, and the audit records the before and
 // after of every field, so it is a change somebody can see rather than one
@@ -181,7 +181,7 @@ func (a *API) updateAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 	var body struct {
 		Name   string `json:"name"`
 		Days   int    `json:"days"`   // 0 = never expires
-		Scope  string `json:"scope"`  // metrics | readonly | full
+		Scope  string `json:"scope"`  // schedules | readonly | full
 		Domain string `json:"domain"` // gateway | app, empty = the whole plane
 		From   string `json:"from"`   // CIDR ranges, empty = anywhere
 	}

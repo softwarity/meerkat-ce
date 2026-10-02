@@ -97,11 +97,39 @@ conteneur écrit sur sa sortie standard.
 >
 > Kubernetes le fait tout seul : 10 Mi, 5 fichiers.
 
+## Au format d'OpenTelemetry
+
+**Infra, OpenTelemetry**, onglet **Logs**, mode **Written for an agent**. Les
+deux journaux gardent leurs sorties et changent de forme, à chaud, sur chaque
+noeud. Un objet par ligne, avec les noms de champs du modèle de log
+d'OpenTelemetry :
+
+```json
+{"timestamp": "2026-10-01T16:35:37.296Z", "severity_text": "WARN", "severity_number": 13,
+ "body": "the upstream is down", "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+ "attributes": {"route": "billing", "upstream.host": "billing:8080"},
+ "resource": {"service.name": "meerkat", "service.version": "..."}}
+```
+
+Rien n'est poussé. Un Collector en **DaemonSet** lit la sortie de chaque
+conteneur et décode ces champs : une ligne arrive dans Loki avec sa sévérité, sa
+trace et ses attributs. **No collector yet?** sur la page OpenTelemetry donne la
+configuration de cet agent. Ce mode existe dans les deux éditions : il écrit, il
+n'exporte pas.
+
+## Ou poussés au collecteur
+
+Le troisième mode, **Pushed to the collector**, envoie les deux journaux en
+OTLP à l'adresse du collecteur (Enterprise), pour les noeuds sans agent : un
+hôte Docker nu, une VM. Les sorties gardent le format choisi au démarrage. Un
+seul mode à la fois : avec un agent qui lit aussi les sorties, chaque ligne
+arriverait deux fois.
+
+La poussée a sa propre file, jamais celle de l'audit : un flot de logs ne peut
+pas coûter un événement au journal. Un lot refusé trois fois par le collecteur
+est abandonné et compté, et l'onglet dit combien.
+
 ## Ce qui manque
 
-- L'envoi des journaux à un collecteur OpenTelemetry (le signal **Logs**, à côté
-  des traces et des métriques) : le journal opérationnel, le journal d'accès des
-  routes qui le demandent, et le [journal d'audit](/docs/operations/audit). Une
-  copie : chacun reste là où il est écrit aujourd'hui.
 - Le niveau réglable depuis la console plutôt qu'au démarrage seulement.
 - Le nom du jeton à côté du compte quand une machine appelle.

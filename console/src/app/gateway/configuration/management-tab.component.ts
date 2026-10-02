@@ -134,7 +134,7 @@ type Row = SavedConfiguration & { current?: boolean };
          name that wraps onto two lines makes the sticky row taller than the
          rows it is meant to sit above. */
       .mat-column-name {
-        flex: 0 0 340px;
+        flex: 0 0 420px;
       }
       .mat-column-updated {
         flex: 0 0 260px;
@@ -146,7 +146,12 @@ type Row = SavedConfiguration & { current?: boolean };
         gap: 8px;
         font-weight: 500;
       }
+      .label {
+        flex: none;
+        white-space: nowrap;
+      }
       .as {
+        min-width: 0;
         color: var(--mat-sys-on-surface-variant);
         font-weight: 400;
         overflow: hidden;
@@ -188,9 +193,8 @@ type Row = SavedConfiguration & { current?: boolean };
       <mat-drawer-content>
         <div class="top">
           <p class="hint grow" style="margin: 0" i18n="@@Management_hint">
-            The first row is what this gateway serves; the others are copies on a shelf. Saving,
-            duplicating and deleting one changes nothing about what is served. Click a row to read
-            its file.
+            The first row is what this gateway serves; the others are saved copies that serve
+            nothing. Click a row to read its file.
           </p>
           <!-- The size of the shelf, said before it is reached: a cap found by
                being refused is a trap, a cap announced is a price. -->
@@ -208,7 +212,7 @@ type Row = SavedConfiguration & { current?: boolean };
             <app-ee-lock
               feature="configurations"
               i18n-why="@@Configurations_ee_why"
-              why="Keep one configuration per customer or per demo on the same instance, and switch between them."
+              why="Keep several configurations on one instance and switch between them."
             />
           </button>
         </div>
@@ -233,7 +237,7 @@ type Row = SavedConfiguration & { current?: boolean };
                     matTooltipPosition="right"
                     >{{ stateIcon() }}</mat-icon
                   >
-                  <ng-container i18n="@@Current_configuration">Current configuration</ng-container>
+                  <span class="label" i18n="@@Current_configuration">Current configuration</span>
                   @if (savedAs(); as name) {
                     <span class="as">{{ name }}</span>
                   }
@@ -451,7 +455,7 @@ export class ConfigurationManagementComponent {
   protected readonly markTip = computed(() =>
     this.state() === 'saved'
       ? $localize`:@@Mark_matches:This is what the gateway serves.`
-      : $localize`:@@Mark_stale:The gateway was set from this one and has changed since. Save the current state again to bring them back together.`,
+      : $localize`:@@Mark_stale:The gateway has changed since it was set from this one. Save the current state again to match.`,
   );
 
   protected readonly stateTip = computed(() => {
@@ -460,9 +464,9 @@ export class ConfigurationManagementComponent {
       case 'saved':
         return $localize`:@@Saved_as_WHAT:Saved as ${c?.savedAs?.name}:name:`;
       case 'drifted':
-        return $localize`:@@Drifted_from_WHAT:Changed since ${c?.active?.name}:name: was saved. Save it again, or these changes are lost the day another configuration is set as current.`;
+        return $localize`:@@Drifted_from_WHAT:Changed since ${c?.active?.name}:name: was saved. Save it again to keep these changes.`;
       default:
-        return $localize`:@@Not_saved_anywhere:Not saved under any name. Nothing to come back to if another configuration is set as current.`;
+        return $localize`:@@Not_saved_anywhere:Not saved under any name.`;
     }
   });
 
@@ -480,11 +484,11 @@ export class ConfigurationManagementComponent {
 
   protected readonly currentLabel = () => $localize`:@@Current_configuration:Current configuration`;
   protected readonly currentSubtitle = () =>
-    $localize`:@@Current_subtitle:What this gateway serves right now. Saving an edited version applies it.`;
+    $localize`:@@Current_subtitle:What this gateway serves. Saving applies your edits.`;
   protected readonly savedSubtitle = () =>
-    $localize`:@@Saved_subtitle:A saved copy. Editing it changes nothing about what is served.`;
+    $localize`:@@Saved_subtitle:A saved copy. Editing it does not change what is served.`;
   protected readonly mediaNote = () =>
-    $localize`:@@Media_not_edited_here:Images are not shown here and editing never changes them: a logo is a megabyte of base64 on one line. They are set on Built-in pages, Branding, and they travel in the exported package.`;
+    $localize`:@@Media_not_edited_here:Images are left out here and kept as they are. Set them in Built-in pages, Branding.`;
   protected readonly saveLabel = () => $localize`:@@Save:Save`;
   protected readonly applyLabel = () => $localize`:@@Save_and_apply:Save and apply`;
 
@@ -601,7 +605,7 @@ export class ConfigurationManagementComponent {
     if (existing) {
       const ok = await this.dialogs.confirm({
         title: $localize`:@@Replace_configuration:Replace ${name}:name:?`,
-        message: $localize`:@@Replace_configuration_message:It already holds a saved configuration, which will be replaced by what this gateway is set to serve right now. What is being served does not change.`,
+        message: $localize`:@@Replace_configuration_message:Its content is replaced by what this gateway serves now.`,
         confirmLabel: $localize`:@@Replace:Replace`,
         danger: true,
       });
@@ -668,7 +672,7 @@ export class ConfigurationManagementComponent {
       if (existing) {
         const ok = await this.dialogs.confirm({
           title: $localize`:@@Replace_configuration:Replace ${outcome.name}:name:?`,
-          message: $localize`:@@Replace_configuration_file_message:It already holds a saved configuration, which will be replaced by this file. Nothing is applied: what the gateway serves does not change.`,
+          message: $localize`:@@Replace_configuration_file_message:Its content is replaced by this file. Nothing is applied.`,
           confirmLabel: $localize`:@@Replace:Replace`,
           danger: true,
         });
@@ -720,8 +724,8 @@ export class ConfigurationManagementComponent {
         title: $localize`:@@Nothing_saved_first:What is running is not saved`,
         message:
           this.state() === 'drifted'
-            ? $localize`:@@Drifted_first_message:This gateway has changed since ${this.current()?.active?.name}:name: was saved, and those changes are in no saved configuration. Switching loses them.`
-            : $localize`:@@Nothing_saved_first_message:No saved configuration matches what this gateway serves, so switching leaves nothing to come back to. Save the current one under a name first if you may want it again.`,
+            ? $localize`:@@Drifted_first_message:This gateway has changed since ${this.current()?.active?.name}:name: was saved. Switching loses those changes.`
+            : $localize`:@@Nothing_saved_first_message:No saved configuration matches what this gateway serves. Save it under a name first if you may want it again.`,
         confirmLabel: $localize`:@@Continue:Continue`,
         danger: true,
       });
@@ -781,7 +785,7 @@ export class ConfigurationManagementComponent {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Delete_configuration:Delete ${c.name}:name:?`,
       message: c.active
-        ? $localize`:@@Delete_active_configuration_message:This is the current one. What the gateway serves does not change - it simply stops having a name, and this copy is gone.`
+        ? $localize`:@@Delete_active_configuration_message:This is the current one. What the gateway serves does not change, it just loses its name.`
         : $localize`:@@Delete_configuration_message:The saved copy is gone. What the gateway serves does not change.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
@@ -852,7 +856,7 @@ export class ConfigurationManagementComponent {
     const updated = count('update');
     const removed = this.removes(plan);
     if (!added && !updated && !removed) {
-      return $localize`:@@Activate_no_change:This gateway already matches this configuration: setting it as current changes nothing.`;
+      return $localize`:@@Activate_no_change:This gateway already matches this configuration. Nothing changes.`;
     }
     const gone = plan.changes
       .filter((c) => c.action === 'remove')

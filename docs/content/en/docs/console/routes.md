@@ -20,8 +20,8 @@ sits last - a catch-all anywhere else would answer for everything under it.
 
 ## The list
 
-One row per route: its name, what it decides about access, what it matches, and
-where it sends. Order is significant - **the first route that matches wins** -
+One row per route: its name, what it decides about access, and one **Matching
+and target** column on two lines: what it matches, then where it sends. Order is significant - **the first route that matches wins** -
 so the table is ordered, not sorted.
 
 - **The drag handle** moves a route up or down and saves at once. It only works
@@ -77,17 +77,15 @@ The name sits in the header. The left column lists the sections, grouped:
 
 | Group | Sections |
 |---|---|
-| - | **Target**, **Identity** |
+| - | **Target**, **Identity**, **OpenTelemetry** |
 | Filters | Security, Predicates, Gates, Rate limits |
-| Modifiers | Incoming, Outgoing |
-| Forwarders | Auth forward |
-| UI | Locales, Color scheme, User button, User info, Tracing, Custom |
+| Modifiers | Incoming, Outgoing, Auth forward |
+| UI | Locales, Color scheme, User button, User info, Custom |
 
-**Identity** sits beside Target rather than in a group: what a route knows about
-the caller is not a filter, a modifier or a forwarder - it is what there is to
-forward, and two sections spend it. **Auth forward** sends it to the service
-(headers or a JWT); **User info** puts it on the page. The facts and their names
-are settled once, in Identity.
+**Identity** is what the route knows about the caller. Two sections spend it:
+**Auth forward** sends it to the service, **User info** puts it on the page.
+**OpenTelemetry** decides whether the route is traced (see
+[traces](/docs/operations/tracing#choosing-which-routes-are-traced)).
 
 ### Reading the marks
 
@@ -154,7 +152,7 @@ On a proxy route you also set:
   to the upstream), or one deposited here as a file. A spec is what unlocks the
   [endpoint screens](/docs/console/endpoints) and the developer swagger.
 
-![The Predicates section: a path predicate with two patterns, a method predicate and a header predicate](img/console/route-editor-predicates.webp)
+![The Predicates section: a path predicate, a method predicate and a header predicate with two accepted values](img/console/route-editor-predicates.webp)
 
 The bricks stack in a panel, each with its own explanation and its own remove
 button. Here: two path patterns, four methods, and a header that accepts a short
@@ -168,7 +166,7 @@ own reference:
 - **[Predicates](/docs/predicates/overview)** - the ways a route decides a request is for it.
 - **[Filters](/docs/filters/overview)** - the ways it transforms one, and the gates that refuse it.
 
-![The Incoming section: a strip-prefix filter and a set-request-header filter, each with arrows to reorder it](img/console/route-editor-filters.webp)
+![The Incoming section: a strip-prefix filter and two set-request-header filters, one of them reading a vault entry, each with arrows to reorder it](img/console/route-editor-filters.webp)
 
 Filters apply in the order they are listed, and the arrows on each card move it
 up or down.

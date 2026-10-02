@@ -84,7 +84,7 @@ export class ModuleEditorComponent implements OnInit {
 
   private readonly q$ = new Subject<string>();
 
-  protected readonly noRoutes = $localize`:@@Portal_no_ui_routes:No UI route exists yet - a module opens a UI route.`;
+  protected readonly noRoutes = $localize`:@@Portal_no_ui_routes:No UI route yet: a module opens one.`;
 
   ngOnInit(): void {
     // input() is not bound in field initializers - seed here.

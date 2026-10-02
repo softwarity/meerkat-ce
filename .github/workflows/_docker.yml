@@ -3,8 +3,12 @@ name: Reusable Docker build & publish
 # Reusable multi-arch build (pattern shared with softwarity/plug). Each
 # architecture is built on its NATIVE runner (no QEMU emulation) in parallel,
 # pushed by digest; a final job assembles the manifest list. Tags are derived
-# from the caller's ref by metadata-action, so the same logic serves branch
-# pushes (CI) and version tags (release).
+# from the caller's ref by metadata-action.
+#
+# The COMMUNITY image, from the public tree: this is what ci.yml calls on the
+# mirror to publish `latest`. The Enterprise image and the release tags are
+# built by ci-ee.yml, in jobs of its own - the sources it builds are in
+# another repository, which a called workflow cannot check out for its caller.
 #
 # Docker Hub is where the image ships: `docker pull softwarity/meerkat` is what
 # a reader types without being told about a registry first. It needs two
@@ -17,16 +21,6 @@ on:
       image:
         description: Full image reference to publish.
         required: true
-        type: string
-      go-tags:
-        description: Go build tags. Empty builds the community image, "ee" the Enterprise one.
-        required: false
-        default: ""
-        type: string
-      registry:
-        description: docker.io or ghcr.io - decides which credential logs in.
-        required: false
-        default: docker.io
         type: string
 
 env:
@@ -42,14 +36,14 @@ jobs:
     steps:
       - id: check
         env:
-          USERNAME: ${{ inputs.registry == 'ghcr.io' && github.actor || secrets.DOCKERHUB_USERNAME }}
-          TOKEN: ${{ inputs.registry == 'ghcr.io' && github.token || secrets.DOCKERHUB_RW }}
+          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKERHUB_RW }}
         run: |
           if [ -n "$USERNAME" ] && [ -n "$TOKEN" ]; then
             echo "publish=true" >> "$GITHUB_OUTPUT"
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Image not published::the credentials for ${{ inputs.registry }} are not set, so the image is built but not pushed."
+            echo "::warning title=Image not published::the Docker Hub credentials are not set, so the image is built but not pushed."
           fi
 
   build:
@@ -59,17 +53,13 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      # A reusable workflow's job permissions REPLACE the caller's, so
-      # declaring this on the calling job was not enough: the token reaching
-      # buildx had no right to push a package.
-      packages: write
     strategy:
       fail-fast: false
       matrix:
         # amd64 ONLY while the two-image split settles: an arm64 runner plus a
         # manifest list doubles the build minutes of every push, and nothing
         # being stabilised here is architecture-specific. Put linux/arm64 back
-        # when the pipeline is quiet.
+        # when the pipeline is quiet - here and in ci-ee.yml together.
         platform: [linux/amd64]
     steps:
       - uses: actions/checkout@v7
@@ -83,13 +73,12 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
       - uses: docker/setup-buildx-action@v4
-      - name: Log in to the registry
+      - name: Log in to Docker Hub
         if: needs.preflight.outputs.publish == 'true'
         uses: docker/login-action@v4
         with:
-          registry: ${{ inputs.registry == 'ghcr.io' && 'ghcr.io' || '' }}
-          username: ${{ inputs.registry == 'ghcr.io' && github.actor || secrets.DOCKERHUB_USERNAME }}
-          password: ${{ inputs.registry == 'ghcr.io' && github.token || secrets.DOCKERHUB_RW }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
       - name: Resolve version
         id: ver
         # A v-tag -> its semver; any branch -> "dev". The short commit is
@@ -102,6 +91,7 @@ jobs:
           esac
           echo "rev=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      # The layer cache is fine HERE: the tree it holds is the public one.
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v7
@@ -112,17 +102,13 @@ jobs:
             VERSION=${{ steps.ver.outputs.value }}
             GIT_REV=${{ steps.ver.outputs.rev }}
             BUILD_DATE=${{ steps.ver.outputs.date }}
-            GO_TAGS=${{ inputs.go-tags }}
-            # What the linker puts in decides the code; EDITION decides what
-            # travels BESIDE it. Without this line the Enterprise image built
-            # here carried no plug client at all - the agent was linked in, and
-            # the account that hands the client out had nothing to hand.
-            EDITION=${{ inputs.go-tags == 'ee' && 'ee' || 'ce' }}
+            GO_TAGS=
+            EDITION=ce
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ needs.preflight.outputs.publish }}
-          cache-from: type=gha,scope=${{ inputs.go-tags == 'ee' && 'ee' || 'ce' }}-${{ env.PLATFORM_PAIR }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.go-tags == 'ee' && 'ee' || 'ce' }}-${{ env.PLATFORM_PAIR }}
+          cache-from: type=gha,scope=ce-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=ce-${{ env.PLATFORM_PAIR }}
       - name: Export digest
         if: needs.preflight.outputs.publish == 'true'
         run: |
@@ -133,7 +119,7 @@ jobs:
         if: needs.preflight.outputs.publish == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: digests-${{ inputs.go-tags == 'ee' && 'ee' || 'ce' }}-${{ env.PLATFORM_PAIR }}
+          name: digests-ce-${{ env.PLATFORM_PAIR }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -146,16 +132,12 @@ jobs:
     if: needs.preflight.outputs.publish == 'true'
     permissions:
       contents: read
-      # A reusable workflow's job permissions REPLACE the caller's, so
-      # declaring this on the calling job was not enough: the token reaching
-      # buildx had no right to push a package.
-      packages: write
     steps:
       - name: Download digests
         uses: actions/download-artifact@v8
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-${{ inputs.go-tags == 'ee' && 'ee' || 'ce' }}-*
+          pattern: digests-ce-*
           merge-multiple: true
       - uses: docker/setup-buildx-action@v4
       - name: Docker tags
@@ -164,24 +146,20 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           # ONE moving tag outside a release, and it is `latest`. A branch tag
-          # (`main`) named the same thing twice and nobody pulled it.
+          # (`main`) named the same thing twice and nobody pulled it. The
+          # semver tags of a release come from ci-ee.yml, which knows the
+          # version; this tree has no tags to derive them from.
           #
           # Worth knowing before expecting this to save room: a tag is a
           # POINTER. Pushing `latest` again moves it and leaves the manifest it
-          # named stored, untagged - which is how ninety-eight of them
-          # accumulated. What removes those is the weekly prune
-          # (prune-packages.yml), not the push.
+          # named stored, untagged.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-      - name: Log in to the registry
+      - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
-          registry: ${{ inputs.registry == 'ghcr.io' && 'ghcr.io' || '' }}
-          username: ${{ inputs.registry == 'ghcr.io' && github.actor || secrets.DOCKERHUB_USERNAME }}
-          password: ${{ inputs.registry == 'ghcr.io' && github.token || secrets.DOCKERHUB_RW }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
       - name: Create and push manifest list
         working-directory: ${{ runner.temp }}/digests
         run: |

@@ -95,7 +95,6 @@ already have.
 
 | Scope | What it opens |
 |---|---|
-| `metrics` | the `/metrics` exposition and nothing else: a scraper's credential |
 | `schedules` | `/api/schedules` and nothing else: the credential of a service managing its [scheduled calls](/docs/operations/scheduler) |
 | `readonly` | reads, and the testers. What counts as a read is decided per endpoint, not by the HTTP verb |
 | `full` | everything its owner may do |

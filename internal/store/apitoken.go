@@ -33,20 +33,10 @@ const (
 	// ScopeReadOnly: reads only. What counts as a read is decided by the
 	// endpoint, not by the HTTP verb - see admin.readsOnly.
 	ScopeReadOnly = "readonly"
-	// ScopeMetrics: /metrics and NOTHING else (OBS-05).
-	//
-	// Narrower than read-only on purpose, and it is the narrowness that makes
-	// it worth having. A scraper is a long-lived credential sitting in a
-	// monitoring stack's configuration, often in a different team's repository
-	// - the one place a token is most likely to leak and least likely to be
-	// rotated. A read-only token there would hand whoever finds it the whole
-	// configuration: every route, every upstream, every rule. This one hands
-	// over counters.
-	ScopeMetrics = "metrics"
 	// ScopeSchedules: the scheduled calls (SCHED-01) and NOTHING else.
 	//
-	// The credential a BACKEND SERVICE holds, and as narrow as the scraper's
-	// for the same reason: it lives in a deployment manifest, often in another
+	// The credential a BACKEND SERVICE holds, and narrow on purpose: it lives
+	// in a deployment manifest, often in another
 	// team's repository, and it is the one nobody remembers to rotate. What it
 	// opens is /api/schedules - not the gateway's configuration, not the
 	// accounts, not the applications in front of it.
@@ -55,7 +45,7 @@ const (
 
 // TokenScopes are the allowed perimeters, in the order a form should offer
 // them (the narrowest first).
-var TokenScopes = []string{ScopeMetrics, ScopeSchedules, ScopeReadOnly, ScopeFull}
+var TokenScopes = []string{ScopeSchedules, ScopeReadOnly, ScopeFull}
 
 // SanitizeTokenCIDRs normalizes the addresses a token may be used from
 // (MCP-02), and refuses what does not parse - a typo here would silently allow
@@ -126,11 +116,11 @@ func SanitizeTokenScope(scope string) (string, error) {
 	switch s := strings.ToLower(strings.TrimSpace(scope)); s {
 	case "":
 		return ScopeReadOnly, nil
-	case ScopeFull, ScopeReadOnly, ScopeMetrics, ScopeSchedules:
+	case ScopeFull, ScopeReadOnly, ScopeSchedules:
 		return s, nil
 	default:
-		return "", fmt.Errorf("token perimeter %q: allowed are %s, %s, %s and %s",
-			scope, ScopeMetrics, ScopeSchedules, ScopeReadOnly, ScopeFull)
+		return "", fmt.Errorf("token perimeter %q: allowed are %s, %s and %s",
+			scope, ScopeSchedules, ScopeReadOnly, ScopeFull)
 	}
 }
 
@@ -315,7 +305,7 @@ func (s *Store) SetAPITokenEnabled(ctx context.Context, userID, id string, enabl
 // the secret itself, and who it acts as.
 //
 // Which makes narrowing cheap, and that is the point. A read-only token
-// sitting in a monitoring stack's scrape config should become a metrics one
+// sitting in a service's deployment manifest should become a schedules one
 // without minting a second and editing another team's repository: the friction
 // is why the safer move does not get made.
 type TokenEdit struct {

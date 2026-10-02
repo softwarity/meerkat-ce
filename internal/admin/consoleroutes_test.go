@@ -10,15 +10,16 @@ import (
 
 // The console and the product share one port, and one of them has to give way.
 //
-// Everything the API serves outside /api - the agent endpoint, the Prometheus
-// exposition - is an EXACT path on the same mux the single-page app is mounted
-// on, and an exact pattern beats the app's catch-all. So a console route named
+// Everything the API serves outside /api - the agent endpoint - is an EXACT
+// path on the same mux the single-page app is mounted on, and an exact pattern
+// beats the app's catch-all. So a console route named
 // after one of them still WORKS while you click around, because the router
 // never asks the server; it breaks on a reload, a bookmark, or a pasted link,
-// where the browser gets the exposition instead of the app.
+// where the browser gets the product's answer instead of the app.
 //
 // That is a failure nobody meets until a user does, which is why it is a test.
-// /metrics collided this way for exactly one afternoon.
+// The Prometheus /metrics, since removed, collided this way for exactly one
+// afternoon.
 func TestNoConsoleRouteTakesAProductPath(t *testing.T) {
 	// The paths the product owns: what the control plane mounts outside /api.
 	owned := map[string]bool{}

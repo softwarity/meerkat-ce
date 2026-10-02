@@ -99,7 +99,7 @@ export class SchedulerPageComponent {
 
   protected readonly zoneHint = computed(() =>
     this.zoneIsUtc()
-      ? $localize`:@@Zone_none:Your profile has no timezone, so these already are the gateway's own hours`
+      ? $localize`:@@Zone_none:Your profile has no timezone: times are already in UTC`
       : $localize`:@@Zone_to_utc:Show the times in UTC rather than ${this.mine()}:zone:`,
   );
 

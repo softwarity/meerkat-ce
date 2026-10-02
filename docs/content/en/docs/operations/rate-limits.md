@@ -102,6 +102,8 @@ cardinality lesson, one level down.
 
 The screen is **Infra > Endpoint rate limits**.
 
+![Endpoint rate limits: three operations with bounds of their own, per user or for the whole operation](img/console/endpoint-limits.webp)
+
 ## In a cluster: read the number twice
 
 > [!WARNING]

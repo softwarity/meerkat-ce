@@ -136,6 +136,57 @@ The agent's `read_audit` tool shares that same function: an agent that saw a wid
 trail than the console would be a way around the capability model, and it would be
 nobody's fault in particular.
 
+## Sent to a collector
+
+**Infra, OpenTelemetry**, tab **Audit** (Enterprise), two switches:
+
+- *Send the audit logs*: the data plane - the accounts' sign-ins, refusals,
+  password and second-factor changes, and the calls of the operations audited
+  in **Endpoint audit**, which send nothing while it is off;
+- *Send Meerkat's console audit too*: the changes made in the console and the
+  sign-ins to it.
+
+Each event also leaves as an OpenTelemetry **log** whose resource says
+`meerkat.stream=audit`: the Collector and the backend keep it apart from
+ordinary logs, with its own query, retention and readers. The action is the
+body; the actor (`user.id`, `user.name`), the target, the organisation, the
+client address and the field-level changes are attributes; the trace id is the
+request's, which joins the event to its trace and its access line.
+
+A copy, never sampled: the trail stays here. Recording an event never waits on
+the network - it is queued and sent in batches, retried while the collector
+does not answer. What a full queue has to drop is counted, and the tab says so.
+
+## Auditing a route's operations
+
+**Infra, Endpoint audit** (Enterprise) lists the operations of each route's
+OpenAPI contract, with a switch per operation. An audited call becomes an audit
+event, sent to the collector with the rest of the trail when the OpenTelemetry
+**Audit** tab is on. Nothing is stored here: the volume is the data plane's.
+
+![Endpoint audit with the refund operation open: two fields taken from the call, and the JSON body carried](img/console/endpoint-audit.webp)
+
+| Always carried | |
+|---|---|
+| the caller | `user.id`, `user.name`, `meerkat.tenant.id`, `meerkat.tenant.name`, `meerkat.group`, `meerkat.roles` |
+| the operation | `meerkat.route`, `http.request.method`, `http.route` (the template), `url.path` (as asked) |
+| the answer | `http.response.status_code` - a refusal is an event too |
+| the rest | `client.address`, the trace id, and the description as the body (pre-filled from the OpenAPI summary) |
+
+On request, per operation:
+
+- **fields taken from the call**, carried as `audit.field.<name>`: a path
+  variable, a query parameter, a header, or a JSON pointer into the body
+  (`/order/id`);
+- **the JSON body**, 64 KB at most, with the fields that hold secrets replaced
+  at any depth (`password`, `token`, `secret`, `apiKey`... - the list can be
+  changed per operation).
+
+Auditing observes and decides nothing: it is wrapped around the endpoint
+security, sees the answer the caller got, and cannot open or close an
+operation. A route without an OpenAPI contract cannot be audited this way:
+deposit its contract, or let the service audit itself.
+
 ## Filters, retention, and what is missing
 
 The screen filters on the part of the trail (**All**, **Changes**, **Data plane
@@ -155,4 +206,4 @@ addresses and names. `GET /api/audit/export` takes the same parameters as the
 list.
 
 Not there yet: server-side pagination, the tunnel's own activity, a Parquet
-export, and sending the trail to a collector over OTLP.
+export.

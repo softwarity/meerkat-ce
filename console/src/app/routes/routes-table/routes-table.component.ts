@@ -50,7 +50,7 @@ export class RoutesTableComponent {
   // Emits the full ordered list of route ids after a drag.
   readonly reorder = output<string[]>();
 
-  protected readonly columns = ['name', 'access', 'matching', 'upstream'];
+  protected readonly columns = ['name', 'access', 'route'];
 
   // Order is first-match-wins, so it means nothing on a subset: a row dragged
   // to the top of three visible rows would land above whatever really sits
@@ -58,7 +58,7 @@ export class RoutesTableComponent {
   protected readonly handleTip = computed(() =>
     this.reorderable()
       ? $localize`:@@Drag_to_reorder:Drag to reorder`
-      : $localize`:@@Clear_the_search_to_reorder:Reordering applies to the whole list: clear the search to move a route`,
+      : $localize`:@@Clear_the_search_to_reorder:Clear the search to reorder`,
   );
 
   // Where a UI route ANSWERS, as a browser would ask for it: the first path
@@ -117,14 +117,27 @@ export class RoutesTableComponent {
   }
 
   protected summary(r: Route): string {
-    const preds = r.predicates
+    return r.predicates
       .map((p) => {
         const first = p.args ? Object.values(p.args)[0] : undefined;
         const value = Array.isArray(first) ? first.join(', ') : (first ?? '');
         return value === '' ? p.type : `${p.type}: ${value}`;
       })
       .join(' AND ');
-    return r.filters.length ? `${preds} - ${r.filters.length} filter(s)` : preds;
+  }
+
+  // The filters by name, in the order they run: a count said there were some,
+  // the names say which.
+  protected filterNames(r: Route): string {
+    return r.filters.map((f) => f.type).join(', ');
+  }
+
+  // Where the request goes: the upstream, or - for a route that answers by
+  // itself (a redirect, a fixed answer) - the filter that does.
+  protected target(r: Route): string {
+    if (r.upstream) return r.upstream;
+    const last = r.filters[r.filters.length - 1];
+    return last ? $localize`:@@Answered_by_FILTER:answered by ${last.type}:filter:` : '';
   }
 
   // What to show beside a route's name, or null when there is nothing worth
@@ -136,7 +149,7 @@ export class RoutesTableComponent {
       return {
         icon: 'heart_broken',
         open: true,
-        tip: $localize`:@@Not_answering_tip:Not answering - callers are getting the unavailable page. Last: ${
+        tip: $localize`:@@Not_answering_tip:Not answering: callers get the unavailable page. Last: ${
           h.lastError || h.lastStatus || '?'
         }:LAST:`,
       };

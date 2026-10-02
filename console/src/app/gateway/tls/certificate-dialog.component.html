@@ -8,9 +8,8 @@
 
   @if (door === 'import') {
     <p class="note" i18n="@@Import_note">
-      Paste what the authority sent back, or pick the keystore a Java or Windows tool exported. It
-      must answer for this host, and it is checked here rather than at the first handshake. The
-      private key stays: it is sealed in the store and never travels back to this screen.
+      Paste the PEM files or pick a keystore (.p12, .pfx). It must cover this host. The private key
+      is stored sealed and never shown again.
     </p>
     <div class="file">
       <button matButton="outlined" type="button" (click)="picker.click()">
@@ -57,13 +56,12 @@
   } @else {
     @if (door === 'self-signed') {
       <p class="note" i18n="@@Self_signed_note">
-        Nobody vouches for this one but itself, so browsers will warn. What it buys is a real
-        handshake today: secure cookies that can be marked secure, and passkeys that work.
+        Browsers will warn, but secure cookies and passkeys work.
       </p>
     } @else {
       <p class="note" i18n="@@Signing_request_note">
-        The request leaves, the private key does not. Carry it to whoever runs your authority, then
-        paste their answer back here - no network, no authority Meerkat has to reach.
+        Send the request to your authority, then adopt the signed certificate here. The private
+        key never leaves.
       </p>
     }
     <div class="split">
@@ -84,7 +82,7 @@
         i18n-label="@@Valid_for_days"
         label="Valid for (days)"
         i18n-hint="@@Apple_398_hint"
-        hint="Apple refuses anything over 398 days, self-signed included."
+        hint="398 days at most: Apple refuses longer."
       >
         <input
           matInput

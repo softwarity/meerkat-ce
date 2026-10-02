@@ -89,7 +89,7 @@ function freeId(wanted: string, taken: string[]): string {
 })
 export class AuthProviderEditorComponent {
   // A hint the field renders itself, so it is a string rather than markup.
-  protected readonly ldapHint = $localize`:@@Server_URL_hint:ldaps is the one to use unless the directory is on a private network`;
+  protected readonly ldapHint = $localize`:@@Server_URL_hint:Prefer ldaps unless the directory is on a private network`;
   // null creates one.
   readonly provider = input<AuthProvider | null>(null);
   // The identifiers already in use, so a derived one never collides.
@@ -344,7 +344,7 @@ export class AuthProviderEditorComponent {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Delete_provider_NAME:Delete "${p.name}:NAME:"?`,
       // Deleting strands the accounts that only came in this way.
-      message: $localize`:@@Delete_provider_hint:The accounts that sign in through it will keep existing, but will no longer have a way in.`,
+      message: $localize`:@@Delete_provider_hint:Its accounts are kept, but lose this way in.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
     });

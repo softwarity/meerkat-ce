@@ -44,7 +44,7 @@ import { PreviewCategory, PreviewTemplate } from '../../api.service';
           <mat-icon class="kind">{{ iconOf(current()) }}</mat-icon>
           <span class="label">{{ current()?.label }}</span>
           @if (current()?.kind === 'mail') {
-            <span class="note" matTooltip="A message is built from light colours only - an e-mail client second-guesses a dark background"
+            <span class="note" matTooltip="E-mails use the light colours only"
               i18n-matTooltip="@@Preview_mail_light_hint" i18n="@@Light_only">light only</span>
           }
           <mat-icon class="caret">arrow_drop_down</mat-icon>

@@ -50,6 +50,8 @@ NodePort, un LoadBalancer, un port Docker publié. La page Infra, Plug enregistr
 donc l'hôte et le port **publiés**, et chaque commande de cette page et de la
 page de profil du développeur les porte, prête à copier.
 
+![L'écran Plug : l'interrupteur du tunnel, l'hôte et le port publiés, et les commandes pour la machine d'un développeur](img/console/plug.webp)
+
 Le tunnel écoute sur **22222** dans le conteneur (`MEERKAT_PLUG_ADDR`).
 
 - **Docker Compose** : le publier, `22222:22222`.

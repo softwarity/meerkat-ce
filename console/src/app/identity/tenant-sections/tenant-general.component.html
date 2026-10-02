@@ -28,7 +28,14 @@
   ></textarea>
 </app-form-field>
 
-<h3 class="sub" i18n="@@Working_hours">Working hours</h3>
+<h3 class="sub">
+  <ng-container i18n="@@Working_hours">Working hours</ng-container>
+  <app-ee-lock
+    feature="business-hours"
+    i18n-why="@@Working_hours_ee_why"
+    why="Refuse access outside declared hours, gateway-wide or per person: an audit requirement rather than a defence."
+  />
+</h3>
 <app-business-access-form
   ee-feature="business-hours"
   [value]="businessAccess()"

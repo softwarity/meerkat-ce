@@ -22,50 +22,46 @@ on:
     branches-ignore: ["dependabot/**", "bench"]
   pull_request:
   workflow_dispatch:
-
-# One pipeline per branch: only the newest commit needs blessing.
-  # Once a week for what no longer runs on every push: the directories and
-  # the whole tree on PostgreSQL. Tuesday, a day away from the package prune,
-  # so two schedules never explain each other's failures.
+  # Once a week for what no longer runs on every push: the OIDC directory.
+  # Tuesday, a day away from the package prune, so two schedules never explain
+  # each other's failures.
   schedule:
     - cron: '23 3 * * 2'
 
-# Every job carries a timeout-minutes: GitHub's default is six HOURS, and a
-# hung server or browser on a private repository bills every one of them.
+# One pipeline per branch: only the newest commit needs blessing.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # This pipeline runs on TWO trees: the Enterprise one, and the community
-  # mirror, which is the same commit with ee/ removed. Everything below that
-  # says `-tags ee` needs code the mirror does not have, so it has to ask
-  # first - and it asks the tree, not the repository name: a rename must not
-  # silently turn the Enterprise half off.
+  # This file lives in TWO trees and runs in ONE. The private repository,
+  # softwarity/meerkat, is where the work lands; the public mirror,
+  # softwarity/meerkat-ce, is the same commit with ee/ removed, published by
+  # mirror-ce.yml. GitHub bills every minute the private one runs and none the
+  # public one runs - so everything runs on the mirror. This pipeline tests
+  # the COMMUNITY tree, the one the outside world clones, forks and sends pull
+  # requests to, and publishes its image. The Enterprise half - everything
+  # built with the ee tag, the suite on PostgreSQL, the LDAP directories, the
+  # multi-organisation integration suite, the Enterprise image - is ci-ee.yml,
+  # which runs on the mirror too, against the private sources it clones for
+  # the occasion.
   #
-  # The two trees also SHARE THE WORK, and that is what most of the conditions
-  # below are about. The mirror is a public repository, where GitHub bills no
-  # minutes; this one is private, where it bills every one of them. So anything
-  # whose answer does not depend on ee/ - the doc site, the split guard, the
-  # community half of the tests, the OIDC directory - is left to the mirror,
-  # which runs it for free minutes later on the very same sources. What stays
-  # here is what the mirror CANNOT answer: everything built with the tag, the
-  # two directories only the Enterprise driver talks to, the integration suite
-  # driving the multi-organisation product, and the publications, which need
-  # credentials a public repository must never hold.
+  # On the private side every job below stands down: the gate is this first
+  # one, which everything needs, and a skipped job starts no runner and bills
+  # nothing. The community tree is not published blind either: mirror-ce.yml
+  # builds and vets it before pushing a single byte.
   #
-  # The community tree is not published blind: mirror-ce.yml builds and vets
-  # it before pushing a single byte, and the mirror's own CI - free - runs
-  # its whole suite right after.
-  edition:
-    name: What this tree carries
+  # Every job carries a timeout-minutes: GitHub's default is six HOURS, and a
+  # hung server or browser holds a runner for every one of them.
+  scope:
+    name: What this push asks for
+    if: github.repository == 'softwarity/meerkat-ce'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      enterprise: ${{ steps.look.outputs.enterprise }}
-      # A scheduled run is NOT a pipeline: it exists for the two slow checks
-      # below and everything else stands down. One expression, read by the
-      # jobs rather than repeated in each of them.
+      # A scheduled run is NOT a pipeline: it exists for the slow check below
+      # and everything else stands down. One expression, read by the jobs
+      # rather than repeated in each of them.
       full: ${{ github.event_name != 'schedule' }}
       directories: ${{ steps.touched.outputs.directories }}
     steps:
@@ -73,13 +69,11 @@ jobs:
         with:
           # Two commits: enough to see what this push changed.
           fetch-depth: 2
-      # The directory suites start real servers for code that moves rarely -
-      # five minutes on every commit to answer a question only some commits
-      # ask. They now run when their own code moves, on a schedule, or by
-      # hand. The net is what their tests compile and start: the two drivers,
-      # the compose file, the module graph. internal/auth used to be in it -
-      # moved on nearly every commit, so the three servers started on nearly
-      # every push, for tests that do not import it (go list -deps says so).
+      # The directory suite starts a real server for code that moves rarely -
+      # minutes on every commit to answer a question only some commits ask. It
+      # runs when its own code moves, on a schedule, or by hand. The net is
+      # what its tests compile and start: the driver, the compose file, the
+      # module graph.
       - id: touched
         run: |
           base="${{ github.event.before }}"
@@ -90,39 +84,26 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$base" "${{ github.sha }}" \
-             | grep -qE '^(ee/directories/|internal/idp/|test/ldap/|go\.(mod|sum)$|\.github/workflows/ci\.yml$)'; then
+             | grep -qE '^(internal/idp/|test/ldap/|go\.(mod|sum)$|\.github/workflows/ci\.yml$)'; then
             echo "directories=true" >> "$GITHUB_OUTPUT"
-            echo "this push touches what the directories exercise"
+            echo "this push touches what the directory exercises"
           else
             echo "directories=false" >> "$GITHUB_OUTPUT"
-            echo "nothing here reaches the directories: they run on the schedule"
-          fi
-      - id: look
-        run: |
-          if [ -d ee ]; then
-            echo "enterprise=true" >> "$GITHUB_OUTPUT"
-            echo "ee/ is here: both editions are tested"
-          else
-            echo "enterprise=false" >> "$GITHUB_OUTPUT"
-            echo "no ee/: this is the community tree, the Enterprise half is skipped"
+            echo "nothing here reaches the directory: it runs on the schedule"
           fi
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: edition
-    if: needs.edition.outputs.full == 'true'
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      # Here, only what the mirror cannot lint: ee/ and the linked edition.
-      # Every other package is the same file over there, linted for free.
       - uses: golangci/golangci-lint-action@v9
-        with:
-          args: ${{ needs.edition.outputs.enterprise == 'true' && '--build-tags ee ./ee/... ./internal/edition/...' || '' }}
 
   # The console, built ONCE and handed to whoever needs it. It was built twice,
   # in two configurations, for two jobs that both just need the files.
@@ -130,8 +111,8 @@ jobs:
     name: Console
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: edition
-    if: needs.edition.outputs.full == 'true'
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -161,13 +142,8 @@ jobs:
     name: Doc site
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: edition
-    # The site has no Enterprise half - it is the same sources either way - so
-    # the mirror answers this one, for free. The hole the job was opened for
-    # (deploy-doc.yml only running after a merge) stays plugged: the mirror
-    # runs minutes after the push, which is when this project's merges happen
-    # anyway, since work lands on main.
-    if: needs.edition.outputs.enterprise == 'false'
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -184,58 +160,38 @@ jobs:
 
   # The Go side in ONE job: vet, the tests, and the two static builds. It was
   # three jobs - The packages, Whole tree, Builds for both architectures - each
-  # paying its own checkout, cache restore and compilation of the same graph,
-  # each rounded up to the minute: about seventeen billed minutes for eight of
-  # work, on a private repository where minutes are the scarce thing.
+  # paying its own checkout, cache restore and compilation of the same graph.
   #
-  # The split between the trees is the other half of the saving. The mirror is
-  # public and free, and runs the community half - ./internal under the race
-  # detector included. Here, ./internal runs once WITH the tag and WITHOUT -race:
-  # the concurrency in those packages is the same code on both sides, and the
-  # mirror already watches it. -race stays on ./ee/..., the one tree only this
-  # side has. vet runs on ./... in both editions: it compiles, it does not
-  # execute, and no other job makes that pass.
+  # ./internal and ./cmd under the race detector: the concurrency in those
+  # packages is the same code in both editions, and this is where it is
+  # watched. No ./ee/...: that tree is this commit with ee/ REMOVED, and naming
+  # it here is `FAIL ./ee/... [setup failed]`.
   #
   # The builds: static, no CGO, amd64 and arm64. Linux only, and that is the
-  # whole target - Meerkat ships as an image. The community build is the
-  # mirror's to make; here, the linked Enterprise binary.
+  # whole target - Meerkat ships as an image.
   unit:
     name: Go - vet, tests, builds
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: edition
-    if: needs.edition.outputs.full == 'true'
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      - name: Vet, community
-        if: needs.edition.outputs.enterprise == 'false'
+      - name: Vet
         run: go vet ./...
-      - name: Vet, Enterprise
-        if: needs.edition.outputs.enterprise == 'true'
-        run: go vet -tags ee ./...
-      # No ./ee/... on the community side: that tree is this commit with ee/
-      # REMOVED, and naming it there is `FAIL ./ee/... [setup failed]`.
-      - name: Test, community
-        if: needs.edition.outputs.enterprise == 'false'
+      - name: Test
         run: go test -race ./internal/... ./cmd/...
-      - name: Test, Enterprise
-        if: needs.edition.outputs.enterprise == 'true'
-        run: |
-          go test -tags ee ./internal/... ./cmd/...
-          go test -race -tags ee ./ee/...
       - name: Build
         env:
           CGO_ENABLED: "0"
           GOOS: linux
         run: |
-          tags=()
-          if [ -d ee ]; then tags=(-tags ee); fi
           for goarch in amd64 arm64; do
-            echo "building linux/$goarch ${tags[*]}"
-            GOARCH=$goarch go build -trimpath "${tags[@]}" -ldflags '-s -w' -o /dev/null ./cmd/meerkat
+            echo "building linux/$goarch"
+            GOARCH=$goarch go build -trimpath -ldflags '-s -w' -o /dev/null ./cmd/meerkat
           done
 
   # The comparative benchmark (tools/bench): Meerkat and Kong, APISIX and
@@ -243,21 +199,19 @@ jobs:
   # a reference, each pinned to one CPU in front of the same upstream, under the
   # same load, in the same run.
   #
-  # The mirror only, and on the two machines it gets for free: public runners
-  # have 4 CPUs and 16 GB on x64 AND on arm64, where this private repository
-  # would be billed for 2. The CPU model is not documented and varies, so the
-  # run records its own (lscpu) beside its figures - a number without its
-  # machine is not a number.
+  # On the two machines a public repository gets for free: 4 CPUs and 16 GB on
+  # x64 AND on arm64. The CPU model is not documented and varies, so the run
+  # records its own (lscpu) beside its figures - a number without its machine
+  # is not a number.
   #
   # Main only, or by hand: a point per commit is the evolution, and a pull
   # request would publish a point for code that may never land.
   bench:
     name: Benchmark (${{ matrix.arch }})
     timeout-minutes: 30
-    needs: edition
+    needs: scope
     if: >-
-      needs.edition.outputs.enterprise == 'false'
-      && ((github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch')
+      (github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -321,195 +275,58 @@ jobs:
             commit -q -m "Benchmark of ${GITHUB_SHA:0:7}"
           git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:bench
 
-  # The SAME suite, on the other database (QUAL-01).
-  #
-  # PostgreSQL is what a cluster runs on (STORE-03), and until this job existed
-  # the evidence that the product works on it was ONE smoke test: a user row, a
-  # setting, and the schema version. The other hundred and sixty-odd queries
-  # were taken on faith - and the first run of this job found two of them
-  # broken, one silently waiting for 2038.
-  #
-  # No second suite was written: internal/store/dbtest gives every test a
-  # private schema when MEERKAT_TEST_DATABASE_URL names a server, and returns
-  # nothing when it does not, so `go test ./...` on a laptop is untouched.
-  #
-  # This tree only. Connecting to an external database is one of the two
-  # images' differences, so it is the only one that can be pointed at a server:
-  # the other answers a database URL in words and every test that needs one
-  # skips. A job that spun up PostgreSQL over there would have been green about
-  # nothing, which is the failure this job was written to prevent.
-  postgres:
-    name: The suite on PostgreSQL
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: edition
-    if: needs.edition.outputs.enterprise == 'true'
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: meerkat
-          POSTGRES_PASSWORD: meerkat
-          POSTGRES_DB: meerkat
-        ports:
-          - 5432:5432
-        # Without this the first connection races the server's own startup,
-        # and the failure reads as a broken query rather than a missing server.
-        options: >-
-          --health-cmd "pg_isready -U meerkat"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      MEERKAT_TEST_DATABASE_URL: postgres://meerkat:meerkat@localhost:5432/meerkat?sslmode=disable
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-      # A suite that quietly fell back to the embedded database would be green
-      # about nothing, which is the failure this whole job exists to prevent.
-      # The smoke test SKIPS when the variable is unset, and a skip passes - so
-      # it is run alone, verbosely, and counted.
-      - name: Prove the server is actually reached
-        run: |
-          go test -tags ee ./internal/store/ -run TestAgainstARealPostgres -count=1 -v 2>&1 | tee out.txt
-          grep -q -- '--- PASS: TestAgainstARealPostgres' out.txt \
-            || { echo "the suite did not reach PostgreSQL"; exit 1; }
-      # What a real server changes and a single process cannot answer: two
-      # gateways against one database, agreeing. Cheap, and on every commit.
-      - name: The cluster, against a real server
-        run: go test -tags ee ./ee/changebus/ ./internal/cluster/ ./internal/store/ -count=1
-
-      # The WHOLE tree on PostgreSQL - the promise that the same suite runs
-      # twice, once on each storage. It costs five minutes of the seven this
-      # job used to take, and it answers a question about the DIALECT: what
-      # changes between two commits is rarely the dialect.
-      #
-      # So it moved to the weekly run and to a dispatch. A release still gets
-      # it: cut the tag from a commit whose CI was asked for by hand, which is
-      # what publishing an image already requires.
-      #
-      # No -race here: the point is the dialect, not the concurrency, and the
-      # packages job already runs the whole tree under the detector.
-      - name: The suite, on the other storage
-        if: github.event_name != 'push'
-        run: go test -tags ee ./... -count=1
-
-  # The authorities, against the real thing. test/ldap brings up OpenLDAP, an
-  # Active Directory and Dex; without them these tests SKIP, and a skip is
-  # silent - `ok internal/idp` was being reported for five tests that never
-  # ran.
-  #
-  # One job per directory rather than one for all three. Not for speed - this
-  # is nowhere near the critical path - but because "the directories failed"
-  # sends someone reading logs, while "Active Directory failed" names the
-  # thing. It also stops the slowest server from gating the others: the domain
-  # controller takes about a minute to provision, and OpenLDAP was waiting for
-  # it to test something unrelated.
+  # The OIDC driver, against the real thing. test/ldap brings up Dex; without
+  # it the test SKIPS, and a skip is silent - `ok internal/idp` was being
+  # reported for tests that never ran. The two LDAP directories need the
+  # Enterprise driver and run in ci-ee.yml.
   #
   # Ubuntu only: Docker is not dependable on the macOS and Windows runners, and
   # interoperability with a directory does not vary by client OS.
-  directories:
-    name: ${{ matrix.directory }}
+  directory:
+    name: OIDC (Dex)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: edition
-    # What this exercises moves rarely, and starting three servers costs five
-    # minutes on every commit to answer a question most of them do not ask.
-    # So: when their own code moves, when somebody asks, and once a week
-    # whatever happens.
+    needs: scope
+    # What this exercises moves rarely: when its own code moves, when somebody
+    # asks, and once a week whatever happens.
     if: >-
-      needs.edition.outputs.directories == 'true'
+      needs.scope.outputs.directories == 'true'
       || github.event_name != 'push'
-    # Dex exercises the OIDC driver, which is community code, so the mirror
-    # runs that row for free too - and it is left here as well, deliberately.
-    # A job's own `if` cannot read `matrix` (only a step's can), so skipping
-    # that one row would mean building the matrix in the edition job above, in
-    # JSON: it would cost the readable table below to save about a minute.
-    # The two LDAP rows need the Enterprise driver and can only run here.
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - directory: OpenLDAP
-            service: openldap
-            tests: 'TestLDAPDirectorySignIn|TestLDAPRefusesBadCredentials|TestLDAPNestedGroupsCanBeTurnedOff'
-            expect: 3
-          - directory: Active Directory
-            service: samba
-            tests: 'TestLDAPActiveDirectorySignIn'
-            expect: 1
-          - directory: OIDC (Dex)
-            service: dex
-            tests: 'TestOIDCAgainstDex'
-            expect: 1
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      - name: Start ${{ matrix.directory }}
-        if: needs.edition.outputs.enterprise == 'true' || matrix.service == 'dex'
+      - name: Start Dex
         working-directory: test/ldap
-        run: docker compose up -d ${{ matrix.service }}
-      # The domain controller provisions itself before it answers, and it is
-      # the only one that needs seeding afterwards.
-      #
-      # Same condition as the step that STARTS it, which this one was missing:
-      # on the mirror nothing is started, so this waited five minutes for a
-      # container that was never coming and then failed on `docker exec`. A
-      # community pull request went red for an Enterprise driver it does not
-      # carry.
-      - name: Wait for the domain controller
-        if: matrix.service == 'samba' && needs.edition.outputs.enterprise == 'true'
-        run: |
-          for _ in $(seq 1 60); do
-            [ "$(docker inspect meerkat-samba-ad --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] && break
-            sleep 5
-          done
-          docker exec meerkat-samba-ad sh /seed.sh
-      # A skipped test PASSES, so counting is the only thing that tells "they
+        run: docker compose up -d dex
+      # A skipped test PASSES, so counting is the only thing that tells "it
       # ran" from "nothing answered and nobody noticed".
-      - name: Run against it, and prove they ran
-        # OIDC is community; the LDAP driver is not. On the mirror there is no
-        # driver to exercise, so the row that needs one has nothing to say -
-        # and saying nothing loudly beats a green tick over an empty run.
-        if: needs.edition.outputs.enterprise == 'true' || matrix.service == 'dex'
+      - name: Run against it, and prove it ran
         run: |
-          if [ "${{ needs.edition.outputs.enterprise }}" = "true" ]; then
-            # Enterprise tree: the LDAP driver lives in ee/directories, run under
-            # the ee tag next to the community OIDC test.
-            go test -tags ee ./ee/directories/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
-          else
-            # Mirror (community): only the OIDC row reaches here, and its driver
-            # is community code. No ee tag - ee/ is gone, and store/external_ee.go
-            # needs ee/pgdriver behind it - and no ee/directories package.
-            go test ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
-          fi
+          go test ./internal/idp/ -run 'TestOIDCAgainstDex' -count=1 -v 2>&1 | tee out.txt
           ran=$(grep -c -- '--- PASS' out.txt)
-          echo "$ran of ${{ matrix.expect }} expected tests ran against ${{ matrix.directory }}"
-          [ "$ran" -eq ${{ matrix.expect }} ] || { echo "the server was not reached"; exit 1; }
+          echo "$ran of 1 expected tests ran against Dex"
+          [ "$ran" -eq 1 ] || { echo "the server was not reached"; exit 1; }
       - if: always()
         working-directory: test/ldap
         run: docker compose down -v
 
   # Integration: a real gateway + the built console, driven by Playwright over
   # the seeded profiles of e2e/scenarios.json (positive AND negative access).
+  # The suite asks the tree what it can build: without ee/ it drives the
+  # community product on the single organisation every installation serves,
+  # and the handful of scenarios that need several organisations carry
+  # `edition: "ee"` in scenarios.json and are left out - the difference is
+  # declared in the matrix, where it can be read, rather than hidden in a
+  # workflow condition. A pull request here is worth nothing if the
+  # integration suite does not run on it.
   e2e:
     name: Integration (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [edition, console]
-    if: needs.edition.outputs.full == 'true'
-    # Runs on BOTH trees. The suite asks the tree what it can build: with ee/ it
-    # drives the Enterprise product multi-organisation, without it the
-    # community one on the single organisation every installation serves. The
-    # handful of scenarios that need several organisations carry
-    # `edition: "ee"` in scenarios.json and are left out there - the difference
-    # is declared in the matrix, where it can be read, rather than hidden in a
-    # workflow condition. A pull request on the mirror is worth nothing if the
-    # integration suite does not run on it.
+    needs: [scope, console]
+    if: needs.scope.outputs.full == 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -517,7 +334,7 @@ jobs:
           go-version: stable
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: e2e/package-lock.json
       - name: Take the console that was already built
@@ -552,35 +369,29 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report
 
-  # Publish only once everything is green. main publishes `latest` (+ `main`);
-  # any other branch publishes only its own `:<branch>` tag - a throwaway image
-  # to test that branch on a real cluster, never latest. Off PRs.
-  # Publishing happens from the ENTERPRISE tree, the one releases are cut from.
-  # The mirror carries the same sources and would push the same bytes under the
-  # same tag - two publishers for one `latest` is a race nobody can read
-  # afterwards.
+  # The community image, once everything is green: `latest` from main, and
+  # only from main - any other branch is tested, not published. Off PRs.
+  #
+  # AUTOMATIC on every push to main, and on demand (`gh workflow run CI --ref
+  # main -R softwarity/meerkat-ce`). Its Docker Hub token is an Actions
+  # secret, which a fork's pull request never receives. A release publishes
+  # the semver tags from ci-ee.yml, which is the one that knows the version:
+  # this tree has no tags.
+  #
+  # THE GATE. A skipped job skips its dependants, and some needs are skipped
+  # on purpose - the directory when its code did not move. So the condition
+  # names what must have PASSED and refuses any failure, rather than asking
+  # every need to have run.
   image:
     name: Build & publish image
-    # coverage-of-the-split is deliberately absent: it runs on the mirror only,
-    # and a skipped dependency skips its dependants - the publication would
-    # never fire.
-    needs: [edition, lint, unit, postgres, directories, e2e, console]
-    # ASKED FOR, not automatic. Publishing on every push to main cost ten
-    # minutes and a stored image version per commit, and those versions never
-    # left: a hundred had piled up by the time the storage bill said so. A
-    # release publishes from its tag (docker-release.yml); anything else is
-    # one command, the day an image is actually wanted:
-    #
-    #   gh workflow run CI --ref main
+    needs: [scope, lint, unit, directory, e2e, console]
     if: >-
-      success() && github.event_name == 'workflow_dispatch'
-      && needs.edition.outputs.enterprise == 'true'
+      !cancelled() && !contains(needs.*.result, 'failure')
+      && needs.lint.result == 'success' && needs.unit.result == 'success'
+      && needs.e2e.result == 'success'
+      && ((github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
-      # Granted, not used: a called workflow cannot request more than its
-      # caller allows, and the shared definition asks for it so the
-      # Enterprise side can push to GH Packages.
-      packages: write
     # Without this the registry credentials never reach the reusable workflow:
     # a called workflow gets no repository secret unless the caller passes it,
     # and the preflight would report "not set" forever.
@@ -588,30 +399,3 @@ jobs:
     uses: ./.github/workflows/_docker.yml
     with:
       image: docker.io/softwarity/meerkat
-      registry: docker.io
-      go-tags: ""
-
-  # The Enterprise image, same commit, private registry. It is the artifact
-  # that IS the licence: what separates it from the one above is the code the
-  # linker put in it, not a flag it reads.
-  image-ee:
-    name: Build & publish the Enterprise image
-    permissions:
-      contents: read
-      packages: write
-    # coverage-of-the-split is deliberately absent: it runs on the mirror only,
-    # and a skipped dependency skips its dependants - the publication would
-    # never fire.
-    needs: [edition, lint, unit, postgres, directories, e2e, console]
-    # And this one could not build at all without ee/: it IS the code the
-    # linker puts in.
-    # Same rule as the community image above: asked for, not automatic.
-    if: >-
-      success() && github.event_name == 'workflow_dispatch'
-      && needs.edition.outputs.enterprise == 'true'
-    secrets: inherit
-    uses: ./.github/workflows/_docker.yml
-    with:
-      image: ghcr.io/softwarity/meerkat
-      registry: ghcr.io
-      go-tags: ee

@@ -42,11 +42,6 @@ spec:
               containerPort: 8080
             - name: admin
               containerPort: 9090
-            # The metrics port: opened by the gateway only while the console's
-            # Prometheus switch is on, on the port chosen there - which this
-            # value has to repeat, or a ServiceMonitor looks in the wrong place.
-            - name: metrics
-              containerPort: {{ .Values.metrics.port }}
             {{- if .Values.plug.enabled }}
             - name: plug
               containerPort: {{ .Values.plug.port }}

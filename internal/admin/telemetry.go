@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/tracing"
@@ -19,7 +20,7 @@ import (
 	"github.com/softwarity/meerkat/internal/version"
 )
 
-// The tracing setting (OBS-04), on the same shape as the Prometheus switch.
+// The tracing setting (OBS-04), and the pushed counters beside it (OBS-06).
 //
 // Infra's, and Enterprise to turn on: exporting is what is sold, the trace
 // context travelling is not. The community image answers WHY rather than
@@ -42,6 +43,11 @@ type telemetrySetting struct {
 	Exporting bool `json:"exporting"`
 	// PushingMetrics is the same question for the counters.
 	PushingMetrics bool `json:"pushingMetrics"`
+	// AuditLost is how many audit events a full queue had to drop since the
+	// gateway started (AUD-03): a trail with a hole says so.
+	AuditLost int64 `json:"auditLost,omitempty"`
+	// LogsLost is the same for pushed log lines.
+	LogsLost int64 `json:"logsLost,omitempty"`
 	// HeaderSet says a LITERAL header value is stored: something authenticates
 	// to the collector that this payload does not carry. A reference travels,
 	// so it does not raise this - the console tells the two states apart by
@@ -163,7 +169,7 @@ func (a *API) testTelemetry(w http.ResponseWriter, r *http.Request, _ store.User
 		_, _, code, refusal := probeCollector(r.Context(), cfg.Endpoint+"/v1/metrics", `{"resourceMetrics":[]}`, headers)
 		if refusal != "" {
 			writeErr(w, code, "traces are accepted, but not metrics - "+refusal+
-				". A backend that receives traces only (Jaeger does) needs an OpenTelemetry Collector in front of it for the metrics, or leave them to the metrics endpoint")
+				". A backend that receives traces only (Jaeger does) needs an OpenTelemetry Collector in front of it for the metrics, or leave the Metrics tab off")
 			return
 		}
 	}
@@ -269,6 +275,8 @@ func (a *API) getTelemetry(w http.ResponseWriter, r *http.Request) {
 		Enterprise:      edition.Enterprise,
 		Exporting:       tracing.Exporting(),
 		PushingMetrics:  metrics.Pushing(),
+		AuditLost:       tracing.AuditLost(),
+		LogsLost:        tracing.LogsLost(),
 		HeaderSet:       held,
 	})
 }
@@ -326,7 +334,7 @@ func (a *API) putTelemetry(w http.ResponseWriter, r *http.Request, actor store.U
 	safe, held := hideLiterals(cfg)
 	writeJSON(w, http.StatusOK, telemetrySetting{
 		TelemetryConfig: safe, Enterprise: edition.Enterprise, Exporting: tracing.Exporting(),
-		PushingMetrics: metrics.Pushing(), HeaderSet: held,
+		PushingMetrics: metrics.Pushing(), HeaderSet: held, AuditLost: tracing.AuditLost(), LogsLost: tracing.LogsLost(),
 	})
 }
 
@@ -345,12 +353,38 @@ func (a *API) ApplyTelemetry(ctx context.Context) {
 		Sample:       cfg.Sample,
 		MaxPerSecond: cfg.MaxPerSecond,
 		Detail:       cfg.GatewayDetail,
+		Caller:       cfg.Caller,
 	}, cfg.ExportsTraces())
 	if err != nil {
 		// Said out loud rather than swallowed: the setting stuck, the pipe did
 		// not, and `exporting` in the answer is what tells the screen so.
 		slog.Warn("traces are not being exported", "endpoint", cfg.Endpoint, "why", err)
 	}
+	// The audit's own way out (AUD-03): it leaves without the traces.
+	err = tracing.ApplyAudit(tracing.Config{
+		Endpoint: cfg.Endpoint,
+		Headers:  cfg.Headers,
+		Service:  "meerkat",
+		Version:  version.Version,
+	}, cfg.Enabled && (cfg.Audit || cfg.AuditConsole))
+	if err != nil {
+		slog.Warn("the audit is not being sent", "endpoint", cfg.Endpoint, "why", err)
+	}
+	tracing.SetAuditScope(cfg.Audit, cfg.AuditConsole)
+	// The logs' format is applied whatever the export says: it writes to the
+	// outputs, it does not send.
+	logging.SetOTel(cfg.Logs)
+	// Pushing them is an export: it needs the collector, and the edition.
+	err = tracing.ApplyLogs(tracing.Config{
+		Endpoint: cfg.Endpoint,
+		Headers:  cfg.Headers,
+		Service:  "meerkat",
+		Version:  version.Version,
+	}, cfg.Enabled && cfg.LogsPush)
+	if err != nil {
+		slog.Warn("the logs are not being pushed", "endpoint", cfg.Endpoint, "why", err)
+	}
+	logging.SetPush(tracing.PushingLogs())
 	host, _ := os.Hostname()
 	err = metrics.ApplyPush(metrics.PushConfig{
 		Endpoint: cfg.Endpoint,

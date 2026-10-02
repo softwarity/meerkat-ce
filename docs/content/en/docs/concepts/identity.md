@@ -60,7 +60,7 @@ Admin tokens are minted by a global administrator only, from the console; a
 person mints their own data-plane token on `/profile/tokens`.
 
 A token can only ever hold **less** than its owner. Three axes narrow it: a
-scope (read-only, full, or metrics only), a domain (the routing side, the
+scope (read-only, full, or scheduled calls only), a domain (the routing side, the
 application side, or both), and a list of client networks - judged on the actual
 peer address, never on a forwarding header.
 

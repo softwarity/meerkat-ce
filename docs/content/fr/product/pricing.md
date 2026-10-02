@@ -33,7 +33,7 @@ docker run -p 8080:8080 -p 9090:9090 \
 Tout ce qui précède, plus ce dont une installation a besoin quand elle
 grandit : plusieurs organisations, LDAP et Active Directory, les rôles accordés
 par votre annuaire, plusieurs passerelles derrière une seule entrée,
-l'exposition Prometheus, le tunnel de développement, les pages intégrées sans
+les métriques poussées en OTLP, le tunnel de développement, les pages intégrées sans
 notre marque - et le support.
 
 **Le support fait partie de l'accord** : vous joignez ceux qui ont écrit la

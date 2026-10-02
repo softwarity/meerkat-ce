@@ -25,6 +25,7 @@ var specClient = &http.Client{Timeout: 20 * time.Second}
 func (a *API) registerOpenAPI(mux Mux) {
 	mux.Handle("GET /api/routes/{id}/operations", a.gw(a.getRouteOperations))
 	mux.Handle("PUT /api/routes/{id}/security", a.infraAdmin(a.putRouteSecurity))
+	mux.Handle("PUT /api/routes/{id}/audit", a.infraAdmin(a.putRouteAudit))
 	mux.Handle("PUT /api/routes/{id}/spec", a.infraAdmin(a.putRouteSpec))
 	mux.Handle("DELETE /api/routes/{id}/spec", a.infraAdmin(a.deleteRouteSpec))
 }
@@ -41,6 +42,8 @@ type routeOperations struct {
 	Access     store.Access            `json:"access"`
 	Operations []openapi.Operation     `json:"operations"`
 	Security   *store.EndpointSecurity `json:"security,omitempty"`
+	// Audit is the operations whose calls are audited (AUD-04).
+	Audit []store.EndpointAudit `json:"audit,omitempty"`
 	// Prefix is the part of the route's own path that every operation below
 	// carries (gateway.KeptPrefix). It is IN those paths - they are the
 	// coordinate the guard compares - and it is the same on every line, so the
@@ -88,7 +91,7 @@ func (a *API) getRouteOperations(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, routeOperations{
 		Title: spec.Title, Version: spec.Version, Format: spec.Format,
 		Access: route.Access, Operations: ops, Security: securityOf(route),
-		Prefix: kept,
+		Audit: auditOf(route), Prefix: kept,
 	})
 }
 
@@ -148,6 +151,64 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 	after := routeSecurityPayload{Access: route.Access, Endpoints: sec.Endpoints, DenyUnlisted: sec.DenyUnlisted}
 	a.auditUpdate(r.Context(), actor, "route.security", "route", route.ID, route.Name, "", before, after)
 	writeJSON(w, http.StatusOK, after)
+}
+
+// routeAuditPayload is the endpoint-audit screen's PUT body.
+type routeAuditPayload struct {
+	Endpoints []store.EndpointAudit `json:"endpoints"`
+}
+
+// putRouteAudit replaces the route's audited operations (AUD-04), through the
+// same engine validation as everything else on a route, then reloads. An
+// empty list stops auditing the route.
+func (a *API) putRouteAudit(w http.ResponseWriter, r *http.Request, actor store.User) {
+	route, err := a.st.GetRoute(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "route not found")
+		return
+	}
+	var body routeAuditPayload
+	if err := decodeStrict(r, &body); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed audit: "+err.Error())
+		return
+	}
+	if err := store.ValidateAudit(body.Endpoints); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	before := routeAuditPayload{Endpoints: auditOf(route)}
+	api := store.RouteAPI{}
+	if route.API != nil {
+		api = *route.API
+	}
+	api.Audit = body.Endpoints
+	if len(api.Audit) == 0 {
+		api.Audit = nil
+	}
+	route.API = &api
+	if err := a.validateRoute(r.Context(), route); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if err := a.st.SaveRoute(r.Context(), route); err != nil {
+		a.internal(w, err)
+		return
+	}
+	if err := a.reloadRouting(r.Context()); err != nil {
+		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
+		return
+	}
+	after := routeAuditPayload{Endpoints: auditOf(route)}
+	a.auditUpdate(r.Context(), actor, "route.audit", "route", route.ID, route.Name, "", before, after)
+	writeJSON(w, http.StatusOK, after)
+}
+
+// auditOf returns the route's audited operations, or nil.
+func auditOf(route store.Route) []store.EndpointAudit {
+	if route.API == nil {
+		return nil
+	}
+	return route.API.Audit
 }
 
 // securityOf returns the route's endpoint security, or nil.

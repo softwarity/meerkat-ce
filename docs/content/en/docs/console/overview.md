@@ -31,6 +31,7 @@ The left rail holds the two planes and the transverse screens.
 | **API** | `/api` | The control plane's own REST reference, tried with your session |
 | **Vault** | `/vault` | Every named value and secret the configuration points at |
 | **Metrics** | `/traffic` | What the gateway has actually served |
+| **Scheduler** | `/scheduler` | The calls the gateway makes to your services on a schedule |
 | **Audit** | `/audit` | Who changed what |
 | **Issues** | `/issues` | What your users reported |
 
@@ -41,8 +42,8 @@ sign-in page looks like. The same person often does both, and holds both
 capabilities, but the questions are asked in two places.
 
 > [!NOTE]
-> Metrics lives at `/traffic`, not `/metrics`: that path belongs to the
-> Prometheus exposition on the same port, so the console could not take it.
+> Metrics lives at `/traffic`, not `/metrics`: outside `/api`, the paths of the
+> control plane belong to the product, so the console keeps clear of them.
 
 ## What you see depends on who you are
 
@@ -51,9 +52,9 @@ same scopes on every call.
 
 | Capability | Opens |
 |---|---|
-| `root` | Everything, including Access tokens, MCP and Configuration |
-| `infra admin` | The Infra plane, Metrics, the vault's infra scope |
-| `app admin` | The Application plane, the vault's application scope |
+| `root` | Everything, including Configuration |
+| `infra admin` | The Infra plane (with Access tokens and MCP), Metrics, Audit and Issues, the vault's infra scope |
+| `app admin` | The Application plane (with Sessions and Access tokens), Scheduler, Audit and Issues, the vault's application scope |
 | `tenant admin` | The organisations they administer, Audit and Issues scoped to them |
 | `tenant creator` | Creating an organisation from the Tenants drawer |
 | `dev` | The developer tooling on the served applications, not a console screen |
@@ -75,9 +76,10 @@ Learn these five and the console stops surprising you.
 - **Saving.** Some screens save on the click (a switch, a checkbox in a matrix),
   others have a Save button and say what is still missing. Where it matters, the
   screen says which it is.
-- **Enterprise controls stay visible.** A control this image cannot honour is
-  dimmed and carries an `[Enterprise]` cap that explains what it buys, linking
-  to the License screen. Nothing is hidden.
+- **Enterprise features are marked.** On the Enterprise image they carry a
+  small `EE` badge (tooltip *Enterprise edition feature*). On the community
+  image they are locked and dimmed, with an `Enterprise` badge that says what
+  they buy and links to License. Nothing is hidden.
 - **Secrets go through the vault.** A sensitive field offers to store its value
   in the [vault](/docs/console/vault) and refuses to be saved as a literal.
 
@@ -87,9 +89,12 @@ Learn these five and the console stops surprising you.
 
 - **[Routes](/docs/console/routes)** - the routing table, in order, and the route editor.
 - **[Endpoint security and rate limits](/docs/console/endpoints)** - per operation, from a route's OpenAPI spec.
+- **[Endpoint audit](/docs/operations/audit#auditing-a-routes-operations)** - which operations are recorded in the audit trail.
 - **[Authentication](/docs/console/authentication)** - the authorities people may sign in through.
 - **[Mail relay](/docs/console/mail-relay)** - the SMTP server, and the daily digest.
 - **[TLS](/docs/console/tls)** - one name, one certificate, and ACME.
+- **[OpenTelemetry](/docs/operations/tracing)** - traces, metrics, audit and logs sent to your collector.
+- **[Plug](/docs/operations/plug)** - the developer tunnel.
 - **[Access tokens, MCP and API](/docs/console/access-and-agents)** - driving Meerkat without a browser.
 - **[Configuration](/docs/console/configuration)** - configurations, restore points, snapshots.
 - **Model** - the fields an account carries, documented with [Users](/docs/console/users).
@@ -102,12 +107,15 @@ Learn these five and the console stops surprising you.
 - **[Groups, Members and Group rules](/docs/console/organisation)** - who is in which group.
 - **[Built-in pages](/docs/console/built-in-pages)** - theme, layout and branding of the pages the gateway serves.
 - **[Portal](/docs/console/portal)** - the navigation bar the proxied applications wear.
+- **[Sessions](/docs/auth/sessions#seeing-the-sessions)** - who is signed in, and signing a session out.
+- **[Access tokens](/docs/console/access-and-agents)** - console tokens, and everyone's application tokens.
 
 ### Across both
 
 - **[Tenants](/docs/console/tenants)** - one organisation's own administration.
 - **[Vault](/docs/console/vault)** - secrets and values, referenced as `$name`.
 - **[Metrics](/docs/console/traffic)** - traffic, latency, the ranking of routes.
+- **[Scheduler](/docs/operations/scheduler)** - the scheduled calls and their runs.
 - **[Audit and Issues](/docs/console/audit-and-issues)** - the trail of changes, and the reports.
 - **License** - which edition answered, and what each Enterprise feature buys. It
   is the only screen that talks about editions: everywhere else a locked control

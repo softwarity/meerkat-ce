@@ -1,0 +1,80 @@
+# The logs agent's configuration: on every node, it reads what the containers
+# write and sends it to the central Collector. Nothing to push from a service.
+#
+# A line in OpenTelemetry's JSON log format - what Meerkat writes once "Write
+# the logs in OpenTelemetry's JSON format" is on - is decoded field by field;
+# any other line travels as it is.
+#
+# On Kubernetes the official chart writes the file reading itself (presets:
+# logsCollection) - see collector-logs-values.yaml. This file is for Docker:
+# it reads /var/lib/docker/containers.
+
+receivers:
+  filelog:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    start_at: end
+    operators:
+      # Docker's json-file wrapping: {"log": "...", "stream": "...", "time": "..."}
+      - type: json_parser
+        id: docker
+        timestamp:
+          parse_from: attributes.time
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+      - type: move
+        from: attributes.log
+        to: body
+      # An OpenTelemetry JSON line: decode it. Anything else goes on as is.
+      - type: json_parser
+        id: otel-json
+        if: 'body matches "^\\{.*\"severity_text\""'
+        parse_from: body
+        parse_to: attributes["otel"]
+        on_error: send_quiet
+      - type: severity_parser
+        if: 'attributes["otel"]?.severity_text != nil'
+        parse_from: attributes["otel"].severity_text
+        on_error: send_quiet
+      - type: trace_parser
+        if: 'attributes["otel"]?.trace_id != nil'
+        trace_id:
+          parse_from: attributes["otel"].trace_id
+        span_id:
+          parse_from: attributes["otel"].span_id
+        on_error: send_quiet
+      - type: move
+        if: 'attributes["otel"]?.body != nil'
+        from: attributes["otel"].body
+        to: body
+      - type: move
+        if: 'attributes["otel"]?.resource != nil and attributes["otel"].resource["service.name"] != nil'
+        from: attributes["otel"].resource["service.name"]
+        to: resource["service.name"]
+      - type: move
+        if: 'attributes["otel"]?.attributes != nil'
+        from: attributes["otel"].attributes
+        to: attributes["log"]
+      - type: flatten
+        if: 'attributes["log"] != nil'
+        field: attributes["log"]
+        on_error: send_quiet
+      - type: remove
+        if: 'attributes["otel"] != nil'
+        field: attributes["otel"]
+
+processors:
+  batch: {}
+
+exporters:
+  otlp:
+    # The central Collector.
+    endpoint: opentelemetry:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [batch]
+      exporters: [otlp]

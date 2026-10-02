@@ -240,7 +240,7 @@ const highlight = templateHighlight(ROLE_SYNTAX);
               <div class="out-head">
                 <mat-icon>play_arrow</mat-icon>
                 <span>
-                  What this route sends every caller of this service, on EVERY request:
+                  Sent on every request:
                   <span class="weight">{{ count() }} roles, {{ bytes() }} bytes</span> of header
                 </span>
               </div>
@@ -255,15 +255,12 @@ const highlight = templateHighlight(ROLE_SYNTAX);
                 @if (bytes() >= LIMIT) {
                   <mat-icon>warning</mat-icon>
                   <span>
-                    Past <strong>8 KB</strong>, which is the default ceiling for one header on Apache
-                    (LimitRequestFieldSize), Tomcat (maxHttpHeaderSize) and nginx
-                    (large_client_header_buffers). Requests will be refused with a 431 or a 400 before the
-                    application sees them. Narrow it down.
+                    Past <strong>8 KB</strong>, the default header limit of Apache, Tomcat and nginx:
+                    requests will be refused with a 431 or a 400. Narrow it down.
                   </span>
                 } @else {
                   <span>
-                    8 KB is the default ceiling for one header on Apache, Tomcat and nginx, and this
-                    travels on every request - not only the first.
+                    8 KB is the default header limit of Apache, Tomcat and nginx.
                   </span>
                 }
               </div>
@@ -277,10 +274,8 @@ const highlight = templateHighlight(ROLE_SYNTAX);
 
           <dt><code [tpl]="KEEP" [syntax]="SYNTAX"></code> and <code [tpl]="DROP" [syntax]="SYNTAX"></code></dt>
           <dd>
-            keep (or remove) what a selector names. <code tpl="&quot;tag:BILLING&quot;" [syntax]="SYNTAX"></code> is a
-            <strong>catalogue tag</strong> - Meerkat's own idea, and how a whole family of roles travels as one
-            word; anything else is a role name. <strong>Every selector listed counts</strong>, so two tags, or a
-            tag and a few named roles, is one call.
+            keep (or remove) what the selectors name. <code tpl="&quot;tag:BILLING&quot;" [syntax]="SYNTAX"></code> is a
+            <strong>catalogue tag</strong>; anything else is a role name. <strong>Every selector listed counts</strong>.
             @if (tags().length) {
               <div class="tags">In this catalogue: <code [style.color]="TAG_COLOR">{{ tags().join(', ') }}</code></div>
             }
@@ -290,7 +285,7 @@ const highlight = templateHighlight(ROLE_SYNTAX);
             <code tpl="cutHead &quot;ROLE_&quot;" [syntax]="SYNTAX"></code>,
             <code tpl="cutTail &quot;_V2&quot;" [syntax]="SYNTAX"></code>
           </dt>
-          <dd>remove that head or tail from each name. A name that does not carry it is left alone.</dd>
+          <dd>remove that head or tail from each name that has it.</dd>
 
           <dt>
             <code tpl="addHead &quot;app:&quot;" [syntax]="SYNTAX"></code>,
@@ -303,8 +298,7 @@ const highlight = templateHighlight(ROLE_SYNTAX);
 
           <dt><code tpl="join &quot;,&quot;" [syntax]="SYNTAX"></code>, <code tpl="json" [syntax]="SYNTAX"></code></dt>
           <dd>
-            how the list is written: separated by something, or a JSON array. One of the two ends the
-            pipeline. Leaving it out sends Go's own rendering, which no service expects.
+            how the list is written: separated, or a JSON array. End the pipeline with one of them.
           </dd>
         </dl>
       </div>

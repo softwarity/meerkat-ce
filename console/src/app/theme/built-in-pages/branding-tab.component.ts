@@ -63,7 +63,7 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
         />
       </div>
       <p class="hint text-muted" i18n="@@Meerkat_mark_hint">
-        The pages this gateway serves carry a "powered by softwarity/meerkat" line at the foot.
+        The pages carry a "powered by softwarity/meerkat" line at the foot.
       </p>
       <mat-slide-toggle
         [checked]="scope.hideMark()"

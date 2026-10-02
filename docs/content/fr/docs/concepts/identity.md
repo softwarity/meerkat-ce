@@ -61,7 +61,7 @@ par un administrateur global, depuis la console ; une personne émet son propre
 jeton du plan de données sur `/profile/tokens`.
 
 Un jeton ne peut jamais porter **plus** que son propriétaire. Trois axes le
-rétrécissent : une portée (lecture seule, complète, ou métriques seulement), un
+rétrécissent : une portée (lecture seule, complète, ou appels planifiés seulement), un
 domaine (le côté routage, le côté application, ou les deux), et une liste de
 réseaux clients - jugée sur l'adresse réelle du pair, jamais sur un en-tête de
 transmission.

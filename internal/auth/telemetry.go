@@ -86,6 +86,14 @@ func (h *Handler) telemetryRelay(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	// Who is reading the page, said by the gateway rather than by the page
+	// (tracing/person.go). A batch the stamp cannot read is relayed as it came:
+	// the person is worth adding, not worth losing the spans over.
+	if attrs := tracing.PersonAttrs(h.relayPerson(r)); len(attrs) > 0 {
+		if stamped, err := tracing.StampSpans(body, attrs); err == nil {
+			body = stamped
+		}
+	}
 	start := time.Now()
 	if err := tracing.RelaySpans(body); err != nil {
 		// Logged at DEBUG: a collector in trouble already says so once through
@@ -97,4 +105,35 @@ func (h *Handler) telemetryRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("telemetry: relayed a page's spans", "bytes", len(body), "took", time.Since(start))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// relayPerson is the person holding this page's session. Nobody signed in, or
+// a sign-in still owing a step, is nobody.
+func (h *Handler) relayPerson(r *http.Request) tracing.Who {
+	if !tracing.Caller() || h.sm == nil {
+		return tracing.Who{}
+	}
+	sess, err := h.sm.Resolve(r.Context(), r)
+	if err != nil || sess.Pending != "" {
+		return tracing.Who{}
+	}
+	who := tracing.Who{UserID: sess.UserID, TenantID: sess.TenantID}
+	if u, err := h.st.GetUserByID(r.Context(), sess.UserID); err == nil {
+		who.Username = u.Username
+	}
+	if sess.TenantID != "" {
+		if t, err := h.st.GetTenant(r.Context(), sess.TenantID); err == nil {
+			who.Tenant = t.Name
+		}
+	}
+	if sess.GroupID != "" {
+		if g, err := h.st.GetGroup(r.Context(), sess.GroupID); err == nil {
+			who.Group = g.Name
+		}
+	}
+	// The roles the access rules are judged on, as the user button reads them.
+	if names, err := h.st.SessionRoleNames(r.Context(), sess.UserID, sess.TenantID, sess.GroupID); err == nil {
+		who.Roles = names
+	}
+	return who
 }

@@ -10,11 +10,8 @@
     </div>
 
     <p class="hint" i18n="@@Access_tokens_both_planes">
-      Console tokens open this console's API without a browser - a script, a pipeline, a backend
-      managing its scheduled calls - with your own powers, narrowed by a perimeter; they are created
-      here. Application tokens call the applications' APIs: each person creates their own, on their
-      profile on the applications, and those who administer the applications see and revoke them here.
-      To connect an assistant, use the MCP section: it needs no token.
+      Console tokens call this console's API with your powers, narrowed by a perimeter. Application
+      tokens are created by each person on their profile; you can see and revoke them here.
     </p>
 
     <div class="toolbar">
@@ -172,8 +169,7 @@
           </div>
         } @else {
           <p class="note" i18n="@@Data_token_note">
-            Created by its owner on their profile, on the applications: only they can create another.
-            Revoking it refuses whatever uses it from its next call.
+            Created by its owner on their profile. Revoked, it is refused from its next call.
           </p>
           <div class="actions">
             <button matButton="outlined" class="danger" (click)="revokeData(t)">

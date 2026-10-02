@@ -96,12 +96,6 @@ service:
   adminType: ClusterIP
   adminNodePort: ""
 
-metrics:
-  # The port the gateway opens for Prometheus while the exposition is on
-  # (console: Infra, Metrics endpoint). It is CHOSEN IN THE CONSOLE; this only
-  # declares it on the pod and on a ClusterIP Service, so the two must match.
-  port: 9091
-
 persistence:
   # Everything the gateway knows lives here: routes, accounts, the sealed
   # vault, the certificates. Without a volume, a restarted pod is a new

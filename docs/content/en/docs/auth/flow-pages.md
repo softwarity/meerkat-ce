@@ -110,7 +110,7 @@ For one request, the language is picked in this order:
 
 1. the `MEERKAT_LANG` cookie, if it names a language you offer;
 2. `Accept-Language`, matched on the language tag;
-3. the first language you offer, and failing that English.
+3. English when a route speaks it, otherwise the first language offered.
 
 Someone's own choice is written to their account and reposed into the cookie
 when they sign in, so their language follows them to a new browser. Arabic and

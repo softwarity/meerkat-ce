@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { ApiService } from '../../api.service';
 import { MeService } from '../../me.service';
+import { EeLockComponent } from '../../shared/ee-lock.component';
 import { TenantRulesComponent } from '../tenant-sections/tenant-rules.component';
 import { TenantScope } from '../tenant-scope';
 
@@ -17,11 +18,18 @@ import { TenantScope } from '../tenant-scope';
 // one in the URL.
 @Component({
   selector: 'app-app-rules',
-  imports: [TenantRulesComponent],
+  imports: [EeLockComponent, TenantRulesComponent],
   providers: [TenantScope],
   template: `
     <div class="banner">
-      <h1 i18n="@@Group_rules">Group rules</h1>
+      <h1>
+        <ng-container i18n="@@Group_rules">Group rules</ng-container>
+        <app-ee-lock
+          feature="directories"
+          i18n-why="@@Group_rules_ee_why"
+          why="Map a directory's groups to this installation's role groups, so access follows the directory."
+        />
+      </h1>
     </div>
     <div class="panel">
       <app-tenant-rules ee-feature="directories" />

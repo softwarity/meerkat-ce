@@ -39,7 +39,7 @@
         subscriptSizing="dynamic"
         [error]="metaError()"
         i18n-info="@@Metadata_filter_info"
-        info="Narrow by what the service filed its schedules under: key=value, or key=~expression. Several conditions are all required."
+        info="Filter by metadata: key=value, or key=~expression. All conditions apply."
       >
         <input
           matInput
@@ -98,8 +98,8 @@
     <div class="body">
       @if (list().length === 0) {
         <div class="empty" i18n="@@No_schedules">
-          Nothing is scheduled here. A service asks for its own calls through
-          the application plane, as itself: a route, a path, a cadence.
+          Nothing is scheduled. Services create their schedules through the
+          API.
         </div>
       } @else {
         <!-- The frame goes on what SCROLLS, and the header is sticky: a header
@@ -406,11 +406,11 @@
               <span class="muted" i18n="@@Paused">Paused</span>
             } @else if (running(s)) {
               <span class="muted" i18n="@@After_this_run_long"
-                >When this run closes, counted from then</span
+                >Counted from the end of this run</span
               >
             } @else if (finished(s)) {
               <span class="muted" i18n="@@Finished_long"
-                >Nothing more: this was a single date, and it has gone</span
+                >None: the single date has passed</span
               >
             } @else {
               {{ s.nextAt | zoned: zone() : "long" }}
@@ -447,8 +447,7 @@
             <dd>
               @if (s.runState === "accepted") {
                 <ng-container i18n="@@Run_accepted_long"
-                  >Accepted - the service took the work and reports on
-                  it</ng-container
+                  >Accepted: the service reports on it</ng-container
                 >
               } @else {
                 <ng-container i18n="@@Run_calling_long"
@@ -461,8 +460,7 @@
             @if (s.attempts > 1) {
               <dt i18n="@@Attempt">Attempt</dt>
               <dd i18n="@@Attempt_of">
-                {{ s.attempts }} - a gateway stopped before the answer, and
-                another sent it again
+                {{ s.attempts }}, resent by another gateway
               </dd>
             }
             <dt i18n="@@Claimed_by">claimed by</dt>
@@ -471,7 +469,7 @@
                 {{ s.claimedBy }}
               } @else {
                 <span class="muted" i18n="@@Handed_back"
-                  >handed back, for the next gateway to send again</span
+                  >handed back, waiting for another gateway</span
                 >
               }
             </dd>

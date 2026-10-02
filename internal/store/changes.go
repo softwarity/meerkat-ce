@@ -36,11 +36,8 @@ const (
 	TopicRouting = "routing"
 	// TopicCertificates is the material the HTTPS listeners hold open.
 	TopicCertificates = "certificates"
-	// TopicMetricsPort is the port a node holds open for scrapers (OBS-05):
-	// chosen and switched in the console, opened and closed on every node.
-	TopicMetricsPort = "metrics-port"
 	// TopicTelemetry is the exporters a node runs towards a collector
-	// (OBS-04, OBS-05): the spans and the pushed counters.
+	// (OBS-04, OBS-06): the spans and the pushed counters.
 	TopicTelemetry = "telemetry"
 )
 

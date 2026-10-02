@@ -48,7 +48,7 @@
           </div>
         } @else if (readOnly()) {
           <div class="menu-why" i18n="@@Theme_builtin_undeletable">
-            A built-in palette is part of the product. Duplicate it to make it yours.
+            Built-in: duplicate it to make it yours.
           </div>
         }
       </mat-menu>
@@ -86,7 +86,7 @@
             (mouseenter)="hoverToken.emit(tok.key)"
             (mouseleave)="hoverToken.emit('')"
             i18n-matTooltip="@@Glow_hint"
-            matTooltip="Decorative flow-page effects: the ambient halo behind the page, logo & button glows, and the app-name gradient. Uncheck for a flat design; this colour then goes unused."
+            matTooltip="Halo, glows and app-name gradient on the flow pages. Uncheck for a flat design."
           >{{ tok.label }}</mat-checkbox>
         } @else {
           <span class="label" (mouseenter)="hoverToken.emit(tok.key)" (mouseleave)="hoverToken.emit('')">{{ tok.label }}</span>

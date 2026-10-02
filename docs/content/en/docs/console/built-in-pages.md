@@ -73,7 +73,7 @@ whichever arrangement is chosen.
 
 ## Branding
 
-![Built-in pages on the Branding tab: application name, tagline, logo and background drop zones, and the Meerkat mark card](img/console/built-in-pages-branding.webp)
+![Built-in pages on the Branding tab: application name, tagline, logo, tab icon and background drop zones, and the Meerkat mark card](img/console/built-in-pages-branding.webp)
 
 The name and tagline typed here appear in the preview at once. Below, the Meerkat
 mark card, capped Enterprise.

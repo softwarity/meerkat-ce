@@ -153,3 +153,24 @@ func TestALoneStarIsLiteralNotAWildcard(t *testing.T) {
 		}
 	}
 }
+
+// A route answers on several patterns: its mount is the head they ALL share,
+// not the first one's - or every operation of the second is prefixed wrong and
+// its rules match nothing.
+func TestMatchPrefixIsTheHeadEveryPatternShares(t *testing.T) {
+	for _, c := range []struct {
+		patterns []any
+		want     string
+	}{
+		{[]any{"/demo/**"}, "/demo"},
+		{[]any{"/api/orders/**", "/api/shipments/**"}, "/api"},
+		{[]any{"/api/v1/orders/**", "/api/v1/{id}"}, "/api/v1"},
+		{[]any{"/orders/**", "/shipments/**"}, ""},
+		{[]any{"/**"}, ""},
+	} {
+		got := MatchPrefix([]Spec{{Type: "path", Args: map[string]any{"patterns": c.patterns}}})
+		if got != c.want {
+			t.Errorf("MatchPrefix(%v) = %q, want %q", c.patterns, got, c.want)
+		}
+	}
+}

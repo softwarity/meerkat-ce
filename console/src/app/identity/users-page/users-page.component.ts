@@ -248,7 +248,7 @@ export class UsersPageComponent {
     if (u.enabled) {
       const ok = await this.dialogs.confirm({
         title: $localize`:@@Disable_user_USERNAME:Disable user "${u.username}:USERNAME:"?`,
-        message: $localize`:@@Disable_user_message:They will be signed out and will not be able to sign in again until you enable them.`,
+        message: $localize`:@@Disable_user_message:They are signed out and cannot sign in until enabled again.`,
         confirmLabel: $localize`:@@Disable:Disable`,
         danger: true,
       });

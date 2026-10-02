@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { EeLockComponent } from '../../shared/ee-lock.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -18,6 +19,7 @@ import { TenantsService } from '../../shared/tenants.service';
 @Component({
   selector: 'app-tenant-general',
   imports: [
+    EeLockComponent,
     DatePipe,
     MatButtonModule,
     MatFormFieldModule,

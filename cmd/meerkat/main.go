@@ -127,6 +127,8 @@ func main() {
 	// Before anything else says anything: a startup line written under Go's
 	// default handler and then a switch to JSON would give a collector two
 	// shapes for the same stream.
+	// Who writes, on every line in OpenTelemetry's format (OBS-03).
+	logging.SetResource(map[string]string{"service.name": "meerkat", "service.version": version.Version})
 	format := logging.Setup(logging.Options{
 		Format: logging.Format(*logFormat), Level: *logLevel, Production: *production,
 	})
@@ -609,11 +611,7 @@ func run(o options) error {
 	tlsSup.SerialiseIssuance(st.WithLock)
 	adminAPI.TLS = tlsSup
 	bus.Register(store.TopicCertificates, tlsSup.Reload)
-	// The metrics port (OBS-05), a third door and the only one chosen in the
-	// console: open while the exposition is on, on the port picked with the
-	// switch, and moved on every node when that changes.
-	adminAPI.ServeMetricsPort()
-	// Where the spans and the pushed counters go (OBS-04, OBS-05), from the
+	// Where the spans and the pushed counters go (OBS-04, OBS-06), from the
 	// STORED setting: an operator who switched it on in the console must find
 	// it on again after a restart - and on every node when it changes. Only
 	// when it is ON at startup: -otlp-endpoint, set by a manifest, still works
@@ -626,12 +624,6 @@ func run(o options) error {
 		return nil
 	})
 	defer metrics.StopPush()
-	bus.Register(store.TopicMetricsPort, adminAPI.ReloadMetricsPort)
-	if err := adminAPI.ReloadMetricsPort(ctx); err != nil {
-		// Not fatal, for the same reason as a taken HTTPS port: the counters
-		// are not worth the gateway.
-		slog.Error("metrics port", "err", err)
-	}
 	if err := tlsSup.Reload(ctx); err != nil {
 		// Not fatal: a taken HTTPS port must not keep the gateway from serving
 		// the plain one, or a typo in an address would take the whole
@@ -711,9 +703,6 @@ func run(o options) error {
 		}
 		if terr := tlsSup.Stop(shutdownCtx); err == nil {
 			err = terr
-		}
-		if merr := adminAPI.StopMetricsPort(shutdownCtx); err == nil {
-			err = merr
 		}
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			return err

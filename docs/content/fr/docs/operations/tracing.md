@@ -69,65 +69,83 @@ votre backend, ce qui est le comportement attendu.
 ## Exporter vers votre collecteur
 
 > [!NOTE] Enterprise edition
-> Le contexte circule dans les deux éditions ; l'export est Enterprise, comme
-> pour Prometheus.
+> Le contexte circule dans les deux éditions. L'export est Enterprise.
 
-On parle **OTLP**, pas un produit : l'adresse pointe vers ce que vous faites
-déjà tourner - OpenTelemetry Collector, Tempo, Jaeger, ou l'endpoint d'un
-éditeur.
+L'export parle **OTLP**, pas un produit : l'adresse peut être n'importe quel
+endpoint OTLP. Nous recommandons un **OpenTelemetry Collector**. Il reçoit tous
+les signaux sur une seule adresse et envoie chacun à sa place : les traces à
+Tempo, les métriques à Prometheus, les logs et l'audit à Loki. Il échantillonne
+aussi les traces complètes (tail sampling), donc la passerelle peut enregistrer
+**100 %** et lui laisser le choix.
 
-Le réglage est dans la console, **Infra, OpenTelemetry**, avec les autres
-systèmes auxquels l'installation est branchée. Il s'applique à chaud, sur
-chaque noeud.
+Le réglage est dans **Infra, OpenTelemetry**. Il s'applique à chaud, sur chaque
+noeud.
 
-Un interrupteur envoie au collecteur, et deux disent **quoi** : les
-**traces**, dont parle surtout cette page, et les **métriques** - les mêmes
-compteurs que ceux de l'[endpoint de métriques](/docs/operations/metrics),
-poussés en OTLP toutes les 30 secondes. L'un, l'autre, ou les deux.
+![L'écran OpenTelemetry : l'interrupteur d'export, l'adresse du collecteur, et l'onglet Traces avec son échantillonnage et son plafond](img/console/opentelemetry.webp)
+
+Un interrupteur principal, **Export to an OpenTelemetry collector**, active
+l'export. Quatre onglets disent ensuite ce qui part :
+
+| onglet | quoi |
+|---|---|
+| **Traces** | un interrupteur : les traces dont parle cette page |
+| **Metrics** | un interrupteur : les compteurs de la passerelle, poussés toutes les 30 secondes. C'est leur seule façon de sortir (voir [les métriques](/docs/operations/metrics)) |
+| **Audit** | deux interrupteurs : **Send the audit logs** (connexions, refus, changements d'identifiants, opérations cochées dans [Endpoint audit](/docs/operations/audit#auditer-les-oprations-dune-route)) et **Send Meerkat's console audit too** (voir [l'audit](/docs/operations/audit)) |
+| **Logs** | un mode parmi trois, ci-dessous |
+
+L'onglet **Logs** a trois modes (voir [les journaux](/docs/operations/logs)) :
+
+- **Not sent** : les journaux gardent leur format habituel.
+- **Written for an agent** : les journaux sont écrits en JSON OpenTelemetry sur
+  stdout. Un Collector sur chaque noeud (un DaemonSet) les lit. Marche export
+  coupé, dans les deux éditions.
+- **Pushed to the collector** : les journaux partent en OTLP vers l'adresse du
+  collecteur, pour les noeuds sans agent. Demande l'export (Enterprise).
 
 | champ | | défaut |
 |---|---|---|
-| Adresse du collecteur | l'adresse **de base** : `/v1/traces` (et `/v1/metrics` quand les métriques partent) est ajouté pour vous, et un chemin collé est retiré | - |
-| En-tête d'authentification | une **référence de coffre** (`$otlp-token`), jamais la clef elle-même | - |
-| Journeys recorded | la part des voyages **ouverts ici** : à la porte d'entrée pour un appel qui arrive sans décision, dans la page quand la moitié navigateur est allumée. Une décision déjà prise par l'appelant est respectée plutôt que rejouée | **10 %** |
-| Ceiling | le plafond de voyages enregistrés par seconde, quel qu'en soit le décideur - votre budget | **200/s** |
+| Collector address | l'adresse **de base** : `/v1/traces` et `/v1/metrics` sont ajoutés, et un chemin collé est retiré | - |
+| Auth header | le nom de l'en-tête, par exemple `Authorization`. Utile surtout pour un collecteur hébergé | - |
+| Its value | rangée dans le coffre : la configuration ne garde que la référence (`Bearer $otlp-token`) | - |
+| Journeys recorded (%) | la part des traces **ouvertes ici**. La décision d'échantillonnage de l'appelant est gardée | **10 %** |
+| Ceiling (per second) | au plus ce nombre de traces enregistrées par seconde, quel qu'en soit le décideur. 0 pour aucune limite | **200/s** |
 
-Le bouton **Test**, à côté d'Enregistrer, pose la question au collecteur avant
-qu'on enregistre quoi que ce soit : la passerelle lui envoie un lot **vide** sur
-`/v1/traces` et rend ce qu'il a répondu, avec le temps que ça a pris. Tout le
-chemin est exercé - résolution du nom, réseau, TLS, la crédentiale - et aucune
-trace n'est écrite nulle part. Les erreurs qui arrivent vraiment sont nommées,
-et la première est celle qu'un code de retour seul ne voit pas : l'adresse de l'**interface** d'un collecteur au
-lieu de son port OTLP. Une interface web répond 200 à tout - elle sert sa page
-pour n'importe quel chemin -, donc le test regarde AUSSI ce qui a répondu, et
-refuse une page (Jaeger écoute les traces en 4318 et sert son UI en 16686).
-L'autre est une crédentiale refusée. Avec les métriques cochées, il interroge
-aussi `/v1/metrics`, et le dit quand un backend ne prend que des traces - ce
-que fait Jaeger.
+Le bouton **Test** envoie un lot **vide** sur `/v1/traces` avant
+l'enregistrement. Il exerce tout le chemin : résolution du nom, réseau, TLS,
+crédentiale. Aucune trace n'est écrite. Il refuse une page web : l'adresse de
+l'interface d'un collecteur répond 200 à tout, mais ce n'est pas le port OTLP.
+Avec les métriques cochées, il interroge aussi `/v1/metrics`, et dit quand un
+backend ne prend que des traces.
 
-**Une trace n'est pas un compteur, et n'est pas censée être exhaustive.** A
-100 %, une journée à 400 req/s fait trente-cinq millions de traces, que votre
-backend facture et indexe. A 10 %, le profil de latence est le même - c'est une
-distribution, pas un inventaire - et la requête précise que vous cherchez, vous
-la retrouvez par son `trace_id` quand elle a été tirée. Ce que vous voulez
-exhaustif, ce sont les [métriques](/docs/operations/metrics) et le
-[journal d'accès](/docs/operations/logs) : ils sont à 100 % et le restent parce
-qu'ils ne coûtent pas par requête.
+**Une trace n'est pas un compteur.** A 100 %, une journée à 400 req/s fait
+trente-cinq millions de traces à facturer et indexer. A 10 %, le profil de
+latence est le même, et une requête précise se retrouve par son `trace_id`
+quand elle a été tirée. Ce que vous voulez exhaustif, ce sont les
+[métriques](/docs/operations/metrics) et le
+[journal d'accès](/docs/operations/logs) : ils restent à 100 %.
 
-Meerkat émet deux spans : un span `SERVER` qui couvre la traversée complète,
-de l'arrivée de la requête jusqu'à la réponse **écrite** - filtres de sortie et
-injections comprises - et, à l'intérieur, un span `CLIENT` autour de l'appel à
-votre service. **L'écart entre les deux est son temps propre.** La route
-choisie et le verdict d'accès y sont des attributs, pas des spans - un span par
-étape interne se compterait en milliers par requête.
+Meerkat émet deux spans : un span `SERVER` pour toute la traversée, jusqu'à la
+réponse **écrite**, et dedans un span `CLIENT` autour de l'appel à votre
+service. **L'écart entre les deux est le temps propre de la passerelle.** La
+route et le verdict d'accès sont des attributs, pas des spans.
 
 Un collecteur en panne ne ralentit jamais le trafic : les spans partent d'une
 file bornée, et ce qui ne passe pas est jeté.
 
-::: details Un collecteur, si vous n'en avez pas
-La page OpenTelemetry vous donne le fichier, pour Docker Swarm et
-pour Kubernetes, avec l'adresse à recopier dans le champ ci-dessus.
-:::
+### Pas encore de collecteur ?
+
+**No collector yet?** sur la page OpenTelemetry ouvre les fichiers pour
+déployer un OpenTelemetry Collector, sur Docker Swarm ou Kubernetes :
+
+- la configuration du Collector ;
+- son agent de logs sur chaque noeud (un DaemonSet sur Kubernetes), qui lit les
+  sorties des conteneurs ;
+- sur Kubernetes, un Service `opentelemetry` : chaque producteur envoie à
+  `opentelemetry:4318` ;
+- deux fichiers Grafana compagnons : les sources de données (Prometheus, Tempo,
+  Loki) et un tableau de bord pour les [métriques](/docs/operations/metrics).
+
+![No collector yet? ouvre un tiroir avec les fichiers pour en déployer un, sur Docker Swarm ou sur Kubernetes](img/console/opentelemetry-collector.webp)
 
 ## Commencer la trace au clic
 
@@ -152,13 +170,18 @@ Trois choses à savoir :
 ## Choisir les routes tracées
 
 Le tracing se décide **route par route**, dans l'éditeur de route, section
-**OpenTelemetry**, avec deux interrupteurs.
+**OpenTelemetry**, avec deux interrupteurs. Une requête à laquelle **aucune
+route ne répond** - un 404 - n'est jamais tracée : aucune route n'a dit oui, et
+une telle requête n'est le parcours de personne. Elle reste comptée dans les
+métriques et écrite dans le journal d'accès.
 
-**Push traces of this route to OpenTelemetry** (allumé par défaut) : la
-passerelle enregistre ses propres spans pour ce que cette route répond. Éteint,
-cette route ne produit **rien du tout** - ni traversée, ni appel amont, ni
-paquet injecté - et le contexte que l'appelant a envoyé repart intact, sans que
-la passerelle se déclare son parent.
+**Include this route in OpenTelemetry** (allumé par défaut) : la passerelle
+enregistre ses propres spans pour ce que cette route répond, et la route a ses
+propres séries parmi les métriques poussées au collecteur. Éteint, cette route
+ne produit **rien du tout** - ni traversée, ni appel amont, ni paquet injecté, ni
+série à elle - même si elle compte toujours dans les totaux de la passerelle
+(`meerkat.gateway.requests`), et le contexte que l'appelant a envoyé repart
+intact, sans que la passerelle se déclare son parent.
 
 **Start the trace from the UI** (éteint par défaut, et disponible seulement si
 le premier est allumé et que la route est une UI) : le paquet OpenTelemetry est
@@ -197,6 +220,33 @@ chaque requête au store, nommée `SELECT users` avec son texte (les marqueurs, 
 Il est **éteint par défaut**, et c'est voulu. Il n'ajoute aucune trace : il approfondit celles qui sont déjà
 échantillonnées, donc le taux et le plafond gardent leur sens - mais chacune pèse plus lourd dans votre collecteur.
 Allumez-le le temps de regarder où passe le temps de la passerelle, puis éteignez-le.
+
+## Qui a fait l'appel
+
+Une trace répond à « qu'est-ce qui a été lent » ; un ticket de support demande « pour qui ». L'interrupteur **Name the
+caller on the spans** (Infra, OpenTelemetry) pose l'appelant connecté sur la trace :
+
+| Attribut | Quoi |
+|---|---|
+| `user.id`, `user.name` | le compte (les noms d'OpenTelemetry lui-même, qu'un backend qui les connaît affiche comme un utilisateur) |
+| `meerkat.tenant.id`, `meerkat.tenant.name` | l'organisation active |
+| `meerkat.group` | le groupe choisi par la session, dans une organisation en mode exclusif |
+| `meerkat.roles` | les rôles sur lesquels les règles d'accès ont été jugées - une liste, et ce qui explique un refus |
+
+Un appel anonyme ne porte rien.
+
+**Une fois par parcours, jamais deux.** Un parcours qui commence dans une page porte la personne sur les spans du
+navigateur ; le span de la passerelle sur ce parcours reste muet. Tout autre parcours - un backend, un script, une page
+sans le bundle - la porte sur le span de la passerelle. Le bundle marque les parcours qu'il ouvre avec `meerkat=b` dans
+`tracestate`, et c'est ainsi que la passerelle les distingue. La recherche d'un backend de traces retrouve quand même la trace entière
+à partir de n'importe lequel de ces attributs : une trace correspond dès qu'un de ses spans correspond.
+
+Il est **éteint par défaut** : une personne dans une trace est une donnée personnelle qui part vers un collecteur que
+quelqu'un d'autre fait peut-être tourner.
+
+Les spans du navigateur sont estampillés **par la passerelle**, au relais qui les transmet à votre collecteur : la page
+n'apprend jamais qui la lit, et un attribut qu'une page poserait sous l'un de ces noms est remplacé par la réponse de
+la passerelle plutôt que cru.
 
 ## Ce qui manque
 

@@ -1,0 +1,44 @@
+# docker stack deploy -c collector-compose.yml telemetry
+#
+# The OpenTelemetry Collector - the one address every producer sends to - and
+# its logs agent on every node. Tempo (or Jaeger), Prometheus and Loki are
+# yours: set their addresses in collector.yaml.
+
+services:
+  opentelemetry:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    configs:
+      - source: collector.yaml
+        target: /etc/otelcol/config.yaml
+    networks: [meerkat]
+    # NO published port: producers reach it as opentelemetry:4318 on this
+    # network.
+
+  logs-agent:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    # One per node: it reads the containers' logs of the node it runs on.
+    deploy:
+      mode: global
+    user: root
+    configs:
+      - source: logs-agent.yaml
+        target: /etc/otelcol/config.yaml
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks: [meerkat]
+
+configs:
+  collector.yaml:
+    file: ./collector.yaml
+  logs-agent.yaml:
+    file: ./logs-agent.yaml
+
+networks:
+  meerkat:
+    external: true
+    name: meerkat_default # the gateway's own network
+
+# Then, in the console: Infra, OpenTelemetry. Set the collector address to
+# http://opentelemetry:4318 and press Test.

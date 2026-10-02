@@ -40,7 +40,7 @@ import { LanguageRowComponent } from '../../shared/language-row.component';
           <span class="name">{{ current()?.name }}</span>
           @if (current()?.holes) {
             <span class="holes"
-              matTooltip="Strings this language has no wording for: the pages show the English there"
+              matTooltip="Untranslated strings, shown in English"
               i18n-matTooltip="@@Locale_holes_hint3">{{ current()?.holes }}</span>
           }
           @if (current()?.edited) {

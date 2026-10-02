@@ -59,9 +59,9 @@ func TestRegisterConsoleValidation(t *testing.T) {
 
 func TestEmbeddedConsoleServing(t *testing.T) {
 	fsys := fstest.MapFS{
-		"index.html":                      {Data: []byte("<html>shell</html>")},
-		"main-K7KMUD.js":                  {Data: []byte("js")},
-		"monitoring/swarm/prometheus.yml": {Data: []byte("global:\n")},
+		"index.html":                       {Data: []byte("<html>shell</html>")},
+		"main-K7KMUD.js":                   {Data: []byte("js")},
+		"tracing/collector/collector.yaml": {Data: []byte("receivers:\n")},
 	}
 	// No store and no sessions: this test is about serving, and an unstamped
 	// shell is exactly what an anonymous visitor gets.
@@ -98,10 +98,10 @@ func TestEmbeddedConsoleServing(t *testing.T) {
 
 	// Angular hashes what it builds and nothing else. A file shipped under
 	// public/ keeps its name across releases, so a year of immutable would
-	// hand an upgraded gateway last year's monitoring template with no way to
+	// hand an upgraded gateway last year's collector template with no way to
 	// ask for the new one.
 	t.Run("a file that keeps its name revalidates", func(t *testing.T) {
-		res := get(t, "/monitoring/swarm/prometheus.yml", "")
+		res := get(t, "/tracing/collector/collector.yaml", "")
 		if res.StatusCode != http.StatusOK {
 			t.Fatalf("got %d", res.StatusCode)
 		}

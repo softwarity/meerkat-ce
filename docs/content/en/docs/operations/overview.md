@@ -18,9 +18,11 @@ changed something. Each has one screen, and this page says which.
 | Is traffic arriving, and how fast | [The traffic screen](/docs/operations/traffic), the **Metrics** entry of the rail |
 | Is a service still answering | [Upstream health](/docs/operations/upstream-health), and the Routes list marks what fails |
 | Why was that call refused with `429` | [Rate limits](/docs/operations/rate-limits) |
-| Who changed this, and when | [The audit trail](/docs/operations/audit) |
+| Who changed this, and when | [The audit trail](/docs/operations/audit), which can also be sent to a collector |
 | Who called what, and how it went | [Logs](/docs/operations/logs) |
 | Where the seconds of THAT request went | [Traces](/docs/operations/tracing) |
+| Did the scheduled call run, and how | [Scheduled calls](/docs/operations/scheduler), the **Scheduler** entry of the rail |
+| How traces, metrics, audit and logs reach my collector | [OpenTelemetry export](/docs/operations/tracing#exporting-to-your-collector), under **Infra, OpenTelemetry** |
 | Is this node ready for traffic | [Health probes](/docs/operations/health) |
 | When does that certificate expire | [TLS and certificates](/docs/operations/tls) |
 | What is actually in a backup | [Backup and restore](/docs/operations/backup-restore) |
@@ -40,11 +42,11 @@ changed something. Each has one screen, and this page says which.
 
 Nothing about traffic is written to disk, and that is deliberate: an app gateway
 is not a time-series database, and an installation that wants a year of curves
-scrapes them into the one it already runs
-([metrics](/docs/operations/metrics)).
+pushes the counters over OTLP to a collector that writes them into the one it
+already runs ([metrics](/docs/operations/metrics)).
 
-[Logs](/docs/operations/logs) are structured, the level changes while the
-gateway runs, and an access log - one line per request crossing the front door -
+[Logs](/docs/operations/logs) are structured. The level is set at startup only.
+An access log - one line per request crossing the front door -
 turns on when asked. It carries the same identifier as
 [traces](/docs/operations/tracing), which is the join between a line of the
 gateway's and a service's own business audit.

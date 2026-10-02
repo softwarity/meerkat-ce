@@ -5,7 +5,11 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-09-30 : **le scheduler complete** - tache ponctuelle (SCHED-02),
+_Derniere mise a jour : 2026-10-01 : **toute la CI sur le miroir public, l'Enterprise comprise** -
+le prive ne construit plus rien, `ci-ee.yml` clone `meerkat` depuis `meerkat-ce` avec un jeton
+d'App GitHub sur un environment `enterprise` ; non commite, et Francois doit creer l'App +
+l'environment avant que ca tourne, voir la section "Session 2026-10-01". Avant cela,
+2026-09-30 : **le scheduler complete** - tache ponctuelle (SCHED-02),
 historique des executions et rejeu (SCHED-03), reprise automatique bornee (SCHED-04), report
 demande par le service (SCHED-05) : quatre commits sur main, **PAS pousses**, voir la section
 "Session 2026-09-30". Avant cela, 2026-09-26 : **la console vivante** (CONSOLE-13 - une ecriture
@@ -286,6 +290,78 @@ repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
 
+## Session 2026-10-01 - toute la CI sur le miroir public, l'Enterprise comprise
+
+**Decision de Francois** : le depot prive `softwarity/meerkat` ne construit plus rien. Il
+ne fait que le miroir (`mirror-ce.yml`, 2-3 min facturees), la release (le tag) et la purge
+hebdomadaire du paquet ghcr. TOUT le reste tourne sur `softwarity/meerkat-ce`, public, donc
+gratuit - y compris l'Enterprise, que le miroir clone a la volee.
+
+**Ce qui a bouge** (non commite au moment d'ecrire, voir `git status -- .github`) :
+- `ci.yml` : pipeline COMMUNAUTAIRE seul. Le job `edition` qui tatait `ee/` est devenu
+  `scope`, garde par `if: github.repository == 'softwarity/meerkat-ce'` : cote prive tous les
+  jobs sautent (un job saute ne demarre pas de runner, zero minute). Plus de `postgres`, plus
+  d'`image-ee`, plus de lignes LDAP ; l'annuaire Dex reste (`directory`).
+- `ci-ee.yml` (NOUVEAU) : pipeline ENTERPRISE, vit dans les deux arbres, ne tourne que sur le
+  miroir. Declenche par `repository_dispatch` (type `enterprise`, payload `{sha, version}`)
+  envoye par `mirror-ce.yml` A CHAQUE push (meme si l'arbre CE n'a pas change : un commit qui
+  ne touche que `ee/` est exactement celui-la), par `workflow_dispatch` (sha, version), et le
+  mardi pour les verifs lentes. Chaque job : `environment: enterprise`, jeton d'App GitHub
+  frappe par `actions/create-github-app-token@v2` (1 h, lecture, un seul depot, revoque en
+  fin de job), `actions/checkout` de `softwarity/meerkat@sha` avec `persist-credentials:
+  false`, `setup-go` SANS cache. Jobs : source (resout le sha par l'API, calcule
+  `thorough` et `directories`), lint (`--build-tags ee ./...`, `skip-cache`), unit, postgres,
+  directories (3 lignes), e2e (console construite dans le job, PAS de rapport Playwright
+  uploade), image (ghcr, ecrit a la main, PAS de cache de couches), image-community
+  (Docker Hub, seulement sur release).
+- `docker-release.yml` SUPPRIME : la release arrive par le dispatch du tag (mirror-ce tourne
+  sur `v*`), `ci-ee.yml` publie les deux images semver depuis ce commit apres ses tests ;
+  l'attente "CI verte du meme commit" est un `needs` au lieu d'un polling.
+- `_docker.yml` : Docker Hub seulement (plus d'entree `registry`, plus de branche ghcr).
+- `preflight-credentials.yml` (prive) : ne verifie plus que PAT_TOKEN (push sur meerkat-ce,
+  scopes `repo` + `delete:packages` lus dans `x-oauth-scopes`).
+- `preflight-enterprise.yml` (NOUVEAU, tourne sur le miroir) : App -> jeton -> ls-remote de
+  meerkat, login ghcr, login Docker Hub. A lancer apres chaque secret touche.
+
+**Les quatre surfaces publiques d'un runner public et la regle pour chacune** (dans l'en-tete
+de `ci-ee.yml`) : journaux tolerés (des extraits, pas le produit ; pas de `-v` sauf pour
+compter) ; ZERO artefact (telechargeable sans compte) ; ZERO cache de l'arbre (le GOCACHE
+contient les archives compilees, le cache gha de Docker la couche `COPY . .` ; une PR de fork
+peut restaurer le cache de la branche de base) ; le secret sur l'ENVIRONMENT, pas le depot.
+
+**Pieges rencontres** :
+- `environment: ${{ inputs.environment }}` avec une chaine vide dans un workflow reutilisable
+  n'est pas fiable (zone structurelle du runner) : d'ou l'image EE ecrite a la main dans
+  `ci-ee.yml` au lieu de passer par `_docker.yml`.
+- Le push ghcr par un jeton d'installation d'App n'est documente nulle part : l'image EE est
+  poussee avec le PAT classique `GH_WRITE_PACKAGE` (write:packages), en secret d'environment.
+  Le `GITHUB_TOKEN` de meerkat-ce ne peut pas ecrire dans un paquet lie a `meerkat`.
+- Le sha prive dans un journal public : le sha court etait DEJA dans chaque message de commit
+  du miroir ("Community sources from meerkat@xxx"). Pas un renoncement.
+- Un output de job ne transporte pas un secret (GitHub le blanchit) : le jeton est frappe
+  dans chaque job, pas une fois.
+- Les etiquettes OCI de l'image EE sont ecrites a la main (`source` = meerkat, pas
+  meerkat-ce) : c'est aussi ce que ghcr lit pour rattacher un paquet a un depot.
+
+**A FAIRE PAR FRANCOIS avant que ca tourne** (sur `softwarity/meerkat-ce`, Settings) :
+1. Une GitHub App dans l'org `softwarity` (ex. `meerkat-ci`), permission Repository >
+   Contents : Read-only, rien d'autre ; installee sur `softwarity/meerkat` SEUL. Noter l'App
+   ID, generer une cle privee (.pem).
+2. Un environment `enterprise` sur meerkat-ce. Variable `EE_APP_ID`, secrets
+   `EE_APP_PRIVATE_KEY` (le .pem entier) et `GH_WRITE_PACKAGE` (le PAT classique existant,
+   copie depuis le prive). Deployment branches : `main` seulement. Required reviewers :
+   son choix - gratuit sur public ; chaque job qui nomme l'environment attend une
+   approbation, une approbation couvre les jobs en attente a ce moment-la.
+3. `DOCKERHUB_USERNAME` / `DOCKERHUB_RW` existent deja comme secrets de depot sur meerkat-ce
+   (le miroir publiait deja `latest`).
+4. Lancer `gh workflow run "Preflight - Enterprise credentials" -R softwarity/meerkat-ce`,
+   puis un premier `gh workflow run "CI - Enterprise" -R softwarity/meerkat-ce`.
+Cote prive : rien a creer, PAT_TOKEN (scope `repo`) suffit au dispatch.
+
+**Reste facture cote prive** : mirror-ce (~2 min/push), release, prune, et `plug-hosted.yml`
+(le mardi, ~15 min, un Swarm) - celui-la pourrait aussi migrer, il ne tire que des images.
+arm64 a remettre dans `_docker.yml` ET dans `ci-ee.yml` ensemble.
+
 ## Session 2026-09-30 - le scheduler complete (SCHED-02 a SCHED-05)
 
 Quatre chantiers demandes par Francois, dans cet ordre, un commit chacun (non pousses). Point
@@ -343,13 +419,15 @@ go test -race -tags ee, e2e 318/318, site de doc construit).
 
 ### Livre
 
-- **Port des metriques** (OBS-05) : `/metrics` sur un port a lui (9091 par defaut, choisi
-  dans la console), jeton facultatif, ouvert/ferme a chaud sur chaque noeud (bus). Page
-  **Infra, Metrics endpoint** (sortie de l'ecran Traffic). Service Helm `-metrics`.
-- **Push OTLP des metriques** : `TelemetryConfig{Enabled, Traces, Metrics}`, cumulatif toutes
-  les 30 s, noms OTel qui se retraduisent vers les memes series que le scrape (verifie contre
+- **Exposition Prometheus RETIREE** (OBS-05, `[-]` dans FEATURES.md) : plus de `/metrics`, de
+  port 9091, de portee de jeton `metrics`, de page Infra, Metrics endpoint, de Service Helm
+  `-metrics`, de `ee/prometheus`. Decision produit : une seule sortie, le push OTLP. L'ecran
+  Metrics de la console (`/api/metrics`, `/api/live`) reste.
+- **Push OTLP des metriques** (OBS-06) : `TelemetryConfig{Enabled, Traces, Metrics}`, cumulatif
+  toutes les 30 s, noms OTel que le collecteur traduit en series Prometheus (verifie contre
   un vrai otelcol-contrib). Le bouton Test sonde aussi `/v1/metrics` et nomme Jaeger qui ne
-  prend que les traces. Chaque page renvoie a l'autre.
+  prend que les traces. Le tableau de bord Grafana est dans les fichiers du Collector
+  (`console/public/tracing/collector/grafana-dashboard.json`).
 - **Plug** : page **Infra, Plug** (interrupteur livre ETEINT, adresse publiee, commandes par
   OS qui suivent les champs, `plug rn`, lien vers la doc de plug). Deux conditions : Plug
   allume ET mode developpeur. Plug eteint = pas de page de cle publique cote profil.
@@ -4710,12 +4788,11 @@ Whole tree et pas seulement dans Lint.
 **Dependabot pesait ~40% du quota** : 24 runs de CI déclenchés en août, à 50 min
 pièce, plus 39 runs « Dependabot Updates ». François l'a désactivé le 2026-08-27.
 
-**Le levier restant, non fait, parce que c'est une décision de confiance** : le
-miroir public exécute déjà la suite communautaire **gratuitement**. Le dépôt
-privé la paie donc une seconde fois. Il pourrait ne garder que ce que le miroir
-ne peut pas prouver (les jambes `ee/`, les annuaires, les images Enterprise) -
-au prix que **le miroir pousse après coup**, donc n'est pas une barrière avant
-merge. À trancher par lui.
+**Le levier restant, TRANCHE le 2026-10-01** : d'abord partage (2026-08-30, le prive ne
+gardait que ce que le miroir ne pouvait pas prouver), puis TOUT passe sur le miroir, y
+compris l'Enterprise que le miroir clone a la volee (`ci-ee.yml`). Voir la section
+"Session 2026-10-01". Le prive ne paie plus que le miroir lui-meme, la release, la purge et
+le tunnel du mardi.
 
 **Ce qui NE vaut pas le détour** : tunneler OpenLDAP/AD/Dex ailleurs (Tailscale
 ou autre). Ces trois jobs pèsent 5,4 min sur 50, et le job paierait de toute

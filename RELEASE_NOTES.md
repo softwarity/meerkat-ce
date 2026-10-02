@@ -182,14 +182,10 @@ is no key to validate and nothing calls home. What the Enterprise one adds:
   own switch, off until someone turns it on - which records the address developers use and
   hands them the commands for macOS, Linux and Windows: install, generate the key pair,
   plug a service in.
-- **A Prometheus endpoint** beside the built-in dashboards, on a port of its own chosen in the
-  console when it is switched on (9091 by default). Like PostgreSQL's and RabbitMQ's exporters
-  it asks for no token unless you want one: the port is never published, so the network is the
-  lock. The Helm chart declares it on a ClusterIP Service. Configured under Infra, beside
-  OpenTelemetry.
-- **Metrics pushed over OTLP**, for a stack that receives rather than scrapes: the same counters,
-  sent to the collector your traces go to, with names that land on the same Prometheus series.
-  The OpenTelemetry page now says what is sent - traces, metrics, or both.
+- **Metrics pushed over OTLP**: the counters behind the built-in dashboards, sent to the
+  collector your traces go to, which writes them into Prometheus under names like
+  `meerkat_requests_total` - with a ready-made Grafana dashboard to draw them. The OpenTelemetry
+  page says what is sent - traces, metrics, or both.
 - **Traces, with the gateway on them**: its own spans exported in OTLP to the collector you
   already run. **Each route answers for itself**, in its OpenTelemetry section: whether the
   gateway reports what it answers - off, and that route produces nothing at all, which is how

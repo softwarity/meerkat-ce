@@ -17,8 +17,8 @@ import (
 // down, nothing grows, and a restart starts a new hour. That is the honest
 // shape for a built-in view - a gateway is not a time-series database, and
 // pretending otherwise is how a product ends up maintaining one badly. An
-// installation that wants a year of history scrapes it into the one it already
-// runs.
+// installation that wants a year of history pushes the counters over OTLP to a
+// collector, which writes them into the one it already runs.
 
 // Sample is one interval's worth of traffic.
 type Sample struct {

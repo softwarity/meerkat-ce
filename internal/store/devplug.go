@@ -211,7 +211,7 @@ const SettingPlug = "plug"
 
 // PlugSetting is that setting.
 type PlugSetting struct {
-	// Enabled opens the tunnel. Ships OFF, like /metrics and the agent: a port
+	// Enabled opens the tunnel. Ships OFF, like the agent endpoint: a port
 	// that reaches into the cluster is a decision somebody takes, not a
 	// side effect of an upgrade.
 	Enabled bool `json:"enabled"`

@@ -91,3 +91,45 @@ func TestAScheduledCallIsACallerWithRoles(t *testing.T) {
 		t.Fatalf("a scheduled call with no role at all answered %d, want 403", code)
 	}
 }
+
+// The same call, on an operation the route's endpoint security names: the
+// endpoint's gate asked for a session, which a scheduled call never has, and
+// answered 401 whatever roles the schedule carried.
+func TestAScheduledCallPassesAnEndpointRule(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(upstream.Close)
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+
+	r := pathRoute("r-orders", "orders", 1, "/orders/**", upstream.URL)
+	r.Access = store.Access{Level: store.AccessAuth}
+	r.API = &store.RouteAPI{Security: &store.EndpointSecurity{Endpoints: []store.EndpointPolicy{
+		{Method: "POST", Path: "/orders/reindex", Access: store.Access{Roles: []string{"ops"}}},
+	}}}
+	if err := st.SaveRoute(ctx, r); err != nil {
+		t.Fatalf("SaveRoute: %v", err)
+	}
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	call := func(roles []string) int {
+		req := httptest.NewRequest("POST", "http://localhost/orders/reindex", nil)
+		req = req.WithContext(WithScheduledCaller(req.Context(), roles, ""))
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if code := call([]string{"ops"}); code != http.StatusOK {
+		t.Fatalf("a scheduled call with the endpoint's role answered %d, want 200", code)
+	}
+	if code := call([]string{"sales"}); code != http.StatusForbidden {
+		t.Fatalf("a scheduled call without it answered %d, want 403", code)
+	}
+}

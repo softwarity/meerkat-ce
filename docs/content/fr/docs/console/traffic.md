@@ -11,11 +11,11 @@ L'entrée **Metrics** du rail, c'est ce que la passerelle a vraiment servi. Tous
 écrans montrent ce qui est **configuré**, et dans une configuration une route qui échoue et
 une route que personne n'appelle se ressemblent.
 
-Elle vit sur `/traffic`, parce que `/metrics` sur ce port est l'exposition Prometheus. Root
+Elle vit sur `/traffic` : hors `/api`, les chemins de ce port appartiennent au produit. Root
 et infra admins seulement : les chiffres nomment chaque route et chaque service, ce qui est
 une carte de l'installation.
 
-![L'écran Metrics : quatre chiffres sur la dernière minute, les courbes de trafic et de latence, et le classement des routes](img/console/traffic.webp)
+![L'écran Metrics : cinq chiffres sur la dernière minute, les courbes de trafic et de latence, et le classement des routes](img/console/traffic.webp)
 
 Requêtes par seconde, part de refusé ou échoué, réponse moyenne, p95 et vol en cours ; en
 dessous les deux courbes, et le classement avec ses trois onglets - celui des échecs
@@ -36,8 +36,9 @@ portant son compteur.
 
 ![Le classement des routes, plus bas : cinq routes avec leurs requêtes, leurs échecs, leur réponse moyenne et le temps passé](img/console/metrics.webp)
 
-Plus bas sur le même écran : les cinq routes sur deux minutes. *Inventory (maintenance)*
-répond à chaque requête en 0,4 ms et les compte toutes comme refusées - ce que fait
+Plus bas sur le même écran : les cinq routes sur les minutes que couvrent les échantillons.
+*Inventory (maintenance)* répond à chaque requête en moins d'une milliseconde et les compte
+toutes comme refusées - ce que fait
 exactement une route en maintenance.
 
 Une route **s'ouvre sur ses endpoints**, dans le même tableau et sur la même période, donc
@@ -57,25 +58,24 @@ réponses que le lecteur doit pouvoir distinguer.
 > échantillons sont sommés sur tous les noeuds, et un endpoint est compté sur celui qui a
 > répondu - l'écran le dit là où cela compte.
 
-## Metrics endpoint
+## Garder un historique
 
-Le bouton dans l'en-tête porte l'état de l'endpoint de scrape sur son visage - exposé ou non - et
-mène là où il se configure : **Infra, Metrics endpoint**, à côté d'OpenTelemetry. L'interrupteur,
-le port, le jeton optionnel et les fichiers à écrire y sont, et les mêmes compteurs peuvent aussi
-être poussés en OTLP depuis **Infra, OpenTelemetry**. Voir [les métriques](/docs/operations/metrics).
+Les compteurs sortent de la passerelle d'une seule façon : poussés en OTLP vers un collecteur,
+depuis **Infra, OpenTelemetry**, onglet **Metrics**, et écrits par le collecteur dans Prometheus.
+Voir [les métriques](/docs/operations/metrics).
 
 > [!NOTE]
-> Edition Enterprise : sortir les compteurs, scrapés ou poussés. Les compteurs et cet écran sont
+> Edition Enterprise : sortir les compteurs. Les compteurs et cet écran sont
 > dans les deux éditions - des courbes sans rien installer est ce que promet l'image
 > communautaire ; ce qui se vend, c'est de les externaliser dans une stack que vous exploitez
 > déjà.
 
 ## Pièges
 
-- **Prometheus scrape chaque noeud, pas le service devant eux.** Les compteurs sont par
-  noeud, donc un répartiteur donnerait un noeud différent à chaque passage et dessinerait une
-  courbe qui n'est celle de personne.
-- **Un redémarrage remet les courbes à zéro**, pas les compteurs que lit Prometheus.
+- **Les compteurs sont par noeud.** Chaque noeud pousse les siens, sous son propre
+  `service.instance.id`, et un tableau de bord les additionne.
+- **Un redémarrage remet les courbes à zéro.** L'historique est dans Prometheus, quand les
+  compteurs y sont poussés.
 - **Une route que personne n'a appelée n'a rien à dire**, ni ses endpoints. Ce n'est pas une
   panne.
 - **Les gabarits déduits peuvent se tromper.** Traitez-les comme une indication tant qu'aucune

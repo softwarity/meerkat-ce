@@ -8,9 +8,7 @@
   <div class="content">
     <mat-card appearance="outlined">
       <p class="hint text-muted" i18n="@@Mail_relay_hint">
-        The SMTP server that delivers account e-mails: confirmations, password resets,
-        administrator notifications. The sender address lives here because a provider only
-        accepts the account it authenticated.
+        The SMTP server that sends account e-mails: confirmations, password resets, notifications.
       </p>
       <div class="fields grid grid-cols-2">
         <mat-form-field>
@@ -57,7 +55,7 @@
           <ng-container i18n="@@Recipients_will_see">Recipients will see</ng-container>
           <span class="mono"> {{ senderPreview() }}</span>
           <ng-container i18n="@@Sender_name_set_in_branding">
-            . The name in front of the address is the application name, from Built-in pages, Branding.
+            . The name is the application name, from Built-in pages, Branding.
           </ng-container>
         </p>
       }
@@ -80,13 +78,11 @@
         <p class="hint text-muted col-span-full">
           @if (auth() === 'oauth2') {
             <ng-container i18n="@@Auth_oauth2_hint">
-              A token minted by client credentials stands in for the password (XOAUTH2). This is
-              the only way into Microsoft 365, which no longer accepts a password over SMTP.
+              A client-credentials token instead of a password (XOAUTH2). Required by Microsoft 365.
             </ng-container>
           } @else {
             <ng-container i18n="@@Auth_password_hint">
-              An account and a secret. What every transactional relay uses, and what Gmail still
-              accepts with an application password.
+              An account and a secret. For Gmail, use an application password.
             </ng-container>
           }
         </p>
@@ -172,8 +168,7 @@
       </div>
 
       <p class="hint text-muted" i18n="@@Send_test_hint" style="margin-bottom:8px;">
-        Send a real message through this relay to see it land: pick which one and the language,
-        with fake values but the real look. The recipient defaults to your own address.
+        Send a real message with sample values. The recipient defaults to your own address.
       </p>
       <div class="test">
         <mat-form-field class="kind" subscriptSizing="dynamic">
@@ -229,10 +224,8 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Daily_digest">Daily digest</h3>
       <p class="hint text-muted" i18n="@@Digest_hint">
-        Once a day, the administrators who carry an e-mail address are told which accounts are
-        about to lose access, which just did, and which vault entries are about to reach their
-        reminder date. A day with nothing to say sends nothing: a daily message that says "nothing
-        today" three hundred times is one nobody opens on the day it matters.
+        Once a day, administrators with an e-mail address get the accounts losing or just lost
+        access, and the vault entries near their reminder date. Nothing to say, nothing sent.
       </p>
       <mat-slide-toggle [checked]="digestOn()" (change)="digestOn.set($event.checked)">
         <ng-container i18n="@@Send_the_daily_notice">Send the daily notice</ng-container>
@@ -264,8 +257,7 @@
         </div>
         @if (!host().trim()) {
           <p class="hint text-error" i18n="@@Digest_needs_a_relay">
-            No relay is configured, so nothing can be sent. The notice stays owed: it goes out the
-            morning a relay answers.
+            No relay configured: the notice goes out once one answers.
           </p>
         }
       }

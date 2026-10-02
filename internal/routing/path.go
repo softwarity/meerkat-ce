@@ -229,11 +229,13 @@ func allStrings(args map[string]any, key string) []string {
 }
 
 // MatchPrefix is the static head a client's path must carry to enter a route
-// ("/demo/**" -> "/demo"): the first path predicate's first pattern, cut at the
-// first segment that matches more than itself. It is where a route's own
-// documents live publicly - the spec it serves, and the base its operations
-// are reachable from - so the gateway and the console must compute it the same
-// way, from here.
+// ("/demo/**" -> "/demo"): the first path predicate's patterns, each cut at the
+// first segment that matches more than itself, and then the head they all
+// share - a route on "/api/orders/**" and "/api/shipments/**" is mounted on
+// "/api", not on whichever of the two was written first. It is where a
+// route's own documents live publicly - the spec it serves, and the base its
+// operations are reachable from - so the gateway and the console must compute
+// it the same way, from here.
 func MatchPrefix(specs []Spec) string {
 	for _, spec := range specs {
 		if spec.Type != "path" {
@@ -243,17 +245,45 @@ func MatchPrefix(specs []Spec) string {
 		if len(patterns) == 0 {
 			break
 		}
-		var kept []string
-		for _, seg := range splitPath(patterns[0]) {
-			if strings.ContainsAny(seg, "*{") {
-				break
+		var common []string
+		for i, pattern := range patterns {
+			var head []string
+			for _, seg := range splitPath(pattern) {
+				if strings.ContainsAny(seg, "*{") {
+					break
+				}
+				head = append(head, seg)
 			}
-			kept = append(kept, seg)
+			if i == 0 {
+				common = head
+				continue
+			}
+			n := 0
+			for n < len(common) && n < len(head) && common[n] == head[n] {
+				n++
+			}
+			common = common[:n]
 		}
-		if len(kept) == 0 {
+		if len(common) == 0 {
 			return ""
 		}
-		return "/" + strings.Join(kept, "/")
+		return "/" + strings.Join(common, "/")
 	}
 	return ""
+}
+
+// Vars returns the {variables} of the pattern as path holds them, nil when the
+// path does not match - what an audited call reads its path fields from.
+func (c CompiledPath) Vars(path string) map[string]string {
+	if !c.p.match(path) {
+		return nil
+	}
+	segs := splitPath(path)
+	vars := map[string]string{}
+	for i, want := range c.p.segments {
+		if i < len(segs) && strings.HasPrefix(want, "{") {
+			vars[strings.TrimSuffix(strings.TrimPrefix(want, "{"), "}")] = segs[i]
+		}
+	}
+	return vars
 }

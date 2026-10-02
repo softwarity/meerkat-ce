@@ -1072,6 +1072,11 @@ const (
 type RouteAPI struct {
 	Spec     *RouteSpec        `json:"spec,omitempty"`
 	Security *EndpointSecurity `json:"security,omitempty"`
+	// Audit names the operations whose calls are audited (AUD-04). Kept apart
+	// from Security on purpose: auditing observes, it never decides who
+	// passes, so an audited operation can never become an access override by
+	// accident.
+	Audit []EndpointAudit `json:"audit,omitempty"`
 }
 
 // Access levels (RBAC-06), the BELONGING axis of an access rule. They are
@@ -1295,6 +1300,13 @@ type EndpointPolicy struct {
 	Method string `json:"method"`
 	Path   string `json:"path"`
 	Access
+	// Inherit says this entry poses NO access rule: the route's applies (or
+	// the refusal, when the route closes what it does not list). It is how an
+	// operation carries only a bound. Without it an empty Access READS as a
+	// rule - the deliberate reopening to whatever the upstream decides - and an
+	// operation posed for its rate limit alone was silently opened to anyone
+	// on a route that asked for a sign-in.
+	Inherit bool `json:"inherit,omitempty"`
 	// Limits bounds this operation on its own (QUOTA-05), on top of whatever
 	// the route carries. Chosen operation by operation and never a default
 	// over the whole inventory: a bound is a counter per (operation, caller),

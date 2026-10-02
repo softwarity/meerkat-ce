@@ -145,7 +145,7 @@ export class GlobalPanelComponent {
     if (on) {
       const ok = await this.dialogs.confirm({
         title: $localize`:@@Close_to_visitors_q:Close this installation to visitors?`,
-        message: $localize`:@@Close_to_visitors_message:Every route stops serving at once and visitors get the unavailable page. The sign-in pages keep working, and anyone who administers or develops here can still go through - so the fix can be checked before reopening.`,
+        message: $localize`:@@Close_to_visitors_message:Every route serves the unavailable page. Sign-in pages keep working, and admins and developers still get through.`,
         confirmLabel: $localize`:@@Close:Close`,
         danger: true,
       });

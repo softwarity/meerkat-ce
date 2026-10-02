@@ -101,7 +101,7 @@ export class LocaleTabComponent {
 
   // Why the number is there, said in full: the count alone reads as a score.
   protected sharedTip(s: LocaleString): string {
-    return $localize`:@@Locale_shared_tip:On ${s.screens}:n: screens. There is one copy of this wording, so changing it here changes it on all of them.`;
+    return $localize`:@@Locale_shared_tip:Shared by ${s.screens}:n: screens: a change here applies to all of them.`;
   }
 
   protected valueOf(s: LocaleString): string {
@@ -244,7 +244,7 @@ export class LocaleTabComponent {
   }
 
   private deleteWarning(code: string): string {
-    return $localize`:@@Locale_delete_confirm:Delete ${code}:code:? It was added here, so this removes the language and everything written in it.`;
+    return $localize`:@@Locale_delete_confirm:Delete ${code}:code: and everything written in it?`;
   }
 
   private importWarning(code: string, n: number, whole: boolean): string {

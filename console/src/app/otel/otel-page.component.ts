@@ -14,13 +14,16 @@ import { EeLockComponent } from '../shared/ee-lock.component';
 import { FormFieldComponent } from '../shared/form-field.component';
 import { SecretFieldComponent } from '../shared/secret-field.component';
 import { SnippetComponent } from '../shared/snippet.component';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatRadioModule } from '@angular/material/radio';
+import { MatTabsModule } from '@angular/material/tabs';
 import { TRACING_PLATFORMS, tracingUrl } from './tracing-files';
 
 // Where this gateway's traces go (OBS-04): a section of Infra, beside the other
 // things this installation is WIRED to.
 //
-// It used to be a drawer on the Metrics screen, beside the Prometheus one, on
-// the grounds that both answer an operator's question from two sides. What that
+// It used to be a drawer on the Metrics screen, on the grounds that both answer
+// an operator's question from two sides. What that
 // arrangement hid is that this is a connection to a system of your own - like
 // the mail relay, like TLS - and that WHICH routes are traced is decided on the
 // routes themselves. The screen that configures the pipe belongs with the pipes.
@@ -39,6 +42,9 @@ import { TRACING_PLATFORMS, tracingUrl } from './tracing-files';
     MatExpansionModule,
     MatIconModule,
     MatInputModule,
+    MatSidenavModule,
+    MatRadioModule,
+    MatTabsModule,
     MatSlideToggleModule,
     MatTooltipModule,
     RouterLink,
@@ -80,6 +86,15 @@ export class OtelPageComponent {
   protected readonly sample = signal(0.1);
   protected readonly maxPerSecond = signal(200);
   protected readonly gatewayDetail = signal(false);
+  protected readonly caller = signal(false);
+  protected readonly audit = signal(false);
+  protected readonly auditConsole = signal(false);
+  protected readonly logs = signal(false);
+  protected readonly logsPush = signal(false);
+  protected readonly logsLost = signal(0);
+  // The three positions of the logs, as the radio group reads them.
+  protected readonly logsMode = computed(() => (this.logsPush() ? 'push' : this.logs() ? 'agent' : 'off'));
+  protected readonly auditLost = signal(0);
   // One header, which is what a collector wants: a name and a value, and the
   // value is a vault reference rather than a key. More than one is rare enough
   // that the API takes a map and this screen offers the common case.
@@ -132,6 +147,13 @@ export class OtelPageComponent {
     this.sample.set(s.sample);
     this.maxPerSecond.set(s.maxPerSecond);
     this.gatewayDetail.set(!!s.gatewayDetail);
+    this.caller.set(!!s.caller);
+    this.audit.set(!!s.audit);
+    this.auditConsole.set(!!s.auditConsole);
+    this.logs.set(!!s.logs);
+    this.logsPush.set(!!s.logsPush);
+    this.logsLost.set(s.logsLost ?? 0);
+    this.auditLost.set(s.auditLost ?? 0);
     this.enterprise.set(s.enterprise);
     this.exporting.set(s.exporting);
     const [name, value] = Object.entries(s.headers ?? {})[0] ?? ['', ''];
@@ -162,7 +184,7 @@ export class OtelPageComponent {
     this.justSaved.set(false);
   }
 
-  // The two toggles APPLY ON CLICK, like the Prometheus switch next door: a
+  // The two toggles APPLY ON CLICK: a
   // switch that needs a second button is a switch somebody leaves half-set.
   //
   // The fields keep the Save button, because saving on every keystroke of an
@@ -171,6 +193,30 @@ export class OtelPageComponent {
   // look at something that is happening now.
   protected toggleDetail(on: boolean) {
     this.gatewayDetail.set(on);
+    this.commit();
+  }
+
+  // Same: a choice about what leaves, applied when it is made.
+  protected toggleCaller(on: boolean) {
+    this.caller.set(on);
+    this.commit();
+  }
+
+  protected toggleAudit(on: boolean) {
+    this.audit.set(on);
+    this.commit();
+  }
+
+  protected toggleAuditConsole(on: boolean) {
+    this.auditConsole.set(on);
+    this.commit();
+  }
+
+  // Off, written for an agent (the outputs, in OTel's format - applies with
+  // the export off), or pushed to the collector. Never two at once.
+  protected setLogsMode(mode: 'off' | 'agent' | 'push') {
+    this.logs.set(mode === 'agent');
+    this.logsPush.set(mode === 'push');
     this.commit();
   }
 
@@ -266,6 +312,11 @@ export class OtelPageComponent {
       sample: this.sample(),
       maxPerSecond: this.maxPerSecond(),
       gatewayDetail: this.gatewayDetail(),
+      caller: this.caller(),
+      audit: this.audit(),
+      auditConsole: this.auditConsole(),
+      logs: this.logs(),
+      logsPush: this.logsPush(),
     };
     this.api
       .setTelemetrySetting(cfg)
@@ -299,36 +350,41 @@ export class OtelPageComponent {
       });
   }
 
-  // For whoever has no collector yet, per platform - and as real FILES on
-  // disk rather than strings here, so `curl <gateway>/tracing/swarm/
-  // docker-compose.yml` gets the file with nothing in the way.
+  // For whoever has no collector yet: the Collector's files per platform - as
+  // real FILES on disk rather than strings here, so `curl <gateway>/tracing/
+  // swarm/collector-compose.yml` gets the file with nothing in the way. In a
+  // drawer: deploying a collector is done once, and the page is about the
+  // export.
   protected readonly platforms = TRACING_PLATFORMS;
+  protected readonly filesOpen = signal(false);
+  // Which panel is open, because that is what decides which files are fetched.
+  protected readonly opened = signal('');
+
+  // The files the open panel shows, and nothing else: two files behind every
+  // visit to a screen read for its switch is two requests nobody asked for.
+  private readonly wanted = computed(() => {
+    if (!this.filesOpen()) return new Set<string>();
+    const p = TRACING_PLATFORMS.find((x) => x.key === this.opened());
+    return new Set((p?.files ?? []).map((f) => f.file));
+  });
 
   private readonly files = new Map<string, () => string>(
-    TRACING_PLATFORMS.map((p) => {
-      // Fetched when its PANEL opens, not when the drawer does: two files
-      // behind every visit to a screen read for its curves is two requests
-      // nobody asked for. An undefined url is a request httpResource does not
-      // make, and that is what a closed panel returns.
-      const res = httpResource.text(() =>
-        this.opened() === p.key ? tracingUrl(p.file) : undefined,
-      );
+    [...new Set(TRACING_PLATFORMS.flatMap((p) => p.files.map((f) => f.file)))].map((path) => {
+      // An undefined url is a request httpResource does not make.
+      const res = httpResource.text(() => (this.wanted().has(path) ? tracingUrl(path) : undefined));
       return [
-        p.key,
+        path,
         () => {
           // A comment rather than an empty box: a panel showing nothing at all
           // says nothing about whether there is nothing to show.
-          if (res.error()) return `# ${tracingUrl(p.file)} did not answer`;
+          if (res.error()) return `# ${tracingUrl(path)} did not answer`;
           return res.value() ?? '';
         },
       ];
     }),
   );
 
-  // Which panel is open, because that is what decides which file is fetched.
-  protected readonly opened = signal('');
-
-  protected fileOf(key: string): string {
-    return this.files.get(key)?.() ?? '';
+  protected fileOf(path: string): string {
+    return this.files.get(path)?.() ?? '';
   }
 }

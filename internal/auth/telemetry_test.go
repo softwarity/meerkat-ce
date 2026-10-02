@@ -59,8 +59,9 @@ func TestTheRelayIsClosedWhenNothingIsListening(t *testing.T) {
 	}
 }
 
-// What a page posts reaches the collector AS IT STANDS: re-encoding it here
-// would be a second implementation of a wire format whose mistakes are silent.
+// What an ANONYMOUS page posts reaches the collector as it stands: there is
+// nobody to stamp, and re-encoding a batch for nothing is a second
+// implementation of a wire format whose mistakes are silent.
 func TestTheRelayForwardsTheBodyUntouched(t *testing.T) {
 	var got atomic.Value
 	tracing.RegisterRelay(func(b []byte) error { got.Store(string(b)); return nil })
@@ -163,5 +164,49 @@ func TestAServedPageCarriesTheNameOfTheRequest(t *testing.T) {
 	mux.ServeHTTP(plain, httptest.NewRequest("GET", "http://localhost/login", nil))
 	if strings.Contains(plain.Body.String(), `class="trace-id"`) {
 		t.Errorf("a page with no request name drew the line anyway")
+	}
+}
+
+// A signed-in page's spans leave naming the person once the switch is on -
+// said by the gateway, which holds the session, and not by the page.
+func TestTheRelayNamesWhoIsReadingThePage(t *testing.T) {
+	var got atomic.Value
+	tracing.RegisterRelay(func(b []byte) error { got.Store(string(b)); return nil })
+	tracing.SetRelayMaxPerSecond(0)
+	openToPages(t)
+	t.Cleanup(func() { tracing.RegisterRelay(nil); tracing.SetCaller(false) })
+
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := t.Context()
+	if err := st.CreateUser(ctx, store.User{ID: "u1", Username: "alice", PasswordHash: "x", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	sm := session.NewManager(st)
+	signed := httptest.NewRecorder()
+	if _, err := sm.Issue(ctx, signed, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
+		t.Fatal(err)
+	}
+	mux := telemetryMux(New(st, sm))
+	send := func(on bool) string {
+		tracing.SetCaller(on)
+		req := httptest.NewRequest("POST", "http://localhost/meerkat/telemetry",
+			bytes.NewBufferString(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"abc"}]}]}]}`))
+		req.AddCookie(signed.Result().Cookies()[0])
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("the relay answered %d", rec.Code)
+		}
+		return got.Load().(string)
+	}
+	if b := send(false); strings.Contains(b, "user.") {
+		t.Errorf("off, yet the person left: %s", b)
+	}
+	if b := send(true); !strings.Contains(b, `"user.id"`) || !strings.Contains(b, `"stringValue":"alice"`) {
+		t.Errorf("on, the person is missing: %s", b)
 	}
 }

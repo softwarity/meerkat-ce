@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -40,7 +41,32 @@ func Detail() bool { return detail.Load() }
 type current struct {
 	traceID string
 	spanID  string
-	off     atomic.Bool
+	// crossing is shared by every step under it, however deep.
+	crossing *crossing
+}
+
+// crossing holds the steps of one request until its server span is settled.
+// A step that ends before the router has chosen the route - the session's
+// queries - cannot know yet whether that route is traced: sent at once, it
+// would be a child of a span that is then never reported.
+type crossing struct {
+	off  atomic.Bool
+	mu   sync.Mutex
+	held []Span
+	sent bool // settled and reported: a step ending later leaves at once
+}
+
+func (c *crossing) emit(s Span) {
+	c.mu.Lock()
+	if !c.sent {
+		c.held = append(c.held, s)
+		c.mu.Unlock()
+		return
+	}
+	c.mu.Unlock()
+	if !c.off.Load() {
+		Emit(s)
+	}
 }
 
 type currentKey struct{}
@@ -48,7 +74,26 @@ type currentKey struct{}
 // WithCurrent makes a recorded span the parent of the steps taken under ctx.
 // Called by the router for its server span, and by Step for its own.
 func WithCurrent(ctx context.Context, traceID, spanID string) context.Context {
-	return context.WithValue(ctx, currentKey{}, &current{traceID: traceID, spanID: spanID})
+	return context.WithValue(ctx, currentKey{}, &current{traceID: traceID, spanID: spanID, crossing: &crossing{}})
+}
+
+// SendCurrent reports the steps held under ctx, once its server span is
+// reported: they leave together, or not at all.
+func SendCurrent(ctx context.Context) {
+	c, ok := ctx.Value(currentKey{}).(*current)
+	if !ok || c == nil {
+		return
+	}
+	c.crossing.mu.Lock()
+	held := c.crossing.held
+	c.crossing.held, c.crossing.sent = nil, true
+	c.crossing.mu.Unlock()
+	if c.crossing.off.Load() {
+		return
+	}
+	for _, s := range held {
+		Emit(s)
+	}
 }
 
 // DropCurrent says the span under ctx is not reported after all - a route that
@@ -56,7 +101,10 @@ func WithCurrent(ctx context.Context, traceID, spanID string) context.Context {
 // emits nothing, including the ones already opened.
 func DropCurrent(ctx context.Context) {
 	if c, ok := ctx.Value(currentKey{}).(*current); ok && c != nil {
-		c.off.Store(true)
+		c.crossing.off.Store(true)
+		c.crossing.mu.Lock()
+		c.crossing.held = nil
+		c.crossing.mu.Unlock()
 	}
 }
 
@@ -71,16 +119,16 @@ func Step(ctx context.Context, name string, attrs ...Attr) (context.Context, fun
 		return ctx, noEnd
 	}
 	parent, ok := ctx.Value(currentKey{}).(*current)
-	if !ok || parent == nil || parent.off.Load() {
+	if !ok || parent == nil || parent.crossing.off.Load() {
 		return ctx, noEnd
 	}
 	id := NewSpanID()
-	child := &current{traceID: parent.traceID, spanID: id}
+	child := &current{traceID: parent.traceID, spanID: id, crossing: parent.crossing}
 	start := time.Now()
 	return context.WithValue(ctx, currentKey{}, child), func(err error, more ...Attr) {
 		// Checked again at the end: a route found untraced after the step
 		// began must not leave half a trace behind.
-		if parent.off.Load() {
+		if parent.crossing.off.Load() {
 			return
 		}
 		span := Span{
@@ -92,7 +140,7 @@ func Step(ctx context.Context, name string, attrs ...Attr) (context.Context, fun
 		if err != nil {
 			span.Status, span.StatusMessage = StatusError, err.Error()
 		}
-		Emit(span)
+		parent.crossing.emit(span)
 	}
 }
 

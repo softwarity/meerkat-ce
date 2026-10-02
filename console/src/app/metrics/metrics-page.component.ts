@@ -1,16 +1,11 @@
 import { DecimalPipe } from '@angular/common';
-import { httpResource } from '@angular/common/http';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RouterLink } from '@angular/router';
 import { LiveWindowDataSource } from '@softwarity/livewire';
 import type { EChartsCoreOption } from 'echarts/core';
-import { ApiService } from '../api.service';
-import { EeLockComponent } from '../shared/ee-lock.component';
 import { ChartComponent } from './chart.component';
 import {
   EndpointsAnswer,
@@ -35,12 +30,9 @@ import {
   imports: [
     ChartComponent,
     DecimalPipe,
-    EeLockComponent,
-    MatButtonModule,
     MatButtonToggleModule,
     MatIconModule,
     MatTooltipModule,
-    RouterLink,
   ],
   templateUrl: './metrics-page.component.html',
   styleUrl: './metrics-page.component.scss',
@@ -74,7 +66,6 @@ export class MetricsPageComponent {
     this.loadEndpoints();
     const timer = setInterval(() => this.loadEndpoints(), 15_000);
     this.destroyRef.onDestroy(() => clearInterval(timer));
-    this.loadExposure();
   }
 
   // Asked for over the period the table is DRAWING, so a route's endpoints add
@@ -337,29 +328,6 @@ export class MetricsPageComponent {
       })
       .slice(0, 10);
   });
-
-  // ── the metrics endpoint ─────────────────────────────────────────────────
-  // Configured in Infra (metrics-endpoint), beside OpenTelemetry. What stays
-  // here is the STATE, on the header button that leads there.
-  private readonly api = inject(ApiService);
-  protected readonly exposed = signal(false);
-  private readonly path = signal('/metrics');
-  protected readonly prometheusTip = computed(() =>
-    this.exposed()
-      ? $localize`:@@Metrics_tip_on:Exposed at ${this.path()}:PATH:`
-      : $localize`:@@Metrics_tip_off:Not exposed - nothing scrapes this gateway`,
-  );
-
-  // Read once, when the screen is built: one small call.
-  private loadExposure() {
-    this.api
-      .metricsSetting()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((s) => {
-        this.exposed.set(s.enabled);
-        this.path.set(s.path);
-      });
-  }
 
   private lines(
     at: number[],

@@ -7,11 +7,13 @@ summary: Décider qui peut appeler chaque opération d'une API, et combien elle 
 
 # Sécurité et quotas par endpoint
 
-**Infra > Endpoint security** et **Infra > Endpoint rate limits** sont deux entrées
-sur un seul inventaire : les opérations que la passerelle lit dans la spec OpenAPI
-d'une route. La sécurité demande *qui peut appeler ceci*, les quotas demandent
-*combien*. Deux entrées de menu, parce que ce sont deux questions avec lesquelles on
-arrive, et un menu qui n'en nomme aucune est un menu où aucune ne se trouve.
+**Infra > Endpoint security**, **Infra > Endpoint rate limits** et **Infra >
+Endpoint audit** sont trois entrées sur un seul inventaire : les opérations que
+la passerelle lit dans la spec OpenAPI d'une route. La sécurité demande *qui
+peut appeler ceci*, les quotas *combien*, l'audit *quels appels garder*
+(Enterprise, voir
+[auditer les opérations d'une route](/docs/operations/audit#auditer-les-oprations-dune-route)).
+Cette page couvre les deux premières.
 
 ## Avant de commencer
 
@@ -54,7 +56,7 @@ Le tiroir porte un interrupteur, **Override the route config**.
 
 ![Le même éditeur d'accès, sur la section Security d'une route : un niveau, une liste de rôles, et une exception pour des utilisateurs nommés](img/console/route-editor-security.webp)
 
-Le même éditeur, ici sur la route *Billing* : le niveau, les rôles (un seul
+Le même éditeur, ici sur la route *Orders API* : le niveau, les rôles (un seul
 suffit, jugés dans l'organisation active), et l'exception des utilisateurs
 nommés. Le tiroir d'une opération montre exactement cela une fois la surcharge
 activée.
@@ -69,6 +71,8 @@ traverse une règle écrite pour tous les autres.
 > ouvert s'appelle *delegated* et non *public*.
 
 ## Sur la page quotas
+
+![La page des quotas : les bornes que porte une opération, dans la première colonne](img/console/endpoint-limits.webp)
 
 Le tiroir porte les bornes propres à l'opération, **en plus** de celles de la route,
 qui s'appliquent toujours. Une borne est un compteur, et vous choisissez sur quoi il

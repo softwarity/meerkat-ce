@@ -435,3 +435,90 @@ func TestTheGatewayDetailsItsOwnWorkWhenAsked(t *testing.T) {
 		t.Errorf("the identity step is of kind %d, want internal", step.Kind)
 	}
 }
+
+// Who made the call, on the crossing - even through a route with no rule,
+// where nothing else needed to know - once the switch is on (OBS-04).
+func TestTheServerSpanNamesTheCallerWhenAsked(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(upstream.Close)
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	if err := st.CreateUser(ctx, store.User{ID: "u1", Username: "alice", PasswordHash: "x", Enabled: true}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if err := st.SaveRoute(ctx, pathRoute("r-who", "orders-api", 1, "/o/**", upstream.URL)); err != nil {
+		t.Fatalf("SaveRoute: %v", err)
+	}
+	sm := session.NewManager(st)
+	rt := New(st, sm)
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	signed := httptest.NewRecorder()
+	if _, err := sm.Issue(ctx, signed, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	t.Cleanup(func() { tracing.SetCaller(false) })
+
+	said := func(on bool, tracestate string) map[string]string {
+		t.Helper()
+		tracing.SetCaller(on)
+		c := listen(t)
+		req := httptest.NewRequest("GET", "http://localhost/o/x", nil)
+		req.AddCookie(signed.Result().Cookies()[0])
+		if tracestate != "" {
+			req.Header.Set(tracing.Header, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+			req.Header.Set(tracing.StateHeader, tracestate)
+		}
+		rt.ServeHTTP(httptest.NewRecorder(), req)
+		server, ok := c.byKind(tracing.KindServer)
+		if !ok {
+			t.Fatal("no server span")
+		}
+		got := map[string]string{}
+		for _, a := range server.Attrs {
+			if strings.HasPrefix(a.Key, "user.") {
+				got[a.Key] = a.Str
+			}
+		}
+		return got
+	}
+	if got := said(false, ""); len(got) != 0 {
+		t.Errorf("off: %v, want nothing about the person", got)
+	}
+	if got := said(true, ""); got["user.id"] != "u1" || got["user.name"] != "alice" {
+		t.Errorf("on: %v, want the id and the username", got)
+	}
+	// A journey our bundle opened: the page's spans carry the person, stamped
+	// at the relay, so the gateway's span does not say it a second time.
+	if got := said(true, "meerkat=b"); len(got) != 0 {
+		t.Errorf("a journey from the page: %v, want the gateway's span silent", got)
+	}
+}
+
+// A request no route answers is not traced: tracing is each route's answer,
+// and no route answered.
+func TestARequestNoRouteAnswersIsNotTraced(t *testing.T) {
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	c := listen(t)
+	rec := httptest.NewRecorder()
+	rt.ServeHTTP(rec, httptest.NewRequest("GET", "http://localhost/nowhere", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("answered %d", rec.Code)
+	}
+	if _, ok := c.byKind(tracing.KindServer); ok {
+		t.Error("a request no route answered left a span")
+	}
+}

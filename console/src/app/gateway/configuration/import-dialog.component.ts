@@ -109,8 +109,7 @@ export type ImportOutcome =
       <mat-radio-group [value]="where()" (change)="pick($event.value)">
         <mat-radio-button value="name" i18n="@@Save_it_under_a_name">Save it under a name</mat-radio-button>
         <p class="why" i18n="@@Under_a_name_why">
-          It joins the saved configurations and is applied to nothing. An existing name is
-          replaced.
+          Stored, not applied. An existing name is replaced.
         </p>
         @if (where() === 'name') {
           <mat-form-field>
@@ -123,15 +122,14 @@ export type ImportOutcome =
           Replace the current configuration
         </mat-radio-button>
         <p class="why" i18n="@@Replace_current_why">
-          After it, this gateway IS that file: what it does not carry goes.
+          What the file does not carry is removed.
         </p>
 
         <mat-radio-button value="merge" i18n="@@Add_to_the_current_one">
           Add it to the current configuration
         </mat-radio-button>
         <p class="why" i18n="@@Merge_why">
-          For a file that holds a part - a few routes lifted from another gateway. What it does
-          not mention is left alone.
+          For a partial file. What it does not mention is left alone.
         </p>
       </mat-radio-group>
 
@@ -140,8 +138,7 @@ export type ImportOutcome =
           <div class="note">
             <mat-icon>check_circle</mat-icon>
             <p i18n="@@Nothing_would_change">
-              This file describes what is already configured here. Importing it would change
-              nothing.
+              This file matches what is already configured. Nothing would change.
             </p>
           </div>
         } @else {
@@ -161,9 +158,8 @@ export type ImportOutcome =
           <div class="note warn">
             <mat-icon>vpn_key_off</mat-icon>
             <p i18n="@@Import_missing_note">
-              This configuration expects vault entries that do not exist here. They will be
-              created empty, and a route that references an empty entry does not serve until it
-              is filled.
+              Missing vault entries will be created empty. A route using one does not serve
+              until it is filled.
             </p>
           </div>
         }
@@ -280,8 +276,7 @@ export class ImportDialogComponent {
     <h2 mat-dialog-title i18n="@@Vault_entries_to_fill">Vault entries to fill</h2>
     <mat-dialog-content>
       <p class="hint" i18n="@@Vault_entries_to_fill_hint">
-        The import created these empty. This is the moment to fill them: in a week nobody
-        remembers what they were for.
+        The import created these empty. Fill them now.
       </p>
       @for (m of pending(); track m.name) {
         <div class="entry">

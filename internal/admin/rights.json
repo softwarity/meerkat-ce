@@ -440,6 +440,11 @@
     "guard": "infraAdmin"
   },
   {
+    "method": "PUT",
+    "path": "/api/routes/{id}/audit",
+    "guard": "infraAdmin"
+  },
+  {
     "method": "GET",
     "path": "/api/routes/{id}/operations",
     "guard": "gw"
@@ -587,16 +592,6 @@
   {
     "method": "PUT",
     "path": "/api/settings/maintenance",
-    "guard": "infraAdmin"
-  },
-  {
-    "method": "GET",
-    "path": "/api/settings/metrics",
-    "guard": "gw"
-  },
-  {
-    "method": "PUT",
-    "path": "/api/settings/metrics",
     "guard": "infraAdmin"
   },
   {

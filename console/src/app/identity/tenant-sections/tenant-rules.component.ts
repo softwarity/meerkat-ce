@@ -111,7 +111,7 @@ export class TenantRulesComponent {
       title: $localize`:@@Delete_rule:Delete this rule?`,
       // Saying what actually happens: nothing changes until people sign in
       // again, which is the single most surprising part of the mechanism.
-      message: $localize`:@@Delete_rule_hint:What it granted is taken back the next time each person signs in. Anyone an administrator placed by hand stays.`,
+      message: $localize`:@@Delete_rule_hint:What it granted is taken back at each person's next sign-in. Manual placements stay.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
     });

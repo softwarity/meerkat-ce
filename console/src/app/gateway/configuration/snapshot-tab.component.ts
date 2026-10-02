@@ -28,16 +28,14 @@ import { SnippetComponent } from '../../shared/snippet.component';
   <mat-card appearance="outlined">
     <h2 i18n="@@Full_snapshot">Full snapshot</h2>
     <p class="hint" i18n="@@Snapshot_hint">
-      A coherent copy of the whole database, taken while the gateway runs: routes and vault,
-      but also users, organisations, sessions and the audit trail. This is what a backup
-      restores; a configuration export is what a second gateway reproduces.
+      A consistent copy of the whole database, users, sessions, vault and audit trail included,
+      taken while the gateway runs. This is your backup.
     </p>
     <div class="note">
       <mat-icon>schedule</mat-icon>
       <p i18n="@@Snapshot_scope_note">
-        Meerkat takes the snapshot, because copying a live database with cp can catch it
-        mid-write and nothing says so until the day you restore it. Scheduling, retention and
-        shipping it off the host belong to your backup tool, not here.
+        Use this rather than copying the live database file. Scheduling and retention are up to
+        your backup tool.
       </p>
     </div>
 
@@ -56,25 +54,20 @@ import { SnippetComponent } from '../../shared/snippet.component';
     @if (showRestore()) {
       @if (backup(); as b) {
         <p class="hint" style="margin-top: 16px" i18n="@@Restore_hint">
-          Restoring happens with the service stopped: a database cannot be replaced under the
-          process holding it open, and the sessions and users it brings back are the ones the
-          request doing it would depend on. Keep the old file until the new one has proven
-          itself.
+          Restore with the service stopped, and keep the old file until the new one works.
         </p>
         <app-snippet filename="restore.sh" [downloadable]="false" [content]="restoreProcedure(b)" />
         @if (b.keyFromEnv) {
           <p class="hint" i18n="@@Key_from_env_note">
-            The master key of this gateway comes from MEERKAT_VAULT_KEY, so it is not in that
-            directory: the snapshot holds the vault encrypted and is worth nothing without
-            that variable. Keep it that way.
+            The master key comes from MEERKAT_VAULT_KEY: the snapshot's vault is useless without
+            that variable.
           </p>
         } @else {
           <div class="note warn">
             <mat-icon>key</mat-icon>
             <p i18n="@@Key_beside_db_note">
-              The master key sits next to the database. Backing them up together undoes the
-              encryption at rest, exactly as a vault file stored beside its passphrase would:
-              keep the key in a secret manager, or supply it through MEERKAT_VAULT_KEY.
+              The master key sits next to the database, so backing both up together defeats the
+              encryption. Keep it in a secret manager, or supply it through MEERKAT_VAULT_KEY.
             </p>
           </div>
         }

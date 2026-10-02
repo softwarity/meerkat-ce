@@ -88,7 +88,7 @@ export class PaletteEditorComponent {
   }
 
   protected readonly tokenGroups = TOKEN_GROUPS;
-  protected readonly tipReadOnly = $localize`:@@Theme_builtin_hint2:A built-in palette is not written to - duplicate it first`;
+  protected readonly tipReadOnly = $localize`:@@Theme_builtin_hint2:Built-in palette: duplicate it first`;
   protected readonly tipClean = $localize`:@@Theme_nothing_to_save:Nothing changed`;
 
   private readonly snack = inject(MatSnackBar);

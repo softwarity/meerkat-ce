@@ -21,7 +21,7 @@ l'intérêt : promouvoir une valeur en secret ne touche jamais à ce qui pointe 
 ![L'écran Vault : trois entrées - deux secrets et une valeur - avec leur genre, leur valeur et ce qui les utilise](img/console/vault.webp)
 
 Deux secrets qui affichent *encrypted, never shown*, une valeur lisible en clair, et la
-colonne *Used by* qui nomme la route pointant sur la première.
+colonne *Used by* qui nomme la route pointant sur chacune.
 
 ## La liste
 

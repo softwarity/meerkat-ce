@@ -1,0 +1,21 @@
+# kubectl apply -f opentelemetry-service.yaml
+#
+# The cluster's ONE address for telemetry: opentelemetry:4318 (OTLP/HTTP) and
+# :4317 (gRPC), landing on the Collector the chart deployed (release
+# "collector"). Producers point here and never at a product: swapping the
+# backend is the Collector's business, not every application's.
+apiVersion: v1
+kind: Service
+metadata:
+  name: opentelemetry
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: opentelemetry-collector
+    app.kubernetes.io/instance: collector
+  ports:
+    - { name: otlp-http, port: 4318, targetPort: 4318 }
+    - { name: otlp-grpc, port: 4317, targetPort: 4317 }
+
+# Then, in the console: Infra, OpenTelemetry. Set the collector address to
+# http://opentelemetry.<namespace>:4318 and press Test.

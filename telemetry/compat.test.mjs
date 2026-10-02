@@ -69,7 +69,7 @@ const site = http.createServer((req, res) => {
     });
   }
   if (req.url.startsWith("/api/")) {
-    ours.push({ url: req.url, tp: req.headers["traceparent"] ?? null });
+    ours.push({ url: req.url, tp: req.headers["traceparent"] ?? null, ts: req.headers["tracestate"] ?? null });
     return res.writeHead(200, cors).end("{}");
   }
   // The page, written the way the gateway writes it: the configuration inline,
@@ -129,6 +129,9 @@ const check = (label, ok, detail = "") => {
 check("the bundle loads with no error", errors.length === 0, errors[0] ?? "");
 check(`our calls carry a traceparent (${ours.length} seen)`, ours.length === 4 && ours.every((h) => h.tp));
 check("the traceparent is W3C-shaped", ours.every((h) => w3c.test(h.tp ?? "")), ours[0]?.tp ?? "");
+// The journeys the page opens are signed, so the gateway leaves the person to
+// the spans it stamps at the relay rather than saying it twice.
+check("our journeys are marked meerkat=b", ours.every((h) => (h.ts ?? "").split(",").includes("meerkat=b")), String(ours[0]?.ts));
 check(`the third party was reached (${third.length})`, third.length === 1);
 check("the third party got NO traceparent", third.every((h) => h.tp === null), String(third[0]?.tp));
 check(`spans left in batches (${exported.length} export)`, exported.length === 1);

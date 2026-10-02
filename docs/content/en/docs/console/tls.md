@@ -15,9 +15,9 @@ There is no *switch HTTPS on*. **Having a certificate is what opens the door**,
 and removing it is what closes it. A switch that can be on with nothing behind it
 is a switch that lies.
 
-![The TLS screen: the console's name and certificate, two application names, the Force HTTPS switch and the ACME card](img/console/tls.webp)
+![The TLS screen: the console's name and certificate, two application names, the Force HTTPS switch with its HSTS duration, and the ACME card](img/console/tls.webp)
 
-Here the console answers on `localhost` with a self-signed certificate valid
+Here the console answers on `console.acme.example` with a self-signed certificate valid
 until 2027, the application serves two names - one still in the clear, one with
 its own certificate - and both Force HTTPS and ACME are off.
 

@@ -6,7 +6,7 @@
   </button>
 </div>
 <p class="lead" i18n="@@Global_lead">
-  What is true of every route at once, and belongs to none of them.
+  Settings that apply to every route.
 </p>
 
 <section [class.on]="maintenance().enabled">
@@ -20,9 +20,8 @@
         }
       </div>
       <p class="hint" i18n="@@Unavailable_hint">
-        Closes every route at once, without a single route being edited - and nothing to put back
-        afterwards. The sign-in pages keep working, and anyone who administers or develops here can
-        still go through, so the fix can be checked before reopening.
+        Closes every route at once. Sign-in pages keep working, and admins and developers still get
+        through.
       </p>
     </div>
     <mat-slide-toggle
@@ -51,11 +50,7 @@
       </mat-select>
     </mat-form-field>
     <p class="hint" i18n="@@Back_in_hint">
-      Optional, and an estimate rather than an appointment. The page keeps the size of what you
-      chose - a day announced still reads as a day an hour later - and only says something smaller
-      once what is left really is smaller. It never repeats it to the minute: a promise to the
-      minute is one a window famously breaks. Left empty, the page says service will be back shortly
-      rather than leaving a blank; an outage with no horizon reads as an abandoned service.
+      Optional, shown as a rough estimate. Empty, the page says service will be back shortly.
     </p>
   </div>
 </section>
@@ -69,11 +64,8 @@
     <div class="grow">
       <div class="title" i18n="@@Upstream_waits">How long to wait for a service</div>
       <p class="hint" i18n="@@Upstream_waits_hint">
-        The first is the time to establish the connection - a service that is not listening, a
-        closed port, a network swallowing packets. The second starts once the request is sent and
-        bounds the wait for the answer's first line: the service is thinking. Past either, the
-        caller gets a 502 instead of waiting. What follows the first line is never bounded: a
-        download or a websocket runs as long as it needs.
+        Past either, the caller gets a 502. Once the answer starts, it is never cut: downloads and
+        websockets run as long as needed.
       </p>
     </div>
   </div>
@@ -103,10 +95,8 @@
     <div class="grow">
       <div class="title" i18n="@@Body_rewrite_ceiling">Body rewriting ceiling</div>
       <p class="hint" i18n="@@Body_rewrite_ceiling_hint">
-        Filters that change a response body - injecting, removing JSON fields - have to hold it in
-        memory to do it. Past this size the answer is forwarded untouched instead: nothing breaks,
-        the filter simply does not apply. The cost is per request being served at that moment, so a
-        large ceiling multiplies by however many arrive together.
+        Filters that rewrite a response body hold it in memory. A larger body is forwarded untouched,
+        without the filter.
       </p>
     </div>
   </div>

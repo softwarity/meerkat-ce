@@ -183,7 +183,7 @@ func trimRoute(r *store.Route) {
 			}
 		}
 	}
-	if r.API != nil && r.Spec().Empty() && r.API.Security == nil {
+	if r.API != nil && r.Spec().Empty() && r.API.Security == nil && len(r.API.Audit) == 0 {
 		r.API = nil
 	}
 }

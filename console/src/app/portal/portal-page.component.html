@@ -17,8 +17,7 @@
         <div class="grow">
           <h2 class="title" i18n="@@Portal">Applications</h2>
           <p class="hint text-muted" i18n="@@Portal_enable_hint">
-            The applications this gateway offers, and how they are offered. Each visitor sees only
-            what their access allows - the list says what exists, the route says who may open it.
+            The applications offered to users. Each one sees only those its access allows.
           </p>
         </div>
       </div>
@@ -39,18 +38,16 @@
       <p class="mode-hint text-muted">
         @switch (mode()) {
           @case ('none') {
-            <ng-container i18n="@@Portal_mode_none_hint">No list anywhere. The user button and the
-              built-in pages show your application name and nothing to click - which is the right
-              answer for an installation with one application.</ng-container>
+            <ng-container i18n="@@Portal_mode_none_hint">No list: the user button and built-in pages
+              show only the application name. Right for a single application.</ng-container>
           }
           @case ('links') {
-            <ng-container i18n="@@Portal_mode_links_hint">The list below, offered in the user
-              button's Applications menu and on the pages Meerkat serves itself.</ng-container>
+            <ng-container i18n="@@Portal_mode_links_hint">The list below, in the user button's
+              Applications menu and on the built-in pages.</ng-container>
           }
           @case ('portal') {
-            <ng-container i18n="@@Portal_mode_portal_hint">A navigation bar on every page of every
-              application, carrying the account button. The built-in pages then offer one way back
-              in rather than a list: the bar is the navigation.</ng-container>
+            <ng-container i18n="@@Portal_mode_portal_hint">A navigation bar with the account button
+              on every application page.</ng-container>
           }
         }
       </p>

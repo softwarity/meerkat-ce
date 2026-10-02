@@ -1,22 +1,5 @@
 <header>
   <h1 i18n="@@Metrics">Metrics</h1>
-  <span class="grow"></span>
-  <!-- The button carries the STATE, so nobody leaves this screen to find out
-       whether anything is scraping; the configuration is in Infra, beside
-       OpenTelemetry, and this is the way there. -->
-  <a
-    [matButton]="exposed() ? 'filled' : 'tonal'"
-    routerLink="/infra/metrics-endpoint"
-    [matTooltip]="prometheusTip()"
-  >
-    <mat-icon>{{ exposed() ? 'sensors' : 'sensors_off' }}</mat-icon>
-    <ng-container i18n="@@Metrics_endpoint">Metrics endpoint</ng-container>
-    <app-ee-lock
-      feature="OBS-05"
-      i18n-why="@@Metrics_prometheus_why"
-      why="Expose /metrics so an existing monitoring stack scrapes this gateway, with the history and the alerting it already has."
-    />
-  </a>
 </header>
 
 <!-- The charts are drawn whatever happens, empty included. A screen that
@@ -26,8 +9,7 @@
    note below say both. -->
 @if (samples().length === 0) {
   <p class="empty" i18n="@@Metrics_empty">
-    Nothing measured yet. The first interval lands a few seconds after the gateway starts, and a
-    route that nobody has called has nothing to say.
+    Nothing measured yet: the first figures arrive a few seconds after start.
   </p>
 }
 <h2 class="over" i18n="@@Metrics_last_minute">Over the last minute</h2>
@@ -161,7 +143,7 @@
                    the caveat; the chip only has to catch the eye. -->
                   <span
                     class="guessed"
-                    matTooltip="Inferred from the shape of the paths this gateway saw, not from a spec: the segments that look like identifiers were folded away. It can be wrong - a year reads like an id. Declare an OpenAPI spec on the route for exact names."
+                    matTooltip="Guessed from the paths seen, not from a spec. Declare an OpenAPI spec on the route for exact names."
                     i18n-matTooltip="@@Metrics_deduced_why"
                     i18n="@@Metrics_deduced"
                     >deduced</span
@@ -176,7 +158,7 @@
           } @empty {
             <tr class="note">
               <td colspan="5" i18n="@@Metrics_endpoints_none">
-                Its endpoints are known, and none of them has been called yet.
+                None of its endpoints has been called yet.
               </td>
             </tr>
           }

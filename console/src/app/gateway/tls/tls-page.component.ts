@@ -192,7 +192,7 @@ export class TlsPageComponent {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Remove_the_name:Remove the name`,
       message: e.cert
-        ? $localize`:@@Remove_name_with_cert:Remove ${e.host}? Its certificate is deleted with it, and the host stops answering over HTTPS.`
+        ? $localize`:@@Remove_name_with_cert:Remove ${e.host}? Its certificate is deleted and it stops answering over HTTPS.`
         : $localize`:@@Remove_name_plain:Remove ${e.host}?`,
       confirmLabel: $localize`:@@Remove:Remove`,
       danger: true,
@@ -469,7 +469,7 @@ export class TlsPageComponent {
     }
   }
 
-  protected readonly selfSignedWarning = $localize`:@@Self_signed_tooltip:Nobody vouches for this one but itself: browsers will warn.`;
+  protected readonly selfSignedWarning = $localize`:@@Self_signed_tooltip:Browsers will warn about this certificate.`;
 
   protected sourceLabel(c: Certificate): string {
     switch (c.source) {
@@ -493,9 +493,8 @@ export class TlsPageComponent {
     <h2 mat-dialog-title i18n="@@Adopt_the_signed_certificate">Adopt the signed certificate</h2>
     <mat-dialog-content class="adopt">
       <p i18n="@@Adopt_note">
-        Paste what the authority signed from this request. Meerkat checks it against the private
-        key that never left: a certificate from another order is refused here rather than at the
-        first handshake.
+        Paste the certificate the authority signed for this request. It must match its private
+        key.
       </p>
       <app-form-field i18n-label="@@Certificate_PEM" label="Certificate (PEM)">
         <textarea

@@ -10,8 +10,8 @@
 }
 <div class="panel-body">
   <p class="workflow" i18n="@@Signing_keys_workflow">
-    Three distinct key pairs, one per algorithm - not one key in three formats. A route picks the
-    one its service can verify, and the private halves never leave this server.
+    Three key pairs, one per algorithm. A route picks the one its service can verify; private keys
+    never leave this server.
   </p>
   @if (data(); as d) {
     <!-- Both labels sit ON the border, the way an outlined field carries its
@@ -40,13 +40,9 @@
          reader has to leave with is that one path costs nothing forever and
          the other is theirs to maintain forever. -->
     <p class="fallback" i18n="@@Static_fallback2">
-      Served by the gateway itself, at the address your services already use to reach it - the one
-      the route answers on, not this console's. A service that fetches it DECLARES NOTHING: no key
-      to paste, no setting to keep in step. It reads this once, caches it, and reads it again the
-      day a token names a key it does not know - so a rotation reaches it on its own. A service
-      that cannot fetch a JWKS takes the PEM from its row below instead, and then every rotation
-      means going back to every service holding one, which is why that is the fallback and not the
-      plan.
+      Served by the gateway on the address your services use to reach it, not this console's. A
+      service fetching it follows rotations on its own; one holding a PEM from below must be updated
+      at every rotation.
     </p>
 
     @for (k of d.keys; track k.algorithm) {
@@ -75,7 +71,7 @@
             <span
               class="kid"
               i18n-matTooltip="@@Key_id_tooltip"
-              matTooltip="The gateway puts this in each token's header. The backend reads it, finds the matching key in the JWKS, and verifies with that one - which is what makes a rotation invisible to it."
+              matTooltip="Set in each token's header: the backend uses it to pick the matching key in the JWKS."
             >{{ k.kid }}</span>
           </mat-panel-description>
         </mat-expansion-panel-header>
@@ -119,7 +115,7 @@
 </div>
 <div class="panel-actions">
   @if (confirming()) {
-    <span class="warn" i18n="@@Rotate_confirm">Rotate now? The old keys keep verifying for a short grace window, so tokens signed a second ago still pass while services pick up the new ones.</span>
+    <span class="warn" i18n="@@Rotate_confirm">Rotate now? The old keys stay valid for a short grace window.</span>
     <button matButton (click)="confirming.set(false)" i18n="@@Cancel">Cancel</button>
     <button matButton="filled" [disabled]="renewing()" (click)="renew()" i18n="@@Rotate">Rotate</button>
   } @else {

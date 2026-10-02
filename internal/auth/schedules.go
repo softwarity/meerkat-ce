@@ -4,7 +4,7 @@ package auth
 //
 // They were, once: a service managed its schedules on the data plane, as
 // itself. They moved to the control plane, whole, because a schedule is a
-// service the GATEWAY provides - like the metrics exposition - not something
+// service the GATEWAY provides - like the agent endpoint - not something
 // an application exposes to a browser. Nobody's user agent has business
 // calling it: a backend does, with a token, and hands its own users whatever
 // it decides to show them.

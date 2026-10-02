@@ -16,7 +16,7 @@ people: one says *this installation records a cost centre*, the other says
 *Alice's is B200*. That separation is also what makes a custom field safe to
 forward, since nobody can grant themselves an attribute a service trusts.
 
-![The Users screen: six accounts, each with its four capability badges](img/console/users.webp)
+![The Users screen: six accounts, each with its five capability badges](img/console/users.webp)
 
 Six accounts. The badges are buttons: here `admin` holds everything, one account
 is app admin and another infra admin, and the rest hold nothing.

@@ -44,8 +44,7 @@ interface FeatureRow {
                 }
               </div>
               <p class="hint" i18n="@@License_perpetual_hint">
-                A license is perpetual: what it unlocks stays unlocked, and an elapsed term never
-                switches anything off. It says how far updates are covered, nothing more.
+                A license is perpetual: its term only covers updates, nothing gets switched off.
               </p>
             </div>
           </div>
@@ -60,8 +59,7 @@ interface FeatureRow {
                   {{ hidden() }} organisations are not being served
                 </div>
                 <p class="hint" i18n="@@Organisations_held_back_hint">
-                  Single-organisation mode serves the first one. Nothing is deleted: the others come
-                  back the moment the mode is switched, and the people in them regain access then.
+                  Single-organisation mode serves only the first. Nothing is deleted.
                 </p>
               </div>
             </div>
@@ -200,19 +198,19 @@ export class LicensePageComponent {
   private readonly copy: Record<string, { label: string; what: string }> = {
     'multi-tenant': {
       label: $localize`:@@Feature_multi_tenant:Several organisations`,
-      what: $localize`:@@Feature_multi_tenant_what:Isolate tenants, each with its own groups, members and hours. Without it there is one, and the console never names it.`,
+      what: $localize`:@@Feature_multi_tenant_what:Isolate tenants, each with its own groups, members and hours.`,
     },
     directories: {
       label: $localize`:@@Feature_directories:Directories`,
-      what: $localize`:@@Feature_directories_what:Plug an LDAP directory, an Active Directory or Kerberos in straight, and map their groups onto yours.`,
+      what: $localize`:@@Feature_directories_what:Connect LDAP, Active Directory or Kerberos and map their groups.`,
     },
     saml: {
       label: $localize`:@@Feature_saml:SAML`,
-      what: $localize`:@@Feature_saml_what:Federate with a SAML identity provider, for the estates that have one and nothing else.`,
+      what: $localize`:@@Feature_saml_what:Federate with a SAML identity provider.`,
     },
     scim: {
       label: $localize`:@@Feature_scim:SCIM provisioning`,
-      what: $localize`:@@Feature_scim_what:Accounts created and, above all, deactivated automatically when someone leaves.`,
+      what: $localize`:@@Feature_scim_what:Accounts created and deactivated automatically.`,
     },
     'business-hours': {
       label: $localize`:@@Feature_business_hours:Working hours`,
@@ -224,7 +222,7 @@ export class LicensePageComponent {
     },
     'audit-export': {
       label: $localize`:@@Feature_audit_export:Audit export`,
-      what: $localize`:@@Feature_audit_export_what:Continuous export to a SIEM and long retention. Reading the trail is free and stays free.`,
+      what: $localize`:@@Feature_audit_export_what:Continuous export to a SIEM and long retention.`,
     },
     'white-label': {
       label: $localize`:@@Feature_white_label:White label`,

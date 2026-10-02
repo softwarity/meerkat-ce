@@ -67,61 +67,79 @@ which is the expected behaviour.
 ## Exporting to your collector
 
 > [!NOTE] Enterprise edition
-> The context travels in both editions; the export is Enterprise, as it is for
-> Prometheus.
+> The context travels in both editions. The export is Enterprise.
 
-What is spoken is **OTLP**, not a product: the address points at whatever you
-already run - an OpenTelemetry Collector, Tempo, Jaeger, or a vendor's
-endpoint.
+The export speaks **OTLP**, not a product: the address can be any OTLP
+endpoint. We recommend an **OpenTelemetry Collector**. It takes every signal
+at one address and sends each where it belongs: traces to Tempo, metrics to
+Prometheus, logs and audit to Loki. It also samples complete traces (tail
+sampling), so the gateway can record **100%** and let it choose.
 
-The setting is in the console, under **Infra, OpenTelemetry**, with the other
-systems this installation is wired to. It is applied live, on every node.
+The setting is under **Infra, OpenTelemetry**. It applies live, on every node.
 
-One switch sends to the collector, and two say **what** is sent: the
-**traces**, which this page is mostly about, and the **metrics** - the same
-counters the [metrics endpoint](/docs/operations/metrics) exposes, pushed over
-OTLP every 30 seconds. Either, or both.
+![The OpenTelemetry screen: the export switch, the collector address, and the Traces tab with its sampling and its ceiling](img/console/opentelemetry.webp)
+
+A master switch, **Export to an OpenTelemetry collector**, turns the export on.
+Four tabs then say what is sent:
+
+| tab | what |
+|---|---|
+| **Traces** | one switch: the traces this page is about |
+| **Metrics** | one switch: the gateway's counters, pushed every 30 seconds. It is the only way they leave the gateway (see [metrics](/docs/operations/metrics)) |
+| **Audit** | two switches: **Send the audit logs** (sign-ins, refusals, credential changes, [Endpoint audit](/docs/operations/audit#auditing-a-routes-operations) operations) and **Send Meerkat's console audit too** (see [audit](/docs/operations/audit)) |
+| **Logs** | one of three modes, below |
+
+The **Logs** tab has three modes (see [logs](/docs/operations/logs)):
+
+- **Not sent**: the logs stay in their usual format.
+- **Written for an agent**: the logs are written as OpenTelemetry JSON on
+  stdout. A Collector on each node (a DaemonSet) reads them. Works with the
+  export off, in both editions.
+- **Pushed to the collector**: the logs are sent over OTLP to the collector
+  address, for nodes with no agent. Needs the export (Enterprise).
 
 | field | | default |
 |---|---|---|
-| Collector address | the **base** address: `/v1/traces` (and `/v1/metrics` when the metrics are sent) is appended for you, and a pasted path is trimmed | - |
-| Authentication header | a **vault reference** (`$otlp-token`), never the key itself | - |
-| Journeys recorded | the share of journeys **opened here**: at the front door for a call that arrives undecided, in the page when the browser half is on. A decision already taken by the caller is honoured rather than rolled again | **10%** |
-| Ceiling | the ceiling on journeys recorded per second, whoever decided - your budget | **200/s** |
+| Collector address | the **base** address: `/v1/traces` and `/v1/metrics` are appended, and a pasted path is trimmed | - |
+| Auth header | the header name, such as `Authorization`. Usually needed only by a hosted collector | - |
+| Its value | stored in the vault: the configuration keeps only the reference (`Bearer $otlp-token`) | - |
+| Journeys recorded (%) | the share of traces **started here**. A caller's own sampling decision is kept | **10%** |
+| Ceiling (per second) | at most this many traces recorded per second, whoever decided. 0 for no limit | **200/s** |
 
-The **Test** button, beside Save, asks the collector before anything is saved:
-the gateway posts an **empty** batch to `/v1/traces` and hands back what came
-of it, with how long it took. The whole path is exercised - name resolution,
-network, TLS, the credential - and no trace is written anywhere. The mistakes that actually happen are named, and the first is the one a status
-code alone cannot see: the address of a collector's **UI** rather than its OTLP
-port. A web interface answers 200 to anything - it serves its page for any path
-- so the probe looks at WHAT answered as well, and refuses a page (Jaeger
-listens for traces on 4318 and serves its UI on 16686). The other is a
-credential that was refused. With metrics on, it asks `/v1/metrics` too, and
-says so when a backend takes traces and nothing else - which Jaeger does.
+The **Test** button posts an **empty** batch to `/v1/traces` before you save.
+It exercises the whole path: name resolution, network, TLS, credential. No
+trace is written. It refuses a web page: the address of a collector's UI
+answers 200 to anything, but it is not the OTLP port. With metrics on, it also
+asks `/v1/metrics`, and says when a backend takes only traces.
 
-**A trace is not a counter, and is not meant to be exhaustive.** At 100%, a day
-at 400 req/s is thirty-five million traces for your backend to bill and index.
-At 10% the latency profile is the same - it is a distribution, not an inventory
-- and the one request you are chasing you find by its `trace_id` when it was
-drawn. What you want complete is [metrics](/docs/operations/metrics) and the
-[access log](/docs/operations/logs): they are at 100% and stay there because
-they do not cost per request.
+**A trace is not a counter.** At 100%, a day at 400 req/s is thirty-five
+million traces to bill and index. At 10% the latency profile is the same, and
+you find one request by its `trace_id` when it was drawn. What you want
+complete is the [metrics](/docs/operations/metrics) and the
+[access log](/docs/operations/logs): they stay at 100%.
 
-Meerkat emits two spans: a `SERVER` span covering the whole crossing, from the
-request arriving to the response being **written** - outgoing filters and
-injections included - and, inside it, a `CLIENT` span around the call to your
-service. **The gap between the two is its own time.** The route picked and
-the access verdict are attributes there, not spans - one span per internal step
-would run to thousands per request.
+Meerkat emits two spans: a `SERVER` span for the whole crossing, up to the
+response being **written**, and inside it a `CLIENT` span around the call to
+your service. **The gap between the two is the gateway's own time.** The route
+and the access verdict are attributes, not spans.
 
 A collector that is down never slows the traffic: spans leave from a bounded
 queue, and what does not fit is dropped.
 
-::: details A collector, if you have none
-The OpenTelemetry page hands you the file, for Docker Swarm and for
-Kubernetes, with the address to copy into the field above.
-:::
+### No collector yet?
+
+**No collector yet?** on the OpenTelemetry page opens the files to deploy an
+OpenTelemetry Collector, for Docker Swarm or Kubernetes:
+
+- the Collector's configuration;
+- its logs agent on each node (a DaemonSet on Kubernetes), which reads the
+  containers' outputs;
+- on Kubernetes, an `opentelemetry` Service: every producer sends to
+  `opentelemetry:4318`;
+- two Grafana companion files: the datasources (Prometheus, Tempo, Loki) and a
+  dashboard for the [metrics](/docs/operations/metrics).
+
+![No collector yet? opens a drawer with the files to deploy one, for Docker Swarm or for Kubernetes](img/console/opentelemetry-collector.webp)
 
 ## Starting the trace at the click
 
@@ -145,11 +163,15 @@ Three things to know:
 ## Choosing which routes are traced
 
 Tracing is decided **route by route**, in the route editor, section
-**OpenTelemetry**, with two switches.
+**OpenTelemetry**, with two switches. A request that **no route answers** - a
+404 - is never traced: no route said yes, and such a request is nobody's
+journey. It stays counted in the metrics and written in the access log.
 
-**Push traces of this route to OpenTelemetry** (on by default): the gateway
-records its own spans for what that route answers. Off, the route produces
-**nothing at all** - no crossing, no call out, no injected bundle - and the
+**Include this route in OpenTelemetry** (on by default): the gateway records its
+own spans for what that route answers, and the route has its own series among
+the metrics pushed to the collector. Off, the route produces **nothing at all**
+- no crossing, no call out, no injected bundle, no series of its own - though it
+still counts in the gateway's totals (`meerkat.gateway.requests`), and the
 context the caller sent travels on untouched, without the gateway naming itself
 as its parent.
 
@@ -188,6 +210,32 @@ store, named `SELECT users` with its text (the placeholders, never the values).
 It is **off by default**, on purpose. It adds no trace: it deepens the ones already sampled, so the rate and the ceiling
 keep their meaning - but each weighs more in your collector. Turn it on while you look at where the gateway's time
 goes, then off again.
+
+## Who made the call
+
+A trace answers "what was slow"; a support ticket asks "for whom". The **Name the caller on the spans** switch
+(Infra, OpenTelemetry) puts the signed-in caller on the trace:
+
+| Attribute | What |
+|---|---|
+| `user.id`, `user.name` | the account (OpenTelemetry's own names, which a backend that knows them shows as a user) |
+| `meerkat.tenant.id`, `meerkat.tenant.name` | the active organisation |
+| `meerkat.group` | the session's chosen group, in an organisation that works in exclusive mode |
+| `meerkat.roles` | the roles the access rules were judged on - a list, and what explains a refusal |
+
+An anonymous call carries nothing.
+
+**Once per journey, never twice.** A journey that starts in a page carries the person on the browser's spans; the
+gateway's own span on that journey stays silent. Any other journey - a backend, a script, a page without the bundle -
+carries it on the gateway's span. The bundle marks the journeys it opens with `meerkat=b` in `tracestate`, which is how
+the gateway tells them apart. A trace backend's search still finds the whole trace from any of these attributes: a trace
+matches as soon as one of its spans does.
+
+It is **off by default**: a person in a trace is personal data going to a collector somebody else may run.
+
+The browser's spans are stamped **by the gateway**, at the relay that forwards them to your collector: the page is
+never told who is reading it, and an attribute a page sets under one of these names is replaced by the gateway's
+answer rather than believed.
 
 ## What is missing
 

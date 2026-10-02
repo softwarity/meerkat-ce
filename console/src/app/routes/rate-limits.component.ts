@@ -26,16 +26,16 @@ function keysFor(scope: Scope): { value: string; label: string; hint: string }[]
     scope === 'operation'
       ? {
           label: $localize`:@@Per_operation:The whole operation`,
-          hint: $localize`:@@Per_operation_hint:One budget for everything this operation carries, whoever is calling. The bound that protects what is behind it.`,
+          hint: $localize`:@@Per_operation_hint:One budget for all calls to this operation, whoever is calling.`,
         }
       : {
           label: $localize`:@@Per_route:The whole route`,
-          hint: $localize`:@@Per_route_hint:One budget for everything this route carries, whoever is calling. The bound that protects the service behind it.`,
+          hint: $localize`:@@Per_route_hint:One budget for all calls to this route, whoever is calling.`,
         };
   const perUser =
     scope === 'operation'
-      ? $localize`:@@Per_user_hint_op:One budget per signed-in account, so no single caller can take this operation's whole allowance. Anonymous callers are not covered - add one per address for them.`
-      : $localize`:@@Per_user_hint:One budget per signed-in account, so no single caller can take the route's whole allowance. Anonymous callers are not covered - add one per address for them.`;
+      ? $localize`:@@Per_user_hint_op:One budget per signed-in account. Anonymous callers are not counted: add one per address.`
+      : $localize`:@@Per_user_hint:One budget per signed-in account. Anonymous callers are not counted: add one per address.`;
   return [
     { value: 'route', label: whole.label, hint: whole.hint },
     { value: 'user', label: $localize`:@@Per_user:Each user`, hint: perUser },
@@ -47,17 +47,17 @@ const KEYS: { value: string; label: string; hint: string }[] = [
   {
     value: 'token',
     label: $localize`:@@Per_token:Each API token`,
-    hint: $localize`:@@Per_token_hint:One budget per token, so an integration is bounded without bounding the person who minted it.`,
+    hint: $localize`:@@Per_token_hint:One budget per API token.`,
   },
   {
     value: 'tenant',
     label: $localize`:@@Per_tenant:Each organisation`,
-    hint: $localize`:@@Per_tenant_hint:One budget per organisation - a quota sold to a customer rather than to a person.`,
+    hint: $localize`:@@Per_tenant_hint:One budget per organisation.`,
   },
   {
     value: 'ip',
     label: $localize`:@@Per_ip:Each address`,
-    hint: $localize`:@@Per_ip_hint:One budget per client address, which is the only key an anonymous caller has. Read from the address this gateway is talking to, so a forwarded header cannot mint a fresh one.`,
+    hint: $localize`:@@Per_ip_hint:One budget per client address, forwarded headers ignored. Covers anonymous callers.`,
   },
 ];
 
@@ -228,15 +228,11 @@ function toState(a: RateLimit['applies']): AccessState {
     } @empty {
       @if (scope() === 'route') {
         <p class="hint" i18n="@@No_limit_hint">
-          Nothing is bounded until a bound is written. Add one for the whole route to protect the
-          service behind it, one per user so a single caller cannot take it all, one per address
-          for whoever has no account - they are all true at once, and the first one exceeded
-          answers 429.
+          No limit yet. Limits add up: the first one exceeded answers 429.
         </p>
       } @else {
         <p class="hint" i18n="@@No_op_limit_hint">
-          This operation is bounded by whatever the route carries, and by nothing of its own. Add a
-          bound here for the one operation that costs more than the others.
+          No limit of its own: only the route's apply.
         </p>
       }
     }
@@ -250,8 +246,7 @@ function toState(a: RateLimit['applies']): AccessState {
       <p class="warn">
         <mat-icon>report</mat-icon>
         <span i18n="@@Only_for_everyone_else">
-          Every bound here is for some callers. Anyone the rules above do not describe is not
-          bounded at all - add one with no "Only for" to cover everybody.
+          Every limit here is for some callers only: everyone else is not limited.
         </span>
       </p>
     }
@@ -265,9 +260,7 @@ function toState(a: RateLimit['applies']): AccessState {
          the mistake, and it is invisible until the day it matters. -->
     @if (value().length) {
       <p class="hint" i18n="@@Bound_is_per_node">
-        Counted per node, in memory: an exact shared counter would cost a database round trip on
-        every request. On a cluster of N gateways the installation therefore allows up to N times
-        what is written here - divide it, or accept the multiplication.
+        Counted per node: a cluster of N gateways allows up to N times this.
       </p>
     }
 

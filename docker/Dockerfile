@@ -9,7 +9,11 @@ ARG NODE_VERSION=24
 # update and versions - because a gateway serves its own client and its own
 # version. The flavour rides in the version string, so nothing here has to
 # repeat it.
-ARG PLUG_VERSION=hosted
+#
+# A RELEASE, pinned. The bare `hosted` tag is moved by plug's CI on every push
+# to its main branch, so an image built from it carries whatever plug was
+# being worked on that morning. Bump this line when plug publishes a release.
+ARG PLUG_VERSION=2.20.2-hosted
 ARG EDITION=ce
 
 # The console first: its production build is embedded in the Go binary, so the

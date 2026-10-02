@@ -43,7 +43,7 @@
       <mat-option [value]="name" class="mono">{{ name }}</mat-option>
     } @empty {
       <mat-option disabled i18n="@@No_group_reported_yet">
-        No group reported yet: nobody has signed in through an authority that sends any.
+        No group reported by an authority yet.
       </mat-option>
     }
   </mat-autocomplete>
@@ -67,8 +67,7 @@
 
   @if (!canSave()) {
     <p class="hint text-error" i18n="@@Rule_needs_a_criterion">
-      Name an authority, an upstream group, or both. A rule matching everything would admit anyone
-      the gateway ever authenticates, through an authority added later for something else.
+      Name an authority, an upstream group, or both.
     </p>
   }
 </mat-dialog-content>

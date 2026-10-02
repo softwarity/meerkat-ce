@@ -34,6 +34,11 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
         icon: 'speed',
       },
       {
+        path: 'endpoint-audit',
+        label: $localize`:@@Endpoint_audit:Endpoint audit`,
+        icon: 'fact_check',
+      },
+      {
         path: 'auth-providers',
         label: $localize`:@@Authentication:Authentication`,
         icon: 'passkey',
@@ -60,9 +65,6 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // Where the traces go. Last, because an installation wires it once and
       // then decides route by route which ones it wants to follow.
       { path: 'opentelemetry', label: $localize`:@@OpenTelemetry:OpenTelemetry`, icon: 'timeline' },
-      // Where a scraper reads the counters: the other way out for metrics,
-      // beside the one that pushes them.
-      { path: 'metrics-endpoint', label: $localize`:@@Metrics_endpoint:Metrics endpoint`, icon: 'sensors' },
       // The developer tunnel: a port into the cluster, opened for the people
       // who plug their machine in.
       { path: 'plug', label: $localize`:@@Plug:Plug`, icon: 'power' },

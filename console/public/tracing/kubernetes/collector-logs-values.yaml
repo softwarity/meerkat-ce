@@ -1,0 +1,98 @@
+# helm upgrade --install collector-logs open-telemetry/opentelemetry-collector -f collector-logs-values.yaml
+# helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+#
+# The logs of EVERY container, on every node: a DaemonSet that reads what the
+# containers write on stdout and stderr (/var/log/pods), and sends it to the
+# central Collector, which labels it and writes it into Loki. Nothing to do in
+# a service but write its logs; nothing to push.
+#
+# A line in OpenTelemetry's JSON log format is decoded field by field:
+#
+#   {"timestamp": "...", "severity_text": "INFO", "body": "...",
+#    "trace_id": "...", "span_id": "...",
+#    "attributes": {...}, "resource": {"service.name": "..."}}
+#
+# Any other line - plain text, or JSON of another shape - travels as it is,
+# with the pod, the container and the namespace it came from.
+
+mode: daemonset
+fullnameOverride: otel-collector-logs
+image:
+  repository: otel/opentelemetry-collector-contrib
+
+presets:
+  logsCollection:
+    enabled: true
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+    otlp: null
+    filelog:
+      operators:
+        # The runtime's own wrapping (CRI or Docker): the pod, the container,
+        # the stream, and the line itself in the body.
+        - type: container
+          id: container-parser
+        # An OpenTelemetry JSON line: decode it. Anything else goes on as is.
+        - type: json_parser
+          id: otel-json
+          if: 'body matches "^\\{.*\"severity_text\""'
+          parse_from: body
+          parse_to: attributes["otel"]
+          on_error: send_quiet
+        - type: time_parser
+          if: 'attributes["otel"]?.timestamp != nil'
+          parse_from: attributes["otel"].timestamp
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+          on_error: send_quiet
+        - type: severity_parser
+          if: 'attributes["otel"]?.severity_text != nil'
+          parse_from: attributes["otel"].severity_text
+          on_error: send_quiet
+        - type: trace_parser
+          if: 'attributes["otel"]?.trace_id != nil'
+          trace_id:
+            parse_from: attributes["otel"].trace_id
+          span_id:
+            parse_from: attributes["otel"].span_id
+          on_error: send_quiet
+        - type: move
+          if: 'attributes["otel"]?.body != nil'
+          from: attributes["otel"].body
+          to: body
+        - type: move
+          if: 'attributes["otel"]?.resource != nil and attributes["otel"].resource["service.name"] != nil'
+          from: attributes["otel"].resource["service.name"]
+          to: resource["service.name"]
+        - type: move
+          if: 'attributes["otel"]?.attributes != nil'
+          from: attributes["otel"].attributes
+          to: attributes["log"]
+        - type: flatten
+          if: 'attributes["log"] != nil'
+          field: attributes["log"]
+          on_error: send_quiet
+        - type: remove
+          if: 'attributes["otel"] != nil'
+          field: attributes["otel"]
+  exporters:
+    otlp/central:
+      endpoint: otel-collector:4317
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      logs:
+        receivers: [filelog]
+        processors: [memory_limiter, batch]
+        exporters: [otlp/central]
+      metrics: null
+      traces: null
+
+resources:
+  limits:
+    memory: 256Mi

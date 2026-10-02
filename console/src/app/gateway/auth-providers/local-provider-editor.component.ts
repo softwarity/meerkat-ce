@@ -39,8 +39,7 @@ import { ApiService, AuthProvider } from '../../api.service';
         </mat-select>
       </mat-form-field>
       <p class="hint text-muted" i18n="@@Local_sign_up_hint">
-        A sign-up form on the sign-in page, with the address confirmed by e-mail. Needs a mail
-        relay (Infra, Mail relay).
+        A sign-up form on the sign-in page, confirmed by e-mail. Needs a mail relay.
       </p>
 
       <!-- Disabled rather than hidden: a switch that disappears leaves nothing
@@ -54,7 +53,7 @@ import { ApiService, AuthProvider } from '../../api.service';
         <ng-container i18n="@@Anti_robot_check">Anti-robot check</ng-container>
       </mat-slide-toggle>
       <p class="hint text-muted" i18n="@@Local_captcha_hint">
-        Guards that form, and only it.
+        Guards the sign-up form.
       </p>
     </section>
   `,

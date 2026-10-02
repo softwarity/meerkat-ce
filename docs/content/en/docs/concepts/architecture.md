@@ -75,12 +75,7 @@ Your routes, and the pages the gateway serves in its own name:
 - `/` - the console, an Angular application embedded in the binary. English only, with no locale segment: it is an operator's tool.
 - `/login`, `/logout` - the console's own sign-in, so that origin is self-sufficient.
 - `/mcp` - the endpoint an agent connects to.
-- `/metrics` - the Prometheus exposition, when it is switched on.
 - `/healthz`, `/readyz`.
-
-> [!NOTE]
-> Enterprise edition, for `/metrics`. The counters themselves, and the
-> dashboards the console draws from them, are in both images.
 
 ## One binary, no dependency
 

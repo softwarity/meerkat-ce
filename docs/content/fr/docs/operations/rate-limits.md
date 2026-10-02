@@ -100,6 +100,8 @@ mille clés ferait deux millions de compteurs - la leçon de cardinalité, un é
 
 L'écran est **Infra > Endpoint rate limits**.
 
+![Endpoint rate limits : trois opérations avec leurs propres bornes, par utilisateur ou pour toute l'opération](img/console/endpoint-limits.webp)
+
 ## En cluster : relire le chiffre
 
 > [!WARNING]

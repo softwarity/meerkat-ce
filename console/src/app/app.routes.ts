@@ -115,17 +115,6 @@ export const routes: Routes = [
           import('./otel/otel-page.component').then((m) => m.OtelPageComponent),
       },
       {
-        // Where a scraper reads the counters (OBS-05), beside OpenTelemetry:
-        // wired once, like the collector. It used to be a drawer of the
-        // Metrics screen, which is read every day for its curves.
-        path: 'metrics-endpoint',
-        canActivate: [infraOnly],
-        loadComponent: () =>
-          import('./metrics-endpoint/metrics-endpoint-page.component').then(
-            (m) => m.MetricsEndpointPageComponent,
-          ),
-      },
-      {
         // The developer tunnel (DEV-11): a port into the cluster, so Infra.
         // Developer mode stays in Application, General - a configuration of
         // what the installation offers its developers - and is the other
@@ -168,6 +157,15 @@ export const routes: Routes = [
         path: 'endpoint-limits',
         canActivate: [infraOnly],
         data: { intent: 'limits' },
+        loadComponent: () =>
+          import('./routes/endpoint-security/endpoint-security.component').then(
+            (m) => m.EndpointSecurityComponent,
+          ),
+      },
+      {
+        path: 'endpoint-audit',
+        canActivate: [infraOnly],
+        data: { intent: 'audit' },
         loadComponent: () =>
           import('./routes/endpoint-security/endpoint-security.component').then(
             (m) => m.EndpointSecurityComponent,
@@ -438,11 +436,9 @@ export const routes: Routes = [
     loadComponent: () => import('./gateway/vault-page.component').then((m) => m.VaultPageComponent),
   },
   {
-    // NOT /metrics: that path belongs to the Prometheus exposition on this
-    // same port (OBS-05), and a console route taking it would be unreachable
-    // by reload, bookmark or a pasted link - the gateway would answer the
-    // scrape instead of the app. The same rule the agent endpoint follows:
-    // outside /api, the control plane's paths are the product's.
+    // Named traffic, not metrics: outside /api, the control plane's paths are
+    // the product's (the agent endpoint's rule), and a console route taking
+    // one would be unreachable by reload, bookmark or a pasted link.
     path: 'traffic',
     canActivate: [metricsAccess],
     loadComponent: () =>

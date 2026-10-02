@@ -130,6 +130,61 @@ L'outil `read_audit` de l'agent partage exactement cette fonction : un agent qui
 plus large que la console serait un contournement du modèle de capacités, et ce ne serait la faute de
 personne en particulier.
 
+## Envoyé à un collecteur
+
+**Infra, OpenTelemetry**, onglet **Audit** (Enterprise), deux interrupteurs :
+
+- *Send the audit logs* : le plan de données - les connexions, refus,
+  changements de mot de passe et de second facteur des comptes, et les appels
+  des opérations auditées dans **Endpoint audit**, qui n'envoient rien tant
+  qu'il est éteint ;
+- *Send Meerkat's console audit too* : les changements faits dans la console et
+  les connexions à la console.
+
+Chaque événement part aussi comme un **log** OpenTelemetry dont la
+ressource dit `meerkat.stream=audit` : le Collector et le backend le séparent
+des logs ordinaires, avec sa requête, sa rétention et ses lecteurs. L'action est
+le corps ; l'acteur (`user.id`, `user.name`), la cible, l'organisation,
+l'adresse du client et les changements champ par champ sont des attributs ; le
+trace id est celui de la requête, qui relie l'événement à sa trace et à sa ligne
+d'accès.
+
+Une copie, jamais échantillonnée : le journal reste ici. Enregistrer un
+événement n'attend jamais le réseau - il est mis en file et envoyé par lots,
+retenté tant que le collecteur ne répond pas. Ce qu'une file pleine doit jeter
+est compté, et l'onglet le dit.
+
+## Auditer les opérations d'une route
+
+**Infra, Endpoint audit** (Enterprise) liste les opérations du contrat OpenAPI de
+chaque route, avec un interrupteur par opération. Un appel audité devient un
+événement d'audit, envoyé au collecteur avec le reste du journal quand l'onglet
+**Audit** d'OpenTelemetry est allumé. Rien n'est stocké ici : le volume est celui
+du plan de données.
+
+![Endpoint audit avec l'opération de remboursement ouverte : deux champs pris dans l'appel, et le corps JSON porté](img/console/endpoint-audit.webp)
+
+| Toujours porté | |
+|---|---|
+| l'appelant | `user.id`, `user.name`, `meerkat.tenant.id`, `meerkat.tenant.name`, `meerkat.group`, `meerkat.roles` |
+| l'opération | `meerkat.route`, `http.request.method`, `http.route` (le gabarit), `url.path` (tel que demandé) |
+| la réponse | `http.response.status_code` - un refus est aussi un événement |
+| le reste | `client.address`, le trace id, et la description comme corps (pré-remplie depuis le summary OpenAPI) |
+
+À la demande, par opération :
+
+- **des champs tirés de l'appel**, portés en `audit.field.<nom>` : une variable
+  de chemin, un paramètre de query, un en-tête, ou un pointeur JSON dans le body
+  (`/order/id`) ;
+- **le body JSON**, 64 Ko au plus, avec les champs qui portent des secrets
+  remplacés à toute profondeur (`password`, `token`, `secret`, `apiKey`... - la
+  liste se change par opération).
+
+L'audit observe et ne décide rien : il enveloppe la sécurité des endpoints, voit
+la réponse reçue par l'appelant, et ne peut ni ouvrir ni fermer une opération.
+Une route sans contrat OpenAPI ne s'audite pas ainsi : déposez son contrat, ou
+laissez le service faire son audit lui-même.
+
 ## Filtres, rétention, et ce qui manque
 
 L'écran filtre sur la partie du journal (**All**, **Changes**, **Data plane sign-ins**, **Console
@@ -148,5 +203,4 @@ l'écran, le périmètre de qui le demande - jamais plus que ce que son écran m
 lue par root) : le fichier porte des adresses et des noms. `GET /api/audit/export` prend les mêmes
 paramètres que la liste.
 
-Pas encore là : la pagination côté serveur, l'activité propre du tunnel, un export Parquet, et l'envoi
-du journal à un collecteur en OTLP.
+Pas encore là : la pagination côté serveur, l'activité propre du tunnel, un export Parquet.

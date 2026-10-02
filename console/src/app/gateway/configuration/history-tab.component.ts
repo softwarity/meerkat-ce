@@ -135,16 +135,14 @@ import { LiveChangesService } from '../../shared/live-changes.service';
       <mat-drawer-content>
         <div class="intro">
           <p class="hint" style="margin: 0" i18n="@@History_hint">
-            A restore point every time a change moves this gateway's configuration - never on
-            purpose, never named. Accounts, sessions and the vault are not configuration and leave
-            no trace here. Nothing is thrown away, and changes made by one person within a couple
-            of minutes count as one.
+            A restore point is recorded at each configuration change; one person's changes within
+            a couple of minutes count as one. Accounts, sessions and the vault are not included.
           </p>
         </div>
 
         @if (!points().length) {
           <p class="empty" i18n="@@No_restore_point">
-            Nothing recorded yet: this gateway has not been changed since it started.
+            Nothing recorded yet: no change since the gateway started.
           </p>
         } @else {
           <mat-table [dataSource]="rows()">
@@ -225,7 +223,7 @@ import { LiveChangesService } from '../../shared/live-changes.service';
                 <app-ee-lock
           feature="configurations"
           i18n-why="@@History_ee_why"
-          why="Go back to any moment of this gateway's configuration, and keep several configurations side by side."
+          why="Go back to any past configuration, and keep several side by side."
         />
       </mat-drawer-content>
 
@@ -314,9 +312,9 @@ export class ConfigurationHistoryComponent {
   protected readonly alreadyTip = () =>
     $localize`:@@Already_this_state:This gateway is already in this state.`;
   protected readonly sameTip = () =>
-    $localize`:@@Same_as_earlier:The same configuration as that earlier moment - this is where it came back to it.`;
+    $localize`:@@Same_as_earlier:Back to the same configuration as that earlier moment.`;
   protected readonly note = () =>
-    $localize`:@@Point_note:A point never carried the images: restoring one leaves the pictures in place.`;
+    $localize`:@@Point_note:Images are not in restore points: restoring leaves them in place.`;
 
   constructor() {
     this.reload();
@@ -432,7 +430,7 @@ export class ConfigurationHistoryComponent {
     const count = (action: string) => plan.changes.filter((c) => c.action === action).length;
     const removed = this.removes(plan);
     if (!count('add') && !count('update') && !removed) {
-      return $localize`:@@Restore_no_change:This gateway already matches that moment: restoring it changes nothing.`;
+      return $localize`:@@Restore_no_change:This gateway already matches that moment. Nothing changes.`;
     }
     const gone = plan.changes
       .filter((c) => c.action === 'remove')

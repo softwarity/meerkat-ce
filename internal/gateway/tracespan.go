@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -40,6 +41,12 @@ type spanNote struct {
 	// events are the steps worth naming inside the span. Cheap - a name and an
 	// instant - which is the whole reason they are not spans of their own.
 	events []tracing.Event
+	// who is the person behind the call, once the router has resolved them
+	// (tracing.PersonAttrs).
+	who tracing.Who
+	// fromPage is a journey the browser bundle opened: its spans carry the
+	// person, stamped at the relay, so this one does not say it twice.
+	fromPage bool
 }
 
 type spanKey struct{}
@@ -50,7 +57,8 @@ func withSpan(req *http.Request, sc tracing.SpanContext) *http.Request {
 	if !tracing.Exporting() || !tracing.ShouldRecord(sc) {
 		return req
 	}
-	n := &spanNote{ctx: sc, id: tracing.NewSpanID(), start: time.Now()}
+	n := &spanNote{ctx: sc, id: tracing.NewSpanID(), start: time.Now(),
+		fromPage: tracing.FromPage(req.Header.Get(tracing.StateHeader))}
 	ctx := context.WithValue(req.Context(), spanKey{}, n)
 	// The steps of the gateway's own work, when the installation asked for
 	// them, hang under this crossing - the store's included, which knows
@@ -92,6 +100,15 @@ func dropTracing(next http.Handler) http.Handler {
 	})
 }
 
+// spanPerson notes who is calling, the first time the router learns it. Free
+// when the request is not being recorded: no note, nothing kept.
+func spanPerson(ctx context.Context, d identityData) {
+	if n := spanOf(ctx); n != nil && !n.fromPage && n.who.UserID == "" {
+		n.who = tracing.Who{UserID: d.UserID, Username: d.Username, TenantID: d.TenantID, Tenant: d.Tenant,
+			Group: d.Group, Roles: slices.Clone(d.Roles)}
+	}
+}
+
 // spanEvent names an instant inside the span: the route was chosen, access was
 // granted. Costs a name and a timestamp, against a whole object for a span.
 func spanEvent(ctx context.Context, name string, attrs ...tracing.Attr) {
@@ -125,6 +142,7 @@ func finishSpan(req *http.Request, routeName, endpoint string, status int) {
 	if routeName != "" {
 		attrs = append(attrs, tracing.String("meerkat.route", routeName))
 	}
+	attrs = append(attrs, tracing.PersonAttrs(n.who)...)
 	tracing.Emit(tracing.Span{
 		TraceID:      n.ctx.TraceID,
 		SpanID:       n.id,
@@ -140,6 +158,8 @@ func finishSpan(req *http.Request, routeName, endpoint string, status int) {
 		// a backend to paint an answer red.
 		StatusMessage: spanMessage(status),
 	})
+	// The steps held for this crossing leave with it.
+	tracing.SendCurrent(req.Context())
 }
 
 // spanStatus follows the standard's reading rather than ours: on a SERVER

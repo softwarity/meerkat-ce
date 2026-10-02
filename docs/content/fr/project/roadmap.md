@@ -45,17 +45,31 @@ ensuite.
   bibliothèque pour cela.
 - **Le cluster** : plusieurs passerelles derrière un PostgreSQL, qui se
   coordonnent par la base plutôt qu'entre elles.
+- **Configurations versionnées** : plusieurs coexistent, une seule est active,
+  l'export et l'import ferment la boucle, un point de reprise à chaque
+  changement, et deux configurations enregistrées se comparent.
+- **Sessions ouvertes** : vos appareils connectés, sur votre profil, avec
+  *Sign out everywhere else*. Les administrateurs voient et ferment les
+  sessions depuis la console.
+- **Export OpenTelemetry** (Enterprise) : une adresse de collecteur pour les
+  traces, les métriques, le journal d'audit et les journaux. Voir
+  [les traces](/docs/operations/tracing).
 
 ## En cours d'achèvement
 
 Ces sujets marchent et ne sont pas finis. Le tableau du dépôt dit, ligne par
 ligne, ce qui manque à chacun.
 
-- **Configurations versionnées** : plusieurs configurations coexistent, une
-  seule est active, l'export et l'import ferment la boucle, et la passerelle
-  pose un point de reprise à chaque changement qui déplace l'empreinte. Ce qui
-  manque est de comparer deux configurations enregistrées sans passer par
-  l'état courant.
+- **Appels planifiés** : la passerelle appelle un service selon une cadence,
+  un calendrier cron ou une seule fois, avec reprises et historique des
+  exécutions. Ce qui manque est la création depuis la console. Voir
+  [les appels planifiés](/docs/operations/scheduler).
+- **Audit des endpoints** (Enterprise) : un interrupteur par opération envoie
+  ses appels au journal d'audit. Ce qui manque est le choix des champs du body
+  à garder, et l'audit d'un refus fait avant que l'opération soit connue.
+- **Tracing** : le contexte traverse la passerelle et les traces partent vers
+  votre collecteur. Ce qui manque est que la passerelle se déclare dans
+  `tracestate` et `baggage`, et un lien d'une ligne d'audit vers sa trace.
 - **Quotas** : ils se posent par route, par endpoint et par consommateur -
   utilisateur, jeton, organisation, adresse - et un dépassement répond 429 avec
   les en-têtes standards. Ce qui manque est l'écran qui montre la consommation,
@@ -88,8 +102,6 @@ ligne, ce qui manque à chacun.
 - **SAML**, pour les entreprises dont le fournisseur d'identité ne parle pas
   OpenID Connect. Il est enregistrable aujourd'hui et refuse à la fabrique, ce
   qui est honnête et pas encore utile.
-- **Ses sessions ouvertes, et se déconnecter de partout** : la liste des
-  appareils connectés sur son propre compte, avec le bouton qui les ferme tous.
 - **Se connecter en tant que** : ce qu'un support fait tous les jours, et qui
   aujourd'hui se fait en demandant son mot de passe à quelqu'un.
 - **Un cache de réponse**, parce que la passerelle est déjà le seul endroit qui

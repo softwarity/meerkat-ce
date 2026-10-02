@@ -1,0 +1,85 @@
+# helm upgrade --install collector open-telemetry/opentelemetry-collector -f collector-values.yaml
+# helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+#
+# The ONE address every producer sends to - opentelemetry:4318 - and what it
+# does with each signal:
+#
+#   traces   -> Tempo, sorted AFTER the fact (tail sampling, below)
+#   metrics  -> Prometheus (its OTLP receiver)
+#   logs     -> Loki, labelled meerkat.stream = "audit" or "logs"
+#
+# Changing a backend, sampling after the fact, filtering: here, never in the
+# applications.
+
+mode: deployment
+fullnameOverride: otel-collector
+image:
+  # contrib: the distribution with the routing and transform processors.
+  repository: otel/opentelemetry-collector-contrib
+
+config:
+  # The chart ships receivers we do not use; null removes them.
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+  processors:
+    # The traces are sorted HERE, once each is complete, rather than at the
+    # head by whoever opened it: producers send 100%, and what is kept is
+    # every error, every slow one, and a share of the rest. A head sampler
+    # throws errors away at random; this one cannot.
+    #
+    # It holds every span of a trace until the decision, so ALL the spans of
+    # one trace must reach THIS process: fine with one replica, and the day
+    # there are several, a load-balancing tier by trace id goes in front.
+    tail_sampling:
+      decision_wait: 10s
+      num_traces: 50000
+      policies:
+        - name: errors
+          type: status_code
+          status_code:
+            status_codes: [ERROR]
+        - name: slow
+          type: latency
+          latency:
+            threshold_ms: 1000
+        - name: a-share-of-the-rest
+          type: probabilistic
+          probabilistic:
+            sampling_percentage: 10
+    # Audit and application logs travel the same pipe; Loki tells them apart
+    # by this resource attribute. A producer marks its audit records
+    # meerkat.stream=audit; anything unmarked is an application log.
+    transform/stream:
+      log_statements:
+        - context: resource
+          statements:
+            - set(attributes["meerkat.stream"], "logs") where attributes["meerkat.stream"] == nil
+  exporters:
+    otlphttp/tempo:
+      endpoint: http://tempo:4318
+    otlphttp/prometheus:
+      # Prometheus' native OTLP endpoint (--web.enable-otlp-receiver).
+      endpoint: http://prometheus/api/v1/otlp
+    otlphttp/loki:
+      # Loki's native OTLP endpoint.
+      endpoint: http://loki:3100/otlp
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, tail_sampling, batch]
+        exporters: [otlphttp/tempo]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlphttp/prometheus]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, transform/stream, batch]
+        exporters: [otlphttp/loki]
+
+resources:
+  limits:
+    memory: 512Mi

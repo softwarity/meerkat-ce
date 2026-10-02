@@ -32,6 +32,7 @@ Le rail de gauche porte les deux plans et les écrans transverses.
 | **API** | `/api` | La référence REST du plan de contrôle, essayée avec votre session |
 | **Vault** | `/vault` | Toutes les valeurs et les secrets que la configuration désigne |
 | **Metrics** | `/traffic` | Ce que la passerelle a réellement servi |
+| **Scheduler** | `/scheduler` | Les appels que la passerelle fait à vos services selon un planning |
 | **Audit** | `/audit` | Qui a changé quoi |
 | **Issues** | `/issues` | Ce que vos utilisateurs ont signalé |
 
@@ -42,9 +43,8 @@ quoi ressemble votre page de connexion. C'est souvent la même personne, avec le
 deux capacités, mais ce sont deux questions posées à deux endroits.
 
 > [!NOTE]
-> Metrics vit sur `/traffic`, pas sur `/metrics` : ce chemin appartient à
-> l'exposition Prometheus servie sur le même port, donc la console ne pouvait pas
-> le prendre.
+> Metrics vit sur `/traffic`, pas sur `/metrics` : hors `/api`, les chemins du
+> plan de contrôle appartiennent au produit, donc la console s'en tient à l'écart.
 
 ## Ce que vous voyez dépend de qui vous êtes
 
@@ -53,9 +53,9 @@ applique les mêmes périmètres à chaque appel.
 
 | Capacité | Ouvre |
 |---|---|
-| `root` | Tout, y compris Access tokens, MCP et Configuration |
-| `infra admin` | Le plan Infra, Metrics, la portée infra du coffre |
-| `app admin` | Le plan Application, la portée applicative du coffre |
+| `root` | Tout, y compris Configuration |
+| `infra admin` | Le plan Infra (avec Access tokens et MCP), Metrics, Audit et Issues, la portée infra du coffre |
+| `app admin` | Le plan Application (avec Sessions et Access tokens), Scheduler, Audit et Issues, la portée applicative du coffre |
 | `tenant admin` | Les organisations qu'il administre, Audit et Issues limités à elles |
 | `tenant creator` | La création d'une organisation depuis le tiroir Tenants |
 | `dev` | L'outillage développeur sur les applications servies, pas un écran de console |
@@ -77,9 +77,11 @@ Ces cinq-là retenues, la console ne surprend plus.
 - **L'enregistrement.** Certains écrans écrivent au clic (un interrupteur, une case
   dans une matrice), d'autres ont un bouton Save et disent ce qui manque encore. Là
   où cela compte, l'écran le précise.
-- **Les contrôles Enterprise restent visibles.** Un contrôle que cette image ne
-  peut pas honorer est grisé et porte une pastille `[Enterprise]` qui explique ce
-  qu'il apporte, avec un lien vers l'écran License. Rien n'est caché.
+- **Les fonctionnalités Enterprise sont marquées.** Sur l'image Enterprise,
+  elles portent une petite pastille `EE` (infobulle *Enterprise edition
+  feature*). Sur l'image communautaire, elles sont verrouillées et grisées, avec
+  une pastille `Enterprise` qui dit ce qu'elles apportent et renvoie vers
+  License. Rien n'est caché.
 - **Les secrets passent par le coffre.** Un champ sensible propose de ranger sa
   valeur dans le [coffre](/docs/console/vault) et refuse d'être enregistré en
   littéral.
@@ -90,9 +92,12 @@ Ces cinq-là retenues, la console ne surprend plus.
 
 - **[Routes](/docs/console/routes)** - la table de routage, dans l'ordre, et l'éditeur de route.
 - **[Sécurité et quotas par endpoint](/docs/console/endpoints)** - par opération, depuis la spec OpenAPI d'une route.
+- **[Endpoint audit](/docs/operations/audit#auditer-les-oprations-dune-route)** - les opérations gardées dans le journal d'audit.
 - **[Authentification](/docs/console/authentication)** - les autorités par lesquelles on se connecte.
 - **[Relais mail](/docs/console/mail-relay)** - le serveur SMTP, et le digest quotidien.
 - **[TLS](/docs/console/tls)** - un nom, un certificat, et ACME.
+- **[OpenTelemetry](/docs/operations/tracing)** - traces, métriques, audit et journaux envoyés à votre collecteur.
+- **[Plug](/docs/operations/plug)** - le tunnel développeur.
 - **[Jetons d'accès, MCP et API](/docs/console/access-and-agents)** - piloter Meerkat sans navigateur.
 - **[Configuration](/docs/console/configuration)** - configurations, points de reprise, instantanés.
 - **Model** - les champs que porte un compte, documenté avec [Users](/docs/console/users).
@@ -105,12 +110,15 @@ Ces cinq-là retenues, la console ne surprend plus.
 - **[Groups, Members et Group rules](/docs/console/organisation)** - qui est dans quel groupe.
 - **[Built-in pages](/docs/console/built-in-pages)** - thème, disposition et identité des pages servies.
 - **[Portal](/docs/console/portal)** - la barre de navigation que portent les applications proxifiées.
+- **[Sessions](/docs/auth/sessions#voir-les-sessions)** - qui est connecté, et déconnecter une session.
+- **[Access tokens](/docs/console/access-and-agents)** - les jetons de console, et les jetons d'application de tout le monde.
 
 ### A travers les deux
 
 - **[Tenants](/docs/console/tenants)** - l'administration propre d'une organisation.
 - **[Vault](/docs/console/vault)** - secrets et valeurs, référencés par `$nom`.
 - **[Metrics](/docs/console/traffic)** - trafic, latences, classement des routes.
+- **[Scheduler](/docs/operations/scheduler)** - les appels planifiés et leurs exécutions.
 - **[Audit et Issues](/docs/console/audit-and-issues)** - la trace des changements, et les signalements.
 - **License** - quelle édition a répondu, et ce qu'achète chaque fonctionnalité
   Enterprise. C'est le seul écran qui parle d'éditions : partout ailleurs, un

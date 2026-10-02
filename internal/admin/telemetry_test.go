@@ -194,7 +194,7 @@ func TestTheCollectorProbeSaysWhenMetricsAreNotTaken(t *testing.T) {
 		t.Fatalf("traces alone were refused: %d %s", code, out)
 	}
 	code, out := f.call(t, "POST", "/api/settings/telemetry/test", `{"endpoint":"`+tracesOnly.URL+`","metrics":true}`, f.rootC)
-	if code != http.StatusBadGateway || !strings.Contains(out, "not metrics") || !strings.Contains(out, "metrics endpoint") {
+	if code != http.StatusBadGateway || !strings.Contains(out, "not metrics") || !strings.Contains(out, "Metrics tab off") {
 		t.Fatalf("a traces-only backend passed for metrics: %d %s", code, out)
 	}
 }
@@ -204,7 +204,7 @@ func TestAnExportThatSendsNothingIsRefused(t *testing.T) {
 	f := setup(t)
 	code, out := f.call(t, "PUT", "/api/settings/telemetry",
 		`{"enabled":true,"traces":false,"metrics":false,"endpoint":"http://collector:4318","sample":0.1,"maxPerSecond":200}`, f.rootC)
-	if code != http.StatusUnprocessableEntity || !strings.Contains(out, "traces, metrics, or both") {
+	if code != http.StatusUnprocessableEntity || !strings.Contains(out, "traces, metrics or the audit") {
 		t.Fatalf("an export sending nothing answered %d: %s", code, out)
 	}
 }

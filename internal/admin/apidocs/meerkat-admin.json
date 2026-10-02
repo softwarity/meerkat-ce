@@ -107,6 +107,16 @@
         "responses": { "200": { "description": "Stored security" }, "422": { "$ref": "#/components/responses/Invalid" } }
       }
     },
+    "/api/routes/{id}/audit": {
+      "put": {
+        "tags": ["Routing"],
+        "summary": "Replace the route's audited operations",
+        "description": "Each audited operation's calls become audit events sent to the OpenTelemetry collector (AUD-04): the caller, the operation, the status, the trace id, the fields named here and, on request, the JSON body with secret fields masked.",
+        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "endpoints": { "type": "array", "items": { "type": "object", "required": ["method", "path"], "properties": { "method": { "type": "string" }, "path": { "type": "string" }, "description": { "type": "string" }, "body": { "type": "boolean" }, "mask": { "type": "array", "items": { "type": "string" } }, "fields": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "from": { "type": "string", "enum": ["path", "query", "header", "body"] }, "key": { "type": "string" } } } } } } } } } } } },
+        "responses": { "200": { "description": "Stored audit" }, "422": { "$ref": "#/components/responses/Invalid" } }
+      }
+    },
     "/api/users": {
       "get": {
         "tags": ["Identity"],
@@ -683,11 +693,11 @@
       },
       "TelemetryConfig": {
         "type": "object",
-        "description": "Where this gateway's traces and pushed counters go (OBS-04, OBS-05). Exporting is Enterprise; the trace context travels in both editions. WHICH routes are traced is not here - each route answers for itself.",
+        "description": "Where this gateway's traces and pushed counters go (OBS-04, OBS-06). Exporting is Enterprise; the trace context travels in both editions. WHICH routes are traced is not here - each route answers for itself.",
         "properties": {
           "enabled": { "type": "boolean", "description": "Anything leaves for the collector at all; what leaves is traces and metrics" },
           "traces": { "type": "boolean", "description": "Send this gateway's spans" },
-          "metrics": { "type": "boolean", "description": "Push the counters /metrics exposes, over OTLP to the same collector, every 30 seconds - cumulative, one resource per node. Needs a collector that receives metrics" },
+          "metrics": { "type": "boolean", "description": "Push the counters the Metrics screen draws, over OTLP to the same collector, every 30 seconds - cumulative, one resource per node. Needs a collector that receives metrics" },
           "endpoint": { "type": "string", "example": "http://jaeger:4318", "description": "The collector's BASE address; the exporter adds /v1/traces" },
           "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Sent with every export. A value may be a vault reference ($otlp-token), which is how a credential reaches a collector without being stored here" },
           "sample": { "type": "number", "format": "double", "description": "Share of the journeys OPENED HERE that are recorded, 0 to 1. A caller who already decided is respected rather than overruled" },

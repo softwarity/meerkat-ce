@@ -105,7 +105,7 @@ export class MailRelayPageComponent {
   protected readonly clockHint = computed(() => {
     const time = this.serverTime();
     if (!time) return $localize`:@@Gateway_time:Gateway time`;
-    return $localize`:@@Gateway_time_now:Gateway time - it is ${time}:TIME: there (${this.serverZone()}:ZONE:)`;
+    return $localize`:@@Gateway_time_now:Gateway time, now ${time}:TIME: (${this.serverZone()}:ZONE:)`;
   });
 
   // The sender address has two cases, and they call for opposite advice.
@@ -115,8 +115,8 @@ export class MailRelayPageComponent {
   // provider has verified or the mail is refused or lands in spam.
   protected readonly fromHint = computed(() =>
     this.username().includes('@')
-      ? $localize`:@@Sender_address_hint_account:Empty sends as the account. Most providers accept only that address, or a verified alias.`
-      : $localize`:@@Sender_address_hint_key:The account is not an address, so one is required here. It must be verified with the provider.`,
+      ? $localize`:@@Sender_address_hint_account:Empty sends as the account, which most providers require.`
+      : $localize`:@@Sender_address_hint_key:Required: the account is not an address. Use one verified with the provider.`,
   );
 
   // A secret typed in clear blocks Save and Test (VAULT-05), whichever mode

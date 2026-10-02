@@ -22,7 +22,9 @@ import {
   BatchSpanProcessor,
   TraceIdRatioBasedSampler,
   ParentBasedSampler,
+  SamplingDecision,
 } from "@opentelemetry/sdk-trace-web";
+import { TraceState } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
@@ -76,7 +78,7 @@ function start(cfg) {
   // than rolling the dice again. Sampling is decided once, at the head of the
   // chain; a second decision here is how traces end up with missing parents.
   const sampler = new ParentBasedSampler({
-    root: new TraceIdRatioBasedSampler(typeof cfg.sample === "number" ? cfg.sample : 0.1),
+    root: marking(new TraceIdRatioBasedSampler(typeof cfg.sample === "number" ? cfg.sample : 0.1)),
   });
 
   const provider = new WebTracerProvider({
@@ -110,6 +112,26 @@ function start(cfg) {
       }),
     ],
   });
+}
+
+// marking signs the journeys this page opens: meerkat=b in tracestate, which
+// the propagator carries to the gateway with the traceparent.
+//
+// WHY: the person behind a page is stamped on its spans by the gateway, at the
+// relay. On a journey that starts here, the gateway's own span then stays
+// silent rather than saying it twice - and this mark is how it knows. Only
+// the ROOT is marked, which is the only place the ratio sampler is asked.
+function marking(inner) {
+  return {
+    shouldSample(ctx, traceId, name, kind, attrs, links) {
+      const r = inner.shouldSample(ctx, traceId, name, kind, attrs, links);
+      if (r.decision !== SamplingDecision.RECORD_AND_SAMPLED) return r;
+      return { ...r, traceState: (r.traceState || new TraceState()).set("meerkat", "b") };
+    },
+    toString() {
+      return "meerkat(" + inner.toString() + ")";
+    },
+  };
 }
 
 // namer names each call after what it asked for.

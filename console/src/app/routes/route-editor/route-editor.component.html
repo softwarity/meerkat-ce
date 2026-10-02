@@ -142,8 +142,9 @@
              different questions, and a run of eleven fields with nothing
              between them makes the reader work out which is which. -->
         <h3 class="sub" i18n="@@How_it_answers">How it answers</h3>
-        <p class="section-hint" i18n="@@Target_hint">Proxying fetches from a service and hands back
-          what it says; the other three answer here, without calling anything.</p>
+        <p class="section-hint" i18n="@@Target_hint">
+          Proxy fetches from a service; the other three answer here, without calling anything.
+        </p>
         <mat-form-field>
           <mat-label i18n="@@Mode">Mode</mat-label>
           <mat-select [value]="mode()" (selectionChange)="setMode($event.value)">
@@ -198,8 +199,7 @@
           </mat-form-field>
         </div>
         <p class="field-hint" i18n="@@Timeouts_hint">
-          Past either, the caller gets a 502 instead of waiting. Only the wait for the first answer
-          is bounded - a download or a websocket that has started runs as long as it needs.
+          Past either, the caller gets a 502. A download or websocket already started is not cut.
         </p>
 
         <mat-checkbox
@@ -228,10 +228,7 @@
             </mat-form-field>
           </div>
           <p class="field-hint" i18n="@@Breaker_hint">
-            While it is down, callers get the unavailable page at once instead of waiting - and the
-            service is met by ONE request after the delay rather than by everything that piled up. A
-            500 does not count: a service answering 500 is up and has a bug, and taking it out of
-            rotation would close a whole route over one endpoint.
+            While it is down, callers get the unavailable page at once, and one request tries again after the delay. A 500 does not count as down.
           </p>
         }
 
@@ -339,9 +336,7 @@
       }
       @case ('security') {
         <p class="section-hint" i18n="@@Route_security_hint">
-          The route's base access, applied to the whole route. Leave it empty to delegate security to
-          the upstream; set it to gate at the edge. An API route can refine it per operation under
-          Endpoints.
+          Access to the whole route. Empty leaves security to the upstream; an API route can refine it per operation under Endpoints.
         </p>
         <app-access-editor
           [value]="draft().access"
@@ -353,10 +348,7 @@
       }
       @case ('limits') {
         <p class="section-hint" i18n="@@Route_limits_hint">
-          How much this route may carry. Several bounds at once, each counting something different:
-          one for the whole route protects the service behind it, one per user keeps a single caller
-          from taking it all, one per address covers whoever has no account. They are all true
-          together, and the first one exceeded answers 429 with the standard headers.
+          Every bound applies at once: per route, per user, per address. The first one exceeded answers 429.
         </p>
         <app-rate-limits
           [value]="draft().limits"
@@ -383,9 +375,7 @@
       }
       @case ('identity') {
         <p class="section-hint" i18n="@@Identity_section_hint2">
-          What this route knows about the signed-in caller, and the name each fact travels under.
-          Two sections spend it: Auth forward sends it to the service, User info puts it on the
-          page. Everything is included by default.
+          What this route knows about the signed-in caller, and under which name. Auth forward sends it to the service, User info puts it on the page.
         </p>
           <div class="id-attrs">
             @for (field of identityFields(); track field) {
@@ -450,9 +440,7 @@
       }
       @case ('authforward') {
         <p class="section-hint" i18n="@@Auth_forward_hint">
-          How the caller reaches the service behind this route: which transport carries the facts
-          the Identity section declares. WHICH facts and under what names is settled there - this
-          is the envelope, not the contents.
+          How the facts declared in Identity reach the service.
         </p>
         <div class="btn-row">
           <mat-form-field class="position-field">
@@ -489,11 +477,7 @@
                signature cost there would be noise. -->
           <h3 class="sub" i18n="@@Signature_algorithm">Signature algorithm</h3>
           <p class="section-hint id-hint" i18n="@@Signature_algorithm_cost">
-            <b>The algorithm is paid on every request</b>, because each call gets a freshly signed
-            token. <b>ES256</b> is the one to choose: fast, and verified by every JWT library.
-            <b>EdDSA</b> is about as fast, but some older libraries cannot verify it. <b>RS256</b>
-            costs about fifteen times more per signature - measured at 1.5 ms instead of 0.1 ms on
-            a real installation - so keep it for a backend that verifies RSA and nothing else.
+            Every request is signed. <b>ES256</b> is fast and verified everywhere; <b>EdDSA</b> is as fast but some older libraries cannot verify it; <b>RS256</b> is about fifteen times slower.
           </p>
           <div class="btn-row">
             <mat-form-field class="position-field">
@@ -510,13 +494,11 @@
           </div>
           @if (draft().identityAlgorithm === 'RS256') {
             <p class="section-hint id-hint warn" i18n="@@Signature_algorithm_rs256_warn">
-              This route signs with RS256: every request pays the slowest signature. If the backend
-              reads the JWKS, switching to ES256 needs nothing on its side.
+              RS256 is the slowest. If the backend reads the JWKS, switching to ES256 needs nothing on its side.
             </p>
           }
           <p class="section-hint id-hint" i18n="@@Signed_jwt_hint">
-            The gateway signs each token; backends verify it against the published JWKS. Manage the
-            keys with "Signing keys" on the Routes page.
+            Backends verify each token against the published JWKS. Keys are under "Signing keys" on the Routes page.
           </p>
         }
 
@@ -526,9 +508,7 @@
                the algorithm above. -->
           <h3 class="sub" i18n="@@Token_lifetime">Token lifetime</h3>
           <p class="section-hint id-hint" i18n="@@Token_lifetime_hint">
-            How long a token stays valid once issued - its <code>exp</code>. Each request gets a
-            fresh one, so a short lifetime costs nothing: it only has to outlast the trip to the
-            service, clock drift included, and it bounds what a leaked token is worth.
+            The token's <code>exp</code>. Each request gets a fresh one, so keep it short.
           </p>
           <div class="ttl-row">
             <mat-form-field class="position-field" subscriptSizing="dynamic">
@@ -552,8 +532,7 @@
                as the plain list (see the Roles block in User info). -->
           <h3 class="sub" i18n="@@Shape_of_the_roles">Shape of the roles</h3>
           <p class="section-hint id-hint" i18n="@@Roles_shape_hint">
-            Roles travel as one value. Three hundred of them is nine kilobytes on every request for
-            a service that reads three, so their shape is worth a look.
+            Roles travel on every request: trim them to what the service reads.
           </p>
           <div class="btn-row">
             <button
@@ -579,21 +558,14 @@
       @case ('scheme') {
         <h3 class="sub" i18n="@@Color_scheme">Color scheme</h3>
         <p class="section-hint" i18n="@@Scheme_section_hint">
-          How THIS application takes a light/dark choice - a property of the UI this route serves,
-          whoever offers the switch. The choice always lands on the CSS color-scheme and a
-          data-meerkat-scheme attribute; pick the application's own mechanism on top if it has one.
-          Set attribute names one attribute and gives it two values; add attribute and class take
-          the two names themselves - one bare attribute, or one class - so an empty one means
-          nothing on the tag in that state, the usual shape: nothing in light, dark in dark.
+          How this application applies light or dark. The CSS color-scheme and a data-meerkat-scheme attribute are always set; add the application's own mechanism if it has one.
         </p>
         <p class="section-hint" i18n="@@Scheme_who_offers">
-          Who offers the switch: with the portal on, its bar carries it on every UI route, and there
-          is nothing to turn on here. Without a portal, it rides in the injected user button - turn
-          that on in User button.
+          The switch is in the portal bar when the portal is on, otherwise in the User button.
         </p>
         @if (imposedScheme(); as imposed) {
           <p class="section-hint warn" i18n="@@Scheme_switch_unavailable">
-            The built-in pages only offer {{ imposed }}, so there is nothing to switch between.
+            The built-in pages only offer {{ imposed }}: nothing to switch.
             <a routerLink="/application/theme">Change that in Theme</a>.
           </p>
         }
@@ -647,9 +619,7 @@
           </div>
           @if (draft().schemeNoAuto) {
             <p class="section-hint" i18n="@@No_system_mode_hint">
-              The visitor's choice of "follow my system" is resolved to light or dark before it
-              reaches this application, and it keeps following the system as that changes. The
-              switch in the user button offers two positions here instead of three.
+              "Follow my system" is resolved to light or dark before reaching the application, so the switch offers two positions instead of three.
             </p>
           }
         }
@@ -662,14 +632,11 @@
              vendor forever, so here the integrator writes the body instead. -->
         @if (draft().schemeMechanism === 'script') {
           <p class="section-hint" i18n="@@Scheme_script_line">
-            Called with the choice in <code>colorScheme</code> on every change and once when a page
-            loads.
+            Called with <code>colorScheme</code> on every change and on page load.
             @if (draft().schemeNoAuto) {
-              It holds "light" or "dark": with no system mode, "auto" is resolved before it gets
-              here.
+              It holds "light" or "dark".
             } @else {
-              It holds "light", "dark" or "auto" - on "auto", put the application back on the system
-              rather than picking a side.
+              It holds "light", "dark" or "auto": on "auto", follow the system.
             }
           </p>
           <div class="css-row">
@@ -697,10 +664,7 @@
         @if (draft().schemeMechanism !== 'none') {
         <h3 class="sub" i18n="@@Override_localstorage">Override localStorage</h3>
         <p class="section-hint" i18n="@@Override_localstorage_hint">
-          If the application remembers its theme in localStorage, name the key and what it writes
-          for each mode. Meerkat then stores the visitor's choice in the application's own words,
-          before its scripts run, and the application applies it itself. Clearing a value removes
-          the entry instead, which leaves the application on its own default.
+          If the application keeps its theme in localStorage, give the key and its value for each mode: Meerkat writes the visitor's choice there before the page's scripts run. An empty value removes the entry.
         </p>
         <div class="flags">
           <mat-checkbox [checked]="draft().schemeStorageOverride" (change)="setStorageOverride($event.checked)">
@@ -752,8 +716,7 @@
         </div>
         @if (draft().schemeMechanism === 'none') {
           <p class="section-hint" i18n="@@Scheme_one_look_no_switch">
-            This application has one look (Color scheme section), so there is nothing to switch here:
-            the button and the portal bar wear that look.
+            This application has one look (Color scheme section): nothing to switch.
           </p>
         }
         @if (draft().btnEnabled) {
@@ -764,7 +727,7 @@
             [checked]="draft().btnInFrame"
             (change)="setFlag('btnInFrame', $event.checked)"
             i18n-matTooltip="@@In_frame_hint"
-            matTooltip="A framed page is usually a portal, with its own user menu: signing out from the frame would end a session the portal still shows as open."
+            matTooltip="A framed page usually sits in a portal that has its own user menu."
           >
             <ng-container i18n="@@Show_it_in_a_framed_page">Show it in a framed page</ng-container>
           </mat-checkbox>
@@ -872,9 +835,7 @@
 
         @if (!draft().schemeSelect && draft().schemeMechanism !== 'none') {
           <p class="section-hint" i18n="@@Button_scheme_hint">
-            No switch here, so nothing for the button to follow: it wears whatever the visitor chose
-            elsewhere, which on an application that has one look means light chrome floating on a
-            dark page. This dresses the button alone - the page is never touched.
+            Without a switch, the button wears what the visitor chose elsewhere. Force it light or dark here; the page is not touched.
           </p>
           <div class="btn-row">
             <mat-form-field class="position-field">
@@ -898,9 +859,7 @@
         <div class="locale-list">
         <h3 class="sub" i18n="@@Locales">Locales</h3>
         <p class="section-hint" i18n="@@Locales_section_hint3">
-          The languages this UI is written in. They fill the account menu on its pages, and the
-          sign-in page offers every language the routes of this gateway speak - so a route that
-          arrives speaking one adds it, and a route that leaves takes it away.
+          The languages this UI is written in. They fill its account menu and are offered on the sign-in page.
         </p>
         <mat-form-field class="add-locale">
           <mat-label i18n="@@Add_a_locale">Add a locale</mat-label>
@@ -964,10 +923,7 @@
              what nobody should have to configure. The mechanism below is for
              an application that reads the language somewhere else. -->
         <p class="section-hint" i18n="@@Locales_forwarding_hint2">
-          Accept-Language always reaches the application with the person's own language in front -
-          their stored choice, or what their browser asks for. Nothing to declare for that. The
-          mechanism below is for an application that reads the language somewhere else, and for how
-          a page follows a change.
+          Accept-Language always carries the person's language first. Pick a mechanism only if the application reads it elsewhere, or to follow a change.
         </p>
         <div class="btn-row">
           <mat-form-field class="mech-field">
@@ -1012,8 +968,7 @@
 
         @if (hasMech('script')) {
           <p class="section-hint" i18n="@@On_language_change_hint">
-            Called with the language in <code>locale</code>: on every change, on every page of this
-            browser, and once when a page loads. Apply it in place - no reload.
+            Called with <code>locale</code> on every change and on page load. Apply it in place, no reload.
           </p>
           <div class="css-row">
             <button matButton="tonal" (click)="editCode('onLocaleChange')">
@@ -1035,8 +990,7 @@
       @case ('userinfo') {
         <h3 class="sub" i18n="@@Roles">Roles</h3>
         <p class="section-hint" i18n="@@Roles_section_hint">
-          Puts the user's effective roles on the page: classes or a custom attribute on a tag of
-          your choice, or a meta tag, so the application can gate elements on roles with pure CSS.
+          Puts the user's roles on the page (classes, an attribute or a meta tag) so CSS can gate elements on them.
         </p>
         <div class="flags">
           <mat-checkbox [checked]="draft().rolesEnabled" (change)="setFlag('rolesEnabled', $event.checked)">
@@ -1088,10 +1042,7 @@
 
         <h3 class="sub" i18n="@@User_info">User info</h3>
         <p class="section-hint" i18n="@@User_info_hint2">
-          Where the facts the Identity section declares land on the PAGE: attributes on a tag of
-          your choice, or meta tags. Untick one to keep it out - a page's attributes are readable
-          by every script on it, which a header to the service is not, so "send it and do not
-          publish it" is a posture worth keeping.
+          Where the Identity facts land on the page. Every script on the page can read them: untick what should stay private.
         </p>
         <div class="flags">
           <mat-checkbox [checked]="draft().userInfoEnabled" (change)="setFlag('userInfoEnabled', $event.checked)">
@@ -1158,8 +1109,7 @@
              own code lives. One panel for both filed a product feature under
              the drawer people keep their CSS in. -->
         <p class="section-hint" i18n="@@Route_tracing_hint">
-          Two questions, and the second only follows the first. Where the traces go is set once for
-          the installation, in <b>Infra, OpenTelemetry</b>; what this route contributes is here.
+          What this route sends. Where it goes is set in <b>Infra, OpenTelemetry</b>.
         </p>
         @if (!telemetryOn()) {
           <!-- The switches keep whatever this route holds: an installation that
@@ -1169,8 +1119,7 @@
           <p class="section-hint off-note">
             <mat-icon inline>info</mat-icon>
             <span i18n="@@Route_tracing_export_off"
-              >This installation exports no traces yet, so neither switch does anything. What this
-              route holds is kept as it is.</span
+              >OpenTelemetry is off for this installation: these switches wait for it.</span
             >
             <button matButton type="button" (click)="openTelemetrySettings()">
               <ng-container i18n="@@Open_telemetry_settings">OpenTelemetry settings</ng-container>
@@ -1186,16 +1135,11 @@
           [disabled]="!telemetryOn()"
           (change)="setFlag('telemetry', $event.checked)"
         >
-          <ng-container i18n="@@Route_tracing_toggle"
-            >Push traces of this route to OpenTelemetry</ng-container
-          >
+          <ng-container i18n="@@Route_tracing_toggle">Include this route in OpenTelemetry</ng-container>
         </mat-slide-toggle>
         <p class="section-hint" i18n="@@Route_tracing_push_hint">
-          Meerkat records <b>its own spans</b> for what this route answers: the time it spent
-          choosing the route, checking access and calling your service, which is a gap in the trace
-          otherwise. Off, this route produces nothing at all and the context a caller sent travels
-          on untouched - for what you have no reason to measure, an admin interface you proxy, a
-          probe.
+          Its traces and its metrics. Off, it only counts in the gateway's totals: right for an
+          admin interface or a probe.
         </p>
         <!-- The second switch needs the first AND a UI route: it injects a
              script into pages, and a service route has none. Disabled rather
@@ -1209,24 +1153,15 @@
           <ng-container i18n="@@Route_tracing_ui_toggle">Start the trace from the UI</ng-container>
         </mat-slide-toggle>
         <p class="section-hint" i18n="@@Route_tracing_ui_hint">
-          The OpenTelemetry bundle is injected into this application's pages, so the journey starts
-          at the <b>click</b> rather than at this gateway: you see the network before us, the
-          browser's queueing, the rendering, and the calls that <b>never reach us at all</b>. The
-          bundle is served by Meerkat, never by a CDN, and it carries trace context to this
-          gateway's own routes and to nobody else. Leave it off for an application that already
-          carries its own agent: two on one page produce two traces for one click, and neither is
-          the whole story.
+          The trace starts at the <b>click</b>, in the page. Leave it off if the application already
+          has its own OpenTelemetry agent.
         </p>
       }
       @case ('custom') {
         <p class="section-hint" i18n="@@Custom_hint">
-          Your own CSS and JavaScript, injected into this application's pages. What the gateway adds
-          on its own account is elsewhere: Tracing, User button, Color scheme.
+          Your own CSS and JavaScript, injected into this application's pages.
         </p>
         <h3 class="sub" i18n="@@Custom_CSS">Custom CSS</h3>
-        <p class="section-hint" i18n="@@Custom_CSS_hint">
-          A style block injected into the pages: tweak the application's look from the gateway.
-        </p>
         <div class="css-row">
           <button matButton="tonal" (click)="editCode('css')">
             <mat-icon>css</mat-icon>
@@ -1243,7 +1178,7 @@
 
         <h3 class="sub" i18n="@@Custom_JavaScript">Custom JavaScript</h3>
         <p class="section-hint" i18n="@@Custom_JS_hint">
-          A script injected into the pages, right after the head opens.
+          Runs right after the head opens.
         </p>
         <div class="css-row">
           <button matButton="tonal" (click)="editCode('js')">

@@ -30,7 +30,7 @@ docker run -p 8080:8080 -p 9090:9090 \
 
 Everything above, plus what an installation needs once it grows: several
 organisations, LDAP and Active Directory, roles granted by your directory,
-several gateways behind one entry point, the Prometheus exposition, the
+several gateways behind one entry point, the metrics pushed over OTLP, the
 developer tunnel, the built-in pages without our mark - and support.
 
 **Support is part of the agreement**: you reach the people who wrote the

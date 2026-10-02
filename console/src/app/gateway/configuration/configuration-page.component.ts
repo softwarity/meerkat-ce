@@ -71,8 +71,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
     <h1 i18n="@@Configuration">Configuration</h1>
     <p class="hint" i18n="@@Configuration_intro">
       Routes, roles, authorities, mail relay, themes and gateway settings travel as one file.
-      Users, organisations, sessions and the vault stay where they are: they are not
-      configuration, they are what this gateway lives with.
+      Users, organisations, sessions and the vault are not part of it.
     </p>
 
     <nav mat-tab-nav-bar [tabPanel]="panel" mat-stretch-tabs="false">

@@ -73,13 +73,13 @@ export const PLANNED_MODIFIERS: Record<string, PlannedBrick[]> = {
   request: [
     {
       type: 'trust-forwarded-for',
-      doc: $localize`:@@planned_trust_forwarded_for:Keep the X-Forwarded-For chain written by a trusted proxy in front - today it is dropped, so a service sees the load balancer`,
+      doc: $localize`:@@planned_trust_forwarded_for:Keep the X-Forwarded-For chain written by a trusted proxy`,
     },
   ],
   response: [
     {
       type: 'response-cache',
-      doc: $localize`:@@planned_response_cache:Cache responses locally - held back: caching a personalised page serves it to the next visitor`,
+      doc: $localize`:@@planned_response_cache:Cache responses locally`,
     },
   ],
   // Nothing planned here: respond shipped, and it does more than the fixed

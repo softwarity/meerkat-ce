@@ -274,14 +274,26 @@ function matchPrefix(predicates: Spec[]): string {
   for (const p of predicates) {
     if (p.type !== "path") continue;
     const patterns = p.args?.["patterns"];
-    const first = Array.isArray(patterns) ? String(patterns[0] ?? "") : "";
-    const kept: string[] = [];
-    for (const segment of first.split("/")) {
-      if (!segment) continue;
-      if (segment.includes("*") || segment.includes("{")) break;
-      kept.push(segment);
+    const list = Array.isArray(patterns) ? patterns.map(String) : [];
+    if (!list.length) return "";
+    // Every pattern's static head, then the part they all share.
+    let common: string[] | null = null;
+    for (const pattern of list) {
+      const head: string[] = [];
+      for (const segment of pattern.split("/")) {
+        if (!segment) continue;
+        if (segment.includes("*") || segment.includes("{")) break;
+        head.push(segment);
+      }
+      if (common === null) {
+        common = head;
+        continue;
+      }
+      let n = 0;
+      while (n < common.length && n < head.length && common[n] === head[n]) n++;
+      common = common.slice(0, n);
     }
-    return kept.length ? "/" + kept.join("/") : "";
+    return common && common.length ? "/" + common.join("/") : "";
   }
   return "";
 }
@@ -648,7 +660,7 @@ export class RouteEditorComponent {
   // Said on the sections a terminal route silences, so the reason is where the
   // question is rather than in a log nobody reads.
   protected readonly proxies = computed(() => this.mode() === "proxy");
-  protected readonly notProxiedTip = $localize`:@@Not_proxied_tip:This route answers by itself, so nothing is sent upstream: the gateway drops incoming filters and forwards no identity.`;
+  protected readonly notProxiedTip = $localize`:@@Not_proxied_tip:This route answers by itself: nothing goes upstream, so no incoming filters and no identity.`;
 
   protected onSectionPick(s: Section): void {
     this.section.set(s);
@@ -705,8 +717,8 @@ export class RouteEditorComponent {
   // would be a lie; on a community one, the mode is what the licence covers.
   protected readonly frozenTip = computed(() =>
     this.me.enterprise()
-      ? $localize`:@@Frozen_single_mode:This instance runs in single-organisation mode: the value would be the same on every request. The mode is in Application, General.`
-      : $localize`:@@Frozen_single_mode_ce:This instance serves one organisation, so the value would be the same on every request. Several organisations is an Enterprise feature - see Application, General.`,
+      ? $localize`:@@Frozen_single_mode:Single-organisation mode: the value is the same on every request. See Application, General.`
+      : $localize`:@@Frozen_single_mode_ce:One organisation only: the value is the same on every request. Several organisations is an Enterprise feature.`,
   );
   // WHAT IDENTITY DECLARED, minus the roles. The page used to carry its own
   // list of facts, ticked separately from the identity one - the same eight
@@ -1119,11 +1131,11 @@ export class RouteEditorComponent {
   // paragraph above it.
   protected readonly uiTraceTip = computed(() => {
     if (!this.telemetryOn())
-      return $localize`:@@Route_tracing_ui_needs_export:This installation exports no traces yet.`;
+      return $localize`:@@Route_tracing_ui_needs_export:OpenTelemetry is off for this installation.`;
     if (!this.draft().telemetry)
-      return $localize`:@@Route_tracing_ui_needs_push:This route pushes no traces, so there is no journey for its pages to start.`;
+      return $localize`:@@Route_tracing_ui_needs_push:Include this route in OpenTelemetry first.`;
     if (!this.draft().isUi)
-      return $localize`:@@Route_tracing_ui_needs_ui:Only a UI route has pages to inject the bundle into. Turn UI on first.`;
+      return $localize`:@@Route_tracing_ui_needs_ui:Only for a UI route.`;
     return '';
   });
 
@@ -1134,7 +1146,7 @@ export class RouteEditorComponent {
     if (this.dirty()) {
       const ok = await this.dialogs.confirm({
         title: $localize`:@@Leave_editor_title:Leave this route?`,
-        message: $localize`:@@Leave_editor_message:This route has changes that are not saved. Going to the OpenTelemetry settings closes the editor and loses them.`,
+        message: $localize`:@@Leave_editor_message:This route has unsaved changes. Opening the OpenTelemetry settings loses them.`,
         confirmLabel: $localize`:@@Leave_and_lose:Leave and lose them`,
         danger: true,
       });
@@ -1175,8 +1187,8 @@ export class RouteEditorComponent {
   protected readonly uiTip = $localize`:@@UI_serves_pages_in_a_browser:UI: serves pages in a browser`;
   protected readonly uiImpossibleTip = computed(() =>
     this.mode() === "redirect"
-      ? $localize`:@@UI_not_for_a_redirect:A redirect answers with a Location and no page: there is nothing to inject into.`
-      : $localize`:@@UI_needs_html:The gateway only rewrites an answer that says it is HTML. Set the content type to text/html for this route to carry page injections.`,
+      ? $localize`:@@UI_not_for_a_redirect:A redirect has no page to inject into.`
+      : $localize`:@@UI_needs_html:Page injections need an HTML answer: set the content type to text/html.`,
   );
 
   protected setIsUi(value: boolean): void {
@@ -1220,7 +1232,7 @@ export class RouteEditorComponent {
   // own hint rather than in a column at the end of the row: it is about what
   // THIS row sends, and a column of its own left every other row with an empty
   // one.
-  protected readonly remoteUserWhy = $localize`:@@Remote_user_why:No header is standardised for the signed-in account (REMOTE_USER is a CGI variable). Meerkat writes both conventions: Spring's, and its dashed form, since an underscore in a header name is dropped by default by nginx. Inbound ones are purged.`;
+  protected readonly remoteUserWhy = $localize`:@@Remote_user_why:No standard header names the signed-in account. Meerkat sends Spring's and its dashed form (nginx drops underscores by default); incoming ones are removed.`;
 
   protected alsoSends(field: string): string {
     return field === "username" && this.draft().identityMechanism === "headers"
@@ -1656,7 +1668,7 @@ export class RouteEditorComponent {
             // The signature IS the explanation: a body whose argument nobody
             // names is a body written by guesswork.
             title: $localize`:@@On_scheme_change:function (colorScheme: "light" | "dark" | "auto")`,
-            hint: $localize`:@@Scheme_script_hint2:Called on every change, and once when a page loads - before the page is parsed and again once it is, so it must survive finding nothing. On "auto", put the application back on the system rather than picking a side.`,
+            hint: $localize`:@@Scheme_script_hint2:Called on every change and on page load, before and after the page is parsed: it must cope with finding nothing. On "auto", follow the system.`,
           }
         : kind === "onLocaleChange"
         ? {
@@ -1665,7 +1677,7 @@ export class RouteEditorComponent {
             code: this.codeOf(kind) || LOCALE_SCRIPT_SEED,
             language,
             title: $localize`:@@On_language_change:On language change`,
-            hint: $localize`:@@Locale_script_hint:Called with the language in locale: on every change, and once when a page loads. Apply it in place - no reload.`,
+            hint: $localize`:@@Locale_script_hint:Called with locale on every change and on page load. Apply it in place, no reload.`,
           }
         : { code: this.codeOf(kind), language };
     const result = await firstValueFrom(

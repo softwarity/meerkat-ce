@@ -16,7 +16,7 @@ import (
 // The scheduled calls (SCHED-01), and this is the WHOLE API for them.
 //
 // They live on the control plane, and that placement is the design. A schedule
-// is a service the gateway provides - like the metrics exposition - not
+// is a service the gateway provides - like the agent endpoint - not
 // something an application exposes to its users: a browser never talks to it.
 // A backend does, with a token, and hands its own users whatever it decides to
 // show them.

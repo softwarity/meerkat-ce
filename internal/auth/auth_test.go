@@ -384,6 +384,11 @@ func TestForcedPasswordStepCannotBeBypassed(t *testing.T) {
 	if err != nil || sess.Pending != "" {
 		t.Fatalf("pending must be cleared: %+v %v", sess, err)
 	}
+	// A sign-in that went through the step is a sign-in: the account no
+	// longer reads "never connected".
+	if u, err := st.GetUserByID(context.Background(), "u1"); err != nil || u.LastConnectionAt == 0 {
+		t.Fatalf("the forced change left no last connection: %+v %v", u.LastConnectionAt, err)
+	}
 	// The old temporary password no longer works, the new one does.
 	if again := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"temp0rary"}}); again.Code != http.StatusUnauthorized {
 		t.Fatalf("temporary password must be dead: %d", again.Code)

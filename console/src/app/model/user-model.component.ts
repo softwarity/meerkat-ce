@@ -44,13 +44,8 @@ import { LiveChangesService } from '../shared/live-changes.service';
     <div class="content">
       <h2 i18n="@@Account_fields">Account fields</h2>
       <p class="hint" i18n="@@Model_hint">
-        What this installation knows about a person that this product could not have guessed - an
-        employee number, a cost centre, a contract reference. Each one is filled per account under
-        Application, Users, and from then on it travels like any other fact about the caller: pick
-        it in a route's identity forwarding to send it to a service, or in its user info to stamp it
-        on a page. None of them is ever mandatory: a field defined today is empty on every account
-        that already exists, and demanding it would stop the next person who opens one of them to
-        change something else.
+        Your own facts about a person, such as an employee number or a cost centre. Fill them per
+        account under Application, Users; a route can then forward them. None is mandatory.
       </p>
 
       @for (f of fields(); track $index) {
@@ -111,8 +106,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
         </div>
       } @empty {
         <p class="empty" i18n="@@No_field_yet">
-          No field yet. An account carries what this product invented - a name, an address, a
-          language - and nothing of what your estate calls a person.
+          No field yet.
         </p>
       }
 

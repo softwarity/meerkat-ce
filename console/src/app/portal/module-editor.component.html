@@ -82,7 +82,7 @@
       </div>
     } @else {
       <p class="hint text-muted" i18n="@@Portal_paste_hint">
-        Paste an SVG. It is trimmed to its shape (viewBox + paths) when saved, so it takes the bar's colour.
+        Paste an SVG. Only its shape is kept, so it takes the bar's colour.
       </p>
       <mat-form-field appearance="outline" class="icon-paste">
         <textarea matInput rows="6" [value]="icon()" (input)="icon.set($any($event.target).value)"

@@ -9,8 +9,11 @@ summary: Driving Meerkat without a browser - a token for a script, an MCP connec
 
 Three screens, one subject: working on this gateway from outside the console.
 
-- **Infra > Access tokens** (root) mints a key for a script or a pipeline.
-- **Infra > MCP** (root) connects an assistant, and produces no key at all.
+- **Access tokens** is on both planes. Under **Infra**, it mints console tokens
+  for a script or a pipeline. Under **Application**, it also lists the
+  application tokens: an app admin sees everyone's and can revoke them.
+- **Infra > MCP** (infra admins) connects an assistant, and produces no key at
+  all.
 - **API** (rail) is the reference for the calls both of them make.
 
 ## Access tokens
@@ -19,18 +22,18 @@ An admin token opens the console's own API without a browser. It acts **with you
 own powers**, narrowed by its perimeter, and it authenticates on the admin port as
 `Authorization: Bearer mk_...`.
 
-![The Access tokens screen: three tokens with their perimeter, prefix, creation date and expiry](img/console/access-tokens.webp)
+![The Access tokens screen: three console tokens and two application tokens, with their owner, plane, perimeter and last use](img/console/access-tokens.webp)
 
-Three tokens: a full-access one on the routing plane, a read-only one on the
-application's identity, and a read-only one restricted to `10.0.0.0/8`. Each
-line carries its switch, edit, new secret and revoke.
+Five tokens: three for the console - full access from `10.20.0.0/16` only, read
+only, and scheduled calls only - and two application tokens their owners created
+on their profile. A row opens its drawer.
 
 Creating one asks five things:
 
 | Field | What it decides |
 |---|---|
 | **Token name** | What you will recognise in the list and in the audit trail |
-| **Perimeter** | *Metrics only* opens `/metrics` and nothing else; *Read only* reads and runs the testers; *Full access* is everything you can do |
+| **Perimeter** | *Scheduled calls only* opens `/api/schedules` and nothing else; *Read only* reads and runs the testers; *Full access* is everything you can do |
 | **Acts on** | The routing plane, the application's identity, or everything you can do |
 | **Used from** | Comma-separated addresses or CIDR ranges. Judged on the connecting address, never on a forwarded header |
 | **Expiry** | Never, 30 days, 90 days, or a year |
@@ -96,6 +99,6 @@ token drives.
   with it.
 - **A connected agent is not in the token list.** It is a connection, and it is
   seen and cut off under MCP.
-- **The metrics perimeter exists for scrapers**: a credential that lives in a
-  monitoring stack's repository is the one most likely to leak and least likely
-  to be rotated. See [Metrics](/docs/console/traffic).
+- **The scheduled-calls perimeter exists for backend services**: a credential
+  that lives in a deployment manifest is the one most likely to leak and least
+  likely to be rotated. See [scheduled calls](/docs/operations/scheduler).

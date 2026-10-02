@@ -112,7 +112,7 @@ func fold(seg string) string {
 		// Written as one rule rather than one per shape because the shapes are
 		// endless: a strict 8-4-4-4-12 test let a 12-4-4-4-12 identifier
 		// through, and each one that gets through is a series of its own - in
-		// this gateway AND in whatever scrapes it.
+		// this gateway AND in whatever collector receives its counters.
 		return idPlaceholder
 	default:
 		return seg

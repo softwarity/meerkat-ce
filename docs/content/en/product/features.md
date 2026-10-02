@@ -27,12 +27,13 @@ Read more: [How someone signs in](/docs/auth/overview).
 
 - **Served sign-in pages**: sign-in, forgotten password, email verification, optional sign-up, in 20 languages, with your theme, logo and background. `AUTH-01 THEME-01`
 - **Passwords** with a configurable policy and history, brute-force protection shared by every node, and messages that never reveal whether an account exists. `AUTH-10 AUTH-11`
-- **TOTP second factor** with QR code and recovery codes, email code fallback, trusted browsers, MFA enforced globally, per authority or per user. `MFA-01 to 04`
+- **TOTP second factor** with QR code and recovery codes, email code fallback, trusted browsers. `MFA-01 to 03`
+- **MFA enforced** globally, per authority or per user. *partly* `MFA-04`
 - **WebAuthn passkeys**: security key, fingerprint, Windows Hello, as a first factor. *partly* `AUTH-15`
 - **OIDC and GitHub federation**: Entra ID, Okta, Google, Keycloak or any compliant IdP, for the first factor. `AUTH-04`
 - **LDAP and Active Directory**, and group rules: a directory group, a GitHub team or an OIDC claim becomes a membership and roles. **Enterprise** `AUTH-03 RBAC-10`
 - **Sign in by e-mail code**: a one-time code instead of the password, bound to the browser that asked, ten minutes, never on the console, and the second factor still runs behind it. Ships off. *partly* `AUTH-16`
-- **API tokens**, personal and machine-to-machine, with the secret shown only once. *partly* `AUTH-09`
+- **API tokens**, personal and machine-to-machine, with the secret shown only once. `AUTH-09`
 - **Accounts** with a validity window in days, custom fields for your domain passed to applications, and an email alert on sign-in from a new browser. `MODEL-01 MODEL-02 AUTH-23`
 
 ## Access and organizations
@@ -88,7 +89,7 @@ What the gateway adds to the pages it serves.
 Read more: [What the gateway injects](/docs/concepts/data-plane-chrome).
 
 - **Injected user button**: profile, sign-out, organization switch, language, light or dark. `UIF-03 UIF-05`
-- **Navigation portal** across your applications, as a bar or a rail, showing only what access rights allow. *partly* `PORTAL-01`
+- **Navigation portal** across your applications, as a bar or a rail, showing only what access rights allow. `PORTAL-01`
 - **Hide UI by role** in pure CSS: roles are stamped on the page server-side. CSS and JavaScript injectable per route. `UIF-02 UIF-06`
 - **Issue reporting**: screenshot, console, technical context, tracked in the admin console. `ISSUE-01 to 04`
 - **Real-time channel** over WebSocket to applications, with no prior integration. `UIF-04`
@@ -113,11 +114,14 @@ A console that replaces YAML files and configuration pipelines.
 Read more: [Operations](/docs/operations/overview).
 
 - **Versioned configurations**: several named versions, one active, comparison, YAML export and import, automatic restore point on every change. `CFG-01 to 06`
-- **Audit log** of every administrative action, with a field-by-field diff, and of the security of the accounts - every sign-in, every refused one with its real reason and address, every factor, passkey, password or token changed by its owner. Append-only, browsable in the console. `AUD-01 AUD-02`
+- **Audit log** of every administrative action, with a field-by-field diff, and of the security of the accounts - every sign-in, every refused one with its real reason and address, every factor, passkey, password or token changed by its owner. Append-only, browsable in the console. *partly* `AUD-01 AUD-02`
+- **Audit sent to the collector** over OTLP: the data plane's security events, and the console's changes too. **Enterprise** `AUD-03`
+- **Endpoint audit**: one switch per operation of a route's OpenAPI spec, and each call becomes an audit event. **Enterprise** *partly* `AUD-04`
+- **CSV export** of the audit trail. Parquet is still to ship. **Enterprise** *partly* `STORE-06`
 - **Built-in dashboards**: traffic, latency and failures per route and per endpoint, with nothing to install. `OBS-01`
-- **Prometheus export**, on a port of its own with an optional token, with a ready-made Grafana dashboard and files ready for Swarm and Kubernetes - and the same counters **pushed over OTLP** to the collector the traces go to. **Enterprise** `OBS-05`
-- **Structured logs**, JSON or text, and an **access log** - one line per request crossing the front door, refusals included, carrying the account as the gateway itself authenticated it. That is the half of an audit no service can write: it never saw the call it was refused, and all it knows of the caller is what it was told. `OBS-03`
-- **Distributed tracing** (W3C Trace Context): the context travels in both editions and an identifier is put on every request - handed back to the caller, written in the log, at the foot of the built-in pages - which **joins a line of the gateway's to a service's own business audit**. In Enterprise the gateway puts itself on the trace: its inbound span, the span of the upstream call, and the gap between the two, which is its own time. **OTLP** export to the OpenTelemetry Collector, Tempo, Jaeger or a vendor. The OpenTelemetry bundle can be injected into UI pages - served by Meerkat, never by a CDN - so the trace starts at the click. **Enterprise** `OBS-04`
+- **Metrics pushed over OTLP** to the collector the traces go to, which writes them into Prometheus - with a ready-made Grafana dashboard. **Enterprise** `OBS-06`
+- **Structured logs**, JSON or text, and an **access log** - one line per request crossing the front door, refusals included, carrying the account as the gateway itself authenticated it. That is the half of an audit no service can write: it never saw the call it was refused, and all it knows of the caller is what it was told. Both logs can be written as OpenTelemetry JSON for a Collector agent, or pushed to the collector (**Enterprise**). *partly* `OBS-03`
+- **Distributed tracing** (W3C Trace Context): the context travels in both editions and an identifier is put on every request - handed back to the caller, written in the log, at the foot of the built-in pages - which **joins a line of the gateway's to a service's own business audit**. In Enterprise the gateway puts itself on the trace: its inbound span, the span of the upstream call, and the gap between the two, which is its own time. **OTLP** export to an OpenTelemetry Collector or any OTLP endpoint. The OpenTelemetry bundle can be injected into UI pages - served by Meerkat, never by a CDN - so the trace starts at the click. **Enterprise** *partly* `OBS-04`
 - **Active/active cluster** on PostgreSQL, with no session affinity and no primary node. **Enterprise** `PERF-03 STORE-03`
 - **Transactional emails** in your theme colors, and a daily digest of expiring accounts. `NOTIF-01 NOTIF-04`
 - **Deployment**: one image, embedded storage by default, Docker, Swarm or Kubernetes with a Helm chart, liveness and readiness probes, seeding from a file. `DEPLOY-01 OBS-02 LIFE-02`

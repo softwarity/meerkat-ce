@@ -39,32 +39,32 @@ export class LayoutTabComponent {
     {
       name: 'centered',
       label: $localize`:@@Layout_centered:Centered`,
-      what: $localize`:@@Layout_centered_what:The logo above, the card in the middle, the picture behind everything.`,
+      what: $localize`:@@Layout_centered_what:Logo above, card in the middle, picture behind.`,
       sided: false,
     },
     {
       name: 'split',
       label: $localize`:@@Layout_split:Split`,
-      what: $localize`:@@Layout_split_what:The picture takes a full-height half and carries the name; the form takes the other.`,
+      what: $localize`:@@Layout_split_what:Picture and name on one half, form on the other.`,
       sided: true,
     },
     {
       name: 'drawer',
       label: $localize`:@@Layout_drawer:Drawer`,
-      what: $localize`:@@Layout_drawer_what:The picture keeps the whole frame; a panel against one edge carries logo and form.`,
+      what: $localize`:@@Layout_drawer_what:Full-frame picture, logo and form in a side panel.`,
       sided: true,
     },
     {
       name: 'banner',
       label: $localize`:@@Layout_banner:Banner`,
-      what: $localize`:@@Layout_banner_what:A brand band across the top, the card under it. Holds up without a picture.`,
+      what: $localize`:@@Layout_banner_what:A brand band on top, the card under it. Works without a picture.`,
       sided: false,
       ownLogoSize: true,
     },
     {
       name: 'bare',
       label: $localize`:@@Layout_bare:Bare`,
-      what: $localize`:@@Layout_bare_what:No card: the fields sit on the picture itself. For a photograph worth showing whole.`,
+      what: $localize`:@@Layout_bare_what:No card: the fields sit on the picture itself.`,
       sided: false,
     },
   ];

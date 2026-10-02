@@ -42,17 +42,29 @@ transform it, an access rule decides, and what happened is visible afterwards.
   serves, injected into pages that ship no library for it.
 - **Clustering**: several gateways behind one PostgreSQL, coordinating through
   the database rather than with each other.
+- **Versioned configurations**: several coexist, one is active, export and
+  import close the loop, a restore point on every change, and two saved
+  configurations compared.
+- **Open sessions**: your devices signed in, on your profile, with
+  *Sign out everywhere else*. Administrators see and end sessions from the
+  console.
+- **OpenTelemetry export** (Enterprise): one collector address for traces,
+  metrics, the audit trail and logs. See [traces](/docs/operations/tracing).
 
 ## Being finished
 
 These work and are not finished. The table in the repository says, line by
 line, what is missing from each.
 
-- **Versioned configurations** - several configurations coexist, one is
-  active, export and import close the loop, and the gateway drops a checkpoint
-  on every change that moves the configuration's fingerprint. What is missing
-  is comparing two SAVED configurations without going through the current
-  state.
+- **Scheduled calls** - the gateway calls a service on a cadence, a cron
+  calendar or once, with retries and a run history. What is missing is
+  creating one from the console. See [scheduled calls](/docs/operations/scheduler).
+- **Endpoint audit** (Enterprise) - one switch per operation sends its calls to
+  the audit trail. What is missing is picking which body fields to keep, and
+  auditing a refusal made before the operation is known.
+- **Tracing** - the context crosses the gateway and the traces leave for your
+  collector. What is missing is the gateway declaring itself in `tracestate`
+  and `baggage`, and a link from an audit line to its trace.
 - **Quotas** - they are posed per route, per endpoint and per consumer - user,
   token, organisation, address - and going over answers 429 with the standard
   headers. What is missing is the screen that shows consumption, throttling
@@ -84,8 +96,6 @@ line, what is missing from each.
 - **SAML**, for the enterprises whose identity provider does not speak OpenID
   Connect. It is registrable today and refuses at the factory, which is honest
   and not yet useful.
-- **Your open sessions, and signing out everywhere**: the list of devices
-  signed in on your own account, with the button that closes all of them.
 - **Sign in as**: what a support desk does every day, and which today is done
   by asking somebody for their password.
 - **A response cache**, because the gateway is already the only place that sees

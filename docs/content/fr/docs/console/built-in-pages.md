@@ -75,7 +75,7 @@ quel que soit l'arrangement choisi.
 
 ## Branding
 
-![Built-in pages sur l'onglet Branding : nom d'application, accroche, zones de dépôt du logo et du fond, et la carte de la marque Meerkat](img/console/built-in-pages-branding.webp)
+![Built-in pages sur l'onglet Branding : nom d'application, accroche, zones de dépôt du logo, de l'icône d'onglet et du fond, et la carte de la marque Meerkat](img/console/built-in-pages-branding.webp)
 
 Le nom et l'accroche tapés ici apparaissent aussitôt dans l'aperçu. En dessous, la carte
 de la marque Meerkat, avec sa pastille Enterprise.

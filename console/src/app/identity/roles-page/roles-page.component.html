@@ -81,7 +81,7 @@
                   <span class="text-muted truncate">{{ r.description }}</span>
                 } @else {
                   <span class="text-muted truncate" i18n="@@Catalogue_root_hint">
-                    The catalogue itself: what hangs here is a top-level role.
+                    The catalogue root: roles under it are top-level.
                   </span>
                 }
               </mat-cell>
@@ -161,7 +161,7 @@
 
         @if (roles().length === 0) {
           <div class="empty" i18n="@@No_role_yet_add_from_root">
-            No role yet: the + on the row above creates the first one.
+            No role yet: use + on the row above.
           </div>
         } @else if (nodes().length === 1) {
           <div class="empty" i18n="@@No_role_matches_the_filter">No role matches the filter.</div>

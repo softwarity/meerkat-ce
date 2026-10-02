@@ -154,7 +154,7 @@ export class StripPrefixFilterComponent {
   // published. Turn it off for an application already configured to live under
   // the prefix, which would otherwise write it twice.
   protected readonly announce = computed(() => this.spec().args?.['announcePrefix'] !== false);
-  protected readonly announceTip = $localize`:@@Announce_prefix_tip:Tells the service the public prefix these segments came from, so it builds its links, redirects and cookie paths under it instead of under its own root. Turn it off for an application already configured to live under that prefix - it would write it twice.`;
+  protected readonly announceTip = $localize`:@@Announce_prefix_tip:Tells the service its public prefix, for its links, redirects and cookie paths. Turn it off if the application is already configured with that prefix.`;
 
   protected set(v: string): void {
     const n = Math.max(1, Math.trunc(Number(v)) || 1);
@@ -404,30 +404,26 @@ const CONTENT_TYPES: { value: string; what: string }[] = [
         <app-respond-editor [value]="body()" (changed)="set('body', $event)" />
         <div class="vars">
           <p class="lead">
-            The answer is written literally, and anything between
-            <code>&#123;&#123;</code> and <code>&#125;&#125;</code> is replaced by something about the caller.
-            Everything else is sent as typed.
+            Sent as typed, except what is between
+            <code>&#123;&#123;</code> and <code>&#125;&#125;</code>, replaced by something about the caller.
           </p>
           <dl>
             <dt><code>{{ GOOD }}</code></dt>
             <dd>
-              the caller's name, <strong>with its quotes and escaping</strong>. Always through
-              <code>json</code> - <code>{{ BAD }}</code> looks equivalent and breaks the day a name holds a
-              quote, which is a name that comes from a directory, not from you.
+              the caller's name, <strong>quoted and escaped</strong>. Always use <code>json</code>:
+              <code>{{ BAD }}</code> breaks on a name holding a quote.
             </dd>
             <dt><code>{{ WRAP }}</code></dt>
             <dd>the roles as one-key objects: <code>{{ WRAP_OUT }}</code>. Empty list if the caller holds none.</dd>
             <dt><code>{{ JOIN }}</code></dt>
             <dd>the roles as one string: <code>ROLE_A,ROLE_B</code>.</dd>
             <dt><code>{{ IFELSE }}</code></dt>
-            <dd>two answers in one route: nobody is signed in when the route has no gateway rule.</dd>
+            <dd>two answers in one route. Nobody is signed in when the route has no gateway rule.</dd>
           </dl>
           <p class="also">
             Also available: <code>.UserID</code> <code>.Fullname</code> <code>.Email</code> <code>.Tenant</code>
             <code>.TenantID</code> <code>.Timezone</code> <code>.Roles</code>. For a shape none of the above
-            covers, loop: <code>{{ LOOP }}</code> - where <code>{{ COMMA }}</code> writes the separating comma
-            (<code>$i</code> is the index, zero is false, so the first element gets none - JSON forbids a
-            trailing one).
+            covers, loop: <code>{{ LOOP }}</code>, with <code>{{ COMMA }}</code> to separate the elements.
           </p>
         </div>
       </div>

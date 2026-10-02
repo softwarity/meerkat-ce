@@ -95,11 +95,37 @@ writes on its standard output.
 >
 > Kubernetes does it on its own: 10 Mi, 5 files.
 
+## In OpenTelemetry's format
+
+**Infra, OpenTelemetry**, tab **Logs**, mode **Written for an agent**. Both
+logs keep their outputs and change their shape, live, on every node. One object
+per line, with the field names of OpenTelemetry's log data model:
+
+```json
+{"timestamp": "2026-10-01T16:35:37.296Z", "severity_text": "WARN", "severity_number": 13,
+ "body": "the upstream is down", "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+ "attributes": {"route": "billing", "upstream.host": "billing:8080"},
+ "resource": {"service.name": "meerkat", "service.version": "..."}}
+```
+
+Nothing is pushed. A Collector running as a **DaemonSet** reads every
+container's output and decodes these fields, so a line lands in Loki with its
+severity, trace and attributes. **No collector yet?** on the OpenTelemetry page
+gives that agent's configuration. This mode is in both editions: it writes, it
+does not export.
+
+## Or pushed to the collector
+
+The third mode, **Pushed to the collector**, sends both logs over OTLP to the
+collector address (Enterprise), for nodes with no agent: a bare Docker host, a
+VM. The outputs keep the format chosen at startup. Only one mode at a time:
+with an agent reading the outputs too, every line would arrive twice.
+
+The push has its own queue, never the audit's: a flood of logs cannot cost
+the trail an event. A batch the collector refuses three times is dropped and
+counted, and the tab says how many.
+
 ## What is missing
 
-- Sending the logs to an OpenTelemetry collector (the **Logs** signal, beside
-  traces and metrics): the operational log, the access log of the routes that
-  ask for it, and the [audit trail](/docs/operations/audit). A copy: each stays
-  where it is written today.
 - The level set from the console rather than at startup only.
 - The token's name next to the account when a machine calls.

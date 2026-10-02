@@ -20,6 +20,9 @@
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
+  // And no min-width: a flex item is as wide as its longest unbreakable
+  // line, and a route's matching line pushed the frame past the page.
+  min-width: 0;
   overflow: auto;
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: var(--mat-sys-corner-medium, 8px);

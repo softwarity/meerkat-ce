@@ -82,14 +82,14 @@ func TestEditingATokenLeavesTheSecretAlone(t *testing.T) {
 	}
 	hash := "the-hash-nobody-may-touch"
 	if err := st.AddAPIToken(ctx, NewToken{
-		ID: "t1", UserID: "u1", Name: "prometheus", TokenHash: hash, Prefix: "mk_abc",
+		ID: "t1", UserID: "u1", Name: "billing", TokenHash: hash, Prefix: "mk_abc",
 		Plane: PlaneAdmin, Scope: ScopeFull, ExpiresAt: 0,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	ok, err := st.UpdateAPIToken(ctx, "u1", "t1", TokenEdit{
-		Name: "prometheus (scraper)", Scope: ScopeMetrics,
+		Name: "billing (scheduler)", Scope: ScopeSchedules,
 		FromCIDRs: "10.0.0.7", ExpiresAt: 0,
 	})
 	if err != nil || !ok {
@@ -101,10 +101,10 @@ func TestEditingATokenLeavesTheSecretAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the token stopped resolving after an edit: %v", err)
 	}
-	if got.Scope != ScopeMetrics {
-		t.Errorf("perimeter is %q, want %q", got.Scope, ScopeMetrics)
+	if got.Scope != ScopeSchedules {
+		t.Errorf("perimeter is %q, want %q", got.Scope, ScopeSchedules)
 	}
-	if got.Name != "prometheus (scraper)" {
+	if got.Name != "billing (scheduler)" {
 		t.Errorf("name is %q, want the edited one", got.Name)
 	}
 	if got.FromCIDRs != "10.0.0.7/32" {

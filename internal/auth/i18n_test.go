@@ -43,19 +43,24 @@ func TestSupportedLanguagesSpeakTheCatalogue(t *testing.T) {
 }
 
 // TestMatchAcceptLanguage: resolution stays within the offered list and falls
-// back to the integrator's first language.
+// back to English when it is offered - the list is sorted, so its first entry
+// says nothing about anybody's choice.
 func TestMatchAcceptLanguage(t *testing.T) {
 	offered := []string{"fr", "en"}
 	cases := map[string]string{
 		"fr-FR,fr;q=0.9,en;q=0.8": "fr",
 		"en-US,en;q=0.9":          "en",
-		"de-DE,de;q=0.9":          "fr", // nothing offered matches -> first offered
-		"":                        "fr",
+		"de-DE,de;q=0.9":          "en", // nothing offered matches -> English
+		"":                        "en",
 	}
 	for header, want := range cases {
 		if got := matchAcceptLanguage(header, offered); got != want {
 			t.Errorf("matchAcceptLanguage(%q) = %q, want %q", header, got, want)
 		}
+	}
+	// No English on offer: the first language there is.
+	if got := matchAcceptLanguage("", []string{"de", "fr"}); got != "de" {
+		t.Errorf("with no English offered, got %q, want de", got)
 	}
 }
 

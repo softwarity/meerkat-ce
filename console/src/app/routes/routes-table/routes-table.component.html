@@ -57,17 +57,21 @@
       </mat-cell>
     </ng-container>
 
-    <ng-container matColumnDef="matching">
-      <mat-header-cell *matHeaderCellDef i18n="@@Matching">Matching</mat-header-cell>
+    <!-- What the route catches and where it sends it, in ONE column on two
+         lines: the matching (predicates, then the filters by name) above, the
+         target below at the full width of the table. Two columns side by side
+         cut both short - a path list and an upstream URL are the two longest
+         things on the row. -->
+    <ng-container matColumnDef="route">
+      <mat-header-cell *matHeaderCellDef i18n="@@Matching_and_target">Matching and target</mat-header-cell>
       <mat-cell *matCellDef="let r" [class.off]="!r.enabled">
-        <span class="muted mono">{{ summary(r) }}</span>
-      </mat-cell>
-    </ng-container>
-
-    <ng-container matColumnDef="upstream">
-      <mat-header-cell *matHeaderCellDef i18n="@@Upstream">Upstream</mat-header-cell>
-      <mat-cell *matCellDef="let r" [class.off]="!r.enabled">
-        <span class="mono">{{ r.upstream }}</span>
+        <span class="two-line route-cell">
+          <span class="matching mono">
+            {{ summary(r) }}
+            @if (filterNames(r); as f) {<span class="filters"> - {{ f }}</span>}
+          </span>
+          <span class="target mono">{{ target(r) }}</span>
+        </span>
         <span rowActions="tonal">
           @if (r.isUi && openUrl(r)) {
             <a

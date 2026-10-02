@@ -106,7 +106,7 @@ export class AccessTokensPageComponent {
   }
 
   protected readonly enableTip = $localize`:@@Enable_token:Enable this token`;
-  protected readonly disableTip = $localize`:@@Disable_token:Disable this token - it stops working, and can be turned back on`;
+  protected readonly disableTip = $localize`:@@Disable_token:Disable this token (it can be turned back on)`;
 
   protected async create(): Promise<void> {
     const res = await firstValueFrom(
@@ -131,8 +131,8 @@ export class AccessTokensPageComponent {
   // Change what a token may do, without touching the token: the secret is a
   // hash and encodes none of this, so whoever holds the key keeps holding the
   // same key. Which is what makes narrowing one cheap - a read-only token in a
-  // scrape config becomes a metrics one without a second token and an edit in
-  // another team's repository.
+  // service's manifest becomes a schedules one without a second token and an
+  // edit in another team's repository.
   protected async edit(t: AdminToken): Promise<void> {
     const res = await firstValueFrom(
       this.dialog
@@ -171,7 +171,7 @@ export class AccessTokensPageComponent {
   protected async renew(t: AdminToken): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Renew_token_NAME:New secret for "${t.name}:NAME:"?`,
-      message: $localize`:@@Renew_token_warning:The current secret stops working immediately. Whatever is using it is refused until the new one is in place.`,
+      message: $localize`:@@Renew_token_warning:The current secret stops working immediately.`,
       confirmLabel: $localize`:@@Renew:New secret`,
       danger: true,
     });
@@ -200,7 +200,7 @@ export class AccessTokensPageComponent {
   protected async revokeData(t: TokenRow): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Revoke_token_NAME:Revoke token "${t.name}:NAME:"?`,
-      message: $localize`:@@Revoke_data_token_warning:It belongs to ${t.ownerName}:OWNER:. Whatever uses it is refused from its next call; only its owner can mint another.`,
+      message: $localize`:@@Revoke_data_token_warning:It belongs to ${t.ownerName}:OWNER:. It is refused from its next call.`,
       confirmLabel: $localize`:@@Revoke:Revoke`,
       danger: true,
     });
@@ -232,8 +232,6 @@ export class AccessTokensPageComponent {
 
   protected scopeLabel(t: TokenRow): string {
     switch (t.scope) {
-      case 'metrics':
-        return $localize`:@@Metrics_only:Metrics only`;
       case 'schedules':
         return $localize`:@@Scheduled_calls_only:Scheduled calls only`;
       case 'readonly':
@@ -313,18 +311,12 @@ export class AccessTokensPageComponent {
       <p><mat-form-field>
         <mat-label i18n="@@Perimeter">Perimeter</mat-label>
         <mat-select [value]="scope()" (selectionChange)="scope.set($event.value)">
-          <mat-option value="metrics" i18n="@@Metrics_only">Metrics only</mat-option>
           <mat-option value="schedules" i18n="@@Scheduled_calls_only">Scheduled calls only</mat-option>
           <mat-option value="readonly" i18n="@@Read_only">Read only</mat-option>
           <mat-option value="full" i18n="@@Full_access">Full access</mat-option>
         </mat-select>
         <mat-hint>
           @switch (scope()) {
-            @case ('metrics') {
-              <ng-container i18n="@@Perimeter_metrics_hint">
-                Opens /metrics and nothing else.
-              </ng-container>
-            }
             @case ('schedules') {
               <ng-container i18n="@@Perimeter_schedules_hint">
                 Opens /api/schedules and nothing else. A backend service's credential.
@@ -445,8 +437,7 @@ export class TokenCreateDialogComponent {
         </button>
       </div>
       <p class="hint" i18n="@@Keep_it_in_an_env_var">
-        Keep it in an environment variable rather than in a file: a configuration file is a thing
-        people commit.
+        Keep it in an environment variable, not in a committed file.
       </p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">

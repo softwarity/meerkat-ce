@@ -88,8 +88,6 @@ body:not(.ee) [ee-feature] app-ee-lock {
 // So: no pointer-events rule here, and no dimming either. Only the badge,
 // which says what the save will say.
 
-// The badge is only shown while this image cannot do it: once it can, the
-// control is just a control.
-body.ee app-ee-lock {
-  display: none;
-}
+// On the Enterprise image the badge stays, as a quiet "EE" (the component
+// picks its form): everything is unlocked there, and without it nobody could
+// tell what the licence bought.

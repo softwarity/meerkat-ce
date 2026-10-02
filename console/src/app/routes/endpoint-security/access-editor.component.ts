@@ -57,17 +57,17 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
   {
     value: '',
     label: $localize`:@@Access_delegated:Delegated`,
-    hint: $localize`:@@Access_delegated_hint:Meerkat lets everyone through, signed in or not, and leaves the decision to the service.`,
+    hint: $localize`:@@Access_delegated_hint:Everyone gets through, signed in or not: the service decides.`,
   },
   {
     value: 'auth',
     label: $localize`:@@Access_authenticated:Signed in`,
-    hint: $localize`:@@Access_authenticated_hint:Anyone with an account, including one that belongs to no organisation yet.`,
+    hint: $localize`:@@Access_authenticated_hint:Anyone with an account, even with no organisation yet.`,
   },
   {
     value: 'tenant',
     label: $localize`:@@Access_in_an_organisation:In an organisation`,
-    hint: $localize`:@@Access_in_an_organisation_hint:An organisation must be active on the session. Turns away an account still awaiting access.`,
+    hint: $localize`:@@Access_in_an_organisation_hint:An organisation must be active on the session.`,
   },
   {
     value: 'tenants',
@@ -77,7 +77,7 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
   {
     value: 'deny',
     label: $localize`:@@Access_nobody:Nobody`,
-    hint: $localize`:@@Access_nobody_hint:Refused before the service is called. Only the users named as an exception get through.`,
+    hint: $localize`:@@Access_nobody_hint:Refused, except the users named below.`,
   },
 ];
 
@@ -334,7 +334,7 @@ export class AccessEditorComponent {
     // perfectly ordinary thing to want, and the access wording - who gets
     // through - would be describing the wrong act.
     if (this.purpose() === 'selects' && this.value().level === 'deny') {
-      return $localize`:@@Selects_nobody_hint:Nobody, apart from the users named below - which is how to bound a few people by name.`;
+      return $localize`:@@Selects_nobody_hint:Only the users named below.`;
     }
     return ACCESS_LEVELS.find((l) => l.value === this.value().level)?.hint ?? '';
   });

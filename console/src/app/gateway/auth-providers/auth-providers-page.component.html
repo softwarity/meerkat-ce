@@ -6,11 +6,8 @@
 
     <div class="content">
       <p class="intro text-muted" i18n="@@Authentication_intro">
-        Every door into the data plane, the accounts held here included. An authority proves who
-        someone is; it never decides what they may do: a first sign-in creates an account that
-        reaches nothing until an administrator places it in an organization and grants roles.
-        Switch them all off and nobody signs in to the data plane, which is what a gateway serving
-        public routes only may want.
+        The ways to sign in to the data plane. An authority proves who someone is; roles, granted by
+        an administrator, decide what they may do.
       </p>
 
       <div class="master">
@@ -18,10 +15,8 @@
           <ng-container i18n="@@Self_registration">Self-registration</ng-container>
         </mat-slide-toggle>
         <span class="hint text-muted" i18n="@@Self_registration_master_hint">
-          Let someone create their own account rather than wait for one. The account reaches
-          nothing until an administrator places it in an organization and grants roles, and
-          administrators are told when one appears. Each authority decides for itself besides;
-          off here, none of them may.
+          Let people create their own account; it reaches nothing until an administrator grants
+          roles. Off here, no authority may.
         </span>
       </div>
       <!-- The mailed links that prove an address: the one finishing a sign-up
@@ -36,8 +31,7 @@
           </mat-select>
         </mat-form-field>
         <span class="hint text-muted" i18n="@@Confirmation_links_hint">
-          The link that finishes a sign-up, and the one sent to a new address before it replaces
-          the old one: a changed address takes effect only once confirmed, and the old one is told.
+          For a sign-up and for a changed e-mail address, which applies only once confirmed.
         </span>
       </div>
 
@@ -68,8 +62,7 @@
                   <!-- No server to reach: what this row needs to say is what
                        turning it off does, and what it never touches. -->
                   <span class="truncate text-muted" i18n="@@Local_accounts_target">
-                    The passwords held here. Off, only the other authorities answer; this console
-                    always keeps its own password sign-in.
+                    The passwords held here. Off, this console still keeps its password sign-in.
                   </span>
                 } @else {
                   <span class="mono truncate">{{ target(p) }}</span>

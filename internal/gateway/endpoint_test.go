@@ -233,3 +233,36 @@ func TestDenyUnlistedClosesWhatNoRuleLists(t *testing.T) {
 		t.Fatalf("an unlisted operation, signed in: %d, want 403", got)
 	}
 }
+
+// An operation posed for its bound alone keeps the route's rule. It used to be
+// written as an empty access, which the guard read as the deliberate
+// reopening - so adding a rate limit to an operation of a signed-in route
+// opened it to anyone.
+func TestABoundAloneDoesNotOpenTheOperation(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("served")) }))
+	t.Cleanup(upstream.Close)
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	route := pathRoute("r-bound", "bounded", 1, "/b/**", upstream.URL)
+	route.Access = store.Access{Level: store.AccessAuth}
+	route.API = &store.RouteAPI{Security: &store.EndpointSecurity{Endpoints: []store.EndpointPolicy{
+		{Method: "GET", Path: "/b/report", Inherit: true,
+			Limits: []store.RateLimit{{Per: "ip", Requests: 100, Window: "PT1M"}}},
+	}}}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	rt.ServeHTTP(rec, httptest.NewRequest("GET", "http://localhost/b/report", nil))
+	if rec.Code == http.StatusOK {
+		t.Fatalf("an anonymous caller reached an operation of a signed-in route through its rate limit: %d %s", rec.Code, rec.Body)
+	}
+}

@@ -1,7 +1,5 @@
 <p class="intro text-muted" i18n="@@Group_rules_intro">
-  What an authority says about someone, turned into access here. A rule reads: whoever arrives
-  with this group upstream becomes a member of this organization, with this group. Nothing else
-  is taken from the authority, and a rule can only grant what belongs here.
+  Whoever signs in with this upstream group becomes a member here, with this group.
 </p>
 
 <!-- One worked example, because the abstract wording above never makes the
@@ -12,8 +10,7 @@
   <ng-container i18n="@@Group_rules_example_2">grants the</ng-container>
   <code class="mono">Agents</code>
   <ng-container i18n="@@Group_rules_example_3">
-    group here. For an organization with its OWN directory, leave the upstream group empty: anyone
-    who signs in through that authority becomes a member.
+    group here. Leave the upstream group empty to admit anyone from that authority.
   </ng-container>
 </p>
 
@@ -21,18 +18,16 @@
   <loading-indicator withContainer />
 } @else if (blocker() === 'authority') {
   <div class="empty" i18n="@@Rules_need_an_authority">
-    No authority is enabled yet. These rules act on what an authority reports, so there is nothing
-    to map until one is configured (Infra, Authentication).
+    No authority is enabled yet: configure one in Infra, Authentication.
   </div>
 } @else if (blocker() === 'group') {
   <div class="empty" i18n="@@Rules_need_a_group">
-    This organization has no group yet. Create one first: a rule grants a group, and the roles it
-    carries are what someone may actually do here.
+    This organization has no group yet: create one first.
   </div>
 } @else {
   @if (rules().length === 0) {
     <div class="empty" i18n="@@No_rule_yet">
-      No rule yet: everyone arriving through an authority waits for an administrator to place them.
+      No rule yet: people arriving through an authority wait for an administrator.
     </div>
   } @else {
     <div class="table-wrap">

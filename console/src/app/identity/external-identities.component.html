@@ -33,15 +33,13 @@
          would send the admin looking in the wrong place. -->
     @if (hasPassword() === false) {
       <p class="empty error" i18n="@@No_authority_and_no_password">
-        No authority is linked and this account has no local password: it cannot sign in. Link it
-        to an authority, or set a password.
+        This account cannot sign in: link an authority or set a password.
       </p>
     } @else if (!view.localSignIn) {
       <!-- A password that opens nothing: local sign-in is switched off for the
            whole installation, so this account waits on an authority. -->
       <p class="empty error" i18n="@@Local_sign_in_disabled_for_account">
-        This account has a local password, but local sign-in is disabled here: it can only get in
-        through an authority, and none is linked.
+        Local sign-in is disabled and no authority is linked: this account cannot sign in.
       </p>
     } @else {
       <p class="empty" i18n="@@No_external_authority_for_this_account">

@@ -89,14 +89,13 @@ export interface VaultFileDialogData {
     <mat-dialog-content>
       @if (data.mode === 'export') {
         <p class="hint" i18n="@@Vault_export_hint">
-          Every entry you administer, encrypted under this passphrase. Unlike a configuration
-          export, this file holds the values themselves: do not version it, and delete it once it
-          has been used. Store the passphrase in a password manager: without it nobody reads the file, not even Meerkat.
+          Every entry you administer, values included, encrypted under this passphrase. Do not
+          version the file; without the passphrase nobody can read it.
         </p>
       } @else {
         <p class="hint" i18n="@@Vault_import_hint">
-          An entry that is missing here is created, one that was left empty is filled, and one
-          that already holds a different value is left alone unless you say otherwise.
+          Missing entries are created, empty ones filled; one holding a different value is kept
+          unless you tick the box below.
         </p>
         <div class="file">
           <button matButton="outlined" (click)="picker.click()">
@@ -180,7 +179,7 @@ export interface VaultFileDialogData {
           @if (r.conflicts.length) {
             <div class="warn">
               <ng-container i18n="@@N_left_alone">
-                {{ r.conflicts.length }} left alone: they already hold a different value
+                {{ r.conflicts.length }} kept: they hold a different value
               </ng-container>
               <span class="names">: {{ r.conflicts.join(', ') }}</span>
             </div>
@@ -188,7 +187,7 @@ export interface VaultFileDialogData {
           @if (r.skipped.length) {
             <div class="warn">
               <ng-container i18n="@@N_skipped">
-                {{ r.skipped.length }} skipped: not yours to write, or an unknown organisation
+                {{ r.skipped.length }} skipped: not yours, or unknown organisation
               </ng-container>
               <span class="names">: {{ r.skipped.join(', ') }}</span>
             </div>

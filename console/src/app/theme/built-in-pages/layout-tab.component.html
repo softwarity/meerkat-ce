@@ -11,8 +11,8 @@
     />
   </h3>
   <p class="hint text-muted" i18n="@@Arrangement_hint">
-    Where the brand, the picture and the form sit on every page this gateway serves. A page opened
-    inside an iframe drops the brand and fills the frame on its own, whichever one is chosen.
+    Where the brand, the picture and the form sit on every page. In an iframe, the page drops the
+    brand and fills the frame.
   </p>
 
   <div class="gallery">
@@ -41,9 +41,7 @@
 <mat-card appearance="outlined" class="size-card">
   <h3 i18n="@@Logo_size">Logo size</h3>
   <p class="hint text-muted" i18n="@@Logo_size_hint">
-    The box the logo is drawn in. A wide wordmark laid in the normal one comes out a quarter of its
-    height. Banner draws the mark at its own size, and there is nothing to size until a logo is set
-    on the Branding tab.
+    The box the logo is drawn in. Needs a logo, and Banner ignores it.
   </p>
   <mat-button-toggle-group
     [value]="scope.logoSize()"
@@ -60,8 +58,7 @@
 <mat-card appearance="outlined" class="side-card">
   <h3 i18n="@@Which_side">Which side</h3>
   <p class="hint text-muted" i18n="@@Which_side_hint">
-    The edge the brand takes. Split and Drawer are the two arrangements made of halves; the others
-    have no side to take.
+    The edge the brand takes, for Split and Drawer only.
   </p>
   <mat-button-toggle-group
     [value]="side()"

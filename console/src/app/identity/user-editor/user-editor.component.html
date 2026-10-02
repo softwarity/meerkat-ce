@@ -109,8 +109,8 @@
       <section class="danger-zone">
         <h3 i18n="@@Danger_zone">Danger zone</h3>
         <p class="hint" i18n="@@Delete_user_hint">
-          The account, its memberships, its sessions and its tokens go with it. The audit trail
-          keeps an anonymized trace.
+          Removes the account, its memberships, sessions and tokens. The audit trail stays,
+          anonymized.
         </p>
         <button matButton [disabled]="isMe()" (click)="remove()">
           <mat-icon>delete</mat-icon>

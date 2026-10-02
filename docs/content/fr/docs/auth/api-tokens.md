@@ -99,7 +99,6 @@ propriétaire n'a pas déjà.
 
 | Portée | Ce qu'elle ouvre |
 |---|---|
-| `metrics` | l'exposition `/metrics` et rien d'autre : un identifiant de collecteur |
 | `schedules` | `/api/schedules` et rien d'autre : l'identifiant d'un service qui gère ses [appels planifiés](/docs/operations/scheduler) |
 | `readonly` | les lectures, et les testeurs. Ce qui compte comme une lecture est décidé par point d'entrée, pas par le verbe HTTP |
 | `full` | tout ce que son propriétaire peut faire |

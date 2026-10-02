@@ -19,7 +19,7 @@ service croit.
 
 ## La liste des utilisateurs
 
-![L'écran Users : six comptes, chacun avec ses quatre pastilles de capacité](img/console/users.webp)
+![L'écran Users : six comptes, chacun avec ses cinq pastilles de capacité](img/console/users.webp)
 
 Six comptes. Les pastilles sont des boutons : ici `admin` porte tout, un compte est
 app admin et un autre infra admin, les autres ne portent rien.

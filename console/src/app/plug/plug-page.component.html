@@ -4,11 +4,9 @@
 
 <div class="content">
 <p class="lead" i18n="@@Plug_lead">
-  <b>plug</b> runs a developer's local process as a member of the cluster: their service answers
-  under its real name, and reaches the others by theirs - no port-forward, no code change. A
-  deployed service of the same name is parked for the session and put back after. Developers
-  connect through a tunnel this gateway opens, each with their own key. Everything plug can do -
-  profiles, several clusters at once, volumes, environments - is in
+  <b>plug</b> runs a developer's local service as a member of the cluster, under its real name,
+  through a tunnel this gateway opens. A deployed service of the same name is parked meanwhile.
+  More in
   <a href="https://softwarity.github.io/plug/" target="_blank" rel="noopener">plug's documentation</a>.
 </p>
 
@@ -26,7 +24,7 @@
     <app-ee-lock
       feature="DEV-11"
       i18n-why="@@Plug_ee_why"
-      why="Plug a developer's machine into the cluster: their service under its real name, the others reachable by theirs."
+      why="Run a developer's local service in the cluster, under its real name."
     />
   </div>
 
@@ -55,15 +53,12 @@
        production declaration is the deployment's. -->
   @if (s.production) {
     <p class="hint" i18n="@@Plug_production">
-      This gateway is declared <b>production</b> (MEERKAT_PRODUCTION): the developer surface stays
-      closed here, whatever is switched on.
+      This gateway is declared <b>production</b> (MEERKAT_PRODUCTION): the tunnel stays closed.
     </p>
   } @else if (!s.devMode) {
     <p class="hint" i18n="@@Plug_devmode_off">
-      <b>Developer mode is off</b>, and the tunnel needs it too. It is the application
-      administrator's switch, under <a routerLink="/application/general">Application, General</a>:
-      it decides what this installation offers its developers - the API docs, the simulated
-      sign-ins - where this page decides the port.
+      <b>Developer mode is off</b>, and the tunnel needs it. Turn it on in
+      <a routerLink="/application/general">Application, General</a>.
     </p>
   }
 
@@ -72,9 +67,8 @@
        below follows these two fields as they are typed. -->
   <h3 class="group" i18n="@@Plug_group_address">The address developers use</h3>
   <p class="hint" i18n="@@Plug_address_hint">
-    Where a developer's machine reaches the tunnel, as your platform publishes it - a NodePort, a
-    LoadBalancer, a published Docker port. The commands below follow what you type here. localhost
-    fits a port-forward or a gateway running on the developer's own machine.
+    Where a developer's machine reaches the tunnel (NodePort, LoadBalancer, Docker port). The
+    commands below use it.
   </p>
   <div class="pair">
     <app-form-field
@@ -82,7 +76,7 @@
       i18n-label="@@Plug_host"
       label="Host"
       i18n-info="@@Plug_host_info"
-      info="The name or address a developer's machine reaches the tunnel at, as published - not this gateway's internal name. No scheme, no port."
+      info="The published name or address, not the internal one. No scheme, no port."
     >
       <input
         matInput
@@ -97,7 +91,7 @@
       label="Port"
       [clearable]="false"
       i18n-info="@@Plug_port_info"
-      info="The published port. Empty when nothing sits in between: the tunnel listens on 22222 in the container, and the Helm chart publishes it through the service plug.service (ClusterIP by default - make it a NodePort or a LoadBalancer for laptops outside the cluster)."
+      info="The published port, empty if nothing sits in between (the container listens on 22222). The Helm chart publishes it as plug.service (ClusterIP by default; use a NodePort or LoadBalancer for laptops outside the cluster)."
     >
       <input
         matInput
@@ -147,23 +141,20 @@
     <li>
       @if (os() === 'windows') {
         <p i18n="@@Plug_step_install_windows">
-          <b>Install plug</b>, from <b>Git Bash</b> (it comes with Git for Windows). It installs from
-          this gateway, not from a package manager, and asks once to run as Administrator - later
-          runs need no privilege.
+          <b>Install plug</b> from <b>Git Bash</b> (part of Git for Windows). It asks once for
+          Administrator rights.
         </p>
       } @else {
         <p i18n="@@Plug_step_install_unix">
-          <b>Install plug</b>, from a terminal. It installs from this gateway, not from a package
-          manager, and may ask for your password once - later runs need no privilege.
+          <b>Install plug</b> from a terminal. It may ask for your password once.
         </p>
       }
       <app-snippet filename="install.sh" [downloadable]="false" [content]="installCmd()" />
     </li>
     <li>
       <p i18n="@@Plug_step_rename">
-        <b>Name the profile</b>. The installer names it after the host; a name of your own reads
-        better, above all once a second cluster is installed, and it is what every command below
-        passes with <code>-p</code>. The key pair, once generated, moves with it.
+        <b>Name the profile</b>, passed with <code>-p</code> by every command below. The installer
+        names it after the host.
       </p>
       <app-form-field
         class="profile"
@@ -171,7 +162,7 @@
         i18n-label="@@Plug_profile"
         label="Profile name"
         i18n-info="@@Plug_profile_info"
-        info="Only changes the commands on this page: nothing is saved, the profile lives on the developer's machine."
+        info="Only changes the commands on this page; nothing is saved."
       >
         <input
           matInput
@@ -184,23 +175,22 @@
     </li>
     <li>
       <p i18n="@@Plug_step_keys">
-        <b>Generate the key pair</b>, once. plug keeps it under ~/.plug/keys; the second line prints
-        the public half and puts it on the clipboard.
+        <b>Generate the key pair</b>, once. The second line copies the public key to the
+        clipboard.
       </p>
       <app-snippet filename="key-pair.sh" [downloadable]="false" [content]="keyCmd()" />
     </li>
     <li>
       <p i18n="@@Plug_step_deposit">
         <b>Deposit the public key</b> on your profile, signed in to the applications:
-        <a [href]="keyPage()" target="_blank" rel="noopener">{{ keyPage() }}</a> - or from any
-        application, the user menu, Developer, plug key. Removing it there closes the door at the
-        next connection.
+        <a [href]="keyPage()" target="_blank" rel="noopener">{{ keyPage() }}</a>, or from the user
+        menu, Developer, plug key. Removing it blocks the next connection.
       </p>
     </li>
     <li>
       <p i18n="@@Plug_step_run">
         <b>Plug a service in</b>: prefix the command that runs it. The cluster reaches it as
-        my-service:8080, forwarded to your local 3000, for as long as it runs.
+        my-service:8080, forwarded to your local 3000.
       </p>
       <app-snippet filename="run.sh" [downloadable]="false" [content]="runCmd()" />
     </li>
@@ -211,7 +201,7 @@
   <h3 class="group" i18n="@@Plug_group_developers">Developers</h3>
   @if (s.developers.length === 0) {
     <p class="hint" i18n="@@Plug_no_developers">
-      Nobody holds the developer capability yet. It is granted per account, under
+      Nobody holds the developer capability yet. Grant it in
       <a routerLink="/application/users">Application, Users</a>.
     </p>
   } @else {

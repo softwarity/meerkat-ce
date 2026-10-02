@@ -46,14 +46,15 @@ and the agent endpoint. In production, in a company, commercially, for free.
 | **Roles from the directory** | Granted in Meerkat | Group rules: an LDAP group, a GitHub team or an OIDC claim becomes a membership and its roles, at each sign-in. |
 | **Business hours** | - | Access windows: time ranges, week days, time zone. Partial - see the [roadmap](/project/roadmap). |
 | **Several gateways** | One gateway on its embedded storage | Active/active on one shared PostgreSQL: change bus, shared certificates, no session affinity to ask for. See [the cluster page](/docs/deploy/kubernetes). |
-| **Monitoring** | Traffic and metrics screens, built in, nothing to install | The same screens, plus a Prometheus exposition so the stack you already run can scrape them, and the same counters pushed over OTLP to your collector. |
+| **Monitoring** | Traffic and metrics screens, built in, nothing to install. Logs written as OpenTelemetry JSON for a node agent. | The same screens, plus export to your OpenTelemetry collector: traces, metrics and logs pushed over OTLP. |
+| **Audit** | The audit trail, in the console | The trail sent to your collector, Endpoint audit per operation, and CSV export. |
 | **Saved configurations** | Three at a time, and the console says which one you are on before you hit the cap | As many as you like - one per customer, one per environment. |
 | **Built-in pages** | Your colours, your logo, your name, the centred arrangement | The split, drawer, banner and bare arrangements too, and the Meerkat mark off the pages you serve. |
 | **Developer tunnel** | plug runs beside the gateway, which is plug's own default | The tunnel inside the gateway, and every substitution attributed to the developer who posed it. See [Dev mode](/product/dev-mode). |
 | **Support** | The repository: an issue is read, and the answer stays where it helps the next person | Part of the agreement - you reach the people who wrote the gateway, not a tier. |
 
 Announced and not built yet: SAML 2.0, Kerberos, and exporting the audit trail
-to analytical formats. The [roadmap](/project/roadmap) says where each stands.
+to Parquet. The [roadmap](/project/roadmap) says where each stands.
 
 ## Which one you need
 

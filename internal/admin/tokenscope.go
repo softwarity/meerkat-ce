@@ -10,8 +10,8 @@ import (
 // A control-plane token's perimeter, enforced (MCP-02).
 //
 // ONE axis, and it stayed one on purpose: a token opens a control plane, and
-// what varies is how far into it - everything, reads only, the exposition, the
-// scheduled calls. Confining it to a PART of the administration used to be a
+// what varies is how far into it - everything, reads only, the scheduled
+// calls. Confining it to a PART of the administration used to be a
 // second axis on the same token; what it confined is what the ACCOUNT already
 // decides, so it was a second rights model to explain to whoever mints one.
 //
@@ -47,10 +47,6 @@ var readsNothing = map[string]bool{
 	// The agent endpoint carries both kinds and sorts them per tool: an
 	// annotated read-only tool answers, a mutating one is refused by name.
 	"/mcp": true,
-	// The exposition. Registered without a verb - a scraper that mistypes the
-	// method must be refused here rather than answered by the console's
-	// catch-all - so the verb cannot classify it, and it reads counters.
-	"/metrics": true,
 }
 
 // readsOnly reports whether this request only reads.

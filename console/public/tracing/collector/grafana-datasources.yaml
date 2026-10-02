@@ -1,0 +1,46 @@
+# /etc/grafana/provisioning/datasources/meerkat.yaml
+#
+# Grafana's three sources for what the Collector stores - Prometheus (the
+# counters), Tempo (the traces), Loki (the logs and the audit) - already
+# coupled: from a trace to its service's metrics and its logs, from a log line
+# to its trace. grafana-dashboard.json reads the Prometheus one by its uid.
+# Change the three addresses to yours.
+
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: meerkat-prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+  - name: Tempo
+    type: tempo
+    uid: meerkat-tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      tracesToMetrics:
+        datasourceUid: meerkat-prometheus
+      tracesToLogsV2:
+        datasourceUid: meerkat-loki
+        filterByTraceID: true
+      serviceMap:
+        datasourceUid: meerkat-prometheus
+      nodeGraph:
+        enabled: true
+      streamingEnabled:
+        search: false
+        metrics: false
+  - name: Loki
+    type: loki
+    uid: meerkat-loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        - name: trace
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: meerkat-tempo
+          url: "$${__value.raw}"

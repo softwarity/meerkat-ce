@@ -2,26 +2,6 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-// Whether /metrics is exposed, whether this image could, and where it answers.
-// The path comes from the gateway rather than being assembled here: one place
-// decides it, and an example a reader pastes has to carry the real one.
-export interface MetricsSetting {
-  enabled: boolean;
-  // Whether the metrics port asks a scraper for a token. Off by default: the
-  // port is never published, so the network is the lock.
-  requireToken: boolean;
-  // The port the gateway opens for scrapers while the exposition is on.
-  metricsPort: number;
-  enterprise: boolean;
-  path: string;
-  // The port the gateway listens on, which is not the one the console was
-  // reached at as soon as anything maps or terminates in between.
-  port: string;
-  // Where the data plane answers: the two monitoring UIs are served through a
-  // route, and neither can guess the public URL it lives under.
-  dataOrigin: string;
-}
-
 // The developer tunnel (DEV-11), Infra, Plug. Mirrors admin.plugAnswer.
 export interface PlugSetting {
   enabled: boolean;
@@ -44,14 +24,14 @@ export interface PlugState extends PlugSetting {
   developers: { username: string; fullname?: string; keys: { fingerprint: string; comment?: string }[] }[];
 }
 
-// Where this gateway's traces and pushed counters go (OBS-04, OBS-05).
+// Where this gateway's traces and pushed counters go (OBS-04, OBS-06).
 // Mirrors store.TelemetryConfig.
 export interface TelemetryConfig {
   // Anything leaves for the collector at all; WHAT leaves is the two below.
   enabled: boolean;
   // The spans. Which routes produce any is each route's own answer.
   traces: boolean;
-  // The counters /metrics exposes, pushed over OTLP to the same collector.
+  // The counters the Metrics screen draws, pushed over OTLP to the same collector.
   metrics?: boolean;
   // The collector's BASE address; the /v1/traces path is added by the
   // exporter, so pasting a vendor's full endpoint is not a second one.
@@ -70,9 +50,26 @@ export interface TelemetryConfig {
   // an upstream, each query to the store. Off by default: it never adds a
   // trace, but it deepens every recorded one.
   gatewayDetail?: boolean;
+  // The signed-in caller on the spans: the account's and the organisation's
+  // ids and names. Off by default - it is personal data in the collector.
+  caller?: boolean;
+  // The data plane's audit, sent to the collector as logs: the accounts'
+  // sign-ins and refusals, and the audited endpoints' calls (AUD-03, AUD-04).
+  audit?: boolean;
+  // The console's audit too: its changes and its sign-ins.
+  auditConsole?: boolean;
+  // Both logs written in OpenTelemetry's JSON format, on the same outputs,
+  // for an agent to read...
+  logs?: boolean;
+  // ...or pushed to the collector over OTLP. One or the other.
+  logsPush?: boolean;
 }
 
 export interface TelemetrySetting extends TelemetryConfig {
+  // Audit events a full queue had to drop since the gateway started.
+  auditLost?: number;
+  // Pushed log lines dropped since the gateway started.
+  logsLost?: number;
   // A LITERAL header value is stored: something authenticates to the collector
   // that this payload does not carry. A reference travels, so it does not
   // raise this - the field tells the two states apart by it (VAULT-05).
@@ -162,6 +159,9 @@ export interface RateLimit {
 export interface EndpointPolicy extends Access {
   method: string;
   path: string;
+  // Poses no access rule: the route's applies. An entry without it and without
+  // access fields is the deliberate reopening to the upstream.
+  inherit?: boolean;
   // What this one operation may carry (QUOTA-05), on top of the route's own
   // bounds. Chosen operation by operation and never a default over the whole
   // inventory: a bound is a counter per (operation, caller).
@@ -196,6 +196,22 @@ export interface OpenAPIOperation {
 
 // What the endpoint-security editor loads: the API metadata, the live operation
 // list fetched from the upstream, and the currently saved security to overlay.
+// An audited operation (AUD-04): its calls become audit events sent to the
+// collector, with the caller, the fields named here and, on request, the body.
+export interface AuditField {
+  name: string;
+  from: 'path' | 'query' | 'header' | 'body';
+  key: string;
+}
+export interface EndpointAudit {
+  method: string;
+  path: string;
+  description?: string;
+  fields?: AuditField[];
+  body?: boolean;
+  mask?: string[];
+}
+
 export interface RouteOperations {
   title?: string;
   version?: string;
@@ -208,6 +224,7 @@ export interface RouteOperations {
   // The route's base Access (the "whole route" default).
   access: Access;
   operations: OpenAPIOperation[];
+  audit?: EndpointAudit[];
   security?: EndpointSecurity;
 }
 
@@ -1008,10 +1025,11 @@ export interface Issue {
 // server for the whole control plane - the REST API and the agent endpoint
 // alike, since the same token opens both.
 // The narrowest first, which is also the order a form offers them in.
-// `metrics` opens /metrics and nothing else: a scraper's credential sits in a
-// monitoring stack's configuration, often another team's repository, and a
-// read-only token there would hand whoever finds it the whole configuration.
-export type TokenScope = 'metrics' | 'schedules' | 'readonly' | 'full';
+// `schedules` opens the scheduled calls and nothing else: a service's
+// credential sits in a deployment manifest, often another team's repository,
+// and a read-only token there would hand whoever finds it the whole
+// configuration.
+export type TokenScope = 'schedules' | 'readonly' | 'full';
 
 // The second axis: what a token may act ON. It MASKS its owner's capabilities
 // rather than adding a rights model of its own - a gateway token minted by
@@ -1774,6 +1792,11 @@ export class ApiService {
 
   // Saves the route's base Access ("whole route") plus the per-operation
   // overrides. No override and an empty Access clears security entirely.
+  // The route's audited operations (AUD-04); an empty list stops auditing it.
+  saveRouteAudit(id: string, endpoints: EndpointAudit[]): Observable<{ endpoints: EndpointAudit[] }> {
+    return this.http.put<{ endpoints: EndpointAudit[] }>(`/api/routes/${encodeURIComponent(id)}/audit`, { endpoints });
+  }
+
   saveRouteSecurity(id: string, security: RouteSecurity): Observable<RouteSecurity> {
     return this.http.put<RouteSecurity>(`/api/routes/${encodeURIComponent(id)}/security`, security);
   }
@@ -2544,24 +2567,8 @@ export class ApiService {
     });
   }
 
-  // Whether this gateway exposes /metrics for a monitoring stack to scrape
-  // (OBS-05). `enterprise` is read-only: which image is running is decided by
-  // what was deployed, never by a request, so the console shows the switch as
-  // LOCKED rather than as off.
-  metricsSetting(): Observable<MetricsSetting> {
-    return this.http.get<MetricsSetting>('/api/settings/metrics');
-  }
-
-  setMetricsSetting(cfg: {
-    enabled: boolean;
-    requireToken: boolean;
-    metricsPort: number;
-  }): Observable<MetricsSetting> {
-    return this.http.put<MetricsSetting>('/api/settings/metrics', cfg);
-  }
-
-  // Where this gateway's traces go (OBS-04). Same shape as the Prometheus
-  // switch, and the same read-only `enterprise`. What comes back is RAW: a
+  // Where this gateway's traces go (OBS-04). `enterprise` is read-only: which
+  // image is running is decided by what was deployed, never by a request. What comes back is RAW: a
   // header value of `$otlp-token` is the reference as written, never the
   // secret behind it - the exporter resolves it at the moment of the call.
   telemetrySetting(): Observable<TelemetrySetting> {

@@ -19,6 +19,8 @@ import { Subject, catchError, debounceTime, firstValueFrom, map, of } from 'rxjs
 import {
   Access,
   ApiService,
+  AuditField,
+  EndpointAudit,
   EndpointPolicy,
   OpenAPIOperation,
   RateLimit,
@@ -32,6 +34,11 @@ import {
 import { AccessBadgesComponent } from './access-badges.component';
 import { AccessEditorComponent, AccessState, emptyAccess, isEmpty } from './access-editor.component';
 import { RateLimitsComponent, limitLabel, limitScope, limitScopeTip } from '../rate-limits.component';
+import { MatInputModule } from '@angular/material/input';
+
+// The three questions one screen answers, one per menu entry: who may call an
+// operation, how much it may carry, and whether its calls are audited.
+type Intent = 'security' | 'limits' | 'audit';
 
 // One operation's editable state: whether it overrides the route-wide default,
 // and (when it does) its own access rule.
@@ -68,6 +75,11 @@ function toPolicy(method: string, path: string, s: OpState): EndpointPolicy {
     if (a.tenants.length) ep.tenants = a.tenants;
     if (a.roles.length) ep.roles = a.roles;
     if (a.users.length) ep.users = a.users;
+  } else {
+    // Said, not implied: an entry with no access fields would READ as the
+    // deliberate reopening to the upstream, and a bound alone would open the
+    // operation to anyone.
+    ep.inherit = true;
   }
   if (s.limits.length) ep.limits = s.limits;
   return ep;
@@ -98,6 +110,7 @@ function fromWire(a: Access | undefined): AccessState {
     MatExpansionModule,
     MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
     MatProgressBarModule,
     MatSelectModule,
     MatSidenavModule,
@@ -149,9 +162,81 @@ export class EndpointSecurityComponent {
   // what is reachable: both halves are always there, or an entry would be a
   // dead end for the other question.
   protected readonly intent = toSignal(
-    inject(ActivatedRoute).data.pipe(map((d) => (d['intent'] === 'limits' ? 'limits' : 'security'))),
-    { initialValue: 'security' as 'security' | 'limits' },
+    inject(ActivatedRoute).data.pipe(
+      map((d) => (d['intent'] === 'limits' || d['intent'] === 'audit' ? d['intent'] : 'security') as Intent),
+    ),
+    { initialValue: 'security' as Intent },
   );
+
+  // Endpoint audit (AUD-04), per operation, keyed like the rest. Kept apart
+  // from the access state on purpose: auditing observes, it decides nothing.
+  private readonly audits = signal<Record<string, EndpointAudit>>({});
+  // Audited operations the spec no longer declares: kept on save.
+  private readonly auditExtras = signal<EndpointAudit[]>([]);
+  protected readonly auditedCount = computed(() => Object.keys(this.audits()).length);
+  // Whether audit events leave at all: the OpenTelemetry Audit switch governs
+  // every audit, these operations' included. Read once, for the warning.
+  protected readonly auditSent = toSignal(
+    this.api.telemetrySetting().pipe(
+      map((t) => !!(t.enabled && t.audit)),
+      catchError(() => of(true)),
+    ),
+    { initialValue: true },
+  );
+  protected readonly auditSources: { value: AuditField['from']; label: string }[] = [
+    { value: 'path', label: $localize`:@@Audit_from_path:Path variable` },
+    { value: 'query', label: $localize`:@@Audit_from_query:Query parameter` },
+    { value: 'header', label: $localize`:@@Audit_from_header:Header` },
+    { value: 'body', label: $localize`:@@Audit_from_body:Body (JSON pointer)` },
+  ];
+
+  protected auditOf(o: OpenAPIOperation): EndpointAudit | undefined {
+    return this.audits()[opKey(o.method, o.path)];
+  }
+
+  // On: pre-filled with the operation's summary, which is what the event says.
+  protected setAudited(o: OpenAPIOperation, on: boolean): void {
+    const k = opKey(o.method, o.path);
+    this.audits.update((a) => {
+      const next = { ...a };
+      if (on) next[k] = { method: o.method.toUpperCase(), path: o.path, description: o.summary ?? '' };
+      else delete next[k];
+      return next;
+    });
+    this.scheduleSave();
+  }
+
+  protected patchAudit(o: OpenAPIOperation, patch: Partial<EndpointAudit>): void {
+    const k = opKey(o.method, o.path);
+    const cur = this.audits()[k];
+    if (!cur) return;
+    this.audits.update((a) => ({ ...a, [k]: { ...cur, ...patch } }));
+    this.scheduleSave();
+  }
+
+  protected addAuditField(o: OpenAPIOperation): void {
+    const fields = [...(this.auditOf(o)?.fields ?? []), { name: '', from: 'path' as const, key: '' }];
+    this.patchAudit(o, { fields });
+  }
+
+  protected setAuditField(o: OpenAPIOperation, i: number, patch: Partial<AuditField>): void {
+    const fields = (this.auditOf(o)?.fields ?? []).map((f, j) => (j === i ? { ...f, ...patch } : f));
+    this.patchAudit(o, { fields });
+  }
+
+  protected removeAuditField(o: OpenAPIOperation, i: number): void {
+    this.patchAudit(o, { fields: (this.auditOf(o)?.fields ?? []).filter((_, j) => j !== i) });
+  }
+
+  protected setAuditMask(o: OpenAPIOperation, text: string): void {
+    const mask = text
+      .split(',')
+      .map((m) => m.trim())
+      .filter((m) => m);
+    this.patchAudit(o, { mask });
+  }
+
+  protected readonly defaultMask = 'password, passwd, secret, token, apiKey, api_key, authorization, cookie';
   // Which operation the drawer is showing. Which SECTION is no longer a
   // question: the page decides, and the drawer carries the one the page is
   // about.
@@ -327,6 +412,16 @@ export class EndpointSecurityComponent {
   }
 
   private seed(ops: RouteOperations): void {
+    const known = new Set(ops.operations.map((o) => opKey(o.method, o.path)));
+    const audits: Record<string, EndpointAudit> = {};
+    const strayAudits: EndpointAudit[] = [];
+    for (const a of ops.audit ?? []) {
+      const k = opKey(a.method, a.path);
+      if (known.has(k)) audits[k] = a;
+      else strayAudits.push(a);
+    }
+    this.audits.set(audits);
+    this.auditExtras.set(strayAudits);
     // The "whole route" default is the route's own Access now; overrides come
     // from the endpoint-security block.
     this.routeAccess.set(fromWire(ops.access));
@@ -395,7 +490,7 @@ export class EndpointSecurityComponent {
   protected readonly label = (l: RateLimit) => limitLabel(l, 'operation');
   protected readonly scope = limitScope;
   protected readonly scopeTip = limitScopeTip;
-  protected readonly inheritsTip = $localize`:@@Bounded_by_the_route:Bounded by whatever the route carries, and by nothing of its own.`;
+  protected readonly inheritsTip = $localize`:@@Bounded_by_the_route:Only the route's limits apply.`;
 
   protected setOpLimits(o: OpenAPIOperation, limits: RateLimit[]): void {
     const k = opKey(o.method, o.path);
@@ -470,6 +565,23 @@ export class EndpointSecurityComponent {
   private async persist(): Promise<void> {
     const id = this.selectedId();
     if (!id) return;
+    if (this.intent() === 'audit') {
+      // Only what can be valid leaves: a field being typed is kept on screen
+      // until it has a name and a key.
+      const endpoints = [...Object.values(this.audits()), ...this.auditExtras()].map((a) => ({
+        ...a,
+        fields: (a.fields ?? []).filter((f) => f.name.trim() && f.key.trim()),
+      }));
+      this.saveState.set('saving');
+      try {
+        await firstValueFrom(this.api.saveRouteAudit(id, endpoints));
+        this.saveState.set('saved');
+      } catch (e) {
+        this.saveError.set(this.message(e));
+        this.saveState.set('error');
+      }
+      return;
+    }
     const endpoints: EndpointPolicy[] = [];
     for (const o of this.operations()) {
       const s = this.state()[opKey(o.method, o.path)];

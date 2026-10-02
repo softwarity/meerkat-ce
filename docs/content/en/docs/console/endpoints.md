@@ -7,11 +7,12 @@ summary: Setting who may call each operation of an API, and how much it may carr
 
 # Endpoint security and rate limits
 
-**Infra > Endpoint security** and **Infra > Endpoint rate limits** are two
-entries onto one inventory: the operations the gateway reads from a route's
-OpenAPI spec. Security asks *who may call this*, rate limits ask *how much*. They
-are two menu entries because those are two questions people arrive with, and a
-menu naming neither is a menu where neither is found.
+**Infra > Endpoint security**, **Infra > Endpoint rate limits** and **Infra >
+Endpoint audit** are three entries onto one inventory: the operations the
+gateway reads from a route's OpenAPI spec. Security asks *who may call this*,
+rate limits ask *how much*, audit asks *which calls to record* (Enterprise, see
+[auditing a route's operations](/docs/operations/audit#auditing-a-routes-operations)).
+This page covers the first two.
 
 ## Before you start
 
@@ -52,7 +53,7 @@ The drawer carries one switch, **Override the route config**.
 
 ![The same access editor, on a route's Security section: a level, a list of roles, and an exception for named users](img/console/route-editor-security.webp)
 
-The same editor, here on the *Billing* route: the level, the roles (any one
+The same editor, here on the *Orders API* route: the level, the roles (any one
 grants access, held in the active organisation), and the exception for named
 users. An operation's drawer shows exactly this once the override is on.
 
@@ -66,6 +67,8 @@ through a rule written for everyone else.
 > *delegated* and not *public*.
 
 ## On the rate limits page
+
+![The rate limits page: the bounds an operation carries, in the first column](img/console/endpoint-limits.webp)
 
 The drawer holds the operation's own bounds, **on top of** the route's, which
 still apply. A bound is a counter, and you choose what it is keyed on:

@@ -45,6 +45,10 @@ import (
 // Header is the name the whole world agreed on for trace context.
 const Header = "traceparent"
 
+// StateHeader carries the vendors' notes on a journey (W3C tracestate). Ours
+// is one: the browser bundle writes meerkat=b on the journeys it opens.
+const StateHeader = "tracestate"
+
 // SpanContext is one request's place in a journey.
 type SpanContext struct {
 	// TraceID names the journey: 32 lowercase hex, stable end to end.

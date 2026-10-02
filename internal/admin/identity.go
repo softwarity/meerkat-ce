@@ -58,18 +58,12 @@ func (a *API) authed(next userHandler) http.Handler {
 				"this token is read-only: it may read the gateway and run the testers, not change anything")
 			return
 		}
-		// A scraper's token opens the exposition and nothing else (OBS-05).
-		// Refused HERE rather than by each endpoint declining it, for the same
-		// reason read-only is: a perimeter written once holds for the endpoint
-		// somebody adds next month without knowing this rule exists.
-		if sess.TokenScope == store.ScopeMetrics && r.URL.Path != expositionPath {
-			writeErr(w, http.StatusForbidden,
-				"this token opens "+expositionPath+" and nothing else: it is a scraper's credential, not an operator's")
-			return
-		}
-		// And a service's token opens its own scheduled calls, the same way
-		// (SCHED-01): it lives in a deployment manifest, so what it can reach
-		// when it leaks is one API and one account's schedules.
+		// A service's token opens its own scheduled calls and nothing else
+		// (SCHED-01). Refused HERE rather than by each endpoint declining it,
+		// for the same reason read-only is: a perimeter written once holds for
+		// the endpoint somebody adds next month without knowing this rule
+		// exists. It lives in a deployment manifest, so what it can reach when
+		// it leaks is one API and one account's schedules.
 		if sess.TokenScope == store.ScopeSchedules && !strings.HasPrefix(r.URL.Path, schedulesPath) {
 			writeErr(w, http.StatusForbidden,
 				"this token opens "+schedulesPath+" and nothing else: it is a service's credential, not an operator's")

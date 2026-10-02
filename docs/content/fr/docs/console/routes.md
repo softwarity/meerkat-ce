@@ -21,8 +21,9 @@ qui est en dessous.
 
 ## La liste
 
-Une ligne par route : son nom, ce qu'elle décide de l'accès, ce qu'elle filtre, et
-où elle envoie. L'ordre compte - **la première route qui matche gagne** - donc le
+Une ligne par route : son nom, ce qu'elle décide de l'accès, et une colonne
+**Matching and target** sur deux lignes : ce qu'elle matche, puis où elle
+envoie. L'ordre compte - **la première route qui matche gagne** - donc le
 tableau est ordonné, pas trié.
 
 - **La poignée de glissement** déplace une route vers le haut ou le bas et
@@ -80,17 +81,15 @@ Le nom est dans l'en-tête. La colonne de gauche liste les sections, groupées :
 
 | Groupe | Sections |
 |---|---|
-| - | **Target**, **Identity** |
+| - | **Target**, **Identity**, **OpenTelemetry** |
 | Filters | Security, Predicates, Gates, Rate limits |
-| Modifiers | Incoming, Outgoing |
-| Forwarders | Auth forward |
-| UI | Locales, Color scheme, User button, User info, Tracing, Custom |
+| Modifiers | Incoming, Outgoing, Auth forward |
+| UI | Locales, Color scheme, User button, User info, Custom |
 
-**Identity** est à côté de Target plutôt que dans un groupe : ce qu'une route sait
-du caller n'est ni un filtre, ni un modificateur, ni un forwarder - c'est ce qu'il
-y a À transmettre, et deux sections le dépensent. **Auth forward** l'envoie au
-service (en-têtes ou JWT) ; **User info** le dépose sur la page. Les faits et leurs
-noms se règlent une fois, dans Identity.
+**Identity** est ce que la route sait de l'appelant. Deux sections le
+dépensent : **Auth forward** l'envoie au service, **User info** le dépose sur la
+page. **OpenTelemetry** décide si la route est tracée (voir
+[les traces](/docs/operations/tracing#choisir-les-routes-traces)).
 
 ### Lire les marques
 
@@ -159,7 +158,7 @@ Sur une route proxy, on règle aussi :
   débloque les [écrans d'endpoints](/docs/console/endpoints) et le swagger
   développeur.
 
-![La section Predicates : un prédicat de chemin à deux motifs, un prédicat de méthode et un prédicat d'en-tête](img/console/route-editor-predicates.webp)
+![La section Predicates : un prédicat de chemin, un prédicat de méthode et un prédicat d'en-tête à deux valeurs acceptées](img/console/route-editor-predicates.webp)
 
 Les briques s'empilent dans le panneau, chacune avec son explication et son bouton
 de retrait. Ici : deux motifs de chemin, quatre méthodes, et un en-tête qui
@@ -173,7 +172,7 @@ leur propre référence :
 - **[Prédicats](/docs/predicates/overview)** - les façons dont une route décide qu'une requête est pour elle.
 - **[Filtres](/docs/filters/overview)** - les façons dont elle la transforme, et les gates qui la refusent.
 
-![La section Incoming : un filtre strip-prefix et un filtre set-request-header, chacun avec ses flèches pour le déplacer](img/console/route-editor-filters.webp)
+![La section Incoming : un filtre strip-prefix et deux filtres set-request-header, dont un qui lit une entrée du coffre, chacun avec ses flèches pour le déplacer](img/console/route-editor-filters.webp)
 
 Les filtres s'appliquent dans l'ordre où ils sont listés, et les flèches de
 chaque carte le déplacent vers le haut ou le bas.

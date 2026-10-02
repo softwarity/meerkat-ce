@@ -80,7 +80,7 @@ export class FiltersComponent implements FormValueControl<Spec[]> {
   protected readonly intro = computed(() => {
     switch (this.phase()) {
       case 'gate':
-        return $localize`:@@Gate_intro:What this route refuses to carry, checked in order before anything else it does. Unlike a predicate or an access rule - which let the next route try - a gate that refuses answers the caller and stops there. Remove a gate to lift its limit.`;
+        return $localize`:@@Gate_intro:What this route refuses, checked in order before anything else. A gate that refuses answers the caller: no other route is tried.`;
       case 'request':
         return $localize`:@@Incoming_modifiers_intro:Applied in order to the request before it reaches the service.`;
       case 'response':

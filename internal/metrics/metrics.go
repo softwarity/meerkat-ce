@@ -6,9 +6,9 @@
 //   - The console's own screens read a RING of samples taken every few
 //     seconds. They want a curve over the last hour, live, with no monitoring
 //     stack to install - which is the promise the community edition makes.
-//   - A Prometheus reads the raw totals through /metrics. It scrapes on its
-//     own schedule and does its own differencing, so it wants counters that
-//     only ever go up, never a window.
+//   - A collector receives the raw totals, pushed over OTLP (push.go), and
+//     writes them into Prometheus or whatever the stack keeps. It does its own
+//     differencing, so it wants counters that only ever go up, never a window.
 //
 // The counters are therefore monotonic and the window is derived from them by
 // a sampler, rather than the other way round. Deriving totals from a window
@@ -68,7 +68,15 @@ type Route struct {
 	ID   string
 	Name string
 	counters
+	// excluded is a route that said no to OpenTelemetry: still counted - the
+	// console's own screen and the gateway's totals include it - but its own
+	// series do not leave (ee/telemetry's push).
+	excluded atomic.Bool
 }
+
+// Exclude says whether this route's own series leave with the push. Set at
+// compile time, from the route's OpenTelemetry switch.
+func (r *Route) Exclude(on bool) { r.excluded.Store(on) }
 
 // Endpoint is one OPERATION's counters, inside a route.
 //
@@ -155,6 +163,9 @@ type RouteSnapshot struct {
 	Buckets  []uint64  `json:"buckets"`
 	SumSecs  float64   `json:"sumSecs"`
 	Failures [4]uint64 `json:"failures"`
+	// Excluded: the route said no to OpenTelemetry, so its own series do not
+	// leave with the push; it still counts in the gateway's totals.
+	Excluded bool `json:"excluded,omitempty"`
 }
 
 // Total is every request this route answered, whatever the outcome.
@@ -184,6 +195,7 @@ func (r *counters) read() RouteSnapshot {
 func (r *Route) snapshot() RouteSnapshot {
 	out := r.read()
 	out.ID, out.Name = r.ID, r.Name
+	out.Excluded = r.excluded.Load()
 	return out
 }
 
@@ -345,8 +357,8 @@ func (reg *Registry) Snapshot() Snapshot {
 }
 
 // Origin is the zero instant, and asking Operations for it asks for everything
-// since the process started - which is what a scraper wants, since it does its
-// own differencing. Named rather than written as a bare time.Time{} at the
+// since the process started - which is what the OTLP push wants, since the
+// collector does its own differencing. Named rather than written as a bare time.Time{} at the
 // call sites: the meaning is the point, not the value.
 var Origin time.Time
 

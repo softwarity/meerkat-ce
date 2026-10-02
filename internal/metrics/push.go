@@ -6,8 +6,9 @@ import (
 	"time"
 )
 
-// Pushing the counters to an OpenTelemetry collector (OBS-05), the other way
-// out beside /metrics: a stack that RECEIVES rather than scrapes.
+// Pushing the counters to an OpenTelemetry collector (OBS-06), the one way
+// they leave this gateway: the collector writes them where the stack keeps
+// them, Prometheus or otherwise.
 //
 // The same seam as the traces (internal/tracing): the trunk says when, the
 // Enterprise package knows the format. The community binary links no pusher,

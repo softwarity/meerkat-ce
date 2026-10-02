@@ -3,6 +3,7 @@
 :host {
   display: flex;
   min-height: 0;
+  min-width: 0;
   flex: 1 1 auto;
 }
 .table-wrap {
@@ -12,10 +13,6 @@
 // clears it from INSIDE, so the page keeps no empty band under the table.
 mat-row:last-of-type {
   margin-bottom: 56px;
-}
-.muted {
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.85em;
 }
 .off {
   opacity: 0.45;
@@ -77,6 +74,48 @@ mat-row.clickable:hover {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+// The name column: narrow and fixed - the name, its marks and the handle - so
+// the route column gets the rest. A long name ends in an ellipsis rather than
+// pushing the table.
+.mat-column-name {
+  flex: 0 0 220px;
+}
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+// What the route catches (quiet) above where it sends it (the primary role,
+// the thing one reads first when scanning for a service). Each line keeps to
+// one line and ends in an ellipsis.
+.mat-column-route {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+// overflow on the cell too: a column flexbox sizes its lines to their whole
+// unwrapped text, and a long matching line pushed the row past the card.
+.route-cell {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.route-cell > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.matching {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+.filters {
+  color: var(--mat-sys-tertiary);
+}
+.target {
+  color: var(--mat-sys-primary);
 }
 /* while a row is dragging, keep it visually intact on top */
 .cdk-drag-preview {

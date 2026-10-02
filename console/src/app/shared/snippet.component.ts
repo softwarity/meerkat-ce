@@ -18,8 +18,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 // file you do not - and telling somebody to select twenty lines of YAML in a
 // scrolling box with their mouse is how a good example goes unused.
 //
-// The filename is not decoration either: `prometheus.yml` and `servicemonitor.yaml`
-// have to land under those names, and a browser's "download.txt" makes the
+// The filename is not decoration either: `collector.yaml` and `tempo.yaml` have
+// to land under those names, and a browser's "download.txt" makes the
 // reader do the one step the example was meant to save.
 @Component({
   selector: 'app-snippet',
@@ -173,8 +173,8 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
   // reader has to get RIGHT - a payload to post, a file to mount - and a
   // misread bracket in either is a support question. Shell too, now that
   // commands are handed out to be pasted into a terminal (the plug page): a
-  // pipe, a flag and an argument read apart at a glance. The rest - PromQL,
-  // an HTTP exchange - keeps its comments coloured and nothing more.
+  // pipe, a flag and an argument read apart at a glance. The rest - an HTTP
+  // exchange - keeps its comments coloured and nothing more.
   private language() {
     const name = this.filename();
     if (/\.ya?ml$/.test(name)) return [yaml()];
@@ -200,8 +200,8 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
   }
 }
 
-// Shell and PromQL both comment with #, and neither has a language package
-// installed. One regex covers the two, which is what this file needs: the
+// What is neither YAML, JSON nor shell comments with #, mostly. One regex
+// covers it, which is what this file needs: the
 // snippets that are not YAML are mostly explanation, and a comment that reads
 // as code is the one thing worth fixing about them.
 //

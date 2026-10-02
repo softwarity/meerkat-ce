@@ -31,7 +31,6 @@ package logging
 
 import (
 	"log/slog"
-	"os"
 	"strings"
 )
 
@@ -80,14 +79,8 @@ func Setup(o Options) Format {
 	// standard output free to mean one thing only: the access log. A person
 	// tailing one is not drowned by the other even before a collector has
 	// looked at the type field.
-	opts := &slog.HandlerOptions{Level: level}
-	var h slog.Handler
-	if format == FormatJSON {
-		h = slog.NewJSONHandler(os.Stderr, opts)
-	} else {
-		h = slog.NewTextHandler(os.Stderr, opts)
-	}
-	slog.SetDefault(slog.New(h))
+	base.Store(format)
+	install()
 	return format
 }
 

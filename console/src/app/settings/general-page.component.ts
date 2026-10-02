@@ -145,7 +145,7 @@ export class GeneralPageComponent {
     if (!multi) {
       const ok = await this.dialogs.confirm({
         title: $localize`:@@Serve_one_organisation:Serve a single organisation?`,
-        message: $localize`:@@Serve_one_organisation_message:The other organisations stop being served and the people in them lose access to whatever asks for one. Nothing is deleted: switching back brings them and their access straight back.`,
+        message: $localize`:@@Serve_one_organisation_message:The other organisations stop being served and their people lose access. Nothing is deleted: switching back restores them.`,
         confirmLabel: $localize`:@@Switch:Switch`,
         danger: true,
       });

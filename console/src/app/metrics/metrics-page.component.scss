@@ -209,11 +209,3 @@ h2.over {
   letter-spacing: 0.03em;
   cursor: help;
 }
-
-/* The Enterprise badge rides INSIDE this button, and the button is filled
-   once /metrics is exposed - tertiary pink on the primary ground, which is
-   two hues and no contrast. On a button, the legible answer is the button's
-   own text color, whichever variant it is wearing. */
-header button app-ee-lock {
-  --mk-ee-lock-color: currentColor;
-}

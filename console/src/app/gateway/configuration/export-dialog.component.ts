@@ -118,11 +118,11 @@ export interface ExportChoice {
           <mat-icon>info</mat-icon>
           <div>
             <p i18n="@@Not_carried_list2">
-              This is not a backup. It does not carry users, organisations and their members,
-              sessions, the vault, the audit trail, personal tokens or signing keys.
+              Not a backup: no users, organisations, sessions, vault, audit trail, personal tokens
+              or signing keys.
             </p>
             <p class="aside" i18n="@@Backup_is_the_snapshot">
-              What restores this installation is the snapshot, on the tab next door.
+              For a backup, use the Snapshot tab.
             </p>
           </div>
         </div>
@@ -131,8 +131,8 @@ export interface ExportChoice {
             <mat-icon>key_off</mat-icon>
             <div>
               <p i18n="@@Export_literals_note">
-                These secrets are stored here as values rather than vault references, so they will
-                NOT be in the file. Wherever it lands, the fields will be empty.
+                These secrets are stored as values, not vault references: they are NOT in the
+                file and arrive empty.
               </p>
               <ul>
                 @for (l of r.literals; track l.holder + l.id + l.field) {
@@ -148,9 +148,8 @@ export interface ExportChoice {
                 }
               </ul>
               <p class="aside" i18n="@@Literals_remedy">
-                Put each one in the vault and reference it by $name: the file then carries the
-                name, the value stays here, and the field is filled on the other side by whatever
-                that vault holds.
+                Move each one to the vault and reference it by $name: the file then carries only
+                the name.
               </p>
             </div>
           </div>
@@ -160,9 +159,8 @@ export interface ExportChoice {
             <mat-icon>vpn_key</mat-icon>
             <div>
               <p i18n="@@Export_refs_note2">
-                The file references these vault entries. On the other side, one that already
-                exists is used as it stands; one that is missing is created EMPTY and reported,
-                and whatever references it stays inert until someone fills it.
+                The file references these vault entries. On import, a missing one is created EMPTY
+                and must be filled.
               </p>
               <mat-chip-set>
                 @for (name of r.refs; track name) {
@@ -176,9 +174,8 @@ export interface ExportChoice {
           <div class="note">
             <mat-icon>image</mat-icon>
             <p i18n="@@Export_image_note">
-              This configuration has a picture. A plain file is text and leaves it out - importing
-              that file elsewhere keeps whatever picture is already in place. Take the package to
-              carry the images with it.
+              This configuration has images. Plain YAML leaves them out; the package carries
+              them.
             </p>
           </div>
         }
@@ -194,7 +191,7 @@ export interface ExportChoice {
           matButton="tonal"
           (click)="close('yaml')"
           i18n-matTooltip="@@Plain_yaml_tip"
-          matTooltip="Text only: the images stay behind, and an import keeps whatever is in place."
+          matTooltip="Text only, without the images."
         >
           <mat-icon>description</mat-icon>
           <ng-container i18n="@@Plain_YAML">Plain YAML</ng-container>
@@ -204,7 +201,7 @@ export interface ExportChoice {
           (click)="close('zip')"
           cdkFocusInitial
           i18n-matTooltip="@@Package_tip"
-          matTooltip="A zip: the configuration reads and diffs, the images sit beside it as files."
+          matTooltip="A zip with the configuration and its images."
         >
           <mat-icon>folder_zip</mat-icon>
           <ng-container i18n="@@Package">Package</ng-container>

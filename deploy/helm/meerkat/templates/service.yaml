@@ -37,23 +37,6 @@ spec:
       {{- with .Values.service.adminNodePort }}
       nodePort: {{ . }}
       {{- end }}
----
-# Where a Prometheus scrapes. ClusterIP and NOTHING ELSE, whatever the other
-# two say: this port answers without a token by default, and it can because
-# nothing outside the cluster reaches it. Its own Service so that publishing
-# the console never drags it along.
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "meerkat.fullname" . }}-metrics
-  labels: {{- include "meerkat.labels" . | nindent 4 }}
-spec:
-  type: ClusterIP
-  selector: {{- include "meerkat.selectorLabels" . | nindent 4 }}
-  ports:
-    - name: metrics
-      port: {{ .Values.metrics.port }}
-      targetPort: metrics
 {{- if .Values.plug.enabled }}
 ---
 # The developer tunnel. How your developers reach it is a network decision, so

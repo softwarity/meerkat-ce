@@ -54,10 +54,6 @@ type API struct {
 	// nil is fine.
 	Scheduler interface{ Wake() }
 
-	// metricsDoor is this node's metrics port (metricsport.go), nil until
-	// main asks for one.
-	metricsDoor *metricsDoor
-
 	st     *store.Store
 	sm     *session.Manager
 	router *gateway.Router

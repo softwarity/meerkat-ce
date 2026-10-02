@@ -116,8 +116,8 @@ func consoleHandler(fsys fs.FS, st *store.Store, sm *session.Manager) http.Handl
 // Immutable is a promise about the NAME, not about the file, and Angular only
 // makes it for what it BUILDS: every bundle carries a content hash, so a new
 // build means new names and a year is safe. Everything else the console ships
-// keeps its name across releases - the monitoring templates under
-// /monitoring/, the icons - and a year of immutable would hand a gateway
+// keeps its name across releases - the collector templates under
+// /tracing/, the icons - and a year of immutable would hand a gateway
 // upgraded today last year's file with no way to ask for the new one.
 func cacheFor(name string) string {
 	switch path.Ext(name) {

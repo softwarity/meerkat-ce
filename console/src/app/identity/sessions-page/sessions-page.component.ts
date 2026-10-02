@@ -100,8 +100,7 @@ import { MeService } from '../../me.service';
       <h1 i18n="@@Sessions">Sessions</h1>
     </div>
     <p class="hint" i18n="@@Sessions_hint">
-      Who is signed in where, right now. Signing a session out ends it at once, on every gateway;
-      the person signs in again or is out. Disabling an account ends all of its sessions.
+      Who is signed in, right now. Signing a session out ends it at once, on every gateway.
     </p>
     <div class="toolbar">
       <mat-form-field class="search" subscriptSizing="dynamic">

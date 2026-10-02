@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/softwarity/meerkat/internal/tracing"
 )
 
 // NewEventID mints an identifier that SORTS BY TIME: twelve hex digits of unix
@@ -319,7 +321,54 @@ func (s *Store) AddAuditEvent(ctx context.Context, ev AuditEvent) error {
 	if err != nil {
 		return fmt.Errorf("store: add audit event %q: %w", ev.Action, err)
 	}
+	// And a copy to the collector, when the audit is sent there (AUD-03).
+	// Queued, never awaited: recording an event does not wait on the network.
+	if tracing.Shipping() {
+		tracing.ShipAudit(s.auditRecord(ctx, ev, changes))
+	}
 	return nil
+}
+
+// auditRecord is ev as it leaves for the collector: the action in the body,
+// everything else as attributes - the actor under OpenTelemetry's own user.*
+// names, the client address as client.address - and the trace id of the
+// request that caused it. The names are resolved here, best-effort, because
+// the row only keeps ids and a collector has no table to join them with.
+func (s *Store) auditRecord(ctx context.Context, ev AuditEvent, changes string) tracing.AuditRecord {
+	attrs := []tracing.Attr{
+		tracing.String("audit.id", ev.ID),
+		tracing.String("audit.action", ev.Action),
+		tracing.String("audit.target", ev.Target),
+		tracing.String("audit.target.id", ev.TargetID),
+		tracing.String("audit.target.name", ev.TargetName),
+		tracing.String("audit.detail", ev.Detail),
+		tracing.String("user.id", ev.ActorID),
+		tracing.String("meerkat.token", ev.ActorToken),
+		tracing.String("meerkat.tenant.id", ev.TenantID),
+		tracing.String("client.address", ev.IP),
+	}
+	if changes != "[]" {
+		attrs = append(attrs, tracing.String("audit.changes", changes))
+	}
+	if ev.ActorID != "" {
+		if u, err := s.GetUserByID(ctx, ev.ActorID); err == nil {
+			attrs = append(attrs, tracing.String("user.name", u.Username))
+		}
+	}
+	if ev.TenantID != "" {
+		if t, err := s.GetTenant(ctx, ev.TenantID); err == nil {
+			attrs = append(attrs, tracing.String("meerkat.tenant.name", t.Name))
+		}
+	}
+	return tracing.AuditRecord{
+		Time:    time.Unix(ev.At, 0),
+		TraceID: tracing.ID(ctx),
+		Body:    ev.Action,
+		Attrs:   attrs,
+		// The data plane's own events are the accounts' sign-ins; everything
+		// else - a change, a console sign-in - is the console's.
+		Console: ev.Target != AuditTargetAccount,
+	}
 }
 
 // ListAuditEvents returns matching events newest first, each enriched with the
