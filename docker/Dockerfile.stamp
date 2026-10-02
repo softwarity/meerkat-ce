@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1
+
+# The release stamp: a label and an environment variable on top of an image
+# that was built, tested and pushed BEFORE its version was chosen, and that is
+# never rebuilt for it. Same layers, same binary; only the manifest is new.
+# internal/version reads MEERKAT_VERSION when the binary was built as `dev`,
+# so `meerkat --version`, /healthz and the telemetry say the released version.
+# See the release job of .github/workflows/ci-ee.yml.
+ARG BASE
+FROM ${BASE}
+ARG VERSION
+ENV MEERKAT_VERSION=${VERSION}
+LABEL org.opencontainers.image.version=${VERSION}

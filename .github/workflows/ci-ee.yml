@@ -45,11 +45,15 @@ name: CI - Enterprise
 # nothing, and a check that waits answers late: on the push after the one
 # that broke it.
 #
-# A RELEASE arrives as a dispatch carrying the version: release.yml tags the
-# private commit, mirror-ce.yml fires on the tag, and the two jobs at the end
-# publish BOTH images under their semver tags from that very commit, once
-# everything else is green. docker-release.yml used to do that on the private
-# side after polling for the CI of the same commit; here the wait is a `needs`.
+# A RELEASE IS AN APPROVAL. Every run on main ends on a job that waits on the
+# `release` environment, where a reviewer is required. Approving it releases
+# the build that just went green: the Enterprise image this very run pushed is
+# re-tagged BY DIGEST under its semver - nothing is rebuilt, what ships is what
+# was tested - the community image follows, and release-flow cuts the version
+# on the private repository (notes, commit, tag, GitHub Release). The bump
+# rides in the approval's comment: empty is a patch, `minor` or `major` say
+# so. Not approving costs nothing: the next push cancels the waiting run, so
+# only the latest green build can ever be released.
 on:
   repository_dispatch:
     types: [enterprise]
@@ -59,19 +63,16 @@ on:
         description: Commit of softwarity/meerkat to run on. Empty takes main.
         required: false
         default: ""
-      version:
-        description: Publish both images under this semver (no leading v). Empty publishes latest only.
-        required: false
-        default: ""
 
 permissions:
   contents: read
 
-# One pipeline for main, cancelled by the next push; a release keeps a group
-# of its own and nothing cancels it.
+# One pipeline, cancelled by the next push - a run waiting for its release
+# approval included, which is what keeps an old build from being released
+# over a newer one.
 concurrency:
-  group: ci-ee-${{ github.event.client_payload.version || inputs.version || 'main' }}
-  cancel-in-progress: ${{ !(github.event.client_payload.version || inputs.version) }}
+  group: ci-ee
+  cancel-in-progress: true
 
 jobs:
   # Which commit, and what it changes. ONE job resolves it so that every other
@@ -85,7 +86,6 @@ jobs:
     environment: enterprise
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
-      version: ${{ steps.resolve.outputs.version }}
     steps:
       - id: token
         uses: actions/create-github-app-token@v2
@@ -98,19 +98,13 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           ASKED: ${{ github.event.client_payload.sha || inputs.sha }}
-          VERSION: ${{ github.event.client_payload.version || inputs.version }}
         run: |
           set -e
           # The API rather than a clone: this job has nothing to build, it
           # needs the commit's full id, whatever it was asked by.
           sha=$(gh api "repos/softwarity/meerkat/commits/${ASKED:-main}" --jq .sha)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          version="${VERSION#v}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          {
-            echo "Enterprise sources: softwarity/meerkat@${sha::7}"
-            if [ -n "$version" ]; then echo "Release: $version"; fi
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Enterprise sources: softwarity/meerkat@${sha::7}" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Every job below opens with the same three steps: a token, the private
   # tree at the resolved commit, Go without its cache. The token is minted
@@ -431,8 +425,8 @@ jobs:
   # handed reliably. amd64 only while the two-image split settles, as the
   # shared workflow does - put linux/arm64 back together with it.
   #
-  # Every push to main publishes `latest`; a release publishes its semver tags
-  # and leaves `latest` to the next push, as docker-release.yml did. A tag is a
+  # Every run publishes `latest`; the semver tags are added to this very image,
+  # by digest, by the release job below once it is approved. A tag is a
   # pointer: what removes the manifests it stops naming is the weekly prune on
   # the private side (prune-packages.yml), not the push.
   #
@@ -448,6 +442,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: enterprise
+    outputs:
+      # What was pushed, exactly: the release re-tags this and nothing else.
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - id: token
         uses: actions/create-github-app-token@v2
@@ -473,18 +470,9 @@ jobs:
           password: ${{ secrets.GH_WRITE_PACKAGE }}
       - id: meta
         env:
-          IMAGE: ghcr.io/softwarity/meerkat
-          VERSION: ${{ needs.source.outputs.version }}
           SHA: ${{ needs.source.outputs.sha }}
         run: |
-          if [ -z "$VERSION" ]; then
-            tags="latest"
-          else
-            tags="$VERSION ${VERSION%.*} ${VERSION%%.*}"
-          fi
           {
-            echo "tags=$(for t in $tags; do printf '%s:%s\n' "$IMAGE" "$t"; done | paste -sd, -)"
-            echo "version=${VERSION:-dev}"
             echo "rev=${SHA::7}"
             echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_OUTPUT"
@@ -494,96 +482,248 @@ jobs:
       # The labels name the PRIVATE repository, by hand: derived from this
       # run they would name the mirror, and the source label is also what GH
       # Packages reads to connect a package to a repository.
-      - uses: docker/build-push-action@v7
+      #
+      # VERSION is `dev`: the version is not known when the image is built,
+      # it is chosen when the image is approved, and this image is never
+      # rebuilt. The commit is what identifies it.
+      - id: build
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ghcr.io/softwarity/meerkat:latest
           labels: |
             org.opencontainers.image.source=https://github.com/softwarity/meerkat
             org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
           build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
+            VERSION=dev
             GIT_REV=${{ steps.meta.outputs.rev }}
             BUILD_DATE=${{ steps.meta.outputs.date }}
             GO_TAGS=ee
             EDITION=ee
-      - run: echo "published ${{ steps.meta.outputs.tags }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: echo "published ghcr.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
 
-  # The community image of a RELEASE, from the same commit. Every push to main
-  # publishes the community `latest` from the mirror's own pipeline (ci.yml),
-  # built from the public tree - the proof that it stands on its own. But the
-  # mirror has no tags and no way to know a version, so the semver tags are
-  # published here, from the private tree built WITHOUT the ee tag: the files
-  # under ee/ are behind the tag and the linker never sees them, so these are
-  # the same bytes the mirror would build.
-  image-community:
-    name: Build & publish the community image (release)
-    needs: [source, lint, unit, postgres, directories, e2e]
-    if: >-
-      !cancelled()
-      && needs.lint.result == 'success' && needs.unit.result == 'success'
-      && needs.postgres.result == 'success' && needs.directories.result == 'success'
-      && needs.e2e.result == 'success'
-      && needs.source.outputs.version != ''
+  # THE RELEASE. This job waits on the `release` environment - a reviewer is
+  # required there - and does nothing until somebody approves it. Approving
+  # releases THIS build: the image this run pushed, the commit this run tested.
+  # Nothing is rebuilt.
+  #
+  # The bump rides in the approval's comment: empty is a patch, `minor` or
+  # `major` say so, anything else stops the job before it touches a thing.
+  #
+  # ORDER MATTERS. The commit release-flow pushes to the private main starts
+  # the mirror, which dispatches the next run, which CANCELS this one (the
+  # concurrency above). So everything that must finish is done BEFORE that
+  # push: the version is computed from the tags, both images are stamped and
+  # tagged, and release-flow runs last - its push is the last thing this job
+  # does, on purpose.
+  #
+  # STAMPED, NOT REBUILT. The version is not known when an image is built, so
+  # the binary inside says `dev`. A release puts a one-line layer on top of the
+  # tested image - FROM its digest, ENV MEERKAT_VERSION - which the binary
+  # reads at start (internal/version). Same layers, same bytes; the manifest
+  # alone is new, and what separates `latest` from `1.2.3` is a label and an
+  # environment variable.
+  #
+  # The community image is the mirror's (ci.yml, Docker Hub, from the public
+  # tree). Its `latest` is stamped the same way when its revision label names
+  # the mirror commit of this very source commit; when the mirror's pipeline
+  # has not finished yet, or `latest` has moved on, it is built here instead,
+  # from the private tree without the ee tag - the same bytes, four minutes.
+  release:
+    name: Release (approve to publish)
+    needs: [source, image]
+    if: ${{ !cancelled() && needs.image.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: enterprise
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+      # The approvals of this very run, where the bump is written.
+      actions: read
     steps:
+      - name: Read the approval
+        id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          comment=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq '[.[] | select(.state == "approved") | select(any(.environments[]; .name == "release"))] | last | .comment // ""')
+          bump=$(printf '%s' "$comment" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          case "$bump" in
+            "") bump="patch" ;;
+            patch|minor|major) ;;
+            *) echo "::error::the approval comment must be empty (patch), minor or major - got '$comment'"; exit 1 ;;
+          esac
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+          echo "approved as a $bump release"
+
+      # The App that WRITES the private repository. Its key lives on this
+      # environment alone, behind the reviewer: the one that the test jobs
+      # hold (environment: enterprise) can only read.
       - id: token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ vars.EE_APP_ID }}
-          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: softwarity
           repositories: meerkat
+      # main, with its tags, and WITH the credential kept: release-flow
+      # commits, tags and pushes through this checkout's origin.
       - uses: actions/checkout@v7
         with:
           repository: softwarity/meerkat
-          ref: ${{ needs.source.outputs.sha }}
+          ref: main
+          fetch-depth: 0
           token: ${{ steps.token.outputs.token }}
-          persist-credentials: false
+      # And main must still BE the tested commit: a push that skipped the
+      # mirror ([skip ci]) would otherwise be released under this build's green.
+      - name: main is still the tested commit
+        env:
+          SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          head=$(git rev-parse HEAD)
+          [ "$head" = "$SHA" ] || { echo "::error::main is at ${head::7} but this build tested ${SHA::7}: a push moved main without a pipeline - run the pipeline again, then approve that one"; exit 1; }
+      # The same arithmetic release-flow does, from the same tags; the job
+      # checks that the two agreed once release-flow has run.
+      - name: Next version
+        id: next
+        env:
+          BUMP: ${{ steps.bump.outputs.bump }}
+        run: |
+          set -e
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          last=${last:-0.0.0}
+          maj=${last%%.*}; rest=${last#*.}; min=${rest%%.*}; pat=${rest#*.}
+          case "$BUMP" in
+            major) maj=$((maj + 1)); min=0; pat=0 ;;
+            minor) min=$((min + 1)); pat=0 ;;
+            patch) pat=$((pat + 1)) ;;
+          esac
+          {
+            echo "version=$maj.$min.$pat"
+            echo "minor=$maj.$min"
+            echo "major=$maj"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+          echo "$last -> $maj.$min.$pat ($BUMP)"
+
       - uses: docker/setup-buildx-action@v4
-      # Docker Hub is where the community image ships: `docker pull
-      # softwarity/meerkat` is what a reader types without being told about a
-      # registry first. The two secrets are this repository's, the same ones
-      # ci.yml publishes `latest` with.
-      - uses: docker/login-action@v4
+      - name: Log in to GH Packages
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_WRITE_PACKAGE }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_RW }}
-      - id: meta
+
+      # The Enterprise image: the digest the image job pushed, nothing else.
+      - name: Stamp and tag the Enterprise image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker
+          file: docker/Dockerfile.stamp
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            BASE=ghcr.io/softwarity/meerkat@${{ needs.image.outputs.digest }}
+            VERSION=${{ steps.next.outputs.version }}
+          tags: |
+            ghcr.io/softwarity/meerkat:${{ steps.next.outputs.version }}
+            ghcr.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
+            ghcr.io/softwarity/meerkat:${{ steps.next.outputs.major }}
+
+      # The community image: is Docker Hub's `latest` the mirror's build of
+      # this very commit? The mirror commit names the private one in its
+      # message, and the image names the mirror commit in its revision label.
+      - uses: actions/checkout@v7
+        with:
+          path: mirror
+          fetch-depth: 0
+      - name: Is the community latest this commit?
+        id: community
         env:
-          IMAGE: docker.io/softwarity/meerkat
-          VERSION: ${{ needs.source.outputs.version }}
           SHA: ${{ needs.source.outputs.sha }}
         run: |
-          tags="$VERSION ${VERSION%.*} ${VERSION%%.*}"
-          {
-            echo "tags=$(for t in $tags; do printf '%s:%s\n' "$IMAGE" "$t"; done | paste -sd, -)"
-            echo "rev=${SHA::7}"
-            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } >> "$GITHUB_OUTPUT"
-      # No layer cache, for the same reason as above: the build stage holds
-      # the whole private tree, whatever the linker keeps of it.
-      - uses: docker/build-push-action@v7
+          set -e
+          mirrored=$(git -C mirror log --format=%H -n1 --grep="meerkat@${SHA::7}" origin/main || true)
+          built=$(docker buildx imagetools inspect docker.io/softwarity/meerkat:latest \
+            --format '{{index .Image.Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || true)
+          if [ -n "$mirrored" ] && [ "$mirrored" = "$built" ]; then
+            digest=$(docker buildx imagetools inspect docker.io/softwarity/meerkat:latest --format '{{.Manifest.Digest}}')
+            echo "stamp=true" >> "$GITHUB_OUTPUT"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            echo "Docker Hub's latest is the mirror's ${mirrored::7}, built from this commit: stamped, not rebuilt"
+          else
+            echo "stamp=false" >> "$GITHUB_OUTPUT"
+            echo "Docker Hub's latest is built from '${built:-?}' and this commit mirrors as '${mirrored:-nothing yet}': building the community image here"
+          fi
+      - name: Stamp and tag the community image
+        if: steps.community.outputs.stamp == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: docker
+          file: docker/Dockerfile.stamp
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            BASE=docker.io/softwarity/meerkat@${{ steps.community.outputs.digest }}
+            VERSION=${{ steps.next.outputs.version }}
+          tags: |
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.version }}
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.major }}
+      # The fallback: the same bytes the mirror would build, with the version
+      # linked in since it is known here. No layer cache, for the reason the
+      # image job gives: the build stage holds the whole private tree.
+      - name: Build and tag the community image
+        if: steps.community.outputs.stamp != 'true'
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.version }}
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.major }}
           labels: |
             org.opencontainers.image.source=https://github.com/softwarity/meerkat-ce
             org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
-            org.opencontainers.image.version=${{ needs.source.outputs.version }}
+            org.opencontainers.image.version=${{ steps.next.outputs.version }}
           build-args: |
-            VERSION=${{ needs.source.outputs.version }}
-            GIT_REV=${{ steps.meta.outputs.rev }}
-            BUILD_DATE=${{ steps.meta.outputs.date }}
+            VERSION=${{ steps.next.outputs.version }}
+            GIT_REV=${{ needs.source.outputs.sha }}
+            BUILD_DATE=${{ steps.next.outputs.date }}
             GO_TAGS=
             EDITION=ce
-      - run: echo "published ${{ steps.meta.outputs.tags }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Last, because its push starts the next run: the notes, the commit, the
+      # tag and the GitHub Release, on the private repository. gh resolves the
+      # repository from the checkout's origin; GH_REPO says it out loud.
+      - name: Cut the version on the private repository
+        id: flow
+        uses: softwarity/release-flow@v1
+        with:
+          bump: ${{ steps.bump.outputs.bump }}
+          token: ${{ steps.token.outputs.token }}
+          commit-user-name: softwarity-bot
+          commit-user-email: bot@softwarity.io
+        env:
+          GH_REPO: softwarity/meerkat
+      - name: The images carry the version that was cut
+        env:
+          CUT: ${{ steps.flow.outputs.version }}
+          TAGGED: ${{ steps.next.outputs.version }}
+          URL: ${{ steps.flow.outputs.release-url }}
+        run: |
+          [ "$CUT" = "$TAGGED" ] || { echo "::error::release-flow cut $CUT but the images were tagged $TAGGED - the tags on the registries are wrong, fix them by hand"; exit 1; }
+          echo "released $CUT: $URL" | tee -a "$GITHUB_STEP_SUMMARY"

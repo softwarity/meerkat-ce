@@ -82,3 +82,63 @@ jobs:
             && test "${{ steps.clone.outcome }}" = success \
             && test "${{ steps.ghcr.outcome }}" = success \
             && test "${{ steps.dockerhub.outcome }}" = success
+
+  # The release job of ci-ee.yml, with its own environment and its own App:
+  # the one that WRITES the private repository. Its key lives nowhere else,
+  # and a reviewer stands in front of it - so this job, too, waits for one.
+  release:
+    name: Can a release be cut?
+    if: github.repository == 'softwarity/meerkat-ce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    steps:
+      # Minting with a permission the App was not granted is refused: the one
+      # way to prove "it can write" without writing anything.
+      - name: Release App (writes the private repository)
+        id: app
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+          permission-contents: write
+
+      - name: Reach softwarity/meerkat with it
+        id: reach
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -e
+          [ -n "$GH_TOKEN" ] || { echo "no token was minted"; exit 1; }
+          git init -q probe && cd probe
+          git remote add ee "https://x-access-token:${GH_TOKEN}@github.com/softwarity/meerkat.git"
+          git ls-remote ee refs/heads/main
+          echo "the remote answers and the token is accepted"
+
+      # Re-tagging the Enterprise image needs the same package credential as
+      # publishing it, held on THIS environment too.
+      - name: GH Packages (re-tagging the Enterprise image)
+        id: ghcr
+        continue-on-error: true
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_WRITE_PACKAGE }}
+
+      - name: Verdict
+        run: |
+          {
+            echo "| credential | for | result |"
+            echo "|---|---|---|"
+            echo "| RELEASE_APP_ID + RELEASE_APP_PRIVATE_KEY (environment: release) | minting a token that may write | ${{ steps.app.outcome }} |"
+            echo "| that token | reaching softwarity/meerkat | ${{ steps.reach.outcome }} |"
+            echo "| GH_WRITE_PACKAGE (environment: release) | re-tagging the Enterprise image | ${{ steps.ghcr.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          test "${{ steps.app.outcome }}" = success \
+            && test "${{ steps.reach.outcome }}" = success \
+            && test "${{ steps.ghcr.outcome }}" = success
