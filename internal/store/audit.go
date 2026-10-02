@@ -303,8 +303,16 @@ func (s *Store) AddAuditEvent(ctx context.Context, ev AuditEvent) error {
 	if ev.ID == "" {
 		ev.ID = NewEventID()
 	}
+	// The row keeps seconds; the copy for the collector keeps the instant. Two
+	// identical actions in the same second - two routes saved at once - are
+	// otherwise the same line at the same time to Loki, which keeps one.
+	now := time.Now()
 	if ev.At == 0 {
-		ev.At = time.Now().Unix()
+		ev.At = now.Unix()
+	}
+	at := time.Unix(ev.At, 0)
+	if ev.At == now.Unix() {
+		at = now
 	}
 	changes := "[]"
 	if len(ev.Changes) > 0 {
@@ -324,7 +332,7 @@ func (s *Store) AddAuditEvent(ctx context.Context, ev AuditEvent) error {
 	// And a copy to the collector, when the audit is sent there (AUD-03).
 	// Queued, never awaited: recording an event does not wait on the network.
 	if tracing.Shipping() {
-		tracing.ShipAudit(s.auditRecord(ctx, ev, changes))
+		tracing.ShipAudit(s.auditRecord(ctx, ev, changes, at))
 	}
 	return nil
 }
@@ -334,7 +342,7 @@ func (s *Store) AddAuditEvent(ctx context.Context, ev AuditEvent) error {
 // names, the client address as client.address - and the trace id of the
 // request that caused it. The names are resolved here, best-effort, because
 // the row only keeps ids and a collector has no table to join them with.
-func (s *Store) auditRecord(ctx context.Context, ev AuditEvent, changes string) tracing.AuditRecord {
+func (s *Store) auditRecord(ctx context.Context, ev AuditEvent, changes string, at time.Time) tracing.AuditRecord {
 	attrs := []tracing.Attr{
 		tracing.String("audit.id", ev.ID),
 		tracing.String("audit.action", ev.Action),
@@ -361,7 +369,7 @@ func (s *Store) auditRecord(ctx context.Context, ev AuditEvent, changes string) 
 		}
 	}
 	return tracing.AuditRecord{
-		Time:    time.Unix(ev.At, 0),
+		Time:    at,
 		TraceID: tracing.ID(ctx),
 		Body:    ev.Action,
 		Attrs:   attrs,
