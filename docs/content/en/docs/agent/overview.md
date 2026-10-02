@@ -51,6 +51,7 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `list_schedules` | The scheduled calls: what runs at night, how often, as whom, and how the last run ended. |
 | `pause_schedule`, `run_schedule` | Stop a scheduled call, let it fire again, or bring its next turn forward to now. |
 | `read_traffic` | What is passing through right now. |
+| `read_logs` | The gateway's own last lines, on the node that answered. |
 | `read_audit` | The audit trail, within the caller's own scope. |
 | `get_settings`, `save_portal` | The global settings, and the navigation portal. |
 | `get_branding`, `save_branding` | The identity the built-in pages wear. |

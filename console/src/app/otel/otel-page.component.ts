@@ -1,6 +1,7 @@
 import { httpResource } from '@angular/common/http';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -36,6 +37,7 @@ import { TRACING_PLATFORMS, tracingUrl } from './tracing-files';
 @Component({
   selector: 'app-otel-page',
   imports: [
+    MatCardModule,
     EeLockComponent,
     FormFieldComponent,
     MatButtonModule,

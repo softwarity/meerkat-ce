@@ -59,6 +59,15 @@
     >
       <mat-icon>history_edu</mat-icon>
     </rail-nav-item>
+    <rail-nav-item
+      i18n-label="@@Logs"
+      label="Logs"
+      routerLink="/logs"
+      [active]="inLogs()"
+      any-role="root infra-admin"
+    >
+      <mat-icon>receipt_long</mat-icon>
+    </rail-nav-item>
     <rail-nav-separator />
     <!-- Below the line: what is about the APPLICATION rather than about
          Meerkat. The vault and the audit above say what this gateway holds and

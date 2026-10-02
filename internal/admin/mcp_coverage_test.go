@@ -27,6 +27,7 @@ var agentCovers = map[string][]string{
 	"catalog":  {"list_route_bricks"},
 	"services": {"list_services"},
 	"metrics":  {"read_traffic"},
+	"logs":     {"read_logs"},
 	// The granting chain (mcp_grants.go). A group in an organisation names
 	// roles, a person is a member of that organisation, that member holds
 	// groups - three links, none of which was reachable, so an application
@@ -47,8 +48,15 @@ var agentCovers = map[string][]string{
 	// hand, and the editor is then where a person who speaks it reviews what
 	// was written. So the tools are coarse on purpose - a language at a time,
 	// never a string.
-	"locales":        {"list_languages", "read_language", "write_language"},
-	"configurations": {"list_configurations", "save_configuration", "activate_configuration"},
+	"locales": {"list_languages", "read_language", "write_language"},
+	"configurations": {"list_configurations", "save_configuration", "activate_configuration",
+		"pull_configuration", "push_configuration"},
+	// The git locations themselves (CFG-07): an agent LISTS them, because
+	// pulling needs to name one, and that is where its business ends. Creating
+	// one hands over a repository URL and a credential reference - a decision
+	// about which repository this installation answers to, taken once, on a
+	// screen, by the person who owns both.
+	"config-remotes": {"list_git_locations"},
 	"schedules":      {"list_schedules", "list_schedule_runs", "pause_schedule", "run_schedule"},
 	// The catalogue was out of reach on the grounds that renaming a role
 	// silently changes who reaches what - every access rule names roles by
@@ -199,6 +207,12 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		// number stored, like the trail's own retention beside it.
 		"PUT /api/settings/schedules": true,
 		"POST /api/configurations":    true, "POST /api/configurations/import": true,
+		// A pull SHELVES a document and applies nothing - but it writes the
+		// row it shelved it in, which is what this list is about.
+		"POST /api/configurations/pull": true, "POST /api/configurations/{id}/pull": true,
+		"POST /api/configurations/{id}/push": true, "PUT /api/configurations/{id}/remote": true,
+		"POST /api/config-remotes": true, "PUT /api/config-remotes/{id}": true,
+		"DELETE /api/config-remotes/{id}":        true,
 		"POST /api/configurations/{id}/activate": true, "POST /api/configurations/{id}/capture": true,
 		"POST /api/configurations/{id}/duplicate": true, "PUT /api/configurations/{id}": true,
 		"PUT /api/configurations/{id}/document": true, "DELETE /api/configurations/{id}": true,
@@ -211,12 +225,15 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"DELETE /api/routes/{id}": true, "PUT /api/routes/{id}/security": true, "PUT /api/routes/{id}/audit": true,
 		"PUT /api/routes/{id}/spec": true, "DELETE /api/routes/{id}/spec": true,
 		"PUT /api/settings": true, "PUT /api/settings/agent": true, "PUT /api/settings/issues": true,
-		"PUT /api/settings/telemetry":   true,
-		"PUT /api/settings/plug":        true,
-		"PUT /api/settings/audit":       true,
-		"DELETE /api/sessions/{id}":     true,
-		"DELETE /api/data-tokens/{id}":  true,
-		"PUT /api/settings/proxy":       true,
+		"PUT /api/settings/telemetry":  true,
+		"PUT /api/settings/plug":       true,
+		"PUT /api/settings/audit":      true,
+		"DELETE /api/sessions/{id}":    true,
+		"DELETE /api/data-tokens/{id}": true,
+		"PUT /api/settings/proxy":      true,
+		// The level is a write even though nothing is stored: it changes what
+		// every node writes from now on.
+		"PUT /api/logs/level":           true,
 		"PUT /api/settings/maintenance": true,
 		"PUT /api/settings/mail-relay":  true, "PUT /api/settings/tenancy": true,
 		"PUT /api/settings/tls": true,
@@ -297,6 +314,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"get_settings",
 		"import_configuration",
 		"list_configurations",
+		"list_git_locations",
 		"list_groups",
 		"list_languages",
 		"list_members",
@@ -311,8 +329,11 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"list_themes",
 		"list_users",
 		"pause_schedule",
+		"pull_configuration",
+		"push_configuration",
 		"read_audit",
 		"read_language",
+		"read_logs",
 		"read_traffic",
 		"run_schedule",
 		"save_branding",

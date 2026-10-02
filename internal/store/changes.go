@@ -112,6 +112,12 @@ const (
 	// encoded message; see internal/metrics for the format, and for why what
 	// travels is running totals rather than intervals.
 	TopicMetrics = "metrics"
+	// TopicLogLevel carries the gateway's log level to the other nodes
+	// (OBS-03): the level, a space, and when it goes back (Unix seconds, 0
+	// for never). Nothing is stored behind it - a level turned up by hand is
+	// a moment, and a restart comes back at the manifest's - so a lost one
+	// leaves a node at the level it had, which its own deadline still ends.
+	TopicLogLevel = "log-level"
 )
 
 // MaxSignalBytes is what a notification may carry. PostgreSQL refuses a

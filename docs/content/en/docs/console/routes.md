@@ -78,6 +78,10 @@ the list follows without a reload.
 - **JWT** holds the keys that sign the identity JWT your services verify: the
   JWKS to hand a backend, each algorithm's public half, the rotation, and which
   routes sign with what.
+  Point a service at the JWKS and it needs nothing else: the token's `kid`
+  names the key, and the key carries its algorithm, so the algorithm is chosen
+  once, in Auth forward. The service takes it from the key, never from the
+  token's header.
 
 ## The editor
 

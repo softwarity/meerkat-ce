@@ -44,6 +44,9 @@ var readsNothing = map[string]bool{
 	"POST /api/auth-providers/{id}/check": true,
 	"POST /api/settings/mail-relay/test":  true,
 	"POST /api/settings/telemetry/test":   true,
+	// Proving a git location answers and its credential is accepted (CFG-07):
+	// it reaches a repository and stores not one byte.
+	"POST /api/config-remotes/{id}/check": true,
 	// The agent endpoint carries both kinds and sorts them per tool: an
 	// annotated read-only tool answers, a mutating one is refused by name.
 	"/mcp": true,

@@ -66,6 +66,7 @@ type Options struct {
 // of thing somebody discovers three weeks later in a broken pipeline.
 func Setup(o Options) Format {
 	level.Set(ParseLevel(o.Level))
+	startup = level.Level()
 
 	format := o.Format
 	if format != FormatJSON && format != FormatText {

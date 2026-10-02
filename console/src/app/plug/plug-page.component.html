@@ -11,6 +11,7 @@
 </p>
 
 @if (state(); as s) {
+  <mat-card appearance="outlined">
   <!-- The switch first, applied on click. Its state is said beside it, from
        what the tunnel is DOING on this node rather than what was ticked. -->
   <div class="row">
@@ -62,6 +63,9 @@
     </p>
   }
 
+  </mat-card>
+
+  <mat-card appearance="outlined">
   <!-- The address, which the gateway cannot see: a NodePort, a LoadBalancer
        or a published Docker port sits between it and a laptop. Every command
        below follows these two fields as they are typed. -->
@@ -122,6 +126,9 @@
     <p class="failed">{{ error() }}</p>
   }
 
+  </mat-card>
+
+  <mat-card appearance="outlined">
   <!-- What a developer runs, in order, for their own system. Worth having
        here and not only on their profile page: this is where whoever opens
        the tunnel checks what the people using it will be told. -->
@@ -196,6 +203,9 @@
     </li>
   </ol>
 
+  </mat-card>
+
+  <mat-card appearance="outlined">
   <!-- Who could plug in. The capability is granted on Users (application);
        the key is theirs to deposit - so the list says who still has to. -->
   <h3 class="group" i18n="@@Plug_group_developers">Developers</h3>
@@ -219,5 +229,6 @@
       }
     </ul>
   }
+  </mat-card>
 }
 </div>

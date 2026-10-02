@@ -96,6 +96,93 @@ modification. Ce qui tourne est laissé de côté : c'est la question qu'on pose
 d'un client et au modèle dont elle est partie, avant de toucher à l'une ou l'autre.
 `GET /api/configurations/{id}/compare/{other}`.
 
+## Dépôt git
+
+*Édition Enterprise.* Les configurations peuvent vivre dans un dépôt git : un
+historique avec des noms dessus, une relecture avant le changement, et une seule
+source de vérité pour plusieurs installations.
+
+Un export est **public par construction** - un champ secret déclaré part sous sa
+référence `${nom}` ou pas du tout - et c'est ce qui rend raisonnable de le poser
+dans un dépôt. Ses octets sont déterministes, donc deux exports du même état
+donnent le même fichier et un diff ne montre que ce qui a bougé.
+
+### Des emplacements, pas des branches
+
+Un **emplacement git** est un dépôt, une branche et un **répertoire** dedans.
+Plusieurs emplacements partagent un dépôt, un répertoire par plateforme :
+
+```
+platforms/acme/meerkat.yaml
+platforms/acme/assets/logo.png
+platforms/foo/meerkat.yaml
+```
+
+Cette disposition est celle qu'un export produit déjà : aucun fichier à choisir,
+rien à convenir.
+
+> [!TIP]
+> Préférez un répertoire par plateforme sur une seule branche à une branche par
+> plateforme. Une branche sert un changement qui a l'intention de fusionner ; des
+> plateformes sont parallèles pour de bon. Une branche par plateforme, c'est
+> cueillir chaque correctif dans quatorze branches, pour toujours. Gardez les
+> branches pour un changement **proposé** - c'est une pull request - et les tags
+> pour « ce que tournait Acme le 2 ».
+
+### La boucle : tirer, lire, activer
+
+**Import from git** lit un emplacement dans une configuration enregistrée et
+**n'applique rien**. La passerelle continue de servir ce qu'elle servait ; la
+réponse est le plan - ce qu'activer ajouterait, modifierait et retirerait, plus
+les entrées de coffre que le document attend et que cette installation n'a pas.
+Vous lisez ça, puis **Set as current** quand le plan dit ce que vous attendiez,
+et vous relisez le plan au passage.
+
+C'est voulu et ce n'est pas négociable : qui peut écrire sur cette branche ne
+doit pas pouvoir reconfigurer une passerelle. Il n'y a aucune réconciliation
+continue, et aucune branche n'est surveillée.
+
+**Export to git** committe la **copie enregistrée** - pas l'état courant, donc
+enregistrez-le d'abord sous un nom si c'est lui que vous voulez - et le commit est
+**attribué à l'opérateur qui a cliqué**. C'est l'intérêt de le faire dans le
+produit plutôt que dans un script : un dépôt dont l'historique dit « meerkat » à
+chaque changement ne répond à rien six mois plus tard.
+
+Si la branche a bougé depuis la dernière lecture de cette configuration, le push
+est **refusé**, avec le remède : tirer dans une copie et comparer. Il n'y a pas de
+push forcé.
+
+### Le jeton
+
+HTTPS avec un jeton. Le jeton est une référence de [coffre](/docs/console/vault),
+jamais un littéral : un emplacement est une ligne que la console lit et qu'un
+snapshot emporte.
+
+Ce qu'il faut accorder, et le **nom d'utilisateur à envoyer à côté du jeton**,
+diffèrent d'une forge à l'autre - et toutes rapportent un mauvais nom
+d'utilisateur comme le même « authentication failed » qu'un mauvais jeton, ce qui
+fait qu'un jeton parfaitement valide coûte un après-midi à quelqu'un. Le
+formulaire dit les deux au fur et à mesure que vous tapez l'URL :
+
+| Forge | Nom d'utilisateur | Ce que le jeton demande |
+|---|---|---|
+| **GitHub** | ignoré | Un jeton **fine-grained**, ce dépôt seulement, *Contents: Read and write*. Pas un jeton classique avec `repo` : c'est le contrôle total de tous les dépôts privés que le compte atteint |
+| **GitLab** | `oauth2` | Un project access token avec `write_repository` et le rôle Maintainer (Developer si la branche n'est pas protégée) |
+| **Bitbucket Cloud** | `x-token-auth` | Un repository access token avec `repository:write` |
+| **Azure DevOps** | ignoré | Un personal access token avec *Code: Read & Write* |
+| **Gitea / Forgejo** | le compte du jeton | Un access token avec `write:repository` |
+
+**Check** prouve que le dépôt répond, que l'identifiant est accepté et que la
+branche existe, sans rien écrire : un mauvais jeton se découvre sur l'écran qui le
+pose.
+
+### Depuis un agent
+
+`list_git_locations`, `pull_configuration` et `push_configuration`
+([agents](/docs/agent/overview)). Un agent qui demande à la passerelle de pousser
+ne détient aucun identifiant et n'a besoin d'aucun checkout : c'est le jeton du
+coffre, limité à un dépôt, qui travaille.
+
 ## History
 
 La passerelle tient sa propre bande : **un point de reprise à chaque changement** qui
@@ -146,3 +233,8 @@ jusqu'à ce que le nouveau ait fait ses preuves.
   un effacement.
 - **Une configuration n'est pas une sauvegarde.** Les utilisateurs et les sessions n'y
   sont pas. C'est à cela que sert l'onglet Snapshot.
+- **Tirer depuis git ne change rien.** Ça range un document et ça vous montre le
+  plan. La passerelle bascule quand quelqu'un active, pas quand le dépôt bouge.
+- **Un emplacement appartient à cette installation, pas au document.** Il n'est
+  jamais exporté : une configuration qui pourrait repointer la passerelle vers un
+  autre dépôt écraserait le répertoire d'un autre client au push suivant.

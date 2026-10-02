@@ -511,6 +511,8 @@ thing, you need a broker.
 organisation and service, updated live: a run starting, advancing and finishing
 appears without refreshing anything. Three actions live there, and they are the
 ones wanted at two in the morning: pause, bring the next turn forward, remove.
+There is no button to create one, by decision: a schedule belongs to the
+service that needs it, which creates it through the API from its own screens.
 
 ![The Scheduler screen: a cadence, a cron line and one date, each with its next run and its last](img/console/scheduler.webp)
 

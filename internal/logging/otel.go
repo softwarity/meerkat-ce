@@ -75,7 +75,10 @@ func Pushing() bool { return pushOn.Load() }
 // install puts the handlers the switches ask for in place, for the
 // operational log and for the access log.
 func install() {
-	slog.SetDefault(slog.New(withPush(handlerFor(os.Stderr, current(), &slog.HandlerOptions{Level: level}), level)))
+	// And every line into the buffer the console's Logs screen reads
+	// (buffer.go), whatever the output's format.
+	out := withPush(handlerFor(os.Stderr, current(), &slog.HandlerOptions{Level: level}), level)
+	slog.SetDefault(slog.New(teeHandler{out, newBufferHandler(level)}))
 	if AccessLogEnabled() {
 		accessLogger.Store(newAccessLogger(os.Stdout, current()))
 	}

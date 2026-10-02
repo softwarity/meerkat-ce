@@ -13,6 +13,8 @@ interface SectionLink {
   // organisation. In multi mode the same screens are reached per organisation,
   // from Tenants - see _modes.scss.
   singleOnly?: boolean;
+  // bottom: pushed to the foot of the nav, a space above it.
+  bottom?: boolean;
 }
 
 const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
@@ -48,15 +50,8 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // Everybody who administers a domain mints their OWN tokens, and a token
       // is never more than its owner - so this is on both planes, not root's.
       { path: 'access-tokens', label: $localize`:@@Access_tokens:Access tokens`, icon: 'key' },
-      {
-        path: 'configuration',
-        label: $localize`:@@Configuration:Configuration`,
-        icon: 'import_export',
-        roles: 'root',
-      },
-      // Below the configuration, and on its own: connecting an assistant is
-      // not the same act as minting a key, and the flow that does it produces
-      // no key at all.
+      // On its own: connecting an assistant is not the same act as minting a
+      // key, and the flow that does it produces no key at all.
       { path: 'mcp', label: $localize`:@@MCP:MCP`, icon: 'smart_toy' },
       // The shape of the objects this installation keeps, apart from the
       // things that USE them: an account's fields are decided once, not
@@ -68,6 +63,15 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // The developer tunnel: a port into the cluster, opened for the people
       // who plug their machine in.
       { path: 'plug', label: $localize`:@@Plug:Plug`, icon: 'power' },
+      // The whole installation as one file: not a daily screen, so it sits at
+      // the bottom, apart from the rest.
+      {
+        path: 'configuration',
+        label: $localize`:@@Configuration:Configuration`,
+        icon: 'import_export',
+        roles: 'root',
+        bottom: true,
+      },
     ],
   },
   application: {

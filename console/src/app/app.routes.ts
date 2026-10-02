@@ -4,6 +4,7 @@ import {
   apiDocsAccess,
   appOnly,
   auditAccess,
+  logsAccess,
   schedulerAccess,
   issuesAccess,
   multiTenantOnly,
@@ -457,6 +458,13 @@ export const routes: Routes = [
     path: 'audit',
     canActivate: [auditAccess],
     loadComponent: () => import('./settings/audit-page.component').then((m) => m.AuditPageComponent),
+  },
+  {
+    // The gateway's own log (OBS-03), live. Not configuration, so not under
+    // Infra: a transverse screen beside the audit trail.
+    path: 'logs',
+    canActivate: [logsAccess],
+    loadComponent: () => import('./logs/logs-page.component').then((m) => m.LogsPageComponent),
   },
   {
     matcher: issuesMatcher,

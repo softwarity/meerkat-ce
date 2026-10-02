@@ -47,11 +47,24 @@
 }
 .content {
   padding: 0 24px 24px;
+  display: grid;
+  gap: 16px;
   max-width: 720px;
+}
+// The same frame as Mail relay: the collector in one card, the signals in
+// another.
+mat-card {
+  padding: 16px 20px;
+}
+mat-card > :first-child {
+  margin-top: 0;
+}
+.signals-card {
+  padding-top: 4px;
 }
 
 .lead {
-  margin: 0 0 16px;
+  margin: 0;
   line-height: 1.5;
   color: var(--mat-sys-on-surface-variant);
 }
@@ -165,7 +178,7 @@ mat-expansion-panel {
 // The four signals. Each tab is a short page of its own: a switch, and what it
 // sends.
 .signals {
-  margin-top: 8px;
+  margin-top: 0;
 }
 .tab {
   // Room on the right for the info buttons' touch target, which reaches a

@@ -5,7 +5,13 @@
 > quand l'état change. Le contrat produit est `FEATURES.md` (une ligne par fonction, l'état lu dans le code) ; les conventions,
 > `CLAUDE.md` ; ici : l'état courant, les chantiers, les pièges.
 
-_Derniere mise a jour : 2026-10-02 : **toute la CI sur le miroir public, l'Enterprise comprise,
+_Derniere mise a jour : 2026-10-02 (2) : **CFG-07, les configurations dans un depot git** (EE) -
+emplacements nommes (depot + branche + repertoire), plusieurs par depot, un repertoire par
+plateforme ; un pull RANGE et n'applique rien, un push committe au nom de l'operateur, une
+branche qui a bouge est un refus avec son remede ; jeton en reference de coffre uniquement,
+nom d'utilisateur HTTP par forge ; `internal/confrepo` (couture) + `ee/gitdriver` (go-git,
+absent du binaire CE) ; teste en vrai contre GitHub et contre un serveur git HTTP local.
+Voir la section "Session 2026-10-02 (2)". Avant cela, 2026-10-02 : **toute la CI sur le miroir public, l'Enterprise comprise,
 et la release par approbation** - le prive ne construit plus rien, `ci-ee.yml` clone `meerkat`
 depuis `meerkat-ce` avec un jeton d'App GitHub, tout tourne a chaque commit, et chaque run
 se termine sur un job `release` en attente d'approbation qui tamponne l'image testee (pas de
@@ -291,6 +297,102 @@ B ait mis cette session en cache et repondu 200 ; aucun verrou consultatif reste
 repond **500 "internal error"** au lieu de 400, alors que le message d'erreur du store nomme
 pourtant les valeurs permises. `invalidError`/`isInvalid()` existent dans `internal/admin/api.go`
 mais le chemin de sauvegarde de route ne s'en sert pas. A signaler a Francois.
+
+## Session 2026-10-02 (2) - CFG-07 : les configurations dans un depot git (EE)
+
+**Ce que c'est.** Les configurations enregistrees (CFG-01) peuvent vivre dans un depot git.
+L'idee de depart de Francois etait « une branche par plateforme cliente » ; ca a ete ecarte
+apres discussion (une branche sert un changement qui a l'intention de fusionner, des
+plateformes sont paralleles pour de bon, et une branche par client c'est cueillir chaque
+correctif dans quatorze branches pour toujours). Ce qui est livre : des **emplacements
+nommes**, chacun un depot + une branche + un **repertoire**, donc plusieurs emplacements par
+depot, un repertoire par plateforme.
+
+**La phrase qui porte tout : git est un TRANSPORT, pas une fonctionnalite.** Tout ce qui
+rend un pull sur la boucle utile existait avant - `storeConfigurationFile` rangeait deja un
+fichier televerse sans rien appliquer, `/{id}/plan` dit ce qu'activer changerait,
+`/{id}/compare/{other}` compare, `/{id}/activate` bascule. Il ne manquait qu'un lecteur qui
+prend les octets dans un depot et un ecrivain dans l'autre sens. C'est pourquoi rien dans
+`internal/admin/configremote.go` n'applique, ne recharge ni n'elague.
+
+**Ce qui est en place.**
+- `internal/config` : `Split(doc)` sort de `MarshalBundle` (les fichiers d'une configuration :
+  `meerkat.yaml` + `assets/`), `Assemble(files)` sort de `UnmarshalBundle`. Le ZIP et le
+  repertoire git partagent donc exactement la meme disposition - `internal/config/layout_test.go`
+  tient `confrepo.DocumentName` egal a `config.BundleName`.
+- `internal/confrepo` : la couture (interface `Driver` : Check / Fetch / Commit, + `Register`
+  / `Available`), la table des **forges** (`providers.go`) et `confrepo/confrepotest` (un
+  depot en memoire, pour tester la couche admin sans serveur git).
+- Store, schema **v70**, purement additif : table `config_remotes` + colonnes `remote_id`,
+  `remote_rev`, `remote_at` sur `configurations`.
+- `internal/admin/configremote.go` : 10 endpoints root-only, EE ; `internal/admin/mcp_git.go` :
+  trois tools (`list_git_locations`, `pull_configuration`, `push_configuration`).
+- `ee/gitdriver` : go-git v5.19.2, **absent du binaire CE** (lie par `cmd/meerkat/link_ee.go`).
+  Rien sur le disque : chaque appel clone en memoire. Lecture en `Depth: 1`, ecriture en
+  clone complet (git lui-meme deconseille de pousser depuis un clone superficiel, et le
+  support go-git y est partiel).
+- Console : la table de plan sortie en composant partage (`plan-table.component.ts` - elle
+  etait ecrite DEUX fois, dans l'import et dans la comparaison, et le pull aurait ete la
+  troisieme), `git-locations-dialog` (la liste + le formulaire, avec l'aide par forge),
+  `pick-location-dialog` (+ `PullResultDialogComponent`), et sur l'ecran Management : deux
+  boutons en haut (Import from git, Git locations) et deux actions de ligne (Pull, Export to git).
+
+**Les decisions a ne pas defaire.**
+1. **L'emplacement ne voyage PAS dans le document.** Une configuration qui pourrait repointer
+   la passerelle vers un autre depot ecraserait le repertoire d'un autre client au push
+   suivant. D'ou une table dediee, comme le coffre.
+2. **La liaison est MEMORISEE** sur la ligne (`remote_id` + `remote_rev`). Sans elle, « le
+   depot a-t-il bouge depuis que j'ai lu ceci ? » n'a pas de reponse, et chaque push est
+   aveugle. La modale ne reapparait donc qu'au premier push ou au changement de destination.
+3. **Un pull n'active jamais.** Qui peut ecrire sur la branche ne doit pas pouvoir
+   reconfigurer la passerelle. **Aucune reconciliation continue**, aucune branche surveillee -
+   si ca arrive un jour, ce sera un mode explicite et la console passera en lecture seule.
+4. **Jamais de push force.** Le `expect` (la revision lue) est compare a la tete avant
+   d'ecrire ; une branche qui a bouge est un 409 avec le remede (tirer dans une copie et
+   comparer), et le refspec n'a pas de `+`.
+5. **Le commit porte l'operateur.** C'est l'interet de le faire dans le produit : un depot
+   dont l'historique dit « meerkat » partout ne repond a rien six mois plus tard. Un compte
+   sans adresse recoit `<username>@meerkat.invalid` (RFC 2606, ne peut etre personne) - la
+   premiere version refusait, ce qui etait un cul-de-sac au premier essai.
+
+**Le piege que personne ne voit venir : le nom d'utilisateur HTTP.** Un jeton voyage en HTTP
+basic auth, qui a deux moities, et chaque forge a tranche la premiere differemment - GitHub
+l'ignore, GitLab veut `oauth2`, Bitbucket REFUSE autre chose que `x-token-auth`. Et toutes
+rapportent un mauvais nom d'utilisateur comme le meme « authentication failed » qu'un mauvais
+jeton : un jeton parfaitement valide coute un apres-midi. D'ou `confrepo/providers.go`, servi
+au formulaire par `GET /api/config-remotes/forges` (une seule table, parce que la meme repond
+aussi a un identifiant refuse cote serveur) et la colonne `token_user` pour le forcer.
+
+**Le jeton est une reference de coffre, point.** Un litteral est refuse par l'API (422) :
+cette table est lue par la console et emportee par un snapshot. Une reference que le coffre
+ne detient pas est refusee la ou est le trou, pas passee en mot de passe vide pour que la
+forge se fasse accuser.
+
+**Corrige en cours de route** : la paperasse du jeton etait collee a TOUT echec du check, donc
+une faute de frappe dans un nom de branche revenait en conseillant un autre jeton - elle n'est
+plus ajoutee que par le driver, et seulement sur un echec d'authentification. Et le check a son
+propre delai (10 s contre 30 s), parce qu'une forge qui etrangle un mauvais jeton en ne
+repondant pas ressemble a une forge en panne.
+
+**Teste en le faisant tourner**, pas seulement en unitaire :
+- contre **GitHub** (depot public, sans jeton) : check ok ; une branche inexistante repond
+  « has no branch "main". It has: master, octocat-patch-1, test » ; un depot prive sans jeton
+  repond le refus + ce que GitHub demande exactement.
+- contre un **serveur git smart-HTTP local** qui exige une authentification et journalise ce
+  qu'il recoit : deux emplacements dans un depot ecrivent dans deux repertoires, le push
+  produit un vrai commit (`author: Administrator <ops@acme.test>`), le secret du coffre arrive
+  bien en mot de passe avec le bon nom d'utilisateur, le pull rend le plan sans rien appliquer,
+  et apres un push de quelqu'un d'autre notre push repond 409 avec le remede.
+
+**Ce qui reste dehors, par decision** : SSH (il faudrait une cle dans le coffre et une
+politique de `known_hosts` - c'est une deuxieme decision sur la confiance, pas un champ de
+plus) et la reconciliation continue.
+
+**A savoir** : `SecretFieldComponent.invalid` n'est bindé NULLE PART dans la console. L'etat
+`typed` (un secret tape en clair, pas encore range) ne bloque donc l'enregistrement d'aucun
+ecran, alors que c'est la regle que VAULT-05 annonce. Relais mail, fournisseurs d'auth, OTel,
+TLS : aucun. Une ligne par ecran a corriger, et c'est un autre commit.
+
 
 ## Session 2026-10-01 - toute la CI sur le miroir public, l'Enterprise comprise
 

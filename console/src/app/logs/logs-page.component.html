@@ -1,0 +1,85 @@
+<div class="banner">
+  <h1 i18n="@@Logs">Logs</h1>
+  @if (state(); as s) {
+    @if (revertsIn()) {
+      <span class="reverts">{{ revertsIn() }}</span>
+    }
+    <mat-form-field class="short" subscriptSizing="dynamic">
+      <mat-label i18n="@@Log_level">Level</mat-label>
+      <mat-select [value]="s.level" (selectionChange)="setLevel($event.value)">
+        @for (l of levels; track l) {
+          <mat-option [value]="l">{{ l }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  }
+  <button matButton="outlined" (click)="download()" [disabled]="!filtered().length">
+    <mat-icon>download</mat-icon>
+    <ng-container i18n="@@Export">Export</ng-container>
+  </button>
+</div>
+
+<div class="toolbar">
+  <p class="hint" i18n="@@Logs_hint">
+    The last lines this gateway wrote about itself, live. In a cluster, only those of the node that
+    answered: {{ state()?.node }}.
+  </p>
+  <div class="filters">
+    <mat-button-toggle-group
+      multiple
+      [value]="shown()"
+      (change)="shown.set($event.value)"
+      i18n-aria-label="@@Log_levels_shown"
+      aria-label="Levels shown"
+    >
+      @for (l of levels; track l) {
+        <mat-button-toggle [value]="l">{{ l }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+    <mat-form-field class="grow" subscriptSizing="dynamic">
+      <mat-label i18n="@@Search">Search</mat-label>
+      <input matInput [value]="search()" (input)="search.set($any($event.target).value)" />
+    </mat-form-field>
+  </div>
+</div>
+
+<div class="scroll" #scroller (scroll)="scrolled()">
+  @if (loading()) {
+    <loading-indicator withContainer />
+  } @else {
+    <div class="lines">
+      @for (e of filtered(); track e.seq) {
+        <div class="line" [class]="e.level" [class.open]="open() === e.seq" (click)="toggle(e)">
+          <span class="time">{{ time(e) }}</span>
+          <span class="level">{{ e.level }}</span>
+          <span class="message">
+            {{ e.message }}
+            @for (a of attrs(e); track a.key) {
+              <span class="attr"><span class="key">{{ a.key }}</span>={{ a.value }}</span>
+            }
+          </span>
+          @if (open() === e.seq) {
+            <dl class="detail" (click)="$event.stopPropagation()">
+              @if (e.traceId) {
+                <dt>trace_id</dt>
+                <dd>{{ e.traceId }}</dd>
+              }
+              @for (a of attrs(e); track a.key) {
+                <dt>{{ a.key }}</dt>
+                <dd>{{ a.value }}</dd>
+              }
+            </dl>
+          }
+        </div>
+      } @empty {
+        <p class="empty" i18n="@@Logs_empty">No line matches.</p>
+      }
+    </div>
+  }
+</div>
+
+@if (!following()) {
+  <button matFab class="follow" (click)="follow()" i18n-matTooltip="@@Logs_follow" matTooltip="Follow new lines">
+    <mat-icon>arrow_downward</mat-icon>
+  </button>
+}

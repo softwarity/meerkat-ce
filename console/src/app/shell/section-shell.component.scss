@@ -15,6 +15,13 @@ nav.left {
   padding: 0 8px;
   overflow-y: auto;
 }
+nav.left .spacer {
+  flex: 1 1 auto;
+  min-height: 16px;
+}
+nav.left .spacer + .section-link {
+  margin-bottom: 8px;
+}
 nav.left h2 {
   margin: 0 -8px 6px;
   padding: 16px 16px 12px;

@@ -108,6 +108,8 @@ export interface RouteSpecSource {
 export interface RouteAPIOptions {
   spec?: RouteSpecSource;
   security?: EndpointSecurity;
+  // Audited operations (AUD-04). Absent here, the editor's save erased them.
+  audit?: EndpointAudit[];
 }
 
 // What comes back from depositing a file: what the spec turned out to be,
@@ -203,6 +205,15 @@ export interface AuditField {
   from: 'path' | 'query' | 'header' | 'body';
   key: string;
 }
+// An exported set of audited operations: the Endpoint audit screen writes it,
+// the route editor reads it back onto a route.
+export const AUDIT_FILE_KIND = 'meerkat.endpoint-audit';
+export interface AuditFile {
+  kind: typeof AUDIT_FILE_KIND;
+  route: string;
+  audit: EndpointAudit[];
+}
+
 export interface EndpointAudit {
   method: string;
   path: string;
@@ -573,6 +584,33 @@ export interface Route {
 // Whether a route is actually answering (SVC-04), as the gateway knows it -
 // from watching real answers, not from a prober of its own. Per node: it is
 // the gateway that was asked which replies.
+// The gateway's own log (OBS-03): the last lines the node that answered
+// wrote, structured whatever its output format.
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+  seq: number;
+  time: string;
+  level: LogLevel;
+  message: string;
+  traceId?: string;
+  attrs?: Record<string, unknown>;
+}
+
+export interface LogLevelState {
+  level: LogLevel;
+  // The level the gateway started with, and when `level` goes back to it.
+  startup: LogLevel;
+  until?: string;
+}
+
+export interface LogsAnswer extends LogLevelState {
+  // Which gateway answered: the lines are its own.
+  node: string;
+  last: number;
+  entries: LogEntry[];
+}
+
 export interface RouteHealth {
   state: 'closed' | 'open' | 'probe';
   // Whether a breaker is armed. A route with none can still be failing, and
@@ -848,6 +886,74 @@ export interface SavedConfiguration {
   // What is inside, counted: three configurations named after customers say
   // nothing about what separates them.
   contents?: ConfigSection[];
+  // The git location this one came from and goes back to (CFG-07), and the
+  // revision it last met there. Remembered rather than asked for at every pull
+  // and push: without it, "has the repository moved since this was read?" has
+  // no answer, and a push is one wrong choice in a dialog away from another
+  // customer's directory.
+  remoteId?: string;
+  remoteRev?: string;
+  remoteAt?: number;
+}
+
+// One named git location (CFG-07): a repository, a branch, and a directory
+// inside it. The directory is what lets several of these share one repository,
+// one per customer platform, and what makes a location name exactly one
+// configuration.
+//
+// `tokenRef` is a vault reference (${name}), never a token: a reference is
+// public, a literal never is.
+export interface ConfigRemote {
+  id: string;
+  name: string;
+  url: string;
+  branch: string;
+  dir: string;
+  tokenRef?: string;
+  // The HTTP basic username beside the token, "" for the forge's default.
+  // GitHub ignores it, GitLab wants oauth2, Bitbucket refuses anything but
+  // x-token-auth - and all three report a wrong one as an authentication
+  // failure, which is why it is a field.
+  tokenUser?: string;
+  authorName?: string;
+  authorEmail?: string;
+  createdAt: number;
+  updatedAt: number;
+  // The configurations bound to it, so deleting one can say what it unbinds.
+  bound?: string[];
+}
+
+// What a forge wants, served by the gateway so that the form says it before
+// anybody clicks Check (and so the server's own refusal says the same thing).
+export interface ConfigForge {
+  id: string;
+  name: string;
+  hosts?: string[];
+  user: string;
+  userFixed?: boolean;
+  needs: string;
+  create?: string;
+  note?: string;
+}
+
+// The answer of a location's check: whether it answers, and whether it already
+// holds a configuration. A failure is one sentence, written by whoever knows
+// why - and when the credential was the problem, that sentence already carries
+// what the forge wants.
+export interface ConfigRemoteCheck {
+  ok: boolean;
+  holds?: boolean;
+  revision?: string;
+  error?: string;
+}
+
+// What a pull hands back: the row as it now stands, and what activating it
+// would change. The plan rides along because a pull that answered "ok" would
+// leave the operator to click twice for the only thing they wanted to know.
+export interface ConfigPullResult {
+  configuration: SavedConfiguration;
+  plan?: ConfigPlan;
+  planError?: string;
 }
 
 // One moment of the gateway's configuration (CFG-06). Nobody asks for a point
@@ -1877,6 +1983,17 @@ export class ApiService {
     return this.http.get<Record<string, RouteHealth>>('/api/routes/health');
   }
 
+  // The lines after `after` (a line number), at most `limit` of them.
+  logs(after = 0, limit?: number): Observable<LogsAnswer> {
+    const params: Record<string, number> = { after };
+    if (limit) params['limit'] = limit;
+    return this.http.get<LogsAnswer>('/api/logs', { params });
+  }
+
+  setLogLevel(level: LogLevel): Observable<LogLevelState> {
+    return this.http.put<LogLevelState>('/api/logs/level', { level });
+  }
+
   proxyLimits(): Observable<ProxyLimits> {
     return this.http.get<ProxyLimits>('/api/settings/proxy');
   }
@@ -2112,6 +2229,67 @@ export class ApiService {
     return this.http.get(`/api/configurations/${id}/export`, {
       responseType: 'text',
     });
+  }
+
+  // ── git locations (CFG-07) ─────────────────────────────────────────────────
+
+  configRemotes(): Observable<ConfigRemote[]> {
+    return this.http.get<ConfigRemote[]>('/api/config-remotes');
+  }
+
+  // What each forge wants. Read from the gateway rather than written into this
+  // file: the same table answers a refused credential server-side, and two
+  // copies of it would drift the day a forge changes its mind.
+  configForges(): Observable<{ forges: ConfigForge[]; generic: ConfigForge }> {
+    return this.http.get<{ forges: ConfigForge[]; generic: ConfigForge }>(
+      '/api/config-remotes/forges',
+    );
+  }
+
+  saveConfigRemote(body: Partial<ConfigRemote>, id?: string): Observable<ConfigRemote> {
+    const payload = {
+      name: body.name ?? '',
+      url: body.url ?? '',
+      branch: body.branch ?? '',
+      dir: body.dir ?? '',
+      tokenRef: body.tokenRef ?? '',
+      tokenUser: body.tokenUser ?? '',
+      authorName: body.authorName ?? '',
+      authorEmail: body.authorEmail ?? '',
+    };
+    return id
+      ? this.http.put<ConfigRemote>(`/api/config-remotes/${id}`, payload)
+      : this.http.post<ConfigRemote>('/api/config-remotes', payload);
+  }
+
+  deleteConfigRemote(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/config-remotes/${id}`);
+  }
+
+  // Proves the repository answers and the credential is accepted. Writes
+  // nothing - so a wrong token is found on the screen that sets it.
+  checkConfigRemote(id: string): Observable<ConfigRemoteCheck> {
+    return this.http.post<ConfigRemoteCheck>(`/api/config-remotes/${id}/check`, {});
+  }
+
+  // Reads a location into a NEW saved configuration. Applies nothing.
+  pullNewConfiguration(remoteId: string, name = ''): Observable<ConfigPullResult> {
+    return this.http.post<ConfigPullResult>('/api/configurations/pull', { remoteId, name });
+  }
+
+  // Refreshes a bound one from its own location. Applies nothing.
+  pullConfiguration(id: string): Observable<ConfigPullResult> {
+    return this.http.post<ConfigPullResult>(`/api/configurations/${id}/pull`, {});
+  }
+
+  // Commits the SAVED copy to its location and pushes. A branch that moved is
+  // a 409, never a force.
+  pushConfiguration(id: string): Observable<SavedConfiguration> {
+    return this.http.post<SavedConfiguration>(`/api/configurations/${id}/push`, {});
+  }
+
+  bindConfiguration(id: string, remoteId: string): Observable<SavedConfiguration> {
+    return this.http.put<SavedConfiguration>(`/api/configurations/${id}/remote`, { remoteId });
   }
 
   // ── snapshots (STORE-05) ───────────────────────────────────────────────────

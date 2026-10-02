@@ -140,6 +140,15 @@ spec:
             # développement y reste fermée, quoi que dise la base.
             - name: MEERKAT_PRODUCTION
               value: "1"
+          # DÉMARRAGE : le stockage est ouvert et migré avant que les ports
+          # s'ouvrent. Jusqu'à deux minutes pour cela, avant que la vivacité
+          # compte.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: app
+            periodSeconds: 2
+            failureThreshold: 60
           # VIVACITÉ : ce processus sert-il encore ? Il répond UP sans rien
           # regarder, et c'est la bonne réponse - cette sonde décide de TUER
           # le processus.
@@ -147,7 +156,6 @@ spec:
             httpGet:
               path: /healthz
               port: app
-            initialDelaySeconds: 5
             periodSeconds: 10
           # DISPONIBILITÉ : ce nœud peut-il prendre une requête maintenant ?
           # Il vérifie le stockage et la table de routage compilée, et répond

@@ -25,6 +25,12 @@ belongs to a dependency belongs to readiness.
 {"status":"UP","version":"dev"}
 ```
 
+It is also the **startup** probe. The store is opened and migrated before the
+ports open, so a gateway that is migrating answers nothing yet: the startup
+probe gives it up to two minutes before liveness starts counting. Without it, a
+long migration after an upgrade would be killed halfway and start over, in a
+loop.
+
 ## /readyz is readiness
 
 It decides whether to **send traffic**, so it asks the two questions that make a

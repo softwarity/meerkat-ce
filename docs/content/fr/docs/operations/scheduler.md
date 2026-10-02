@@ -524,6 +524,8 @@ compte, organisation et service, mis à jour en direct : une exécution qui
 démarre, avance et se termine apparaît sans rien rafraîchir. Trois actions y
 vivent, et ce sont celles qu'on veut à deux heures du matin : suspendre,
 avancer le prochain tour, supprimer.
+Aucun bouton pour en créer une, par décision : une planification appartient au
+service qui en a besoin, qui la crée par l'API depuis ses propres écrans.
 
 ![L'écran Scheduler : une cadence, une ligne cron et une date unique, chacune avec son prochain tour et le dernier](img/console/scheduler.webp)
 

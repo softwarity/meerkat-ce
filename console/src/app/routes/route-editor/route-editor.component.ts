@@ -37,9 +37,12 @@ import { firstValueFrom } from "rxjs";
 import { DialogsService } from "../../shared/dialogs.service";
 import { LOCALE_ID } from "@angular/core";
 import {
+  AUDIT_FILE_KIND,
   Access,
   ApiService,
+  AuditFile,
   CatalogEntry,
+  EndpointAudit,
   DiscoveredService,
   Spec,
   IDENTITY_FIELDS,
@@ -681,9 +684,43 @@ export class RouteEditorComponent {
   // the work away.
   readonly dirty = computed(
     () =>
+      this.auditUpload() !== null ||
       JSON.stringify(this.draft()) !==
-      JSON.stringify(draftOf(this.route(), this.customFields())),
+        JSON.stringify(draftOf(this.route(), this.customFields())),
   );
+
+  // Audited operations read from a file (AUD-04), waiting for Save. Null when
+  // nothing was uploaded: the route keeps what it has, read live like the
+  // endpoint security, so the Endpoint audit screen's edits are never undone
+  // by a save here. Cleared when the drawer opens another route.
+  protected readonly auditUpload = linkedSignal<Route | null, EndpointAudit[] | null>({
+    source: this.route,
+    computation: () => null,
+  });
+  protected readonly auditUploadError = signal("");
+  protected readonly auditCount = computed(
+    () => (this.auditUpload() ?? this.route()?.api?.audit ?? []).length,
+  );
+
+  protected uploadAudit(input: HTMLInputElement): void {
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    this.auditUploadError.set("");
+    file.text().then((text) => {
+      try {
+        const parsed = JSON.parse(text) as Partial<AuditFile>;
+        if (parsed.kind !== AUDIT_FILE_KIND || !Array.isArray(parsed.audit)) {
+          throw new Error("kind");
+        }
+        this.auditUpload.set(parsed.audit);
+      } catch {
+        this.auditUploadError.set(
+          $localize`:@@Audit_file_invalid:Not an audit file exported from Endpoint audit.`,
+        );
+      }
+    });
+  }
 
   // The APPLICATION's locale offer, shown read-only (managed in Application
   // General). Display names come from Intl: the console's locale for the
@@ -1766,6 +1803,12 @@ export class RouteEditorComponent {
     }
     if (security) {
       route.api = { ...(route.api ?? {}), security };
+    }
+    // Carried over like the security - its own screen edits it - unless a
+    // file was uploaded here. Dropping it was a save that erased the audit.
+    const audit = this.auditUpload() ?? this.route()?.api?.audit;
+    if (audit?.length) {
+      route.api = { ...(route.api ?? {}), audit };
     }
     if (d.isUi && this.uiPossible()) {
       const writesOnTag = ["attribute", "add-attribute", "class"].includes(

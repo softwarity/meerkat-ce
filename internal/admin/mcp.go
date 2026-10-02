@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/filters"
+	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/mcp"
 	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -307,6 +309,20 @@ func (a *API) tools() []mcp.Tool {
 			Call: a.toolReadTraffic,
 		},
 		{
+			Name: "read_logs", Allow: administersRouting, Title: "Read the gateway's own log", ReadOnly: true,
+			Description: "The last lines this gateway wrote about itself - startup, reloads, upstreams going " +
+				"down, refused configurations - newest last, with their level, message, attributes and " +
+				"trace id. Use it to answer 'why is this route failing' or 'what happened at startup'. " +
+				"The lines are the node that answered (`node`); in a cluster the others hold their own. " +
+				"The access log (one line per request) is not in it: read_traffic answers that.",
+			Schema: object(map[string]any{
+				"limit":  map[string]any{"type": "integer", "description": "How many lines, 1 to 500 (default 100)."},
+				"level":  str("Optional: only this level and above - debug, info, warn or error."),
+				"search": str("Optional: only lines whose message or attributes contain this text, ignoring case."),
+			}),
+			Call: a.toolReadLogs,
+		},
+		{
 			Name: "read_audit", Allow: a.administersSomething, Title: "Read the audit trail", ReadOnly: true,
 			Description: "Who changed what, most recent first, with the value before and after each field. " +
 				"Use it to answer 'when did this change and who did it'. The trail also holds the SECURITY " +
@@ -336,6 +352,7 @@ func (a *API) tools() []mcp.Tool {
 	read = append(read, a.roleTools()...)
 	read = append(read, a.grantTools()...)
 	read = append(read, a.accountTools()...)
+	read = append(read, a.gitTools()...)
 	return append(read, a.lookWriteTools()...)
 }
 
@@ -617,4 +634,45 @@ func (a *API) toolReadTraffic(_ context.Context, raw json.RawMessage) (any, erro
 	// reading one period and not two.
 	answer.endpoints(a.registry(), time.Now().Add(-time.Duration(asked.Minutes)*time.Minute), 20)
 	return answer, nil
+}
+
+func (a *API) toolReadLogs(_ context.Context, raw json.RawMessage) (any, error) {
+	var asked struct {
+		Limit  int    `json:"limit"`
+		Level  string `json:"level"`
+		Search string `json:"search"`
+	}
+	_ = json.Unmarshal(raw, &asked)
+	if asked.Limit <= 0 || asked.Limit > 500 {
+		asked.Limit = 100
+	}
+	answer := logsAnswer{logLevelState: currentLogLevel(), Node: nodeName(), Last: logging.LastSeq(), Entries: []logging.Entry{}}
+	floor := logging.ParseLevel(asked.Level)
+	needle := strings.ToLower(asked.Search)
+	all := logging.Recent(0, 0)
+	// Newest first while filtering, so the limit keeps the recent ones.
+	for i := len(all) - 1; i >= 0 && len(answer.Entries) < asked.Limit; i-- {
+		e := all[i]
+		if asked.Level != "" && logging.ParseLevel(e.Level) < floor {
+			continue
+		}
+		if needle != "" && !entryContains(e, needle) {
+			continue
+		}
+		answer.Entries = append(answer.Entries, e)
+	}
+	slices.Reverse(answer.Entries)
+	return answer, nil
+}
+
+func entryContains(e logging.Entry, needle string) bool {
+	if strings.Contains(strings.ToLower(e.Message), needle) {
+		return true
+	}
+	for k, v := range e.Attrs {
+		if strings.Contains(strings.ToLower(k+"="+fmt.Sprint(v)), needle) {
+			return true
+		}
+	}
+	return false
 }

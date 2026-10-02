@@ -45,6 +45,15 @@
     </mat-select>
   </mat-form-field>
 
+  @if (intent() === 'audit' && selectedId()) {
+    <!-- The rules as a file: what the route editor's OpenTelemetry section
+         uploads, onto this route or another one. -->
+    <button matButton="tonal" type="button" (click)="exportAudit()">
+      <mat-icon>download</mat-icon>
+      <ng-container i18n="@@Export">Export</ng-container>
+    </button>
+  }
+
   @if (intent() === 'audit') {
     <p class="intro" i18n="@@Endpoint_audit_intro">
       Which operations leave an audit event, sent to the collector when the

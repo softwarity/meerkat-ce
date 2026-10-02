@@ -105,6 +105,16 @@ export const metricsAccess: CanActivateFn = async (_route, state) => {
   return ok ? true : bounce(router, state, landing(me));
 };
 
+// logsAccess gates the transverse Logs section: the gateway's own log names
+// routes, upstreams and addresses, which is the routing plane's to read.
+export const logsAccess: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  const ok = me.isRoot() || me.isInfraAdmin();
+  return ok ? true : bounce(router, state, landing(me));
+};
+
 // auditAccess gates the transverse Audit section: anyone who administers a
 // domain may open it (root, infra-admin, app-admin, or a tenant admin). The
 // API scopes the CONTENT to that domain; this only guards the page itself.

@@ -47,6 +47,7 @@
   Send this gateway's <b>traces</b>, <b>metrics</b>, <b>audit</b> and <b>logs</b> to one
   OpenTelemetry collector.
 </p>
+<mat-card appearance="outlined">
 
 <!-- The switch first, because it is what somebody came for, and it APPLIES ON
      CLICK. A toggle that needs a second
@@ -166,9 +167,12 @@
 
 }
 
+</mat-card>
+
 <!-- The four signals, one tab each, each with its own switch. Traces,
      metrics and audit LEAVE for the collector above, so they wait for the
      export; logs are written on the gateway's own outputs and do not. -->
+<mat-card appearance="outlined" class="signals-card">
 <mat-tab-group class="signals" animationDuration="0ms" mat-stretch-tabs="false">
   <mat-tab i18n-label="@@Tracing_tab_traces" label="Traces">
     <div class="tab">
@@ -344,6 +348,7 @@
     </div>
   </mat-tab>
 </mat-tab-group>
+</mat-card>
 
 @if (error()) {
   <p class="failed">{{ error() }}</p>

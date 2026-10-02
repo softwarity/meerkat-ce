@@ -34,6 +34,7 @@ Le rail de gauche porte les deux plans et les écrans transverses.
 | **Metrics** | `/traffic` | Ce que la passerelle a réellement servi |
 | **Scheduler** | `/scheduler` | Les appels que la passerelle fait à vos services selon un planning |
 | **Audit** | `/audit` | Qui a changé quoi |
+| **Logs** | `/logs` | Ce que la gateway dit d'elle-même, en direct |
 | **Issues** | `/issues` | Ce que vos utilisateurs ont signalé |
 
 Le découpage n'est pas cosmétique. **Infra** parle de l'installation : un amont, un
@@ -54,7 +55,7 @@ applique les mêmes périmètres à chaque appel.
 | Capacité | Ouvre |
 |---|---|
 | `root` | Tout, y compris Configuration |
-| `infra admin` | Le plan Infra (avec Access tokens et MCP), Metrics, Audit et Issues, la portée infra du coffre |
+| `infra admin` | Le plan Infra (avec Access tokens et MCP), Metrics, Logs, Audit et Issues, la portée infra du coffre |
 | `app admin` | Le plan Application (avec Sessions et Access tokens), Scheduler, Audit et Issues, la portée applicative du coffre |
 | `tenant admin` | Les organisations qu'il administre, Audit et Issues limités à elles |
 | `tenant creator` | La création d'une organisation depuis le tiroir Tenants |
@@ -99,8 +100,8 @@ Ces cinq-là retenues, la console ne surprend plus.
 - **[OpenTelemetry](/docs/operations/tracing)** - traces, métriques, audit et journaux envoyés à votre collecteur.
 - **[Plug](/docs/operations/plug)** - le tunnel développeur.
 - **[Jetons d'accès, MCP et API](/docs/console/access-and-agents)** - piloter Meerkat sans navigateur.
-- **[Configuration](/docs/console/configuration)** - configurations, points de reprise, instantanés.
 - **Model** - les champs que porte un compte, documenté avec [Users](/docs/console/users).
+- **[Configuration](/docs/console/configuration)** - configurations, points de reprise, instantanés. En bas du menu, à l'écart des écrans du quotidien.
 
 ### Application
 
@@ -120,6 +121,7 @@ Ces cinq-là retenues, la console ne surprend plus.
 - **[Metrics](/docs/console/traffic)** - trafic, latences, classement des routes.
 - **[Scheduler](/docs/operations/scheduler)** - les appels planifiés et leurs exécutions.
 - **[Audit et Issues](/docs/console/audit-and-issues)** - la trace des changements, et les signalements.
+- **[Logs](/docs/operations/logs#dans-la-console)** - les lignes de la gateway, en direct, et son niveau. Un nœud à la fois.
 - **License** - quelle édition a répondu, et ce qu'achète chaque fonctionnalité
   Enterprise. C'est le seul écran qui parle d'éditions : partout ailleurs, un
   contrôle verrouillé porte sa pastille et renvoie ici.

@@ -79,9 +79,15 @@ spec:
             - name: MEERKAT_PLUG_ADDR
               value: ":{{ .Values.plug.port }}"
             {{- end }}
+          # The store is opened and migrated BEFORE the ports open, so a long
+          # migration answers nothing for a while: up to two minutes before
+          # liveness starts counting, rather than a restart in mid-migration.
+          startupProbe:
+            httpGet: { path: /healthz, port: app }
+            periodSeconds: 2
+            failureThreshold: 60
           livenessProbe:
             httpGet: { path: /healthz, port: app }
-            initialDelaySeconds: 5
           readinessProbe:
             httpGet: { path: /readyz, port: app }
           volumeMounts:

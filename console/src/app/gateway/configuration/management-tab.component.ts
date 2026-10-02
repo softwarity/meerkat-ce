@@ -15,13 +15,24 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable, firstValueFrom } from 'rxjs';
 import { RowActionsDirective } from '@softwarity/row-actions';
-import { ApiService, ConfigPlan, CurrentConfiguration, Edition, SavedConfiguration } from '../../api.service';
+import {
+  ApiService,
+  ConfigPlan,
+  ConfigRemote,
+  CurrentConfiguration,
+  Edition,
+  SavedConfiguration,
+} from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { ConfigurationYamlComponent } from './configuration-yaml.component';
 import { CompareDialogComponent } from './compare-dialog.component';
 import { ExportDialogComponent } from './export-dialog.component';
 import { ImportDialogComponent, VaultHolesDialogComponent } from './import-dialog.component';
+import {
+  PickLocationDialogComponent,
+  PullResultDialogComponent,
+} from './pick-location-dialog.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
 
 // One row per configuration, and the CURRENT one is the first of them.
@@ -186,6 +197,31 @@ type Row = SavedConfiguration & { current?: boolean };
       input[type='file'] {
         display: none;
       }
+      /* Where a row lives in git, and whether it is level with it. One icon and
+         one name: the full URL belongs in the tooltip, where a line of it does
+         not push the dates off the row. */
+      .git {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        color: var(--mat-sys-on-surface-variant);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .git mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+      .git.ahead {
+        color: var(--mat-sys-primary);
+      }
+      .git.behind,
+      .git.diverged {
+        color: var(--mat-sys-error);
+      }
     `,
   ],
   template: `
@@ -197,14 +233,16 @@ type Row = SavedConfiguration & { current?: boolean };
             nothing. Click a row to read its file.
           </p>
           <!-- The size of the shelf, said before it is reached: a cap found by
-               being refused is a trap, a cap announced is a price. -->
+               being refused is a trap, a cap announced is a price.
+               ONLY where there is one. Enterprise has no limit, so counting the
+               rows there announced nothing - it was a number beside a list that
+               already shows them, and it read as a quota to somebody who has
+               none. -->
           @if (cap(); as n) {
             <span class="shelf" [class.full]="saved().length >= n">
               <ng-container i18n="@@Configurations_shelf">{{ saved().length }} of {{ n }} saved</ng-container>
               <span class="ee" i18n="@@Configurations_shelf_ee">- no limit in Enterprise</span>
             </span>
-          } @else if (edition.hasValue()) {
-            <span class="shelf" i18n="@@Configurations_shelf_unlimited">{{ saved().length }} saved - no limit</span>
           }
           <button matButton="outlined" ee-feature="configurations" [disabled]="busy()" (click)="picker.click()">
             <mat-icon>upload_file</mat-icon>
@@ -213,6 +251,19 @@ type Row = SavedConfiguration & { current?: boolean };
               feature="configurations"
               i18n-why="@@Configurations_ee_why"
               why="Keep several configurations on one instance and switch between them."
+            />
+          </button>
+          <!-- The same act as importing a file, with the bytes coming from a
+               repository instead of a download folder: it SHELVES and applies
+               nothing. Hence a button beside that one rather than a screen of
+               its own. -->
+          <button matButton="outlined" ee-feature="configurations" [disabled]="busy()" (click)="pullFromGit()">
+            <mat-icon>cloud_download</mat-icon>
+            <ng-container i18n="@@Import_from_git">Import from git</ng-container>
+            <app-ee-lock
+              feature="configurations"
+              i18n-why="@@Git_ee_why"
+              why="Keep your configurations in a git repository, one directory per platform."
             />
           </button>
         </div>
@@ -270,7 +321,15 @@ type Row = SavedConfiguration & { current?: boolean };
 
           <ng-container matColumnDef="description">
             <mat-header-cell *matHeaderCellDef i18n="@@Description">Description</mat-header-cell>
-            <mat-cell *matCellDef="let c"><span class="desc">{{ c.description }}</span></mat-cell>
+            <mat-cell *matCellDef="let c">
+              <span class="desc">{{ c.description }}</span>
+              @if (!c.current && remoteOf(c); as r) {
+                <span class="git" [class]="syncOf(c)" [matTooltip]="syncTip(c, r)">
+                  <mat-icon>{{ syncIcon(c) }}</mat-icon>
+                  {{ r.name }}
+                </span>
+              }
+            </mat-cell>
           </ng-container>
 
           <!-- The row actions live in the LAST existing column: a column of
@@ -304,6 +363,22 @@ type Row = SavedConfiguration & { current?: boolean };
                     aria-label="Export"
                   >
                     <mat-icon>download</mat-icon>
+                  </button>
+                  <!-- The running state goes to git too. A repository holds
+                       NAMED configurations, so this names it on the way - the
+                       alternative was a download button with no counterpart
+                       beside it and an operator wondering where theirs went. -->
+                  <button
+                    matIconButton
+                    ee-feature="configurations"
+                    [disabled]="busy()"
+                    (click)="$event.stopPropagation(); pushCurrent()"
+                    i18n-matTooltip="@@Export_to_git"
+                    matTooltip="Export to git"
+                    i18n-aria-label="@@Export_to_git"
+                    aria-label="Export to git"
+                  >
+                    <mat-icon>cloud_upload</mat-icon>
                   </button>
                 } @else {
                   <button
@@ -351,6 +426,32 @@ type Row = SavedConfiguration & { current?: boolean };
                     aria-label="Export"
                   >
                     <mat-icon>download</mat-icon>
+                  </button>
+                  @if (c.remoteId) {
+                    <button
+                      matIconButton
+                      ee-feature="configurations"
+                      [disabled]="busy()"
+                      (click)="$event.stopPropagation(); pullInto(c)"
+                      i18n-matTooltip="@@Pull_from_git"
+                      matTooltip="Pull from git"
+                      i18n-aria-label="@@Pull_from_git"
+                      aria-label="Pull from git"
+                    >
+                      <mat-icon>cloud_download</mat-icon>
+                    </button>
+                  }
+                  <button
+                    matIconButton
+                    ee-feature="configurations"
+                    [disabled]="busy()"
+                    (click)="$event.stopPropagation(); pushToGit(c)"
+                    i18n-matTooltip="@@Export_to_git"
+                    matTooltip="Export to git"
+                    i18n-aria-label="@@Export_to_git"
+                    aria-label="Export to git"
+                  >
+                    <mat-icon>cloud_upload</mat-icon>
                   </button>
                   <button
                     matIconButton
@@ -412,6 +513,8 @@ export class ConfigurationManagementComponent {
   protected readonly busy = signal(false);
   protected readonly columns = ['name', 'description', 'updated'];
   protected readonly document = signal('');
+  // The git locations, so a row can name where it lives without a call per row.
+  protected readonly remotes = signal<ConfigRemote[]>([]);
 
   // The current configuration IS a row: the one in force.
   protected readonly rows = computed<Row[]>(() => {
@@ -498,6 +601,10 @@ export class ConfigurationManagementComponent {
     // imported or restored anywhere shows up here without a click.
     inject(LiveChangesService).on('configuration', () => this.reload());
     inject(LiveChangesService).on('config', () => this.reload());
+    // The locations live on the page above this tab now, so a deletion there
+    // (which unbinds configurations here) arrives the same way anybody else's
+    // write does.
+    inject(LiveChangesService).on('config-remote', () => this.reload());
     // The document follows the URL, not the click: opening the drawer from a
     // pasted link (or reloading on one) must load what clicking the row loads.
     // Fetching it in the click handler alone left a deep link showing an EMPTY
@@ -506,6 +613,47 @@ export class ConfigurationManagementComponent {
       const row = this.opened();
       untracked(() => this.load(row));
     });
+  }
+
+  protected remoteOf(c: SavedConfiguration): ConfigRemote | undefined {
+    return c.remoteId ? this.remotes().find((r) => r.id === c.remoteId) : undefined;
+  }
+
+  // Where a row stands against its repository, and it is a COMPARISON like
+  // every other state on this screen - never a flag recorded once.
+  //
+  // What is knowable without reaching out is this: a row that has never met its
+  // location (nothing pushed yet), and a row whose document has changed since it
+  // last did (so the repository is behind). Whether somebody ELSE has pushed
+  // since cannot be known from here - finding out is a pull, and a screen that
+  // claimed to know would be guessing. So "level" means level as far as this
+  // gateway last looked, and the tooltip says so.
+  protected syncOf(c: SavedConfiguration): 'new' | 'ahead' | 'level' {
+    if (!c.remoteRev) return 'new';
+    return (c.remoteAt ?? 0) >= (c.updatedAt ?? 0) ? 'level' : 'ahead';
+  }
+
+  protected syncIcon(c: SavedConfiguration): string {
+    switch (this.syncOf(c)) {
+      case 'level':
+        return 'cloud_done';
+      case 'ahead':
+        return 'cloud_upload';
+      default:
+        return 'cloud_off';
+    }
+  }
+
+  protected syncTip(c: SavedConfiguration, r: ConfigRemote): string {
+    const where = r.url + ' (' + r.branch + ')' + (r.dir ? ' / ' + r.dir : '');
+    switch (this.syncOf(c)) {
+      case 'level':
+        return $localize`:@@Git_level:${where}:where: - pushed as it stands. Pull to see whether anyone else has changed it since.`;
+      case 'ahead':
+        return $localize`:@@Git_ahead:${where}:where: - changed here since it was last pushed.`;
+      default:
+        return $localize`:@@Git_never:${where}:where: - never pushed there yet.`;
+    }
   }
 
   // Guarded by the id: the list is re-read after every change, so `opened()`
@@ -533,7 +681,7 @@ export class ConfigurationManagementComponent {
     });
   }
 
-  private reload(): void {
+  protected reload(): void {
     this.api.configurations().subscribe({
       next: (list) => this.saved.set(list),
       error: () => this.saved.set([]),
@@ -543,6 +691,12 @@ export class ConfigurationManagementComponent {
     this.api.currentConfiguration().subscribe({
       next: (c) => this.current.set(c),
       error: () => this.current.set(null),
+    });
+    // The locations, so a row can say where it lives. A 403 is the community
+    // image answering, and then no row has one - the buttons are inert anyway.
+    this.api.configRemotes().subscribe({
+      next: (list) => this.remotes.set(list),
+      error: () => this.remotes.set([]),
     });
   }
 
@@ -811,6 +965,140 @@ export class ConfigurationManagementComponent {
     this.api.exportConfiguration(c.id).subscribe({
       next: (text) => this.offerFile(text, `meerkat-${this.slug(c.name)}.yaml`),
       error: (err: unknown) => this.fail(err),
+    });
+  }
+
+  // ── git (CFG-07) ───────────────────────────────────────────────────────────
+
+  // Reading a location into a NEW saved configuration. The same act as
+  // importing a file: it shelves, and applies nothing.
+  protected async pullFromGit(): Promise<void> {
+    const choice = await firstValueFrom(
+      this.dialog
+        .open(PickLocationDialogComponent, {
+          data: { way: 'pull', taken: this.saved().map((c) => c.name) },
+          width: '600px',
+        })
+        .afterClosed(),
+    );
+    if (!choice?.remoteId) return;
+    this.busy.set(true);
+    this.api.pullNewConfiguration(choice.remoteId, choice.name).subscribe({
+      next: (result) => {
+        this.busy.set(false);
+        this.reload();
+        this.showPull(result, choice.remoteId);
+      },
+      error: (err: unknown) => {
+        this.busy.set(false);
+        this.fail(err);
+      },
+    });
+  }
+
+  // Refreshing a bound row from its own location. No dialog: the destination
+  // was decided when it was bound, and asking again is how a pull ends up
+  // reading the wrong platform.
+  protected pullInto(c: SavedConfiguration): void {
+    this.busy.set(true);
+    this.api.pullConfiguration(c.id).subscribe({
+      next: (result) => {
+        this.busy.set(false);
+        this.reload();
+        this.showPull(result, c.remoteId ?? '');
+      },
+      error: (err: unknown) => {
+        this.busy.set(false);
+        this.fail(err);
+      },
+    });
+  }
+
+  private showPull(result: { configuration: SavedConfiguration }, remoteId: string): void {
+    const r = this.remotes().find((o) => o.id === remoteId);
+    this.dialog.open(PullResultDialogComponent, {
+      data: { result, location: r?.name ?? '' },
+      width: '680px',
+    });
+  }
+
+  // Pushing WHAT IS RUNNING. A repository holds named configurations, not a
+  // running state, so this names it first: when a saved copy already matches
+  // byte for byte, that one is pushed and nothing is asked; otherwise the name
+  // is asked for and the state is saved under it on the way.
+  protected async pushCurrent(): Promise<void> {
+    let row = this.savedMatchingCurrent();
+    if (!row) {
+      const name = await this.dialogs.prompt({
+        title: $localize`:@@Export_to_git:Export to git`,
+        label: $localize`:@@Name:Name`,
+        confirmLabel: $localize`:@@Save_and_push:Save and push`,
+        initial: this.current()?.active?.name ?? '',
+      });
+      if (!name) return;
+      const existing = this.byName(name);
+      this.busy.set(true);
+      try {
+        row = await firstValueFrom(
+          existing
+            ? this.api.recaptureConfiguration(existing.id)
+            : this.api.captureConfiguration(name),
+        );
+      } catch (err) {
+        this.busy.set(false);
+        this.fail(err);
+        return;
+      }
+      this.busy.set(false);
+      this.reload();
+    }
+    await this.pushToGit(row);
+  }
+
+  // The saved configuration that IS what the gateway runs, when there is one.
+  // The digests are compared server-side, so this is a fact rather than a mark
+  // somebody set once.
+  private savedMatchingCurrent(): SavedConfiguration | undefined {
+    const id = this.current()?.savedAs?.id;
+    return id ? this.saved().find((c) => c.id === id) : undefined;
+  }
+
+  // Committing a saved copy to its location. The destination is asked for ONCE -
+  // the first time, or when it changes - and remembered on the row after that.
+  protected async pushToGit(c: SavedConfiguration): Promise<void> {
+    let remoteId = c.remoteId ?? '';
+    if (!remoteId) {
+      const choice = await firstValueFrom(
+        this.dialog
+          .open(PickLocationDialogComponent, {
+            data: { way: 'push', configuration: c.name, selected: remoteId },
+            width: '600px',
+          })
+          .afterClosed(),
+      );
+      if (!choice?.remoteId) return;
+      remoteId = choice.remoteId;
+      this.busy.set(true);
+      try {
+        await firstValueFrom(this.api.bindConfiguration(c.id, remoteId));
+      } catch (err) {
+        this.busy.set(false);
+        this.fail(err);
+        return;
+      }
+      this.busy.set(false);
+    }
+    this.busy.set(true);
+    this.api.pushConfiguration(c.id).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.reload();
+        this.snack.open($localize`:@@Pushed_to_git:Pushed`, undefined, { duration: 2500 });
+      },
+      error: (err: unknown) => {
+        this.busy.set(false);
+        this.fail(err);
+      },
     });
   }
 

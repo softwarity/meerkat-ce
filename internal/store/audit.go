@@ -203,6 +203,10 @@ var auditTargets = map[string]AuditTarget{
 	// document, and a snapshot of the database.
 	"token":         {},
 	"configuration": {},
+	// The git locations a configuration travels through (CFG-07). Root's, like
+	// the configurations themselves: a location names a repository and a
+	// credential reference, which is the installation's own business.
+	"config-remote": {},
 	AuditTargetAll:  {},
 	"backup":        {},
 	// The SECURITY of an account rather than its administration (AUD-01): a

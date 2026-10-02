@@ -116,6 +116,7 @@ export class AppComponent {
   protected readonly inVault = computed(() => this.url().startsWith('/vault'));
   protected readonly inMetrics = computed(() => this.url().startsWith('/traffic'));
   protected readonly inAudit = computed(() => this.url().startsWith('/audit'));
+  protected readonly inLogs = computed(() => this.url().startsWith('/logs'));
   protected readonly inScheduler = computed(() => this.url().startsWith('/scheduler'));
   protected readonly inIssues = computed(() => this.url().startsWith('/issues'));
   protected readonly inApiDocs = computed(() => this.url().startsWith('/api'));

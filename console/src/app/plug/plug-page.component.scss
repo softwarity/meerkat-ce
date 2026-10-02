@@ -16,10 +16,20 @@
 }
 .content {
   padding: 0 24px 24px;
+  display: grid;
+  gap: 16px;
   max-width: 760px;
 }
+// The same frame as Mail relay: one card per thing to do.
+mat-card {
+  padding: 16px 20px;
+}
+mat-card > h3.group:first-child,
+mat-card > :first-child {
+  margin-top: 0;
+}
 .lead {
-  margin: 0 0 16px;
+  margin: 0;
   line-height: 1.5;
   color: var(--mat-sys-on-surface-variant);
 }

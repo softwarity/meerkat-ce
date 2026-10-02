@@ -31,6 +31,29 @@ MEERKAT_LOG_FORMAT   json | text                      json en production, texte 
 Une faute de frappe dans le niveau retombe sur `info` plutôt que d'empêcher un
 démarrage.
 
+### Dans la console
+
+![L'écran Logs : le niveau en haut à droite, les filtres de niveau et la recherche, puis les lignes, dont une ouverte](img/console/logs.webp)
+
+**Logs**, dans le rail sous Audit (root et infra admin), montre les 5 000
+dernières lignes en direct. La passerelle les garde structurées, donc l'écran
+les met en forme quel que soit le format de sortie : heure, niveau, message,
+attributs. Un clic ouvre une ligne. On filtre par niveau, on cherche dans le
+texte, et on exporte ce qui est affiché en `.jsonl`. Remonter dans la liste
+arrête le suivi ; la flèche le reprend.
+
+**Le niveau**, en haut à droite, s'applique tout de suite, sur tous les nœuds.
+Un niveau plus bavard que celui du démarrage revient de lui-même au bout de
+30 minutes, et l'écran affiche le décompte. Il n'est pas stocké : un redémarrage
+revient à `MEERKAT_LOG_LEVEL`.
+
+> [!NOTE] Un seul nœud
+> En cluster, les lignes sont celles du nœud qui a répondu, et l'écran le nomme.
+> Le journal du cluster entier, c'est celui du collecteur.
+
+Le journal d'accès n'est pas sur cet écran : il chasserait tout le reste en
+quelques secondes. [Metrics](/docs/console/traffic) et les traces y répondent.
+
 ## Le journal d'accès
 
 Livré éteint : à quatre cents requêtes par seconde, c'est trente-cinq millions
@@ -55,6 +78,7 @@ Une ligne, telle qu'elle sort :
 | `path` | le chemin tel qu'il a été demandé, identifiants compris |
 | `endpoint` | le gabarit, quand la route déclare une spec - ce qui rend ces lignes comptables |
 | `user` | le compte **tel que cette passerelle l'a authentifié**, jamais tel qu'un en-tête l'a prétendu |
+| `token` | le nom du jeton d'API quand une machine appelle : un compte peut en avoir plusieurs |
 | `ip` | l'adresse **résolue par la passerelle**, jamais un `X-Forwarded-For` écrit par l'appelant |
 | `outcome` | `ok`, `refused`, `rejected`, `failed`, `upstream-down` |
 
@@ -128,8 +152,3 @@ arriverait deux fois.
 La poussée a sa propre file, jamais celle de l'audit : un flot de logs ne peut
 pas coûter un événement au journal. Un lot refusé trois fois par le collecteur
 est abandonné et compté, et l'onglet dit combien.
-
-## Ce qui manque
-
-- Le niveau réglable depuis la console plutôt qu'au démarrage seulement.
-- Le nom du jeton à côté du compte quand une machine appelle.

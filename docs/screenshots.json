@@ -5,7 +5,7 @@
     "console": "the binary must EMBED the console, or the admin port answers a JSON status page: make ui first, or stage console/dist/console/browser into internal/admin/ui/dist",
     "edition": "Enterprise (-tags ee): the console's EE badges and the Enterprise screens are part of what is shown",
     "upstream": "node scripts/screenshots-upstream.mjs  (keeps running on 127.0.0.1:8099): the instance reaches the routes' services - http://docs:8080 and http://orders-api:8080, names of a stack - through it, as HTTP_PROXY; Billing is left out of the proxy on purpose (NO_PROXY), so the routes list shows a target that is down",
-    "run": "MEERKAT_VERSION=1.0.1 HTTP_PROXY=http://127.0.0.1:8099 NO_PROXY=billing.svc.acme.internal MEERKAT_TENANCY=multi MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8086 -admin-addr 127.0.0.1:9096 -data /tmp/docdata",
+    "run": "HOSTNAME=meerkat-7d9f8c6b5-x2k4p MEERKAT_VERSION=1.0.1 HTTP_PROXY=http://127.0.0.1:8099 NO_PROXY=billing.svc.acme.internal MEERKAT_TENANCY=multi MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8086 -admin-addr 127.0.0.1:9096 -data /tmp/docdata",
     "seed": "node scripts/screenshots-seed.mjs  (once, on an EMPTY data directory)",
     "ports": "8086/9096 and 8087/9097 on purpose: this repository's own dev instance runs on 8082 and 9092 and must never be disturbed",
     "admin": "http://gateway.acme.example:9096",
@@ -159,6 +159,35 @@
         {
           "wait": 800
         }
+      ]
+    },
+    {
+      "file": "img/console/logs.webp",
+      "plane": "admin",
+      "path": "/logs",
+      "steps": [
+        {
+          "click": "mat-select"
+        },
+        {
+          "click": "mat-option:has-text(\"debug\")"
+        },
+        {
+          "waitFor": ".reverts"
+        },
+        {
+          "click": ".line:has-text(\"routes reloaded\")"
+        },
+        {
+          "wait": 500
+        }
+      ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/operations/logs"
       ]
     },
     {
@@ -630,7 +659,7 @@
   "instances": {
     "single": {
       "why": "Application, Groups and Members exist only when the installation serves one organisation (singleTenantOnly); in multi mode the same tables live under each tenant, with the tenant's own navigation",
-      "run": "MEERKAT_VERSION=1.0.1 HTTP_PROXY=http://127.0.0.1:8099 NO_PROXY=billing.svc.acme.internal MEERKAT_TENANCY=single MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8087 -admin-addr 127.0.0.1:9097 -data /tmp/docdata-single",
+      "run": "HOSTNAME=meerkat-7d9f8c6b5-x2k4p MEERKAT_VERSION=1.0.1 HTTP_PROXY=http://127.0.0.1:8099 NO_PROXY=billing.svc.acme.internal MEERKAT_TENANCY=single MEERKAT_ADMIN_PASSWORD=test1234 /tmp/meerkat-doc -addr :8087 -admin-addr 127.0.0.1:9097 -data /tmp/docdata-single",
       "seed": "node scripts/screenshots-seed.mjs --instance single",
       "admin": "http://gateway.acme.example:9097",
       "data": "http://gateway.acme.example:8087",

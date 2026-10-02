@@ -211,10 +211,20 @@ func run(o options) error {
 	defer func() { _ = st.Close() }()
 
 	ctx := context.Background()
-	// What this installation IS, before it answers a request. The edition is a
-	// COMPILE-time constant now - the image is the licence - so nothing is read
-	// here beyond the mode.
-	slog.Info("edition", "edition", edition.Name, "enterprise", edition.Enterprise)
+	// Which product this binary IS, before it answers a request - a sentence
+	// rather than the word "edition" three times. It is the line somebody reads
+	// when an Enterprise capability is missing, and the first thing it has to
+	// settle is whether they are running the Enterprise image at all: the tag
+	// is a COMPILE-time constant, so a build that forgot it says so here and
+	// nowhere else until a feature refuses.
+	//
+	// The machine-readable `edition` attribute stays on the data plane's own
+	// line, where a collector looks for it.
+	if edition.Enterprise {
+		slog.Info("Meerkat Enterprise edition", "version", version.Version)
+	} else {
+		slog.Info("Meerkat Community edition", "version", version.Version)
+	}
 	if err := settleTenancy(ctx, st, tenancy); err != nil {
 		return err
 	}
@@ -489,6 +499,7 @@ func run(o options) error {
 	// background every gateway.TargetInterval, per node like the breaker, and
 	// a flip is pushed to the routes screen. Stops with ctx.
 	routeHealth := live.NewRouteHealth()
+	logs := live.NewLogs()
 	go router.WatchTargets(ctx, gateway.DefaultTargetCheck(routeHealth.Flipped))
 	liveServer := live.New(func(p live.Perimeter) live.Sources {
 		sources := live.Sources{
@@ -499,6 +510,9 @@ func run(o options) error {
 			// The routing plane's readers are who GET /api/routes/health
 			// answers, so they are who hear that a target flipped.
 			sources[live.RouteHealthTopic] = routeHealth
+			// And that this node wrote a line, for the Logs screen (OBS-03),
+			// read through GET /api/logs, which answers the same readers.
+			sources[live.LogsTopic] = logs
 		}
 		if p.Schedules {
 			// The scheduler screen watches a run start, advance and finish
@@ -516,6 +530,8 @@ func run(o options) error {
 	// Every administrative write passes through the audit funnel, which is what
 	// makes this complete without an emission at forty call sites.
 	adminAPI.Changes = changes
+	// The log level turned on another node's console (OBS-03).
+	bus.OnSignal(store.TopicLogLevel, admin.ApplyLogLevelSignal)
 	// And a write taken by ANOTHER node reaches the consoles this one holds
 	// open. A signal rather than a topic: there is no table to re-read behind
 	// it - the screens ask the API - so losing one costs a late screen and

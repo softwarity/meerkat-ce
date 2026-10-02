@@ -1,12 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatChipsModule } from '@angular/material/chips';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { ApiService, ConfigMissingRef, ConfigPlan } from '../../api.service';
+import { PlanTableComponent } from './plan-table.component';
 
 // Where an uploaded file lands, then what it would do, then what it left to
 // fill in - one window, in that order, because that is the order the questions
@@ -27,12 +27,11 @@ export type ImportOutcome =
   selector: 'app-import-dialog',
   imports: [
     MatButtonModule,
-    MatChipsModule,
     MatDialogModule,
     MatFormFieldModule,
-    MatIconModule,
     MatInputModule,
     MatRadioModule,
+    PlanTableComponent,
   ],
   styles: [
     `
@@ -56,48 +55,6 @@ export type ImportOutcome =
       mat-form-field {
         width: 100%;
         margin-top: 4px;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 12px 0;
-        font-size: 0.85rem;
-      }
-      td {
-        padding: 4px 8px 4px 0;
-      }
-      .act {
-        width: 90px;
-        font-weight: 600;
-      }
-      .act.add {
-        color: var(--mat-sys-primary);
-      }
-      .act.remove {
-        color: var(--mat-sys-error);
-      }
-      .kind {
-        width: 110px;
-        color: var(--mat-sys-on-surface-variant);
-      }
-      .note {
-        display: flex;
-        gap: 12px;
-        padding: 12px 16px;
-        border-radius: 8px;
-        background: var(--mat-sys-surface-container);
-        margin: 12px 0;
-      }
-      .note mat-icon {
-        flex-shrink: 0;
-        color: var(--mat-sys-on-surface-variant);
-      }
-      .note.warn mat-icon {
-        color: var(--mat-sys-error);
-      }
-      .note p {
-        margin: 0;
-        font-size: 0.85rem;
       }
     `,
   ],
@@ -133,37 +90,11 @@ export type ImportOutcome =
         </p>
       </mat-radio-group>
 
-      @if (plan(); as p) {
-        @if (!touched(p)) {
-          <div class="note">
-            <mat-icon>check_circle</mat-icon>
-            <p i18n="@@Nothing_would_change">
-              This file matches what is already configured. Nothing would change.
-            </p>
-          </div>
-        } @else {
-          <table>
-            @for (c of p.changes; track c.kind + c.id + c.label) {
-              @if (c.action !== 'same') {
-                <tr>
-                  <td class="act" [class]="c.action">{{ label(c.action) }}</td>
-                  <td class="kind">{{ kindLabel(c.kind) }}</td>
-                  <td>{{ c.label || c.id }}</td>
-                </tr>
-              }
-            }
-          </table>
-        }
-        @if (p.missing.length) {
-          <div class="note warn">
-            <mat-icon>vpn_key_off</mat-icon>
-            <p i18n="@@Import_missing_note">
-              Missing vault entries will be created empty. A route using one does not serve
-              until it is filled.
-            </p>
-          </div>
-        }
-      }
+      <app-plan-table
+        [plan]="plan()"
+        i18n-nothing="@@Nothing_would_change"
+        nothing="This file matches what is already configured. Nothing would change."
+      />
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button matButton mat-dialog-close i18n="@@Cancel">Cancel</button>
@@ -214,39 +145,8 @@ export class ImportDialogComponent {
     this.ref.close(where === 'name' ? { where, name: this.name().trim() } : { where });
   }
 
-  protected touched(plan: ConfigPlan): boolean {
-    return plan.changes.some((c) => c.action !== 'same');
-  }
 
-  protected label(action: string): string {
-    switch (action) {
-      case 'add':
-        return $localize`:@@Added:Added`;
-      case 'update':
-        return $localize`:@@Updated:Updated`;
-      case 'remove':
-        return $localize`:@@Removed:Removed`;
-      default:
-        return $localize`:@@Unchanged:Unchanged`;
-    }
-  }
 
-  protected kindLabel(kind: string): string {
-    switch (kind) {
-      case 'route':
-        return $localize`:@@Route:Route`;
-      case 'role':
-        return $localize`:@@Role:Role`;
-      case 'authProvider':
-        return $localize`:@@Authority:Authority`;
-      case 'theme':
-        return $localize`:@@Theme:Theme`;
-      case 'mailRelay':
-        return $localize`:@@Mail_relay:Mail relay`;
-      default:
-        return $localize`:@@Setting:Setting`;
-    }
-  }
 }
 
 // What an import reserved empty, asked for straight away: this is the last

@@ -2,6 +2,41 @@
 
 ## NEXT RELEASE
 
+- **Endpoint audit rules travel as a file.** Export them from Endpoint audit,
+  upload them onto any route from its OpenTelemetry section.
+- **Saving a route in the editor no longer drops its endpoint audit.**
+- **Configuration sits at the bottom of the Infra menu**, apart from the daily
+  screens.
+- **OpenTelemetry and Plug are laid out like Mail relay**, one framed card per
+  section.
+- **Logs in the console.** A new Logs screen, under Audit, shows the gateway's
+  own lines live, with level filters and search. The level is set there, on
+  every node, and goes back on its own after 30 minutes. One node at a time:
+  the screen says which.
+- **The access log names the API token** a machine called with, beside its
+  account.
+- **Helm chart: a startup probe.** A gateway migrating its database after an
+  upgrade gets up to two minutes before liveness counts, instead of being
+  restarted halfway.
+- **Configurations can live in a git repository** (Enterprise). You name a
+  location - a repository, a branch and a directory - and the same repository
+  holds one directory per platform, the configuration written there as
+  `meerkat.yaml` with its images beside it.
+- **Importing from git applies nothing.** The configuration lands beside the one
+  running, with the list of what serving it would change and the vault entries
+  it expects; the gateway switches when you say so, not when the repository
+  moves. Whoever can write to that branch cannot reconfigure a gateway.
+- **Exporting to git commits under your own name**, so the repository's history
+  answers who changed what. A branch somebody else has moved is refused, with
+  what to do about it - there is no force push. The running configuration can go
+  too: it is named on the way, because a repository holds named configurations.
+- **The access token is a vault reference**, never a token typed into a field,
+  and the form says what each forge wants - including the username it insists on
+  beside the token, which every forge decided differently and all of them report
+  a wrong one as the same authentication failure.
+- **The startup line says which product it is**: "Meerkat Enterprise edition",
+  where it used to say the word edition three times.
+
 ---
 
 ## 1.0.2

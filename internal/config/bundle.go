@@ -92,18 +92,20 @@ func specAssets(doc *Document) map[string][]byte {
 	return out
 }
 
-// MarshalBundle renders doc as a ZIP: the YAML with each picture replaced by a
-// relative path, and the pictures as files beside it.
-func MarshalBundle(doc *Document) ([]byte, error) {
+// Split renders doc as the FILES that carry it: the YAML with each picture
+// replaced by a relative path, and those pictures keyed by that same path.
+//
+// Taken out of MarshalBundle because a ZIP is one way to carry these files and
+// a git repository (CFG-07) is another - only the carrier differs, and the
+// layout must not. The refusal stays with the ZIP: a package holding nothing
+// but a YAML is a wrapper nobody asked for, where a DIRECTORY holding nothing
+// but a YAML is simply a configuration without pictures.
+func Split(doc *Document) ([]byte, map[string][]byte, error) {
 	branding, err := brandingMap(doc)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	type asset struct {
-		name string
-		body []byte
-	}
-	var assets []asset
+	assets := map[string][]byte{}
 	for _, f := range imageFields {
 		uri, _ := getPath(branding, f.path).(string)
 		content, ext := decodeDataURI(uri)
@@ -111,37 +113,66 @@ func MarshalBundle(doc *Document) ([]byte, error) {
 			continue
 		}
 		name := path.Join(assetDir, f.name+ext)
-		assets = append(assets, asset{name, content})
+		assets[name] = content
 		setPath(branding, f.path, name)
 	}
 	for name, content := range specAssets(doc) {
-		assets = append(assets, asset{name, content})
-	}
-	sort.Slice(assets, func(i, j int) bool { return assets[i].name < assets[j].name })
-	if len(assets) == 0 {
-		// Nothing to extract: a package would add a layer for no reason.
-		return nil, fmt.Errorf("config: this configuration carries no image")
+		assets[name] = content
 	}
 	// The document is copied before being rewritten: the caller's own document
 	// must not come back with paths where its images used to be.
 	rewritten, err := withBranding(doc, branding)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	body, err := Marshal(rewritten)
 	if err != nil {
+		return nil, nil, err
+	}
+	return body, assets, nil
+}
+
+// SortedNames orders the files of a Split, so that two renderings of the same
+// document produce the same sequence - a ZIP entry order, a commit's file list.
+func SortedNames(assets map[string][]byte) []string {
+	names := make([]string, 0, len(assets))
+	for name := range assets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// MarshalBundle renders doc as a ZIP: the YAML with each picture replaced by a
+// relative path, and the pictures as files beside it.
+func MarshalBundle(doc *Document) ([]byte, error) {
+	body, assets, err := Split(doc)
+	if err != nil {
 		return nil, err
+	}
+	if len(assets) == 0 {
+		// Nothing to extract: a package would add a layer for no reason.
+		return nil, fmt.Errorf("config: this configuration carries no image")
 	}
 
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	for _, entry := range append([]asset{{BundleName, body}}, assets...) {
-		w, err := zw.Create(entry.name)
+	add := func(name string, content []byte) error {
+		w, err := zw.Create(name)
 		if err != nil {
-			return nil, fmt.Errorf("config: package %s: %w", entry.name, err)
+			return fmt.Errorf("config: package %s: %w", name, err)
 		}
-		if _, err := w.Write(entry.body); err != nil {
-			return nil, fmt.Errorf("config: package %s: %w", entry.name, err)
+		if _, err := w.Write(content); err != nil {
+			return fmt.Errorf("config: package %s: %w", name, err)
+		}
+		return nil
+	}
+	if err := add(BundleName, body); err != nil {
+		return nil, err
+	}
+	for _, name := range SortedNames(assets) {
+		if err := add(name, assets[name]); err != nil {
+			return nil, err
 		}
 	}
 	if err := zw.Close(); err != nil {
@@ -217,7 +248,6 @@ func UnmarshalBundle(body []byte) (*Document, error) {
 		return nil, fmt.Errorf("config: this package cannot be opened: %w", err)
 	}
 	files := map[string][]byte{}
-	var doc []byte
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
 			continue
@@ -238,14 +268,22 @@ func UnmarshalBundle(body []byte) (*Document, error) {
 		if err != nil {
 			return nil, fmt.Errorf("config: package %s: %w", name, err)
 		}
-		if path.Base(name) == BundleName && path.Dir(name) == "." {
-			doc = content
-			continue
-		}
 		files[name] = content
 	}
-	if doc == nil {
-		return nil, fmt.Errorf("config: this package holds no %s", BundleName)
+	return Assemble(files)
+}
+
+// Assemble reads the FILES of a configuration back into one document: the YAML
+// under its own name, the pictures and the deposited specs put back where the
+// document points at them.
+//
+// The counterpart of Split, and the reason both exist apart from the ZIP: a git
+// directory (CFG-07) holds exactly these files, so the same code reads a package
+// and a repository, and neither can grow a quirk the other has not got.
+func Assemble(files map[string][]byte) (*Document, error) {
+	doc, ok := files[BundleName]
+	if !ok {
+		return nil, fmt.Errorf("config: there is no %s here", BundleName)
 	}
 	parsed, err := Unmarshal(doc)
 	if err != nil {
@@ -394,3 +432,8 @@ func setPath(m map[string]any, keys []string, value string) {
 	}
 	cur[keys[len(keys)-1]] = value
 }
+
+// AssetDirName is where a Split puts the media, for the packages that have to
+// agree with it (see confrepo). Exported as a function rather than the constant
+// so that nothing outside can hold it as a compile-time value and drift.
+func AssetDirName() string { return assetDir }

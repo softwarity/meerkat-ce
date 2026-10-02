@@ -1465,6 +1465,9 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	if err != nil || sess.Pending != "" {
 		return identityData{}, false
 	}
+	// A machine calling with an API token: the access line names the token
+	// beside the account it belongs to (OBS-03).
+	noteToken(req.Context(), sess.TokenName)
 	now := time.Now()
 	key := identityKey{user: sess.UserID, tenant: sess.TenantID, group: sess.GroupID}
 	e, ok := rt.cachedIdentity(key, now)

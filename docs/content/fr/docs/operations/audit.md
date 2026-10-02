@@ -185,6 +185,14 @@ la réponse reçue par l'appelant, et ne peut ni ouvrir ni fermer une opération
 Une route sans contrat OpenAPI ne s'audite pas ainsi : déposez son contrat, ou
 laissez le service faire son audit lui-même.
 
+### D'une route à l'autre
+
+**Export**, sur l'écran Endpoint audit, télécharge les règles de la route en
+fichier JSON. Dans l'éditeur de route, la section **OpenTelemetry** propose
+**Upload audit configuration** : elle lit ce fichier, et les règles sont
+enregistrées avec la route. Les règles voyagent aussi avec l'export de la
+[configuration](/docs/console/configuration).
+
 ## Filtres, rétention, et ce qui manque
 
 L'écran filtre sur la partie du journal (**All**, **Changes**, **Data plane sign-ins**, **Console

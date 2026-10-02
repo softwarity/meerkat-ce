@@ -2,9 +2,9 @@ import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { ApiService, ConfigPlan, SavedConfiguration } from '../../api.service';
+import { PlanTableComponent } from './plan-table.component';
 
 export interface CompareDialogData {
   from: SavedConfiguration;
@@ -17,7 +17,13 @@ export interface CompareDialogData {
 // "going from this one to that one".
 @Component({
   selector: 'app-compare-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatSelectModule],
+  imports: [
+    MatButtonModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatSelectModule,
+    PlanTableComponent,
+  ],
   styles: [
     `
       mat-dialog-content {
@@ -25,35 +31,6 @@ export interface CompareDialogData {
       }
       mat-form-field {
         width: 100%;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 12px 0;
-        font-size: 0.85rem;
-      }
-      td {
-        padding: 4px 8px 4px 0;
-        vertical-align: top;
-      }
-      .act {
-        width: 90px;
-        font-weight: 600;
-      }
-      .act.add {
-        color: var(--mat-sys-primary);
-      }
-      .act.remove {
-        color: var(--mat-sys-error);
-      }
-      .kind {
-        width: 110px;
-        color: var(--mat-sys-on-surface-variant);
-      }
-      .fields {
-        font-family: var(--mk-mono, monospace);
-        font-size: 0.75rem;
-        color: var(--mat-sys-on-surface-variant);
       }
       .same {
         display: flex;
@@ -80,30 +57,12 @@ export interface CompareDialogData {
       @if (error(); as e) {
         <p class="same">{{ e }}</p>
       }
-      @if (plan(); as p) {
-        @if (differences(p) === 0) {
-          <div class="same">
-            <mat-icon>check_circle</mat-icon>
-            <span i18n="@@Configurations_identical">These two configurations describe the same thing.</span>
-          </div>
-        } @else {
-          <table>
-            @for (c of p.changes; track c.kind + c.id) {
-              @if (c.action !== 'same') {
-                <tr>
-                  <td class="act" [class]="c.action">{{ label(c.action) }}</td>
-                  <td class="kind">{{ kindLabel(c.kind) }}</td>
-                  <td>
-                    {{ c.label || c.id }}
-                    @if (c.fields?.length) {
-                      <div class="fields">{{ c.fields!.join(', ') }}</div>
-                    }
-                  </td>
-                </tr>
-              }
-            }
-          </table>
-        }
+      @if (plan()) {
+        <app-plan-table
+          [plan]="plan()"
+          i18n-nothing="@@Configurations_identical"
+          nothing="These two configurations describe the same thing."
+        />
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -126,41 +85,6 @@ export class CompareDialogComponent {
     });
   }
 
-  protected differences(p: ConfigPlan): number {
-    return p.changes.filter((c) => c.action !== 'same').length;
-  }
 
-  protected label(action: string): string {
-    switch (action) {
-      case 'add':
-        return $localize`:@@Added:Added`;
-      case 'update':
-        return $localize`:@@Updated:Updated`;
-      case 'remove':
-        return $localize`:@@Removed:Removed`;
-      default:
-        return $localize`:@@Unchanged:Unchanged`;
-    }
-  }
 
-  protected kindLabel(kind: string): string {
-    switch (kind) {
-      case 'route':
-        return $localize`:@@Route:Route`;
-      case 'role':
-        return $localize`:@@Role:Role`;
-      case 'authProvider':
-        return $localize`:@@Authority:Authority`;
-      case 'theme':
-        return $localize`:@@Theme:Theme`;
-      case 'mailRelay':
-        return $localize`:@@Mail_relay:Mail relay`;
-      case 'tenant':
-        return $localize`:@@Organisation:Organisation`;
-      case 'group':
-        return $localize`:@@Group:Group`;
-      default:
-        return $localize`:@@Setting:Setting`;
-    }
-  }
 }

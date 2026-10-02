@@ -1,6 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { EeLockComponent } from '../../shared/ee-lock.component';
+import { GitLocationsPanelComponent } from './git-locations-panel.component';
 
 // Configuration - INFRA plane, root only, because everything under it crosses
 // both planes at once: routes belong to infra, authorities and settings to the
@@ -28,7 +35,17 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 // snapshot procedure must come back to the snapshot procedure.
 @Component({
   selector: 'app-configuration-page',
-  imports: [MatTabsModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [
+    MatButtonModule,
+    MatIconModule,
+    MatSidenavModule,
+    MatTabsModule,
+    EeLockComponent,
+    GitLocationsPanelComponent,
+    RouterLink,
+    RouterLinkActive,
+    RouterOutlet,
+  ],
   styles: [
     `
       /* The screen owns the height: the heading and the tabs stay put, the
@@ -37,12 +54,38 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
          nowhere to open. The reading width lives on the TABS instead, each
          setting its own. */
       :host {
+        display: block;
+        height: 100%;
+        overflow: hidden;
+      }
+      /* The drawer is the PAGE's, not a tab's, and that is what gives it the
+         whole height: the git locations are global to this screen - the same
+         repositories whichever tab is open - so hanging them off Management
+         would have cost them the heading and the tab bar for nothing. */
+      mat-drawer-container {
+        background: transparent;
+        height: 100%;
+      }
+      mat-drawer-content {
         display: flex;
         flex-direction: column;
-        height: 100%;
         padding: 24px 24px 0;
         box-sizing: border-box;
         overflow: hidden;
+      }
+      mat-drawer {
+        width: min(760px, 96vw);
+        border-left: 1px solid var(--mat-sys-outline-variant);
+        background: var(--mat-sys-surface-container-high);
+      }
+      .title {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .title .grow {
+        flex: 1;
+        min-width: 0;
       }
       h1 {
         margin-top: 0;
@@ -68,11 +111,28 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
     `,
   ],
   template: `
-    <h1 i18n="@@Configuration">Configuration</h1>
-    <p class="hint" i18n="@@Configuration_intro">
-      Routes, roles, authorities, mail relay, themes and gateway settings travel as one file.
-      Users, organisations, sessions and the vault are not part of it.
-    </p>
+    <mat-drawer-container>
+      <mat-drawer-content>
+        <div class="title">
+          <div class="grow">
+            <h1 i18n="@@Configuration">Configuration</h1>
+            <p class="hint" i18n="@@Configuration_intro">
+              Routes, roles, authorities, mail relay, themes and gateway settings travel as one
+              file. Users, organisations, sessions and the vault are not part of it.
+            </p>
+          </div>
+          <!-- Above the tabs because it belongs to none of them: the same
+               repositories answer whichever tab is open. -->
+          <button matButton ee-feature="configurations" (click)="openGit()">
+            <mat-icon>hub</mat-icon>
+            <ng-container i18n="@@Git_locations">Git locations</ng-container>
+            <app-ee-lock
+              feature="configurations"
+              i18n-why="@@Git_ee_why"
+              why="Keep your configurations in a git repository, one directory per platform."
+            />
+          </button>
+        </div>
 
     <nav mat-tab-nav-bar [tabPanel]="panel" mat-stretch-tabs="false">
       <a
@@ -106,6 +166,42 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
     <mat-tab-nav-panel #panel>
       <router-outlet />
     </mat-tab-nav-panel>
+      </mat-drawer-content>
+
+      <mat-drawer position="end" mode="over" [opened]="git()" (closedStart)="closeGit()">
+        @if (git()) {
+          <app-git-locations-panel (closed)="closeGit()" />
+        }
+      </mat-drawer>
+    </mat-drawer-container>
   `,
 })
-export class ConfigurationPageComponent {}
+export class ConfigurationPageComponent {
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
+  // A QUERY parameter rather than a path segment: the path belongs to the tabs,
+  // and the locations are not one of them. It survives F5 and a tab change,
+  // like every other drawer on this screen.
+  private readonly flag = toSignal(
+    this.route.queryParamMap.pipe(map((p) => p.get('git'))),
+    { initialValue: null },
+  );
+  protected readonly git = computed(() => this.flag() === '1');
+
+  protected openGit(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { git: 1 },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected closeGit(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { git: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+}

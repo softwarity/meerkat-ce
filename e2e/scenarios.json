@@ -430,6 +430,99 @@
       }
     },
     {
+      "id": "api-config-remotes",
+      "domain": "gateway",
+      "kind": "api",
+      "edition": "ee",
+      "probe": {
+        "method": "GET",
+        "path": "/api/config-remotes"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "List the git locations",
+        "fr": "Lister les emplacements git"
+      },
+      "description": {
+        "en": "The named git locations a configuration travels through (CFG-07): a repository, a branch and a directory each, so the same repository can hold one directory per customer platform. Root only, like every configuration - a location names a repository and a vault reference for its token, which is the installation's own business.",
+        "fr": "Les emplacements git nommés par lesquels une configuration voyage (CFG-07) : un dépôt, une branche et un répertoire chacun, de sorte qu'un même dépôt tient un répertoire par plateforme cliente. Root seulement, comme toute configuration : un emplacement nomme un dépôt et une référence de coffre pour son jeton, ce qui est l'affaire de l'installation elle-même."
+      }
+    },
+    {
+      "id": "api-config-remote-check",
+      "domain": "gateway",
+      "kind": "api",
+      "edition": "ee",
+      "probe": {
+        "method": "POST",
+        "path": "/api/config-remotes/no-such/check",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Check a git location without writing to it",
+        "fr": "Vérifier un emplacement git sans rien y écrire"
+      },
+      "description": {
+        "en": "Proves the repository answers, the credential is accepted and the branch exists, and writes nothing - so a wrong token is found on the screen that sets it rather than during the first push of a real change. A refused credential comes back with what that forge actually wants, because every forge reports a missing permission and a wrong basic-auth username as the same sentence. The probe names a location that does not exist, so a 404 proves the barrier without a fixture.",
+        "fr": "Prouve que le dépôt répond, que l'identifiant est accepté et que la branche existe, sans rien écrire : un mauvais jeton se découvre sur l'écran qui le pose, pas au premier push d'un vrai changement. Un identifiant refusé revient avec ce que cette forge demande réellement, parce que toutes rapportent une permission manquante et un mauvais nom d'utilisateur HTTP de la même façon. La sonde nomme un emplacement inexistant : le 404 prouve la barrière sans fixture."
+      }
+    },
+    {
+      "id": "api-config-pull",
+      "domain": "gateway",
+      "kind": "api",
+      "edition": "ee",
+      "probe": {
+        "method": "POST",
+        "path": "/api/configurations/no-such/pull",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Pull a configuration from git, applying nothing",
+        "fr": "Tirer une configuration depuis git sans rien appliquer"
+      },
+      "description": {
+        "en": "Reads a configuration out of its git location and SHELVES it: the document lands as a saved copy and the gateway goes on serving what it serves. The answer carries the plan - what activating it would add, change and remove - because the loop is pull, read, activate, read again. Whoever can write to the branch must not be able to reconfigure the gateway, which is why nothing here applies.",
+        "fr": "Lit une configuration dans son emplacement git et la RANGE : le document arrive comme copie enregistrée et la passerelle continue de servir ce qu'elle servait. La réponse porte le plan - ce qu'activer ajouterait, modifierait et retirerait - parce que la boucle est tirer, lire, activer, relire. Qui peut écrire sur la branche ne doit pas pouvoir reconfigurer la passerelle : c'est pourquoi rien ici n'applique."
+      }
+    },
+    {
+      "id": "api-config-push",
+      "domain": "gateway",
+      "kind": "api",
+      "edition": "ee",
+      "probe": {
+        "method": "POST",
+        "path": "/api/configurations/no-such/push",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Push a saved configuration to git",
+        "fr": "Pousser une configuration enregistrée vers git"
+      },
+      "description": {
+        "en": "Commits the SAVED copy to its git location, attributed to the operator who clicked - which is what links the audit trail to the repository's history. A branch that has moved since this configuration was last read from it is a refusal with a cure (pull it into a copy and compare), never a force push.",
+        "fr": "Committe la copie ENREGISTRÉE dans son emplacement git, attribuée à l'opérateur qui a cliqué : c'est ce qui relie la piste d'audit à l'historique du dépôt. Une branche qui a bougé depuis la dernière lecture est un refus accompagné du remède (tirer dans une copie et comparer), jamais un push forcé."
+      }
+    },
+    {
       "id": "api-infra-mail-relay-test",
       "domain": "gateway",
       "kind": "api",
@@ -770,6 +863,54 @@
       "description": {
         "en": "The console has always shown what is CONFIGURED and never what WORKS (SVC-04). This reports what the circuit breaker already watches on every answer, per node - so it needs no prober of its own, and it sits on the routing plane's perimeter like the routes it describes.",
         "fr": "La console a toujours montre ce qui est CONFIGURE et jamais ce qui MARCHE (SVC-04). Ceci rapporte ce que le disjoncteur observe deja sur chaque reponse, noeud par noeud - donc sans sonde propre, et dans le perimetre du plan de routage comme les routes qu'il decrit."
+      }
+    },
+    {
+      "id": "api-infra-logs",
+      "domain": "infra",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/logs?limit=1"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the gateway's own log",
+        "fr": "Lire le journal de la gateway"
+      },
+      "description": {
+        "en": "The last lines this node wrote about itself (OBS-03), structured whatever the output format, for the console's Logs screen. Per node: in a cluster the answer names the node, and the whole cluster's log is the collector's business. The access log is not in it.",
+        "fr": "Les dernieres lignes que ce noeud a ecrites sur lui-meme (OBS-03), structurees quel que soit le format de sortie, pour l'ecran Logs de la console. Par noeud : en cluster la reponse nomme le noeud, et le journal du cluster entier est l'affaire du collecteur. Le journal d'acces n'y est pas."
+      }
+    },
+    {
+      "id": "api-infra-log-level",
+      "domain": "infra",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/logs/level",
+        "body": {
+          "level": "no-such-level"
+        },
+        "allowedStatus": [
+          422
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Turn the log level up or down",
+        "fr": "Monter ou baisser le niveau de log"
+      },
+      "description": {
+        "en": "Live, on every node, and not stored: a restart comes back at the manifest's level. A level more talkative than the startup one goes back on its own after thirty minutes, because a gateway left at debug fills a disk. The probe sends a level that does not exist, refused after the guard, so the run never changes what the gateway writes.",
+        "fr": "A chaud, sur tous les noeuds, et sans stockage : un redemarrage revient au niveau du manifeste. Un niveau plus bavard que celui du demarrage revient de lui-meme apres trente minutes, parce qu'une gateway laissee en debug remplit un disque. La sonde envoie un niveau qui n'existe pas, refuse apres la garde, pour que le passage ne change jamais ce que la gateway ecrit."
       }
     },
     {

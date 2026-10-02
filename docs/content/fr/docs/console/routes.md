@@ -82,6 +82,10 @@ où il est. Quand un cœur change, la liste suit sans rechargement.
 - **JWT** porte les clés qui signent le JWT d'identité que vos services vérifient :
   le JWKS à donner à un backend, la moitié publique de chaque algorithme, la
   rotation, et quelles routes signent avec quoi.
+  Un service pointé sur le JWKS n'a besoin de rien d'autre : le `kid` du jeton
+  désigne la clé, et la clé porte son algorithme, qui se choisit donc une seule
+  fois, dans Auth forward. Le service le prend sur la clé, jamais dans
+  l'en-tête du jeton.
 
 ## L'éditeur
 

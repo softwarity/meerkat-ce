@@ -95,6 +95,88 @@ the fields that moved inside an update. What runs is left out: it is the questio
 asked of a customer's configuration and the template it was made from, before
 touching either. `GET /api/configurations/{id}/compare/{other}`.
 
+## Git repository
+
+*Enterprise edition.* The configurations can live in a git repository: a history
+with names on it, review before a change, and one source of truth across several
+installations.
+
+An export is **public by construction** - a declared secret field leaves as its
+`${name}` reference or not at all - which is what makes putting one in a
+repository a reasonable thing to do. And its bytes are deterministic, so two
+exports of the same state produce the same file and a diff shows only what moved.
+
+### Locations, not branches
+
+A **git location** is a repository, a branch and a **directory** inside it. Several
+locations share one repository, one directory per platform:
+
+```
+platforms/acme/meerkat.yaml
+platforms/acme/assets/logo.png
+platforms/foo/meerkat.yaml
+```
+
+That layout is the one an export already produces, so there is no file to pick
+and nothing to agree on.
+
+> [!TIP]
+> Prefer one directory per platform on one branch over one branch per platform.
+> A branch is for a change that intends to merge; platforms are parallel for
+> good. Branch-per-platform means cherry-picking every fix into fourteen
+> branches, forever. Keep branches for a **proposed** change - that is a pull
+> request - and tags for *what Acme was running on the 2nd*.
+
+### The loop: pull, read, activate
+
+**Import from git** reads a location into a saved configuration and **applies
+nothing**. The gateway goes on serving what it served; the answer is the plan -
+what activating it would add, change and remove, plus the vault entries it
+expects and this installation has not got. You read that, then **Set as current**
+when it says what you expected, and read the plan again on the way.
+
+This is deliberate and it is not negotiable: whoever can write to that branch
+must not be able to reconfigure a gateway. There is no continuous
+reconciliation, and no branch is watched.
+
+**Export to git** commits the **saved copy** - not the running state, so save it
+under a name first if that is what you want - and the commit is **attributed to
+the operator who clicked**. That is the point of doing this in the product rather
+than in a script: a repository whose history reads *meerkat* for every change
+answers nothing six months later.
+
+If the branch has moved since that configuration was last read from it, the push
+is **refused**, with the cure: pull it into a copy and compare. There is no force
+push.
+
+### The token
+
+HTTPS with a token. The token is a [vault](/docs/console/vault) reference, never
+a literal - a location is a row the console reads and a snapshot carries.
+
+What to grant, and the **username to send beside the token**, differ per forge -
+and they all report a wrong username as the same *authentication failed* a wrong
+token gives, which is how a perfectly good token costs somebody an afternoon. The
+form says both as you type the URL:
+
+| Forge | Username | What the token needs |
+|---|---|---|
+| **GitHub** | ignored | A **fine-grained** token, this repository only, *Contents: Read and write*. Not a classic token with `repo`: that is full control of every private repository the account can reach |
+| **GitLab** | `oauth2` | A project access token with `write_repository` and the Maintainer role (Developer where the branch is not protected) |
+| **Bitbucket Cloud** | `x-token-auth` | A repository access token with `repository:write` |
+| **Azure DevOps** | ignored | A personal access token with *Code: Read & Write* |
+| **Gitea / Forgejo** | the token's account | An access token with `write:repository` |
+
+**Check** proves the repository answers, the credential is accepted and the branch
+exists, and writes nothing - so a wrong token is found on the screen that sets it.
+
+### From an agent
+
+`list_git_locations`, `pull_configuration` and `push_configuration`
+([agents](/docs/agent/overview)). An agent that asks the gateway to push holds no
+credential and needs no checkout: the token in the vault, scoped to one
+repository, is the one doing the work.
+
 ## History
 
 The gateway keeps its own tape: **one restore point per change** that moves the
@@ -142,3 +224,9 @@ has proven itself.
   merge and a wipe.
 - **A configuration is not a backup.** Users and sessions are not in it. That is
   what the Snapshot tab is for.
+- **Pulling from git changes nothing.** It shelves a document and shows you the
+  plan. The gateway switches when somebody activates it, not when the repository
+  moves.
+- **A location belongs to this installation, not to the document.** It is never
+  exported: a configuration that could repoint the gateway at another repository
+  would overwrite another customer's directory on the next push.

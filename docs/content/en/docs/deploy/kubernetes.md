@@ -137,6 +137,14 @@ spec:
             # closed here whatever the database says.
             - name: MEERKAT_PRODUCTION
               value: "1"
+          # STARTUP: the store is opened and migrated before the ports
+          # open. Up to two minutes for that, before liveness counts.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: app
+            periodSeconds: 2
+            failureThreshold: 60
           # LIVENESS: is this process still serving? It answers UP without
           # looking at anything, and that is the right answer - this probe
           # decides whether to KILL the process.
@@ -144,7 +152,6 @@ spec:
             httpGet:
               path: /healthz
               port: app
-            initialDelaySeconds: 5
             periodSeconds: 10
           # READINESS: can this node take a request right now? It checks the
           # store and the compiled routing table, and answers 503 naming which

@@ -37,6 +37,17 @@ type Configuration struct {
 	Active    bool   `json:"active"`
 	CreatedAt int64  `json:"createdAt"`
 	UpdatedAt int64  `json:"updatedAt"`
+	// RemoteID names the git location this one is bound to (CFG-07), "" for a
+	// configuration that lives only here. RemoteRev is the revision its
+	// document was last read at or pushed to.
+	//
+	// Remembered rather than chosen at each pull and push: a binding is what
+	// turns "is the repository ahead of me?" into a comparison, and what stops
+	// a push from being a dialog's default away from another customer's
+	// directory.
+	RemoteID  string `json:"remoteId,omitempty"`
+	RemoteRev string `json:"remoteRev,omitempty"`
+	RemoteAt  int64  `json:"remoteAt,omitempty"`
 }
 
 // ErrConfigurationNotFound is what a caller checks instead of comparing error
@@ -107,7 +118,8 @@ func (s *Store) SaveConfiguration(ctx context.Context, c *Configuration) error {
 // first among equals - the list a screen draws.
 func (s *Store) ListConfigurations(ctx context.Context) ([]Configuration, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, description, digest, active, created_at, updated_at
+		`SELECT id, name, description, digest, active, created_at, updated_at,
+		        remote_id, remote_rev, remote_at
 		   FROM configurations ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list configurations: %w", err)
@@ -116,7 +128,8 @@ func (s *Store) ListConfigurations(ctx context.Context) ([]Configuration, error)
 	out := []Configuration{}
 	for rows.Next() {
 		var c Configuration
-		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.Digest, &c.Active, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.Digest, &c.Active, &c.CreatedAt, &c.UpdatedAt,
+			&c.RemoteID, &c.RemoteRev, &c.RemoteAt); err != nil {
 			return nil, fmt.Errorf("store: scan configuration: %w", err)
 		}
 		out = append(out, c)
@@ -127,7 +140,8 @@ func (s *Store) ListConfigurations(ctx context.Context) ([]Configuration, error)
 // GetConfiguration returns one, document included.
 func (s *Store) GetConfiguration(ctx context.Context, id string) (Configuration, error) {
 	return s.configurationRow(ctx,
-		`SELECT id, name, description, document, digest, active, created_at, updated_at
+		`SELECT id, name, description, document, digest, active, created_at, updated_at,
+		        remote_id, remote_rev, remote_at
 		   FROM configurations WHERE id = ?`, id)
 }
 
@@ -136,14 +150,16 @@ func (s *Store) GetConfiguration(ctx context.Context, id string) (Configuration,
 // serves what is in its database, named or not.
 func (s *Store) ActiveConfiguration(ctx context.Context) (Configuration, error) {
 	return s.configurationRow(ctx,
-		`SELECT id, name, description, document, digest, active, created_at, updated_at
+		`SELECT id, name, description, document, digest, active, created_at, updated_at,
+		        remote_id, remote_rev, remote_at
 		   FROM configurations WHERE active = ?`, true)
 }
 
 func (s *Store) configurationRow(ctx context.Context, query string, args ...any) (Configuration, error) {
 	var c Configuration
 	err := s.db.QueryRowContext(ctx, query, args...).
-		Scan(&c.ID, &c.Name, &c.Description, &c.Document, &c.Digest, &c.Active, &c.CreatedAt, &c.UpdatedAt)
+		Scan(&c.ID, &c.Name, &c.Description, &c.Document, &c.Digest, &c.Active, &c.CreatedAt, &c.UpdatedAt,
+			&c.RemoteID, &c.RemoteRev, &c.RemoteAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Configuration{}, ErrConfigurationNotFound
 	}

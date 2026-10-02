@@ -33,6 +33,7 @@ The left rail holds the two planes and the transverse screens.
 | **Metrics** | `/traffic` | What the gateway has actually served |
 | **Scheduler** | `/scheduler` | The calls the gateway makes to your services on a schedule |
 | **Audit** | `/audit` | Who changed what |
+| **Logs** | `/logs` | What the gateway says about itself, live |
 | **Issues** | `/issues` | What your users reported |
 
 The split is not cosmetic. **Infra** is about the installation: an upstream, a
@@ -53,7 +54,7 @@ same scopes on every call.
 | Capability | Opens |
 |---|---|
 | `root` | Everything, including Configuration |
-| `infra admin` | The Infra plane (with Access tokens and MCP), Metrics, Audit and Issues, the vault's infra scope |
+| `infra admin` | The Infra plane (with Access tokens and MCP), Metrics, Logs, Audit and Issues, the vault's infra scope |
 | `app admin` | The Application plane (with Sessions and Access tokens), Scheduler, Audit and Issues, the vault's application scope |
 | `tenant admin` | The organisations they administer, Audit and Issues scoped to them |
 | `tenant creator` | Creating an organisation from the Tenants drawer |
@@ -96,8 +97,8 @@ Learn these five and the console stops surprising you.
 - **[OpenTelemetry](/docs/operations/tracing)** - traces, metrics, audit and logs sent to your collector.
 - **[Plug](/docs/operations/plug)** - the developer tunnel.
 - **[Access tokens, MCP and API](/docs/console/access-and-agents)** - driving Meerkat without a browser.
-- **[Configuration](/docs/console/configuration)** - configurations, restore points, snapshots.
 - **Model** - the fields an account carries, documented with [Users](/docs/console/users).
+- **[Configuration](/docs/console/configuration)** - configurations, restore points, snapshots. At the foot of the menu, apart from the daily screens.
 
 ### Application
 
@@ -117,6 +118,7 @@ Learn these five and the console stops surprising you.
 - **[Metrics](/docs/console/traffic)** - traffic, latency, the ranking of routes.
 - **[Scheduler](/docs/operations/scheduler)** - the scheduled calls and their runs.
 - **[Audit and Issues](/docs/console/audit-and-issues)** - the trail of changes, and the reports.
+- **[Logs](/docs/operations/logs#in-the-console)** - the gateway's own lines, live, and its level. One node at a time.
 - **License** - which edition answered, and what each Enterprise feature buys. It
   is the only screen that talks about editions: everywhere else a locked control
   carries its cap and links here.

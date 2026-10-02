@@ -17,9 +17,11 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { sessionStored } from '@softwarity/store';
 import { Subject, catchError, debounceTime, firstValueFrom, map, of } from 'rxjs';
 import {
+  AUDIT_FILE_KIND,
   Access,
   ApiService,
   AuditField,
+  AuditFile,
   EndpointAudit,
   EndpointPolicy,
   OpenAPIOperation,
@@ -561,17 +563,38 @@ export class EndpointSecurityComponent {
     this.scheduleSave();
   }
 
+  // The audited operations as a file: the route editor uploads it back, onto
+  // this route or another (AUD-04).
+  protected exportAudit(): void {
+    const route = this.apiRoutes().find((r) => r.id === this.selectedId());
+    const file: AuditFile = {
+      kind: AUDIT_FILE_KIND,
+      route: route?.name ?? this.selectedId(),
+      audit: this.auditEndpoints(),
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2) + '\n'], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(route?.name ?? 'route').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-audit.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Only what can be valid leaves: a field being typed is kept on screen until
+  // it has a name and a key.
+  private auditEndpoints(): EndpointAudit[] {
+    return [...Object.values(this.audits()), ...this.auditExtras()].map((a) => ({
+      ...a,
+      fields: (a.fields ?? []).filter((f) => f.name.trim() && f.key.trim()),
+    }));
+  }
+
   // ── Save ───────────────────────────────────────────────────────────────────
   private async persist(): Promise<void> {
     const id = this.selectedId();
     if (!id) return;
     if (this.intent() === 'audit') {
-      // Only what can be valid leaves: a field being typed is kept on screen
-      // until it has a name and a key.
-      const endpoints = [...Object.values(this.audits()), ...this.auditExtras()].map((a) => ({
-        ...a,
-        fields: (a.fields ?? []).filter((f) => f.name.trim() && f.key.trim()),
-      }));
+      const endpoints = this.auditEndpoints();
       this.saveState.set('saving');
       try {
         await firstValueFrom(this.api.saveRouteAudit(id, endpoints));

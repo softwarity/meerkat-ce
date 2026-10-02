@@ -24,6 +24,7 @@ export type ChangeKind =
   | 'schedule'
   | 'configuration'
   | 'config'
+  | 'config-remote'
   | 'issue'
   | 'backup';
 

@@ -1156,6 +1156,28 @@
           The trace starts at the <b>click</b>, in the page. Leave it off if the application already
           has its own OpenTelemetry agent.
         </p>
+        <!-- The operations whose calls are audited (AUD-04). Edited one by
+             one on the Endpoint audit screen; here, a file exported from it
+             replaces them at once, on this route or another one. -->
+        <h3 class="sub" i18n="@@Section_audit">Audit</h3>
+        <p class="section-hint">
+          @if (auditUpload(); as up) {
+            <ng-container i18n="@@Audit_uploaded">{{ up.length }} audited operations read from the file, saved with the route.</ng-container>
+          } @else {
+            <ng-container i18n="@@Audit_count">{{ auditCount() }} audited operations, set in
+              <a routerLink="/infra/endpoint-audit">Endpoint audit</a>.</ng-container>
+          }
+        </p>
+        <div class="css-row">
+          <button matButton="tonal" type="button" (click)="auditFile.click()" [disabled]="!route()">
+            <mat-icon>upload_file</mat-icon>
+            <ng-container i18n="@@Upload_audit">Upload audit configuration</ng-container>
+          </button>
+          <input #auditFile type="file" accept="application/json,.json" hidden (change)="uploadAudit(auditFile)" />
+        </div>
+        @if (auditUploadError(); as err) {
+          <p class="section-hint error">{{ err }}</p>
+        }
       }
       @case ('custom') {
         <p class="section-hint" i18n="@@Custom_hint">

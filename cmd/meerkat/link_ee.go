@@ -11,6 +11,7 @@ import (
 	_ "github.com/softwarity/meerkat/ee/changebus"
 	_ "github.com/softwarity/meerkat/ee/devplug"
 	_ "github.com/softwarity/meerkat/ee/directories"
+	_ "github.com/softwarity/meerkat/ee/gitdriver"
 	_ "github.com/softwarity/meerkat/ee/layouts"
 	_ "github.com/softwarity/meerkat/ee/telemetry"
 )

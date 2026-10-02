@@ -187,6 +187,14 @@ security, sees the answer the caller got, and cannot open or close an
 operation. A route without an OpenAPI contract cannot be audited this way:
 deposit its contract, or let the service audit itself.
 
+### From one route to another
+
+**Export** on the Endpoint audit screen downloads the route's rules as a JSON
+file. In the route editor, the **OpenTelemetry** section has **Upload audit
+configuration**: it reads such a file, and the rules are saved with the route.
+The rules also travel with the [configuration](/docs/console/configuration)
+export.
+
 ## Filters, retention, and what is missing
 
 The screen filters on the part of the trail (**All**, **Changes**, **Data plane

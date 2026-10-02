@@ -1,3 +1,4 @@
+import { MatCardModule } from '@angular/material/card';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -26,6 +27,7 @@ type Os = 'macos' | 'linux' | 'windows';
 @Component({
   selector: 'app-plug-page',
   imports: [
+    MatCardModule,
     EeLockComponent,
     FormFieldComponent,
     MatButtonModule,

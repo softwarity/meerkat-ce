@@ -24,6 +24,12 @@ répare en mourant. Ce qui appartient à une dépendance appartient à la dispon
 {"status":"UP","version":"dev"}
 ```
 
+C'est aussi la sonde de **démarrage**. Le stockage est ouvert et migré avant que
+les ports s'ouvrent, donc une passerelle en pleine migration ne répond encore
+rien : la sonde de démarrage lui laisse jusqu'à deux minutes avant que la
+vivacité commence à compter. Sans elle, une longue migration après une montée de
+version serait tuée en route et recommencerait, en boucle.
+
 ## /readyz est la disponibilité
 
 Elle décide d'**envoyer du trafic**, donc elle pose les deux questions qui rendent un noeud inutile :

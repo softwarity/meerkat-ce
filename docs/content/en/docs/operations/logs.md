@@ -29,6 +29,28 @@ MEERKAT_LOG_FORMAT   json | text                      json in production, text e
 
 A typo in the level falls back to `info` rather than stopping a start.
 
+### In the console
+
+![The Logs screen: the level at the top right, the level filters and the search, then the lines, one of them open](img/console/logs.webp)
+
+**Logs**, in the rail under Audit (root and infra admin), shows the last 5,000
+lines live. The gateway keeps them structured, so the screen lays them out
+whatever the output format: time, level, message, attributes. Click a line to
+open it. Filter by level, search the text, and export what is shown as `.jsonl`.
+Scroll up and the screen stops following; the arrow brings it back.
+
+**The level** at the top right applies at once, on every node. A level more
+talkative than the startup one goes back on its own after 30 minutes, and the
+screen counts down. It is not stored: a restart comes back at
+`MEERKAT_LOG_LEVEL`.
+
+> [!NOTE] One node
+> In a cluster, the lines are those of the node that answered, and the screen
+> names it. The whole cluster's log is the collector's.
+
+The access log is not on this screen: it would push everything else out in a
+few seconds. [Metrics](/docs/console/traffic) and the traces answer it.
+
 ## The access log
 
 Ships off: at four hundred requests a second, that is thirty-five million lines
@@ -53,6 +75,7 @@ One line, as it comes out:
 | `path` | the path as it was asked for, identifiers included |
 | `endpoint` | the template, when the route declares a spec - which is what makes these lines countable |
 | `user` | the account **as this gateway authenticated it**, never as a header claimed it |
+| `token` | the API token's name when a machine called: one account can hold several |
 | `ip` | the address **resolved by the gateway**, never an `X-Forwarded-For` written by the caller |
 | `outcome` | `ok`, `refused`, `rejected`, `failed`, `upstream-down` |
 
@@ -124,8 +147,3 @@ with an agent reading the outputs too, every line would arrive twice.
 The push has its own queue, never the audit's: a flood of logs cannot cost
 the trail an event. A batch the collector refuses three times is dropped and
 counted, and the tab says how many.
-
-## What is missing
-
-- The level set from the console rather than at startup only.
-- The token's name next to the account when a machine calls.

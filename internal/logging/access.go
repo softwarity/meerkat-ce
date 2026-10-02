@@ -34,11 +34,15 @@ var accessLogger atomic.Pointer[slog.Logger]
 // Off by default, and that is deliberate: at four hundred requests a second
 // this is thirty-five million lines a day, and an operator reading `docker
 // logs` for a startup problem should not have to opt OUT of that.
-func EnableAccessLog(format Format) {
+func EnableAccessLog(format Format) { EnableAccessLogTo(os.Stdout, format) }
+
+// EnableAccessLogTo is EnableAccessLog onto another output: what a test reads
+// the lines from.
+func EnableAccessLogTo(w io.Writer, format Format) {
 	if otelOn.Load() {
 		format = FormatOTel
 	}
-	accessLogger.Store(newAccessLogger(os.Stdout, format))
+	accessLogger.Store(newAccessLogger(w, format))
 }
 
 // DisableAccessLog stops, live. Turning it on for an hour to catch something

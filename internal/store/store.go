@@ -749,11 +749,53 @@ CREATE TABLE IF NOT EXISTS configurations (
   digest      TEXT NOT NULL DEFAULT '',
   active      BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  BIGINT NOT NULL DEFAULT 0,
-  updated_at  BIGINT NOT NULL DEFAULT 0
+  updated_at  BIGINT NOT NULL DEFAULT 0,
+  -- Where this configuration came from, and goes back to (CFG-07), v70. The
+  -- binding is REMEMBERED rather than asked for at every pull and push, and
+  -- that is not a convenience: without it the question "has the repository
+  -- moved since this row was read?" has no answer, and a push is one wrong
+  -- choice in a dialog away from overwriting another customer's directory.
+  remote_id   TEXT NOT NULL DEFAULT '',
+  -- The revision the document was last read at or pushed to. It is what makes
+  -- a commit a comparison instead of a clobber.
+  remote_rev  TEXT NOT NULL DEFAULT '',
+  remote_at   BIGINT NOT NULL DEFAULT 0
 );
 -- One active configuration at a time, enforced by the index rather than by a
 -- transaction everyone has to remember.
 CREATE UNIQUE INDEX IF NOT EXISTS configurations_active ON configurations(active) WHERE active = TRUE;
+
+-- Named git locations (CFG-07), v70, Enterprise.
+--
+-- One row is one repository, one branch and one DIRECTORY inside it, which is
+-- what lets several rows share a repository - one directory per customer
+-- platform - and what makes a row name exactly one document: the layout inside
+-- is config.Split's, meerkat.yaml with its assets/ beside it.
+--
+-- The token is a vault reference (${name}), never a value: this table is read
+-- by the control plane and dumped in a snapshot, and a credential in clear
+-- here would be a credential in clear in a file somebody mails to support.
+-- The remote is NOT part of the configuration document and never travels in
+-- one - a document that could repoint the gateway at another repository would
+-- make activating a customer's configuration overwrite that customer's own
+-- directory on the next push.
+CREATE TABLE IF NOT EXISTS config_remotes (
+  id           TEXT PRIMARY KEY,
+  name         TEXT NOT NULL UNIQUE,
+  url          TEXT NOT NULL DEFAULT '',
+  branch       TEXT NOT NULL DEFAULT '',
+  dir          TEXT NOT NULL DEFAULT '',
+  token_ref    TEXT NOT NULL DEFAULT '',
+  -- The HTTP basic username sent beside the token. Empty means the forge's
+  -- default (confrepo.BasicUser): GitHub ignores it, GitLab wants "oauth2",
+  -- Bitbucket refuses anything but "x-token-auth" - and all three answer a
+  -- wrong one with the same "authentication failed" a wrong token gives.
+  token_user   TEXT NOT NULL DEFAULT '',
+  author_name  TEXT NOT NULL DEFAULT '',
+  author_email TEXT NOT NULL DEFAULT '',
+  created_at   BIGINT NOT NULL DEFAULT 0,
+  updated_at   BIGINT NOT NULL DEFAULT 0
+);
 
 -- Restore points (CFG-06): the gateway's own tape, written whenever a change
 -- moves the configuration's fingerprint - never on purpose, never named.
@@ -981,7 +1023,7 @@ CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);`
 // v56 scheduled calls (SCHED-01): the schedules table. A row is what to call,
 // when, and as whom - and the lease columns are what let several gateways
 // share one schedule without running it twice or losing it when a node dies.
-const schemaVersion = 69
+const schemaVersion = 70
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

@@ -136,6 +136,36 @@
   },
   {
     "method": "GET",
+    "path": "/api/config-remotes",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/config-remotes",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/config-remotes/forges",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/config-remotes/{id}",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/config-remotes/{id}",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/config-remotes/{id}/check",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
     "path": "/api/config/document",
     "guard": "rootOnly"
   },
@@ -205,6 +235,11 @@
     "guard": "rootOnly"
   },
   {
+    "method": "POST",
+    "path": "/api/configurations/pull",
+    "guard": "rootOnly"
+  },
+  {
     "method": "DELETE",
     "path": "/api/configurations/{id}",
     "guard": "rootOnly"
@@ -257,6 +292,21 @@
   {
     "method": "GET",
     "path": "/api/configurations/{id}/plan",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/{id}/pull",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/{id}/push",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/configurations/{id}/remote",
     "guard": "rootOnly"
   },
   {
@@ -343,6 +393,16 @@
     "method": "PUT",
     "path": "/api/locales/{code}",
     "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/logs",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/logs/level",
+    "guard": "infraAdmin"
   },
   {
     "method": "GET",

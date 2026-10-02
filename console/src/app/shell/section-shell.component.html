@@ -2,6 +2,9 @@
   <nav class="left">
     <h2>{{ title }}</h2>
     @for (s of sections; track s.path) {
+      @if (s.bottom) {
+        <span class="spacer"></span>
+      }
       <a
         [routerLink]="s.path"
         routerLinkActive="active"

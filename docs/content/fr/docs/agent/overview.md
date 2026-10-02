@@ -55,6 +55,7 @@ davantage en passant par un assistant plutôt que par un clic.
 | `list_schedules` | Les appels planifiés : ce qui tourne la nuit, à quelle cadence, sous quel compte, et comment le dernier tour s'est terminé. |
 | `pause_schedule`, `run_schedule` | Suspendre un appel planifié, le reprendre, ou avancer son prochain tour à maintenant. |
 | `read_traffic` | Ce qui passe en ce moment. |
+| `read_logs` | Les dernières lignes de la gateway, sur le nœud qui répond. |
 | `read_audit` | Le journal d'audit, dans le périmètre de l'appelant. |
 | `get_settings`, `save_portal` | Les réglages globaux, et le portail de navigation. |
 | `get_branding`, `save_branding` | L'identité que portent les pages intégrées. |

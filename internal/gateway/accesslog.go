@@ -62,6 +62,16 @@ func noteIdentity(ctx context.Context, d identityData) {
 	}
 }
 
+// noteToken records which API token the caller presented, empty for a
+// browser session. The account alone would say whose credential it was, not
+// which one: a person with a laptop session and three machine tokens is four
+// callers to whoever reads the log.
+func noteToken(ctx context.Context, name string) {
+	if n := noteOf(ctx); n != nil {
+		n.token = name
+	}
+}
+
 // writeAccess puts down one crossing. route and endpoint are empty for a
 // request that matched nothing, which is itself worth recording: a rising
 // number of them is somebody calling a path this gateway does not serve.
