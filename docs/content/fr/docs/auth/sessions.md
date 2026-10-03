@@ -30,6 +30,13 @@ l'application et à la console.
 | `MEERKAT_UNTIL` | plan de données | quand cette session expire, en horodatage |
 | `MEERKAT_ADMIN_UNTIL` | plan de contrôle | la même chose, pour la console |
 
+Chaque nom se termine par l'identifiant de cette installation - `MEERKAT_SESSION_3fa9c1e2` -
+généré à l'installation et jamais exporté avec une configuration. Un cran au-dessus, la même
+raison : deux passerelles qu'un navigateur atteint sous un même nom d'hôte, une Enterprise et
+une communautaire côte à côte sur `localhost`, écraseraient sinon les sessions l'une de
+l'autre. Le cookie de navigateur de confiance est suffixé de la même façon ; ceux de la langue
+et du thème sont le choix de la personne et restent partagés.
+
 Les cookies de session sont `HttpOnly`, `SameSite=Lax`, `Path=/`, avec un
 `Max-Age` égal à la durée de vie de la session. `Secure` est posé quand la requête
 est arrivée en HTTPS - soit TLS terminé par la gateway, soit

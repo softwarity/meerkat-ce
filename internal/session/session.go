@@ -25,10 +25,37 @@ import (
 
 // Cookie names, one per plane: cookies are NOT port-scoped, so on a same-host
 // deployment the two ports would otherwise share the browser's session.
-const (
+//
+// And one set per INSTALLATION, for the same reason one level up: two
+// gateways a browser reaches under one host name overwrote each other's
+// sessions. SetCookieSuffix appends the installation's identifier at startup,
+// before any request; until then (and in tests) the names are the bare ones.
+var (
 	CookieName      = "MEERKAT_SESSION"       // data plane
 	AdminCookieName = "MEERKAT_ADMIN_SESSION" // control plane
 )
+
+// SetCookieSuffix makes this installation's cookie names its own. Called once
+// by main, before the handlers serve anything.
+func SetCookieSuffix(suffix string) {
+	cookieSuffix = suffix
+	CookieName = Suffixed("MEERKAT_SESSION")
+	AdminCookieName = Suffixed("MEERKAT_ADMIN_SESSION")
+	UntilCookieName = Suffixed("MEERKAT_UNTIL")
+	AdminUntilCookieName = Suffixed("MEERKAT_ADMIN_UNTIL")
+}
+
+var cookieSuffix string
+
+// Suffixed is base with this installation's suffix, for a cookie that holds
+// state of THIS installation (a session, a trusted browser). A preference -
+// the language, the colour scheme - is the person's and stays shared.
+func Suffixed(base string) string {
+	if cookieSuffix == "" {
+		return base
+	}
+	return base + "_" + cookieSuffix
+}
 
 // Planes stamped on every stored session - Resolve refuses a token from the
 // other plane even if someone copies the cookie across.
@@ -172,7 +199,7 @@ func (m *Manager) IssueWith(ctx context.Context, w http.ResponseWriter, r *http.
 // signed in. A unix timestamp discloses nothing; the page agent reads it and
 // goes to the login page on its own instead of waiting for someone to click
 // and discover it is over. One cookie per plane, same reason as the session's.
-const (
+var (
 	UntilCookieName      = "MEERKAT_UNTIL"
 	AdminUntilCookieName = "MEERKAT_ADMIN_UNTIL"
 )

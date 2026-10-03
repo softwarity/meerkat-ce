@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/softwarity/meerkat/internal/filters"
+	"github.com/softwarity/meerkat/internal/session"
 
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -17,9 +18,10 @@ import (
 // the browser - its hash rides on each event so the list can badge the rows
 // made from THIS browser, same spirit as the passkey/trusted-browser badges.
 
-// browserCookieName carries the durable browser identifier - an opaque random
+// browserCookieName() carries the durable browser identifier - an opaque random
 // token with no authority whatsoever; only its hash is stored, per event.
-const browserCookieName = "MEERKAT_BROWSER"
+// Suffixed per installation: the browser is named by ONE gateway's history.
+func browserCookieName() string { return session.Suffixed("MEERKAT_BROWSER") }
 
 // How a sign-in completed; stored per event, translated at display time.
 const (
@@ -37,7 +39,7 @@ const (
 )
 
 func browserTokenOf(r *http.Request) string {
-	if c, err := r.Cookie(browserCookieName); err == nil {
+	if c, err := r.Cookie(browserCookieName()); err == nil {
 		return c.Value
 	}
 	return ""
@@ -73,7 +75,7 @@ func (h *Handler) recordLogin(w http.ResponseWriter, r *http.Request, userID, te
 		} else {
 			token = t
 			http.SetCookie(w, &http.Cookie{
-				Name: browserCookieName, Value: token, Path: "/",
+				Name: browserCookieName(), Value: token, Path: "/",
 				HttpOnly: true, Secure: filters.Secure(r), SameSite: http.SameSiteLaxMode,
 				MaxAge: 2 * 365 * 24 * 3600,
 			})

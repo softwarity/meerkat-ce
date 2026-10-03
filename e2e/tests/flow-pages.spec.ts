@@ -33,7 +33,7 @@ test('flow-login-bad-password: refused without a session', async ({ page }) => {
   await page.click('button[type=submit]');
   await expect(page.locator('p.error').first()).toBeVisible();
   const cookies = await page.context().cookies();
-  expect(cookies.find((c) => c.name === 'MEERKAT_SESSION')).toBeUndefined();
+  expect(cookies.find((c) => c.name.startsWith('MEERKAT_SESSION'))).toBeUndefined();
 });
 
 test('flow-profile-history: a fresh sign-in shows with its method', async ({ browser }) => {

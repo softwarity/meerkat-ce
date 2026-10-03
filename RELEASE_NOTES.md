@@ -98,6 +98,10 @@
 - **The TLS screen links to the port the world reaches** - 19443 rather than
   the container's 9443 - read from Kubernetes, Docker or Swarm, and says when
   an HTTPS door is not published at all.
+- **Two gateways on one host name keep their own sessions.** Session cookies
+  now end with an identifier generated at install, so an Enterprise and a
+  community gateway side by side on `localhost` no longer sign each other out.
+  Everyone signs in once after the upgrade.
 
 ---
 

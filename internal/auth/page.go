@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -52,7 +53,9 @@ import (
 func (h *Handler) pageJS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")
-	_, _ = w.Write([]byte(pageJS))
+	// The deadline cookie's name is this installation's (session.Suffixed),
+	// known once main has started: written in here rather than compiled in.
+	_, _ = w.Write([]byte(strings.Replace(pageJS, "__MEERKAT_UNTIL__", session.UntilCookieName, 1)))
 }
 
 // schemeJS serves ONE route's scheme script (SchemeConfig.Script) as a real
@@ -407,7 +410,7 @@ const pageJS = `(() => {
   // not answer before: is the session still there? Without it a tab left open
   // shows a live-looking screen until someone clicks and gets an error - or
   // gets nothing at all, which is worse.
-  const until = () => Number(getCookie('` + session.UntilCookieName + `') || 0) * 1000;
+  const until = () => Number(getCookie('__MEERKAT_UNTIL__') || 0) * 1000;
 
   let sessionChannel = null;
   const sessionOpen = () => {

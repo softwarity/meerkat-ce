@@ -14,13 +14,15 @@ import (
 
 	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/mfa"
+	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/useragent"
 )
 
-// trustCookieName carries the opaque trusted-browser token (MFA-03) - a factor
+// trustCookieName() carries the opaque trusted-browser token (MFA-03) - a factor
 // entirely separate from the session cookie; only its hash is stored.
-const trustCookieName = "MEERKAT_TRUST"
+// Suffixed per installation: a trusted browser is trusted by ONE gateway.
+func trustCookieName() string { return session.Suffixed("MEERKAT_TRUST") }
 
 func hashTrust(token string) string {
 	sum := sha256.Sum256([]byte(token))
@@ -28,7 +30,7 @@ func hashTrust(token string) string {
 }
 
 func trustTokenOf(r *http.Request) string {
-	if c, err := r.Cookie(trustCookieName); err == nil {
+	if c, err := r.Cookie(trustCookieName()); err == nil {
 		return c.Value
 	}
 	return ""
@@ -80,7 +82,7 @@ func (h *Handler) issueTrust(w http.ResponseWriter, r *http.Request, userID stri
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     trustCookieName,
+		Name:     trustCookieName(),
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,

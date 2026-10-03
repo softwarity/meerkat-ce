@@ -29,6 +29,13 @@ session.
 | `MEERKAT_UNTIL` | data plane | when this session expires, as a timestamp |
 | `MEERKAT_ADMIN_UNTIL` | control plane | the same, for the console |
 
+Each name ends with this installation's identifier - `MEERKAT_SESSION_3fa9c1e2` -
+generated at install and never exported with a configuration. One level up, the
+same reason: two gateways a browser reaches under one host name, an Enterprise
+and a community one side by side on `localhost`, would otherwise overwrite each
+other's sessions. The trusted-browser cookie is suffixed the same way; the
+language and colour-scheme cookies are the person's choice and stay shared.
+
 The session cookies are `HttpOnly`, `SameSite=Lax`, `Path=/`, with a `Max-Age`
 equal to the session's lifetime. `Secure` is set when the request arrived over
 HTTPS - either TLS terminated by the gateway, or `X-Forwarded-Proto: https` from

@@ -9,7 +9,10 @@ import { Injectable } from '@angular/core';
 // The data plane has the same watch inside its injected page agent
 // (internal/auth/page.go). The two never meet: BroadcastChannel is scoped to
 // an origin, and the two planes listen on different ports.
-const UNTIL_COOKIE = 'MEERKAT_ADMIN_UNTIL';
+// The deadline cookie's name is this installation's own (cookies are scoped to
+// a host, not a port, so two gateways on one host would share it); the gateway
+// stamps it on <body>.
+const UNTIL_COOKIE = document.body.getAttribute('data-meerkat-until-cookie') || 'MEERKAT_ADMIN_UNTIL';
 const CHANNEL = 'meerkat-session';
 
 // ONCE, and that "once" is the whole point. A cold start fires several calls at

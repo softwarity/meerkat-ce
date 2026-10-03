@@ -209,6 +209,14 @@ func run(o options) error {
 		slog.Info("storage: external database", "kind", "postgres")
 	}
 	defer func() { _ = st.Close() }()
+	// This installation's cookies are its own (session.SetCookieSuffix): two
+	// gateways a browser reaches under one host name no longer overwrite each
+	// other's sessions. Before any handler exists.
+	installID, err := st.InstallationID(context.Background())
+	if err != nil {
+		return err
+	}
+	session.SetCookieSuffix(installID)
 
 	ctx := context.Background()
 	// Which product this binary IS, before it answers a request - a sentence
