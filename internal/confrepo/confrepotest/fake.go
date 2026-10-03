@@ -9,7 +9,6 @@ package confrepotest
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -86,17 +85,14 @@ func under(dir, path string) (string, bool) {
 	return strings.TrimPrefix(path, prefix), true
 }
 
-// Commit replaces the remote's directory with files, refusing a stale expect.
+// Commit replaces the remote's directory with files.
 func (f *Fake) Commit(
-	_ context.Context, r confrepo.Remote, msg string, files map[string][]byte, expect string,
+	_ context.Context, r confrepo.Remote, msg string, files map[string][]byte,
 ) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.Fail != nil {
 		return "", f.Fail
-	}
-	if expect != "" && expect != f.rev() {
-		return "", fmt.Errorf("%w (at %s, you had %s)", confrepo.ErrMoved, f.rev(), expect)
 	}
 	for path := range f.Files {
 		if name, inside := under(r.Dir, path); inside &&

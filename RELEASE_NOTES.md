@@ -121,9 +121,17 @@
   to this repository's own token page, and the username is asked only where
   the forge leaves it open. The forge is kept, so a self-hosted GitLab still
   sends oauth2.
-- **A saved configuration says where it stands against git in words** -
-  *up to date*, *changed since push*, *never pushed* - beside its location;
-  the repository, branch and directory are on hover, one per line.
+- **Pushing to and pulling from git shows what is happening**, on the row
+  itself: a turning icon and *pushing to undrstry...* while it runs, and the
+  configuration and location named when a push is done.
+- **A saved configuration says where it stands against git in words**:
+  *synced* with the date of the last push or pull, *changed here since*, or
+  *never pushed*; the repository, branch and directory are on hover.
+- **Push and pull are plain**: a pull replaces the saved configuration with the
+  repository's version, a push replaces the location's directory with the saved
+  configuration - and only that directory, so another platform in the same
+  repository is left alone. A push is no longer refused because the branch
+  moved; what it replaces stays in the git history.
 - **ACME is now Enterprise.** On the community image the TLS screen still
   generates, imports and signs certificates on request; asking an authority
   is part of the Enterprise edition.

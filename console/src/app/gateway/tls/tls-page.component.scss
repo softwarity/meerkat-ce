@@ -366,16 +366,6 @@ textarea.pem {
 }
 
 
-// An authority being asked: the icon turns while the answer is on its way.
-.grip.spin {
-  animation: spin 1.2s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .acme-door {
   display: inline-flex;
   align-items: center;

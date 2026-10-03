@@ -142,8 +142,9 @@ func TestAPushWritesTheDirectory(t *testing.T) {
 	}
 }
 
-// THE RULE: a branch somebody else moved refuses the push, and says to pull.
-func TestAMovedBranchRefusesThePush(t *testing.T) {
+// A push REPLACES what the location holds, whatever somebody else pushed
+// there since - as a pull replaces the saved configuration.
+func TestAPushReplacesWhatTheRepositoryHolds(t *testing.T) {
 	f := setup(t)
 	repo := confrepotest.New()
 	repo.Register(t)
@@ -175,14 +176,11 @@ func TestAMovedBranchRefusesThePush(t *testing.T) {
 	repo.Move()
 
 	code, body = f.call(t, "POST", "/api/configurations/"+saved.ID+"/push", "", f.rootC)
-	if code != http.StatusConflict {
-		t.Fatalf("pushing onto a moved branch: %d %s", code, body)
+	if code != http.StatusOK {
+		t.Fatalf("pushing over somebody else's push: %d %s", code, body)
 	}
-	if !strings.Contains(body, "pull") {
-		t.Errorf("the refusal does not offer the cure: %s", body)
-	}
-	if repo.Commits != 1 {
-		t.Errorf("the refused push committed anyway: %d commits", repo.Commits)
+	if repo.Commits != 2 {
+		t.Errorf("the push did not commit: %d commits", repo.Commits)
 	}
 }
 

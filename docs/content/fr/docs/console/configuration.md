@@ -149,9 +149,17 @@ enregistrez-le d'abord sous un nom si c'est lui que vous voulez - et le commit e
 produit plutôt que dans un script : un dépôt dont l'historique dit « meerkat » à
 chaque changement ne répond à rien six mois plus tard.
 
-Si la branche a bougé depuis la dernière lecture de cette configuration, le push
-est **refusé**, avec le remède : tirer dans une copie et comparer. Il n'y a pas de
-push forcé.
+Les deux sens sont simples : **un pull remplace** la configuration enregistrée par ce
+que le dépôt contient, **un push remplace** ce que le dossier de l'emplacement contient
+par la configuration enregistrée - quoi que quelqu'un d'autre y ait mis. Rien n'est
+perdu : ce qu'un push a remplacé est le commit précédent de l'historique. Seul le
+dossier de l'emplacement est écrit ; le dossier d'une autre plateforme dans le même
+dépôt n'est pas touché. Pour voir la version du dépôt avant de choisir, tirez-la dans
+une nouvelle configuration (*Import from git*) et comparez.
+
+Une ligne dit où elle en est : *synced* avec la date du dernier push ou pull,
+*changed here since*, ou *never pushed*. « Synced » est ce que la passerelle sait à
+son dernier échange - savoir si quelqu'un a modifié le dépôt depuis demande un pull.
 
 ### Le jeton
 

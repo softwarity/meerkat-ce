@@ -146,9 +146,17 @@ the operator who clicked**. That is the point of doing this in the product rathe
 than in a script: a repository whose history reads *meerkat* for every change
 answers nothing six months later.
 
-If the branch has moved since that configuration was last read from it, the push
-is **refused**, with the cure: pull it into a copy and compare. There is no force
-push.
+The two directions are plain: **a pull replaces** the saved configuration with what
+the repository holds, **a push replaces** what the location's directory holds with
+the saved configuration - whatever somebody else put there. Nothing is lost: what a
+push replaced is the previous commit of the history. Only the location's directory is
+written; another platform's directory in the same repository is left alone. To see
+the repository's version before choosing, pull it into a new configuration (*Import
+from git*) and compare.
+
+A row says where it stands: *synced* with the date of the last push or pull,
+*changed here since*, or *never pushed*. "Synced" is what this gateway knows at its
+last exchange - whether somebody changed the repository since is a pull away.
 
 ### The token
 

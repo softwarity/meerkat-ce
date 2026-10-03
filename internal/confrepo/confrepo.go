@@ -64,10 +64,10 @@ type Remote struct {
 // different sentence from a git failure.
 var ErrNoDriver = errors.New("confrepo: this build carries no git driver")
 
-// ErrMoved says the branch is not where the caller thought it was, so the
-// commit was not pushed. A sentinel because it is the one failure with a cure
-// the console can offer: pull first.
-var ErrMoved = errors.New("confrepo: the branch has moved since it was last read")
+// ErrMoved says the branch kept moving WHILE the push was being written -
+// somebody else pushing at the same moment, several times in a row. Nothing
+// was pushed, and pushing again is the cure.
+var ErrMoved = errors.New("confrepo: the branch kept moving while this push was written")
 
 // ErrAbsent says the remote's directory holds no document. Told apart from a
 // failure because it is the ordinary state of a remote nothing has been pushed
@@ -88,10 +88,11 @@ type Driver interface {
 	// and pushes. Paths the directory holds and files does not are REMOVED, so
 	// that a logo taken out of a configuration leaves the repository too.
 	//
-	// expect is the revision the caller last read; a branch that has moved on
-	// gives ErrMoved and nothing is pushed. An empty expect is a first write,
-	// not a licence to clobber: the driver still refuses a non-fast-forward.
-	Commit(ctx context.Context, r Remote, msg string, files map[string][]byte, expect string) (rev string, err error)
+	// A push REPLACES the directory, whatever is there - as a pull replaces
+	// the saved configuration. Nothing is lost: what it replaced is the
+	// previous commit of the history. Only this directory is written; the
+	// rest of the repository - other platforms - is left as it is.
+	Commit(ctx context.Context, r Remote, msg string, files map[string][]byte) (rev string, err error)
 }
 
 var (

@@ -100,12 +100,19 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
          screen uses one.) */
       .form {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        /* The short values on the left - the forge, the host, the branch - and
+           the long ones on the right: a name, a repository path, a directory. */
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
         align-items: start;
         column-gap: 12px;
       }
       .form > .full {
         grid-column: 1 / -1;
+      }
+      /* A field with no info icon keeps the room of one, so it lines up with
+         the fields under it that have. */
+      .form > .gutter {
+        margin-right: 42px;
       }
       .actions {
         display: flex;
@@ -255,7 +262,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
       <div class="form">
         <!-- The forge first: it decides what is left to type, the username sent
              beside the token, and how that token is made. -->
-        <mat-form-field class="full">
+        <mat-form-field class="gutter">
           <mat-label i18n="@@Git_forge">Forge</mat-label>
           <mat-select [value]="provider().id" (valueChange)="pick($event)">
             @for (f of choices(); track f.id) {
@@ -265,7 +272,6 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
         </mat-form-field>
 
         <app-form-field
-          class="full"
           i18n-label="@@Name"
           label="Name"
           i18n-info="@@Git_location_name_info"

@@ -514,10 +514,14 @@ func (a *API) pushConfiguration(w http.ResponseWriter, r *http.Request, actor st
 	author, email := commitAuthor(row, actor)
 	remote.AuthorName, remote.AuthorEmail = author, email
 	msg := pushMessage(c, author)
-	rev, err := driver.Commit(r.Context(), remote, msg, files, c.RemoteRev)
+	rev, err := driver.Commit(r.Context(), remote, msg, files)
+	// A push replaces this location's directory, whatever is there. The one
+	// refusal left is somebody pushing at the very same moment, several times
+	// running - and pushing again is the cure. 422, not 409: the console
+	// answers 409 with "reload".
 	if errors.Is(err, confrepo.ErrMoved) {
-		writeErr(w, http.StatusConflict, fmt.Sprintf(
-			"%s has moved since %s was last read from it: pull it into a copy and compare before pushing",
+		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"Nothing was pushed: %s kept moving while %s was being written - somebody else pushing at the same moment. Push again.",
 			row.Name, c.Name))
 		return
 	}

@@ -60,9 +60,9 @@ func (a *API) gitTools() []mcp.Tool {
 			Description: "Commit a SAVED configuration to the git location it is bound to, and push. " +
 				"The commit is attributed to the account this token belongs to. \n\nIt pushes the saved " +
 				"copy, not the running state: if you want what the gateway is running right now, call " +
-				"save_configuration first and push that. \n\nIf the branch has moved since this " +
-				"configuration was last read from it, this REFUSES - pull it into a copy and compare " +
-				"rather than asking again. There is no force. Enterprise edition.",
+				"save_configuration first and push that. \n\nA push REPLACES what the location's " +
+				"directory holds - as a pull replaces the saved configuration - and only that directory: " +
+				"what it replaced stays in the git history. Enterprise edition.",
 			Schema: object(map[string]any{
 				"configuration": str("The saved configuration's name, as list_configurations gives it."),
 				"location": str("Optional: a git location name to bind it to first, when it has none " +
@@ -291,10 +291,10 @@ func (a *API) toolPushConfiguration(ctx context.Context, args json.RawMessage) (
 	if err != nil {
 		return nil, err
 	}
-	rev, err := driver.Commit(ctx, target, pushMessage(c, author), files, c.RemoteRev)
+	rev, err := driver.Commit(ctx, target, pushMessage(c, author), files)
 	if errors.Is(err, confrepo.ErrMoved) {
-		return nil, fmt.Errorf("%s has moved since %s was last read from it, so nothing was pushed: "+
-			"pull it into a copy and compare before pushing. There is no force", remote.Name, c.Name)
+		return nil, fmt.Errorf("nothing was pushed: %s kept moving while %s was being written - "+
+			"somebody else pushing at the same moment. Push again", remote.Name, c.Name)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", remote.Name, err)

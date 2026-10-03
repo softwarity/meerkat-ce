@@ -256,7 +256,7 @@ type Row = SavedConfiguration & { current?: boolean };
                nothing. Hence a button beside that one rather than a screen of
                its own. -->
           <button matButton="outlined" ee-feature="configurations" [disabled]="busy()" (click)="pullFromGit()">
-            <mat-icon>cloud_download</mat-icon>
+            <mat-icon [class.spin]="workingId() === 'new'">{{ workingId() === 'new' ? 'sync' : 'cloud_download' }}</mat-icon>
             <ng-container i18n="@@Import_from_git">Import from git</ng-container>
             <app-ee-lock
               feature="configurations"
@@ -266,6 +266,7 @@ type Row = SavedConfiguration & { current?: boolean };
           </button>
         </div>
         <input #picker type="file" accept=".yaml,.yml,.json,.zip" (change)="pick($event)" />
+
 
         <mat-table [dataSource]="rows()">
           <ng-container matColumnDef="name">
@@ -321,7 +322,12 @@ type Row = SavedConfiguration & { current?: boolean };
             <mat-header-cell *matHeaderCellDef i18n="@@Description">Description</mat-header-cell>
             <mat-cell *matCellDef="let c">
               <span class="desc">{{ c.description }}</span>
-              @if (!c.current && remoteOf(c); as r) {
+              @if (workingId() === c.id) {
+                <span class="git working" role="status">
+                  <mat-icon class="spin">sync</mat-icon>
+                  {{ working() }}
+                </span>
+              } @else if (!c.current && remoteOf(c); as r) {
                 <!-- The state in words beside the location's name; where it
                      is exactly, on hover, one part per line. -->
                 <span
@@ -513,6 +519,10 @@ export class ConfigurationManagementComponent {
   protected readonly cap = computed(() => this.edition.value()?.configurationCap ?? 0);
   protected readonly current = signal<CurrentConfiguration | null>(null);
   protected readonly busy = signal(false);
+  // The git exchange under way: on which row, and in a few words. A pull into
+  // a new configuration has no row yet - its button says it instead.
+  protected readonly workingId = signal('');
+  protected readonly working = signal('');
   protected readonly columns = ['name', 'description', 'updated'];
   protected readonly document = signal('');
   // The git locations, so a row can name where it lives without a call per row.
@@ -646,12 +656,15 @@ export class ConfigurationManagementComponent {
     }
   }
 
+  // What is KNOWN, not what is hoped: when this gateway and the repository
+  // last agreed. Whether somebody changed it there since is only a pull away -
+  // and a push says so if they did.
   protected syncLabel(c: SavedConfiguration): string {
     switch (this.syncOf(c)) {
       case 'level':
-        return $localize`:@@Git_up_to_date:up to date`;
+        return $localize`:@@Git_synced_at:synced ${this.when(c.remoteAt ?? 0)}:when:`;
       case 'ahead':
-        return $localize`:@@Git_changed_since_push:changed since push`;
+        return $localize`:@@Git_changed_since_sync:changed here since`;
       default:
         return $localize`:@@Git_never_pushed:never pushed`;
     }
@@ -663,7 +676,7 @@ export class ConfigurationManagementComponent {
     const where = [r.url.replace(/^https?:\/\//, '').replace(/\.git$/, ''), $localize`:@@Git_branch_line:branch ${r.branch}:branch:`];
     if (r.dir) where.push($localize`:@@Git_dir_line:directory ${r.dir}:dir:`);
     if (this.syncOf(c) === 'level') {
-      where.push('', $localize`:@@Git_level_note:As of this gateway's last push or pull: pull to see whether anyone else has changed it since.`);
+      where.push('', $localize`:@@Git_synced_note2:Synced at the last push or pull. A pull replaces this configuration with the repository's version; a push replaces the repository's with this one.`);
     }
     return where.join('\n');
   }
@@ -996,14 +1009,17 @@ export class ConfigurationManagementComponent {
     );
     if (!choice?.remoteId) return;
     this.busy.set(true);
+    this.workingId.set('new');
     this.api.pullNewConfiguration(choice.remoteId, choice.name).subscribe({
       next: (result) => {
         this.busy.set(false);
+        this.workingId.set('');
         this.reload();
         this.showPull(result, choice.remoteId);
       },
       error: (err: unknown) => {
         this.busy.set(false);
+        this.workingId.set('');
         this.fail(err);
       },
     });
@@ -1014,14 +1030,18 @@ export class ConfigurationManagementComponent {
   // reading the wrong platform.
   protected pullInto(c: SavedConfiguration): void {
     this.busy.set(true);
+    this.workingId.set(c.id);
+    this.working.set($localize`:@@Git_pulling_row:pulling from ${this.remoteName(c.remoteId ?? '')}:location:...`);
     this.api.pullConfiguration(c.id).subscribe({
       next: (result) => {
         this.busy.set(false);
+        this.workingId.set('');
         this.reload();
         this.showPull(result, c.remoteId ?? '');
       },
       error: (err: unknown) => {
         this.busy.set(false);
+        this.workingId.set('');
         this.fail(err);
       },
     });
@@ -1106,17 +1126,32 @@ export class ConfigurationManagementComponent {
       this.busy.set(false);
     }
     this.busy.set(true);
+    const where = this.remoteName(remoteId);
+    this.workingId.set(c.id);
+    this.working.set($localize`:@@Git_pushing_row:pushing to ${where}:location:...`);
     this.api.pushConfiguration(c.id).subscribe({
       next: () => {
         this.busy.set(false);
+        this.workingId.set('');
         this.reload();
-        this.snack.open($localize`:@@Pushed_to_git:Pushed`, undefined, { duration: 2500 });
+        this.snack.open($localize`:@@Pushed_to_git_named:${c.name}:name: pushed to ${where}:location:`, undefined, {
+          duration: 3500,
+        });
       },
       error: (err: unknown) => {
         this.busy.set(false);
+        this.workingId.set('');
         this.fail(err);
       },
     });
+  }
+
+  private when(ts: number): string {
+    return ts ? new Date(ts * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
+  }
+
+  private remoteName(id: string): string {
+    return this.remotes().find((r) => r.id === id)?.name ?? $localize`:@@Git_the_repository:the repository`;
   }
 
   private byName(name: string): SavedConfiguration | undefined {
