@@ -114,6 +114,13 @@
   configuration are no longer locked on the Community edition** - the gateway
   always allowed them; the console had them greyed. The Community edition keeps
   three saved configurations at a time.
+- **A git location starts with its forge**: GitHub, GitLab, Bitbucket Cloud,
+  Azure DevOps, Gitea / Forgejo or another server. A known forge fills in its
+  host (editable for a self-hosted GitLab or Forgejo) and only the repository
+  is typed; the steps to make the token are written for that forge, with a link
+  to this repository's own token page, and the username is asked only where
+  the forge leaves it open. The forge is kept, so a self-hosted GitLab still
+  sends oauth2.
 - **A saved configuration says where it stands against git in words** -
   *up to date*, *changed since push*, *never pushed* - beside its location;
   the repository, branch and directory are on hover, one per line.

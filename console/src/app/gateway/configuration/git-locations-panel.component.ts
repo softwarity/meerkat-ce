@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -40,6 +41,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatSelectModule,
     MatTableModule,
     MatTooltipModule,
     RowActionsDirective,
@@ -130,6 +132,38 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
         width: 18px;
         height: 18px;
       }
+      .creds {
+        margin: 0 0 12px;
+        font-size: 0.82rem;
+        color: var(--mat-sys-on-surface-variant);
+      }
+      .creds h3 {
+        margin: 4px 0 4px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--mat-sys-on-surface);
+      }
+      .creds ol {
+        margin: 0 0 6px;
+        padding-left: 20px;
+        line-height: 1.45;
+      }
+      .creds a {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--mat-sys-primary);
+      }
+      .creds a mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+      .fixed-user {
+        margin: -4px 0 12px;
+        font-size: 0.8rem;
+        color: var(--mat-sys-on-surface-variant);
+      }
       .verdict {
         display: flex;
         align-items: center;
@@ -219,6 +253,17 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
 
     <div class="body">
       <div class="form">
+        <!-- The forge first: it decides what is left to type, the username sent
+             beside the token, and how that token is made. -->
+        <mat-form-field class="full">
+          <mat-label i18n="@@Git_forge">Forge</mat-label>
+          <mat-select [value]="provider().id" (valueChange)="pick($event)">
+            @for (f of choices(); track f.id) {
+              <mat-option [value]="f.id">{{ f.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
         <app-form-field
           class="full"
           i18n-label="@@Name"
@@ -229,22 +274,57 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           <input matInput [value]="form().name || ''" (input)="set('name', $any($event.target).value)" />
         </app-form-field>
 
-        <app-form-field
-          class="full"
-          icon="link"
-          i18n-label="@@Repository_URL"
-          label="Repository URL"
-          i18n-info="@@Repository_URL_info"
-          info="An https URL. SSH is not supported: it would need a private key in the vault and a host-key policy."
-        >
-          <input
-            matInput
-            [value]="form().url || ''"
-            (input)="set('url', $any($event.target).value)"
-            placeholder="https://github.com/acme/meerkat-config.git"
-            spellcheck="false"
-          />
-        </app-form-field>
+        @if (provider().host) {
+          <!-- A known forge: its host is filled in, only the repository is
+               typed. The URL is made from the two. -->
+          @if (provider().hostEditable) {
+            <app-form-field
+              i18n-label="@@Git_host"
+              label="Host"
+              i18n-info="@@Git_host_info"
+              info="This forge's own host is filled in; change it for a self-hosted instance."
+            >
+              <input
+                matInput
+                [value]="host()"
+                (input)="setHost($any($event.target).value)"
+                spellcheck="false"
+              />
+            </app-form-field>
+          }
+          <app-form-field
+            [class.full]="!provider().hostEditable"
+            icon="link"
+            i18n-label="@@Git_repository"
+            label="Repository"
+            [info]="urlPreview()"
+          >
+            <input
+              matInput
+              [value]="path()"
+              (input)="setPath($any($event.target).value)"
+              [placeholder]="provider().path ?? ''"
+              spellcheck="false"
+            />
+          </app-form-field>
+        } @else {
+          <app-form-field
+            class="full"
+            icon="link"
+            i18n-label="@@Repository_URL"
+            label="Repository URL"
+            i18n-info="@@Repository_URL_info"
+            info="An https URL. SSH is not supported: it would need a private key in the vault and a host-key policy."
+          >
+            <input
+              matInput
+              [value]="form().url || ''"
+              (input)="set('url', $any($event.target).value)"
+              placeholder="https://github.com/acme/meerkat-config.git"
+              spellcheck="false"
+            />
+          </app-form-field>
+        }
 
         <!-- An info icon it would not strictly need: that icon is a GUTTER,
              and a field without one runs past the field beside it. -->
@@ -277,11 +357,33 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           />
         </app-form-field>
 
+        <!-- How the token is made, in this forge's own menus, with the link to
+             the very page - the steps are the afternoon this screen saves. -->
+        <div class="full creds">
+          <h3 i18n="@@Git_token_steps">The access token</h3>
+          <ol>
+            @for (step of provider().steps ?? []; track step) {
+              <li>{{ step }}</li>
+            }
+          </ol>
+          @if (createLink(); as link) {
+            <a [href]="link" target="_blank" rel="noopener">
+              <mat-icon>open_in_new</mat-icon>
+              <ng-container i18n="@@Git_open_token_page">Open the page that makes it</ng-container>
+            </a>
+          } @else if (provider().create) {
+            <span class="wait" i18n="@@Git_fill_repository_first"
+              >Fill in the repository first: the link opens its own token page.</span
+            >
+          }
+        </div>
+
         <!-- No at= here: unlike a relay password or a client secret, a token
              never sits in this table as a literal to be moved out - the API
              refuses one outright - so the only path is paste it, stash it in
              the vault, keep the reference. -->
         <app-secret-field
+          [class.full]="!userShown()"
           i18n-label="@@Access_token"
           label="Access token"
           [info]="tokenInfo()"
@@ -290,20 +392,26 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           (valueChange)="set('tokenRef', $event)"
         />
 
-        <app-form-field
-          i18n-label="@@Token_username"
-          label="Token username"
-          i18n-info="@@Token_username_info"
-          info="Sent beside the token. Leave it empty for this forge's default - GitHub ignores it, GitLab wants oauth2, Bitbucket refuses anything else than x-token-auth, and all three report a wrong one as an authentication failure."
-        >
-          <input
-            matInput
-            [value]="form().tokenUser || ''"
-            (input)="set('tokenUser', $any($event.target).value)"
-            [placeholder]="forge()?.user || 'git'"
-            spellcheck="false"
-          />
-        </app-form-field>
+        @if (userShown()) {
+          <app-form-field
+            i18n-label="@@Token_username"
+            label="Token username"
+            i18n-info="@@Token_username_info2"
+            info="Sent beside the token: on Gitea and Forgejo, the account the token belongs to; on another server, the name it expects."
+          >
+            <input
+              matInput
+              [value]="form().tokenUser || ''"
+              (input)="set('tokenUser', $any($event.target).value)"
+              [placeholder]="provider().user"
+              spellcheck="false"
+            />
+          </app-form-field>
+        } @else if (provider().userFixed) {
+          <p class="full fixed-user" i18n="@@Git_user_fixed">
+            Sent with the username <code>{{ provider().user }}</code>, the only one {{ provider().name }} accepts beside this token.
+          </p>
+        }
 
         <app-form-field
           class="full"
@@ -321,16 +429,6 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           />
         </app-form-field>
       </div>
-
-      @if (forge(); as f) {
-        <p class="forge">
-          <mat-icon>key</mat-icon>
-          <span>{{ f.name }}</span>
-          @if (f.create) {
-            <a [href]="f.create" target="_blank" rel="noopener" i18n="@@Create_a_token">Create a token</a>
-          }
-        </p>
-      }
 
       @if (verdict(); as v) {
         <div class="verdict" [class.bad]="!v.ok">
@@ -462,17 +560,42 @@ export class GitLocationsPanelComponent {
   private readonly forges = signal<ConfigForge[]>([]);
   private readonly generic = signal<ConfigForge | null>(null);
 
-  // Which forge this URL points at, matched on the HOST - so the permissions to
-  // grant and the username default appear as the URL is typed, before anything
-  // is saved and before anyone clicks Check.
-  protected readonly forge = computed<ConfigForge | null>(() => {
-    const host = this.hostOf(this.form().url ?? '');
-    if (!host) return null;
-    const match = this.forges().find((f) =>
-      (f.hosts ?? []).some((h) => host === h || host.endsWith('.' + h)),
+  // The forge picked - for a row from before the choice, the one its URL's host
+  // gives away. It decides what is left to type, the username sent beside the
+  // token, and the steps that make that token.
+  protected readonly choices = computed(() => [
+    ...this.forges(),
+    ...(this.generic() ? [this.generic()!] : []),
+  ]);
+  protected readonly provider = computed<ConfigForge>(() => {
+    const id = this.form().provider;
+    return (
+      this.choices().find((f) => f.id === id) ??
+      this.byHost(this.form().url ?? '') ??
+      this.forges().find((f) => f.id === 'github') ?? {
+        id: 'generic', name: '', user: 'git', needs: '',
+      }
     );
-    return match ?? this.generic();
   });
+
+  // A known forge's URL is made of its host and the repository typed after it.
+  protected readonly host = signal('');
+  protected readonly path = signal('');
+  protected readonly urlPreview = computed(() => this.form().url || (this.provider().path ?? ''));
+
+  // The token page of THIS repository, once enough is typed to name it.
+  protected readonly createLink = computed(() => {
+    const create = this.provider().create;
+    if (!create) return '';
+    const path = this.path().replace(/\.git$/, '');
+    if (create.includes('{path}') && !path) return '';
+    return create.replace('{host}', this.host() || this.provider().host || '').replace('{path}', path);
+  });
+
+  // The username is a choice only where the forge leaves it to you: Gitea and
+  // Forgejo want the token's own account, another server its own rule. GitHub
+  // and Azure ignore it; GitLab and Bitbucket accept only theirs.
+  protected readonly userShown = computed(() => ['gitea', 'generic'].includes(this.provider().id));
 
   // The explanation, once, behind the header's help icon rather than as a
   // paragraph under the title: it is read on the first visit and never again,
@@ -486,7 +609,7 @@ export class GitLocationsPanelComponent {
   // text that saves an afternoon, and a tooltip is where a long sentence can
   // live without pushing the list off the screen.
   protected readonly tokenInfo = computed(() => {
-    const f = this.forge();
+    const f = this.provider();
     const rule = $localize`:@@Token_is_a_reference:A vault reference, never the token itself: paste it and the key button puts it in the vault.`;
     return f ? rule + ' ' + f.needs + (f.note ? ' ' + f.note : '') : rule;
   });
@@ -509,6 +632,7 @@ export class GitLocationsPanelComponent {
       next: (t) => {
         this.forges.set(t.forges);
         this.generic.set(t.generic);
+        if (!this.form().provider) this.pick('github');
       },
       error: () => this.forges.set([]),
     });
@@ -535,14 +659,62 @@ export class GitLocationsPanelComponent {
 
   protected clear(): void {
     this.editingId.set('');
-    this.form.set({ branch: 'main' });
+    this.form.set({ branch: 'main', provider: this.provider().id });
+    this.splitUrl('');
     this.verdict.set(null);
   }
 
   protected edit(r: ConfigRemote): void {
     this.editingId.set(r.id);
-    this.form.set({ ...r });
+    this.form.set({ ...r, provider: r.provider || this.byHost(r.url)?.id || 'generic' });
+    this.splitUrl(r.url);
     this.verdict.set(null);
+  }
+
+  // Another forge: its host is filled in, the repository typed so far kept.
+  protected pick(id: string): void {
+    const f = this.choices().find((c) => c.id === id);
+    this.form.update((x) => ({ ...x, provider: id, tokenUser: '' }));
+    if (f?.host) {
+      this.host.set(f.host);
+      this.compose();
+    }
+    this.verdict.set(null);
+  }
+
+  protected setHost(v: string): void {
+    this.host.set(v.trim().replace(/^https?:\/\//, '').replace(/\/+$/, ''));
+    this.compose();
+  }
+
+  protected setPath(v: string): void {
+    this.path.set(v.trim().replace(/^\/+/, '').replace(/\.git$/, ''));
+    this.compose();
+  }
+
+  // The URL a known forge's fields make: https://host/path.git.
+  private compose(): void {
+    const host = this.host() || this.provider().host || '';
+    const path = this.path();
+    this.set('url', host && path ? `https://${host}/${path}.git` : '');
+  }
+
+  // The other way round, for a row being edited.
+  private splitUrl(url: string): void {
+    try {
+      const u = new URL(url);
+      this.host.set(u.host);
+      this.path.set(u.pathname.replace(/^\/+/, '').replace(/\.git$/, ''));
+    } catch {
+      this.host.set(this.provider().host ?? '');
+      this.path.set('');
+    }
+  }
+
+  private byHost(url: string): ConfigForge | undefined {
+    const host = this.hostOf(url);
+    if (!host) return undefined;
+    return this.forges().find((f) => (f.hosts ?? []).some((h) => host === h || host.endsWith('.' + h)));
   }
 
   // A copy keeps the repository, the branch and the credential, and takes a new
@@ -550,7 +722,13 @@ export class GitLocationsPanelComponent {
   // was for the operator to edit rather than blanked.
   protected duplicate(r: ConfigRemote): void {
     this.editingId.set('');
-    this.form.set({ ...r, id: '', name: r.name + ' (copy)' });
+    this.form.set({
+      ...r,
+      id: '',
+      name: r.name + ' (copy)',
+      provider: r.provider || this.byHost(r.url)?.id || 'generic',
+    });
+    this.splitUrl(r.url);
     this.verdict.set(null);
   }
 

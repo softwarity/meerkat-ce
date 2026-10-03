@@ -157,8 +157,13 @@ a literal - a location is a row the console reads and a snapshot carries.
 
 What to grant, and the **username to send beside the token**, differ per forge -
 and they all report a wrong username as the same *authentication failed* a wrong
-token gives, which is how a perfectly good token costs somebody an afternoon. The
-form says both as you type the URL:
+token gives, which is how a perfectly good token costs somebody an afternoon. So
+the form starts with the **forge**: GitHub, GitLab, Bitbucket Cloud, Azure DevOps,
+Gitea / Forgejo, or another git server. A known forge fills in its host - change it
+for a self-hosted GitLab or Forgejo - and you type only the repository
+(`owner/repository`); the URL is made from the two. Under it, the steps that make the
+token in that forge's own menus, with a link to the token page of this very
+repository, and the username it sends - asked only where the forge leaves it to you:
 
 | Forge | Username | What the token needs |
 |---|---|---|

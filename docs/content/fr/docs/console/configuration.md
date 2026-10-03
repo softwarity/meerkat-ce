@@ -163,7 +163,13 @@ Ce qu'il faut accorder, et le **nom d'utilisateur à envoyer à côté du jeton*
 diffèrent d'une forge à l'autre - et toutes rapportent un mauvais nom
 d'utilisateur comme le même « authentication failed » qu'un mauvais jeton, ce qui
 fait qu'un jeton parfaitement valide coûte un après-midi à quelqu'un. Le
-formulaire dit les deux au fur et à mesure que vous tapez l'URL :
+formulaire commence donc par la **forge** : GitHub, GitLab, Bitbucket Cloud, Azure
+DevOps, Gitea / Forgejo, ou un autre serveur git. Une forge connue remplit son hôte -
+à changer pour un GitLab ou un Forgejo auto-hébergé - et vous ne tapez que le dépôt
+(`propriétaire/dépôt`) ; l'URL est faite des deux. En dessous, les étapes qui
+fabriquent le jeton dans les menus de cette forge, avec un lien vers la page des
+jetons de ce dépôt-là, et le nom d'utilisateur envoyé - demandé seulement là où la
+forge vous laisse le choix :
 
 | Forge | Nom d'utilisateur | Ce que le jeton demande |
 |---|---|---|

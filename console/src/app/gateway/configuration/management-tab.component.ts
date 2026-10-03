@@ -990,6 +990,7 @@ export class ConfigurationManagementComponent {
         .open(PickLocationDialogComponent, {
           data: { way: 'pull', taken: this.saved().map((c) => c.name) },
           width: '600px',
+          maxWidth: '92vw',
         })
         .afterClosed(),
     );
@@ -1030,7 +1031,10 @@ export class ConfigurationManagementComponent {
     const r = this.remotes().find((o) => o.id === remoteId);
     this.dialog.open(PullResultDialogComponent, {
       data: { result, location: r?.name ?? '' },
+      // Wider than Material's 560px, set on the dialog and not on its
+      // content: content wider than its dialog scrolls sideways.
       width: '680px',
+      maxWidth: '92vw',
     });
   }
 
@@ -1085,6 +1089,7 @@ export class ConfigurationManagementComponent {
           .open(PickLocationDialogComponent, {
             data: { way: 'push', configuration: c.name, selected: remoteId },
             width: '600px',
+            maxWidth: '92vw',
           })
           .afterClosed(),
       );

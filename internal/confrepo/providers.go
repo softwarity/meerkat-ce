@@ -45,34 +45,68 @@ type Provider struct {
 	Create string `json:"create,omitempty"`
 	// Note is the one extra thing that catches people out.
 	Note string `json:"note,omitempty"`
+
+	// What the console's form is built from, once this forge is picked.
+	//
+	// Host is its own host, which the form fills in; HostEditable says a
+	// self-hosted instance is common enough to offer changing it (a company
+	// GitLab, a Forgejo). Path says what is left to type after the host -
+	// "owner/repository" - and an empty Host means the whole URL is typed.
+	Host         string `json:"host,omitempty"`
+	HostEditable bool   `json:"hostEditable,omitempty"`
+	Path         string `json:"path,omitempty"`
+	// Steps are how the token is made, in this forge's own menus. Create may
+	// carry {host} and {path}, which the console fills from the form, so the
+	// link lands on the very page of this repository.
+	Steps []string `json:"steps,omitempty"`
 }
 
 // Providers is the table, in the order a list shows them.
 var Providers = []Provider{
 	{
 		ID: "github", Name: "GitHub", Hosts: []string{"github.com"},
+		Host: "github.com", Path: "owner/repository",
 		User: "x-access-token",
 		Needs: "A fine-grained token, Repository access limited to this repository, " +
 			"Repository permissions > Contents: Read and write. Nothing else - and not a " +
 			"classic token with repo, which grants full control of every private repository " +
 			"the account can reach.",
-		Create: "https://github.com/settings/personal-access-tokens",
-		Note:   "The username is ignored by GitHub; any non-empty value works.",
+		Create: "https://github.com/settings/personal-access-tokens/new",
+		Steps: []string{
+			"Create a fine-grained token (the link opens the page).",
+			"Resource owner: the account or organisation that owns the repository. Repository access: Only select repositories, and pick this one.",
+			"Repository permissions > Contents: Read and write. Nothing else - not a classic token, which reaches every private repository of the account.",
+			"Generate it, copy it, paste it below: the key button puts it in the vault.",
+		},
+		Note: "The username is ignored by GitHub; any non-empty value works.",
 	},
 	{
 		ID: "gitlab", Name: "GitLab", Hosts: []string{"gitlab.com"},
+		Host: "gitlab.com", HostEditable: true, Path: "group/project",
 		User: "oauth2", UserFixed: true,
 		Needs: "A project access token with the write_repository scope and the Maintainer role " +
 			"(Developer is enough when the branch is not protected). A personal access token " +
 			"with write_repository works too.",
-		Create: "https://gitlab.com/-/user_settings/personal_access_tokens",
-		Note:   "GitLab wants the username oauth2 beside the token, whatever the token is called.",
+		Create: "https://{host}/{path}/-/settings/access_tokens",
+		Steps: []string{
+			"In the project, Settings > Access tokens > Add new token (the link opens the page).",
+			"Role: Maintainer - Developer is enough when the branch is not protected. Scope: write_repository.",
+			"Create it, copy it, paste it below: the key button puts it in the vault.",
+		},
+		Note: "GitLab wants the username oauth2 beside the token, whatever the token is called. A company GitLab: change the host.",
 	},
 	{
 		ID: "bitbucket", Name: "Bitbucket Cloud", Hosts: []string{"bitbucket.org"},
+		Host: "bitbucket.org", Path: "workspace/repository",
 		User: "x-token-auth", UserFixed: true,
 		Needs: "A repository access token with the repository:write scope (repository:read is " +
 			"not enough to push).",
+		Create: "https://bitbucket.org/{path}/admin/access-tokens",
+		Steps: []string{
+			"In the repository, Repository settings > Security > Access tokens > Create Repository Access Token (the link opens the page).",
+			"Scope: Repositories > Write. Read is not enough to push.",
+			"Create it, copy it, paste it below: the key button puts it in the vault.",
+		},
 		Note: "Bitbucket REFUSES any username but x-token-auth for an access token. An app " +
 			"password is the other way in, and that one takes your account name as the username.",
 	},
@@ -82,14 +116,27 @@ var Providers = []Provider{
 		Needs: "A personal access token with Code: Read & Write, scoped to the project that " +
 			"holds this repository.",
 		Create: "https://dev.azure.com",
-		Note:   "Azure ignores the username; it reads the token from the password.",
+		Steps: []string{
+			"Copy the repository's HTTPS clone URL (Repos > Clone) into the URL field.",
+			"User settings > Personal access tokens > New Token, in the organisation that holds it.",
+			"Scopes: Custom defined, Code > Read & write.",
+			"Create it, copy it, paste it below: the key button puts it in the vault.",
+		},
+		Note: "Azure ignores the username; it reads the token from the password.",
 	},
 	{
 		ID: "gitea", Name: "Gitea or Forgejo", Hosts: []string{"codeberg.org"},
+		Host: "codeberg.org", HostEditable: true, Path: "owner/repository",
 		User: "git",
 		Needs: "An access token with write:repository. On Gitea and Forgejo the username is the " +
 			"account the token belongs to, so put that in the username field if git is refused.",
-		Note: "Self-hosted: match it by hand, the host is your own.",
+		Create: "https://{host}/user/settings/applications",
+		Steps: []string{
+			"Settings > Applications > Generate new token (the link opens the page).",
+			"Permissions: repository - Read and write.",
+			"Generate it, copy it, paste it below - and put the account it belongs to as the username.",
+		},
+		Note: "Self-hosted: change the host to your own.",
 	},
 }
 
@@ -100,6 +147,33 @@ var GenericProvider = Provider{
 	ID: "generic", Name: "Another git server", User: "git",
 	Needs: "A token or password allowed to read and write this repository's contents, " +
 		"and the username that forge expects beside it.",
+	Steps: []string{
+		"Make a token or password that may read and write this repository's contents, in that server's own settings.",
+		"Paste it below - the key button puts it in the vault - and the username that server expects beside it.",
+	},
+}
+
+// ProviderByID finds a forge of the table, the generic one included.
+func ProviderByID(id string) (Provider, bool) {
+	if id == GenericProvider.ID {
+		return GenericProvider, true
+	}
+	for _, p := range Providers {
+		if p.ID == id {
+			return p, true
+		}
+	}
+	return Provider{}, false
+}
+
+// ProviderOf is the forge a location was set up for, and the URL's host for
+// one set up before the choice existed. A self-hosted GitLab answers to no
+// known host: only the choice knows it wants oauth2.
+func ProviderOf(r Remote) Provider {
+	if p, ok := ProviderByID(r.Provider); ok {
+		return p
+	}
+	return ProviderFor(r.URL)
 }
 
 // ProviderFor matches a repository URL to what is known about its forge.
@@ -134,12 +208,12 @@ func BasicUser(r Remote) string {
 	if u := strings.TrimSpace(r.User); u != "" {
 		return u
 	}
-	return ProviderFor(r.URL).User
+	return ProviderOf(r).User
 }
 
 // Paperwork is the sentence to add to a refused credential, so that "403" turns
 // into something the operator can act on without leaving the screen.
-func Paperwork(repo string) string {
-	p := ProviderFor(repo)
+func Paperwork(r Remote) string {
+	p := ProviderOf(r)
 	return p.Name + " wants: " + p.Needs
 }

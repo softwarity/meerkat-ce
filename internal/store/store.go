@@ -810,7 +810,10 @@ CREATE TABLE IF NOT EXISTS config_remotes (
   author_name  TEXT NOT NULL DEFAULT '',
   author_email TEXT NOT NULL DEFAULT '',
   created_at   BIGINT NOT NULL DEFAULT 0,
-  updated_at   BIGINT NOT NULL DEFAULT 0
+  updated_at   BIGINT NOT NULL DEFAULT 0,
+  -- The forge picked when it was set up (confrepo.Providers): it decides the
+  -- username beside the token for a self-hosted one no host gives away.
+  provider     TEXT NOT NULL DEFAULT ''
 );
 
 -- Restore points (CFG-06): the gateway's own tape, written whenever a change

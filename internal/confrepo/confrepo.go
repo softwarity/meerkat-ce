@@ -43,10 +43,13 @@ import (
 // package never reads the vault, and nothing here keeps a credential past the
 // call it was handed to.
 type Remote struct {
-	Name   string
-	URL    string
-	Branch string
-	Dir    string
+	Name string
+	// Provider is the forge the location was set up for (Providers), "" for
+	// one set up before the choice: then the URL's host decides.
+	Provider string
+	URL      string
+	Branch   string
+	Dir      string
 	// User is the HTTP basic username sent beside the token. Empty means the
 	// forge's default (see BasicUser): every forge decided this differently and
 	// two of them refuse anything else.

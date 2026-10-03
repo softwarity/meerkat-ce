@@ -111,6 +111,8 @@ func (a *API) listForges(w http.ResponseWriter, _ *http.Request, _ store.User) {
 
 // remoteBody is what the console sends for a location.
 type remoteBody struct {
+	// Provider is the forge picked (confrepo.Providers, or "generic").
+	Provider    string `json:"provider"`
 	Name        string `json:"name"`
 	URL         string `json:"url"`
 	Branch      string `json:"branch"`
@@ -152,6 +154,18 @@ func (b remoteBody) into(row *store.ConfigRemote) error {
 		return errors.New("the access token must be a vault reference (${name}), never the token itself: " +
 			"put it in the vault and refer to it")
 	}
+	provider := strings.TrimSpace(b.Provider)
+	if provider != "" {
+		if _, ok := confrepo.ProviderByID(provider); !ok {
+			var known []string
+			for _, p := range confrepo.Providers {
+				known = append(known, p.ID)
+			}
+			return fmt.Errorf("unknown forge %q (allowed: %s, %s)", provider,
+				strings.Join(known, ", "), confrepo.GenericProvider.ID)
+		}
+	}
+	row.Provider = provider
 	row.Name, row.URL, row.Branch = name, url, branch
 	row.Dir = confrepo.CleanDir(b.Dir)
 	row.TokenRef = ref
@@ -680,7 +694,7 @@ func (a *API) remoteNameFree(w http.ResponseWriter, r *http.Request, name, excep
 func remoteMeta(row store.ConfigRemote) map[string]string {
 	return map[string]string{
 		"name": row.Name, "url": row.URL, "branch": row.Branch, "dir": row.Dir,
-		"tokenRef": row.TokenRef, "tokenUser": row.TokenUser,
+		"tokenRef": row.TokenRef, "tokenUser": row.TokenUser, "provider": row.Provider,
 		"authorName": row.AuthorName, "authorEmail": row.AuthorEmail,
 	}
 }

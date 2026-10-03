@@ -41,9 +41,6 @@ export type PickLocationOutcome = { remoteId: string; name: string };
   ],
   styles: [
     `
-      mat-dialog-content {
-        width: min(600px, 86vw);
-      }
       mat-radio-button {
         display: block;
       }
@@ -190,9 +187,6 @@ export class PickLocationDialogComponent {
   imports: [MatButtonModule, MatDialogModule, MatIconModule, PlanTableComponent],
   styles: [
     `
-      mat-dialog-content {
-        width: min(680px, 86vw);
-      }
       .from {
         margin: 0 0 4px;
         font-size: 0.85rem;
@@ -235,15 +229,22 @@ export class PickLocationDialogComponent {
           <mat-icon>error</mat-icon>
           <p>{{ data.result.planError }}</p>
         </div>
-      } @else {
+      } @else if (data.result.plan; as plan) {
         <p class="from" i18n="@@What_activating_would_change">
           What serving it would change:
         </p>
         <app-plan-table
-          [plan]="data.result.plan ?? null"
+          [plan]="plan"
           i18n-nothing="@@Pull_no_change"
           nothing="This gateway already matches what the repository holds."
         />
+      } @else {
+        <!-- No plan sent back: nothing would change, said rather than left
+             as a heading over an empty list. -->
+        <div class="note">
+          <mat-icon>check_circle</mat-icon>
+          <p i18n="@@Pull_no_change">This gateway already matches what the repository holds.</p>
+        </div>
       }
       <div class="note">
         <mat-icon>info</mat-icon>

@@ -365,7 +365,7 @@ func (a *API) gitRemote(ctx context.Context, row store.ConfigRemote) (confrepo.D
 		return nil, confrepo.Remote{}, err
 	}
 	target := confrepo.Remote{
-		Name: row.Name, URL: row.URL, Branch: row.Branch, Dir: row.Dir, User: row.TokenUser,
+		Name: row.Name, Provider: row.Provider, URL: row.URL, Branch: row.Branch, Dir: row.Dir, User: row.TokenUser,
 		AuthorName: row.AuthorName, AuthorEmail: row.AuthorEmail,
 	}
 	if row.TokenRef != "" {

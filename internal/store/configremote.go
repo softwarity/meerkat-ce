@@ -23,10 +23,13 @@ import (
 // the whole reason this row can be read by the console, dumped in a snapshot
 // and shown in an audit diff: a reference is public, a literal never is.
 type ConfigRemote struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	URL    string `json:"url"`
-	Branch string `json:"branch"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Provider is the forge picked when it was set up (confrepo.Providers),
+	// "" for one set up before the choice existed.
+	Provider string `json:"provider,omitempty"`
+	URL      string `json:"url"`
+	Branch   string `json:"branch"`
 	// Dir is the directory inside the repository, "" for its root. It is what
 	// lets several locations share one repository, one per customer platform.
 	Dir      string `json:"dir"`
@@ -71,15 +74,15 @@ func (s *Store) SaveConfigRemote(ctx context.Context, r *ConfigRemote) error {
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO config_remotes
 		   (id, name, url, branch, dir, token_ref, token_user, author_name, author_email,
-		    created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		    created_at, updated_at, provider)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, url = excluded.url, branch = excluded.branch,
 		   dir = excluded.dir, token_ref = excluded.token_ref, token_user = excluded.token_user,
 		   author_name = excluded.author_name, author_email = excluded.author_email,
-		   updated_at = excluded.updated_at`,
+		   updated_at = excluded.updated_at, provider = excluded.provider`,
 		r.ID, name, r.URL, r.Branch, r.Dir, r.TokenRef, r.TokenUser,
-		r.AuthorName, r.AuthorEmail, created, now)
+		r.AuthorName, r.AuthorEmail, created, now, r.Provider)
 	if err != nil {
 		return fmt.Errorf("store: save git location %q: %w", name, err)
 	}
@@ -88,7 +91,7 @@ func (s *Store) SaveConfigRemote(ctx context.Context, r *ConfigRemote) error {
 }
 
 const configRemoteColumns = `id, name, url, branch, dir, token_ref, token_user,
-	author_name, author_email, created_at, updated_at`
+	author_name, author_email, created_at, updated_at, provider`
 
 // ListConfigRemotes returns them by name.
 func (s *Store) ListConfigRemotes(ctx context.Context) ([]ConfigRemote, error) {
@@ -102,7 +105,7 @@ func (s *Store) ListConfigRemotes(ctx context.Context) ([]ConfigRemote, error) {
 	for rows.Next() {
 		var r ConfigRemote
 		if err := rows.Scan(&r.ID, &r.Name, &r.URL, &r.Branch, &r.Dir, &r.TokenRef, &r.TokenUser,
-			&r.AuthorName, &r.AuthorEmail, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			&r.AuthorName, &r.AuthorEmail, &r.CreatedAt, &r.UpdatedAt, &r.Provider); err != nil {
 			return nil, fmt.Errorf("store: scan git location: %w", err)
 		}
 		out = append(out, r)
@@ -116,7 +119,7 @@ func (s *Store) GetConfigRemote(ctx context.Context, id string) (ConfigRemote, e
 	err := s.db.QueryRowContext(ctx,
 		`SELECT `+configRemoteColumns+` FROM config_remotes WHERE id = ?`, id).
 		Scan(&r.ID, &r.Name, &r.URL, &r.Branch, &r.Dir, &r.TokenRef, &r.TokenUser,
-			&r.AuthorName, &r.AuthorEmail, &r.CreatedAt, &r.UpdatedAt)
+			&r.AuthorName, &r.AuthorEmail, &r.CreatedAt, &r.UpdatedAt, &r.Provider)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ConfigRemote{}, ErrConfigRemoteNotFound
 	}

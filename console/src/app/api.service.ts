@@ -916,6 +916,8 @@ export interface SavedConfiguration {
 export interface ConfigRemote {
   id: string;
   name: string;
+  // The forge picked when it was set up, '' for one from before the choice.
+  provider?: string;
   url: string;
   branch: string;
   dir: string;
@@ -944,6 +946,13 @@ export interface ConfigForge {
   needs: string;
   create?: string;
   note?: string;
+  // What the form is built from: its own host (editable for a self-hosted
+  // kind), what is typed after it, and how the token is made - create may
+  // carry {host} and {path}.
+  host?: string;
+  hostEditable?: boolean;
+  path?: string;
+  steps?: string[];
 }
 
 // The answer of a location's check: whether it answers, and whether it already
