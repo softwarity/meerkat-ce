@@ -1827,7 +1827,8 @@
           "acceptTos": true
         },
         "allowedStatus": [
-          404
+          404,
+          422
         ]
       },
       "allowed": [
@@ -1839,8 +1840,8 @@
         "fr": "Modifier une autorité ACME"
       },
       "description": {
-        "en": "Another directory is another account: it gets a fresh corner of the cache.",
-        "fr": "Un autre répertoire est un autre compte : il reçoit un coin neuf du cache."
+        "en": "Another directory is another account: it gets a fresh corner of the cache. On the community image the edition refuses first (422).",
+        "fr": "Un autre répertoire est un autre compte : il reçoit un coin neuf du cache. Sur l'image communautaire, l'édition refuse d'abord (422)."
       }
     },
     {
@@ -1875,7 +1876,8 @@
         "method": "POST",
         "path": "/api/certificates/no-such/retry",
         "allowedStatus": [
-          404
+          404,
+          422
         ]
       },
       "allowed": [
@@ -1887,8 +1889,8 @@
         "fr": "Redemander à une autorité"
       },
       "description": {
-        "en": "Once whatever the authority refused for is fixed - a DNS record, a closed port - the order is asked again.",
-        "fr": "Une fois corrigé ce que l'autorité a refusé - un enregistrement DNS, un port fermé - la commande est redemandée."
+        "en": "Once whatever the authority refused for is fixed - a DNS record, a closed port - the order is asked again. On the community image the edition refuses first (422).",
+        "fr": "Une fois corrigé ce que l'autorité a refusé - un enregistrement DNS, un port fermé - la commande est redemandée. Sur l'image communautaire, l'édition refuse d'abord (422)."
       }
     },
     {
