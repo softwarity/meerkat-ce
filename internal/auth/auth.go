@@ -409,6 +409,15 @@ const flowTop = `<!doctype html>
       -webkit-background-clip: text; background-clip: text; color: transparent;
       animation: rise .7s .08s both;
     }
+    /* The edition beside the console's wordmark: a badge, not a letter of it -
+       its own colour, since the wordmark paints its text with a gradient. */
+    .wordmark .edition {
+      display: inline-block; vertical-align: top; margin-left: -.1em;
+      padding: 3px 7px; border: 1px solid var(--mk-primary); border-radius: 999px;
+      font-family: var(--mk-mono); font-size: .26em; font-weight: 700;
+      letter-spacing: .1em; text-indent: 0; line-height: 1;
+      color: var(--mk-primary); -webkit-text-fill-color: var(--mk-primary);
+    }
     .tagline {
       margin: 8px 0 24px; font-family: var(--mk-mono); font-size: .68rem;
       letter-spacing: .22em; text-transform: uppercase; color: var(--mk-on-surface-variant);
@@ -736,7 +745,7 @@ const flowTop = `<!doctype html>
         <path d="M22 14l2.5 2.1-2.5 1.3-2.5-1.3z" fill="var(--meerkat-eye)"/>
       </svg>{{end}}
     </div>
-    <h1 class="wordmark">{{.Brand.AppName}}</h1>
+    <h1 class="wordmark">{{.Brand.AppName}}{{if .Brand.Edition}}<span class="edition">{{.Brand.Edition}}</span>{{end}}</h1>
     <p class="tagline">{{.Brand.Tagline}}</p>
     </div>
     <div class="pane">
@@ -1848,6 +1857,10 @@ type brandView struct {
 	// its pulse are Meerkat lore - an integrator's app gets a neutral
 	// placeholder and no animation.
 	Meerkat bool
+	// Edition is "EE" or "CE" on the admin plane's sign-in, beside the
+	// wordmark: which image answered, before anybody signs in. Empty on the
+	// data plane, whose pages are the integrator's application.
+	Edition string
 	// BackgroundCSS is the page layer carrying the branding's background image
 	// (THEME-06), or "" when there is none. Like the favicon, the image itself
 	// is fetched from an endpoint - only the rule that points at it rides in
@@ -1904,6 +1917,10 @@ func (h *Handler) chrome() (template.CSS, brandView, store.PageLayout) {
 	if h.adminPlane {
 		brand := toBrandView(store.MeerkatBranding())
 		brand.Meerkat = true
+		brand.Edition = "CE"
+		if edition.Enterprise {
+			brand.Edition = "EE"
+		}
 		return template.CSS(store.DefaultTheme().CSS()), brand, store.DefaultPageLayout() //nolint:gosec // built-in constants
 	}
 	h.themeMu.Lock()
