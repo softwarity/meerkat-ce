@@ -657,7 +657,7 @@ func run(o options) error {
 	tlsSup := certs.NewSupervisor(st,
 		func(err error) bool { return errors.Is(err, store.ErrNoRows) },
 		certs.NewListener("data", o.tlsAddr, srv.Handler, nil),
-		certs.NewListener("admin", o.adminTLSAddr, adminSrv.Handler, nil),
+		certs.NewListener("admin", o.adminTLSAddr, certs.ForgetHSTS(adminSrv.Handler), nil),
 		dataRedirect,
 	)
 	tlsSup.Ports(addr, adminAddr)

@@ -258,7 +258,7 @@ func consoleBodyAttrs(r *http.Request, st *store.Store, sm *session.Manager) str
 		{"primary-tenant", primary},
 		// The name of this installation's readable session deadline: suffixed
 		// per installation, so the console cannot spell it itself.
-		{"until-cookie", session.AdminUntilCookieName},
+		{"until-cookie", session.ForScheme(session.AdminUntilCookieName, r)},
 	} {
 		if kv[1] == "" {
 			continue

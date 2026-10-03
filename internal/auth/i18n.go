@@ -304,9 +304,9 @@ func (h *Handler) flowData(r *http.Request, titleKey string) flowChrome {
 	chrome.T = t
 	chrome.PoweredBy = !h.markHidden()
 	chrome.MarkText, chrome.MarkURL = MarkText, MarkURL
-	chrome.UntilCookie = session.UntilCookieName
+	chrome.UntilCookie = session.ForScheme(session.UntilCookieName, r)
 	if h.adminPlane {
-		chrome.UntilCookie = session.AdminUntilCookieName
+		chrome.UntilCookie = session.ForScheme(session.AdminUntilCookieName, r)
 		chrome.Scheme = "dark"
 		chrome.SchemeSwitch = false
 	} else if imposed := h.imposedScheme(); imposed != "" {

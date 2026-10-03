@@ -37,6 +37,12 @@ une communautaire côte à côte sur `localhost`, écraseraient sinon les sessio
 l'autre. Le cookie de navigateur de confiance est suffixé de la même façon ; ceux de la langue
 et du thème sont le choix de la personne et restent partagés.
 
+En HTTPS, les noms commencent par `__Host-` (`__Host-MEERKAT_ADMIN_SESSION_...`). Un
+navigateur interdit à une page en clair d'écraser un cookie `Secure` du même nom : un seul nom
+pour les deux schémas rendait la connexion en HTTP impossible après une session en HTTPS - et la
+porte en clair de la console existe pour le jour où un certificat casse. Le préfixe fait aussi
+garantir par le navigateur que le cookie a été posé en HTTPS, par cet hôte, pour tout le site.
+
 Les cookies de session sont `HttpOnly`, `SameSite=Lax`, `Path=/`, avec un
 `Max-Age` égal à la durée de vie de la session. `Secure` est posé quand la requête
 est arrivée en HTTPS - soit TLS terminé par la gateway, soit

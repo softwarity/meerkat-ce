@@ -500,7 +500,9 @@ func stripGatewayCookies(r *http.Request) {
 	cookies := r.Cookies()
 	r.Header.Del("Cookie")
 	for _, c := range cookies {
-		if c.Name == session.CookieName || c.Name == session.AdminCookieName {
+		// Both spellings: a session set over HTTPS carries the __Host- prefix.
+		name := strings.TrimPrefix(c.Name, session.SecurePrefix)
+		if name == session.CookieName || name == session.AdminCookieName {
 			continue
 		}
 		r.AddCookie(c)

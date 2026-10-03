@@ -50,12 +50,12 @@ import (
 // reloaded. It opens on the first onEvent listener, so a page that asks for
 // nothing pays nothing, and it is never required - every listener already has
 // its state from the fetch at load.
-func (h *Handler) pageJS(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) pageJS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	// The deadline cookie's name is this installation's (session.Suffixed),
 	// known once main has started: written in here rather than compiled in.
-	_, _ = w.Write([]byte(strings.Replace(pageJS, "__MEERKAT_UNTIL__", session.UntilCookieName, 1)))
+	_, _ = w.Write([]byte(strings.Replace(pageJS, "__MEERKAT_UNTIL__", session.ForScheme(session.UntilCookieName, r), 1)))
 }
 
 // schemeJS serves ONE route's scheme script (SchemeConfig.Script) as a real

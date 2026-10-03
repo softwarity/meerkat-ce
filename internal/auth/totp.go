@@ -30,7 +30,7 @@ func hashTrust(token string) string {
 }
 
 func trustTokenOf(r *http.Request) string {
-	if c, err := r.Cookie(trustCookieName()); err == nil {
+	if c, err := r.Cookie(session.ForScheme(trustCookieName(), r)); err == nil {
 		return c.Value
 	}
 	return ""
@@ -82,7 +82,7 @@ func (h *Handler) issueTrust(w http.ResponseWriter, r *http.Request, userID stri
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     trustCookieName(),
+		Name:     session.ForScheme(trustCookieName(), r),
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,

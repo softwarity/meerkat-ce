@@ -128,3 +128,23 @@ func TestTheRedirectGoesToThePublishedPort(t *testing.T) {
 		t.Fatalf("redirected to %q", got)
 	}
 }
+
+// The console's HTTPS never promises HSTS and always withdraws one: it is
+// often where somebody lands after switching Force HTTPS off.
+func TestTheConsoleWithdrawsHSTS(t *testing.T) {
+	h := ForgetHSTS(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	r := httptest.NewRequest("GET", "https://app.example:9443/", nil)
+	r.Host = "app.example:9443"
+	r.TLS = &tls.ConnectionState{}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	if got := rec.Header().Get("Strict-Transport-Security"); got != "max-age=0" {
+		t.Fatalf("got %q", got)
+	}
+	plain := httptest.NewRequest("GET", "http://app.example:9090/", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, plain)
+	if got := rec.Header().Get("Strict-Transport-Security"); got != "" {
+		t.Fatalf("sent over plain HTTP: %q", got)
+	}
+}

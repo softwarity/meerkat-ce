@@ -36,6 +36,13 @@ and a community one side by side on `localhost`, would otherwise overwrite each
 other's sessions. The trusted-browser cookie is suffixed the same way; the
 language and colour-scheme cookies are the person's choice and stay shared.
 
+Over HTTPS the names start with `__Host-` (`__Host-MEERKAT_ADMIN_SESSION_...`).
+A browser forbids a page in the clear to overwrite a `Secure` cookie of the
+same name, so one name for both schemes made signing in over plain HTTP
+impossible after a session over HTTPS - and the console's plain door exists for
+the day a certificate breaks. The prefix also makes the browser guarantee the
+cookie was set over HTTPS, by this host, for the whole site.
+
 The session cookies are `HttpOnly`, `SameSite=Lax`, `Path=/`, with a `Max-Age`
 equal to the session's lifetime. `Secure` is set when the request arrived over
 HTTPS - either TLS terminated by the gateway, or `X-Forwarded-Proto: https` from

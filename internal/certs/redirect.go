@@ -239,3 +239,17 @@ func hstsHost(hostport string) bool {
 	}
 	return net.ParseIP(host) == nil
 }
+
+// ForgetHSTS stamps max-age=0 on the HTTPS answers of a plane that never
+// promises HSTS - the console's. A promise made by the application plane on
+// the same name covers the console's ports too, and the console's HTTPS is
+// often the first page somebody opens after switching Force HTTPS off: it has
+// to be able to withdraw the promise, not only the application's door.
+func ForgetHSTS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if filters.Secure(r) && hstsHost(r.Host) {
+			w = &hstsWriter{ResponseWriter: w, value: "max-age=0"}
+		}
+		next.ServeHTTP(w, r)
+	})
+}

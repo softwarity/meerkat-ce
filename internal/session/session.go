@@ -45,6 +45,25 @@ func SetCookieSuffix(suffix string) {
 	AdminUntilCookieName = Suffixed("MEERKAT_ADMIN_UNTIL")
 }
 
+// SecurePrefix names a cookie set over HTTPS. Browsers forbid a page in the
+// clear to overwrite a Secure cookie of the same name ("leave secure cookies
+// alone"), so a session opened over HTTPS made signing in over plain HTTP
+// silently impossible: the password was right, the cookie was thrown away,
+// and the login page came back. The plain door of the console exists for the
+// day a certificate is broken - exactly when somebody who used HTTPS before
+// needs it. Two names, one per scheme, never meet; and __Host- makes the
+// browser guarantee the HTTPS one was set over HTTPS, by this host, for the
+// whole site.
+const SecurePrefix = "__Host-"
+
+// ForScheme is the name a cookie carries on the scheme r arrived over.
+func ForScheme(name string, r *http.Request) string {
+	if filters.Secure(r) {
+		return SecurePrefix + name
+	}
+	return name
+}
+
 var cookieSuffix string
 
 // Suffixed is base with this installation's suffix, for a cookie that holds
@@ -220,7 +239,7 @@ func (m *Manager) setCookies(w http.ResponseWriter, r *http.Request, token strin
 	secure := filters.Secure(r)
 	age := int(ttl.Seconds())
 	http.SetCookie(w, &http.Cookie{
-		Name:     m.cookieName,
+		Name:     ForScheme(m.cookieName, r),
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
@@ -229,7 +248,7 @@ func (m *Manager) setCookies(w http.ResponseWriter, r *http.Request, token strin
 		MaxAge:   age,
 	})
 	http.SetCookie(w, &http.Cookie{
-		Name:     m.untilCookieName(),
+		Name:     ForScheme(m.untilCookieName(), r),
 		Value:    strconv.FormatInt(expiresAt, 10),
 		Path:     "/",
 		HttpOnly: false, // the whole point: a page reads it
@@ -261,7 +280,7 @@ func (m *Manager) Sliding(next http.Handler) http.Handler {
 }
 
 func (m *Manager) slide(w http.ResponseWriter, r *http.Request) {
-	c, err := r.Cookie(m.cookieName)
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
 	if err != nil || c.Value == "" {
 		return // no browser session: an API token has no deadline to push
 	}
@@ -297,7 +316,7 @@ func (m *Manager) ClearPending(ctx context.Context, r *http.Request) error {
 // (AUTH-05) - e.g. from the password step to the MFA step - without issuing a
 // new session. "" clears the step (flow complete). Refreshes the cache.
 func (m *Manager) SetPending(ctx context.Context, r *http.Request, step string) error {
-	c, err := r.Cookie(m.cookieName)
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
 	if err != nil || c.Value == "" {
 		return ErrNoSession
 	}
@@ -312,7 +331,7 @@ func (m *Manager) SetPending(ctx context.Context, r *http.Request, step string) 
 // SetTenant records the active tenant on the request's session (the
 // select-tenant step - TENANT-03) and refreshes the cache.
 func (m *Manager) SetTenant(ctx context.Context, r *http.Request, tenantID string) error {
-	c, err := r.Cookie(m.cookieName)
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
 	if err != nil || c.Value == "" {
 		return ErrNoSession
 	}
@@ -327,7 +346,7 @@ func (m *Manager) SetTenant(ctx context.Context, r *http.Request, tenantID strin
 // SetGroup records the ACTIVE group on the request's session (the
 // select-group step, exclusive mode - RBAC-03) and refreshes the cache.
 func (m *Manager) SetGroup(ctx context.Context, r *http.Request, groupID string) error {
-	c, err := r.Cookie(m.cookieName)
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
 	if err != nil || c.Value == "" {
 		return ErrNoSession
 	}
@@ -343,7 +362,7 @@ func (m *Manager) SetGroup(ctx context.Context, r *http.Request, groupID string)
 // are served from the memory cache within cacheTTL; expiry is always checked
 // against the wall clock, so a cached session never outlives its TTL.
 func (m *Manager) Resolve(ctx context.Context, r *http.Request) (store.Session, error) {
-	c, err := r.Cookie(m.cookieName)
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
 	if err != nil || c.Value == "" {
 		// No browser session: an API token may authenticate (AUTH-16), but only
 		// one scoped to THIS plane - a data token never opens the admin port and
@@ -543,7 +562,7 @@ func (m *Manager) touchToken(ctx context.Context, tokenHash, id string, now time
 // converge within cacheTTL (LISTEN/NOTIFY-style invalidation comes with the
 // cluster backend).
 func (m *Manager) Destroy(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	c, err := r.Cookie(m.cookieName)
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
 	if err == nil && c.Value != "" {
 		th := hashToken(c.Value)
 		if err := m.st.DeleteSession(ctx, th); err != nil {
@@ -552,19 +571,21 @@ func (m *Manager) Destroy(ctx context.Context, w http.ResponseWriter, r *http.Re
 		m.dropped(th)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     m.cookieName,
+		Name:     ForScheme(m.cookieName, r),
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   filters.Secure(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
 	// The deadline goes with it: left behind, it would tell every open page
 	// that a session it no longer has is good for another half hour.
 	http.SetCookie(w, &http.Cookie{
-		Name:     m.untilCookieName(),
+		Name:     ForScheme(m.untilCookieName(), r),
 		Value:    "",
 		Path:     "/",
+		Secure:   filters.Secure(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
@@ -599,7 +620,7 @@ func clipAgent(ua string) string {
 // CurrentID is the public id of the session the request carries, "" without
 // one - what a list of sessions marks as "this browser".
 func (m *Manager) CurrentID(r *http.Request) string {
-	c, err := r.Cookie(m.cookieName)
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
 	if err != nil || c.Value == "" {
 		return ""
 	}

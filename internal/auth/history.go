@@ -39,7 +39,7 @@ const (
 )
 
 func browserTokenOf(r *http.Request) string {
-	if c, err := r.Cookie(browserCookieName()); err == nil {
+	if c, err := r.Cookie(session.ForScheme(browserCookieName(), r)); err == nil {
 		return c.Value
 	}
 	return ""
@@ -75,7 +75,7 @@ func (h *Handler) recordLogin(w http.ResponseWriter, r *http.Request, userID, te
 		} else {
 			token = t
 			http.SetCookie(w, &http.Cookie{
-				Name: browserCookieName(), Value: token, Path: "/",
+				Name: session.ForScheme(browserCookieName(), r), Value: token, Path: "/",
 				HttpOnly: true, Secure: filters.Secure(r), SameSite: http.SameSiteLaxMode,
 				MaxAge: 2 * 365 * 24 * 3600,
 			})

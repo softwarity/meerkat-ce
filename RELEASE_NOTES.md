@@ -108,6 +108,11 @@
   forget an earlier promise - as they now do when Force HTTPS is switched off.
 - **The redirect to HTTPS uses the published port** (8444 for a Service
   publishing 8443 as 8444), not the container's.
+- **Signing in over plain HTTP works after a session over HTTPS.** A browser
+  refused to let the plain page replace the Secure cookie, so the console's
+  plain door - the one for a broken certificate - silently did nothing. Cookies
+  set over HTTPS now carry the `__Host-` prefix. The console's HTTPS also tells
+  browsers to forget an earlier HSTS promise.
 
 ---
 
