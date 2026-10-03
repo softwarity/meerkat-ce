@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -239,6 +240,14 @@ func TestLoginOutsideWorkingHoursIsRefusedExplicitly(t *testing.T) {
 		store.BusinessAccess{Timezone: "UTC", Days: baDays("00:00", "23:59", notToday)}, "")
 	rec := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}})
 	body, _ := io.ReadAll(rec.Result().Body)
+	// Working hours are Enterprise (TENANT-04): the community image keeps the
+	// window and enforces none.
+	if !edition.Enterprise {
+		if rec.Code == http.StatusForbidden {
+			t.Fatalf("the community image enforced working hours: %d %s", rec.Code, body)
+		}
+		return
+	}
 	if rec.Code != http.StatusForbidden || !strings.Contains(string(body), "working hours") {
 		t.Fatalf("outside hours: %d %s", rec.Code, body)
 	}

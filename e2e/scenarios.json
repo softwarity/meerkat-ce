@@ -604,7 +604,8 @@
       },
       "allowed": [
         "root",
-        "app-admin"
+        "app-admin",
+        "tenant-admin"
       ],
       "title": {
         "en": "List the live sessions",
@@ -628,7 +629,8 @@
       },
       "allowed": [
         "root",
-        "app-admin"
+        "app-admin",
+        "tenant-admin"
       ],
       "title": {
         "en": "End a session",

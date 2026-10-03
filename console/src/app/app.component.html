@@ -74,6 +74,15 @@
          what was done to it; these three say what the thing it serves is
          doing. -->
     <rail-nav-item
+      i18n-label="@@Sessions"
+      label="Sessions"
+      routerLink="/sessions"
+      [active]="inSessions()"
+      any-role="root app-admin tenant-admin"
+    >
+      <mat-icon>devices</mat-icon>
+    </rail-nav-item>
+    <rail-nav-item
       i18n-label="@@Scheduler"
       label="Scheduler"
       routerLink="/scheduler"

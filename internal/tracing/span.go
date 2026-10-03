@@ -346,7 +346,10 @@ func Apply(cfg Config, enabled bool) error {
 	SetRelayMaxPerSecond(relayBudget)
 	SetDetail(cfg.Detail)
 	SetCaller(cfg.Caller)
-	exporting.Store(enabled)
+	// Exporting only once the exporter actually started: on the community
+	// image Start refuses, and a flag left at true would say spans leave
+	// when nothing does.
+	exporting.Store(false)
 	if !enabled {
 		return nil
 	}
@@ -354,6 +357,7 @@ func Apply(cfg Config, enabled bool) error {
 	if err != nil {
 		return err
 	}
+	exporting.Store(true)
 	runningStop = stop
 	return nil
 }

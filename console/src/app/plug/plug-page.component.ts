@@ -1,3 +1,4 @@
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatCardModule } from '@angular/material/card';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -35,6 +36,7 @@ type Os = 'macos' | 'linux' | 'windows';
     MatIconModule,
     MatInputModule,
     MatSlideToggleModule,
+    MatSidenavModule,
     RouterLink,
     SnippetComponent,
   ],
@@ -43,6 +45,8 @@ type Os = 'macos' | 'linux' | 'windows';
 })
 export class PlugPageComponent {
   private readonly api = inject(ApiService);
+  // The help drawer: what a developer runs on their machine.
+  protected readonly helpOpen = signal(false);
   private readonly snack = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
 

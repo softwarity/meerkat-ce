@@ -32,6 +32,7 @@ The left rail holds the two planes and the transverse screens.
 | **Vault** | `/vault` | Every named value and secret the configuration points at |
 | **Metrics** | `/traffic` | What the gateway has actually served |
 | **Scheduler** | `/scheduler` | The calls the gateway makes to your services on a schedule |
+| **Sessions** | `/sessions` | Who is signed in, within your perimeter |
 | **Audit** | `/audit` | Who changed what |
 | **Logs** | `/logs` | What the gateway says about itself, live |
 | **Issues** | `/issues` | What your users reported |
@@ -55,8 +56,8 @@ same scopes on every call.
 |---|---|
 | `root` | Everything, including Configuration |
 | `infra admin` | The Infra plane (with Access tokens and MCP), Metrics, Logs, Audit and Issues, the vault's infra scope |
-| `app admin` | The Application plane (with Sessions and Access tokens), Scheduler, Audit and Issues, the vault's application scope |
-| `tenant admin` | The organisations they administer, Audit and Issues scoped to them |
+| `app admin` | The Application plane (with Access tokens), Sessions, Scheduler, Audit and Issues, the vault's application scope |
+| `tenant admin` | The organisations they administer, Sessions, Audit and Issues scoped to them |
 | `tenant creator` | Creating an organisation from the Tenants drawer |
 | `dev` | The developer tooling on the served applications, not a console screen |
 

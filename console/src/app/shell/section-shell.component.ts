@@ -87,7 +87,6 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       { path: 'groups', label: $localize`:@@Groups:Groups`, icon: 'groups', singleOnly: true },
       { path: 'users', label: $localize`:@@Users:Users`, icon: 'group' },
       // Who is signed in where, right now (CONSOLE-08).
-      { path: 'sessions', label: $localize`:@@Sessions:Sessions`, icon: 'devices' },
       { path: 'members', label: $localize`:@@Members:Members`, icon: 'badge_check', singleOnly: true },
       { path: 'group-rules', label: $localize`:@@Group_rules:Group rules`, icon: 'rule', singleOnly: true },
       // The pages this gateway serves: one entry, three tabs on its left panel

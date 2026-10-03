@@ -587,12 +587,12 @@
   {
     "method": "GET",
     "path": "/api/sessions",
-    "guard": "appAdmin"
+    "guard": "authed"
   },
   {
     "method": "DELETE",
     "path": "/api/sessions/{id}",
-    "guard": "appAdmin"
+    "guard": "authed"
   },
   {
     "method": "GET",

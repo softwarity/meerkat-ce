@@ -94,7 +94,7 @@ the installation-wide lifetime, because the organisation is not known yet.
 | Deleting the account | every session of that account | yes |
 | **Disabling** the account | every session of that account, on both planes | yes |
 | **Sign out** on the profile's *Active sessions*, or *Sign out everywhere else* | that session, or every other one of that person | yes |
-| **Sign out** on the console's *Application, Sessions* screen | that session | yes |
+| **Sign out** on the console's *Sessions* screen | that session | yes |
 
 Logout is a `POST` - there is no `GET /logout` - and it deletes the row rather
 than merely clearing the cookie, then clears both cookies and tells the other
@@ -118,11 +118,13 @@ browser signed in to the applications, when and from which address, *This
 browser* marked; **Sign out** on any other one, or **Sign out everywhere else**.
 Another account's session is never theirs to close, whatever id a form carries.
 
-Administrators read them on **Application, Sessions**: who, which browser and
-address, which plane, since when - filtered by account, paged. Root reads both
-planes; an application administrator the applications' sessions only, since who
-runs the console, and from where, is root's business. Ending one writes
+Administrators read them on **Sessions**, in the rail: who, which browser and
+address, which plane, since when - filtered by account, paged. Each reads their
+own perimeter. Root reads both planes; an application administrator the
+applications' sessions, every organisation, since who runs the console, and
+from where, is root's business; an organisation's administrator the sessions
+open in the organisations they administer, and can end only those. Ending one writes
 `session.revoke` to the [audit trail](/docs/operations/audit).
 
-![Application, Sessions: who is signed in, from which browser and address, on which plane, and since when](img/console/sessions.webp)
+![Sessions: who is signed in, from which browser and address, on which plane, and since when](img/console/sessions.webp)
 

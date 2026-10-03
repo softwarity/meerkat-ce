@@ -5,6 +5,7 @@ import {
   appOnly,
   auditAccess,
   logsAccess,
+  sessionsAccess,
   schedulerAccess,
   issuesAccess,
   multiTenantOnly,
@@ -356,12 +357,8 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./portal/portal-page.component').then((m) => m.PortalPageComponent),
       },
-      {
-        path: 'sessions',
-        canActivate: [appOnly],
-        loadComponent: () =>
-          import('./identity/sessions-page/sessions-page.component').then((m) => m.SessionsPageComponent),
-      },
+      // Moved to the rail: sessions are not configuration (see /sessions).
+      { path: 'sessions', redirectTo: '/sessions' },
       {
         path: 'security',
         canActivate: [appOnly],
@@ -453,6 +450,15 @@ export const routes: Routes = [
     canActivate: [schedulerAccess],
     loadComponent: () =>
       import('./scheduler/scheduler-page.component').then((m) => m.SchedulerPageComponent),
+  },
+  {
+    // Who is signed in where: not configuration, so a rail entry of its own,
+    // read within the caller's perimeter - root every session, an application
+    // administrator the applications', an organisation's administrator theirs.
+    path: 'sessions',
+    canActivate: [sessionsAccess],
+    loadComponent: () =>
+      import('./identity/sessions-page/sessions-page.component').then((m) => m.SessionsPageComponent),
   },
   {
     path: 'audit',

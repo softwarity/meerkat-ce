@@ -72,6 +72,12 @@
 <p class="hint" i18n="@@Tracing_ce_note_signals">
   A <code>traceparent</code> reaches your services in both editions.
 </p>
+@if (!enterprise()) {
+  <p class="hint" i18n="@@Tracing_ce_nothing_leaves">
+    Nothing leaves this community image: traces, metrics, audit and pushed logs are sent from the
+    Enterprise image only. Logs written for an agent work here.
+  </p>
+}
 
 @if (enabled()) {
   <!-- Where. We speak a protocol, not a product, so this is one address and no
@@ -175,10 +181,10 @@
 <mat-card appearance="outlined" class="signals-card">
 <mat-tab-group class="signals" animationDuration="0ms" mat-stretch-tabs="false">
   <mat-tab i18n-label="@@Tracing_tab_traces" label="Traces">
-    <div class="tab">
+    <div class="tab" ee-feature="OBS-06">
       <div class="row">
         <mat-slide-toggle
-          [checked]="traces()"
+          [checked]="traces() && enterprise()"
           [disabled]="!enabled() || saving()"
           (change)="toggleTraces($event.checked)"
         >
@@ -235,7 +241,7 @@
            somebody is looking at where the gateway's time goes. -->
       <div class="row">
         <mat-slide-toggle
-          [checked]="gatewayDetail()"
+          [checked]="gatewayDetail() && enterprise()"
           [disabled]="!enabled() || saving()"
           (change)="toggleDetail($event.checked)"
         >
@@ -249,7 +255,7 @@
       <!-- Who made the call. Off by default: a person in a trace is personal
            data leaving for a collector somebody else may run. -->
       <div class="row">
-        <mat-slide-toggle [checked]="caller()" [disabled]="!enabled() || saving()" (change)="toggleCaller($event.checked)">
+        <mat-slide-toggle [checked]="caller() && enterprise()" [disabled]="!enabled() || saving()" (change)="toggleCaller($event.checked)">
           <ng-container i18n="@@Tracing_caller">Name the caller on the spans</ng-container>
         </mat-slide-toggle>
       </div>
@@ -262,10 +268,10 @@
     </div>
   </mat-tab>
   <mat-tab i18n-label="@@Tracing_tab_metrics" label="Metrics">
-    <div class="tab">
+    <div class="tab" ee-feature="OBS-06">
       <div class="row">
         <mat-slide-toggle
-          [checked]="metrics()"
+          [checked]="metrics() && enterprise()"
           [disabled]="!enabled() || saving()"
           (change)="toggleMetrics($event.checked)"
         >
@@ -280,10 +286,10 @@
     </div>
   </mat-tab>
   <mat-tab i18n-label="@@Tracing_tab_audit" label="Audit">
-    <div class="tab">
+    <div class="tab" ee-feature="OBS-06">
       <div class="row">
         <mat-slide-toggle
-          [checked]="audit()"
+          [checked]="audit() && enterprise()"
           [disabled]="!enabled() || saving()"
           (change)="toggleAudit($event.checked)"
         >

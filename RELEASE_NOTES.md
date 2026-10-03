@@ -73,6 +73,25 @@
   feature should be: its events only leave through the collector export. The
   screen and the upload are locked, the API refuses new rules, and rules
   carried over from an Enterprise configuration are kept but not applied.
+- **Working hours are not enforced on the community image** any more, as an
+  Enterprise feature should not be: windows a configuration brought over are
+  kept and ignored. On Application, General, their Save button sits in their
+  card and locks with it.
+- **OpenTelemetry on the community image shows that nothing leaves**, rather
+  than the export an imported configuration had switched on.
+- **Plug's steps for a developer's machine open in a drawer**: help, not
+  configuration.
+- **Sessions moved to the rail**, out of Application: it is not configuration.
+  Each administrator reads their own perimeter - root every session, an
+  application administrator the applications', and now an organisation's
+  administrator the sessions open in their organisations.
+- **Members has its membership column in single-organisation mode too**:
+  join, leave and the admin badge work as in an organisation, and the
+  whole-column box has members to act on.
+- **A configuration import no longer brings Enterprise settings onto the
+  community image.** Working hours, layouts, a hidden mark, the OpenTelemetry
+  export and directories are left out, and the plan lists them - the rest of
+  an Enterprise configuration still imports.
 
 ---
 

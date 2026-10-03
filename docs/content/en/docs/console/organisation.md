@@ -47,19 +47,19 @@ Above the matrix, **Group mode** decides how a person's groups combine:
 
 ![The Members screen: the accounts down the side, the same three group columns, and the last connection](img/console/members.webp)
 
-The same installation in single-organisation mode: no membership column and no
-admin badge, just who is in which group, and when each account last signed in.
+The same installation in single-organisation mode: the same matrix as an
+organisation's, membership and admin badge included - one organisation is still
+an organisation.
 
 A matrix again: the accounts down the side, this organisation's groups across the
 top.
 
-- In several-organisations mode, the **first column** is membership itself: the
-  tick joins or leaves, and the **admin** badge beside it promotes a member to
-  administrator of the organisation. The owner shows a read-only **owner** badge
-  instead, and ownership is transferred in the organisation's Danger zone.
-- In single-organisation mode those two columns are gone: an enabled account **is**
-  a member here, and the `app admin` capability already says who administers.
-- Group columns are disabled for a non-member: join first.
+- The **first column** is membership itself, in both modes: the tick joins or
+  leaves, and the **admin** badge beside it promotes a member to administrator of
+  the organisation. The owner shows a read-only **owner** badge instead, and
+  ownership is transferred in the organisation's Danger zone.
+- Ticking a group for somebody who is not a member yet makes them one; the
+  whole-column box acts on the members on screen.
 - The last column shows the last connection and carries the password reset, scoped
   to this organisation.
 

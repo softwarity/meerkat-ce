@@ -9,10 +9,9 @@ import { MembersMatrixComponent } from '../members-matrix/members-matrix.compone
 //
 // Users and this screen answer two different questions and stay apart: Users
 // is the account - who exists, what they may do across the whole gateway -
-// while this is the assignment. In single-tenant mode the matrix loses the two
-// columns that stop meaning anything: belonging (an enabled account IS a
-// member here) and the ADMIN badge (the app-admin capability already says it).
-// Both are marked multi-tenant-only inside the matrix itself.
+// while this is the assignment. The matrix is the same as an organisation's
+// in multi mode: single mode is ONE organisation, with members and their
+// administrators like any other.
 @Component({
   selector: 'app-app-members',
   imports: [MatFormFieldModule, MatInputModule, MembersMatrixComponent],

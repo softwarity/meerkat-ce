@@ -105,6 +105,19 @@ import { ConfigPlan } from '../../api.service';
           </p>
         </div>
       }
+      @if (p.notApplied?.length) {
+        <div class="note warn">
+          <mat-icon>workspace_premium</mat-icon>
+          <div>
+            <p i18n="@@Plan_not_applied_note">Left out on this community image:</p>
+            <ul>
+              @for (n of p.notApplied; track n) {
+                <li>{{ n }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
     }
   `,
 })

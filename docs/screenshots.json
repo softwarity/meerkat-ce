@@ -473,6 +473,26 @@
       ]
     },
     {
+      "file": "img/console/plug-machine.webp",
+      "plane": "admin",
+      "path": "/infra/plug",
+      "steps": [
+        {
+          "click": "button:has-text(\"On a developer\")"
+        },
+        {
+          "wait": 800
+        }
+      ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/operations/plug"
+      ]
+    },
+    {
       "file": "img/console/portal.webp",
       "plane": "admin",
       "path": "/application/portal",
@@ -627,7 +647,7 @@
     {
       "file": "img/console/sessions.webp",
       "plane": "admin",
-      "path": "/application/sessions",
+      "path": "/sessions",
       "viewport": [
         1600,
         1000

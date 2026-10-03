@@ -48,22 +48,20 @@ combinent :
 
 ![L'écran Members : les comptes sur le côté, les trois mêmes colonnes de groupes, et la dernière connexion](img/console/members.webp)
 
-La même installation en mode mono-organisation : pas de colonne d'appartenance ni de
-pastille admin, seulement qui est dans quel groupe, et la dernière connexion de chaque
-compte.
+La même installation en mode mono-organisation : la même matrice que celle d'une
+organisation, appartenance et pastille admin comprises - une seule organisation reste
+une organisation.
 
 Une matrice encore : les comptes sur le côté, les groupes de cette organisation en
 colonnes.
 
-- En mode multi-organisations, la **première colonne** est l'appartenance elle-même : la
-  coche fait entrer ou sortir, et la pastille **admin** à côté promeut un membre en
+- La **première colonne** est l'appartenance elle-même, dans les deux modes : la coche
+  fait entrer ou sortir, et la pastille **admin** à côté promeut un membre en
   administrateur de l'organisation. Le propriétaire porte à la place une pastille
   **owner** en lecture seule, et la propriété se transfère dans la zone de danger de
   l'organisation.
-- En mode mono-organisation ces deux colonnes disparaissent : un compte activé **est**
-  membre ici, et la capacité `app admin` dit déjà qui administre.
-- Les colonnes de groupes sont désactivées pour un non-membre : il faut d'abord le faire
-  entrer.
+- Cocher un groupe pour quelqu'un qui n'est pas encore membre le fait entrer ; la case de
+  toute la colonne agit sur les membres affichés.
 - La dernière colonne montre la dernière connexion et porte la réinitialisation de mot de
   passe, limitée à cette organisation.
 

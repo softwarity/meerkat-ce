@@ -115,6 +115,17 @@ export const logsAccess: CanActivateFn = async (_route, state) => {
   return ok ? true : bounce(router, state, landing(me));
 };
 
+// sessionsAccess gates the transverse Sessions section: root, an application
+// administrator, or an organisation's administrator - the API narrows each to
+// their perimeter.
+export const sessionsAccess: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  const ok = me.isRoot() || me.isAppAdmin() || me.isTenantAdmin();
+  return ok ? true : bounce(router, state, landing(me));
+};
+
 // auditAccess gates the transverse Audit section: anyone who administers a
 // domain may open it (root, infra-admin, app-admin, or a tenant admin). The
 // API scopes the CONTENT to that domain; this only guards the page itself.

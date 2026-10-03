@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"context"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,8 +18,8 @@ import (
 // applications' sessions only: who runs the console, and from where, is
 // root's business - the same line the audit trail draws for console sign-ins.
 func (a *API) registerSessions(mux Mux) {
-	mux.Handle("GET /api/sessions", a.appAdmin(a.listSessions))
-	mux.Handle("DELETE /api/sessions/{id}", a.appAdmin(a.revokeSession))
+	mux.Handle("GET /api/sessions", a.authed(a.listSessions))
+	mux.Handle("DELETE /api/sessions/{id}", a.authed(a.revokeSession))
 }
 
 type sessionRow struct {
@@ -33,7 +35,30 @@ type sessionPage struct {
 	Total    int          `json:"total"`
 }
 
+// sessionScope is who sees which sessions: root every one, console included;
+// an application administrator the applications' sessions, every
+// organisation; an organisation's administrator the sessions open in the
+// organisations they administer. ok false: none of these.
+func (a *API) sessionScope(ctx context.Context, actor store.User) (narrowed bool, tenants []string, ok bool) {
+	if actor.Root || actor.AppAdmin {
+		return false, nil, true
+	}
+	administered, err := a.st.ListTenantsAdministeredBy(ctx, actor.ID)
+	if err != nil || len(administered) == 0 {
+		return false, nil, false
+	}
+	for _, t := range administered {
+		tenants = append(tenants, t.ID)
+	}
+	return true, tenants, true
+}
+
 func (a *API) listSessions(w http.ResponseWriter, r *http.Request, actor store.User) {
+	narrowed, tenants, ok := a.sessionScope(r.Context(), actor)
+	if !ok {
+		writeErr(w, http.StatusForbidden, "sessions require root, the app-admin capability, or administering an organisation")
+		return
+	}
 	q := r.URL.Query()
 	f := store.SessionFilter{
 		Search: strings.TrimSpace(q.Get("q")),
@@ -48,6 +73,7 @@ func (a *API) listSessions(w http.ResponseWriter, r *http.Request, actor store.U
 	if !actor.Root {
 		f.Plane = store.PlaneData
 	}
+	f.Narrowed, f.Tenants = narrowed, tenants
 	list, total, err := a.st.ListSessions(r.Context(), f, time.Now().Unix())
 	if err != nil {
 		a.internal(w, err)
@@ -70,12 +96,26 @@ func (a *API) listSessions(w http.ResponseWriter, r *http.Request, actor store.U
 
 func (a *API) revokeSession(w http.ResponseWriter, r *http.Request, actor store.User) {
 	id := r.PathValue("id")
+	narrowed, tenants, ok := a.sessionScope(r.Context(), actor)
+	if !ok {
+		writeErr(w, http.StatusForbidden, "sessions require root, the app-admin capability, or administering an organisation")
+		return
+	}
 	_, userID, plane, err := a.st.SessionHashByID(r.Context(), id)
 	// Out of the perimeter reads as absent: an application administrator has
-	// no business learning that a console session exists under that id.
+	// no business learning that a console session exists under that id, nor
+	// an organisation's administrator that one exists in another organisation.
 	if err != nil || (plane == store.PlaneAdmin && !actor.Root) {
 		writeErr(w, http.StatusNotFound, "session not found")
 		return
+	}
+	tenantID := ""
+	if narrowed {
+		tenantID, err = a.st.SessionTenantByID(r.Context(), id)
+		if err != nil || !slices.Contains(tenants, tenantID) {
+			writeErr(w, http.StatusNotFound, "session not found")
+			return
+		}
 	}
 	if id == a.sm.CurrentID(r) && plane == store.PlaneAdmin {
 		writeErr(w, http.StatusUnprocessableEntity, "this is your own session: sign out instead")
@@ -86,7 +126,7 @@ func (a *API) revokeSession(w http.ResponseWriter, r *http.Request, actor store.
 		return
 	}
 	u, _ := a.st.GetUserByID(r.Context(), userID)
-	a.auditEvent(r.Context(), actor, "session.revoke", "user", userID, u.Username, "", plane)
+	a.auditEvent(r.Context(), actor, "session.revoke", "user", userID, u.Username, tenantID, plane)
 	w.WriteHeader(http.StatusNoContent)
 }
 

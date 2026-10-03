@@ -505,6 +505,8 @@ export interface ConfigPlan {
   changes: ConfigChange[];
   missing: ConfigMissingRef[];
   prune: boolean;
+  // What the community image leaves out of the document: its Enterprise parts.
+  notApplied?: string[];
 }
 
 // What an encrypted vault import did. Names only: this answers about secrets,

@@ -50,7 +50,7 @@ NodePort, un LoadBalancer, un port Docker publié. La page Infra, Plug enregistr
 donc l'hôte et le port **publiés**, et chaque commande de cette page et de la
 page de profil du développeur les porte, prête à copier.
 
-![L'écran Plug : l'interrupteur du tunnel, l'hôte et le port publiés, et les commandes pour la machine d'un développeur](img/console/plug.webp)
+![L'écran Plug : l'interrupteur du tunnel, l'hôte et le port publiés, et qui a la capacité développeur](img/console/plug.webp)
 
 Le tunnel écoute sur **22222** dans le conteneur (`MEERKAT_PLUG_ADDR`).
 
@@ -61,6 +61,13 @@ Le tunnel écoute sur **22222** dans le conteneur (`MEERKAT_PLUG_ADDR`).
 - **Docker Swarm** : non fourni (voir [Une passerelle](/docs/deploy/one-gateway)).
 
 ## Sur la machine d'un développeur
+
+Sur Infra, Plug, le bouton **On a developer's machine** ouvre ces étapes dans un
+tiroir, pour macOS, Linux ou Windows, avec des commandes qui portent déjà
+l'adresse de cette passerelle. C'est de l'aide, pas de la configuration : rien
+n'y est enregistré.
+
+![Le tiroir des étapes pour la machine d'un développeur : installer, nommer le profil, la paire de clés, la déposer, brancher un service](img/console/plug-machine.webp)
 
 Le développeur doit avoir la **capacité développeur** sur son compte
 (Application, Users). Ensuite, une fois :

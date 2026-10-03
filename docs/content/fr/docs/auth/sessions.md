@@ -97,7 +97,7 @@ pas encore connue.
 | La suppression du compte | toutes les sessions de ce compte | oui |
 | La **désactivation** du compte | toutes les sessions de ce compte, sur les deux plans | oui |
 | **Sign out** dans *Active sessions* du profil, ou *Sign out everywhere else* | cette session, ou toutes les autres de cette personne | oui |
-| **Sign out** sur l'écran *Application, Sessions* de la console | cette session | oui |
+| **Sign out** sur l'écran *Sessions* de la console | cette session | oui |
 
 La déconnexion est un `POST` - il n'y a pas de `GET /logout` - et elle supprime la
 ligne plutôt que d'effacer seulement le cookie, puis efface les deux cookies et
@@ -123,11 +123,13 @@ signalé ; **Sign out** sur n'importe quel autre, ou **Sign out everywhere else*
 session d'un autre compte n'est jamais la sienne à fermer, quel que soit l'identifiant
 qu'un formulaire porte.
 
-Les administrateurs les lisent dans **Application, Sessions** : qui, quel navigateur et
-quelle adresse, quel plan, depuis quand - filtrées par compte, par pages. Root lit les
-deux plans ; un administrateur d'application les sessions des applications seulement,
-puisque qui fait tourner la console, et d'où, est l'affaire de root. En fermer une écrit
+Les administrateurs les lisent dans **Sessions**, dans le rail : qui, quel navigateur et
+quelle adresse, quel plan, depuis quand - filtrées par compte, par pages. Chacun lit son
+périmètre. Root lit les deux plans ; un administrateur d'application les sessions des
+applications, toutes organisations, puisque qui fait tourner la console, et d'où, est
+l'affaire de root ; un administrateur d'organisation les sessions ouvertes dans les
+organisations qu'il administre, et ne peut fermer que celles-là. En fermer une écrit
 `session.revoke` au [journal d'audit](/docs/operations/audit).
 
-![Application, Sessions : qui est connecté, depuis quel navigateur et quelle adresse, sur quel plan, et depuis quand](img/console/sessions.webp)
+![Sessions : qui est connecté, depuis quel navigateur et quelle adresse, sur quel plan, et depuis quand](img/console/sessions.webp)
 

@@ -1271,6 +1271,36 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		writeErr(w, http.StatusUnprocessableEntity, "trusted-browser duration is required when trusted browsers are allowed")
 		return
 	}
+	// The layout is checked here, with the rest, before anything is written:
+	// refused after the hours and the policies were saved, it left half of
+	// the screen applied.
+	layout := p.PageLayout
+	if err := store.SanitizePageLayout(&layout); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	// Arranging the pages is part of white-label: making them look like the
+	// integrator's product rather than ours - the same purchase as removing
+	// the mark, so the same key.
+	//
+	// The gate is on the CHANGE, and that matters three times over. A settings
+	// PUT carries the WHOLE payload, so every other screen sends the current
+	// layout back untouched: refusing on the value would break saving a locale
+	// on an unlicensed instance. A licence that lapses must keep serving what
+	// was paid for - the model is perpetual, and an expired file silently
+	// redrawing every customer's sign-in page is the "it worked yesterday"
+	// this product refuses. And going back to the free default is always
+	// allowed, or an instance could be stranded on a layout it cannot leave.
+	current := store.DefaultPageLayout()
+	_ = a.st.GetSetting(r.Context(), store.SettingPageLayout, &current)
+	if layout != current && layout != store.DefaultPageLayout() {
+		if err := edition.Require("arranging the built-in pages"); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity,
+				"changing how the built-in pages are arranged "+err.Error()+
+					" - the arrangement already in place keeps being served, and returning to the default one is always allowed")
+			return
+		}
+	}
 	// Working hours (TENANT-04) are internal control rather than security - no
 	// attacker is stopped by opening hours - which is why they are sold while
 	// MFA never will be. Gated on the WRITE only: a window already in place
@@ -1362,33 +1392,6 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		writeErr(w, http.StatusUnprocessableEntity,
 			"pages scheme "+p.PagesScheme+" is not allowed: use \"\" (the visitor decides), light or dark")
 		return
-	}
-	layout := p.PageLayout
-	if err := store.SanitizePageLayout(&layout); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	// Arranging the pages is part of white-label: making them look like the
-	// integrator's product rather than ours - the same purchase as removing
-	// the mark, so the same key.
-	//
-	// The gate is on the CHANGE, and that matters three times over. A settings
-	// PUT carries the WHOLE payload, so every other screen sends the current
-	// layout back untouched: refusing on the value would break saving a locale
-	// on an unlicensed instance. A licence that lapses must keep serving what
-	// was paid for - the model is perpetual, and an expired file silently
-	// redrawing every customer's sign-in page is the "it worked yesterday"
-	// this product refuses. And going back to the free default is always
-	// allowed, or an instance could be stranded on a layout it cannot leave.
-	current := store.DefaultPageLayout()
-	_ = a.st.GetSetting(r.Context(), store.SettingPageLayout, &current)
-	if layout != current && layout != store.DefaultPageLayout() {
-		if err := edition.Require("arranging the built-in pages"); err != nil {
-			writeErr(w, http.StatusUnprocessableEntity,
-				"changing how the built-in pages are arranged "+err.Error()+
-					" - the arrangement already in place keeps being served, and returning to the default one is always allowed")
-			return
-		}
 	}
 	if err := a.st.SetSetting(r.Context(), store.SettingPageLayout, layout); err != nil {
 		a.internal(w, err)

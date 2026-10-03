@@ -33,6 +33,7 @@ Le rail de gauche porte les deux plans et les écrans transverses.
 | **Vault** | `/vault` | Toutes les valeurs et les secrets que la configuration désigne |
 | **Metrics** | `/traffic` | Ce que la passerelle a réellement servi |
 | **Scheduler** | `/scheduler` | Les appels que la passerelle fait à vos services selon un planning |
+| **Sessions** | `/sessions` | Qui est connecté, dans votre périmètre |
 | **Audit** | `/audit` | Qui a changé quoi |
 | **Logs** | `/logs` | Ce que la gateway dit d'elle-même, en direct |
 | **Issues** | `/issues` | Ce que vos utilisateurs ont signalé |
@@ -56,8 +57,8 @@ applique les mêmes périmètres à chaque appel.
 |---|---|
 | `root` | Tout, y compris Configuration |
 | `infra admin` | Le plan Infra (avec Access tokens et MCP), Metrics, Logs, Audit et Issues, la portée infra du coffre |
-| `app admin` | Le plan Application (avec Sessions et Access tokens), Scheduler, Audit et Issues, la portée applicative du coffre |
-| `tenant admin` | Les organisations qu'il administre, Audit et Issues limités à elles |
+| `app admin` | Le plan Application (avec Access tokens), Sessions, Scheduler, Audit et Issues, la portée applicative du coffre |
+| `tenant admin` | Les organisations qu'il administre, Sessions, Audit et Issues limités à elles |
 | `tenant creator` | La création d'une organisation depuis le tiroir Tenants |
 | `dev` | L'outillage développeur sur les applications servies, pas un écran de console |
 

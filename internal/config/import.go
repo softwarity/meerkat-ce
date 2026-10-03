@@ -71,6 +71,9 @@ type Plan struct {
 	// Prune says whether objects absent from the file were (or would be)
 	// removed. Only sections the file actually carries are ever pruned.
 	Prune bool `json:"prune"`
+	// NotApplied names the Enterprise parts the community image took out of
+	// the document before applying it (edition.go).
+	NotApplied []string `json:"notApplied,omitempty"`
 }
 
 // Touches reports whether the plan changes anything at all.
@@ -179,7 +182,7 @@ func run(ctx context.Context, st *store.Store, doc *Document, prune, commit, who
 	if err := check(doc); err != nil {
 		return nil, err
 	}
-	plan := &Plan{Prune: prune}
+	plan := &Plan{Prune: prune, NotApplied: notOnCommunity(doc)}
 
 	// The vault first: the objects about to be written reference it, and a
 	// route saved before its $name exists reloads with an unresolved reference.

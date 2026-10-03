@@ -49,7 +49,7 @@ LoadBalancer, a published Docker port. So Infra, Plug records the **published**
 host and port, and every command on that page and on the developer's profile
 page carries them, ready to copy.
 
-![The Plug screen: the tunnel switch, the published host and port, and the commands for a developer's machine](img/console/plug.webp)
+![The Plug screen: the tunnel switch, the published host and port, and who holds the developer capability](img/console/plug.webp)
 
 The tunnel listens on **22222** in the container (`MEERKAT_PLUG_ADDR`).
 
@@ -60,6 +60,12 @@ The tunnel listens on **22222** in the container (`MEERKAT_PLUG_ADDR`).
 - **Docker Swarm**: not provided (see [One gateway](/docs/deploy/one-gateway)).
 
 ## On a developer's machine
+
+On Infra, Plug, the **On a developer's machine** button opens these steps in a
+drawer, for macOS, Linux or Windows, with the commands already carrying this
+gateway's address. It is help, not configuration: nothing in it is saved.
+
+![The drawer with the steps for a developer's machine: install, name the profile, the key pair, deposit it, plug a service in](img/console/plug-machine.webp)
 
 A developer needs the **developer capability** on their account (Application,
 Users). Then, once:

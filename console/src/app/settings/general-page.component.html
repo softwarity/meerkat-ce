@@ -80,10 +80,11 @@
         [topLevel]="true"
         (valueChange)="businessAccess.set($event)"
       />
+      <!-- It saves the hours and nothing else (the switches above apply on
+           click), so it sits in their card and locks with it. -->
+      <div class="flex justify-end">
+        <button matButton="filled" (click)="save()" [disabled]="saving()" i18n="@@Save">Save</button>
+      </div>
     </mat-card>
-
-    <div class="flex justify-end">
-      <button matButton="filled" (click)="save()" [disabled]="saving()" i18n="@@Save">Save</button>
-    </div>
   </div>
 }

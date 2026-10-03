@@ -141,7 +141,10 @@ export class OtelPageComponent {
   }
 
   private take(s: TelemetrySetting) {
-    this.enabled.set(s.enabled);
+    // On the community image nothing leaves, whatever the stored setting
+    // says - an imported Enterprise configuration carries it switched on. The
+    // screen shows what HAPPENS, not what was written down elsewhere.
+    this.enabled.set(s.enabled && s.enterprise);
     this.traces.set(s.traces);
     this.metrics.set(!!s.metrics);
     this.pushingMetrics.set(!!s.pushingMetrics);

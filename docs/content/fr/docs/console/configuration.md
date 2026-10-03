@@ -233,6 +233,10 @@ jusqu'à ce que le nouveau ait fait ses preuves.
   un effacement.
 - **Une configuration n'est pas une sauvegarde.** Les utilisateurs et les sessions n'y
   sont pas. C'est à cela que sert l'onglet Snapshot.
+- **L'image communautaire laisse de côté les parties Enterprise.** Une configuration
+  exportée d'une passerelle Enterprise s'importe dans une communautaire sans ses heures
+  de travail, sa mise en page, sa marque masquée, son export OpenTelemetry ni ses
+  annuaires ; le plan liste ce qui a été laissé de côté.
 - **Tirer depuis git ne change rien.** Ça range un document et ça vous montre le
   plan. La passerelle bascule quand quelqu'un active, pas quand le dépôt bouge.
 - **Un emplacement appartient à cette installation, pas au document.** Il n'est

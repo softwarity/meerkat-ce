@@ -2782,9 +2782,14 @@ type SessionInfo struct {
 type SessionFilter struct {
 	UserID string
 	Plane  string
-	Search string
-	Limit  int
-	Offset int
+	// Tenants narrows to sessions whose active organisation is one of these
+	// (an organisation's administrator), when Narrowed. A session with no
+	// active organisation belongs to none of them.
+	Tenants  []string
+	Narrowed bool
+	Search   string
+	Limit    int
+	Offset   int
 }
 
 // ListSessions lists the live sessions, newest first, and how many match.
@@ -2802,6 +2807,16 @@ func (s *Store) ListSessions(ctx context.Context, f SessionFilter, now int64) ([
 	if q := strings.TrimSpace(f.Search); q != "" {
 		where = append(where, "LOWER(u.username) LIKE ?")
 		args = append(args, "%"+strings.ToLower(q)+"%")
+	}
+	if f.Narrowed {
+		if len(f.Tenants) == 0 {
+			where = append(where, "1 = 0")
+		} else {
+			where = append(where, "s.tenant_id IN (?"+strings.Repeat(", ?", len(f.Tenants)-1)+")")
+			for _, t := range f.Tenants {
+				args = append(args, t)
+			}
+		}
 	}
 	from := ` FROM sessions s JOIN users u ON u.id = s.user_id LEFT JOIN tenants t ON t.id = s.tenant_id
 	          WHERE ` + strings.Join(where, " AND ")
@@ -2846,6 +2861,20 @@ func (s *Store) SessionHashByID(ctx context.Context, id string) (hash, userID, p
 		return "", "", "", fmt.Errorf("store: session %q: %w", id, err)
 	}
 	return hash, userID, plane, nil
+}
+
+// SessionTenantByID is the active organisation of one session, "" for none.
+func (s *Store) SessionTenantByID(ctx context.Context, id string) (string, error) {
+	if len(id) != 16 {
+		return "", fmt.Errorf("store: session %q: %w", id, sql.ErrNoRows)
+	}
+	var tenant string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT tenant_id FROM sessions WHERE token_hash LIKE ?`, id+"%").Scan(&tenant)
+	if err != nil {
+		return "", fmt.Errorf("store: session %q: %w", id, err)
+	}
+	return tenant, nil
 }
 
 // DeleteSession revokes a single session. Deleting an absent session is not

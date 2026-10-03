@@ -132,3 +132,55 @@ func TestAdministratorsSeeAndRevokeApplicationTokens(t *testing.T) {
 		t.Fatalf("not in the trail: %+v", events)
 	}
 }
+
+// An organisation's administrator sees the sessions open in the organisations
+// they administer, and ends those - nothing outside them.
+func TestATenantAdministratorSeesTheirOrganisationsSessions(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	for _, id := range []string{"t1", "t2"} {
+		if err := f.api.st.SaveTenant(ctx, store.Tenant{ID: id, Name: id, Enabled: true,
+			BusinessAccess: store.BusinessAccess{Inherited: true}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.api.st.SaveMembership(ctx, store.Membership{UserID: "bob", TenantID: "t1", Type: store.MemberAdmin,
+		Enabled: true, BusinessAccess: store.BusinessAccess{Inherited: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.api.st.CreateUser(ctx, store.User{ID: "carol", Username: "carol", PasswordHash: "x", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	future := time.Now().Add(time.Hour).Unix()
+	for _, s := range []store.Session{
+		{TokenHash: "cccccccccccccccc1111", UserID: "carol", TenantID: "t1", Plane: store.PlaneData, ExpiresAt: future, CreatedAt: 10},
+		{TokenHash: "dddddddddddddddd2222", UserID: "carol", TenantID: "t2", Plane: store.PlaneData, ExpiresAt: future, CreatedAt: 20},
+	} {
+		if err := f.api.st.CreateSession(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, out := f.call(t, "GET", "/api/sessions", "", f.plainC)
+	if code != http.StatusOK {
+		t.Fatalf("list: %d %s", code, out)
+	}
+	var p sessionPage
+	_ = json.Unmarshal([]byte(out), &p)
+	if len(p.Sessions) != 1 || p.Sessions[0].ID != "cccccccccccccccc" {
+		t.Fatalf("want t1's session only, got %+v", p.Sessions)
+	}
+	if code, _ := f.call(t, "DELETE", "/api/sessions/dddddddddddddddd", "", f.plainC); code != http.StatusNotFound {
+		t.Fatalf("ended a session of another organisation: %d", code)
+	}
+	if code, _ := f.call(t, "DELETE", "/api/sessions/cccccccccccccccc", "", f.plainC); code != http.StatusNoContent {
+		t.Fatalf("ending a session of their organisation: %d", code)
+	}
+}
+
+// Somebody who administers nothing reads no session at all.
+func TestSessionsAreRefusedToSomebodyWhoAdministersNothing(t *testing.T) {
+	f := setup(t)
+	if code, _ := f.call(t, "GET", "/api/sessions", "", f.plainC); code != http.StatusForbidden {
+		t.Fatalf("a plain account read sessions: %d", code)
+	}
+}

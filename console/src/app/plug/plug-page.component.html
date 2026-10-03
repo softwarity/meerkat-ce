@@ -1,5 +1,96 @@
+<mat-drawer-container class="wrap" autosize>
+<!-- What a developer runs, in order, for their own system. Help rather than
+     configuration, so in a drawer: worth having here and not only on their
+     profile page, since this is where whoever opens the tunnel checks what
+     the people using it will be told. -->
+<mat-drawer position="end" mode="over" [opened]="helpOpen()" (closed)="helpOpen.set(false)">
+  <div class="drawer-head">
+    <h2 i18n="@@Plug_group_machine">On a developer's machine</h2>
+    <button matIconButton (click)="helpOpen.set(false)" i18n-aria-label="@@Close" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+  <div class="drawer-body">
+  <mat-button-toggle-group
+    class="os"
+    [value]="os()"
+    (change)="os.set($event.value)"
+    hideSingleSelectionIndicator
+  >
+    <mat-button-toggle value="macos">macOS</mat-button-toggle>
+    <mat-button-toggle value="linux">Linux</mat-button-toggle>
+    <mat-button-toggle value="windows">Windows</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  <ol class="steps">
+    <li>
+      @if (os() === 'windows') {
+        <p i18n="@@Plug_step_install_windows">
+          <b>Install plug</b> from <b>Git Bash</b> (part of Git for Windows). It asks once for
+          Administrator rights.
+        </p>
+      } @else {
+        <p i18n="@@Plug_step_install_unix">
+          <b>Install plug</b> from a terminal. It may ask for your password once.
+        </p>
+      }
+      <app-snippet filename="install.sh" [downloadable]="false" [content]="installCmd()" />
+    </li>
+    <li>
+      <p i18n="@@Plug_step_rename">
+        <b>Name the profile</b>, passed with <code>-p</code> by every command below. The installer
+        names it after the host.
+      </p>
+      <app-form-field
+        class="profile"
+        icon="badge"
+        i18n-label="@@Plug_profile"
+        label="Profile name"
+        i18n-info="@@Plug_profile_info"
+        info="Only changes the commands on this page; nothing is saved."
+      >
+        <input
+          matInput
+          [value]="profile()"
+          (input)="profile.set($any($event.target).value)"
+          [placeholder]="addr().host"
+        />
+      </app-form-field>
+      <app-snippet filename="rename.sh" [downloadable]="false" [content]="renameCmd()" />
+    </li>
+    <li>
+      <p i18n="@@Plug_step_keys">
+        <b>Generate the key pair</b>, once. The second line copies the public key to the
+        clipboard.
+      </p>
+      <app-snippet filename="key-pair.sh" [downloadable]="false" [content]="keyCmd()" />
+    </li>
+    <li>
+      <p i18n="@@Plug_step_deposit">
+        <b>Deposit the public key</b> on your profile, signed in to the applications:
+        <a [href]="keyPage()" target="_blank" rel="noopener">{{ keyPage() }}</a>, or from the user
+        menu, Developer, plug key. Removing it blocks the next connection.
+      </p>
+    </li>
+    <li>
+      <p i18n="@@Plug_step_run">
+        <b>Plug a service in</b>: prefix the command that runs it. The cluster reaches it as
+        my-service:8080, forwarded to your local 3000.
+      </p>
+      <app-snippet filename="run.sh" [downloadable]="false" [content]="runCmd()" />
+    </li>
+  </ol>
+
+  </div>
+</mat-drawer>
+<mat-drawer-content>
+
 <div class="banner">
   <h1 i18n="@@Plug">Plug</h1>
+  <button matButton="tonal" (click)="helpOpen.set(true)">
+    <mat-icon>terminal</mat-icon>
+    <ng-container i18n="@@Plug_machine_button">On a developer's machine</ng-container>
+  </button>
 </div>
 
 <div class="content">
@@ -128,82 +219,6 @@
 
   </mat-card>
 
-  <mat-card appearance="outlined">
-  <!-- What a developer runs, in order, for their own system. Worth having
-       here and not only on their profile page: this is where whoever opens
-       the tunnel checks what the people using it will be told. -->
-  <h3 class="group" i18n="@@Plug_group_machine">On a developer's machine</h3>
-  <mat-button-toggle-group
-    class="os"
-    [value]="os()"
-    (change)="os.set($event.value)"
-    hideSingleSelectionIndicator
-  >
-    <mat-button-toggle value="macos">macOS</mat-button-toggle>
-    <mat-button-toggle value="linux">Linux</mat-button-toggle>
-    <mat-button-toggle value="windows">Windows</mat-button-toggle>
-  </mat-button-toggle-group>
-
-  <ol class="steps">
-    <li>
-      @if (os() === 'windows') {
-        <p i18n="@@Plug_step_install_windows">
-          <b>Install plug</b> from <b>Git Bash</b> (part of Git for Windows). It asks once for
-          Administrator rights.
-        </p>
-      } @else {
-        <p i18n="@@Plug_step_install_unix">
-          <b>Install plug</b> from a terminal. It may ask for your password once.
-        </p>
-      }
-      <app-snippet filename="install.sh" [downloadable]="false" [content]="installCmd()" />
-    </li>
-    <li>
-      <p i18n="@@Plug_step_rename">
-        <b>Name the profile</b>, passed with <code>-p</code> by every command below. The installer
-        names it after the host.
-      </p>
-      <app-form-field
-        class="profile"
-        icon="badge"
-        i18n-label="@@Plug_profile"
-        label="Profile name"
-        i18n-info="@@Plug_profile_info"
-        info="Only changes the commands on this page; nothing is saved."
-      >
-        <input
-          matInput
-          [value]="profile()"
-          (input)="profile.set($any($event.target).value)"
-          [placeholder]="addr().host"
-        />
-      </app-form-field>
-      <app-snippet filename="rename.sh" [downloadable]="false" [content]="renameCmd()" />
-    </li>
-    <li>
-      <p i18n="@@Plug_step_keys">
-        <b>Generate the key pair</b>, once. The second line copies the public key to the
-        clipboard.
-      </p>
-      <app-snippet filename="key-pair.sh" [downloadable]="false" [content]="keyCmd()" />
-    </li>
-    <li>
-      <p i18n="@@Plug_step_deposit">
-        <b>Deposit the public key</b> on your profile, signed in to the applications:
-        <a [href]="keyPage()" target="_blank" rel="noopener">{{ keyPage() }}</a>, or from the user
-        menu, Developer, plug key. Removing it blocks the next connection.
-      </p>
-    </li>
-    <li>
-      <p i18n="@@Plug_step_run">
-        <b>Plug a service in</b>: prefix the command that runs it. The cluster reaches it as
-        my-service:8080, forwarded to your local 3000.
-      </p>
-      <app-snippet filename="run.sh" [downloadable]="false" [content]="runCmd()" />
-    </li>
-  </ol>
-
-  </mat-card>
 
   <mat-card appearance="outlined">
   <!-- Who could plug in. The capability is granted on Users (application);
@@ -232,3 +247,6 @@
   </mat-card>
 }
 </div>
+
+</mat-drawer-content>
+</mat-drawer-container>

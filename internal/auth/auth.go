@@ -3331,6 +3331,11 @@ func (h *Handler) activeMemberships(ctx context.Context, userID string) ([]store
 // broken configuration (bad timezone) fails OPEN with a warning - a config
 // mistake must not lock every user out.
 func (h *Handler) withinHours(ctx context.Context, userID, tenantID string) bool {
+	// Enterprise (TENANT-04): the community image keeps the windows a
+	// configuration brought over and enforces none of them.
+	if !edition.Enterprise {
+		return true
+	}
 	ba, err := h.st.ResolveBusinessAccess(ctx, userID, tenantID)
 	if err != nil {
 		slog.Warn("business access resolution failed, allowing", "err", err)
