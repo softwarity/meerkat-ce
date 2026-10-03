@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/softwarity/meerkat/internal/certs"
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
 )
@@ -364,6 +365,10 @@ type tlsPayload struct {
 	// Issued is what the authority already holds, per domain, so the screen
 	// shows a real expiry rather than a form that says nothing.
 	Issued map[string]certs.Info `json:"issued,omitempty"`
+	// Published is where the runtime publishes this gateway's ports, inside
+	// port to outside one: the links are written with what the world reaches
+	// (19443), not with what the container listens on (9443).
+	Published discovery.Published `json:"published"`
 }
 
 func (a *API) tlsView(ctx context.Context) tlsPayload {
@@ -379,6 +384,7 @@ func (a *API) tlsView(ctx context.Context) tlsPayload {
 	if a.TLS != nil {
 		v.State = a.TLS.State()
 	}
+	v.Published = discovery.Self(ctx)
 	if cfg.ACME.Enabled {
 		cache := certs.StoreCache{S: a.st, Missing: func(err error) bool { return errors.Is(err, store.ErrNoRows) }}
 		issued := map[string]certs.Info{}

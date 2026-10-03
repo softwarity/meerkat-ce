@@ -348,9 +348,15 @@
           <mat-icon>lock_open_right</mat-icon><span>{{ link(e, 'http') }}</span>
         </a>
         @if (secure(e) && e.cert && !e.cert.pending) {
-          <a [href]="link(e, 'https')" target="_blank" rel="noopener">
-            <mat-icon>lock</mat-icon><span>{{ link(e, 'https') }}</span>
-          </a>
+          @if (unpublished(e); as port) {
+            <span class="unpublished" i18n="@@Https_port_unpublished">
+              HTTPS listens on {{ port }}, which the deployment does not publish.
+            </span>
+          } @else {
+            <a [href]="link(e, 'https')" target="_blank" rel="noopener">
+              <mat-icon>lock</mat-icon><span>{{ link(e, 'https') }}</span>
+            </a>
+          }
         }
       </span>
     }

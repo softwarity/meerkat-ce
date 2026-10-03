@@ -44,6 +44,19 @@ Une porte HTTPS par plan, à côté de celle en clair, ouverte et fermée pendan
 Un port dont on ne peut pas nommer le protocole est un port contre lequel personne ne peut écrire une
 règle de pare-feu ni une procédure, ce qui est la raison pour laquelle il y en a quatre et non deux.
 
+**Ce sont les ports à l'intérieur.** Entre eux et un navigateur il y a en général une correspondance :
+un Service Kubernetes qui publie `9443` en `19443`, un `-p` Docker, un ingress Swarm. La passerelle le
+demande à son environnement - son propre pod et les Services qui le sélectionnent, ou son conteneur par
+le socket Docker - et les liens de l'écran TLS portent le port que le monde atteint. Quand
+l'environnement ne publie pas une porte HTTPS, l'écran le dit plutôt que d'offrir un lien qui n'atteint
+rien. Le chart Helm publie les deux portes HTTPS par défaut (`service.appTlsPort`,
+`service.adminTlsPort`) et accorde la lecture nécessaire (`rbac.read`).
+
+> [!NOTE] Docker Desktop
+> Son Kubernetes publie les ports d'un LoadBalancer sur `localhost` à la création du Service, et ignore
+> ceux ajoutés ensuite. Après avoir monté une release vers un chart qui ajoute les ports HTTPS,
+> supprimez les deux Services et relancez `helm upgrade`.
+
 Remplacer un certificat, c'est échanger une tranche derrière un verrou : la poignée de main le lit par un
 rappel, donc l'écoute ne bouge pas et aucune connexion n'est coupée. Ouvrir une porte se lie **d'abord**
 et renvoie l'échec avant que rien n'ait changé - un port déjà pris ne doit pas laisser un exploitant

@@ -102,3 +102,36 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "meerkat.fullname" . }}
 {{- end }}
+{{- if ne ((.Values.rbac | default dict).read) false }}
+---
+# Read-only, and always there: what the gateway may LOOK at in its own
+# namespace. The services, for the route editor's discovery; its own pod and
+# the Services that select it, to say which port the world reaches each of its
+# doors on - an HTTPS link written with the container's 9443 reaches nothing
+# when the Service publishes it as 19443.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "meerkat.fullname" . }}-read
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "meerkat.fullname" . }}-read
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "meerkat.fullname" . }}-read
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" . }}
+{{- end }}

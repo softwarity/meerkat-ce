@@ -92,6 +92,11 @@ service:
   appPort: 8080   # application plane: what your users reach
   nodePort: ""    # pin the NodePort instead of taking the one k8s draws
   adminPort: 9090 # control plane: the admin console, keep it internal
+  # The HTTPS doors, published beside the plain ones (0 leaves one out). They
+  # answer once a certificate is posted in Infra, TLS; the console then links
+  # to the port published here, which it reads from this Service.
+  appTlsPort: 8443
+  adminTlsPort: 9443
   # How the CONTROL plane is reached. Its own setting, and ClusterIP by default,
   # because publishing the console is a decision and not a side effect of
   # publishing the application. Set it to LoadBalancer or NodePort where the
@@ -119,3 +124,9 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 podAnnotations: {}
+
+# Read-only access to the gateway's own namespace: the services (route
+# discovery) and its own pod (the ports it is published on). Set false where
+# a service account may read nothing.
+rbac:
+  read: true

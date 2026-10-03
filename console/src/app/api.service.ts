@@ -1317,6 +1317,9 @@ export interface TlsSettings {
   eabSecretSet: boolean;
   state: TlsState;
   issued?: Record<string, CertInfo>;
+  // Where the runtime publishes this gateway's ports, inside -> outside
+  // (JSON keys are strings). Absent ports are not published.
+  published?: { ports?: Record<string, number>; source?: string; why?: string };
 }
 
 // Trusted-browser policy (MFA-03): whether a user may skip the TOTP challenge

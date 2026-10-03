@@ -46,6 +46,20 @@ One HTTPS door per plane, beside the plain one, opened and closed while the gate
 A port whose protocol cannot be named is a port nobody can write a firewall rule or a
 runbook against, which is why there are four and not two.
 
+**Those are the ports inside.** Between them and a browser there is usually a
+mapping: a Kubernetes Service publishing `9443` as `19443`, a Docker `-p`, a Swarm
+ingress. The gateway asks its runtime - its own pod and the Services that select it,
+or its container through the Docker socket - and the links on the TLS screen carry
+the port the world reaches. When the runtime does not publish an HTTPS door, the
+screen says so instead of offering a link that reaches nothing. The Helm chart
+publishes both HTTPS doors by default (`service.appTlsPort`, `service.adminTlsPort`)
+and grants the read it takes (`rbac.read`).
+
+> [!NOTE] Docker Desktop
+> Its Kubernetes publishes a LoadBalancer's ports on `localhost` when the Service is
+> created, and ignores ports added later. After upgrading a release to a chart that
+> adds the HTTPS ports, delete the two Services and run `helm upgrade` again.
+
 Replacing a certificate is swapping a slice behind a lock: the handshake reads it through
 a callback, so the listener never moves and no connection is dropped. Opening a door binds
 **first** and returns the failure before anything has changed - a taken port must not leave

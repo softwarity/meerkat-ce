@@ -92,6 +92,12 @@
   community image.** Working hours, layouts, a hidden mark, the OpenTelemetry
   export and directories are left out, and the plan lists them - the rest of
   an Enterprise configuration still imports.
+- **Helm chart: the HTTPS doors are published** beside the plain ones
+  (`service.appTlsPort`, `service.adminTlsPort`), with a read-only role
+  (`rbac.read`) that lets the gateway see its own Service and pod.
+- **The TLS screen links to the port the world reaches** - 19443 rather than
+  the container's 9443 - read from Kubernetes, Docker or Swarm, and says when
+  an HTTPS door is not published at all.
 
 ---
 

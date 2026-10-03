@@ -387,9 +387,26 @@ export class TlsPageComponent {
         : scheme === 'http'
           ? st.appPlainAddr
           : st.appAddr;
-    const p = this.port(addr);
+    const p = this.outside(this.port(addr));
     const implied = scheme === 'http' ? '80' : '443';
     return `${scheme}://${p && p !== implied ? e.host + ':' + p : e.host}`;
+  }
+
+  // The port the world reaches an inside one on, when the runtime says
+  // (a Service publishing 9443 as 19443). Otherwise the inside one.
+  private outside(inside: string): string {
+    const pub = this.tls()?.published?.ports?.[inside];
+    return pub ? String(pub) : inside;
+  }
+
+  // Said when the runtime was asked and does not publish this HTTPS door: the
+  // link would reach nothing, and the fix is in the deployment, not here.
+  protected unpublished(e: Entry): string {
+    const pub = this.tls()?.published;
+    const st = this.state();
+    if (!pub?.source || !st) return '';
+    const inside = this.port(e.plane === 'console' ? st.consoleAddr : st.appAddr);
+    return inside && !pub.ports?.[inside] ? inside : '';
   }
 
   // A wildcard stands for names rather than being one, so there is nothing to

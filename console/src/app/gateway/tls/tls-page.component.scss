@@ -602,3 +602,8 @@ textarea.pem {
 .hsts {
   width: 190px;
 }
+
+.unpublished {
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}

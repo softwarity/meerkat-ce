@@ -15,6 +15,13 @@ spec:
       {{- with .Values.service.nodePort }}
       nodePort: {{ . }}
       {{- end }}
+    {{- with .Values.service.appTlsPort }}
+    # HTTPS, published by default: TLS is configured from the console, and a
+    # certificate posted there must not wait for somebody to edit a chart.
+    - name: app-tls
+      port: {{ . }}
+      targetPort: app-tls
+    {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -37,6 +44,11 @@ spec:
       {{- with .Values.service.adminNodePort }}
       nodePort: {{ . }}
       {{- end }}
+    {{- with .Values.service.adminTlsPort }}
+    - name: admin-tls
+      port: {{ . }}
+      targetPort: admin-tls
+    {{- end }}
 {{- if .Values.plug.enabled }}
 ---
 # The developer tunnel. How your developers reach it is a network decision, so

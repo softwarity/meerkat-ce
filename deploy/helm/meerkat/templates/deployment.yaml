@@ -42,6 +42,12 @@ spec:
               containerPort: 8080
             - name: admin
               containerPort: 9090
+            # The HTTPS doors. They open once a certificate is posted (Infra,
+            # TLS); until then the published ports refuse the connection.
+            - name: app-tls
+              containerPort: 8443
+            - name: admin-tls
+              containerPort: 9443
             {{- if .Values.plug.enabled }}
             - name: plug
               containerPort: {{ .Values.plug.port }}
