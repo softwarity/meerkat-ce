@@ -1168,11 +1168,16 @@
               <a routerLink="/infra/endpoint-audit">Endpoint audit</a>.</ng-container>
           }
         </p>
-        <div class="css-row">
+        <div class="css-row" ee-feature="AUD-04">
           <button matButton="tonal" type="button" (click)="auditFile.click()" [disabled]="!route()">
             <mat-icon>upload_file</mat-icon>
             <ng-container i18n="@@Upload_audit">Upload audit configuration</ng-container>
           </button>
+          <app-ee-lock
+            feature="AUD-04"
+            i18n-why="@@Endpoint_audit_ee_why"
+            why="Record chosen operations of a route in the audit trail, sent to your collector."
+          />
           <input #auditFile type="file" accept="application/json,.json" hidden (change)="uploadAudit(auditFile)" />
         </div>
         @if (auditUploadError(); as err) {

@@ -7,6 +7,15 @@
         <ng-container i18n="@@Endpoint_rate_limits">Endpoint rate limits</ng-container>
       } @else if (intent() === 'audit') {
         <ng-container i18n="@@Endpoint_audit">Endpoint audit</ng-container>
+        <!-- Enterprise (AUD-04): an audited call becomes an event sent to the
+             collector, and sending it is the Enterprise export. On the
+             community image the switches below are locked: a rule nothing
+             would ever send is a trail that looks kept and is not. -->
+        <app-ee-lock
+          feature="AUD-04"
+          i18n-why="@@Endpoint_audit_ee_why"
+          why="Record chosen operations of a route in the audit trail, sent to your collector."
+        />
       } @else {
         <ng-container i18n="@@Endpoint_security">Endpoint security</ng-container>
       }
@@ -48,7 +57,7 @@
   @if (intent() === 'audit' && selectedId()) {
     <!-- The rules as a file: what the route editor's OpenTelemetry section
          uploads, onto this route or another one. -->
-    <button matButton="tonal" type="button" (click)="exportAudit()">
+    <button matButton="tonal" type="button" ee-feature="AUD-04" (click)="exportAudit()">
       <mat-icon>download</mat-icon>
       <ng-container i18n="@@Export">Export</ng-container>
     </button>
@@ -59,7 +68,7 @@
       Which operations leave an audit event, sent to the collector when the
       <a routerLink="/infra/opentelemetry">OpenTelemetry</a> audit is on.
     </p>
-    @if (!auditSent()) {
+    @if (enterprise() && !auditSent()) {
       <!-- Said where the switches are: an operation ticked here while the
            audit is not sent is a trail that looks kept and is not. -->
       <p class="audit-off" i18n="@@Endpoint_audit_not_sent">
@@ -98,7 +107,7 @@
   </div>
 } @else if (!loadingOps() && data()) {
 
-  <div class="table-wrap">
+  <div class="table-wrap" [attr.ee-feature]="intent() === 'audit' ? 'AUD-04' : null">
     <table
       mat-table
       [dataSource]="sortedOps()"

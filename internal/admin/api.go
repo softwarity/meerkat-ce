@@ -11,11 +11,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/cluster"
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/metrics"
@@ -374,6 +376,14 @@ func (a *API) saveRoute(ctx context.Context, actor store.User, route store.Route
 	old, hadRoute := store.Route{}, false
 	if prev, err := a.st.GetRoute(ctx, route.ID); err == nil {
 		old, hadRoute = prev, true
+	}
+	// Endpoint audit is Enterprise (AUD-04). Refused only when the rules
+	// CHANGE: a route saved on the community image with rules a configuration
+	// brought over keeps them, unapplied, rather than being unsaveable.
+	if newAudit := auditOf(route); len(newAudit) > 0 && !reflect.DeepEqual(newAudit, auditOf(old)) {
+		if err := edition.Require("auditing a route's operations"); err != nil {
+			return route, invalidErr(err)
+		}
 	}
 	// A route that stops declaring a deposited spec drops the file with it:
 	// bytes nothing names any more are bytes nobody will ever delete on

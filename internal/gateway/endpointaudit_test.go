@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/store/dbtest"
@@ -21,6 +22,9 @@ import (
 // names and the body with its secrets masked - and the upstream still gets the
 // whole body (AUD-04).
 func TestAnAuditedCallBecomesAnEventAndTheBodyStillArrives(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("endpoint audit is Enterprise: the community image keeps the rules and applies none (AUD-04)")
+	}
 	var got sync.Map
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
@@ -126,5 +130,19 @@ func TestAnAuditFieldMustSayWhereFrom(t *testing.T) {
 		if err := store.ValidateAudit(bad); err == nil {
 			t.Errorf("accepted %+v", bad)
 		}
+	}
+}
+
+// On the community image the rules a configuration carries are kept and not
+// applied: the call goes through untouched and no event is built.
+func TestTheCommunityImageAppliesNoEndpointAudit(t *testing.T) {
+	if edition.Enterprise {
+		t.Skip("the community image's behaviour")
+	}
+	route := pathRoute("r1", "orders", 1, "/**", "http://127.0.0.1:1")
+	route.API = &store.RouteAPI{Audit: []store.EndpointAudit{{Method: "GET", Path: "/x"}}}
+	rt := newRouter(t, route)
+	if rt.Problems()["r1"] != "" {
+		t.Fatalf("a route carrying audit rules was left out: %s", rt.Problems()["r1"])
 	}
 }

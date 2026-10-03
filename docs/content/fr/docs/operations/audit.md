@@ -162,6 +162,11 @@ chaque route, avec un interrupteur par opération. Un appel audité devient un
 **Audit** d'OpenTelemetry est allumé. Rien n'est stocké ici : le volume est celui
 du plan de données.
 
+Sur l'image communautaire, l'écran est verrouillé, comme l'import dans l'éditeur
+de route : un événement que rien n'enverrait jamais est un journal qui a l'air tenu
+et ne l'est pas. Les règles qu'une configuration apporte de l'image Enterprise sont
+gardées avec la route sans être appliquées, et peuvent toujours être retirées.
+
 ![Endpoint audit avec l'opération de remboursement ouverte : deux champs pris dans l'appel, et le corps JSON porté](img/console/endpoint-audit.webp)
 
 | Toujours porté | |

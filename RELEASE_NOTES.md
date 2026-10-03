@@ -67,6 +67,10 @@
   contract: what each does, how far it is built, and the screen it lives on -
   or that it has none, like the active/active cluster. It opens from the
   account menu, under the version, which now says EE or CE.
+- **Endpoint audit is locked on the community image**, as an Enterprise
+  feature should be: its events only leave through the collector export. The
+  screen and the upload are locked, the API refuses new rules, and rules
+  carried over from an Enterprise configuration are kept but not applied.
 
 ---
 

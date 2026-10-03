@@ -164,6 +164,11 @@ OpenAPI contract, with a switch per operation. An audited call becomes an audit
 event, sent to the collector with the rest of the trail when the OpenTelemetry
 **Audit** tab is on. Nothing is stored here: the volume is the data plane's.
 
+On the community image the screen is locked, and so is the route editor's
+upload: an event nothing would ever send is a trail that looks kept and is not.
+Rules a configuration brings over from the Enterprise image are kept with the
+route and not applied, and can still be removed.
+
 ![Endpoint audit with the refund operation open: two fields taken from the call, and the JSON body carried](img/console/endpoint-audit.webp)
 
 | Always carried | |

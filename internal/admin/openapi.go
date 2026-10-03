@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/openapi"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -175,6 +176,15 @@ func (a *API) putRouteAudit(w http.ResponseWriter, r *http.Request, actor store.
 	if err := store.ValidateAudit(body.Endpoints); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	// Enterprise (AUD-04): the events go to the collector, which only that
+	// edition exports to. Emptying the list stays allowed - a configuration
+	// brought over from the other image must be able to drop its rules.
+	if len(body.Endpoints) > 0 {
+		if err := edition.Require("auditing a route's operations"); err != nil {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
 	}
 	before := routeAuditPayload{Endpoints: auditOf(route)}
 	api := store.RouteAPI{}

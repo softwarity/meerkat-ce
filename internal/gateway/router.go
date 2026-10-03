@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	filtering "github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/openapi"
@@ -1001,8 +1002,11 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 		return compiledRoute{}, fmt.Errorf("route poses security but no session manager is configured")
 	}
 	// Endpoint audit (AUD-04), around the guard: it sees the answer the caller
-	// got, refusals included, and decides nothing.
-	if r.API != nil && len(r.API.Audit) > 0 {
+	// got, refusals included, and decides nothing. Enterprise: its events leave
+	// through the collector export, so on the community image the rules a
+	// configuration may carry are kept and not applied - no body read and
+	// buffered for an event nothing would send.
+	if r.API != nil && len(r.API.Audit) > 0 && edition.Enterprise {
 		if err := store.ValidateAudit(r.API.Audit); err != nil {
 			return compiledRoute{}, err
 		}

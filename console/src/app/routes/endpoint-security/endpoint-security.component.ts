@@ -1,3 +1,5 @@
+import { EeLockComponent } from '../../shared/ee-lock.component';
+import { MeService } from '../../me.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -123,6 +125,7 @@ function fromWire(a: Access | undefined): AccessState {
     AccessEditorComponent,
     AccessBadgesComponent,
     RateLimitsComponent,
+    EeLockComponent,
   ],
   templateUrl: './endpoint-security.component.html',
   styleUrl: './endpoint-security.component.scss',
@@ -176,6 +179,8 @@ export class EndpointSecurityComponent {
   // Audited operations the spec no longer declares: kept on save.
   private readonly auditExtras = signal<EndpointAudit[]>([]);
   protected readonly auditedCount = computed(() => Object.keys(this.audits()).length);
+  // Endpoint audit is Enterprise (AUD-04): locked on the community image.
+  protected readonly enterprise = inject(MeService).enterprise;
   // Whether audit events leave at all: the OpenTelemetry Audit switch governs
   // every audit, these operations' included. Read once, for the warning.
   protected readonly auditSent = toSignal(
