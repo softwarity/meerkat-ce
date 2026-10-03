@@ -120,7 +120,7 @@ func TestTheRedirectGoesToThePublishedPort(t *testing.T) {
 		}
 		return 0
 	})
-	h := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	h := d.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	r := httptest.NewRequest("GET", "http://app.example:8081/x", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
