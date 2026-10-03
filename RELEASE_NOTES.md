@@ -65,7 +65,8 @@
   new key, then the old one goes.
 - **The License screen lists every Enterprise feature**, from the product's own
   contract: what each does, how far it is built, and the screen it lives on -
-  or that it has none, like the active/active cluster.
+  or that it has none, like the active/active cluster. It opens from the
+  account menu, under the version, which now says EE or CE.
 
 ---
 

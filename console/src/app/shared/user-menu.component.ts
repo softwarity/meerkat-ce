@@ -4,6 +4,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 import { RailnavItemComponent } from '@softwarity/rail-nav';
 import { SessionWatchService } from '../session';
 import { httpResource } from '@angular/common/http';
@@ -20,7 +21,7 @@ import { ReleaseNotes, ReleaseNotesDialogComponent } from './release-notes.compo
 // gone, and choosing it walked into a URL nobody serves.
 @Component({
   selector: 'app-user-menu',
-  imports: [MatDividerModule, MatIconModule, MatMenuModule, MatTooltipModule, RailnavItemComponent],
+  imports: [MatDividerModule, MatIconModule, MatMenuModule, MatTooltipModule, RailnavItemComponent, RouterLink],
   styles: [
     `
       .avatar {
@@ -116,9 +117,16 @@ import { ReleaseNotes, ReleaseNotesDialogComponent } from './release-notes.compo
           matTooltipPosition="right"
         >
           <mat-icon>new_releases</mat-icon>
-          <span i18n="@@Meerkat_VERSION">Meerkat {{ n.version }}</span>
+          <span i18n="@@Meerkat_VERSION_EDITION">Meerkat {{ n.version }} {{ enterprise() ? 'EE' : 'CE' }}</span>
         </button>
       }
+      <!-- The edition's own screen: what the Enterprise edition carries, or
+           would add (CONSOLE-14). Beside the version, which says which one
+           this is. -->
+      <a mat-menu-item routerLink="/license">
+        <mat-icon>workspace_premium</mat-icon>
+        <span i18n="@@License">License</span>
+      </a>
       <button mat-menu-item (click)="logout()">
         <mat-icon>logout</mat-icon>
         <span i18n="@@Sign_out">Sign out</span>
@@ -130,7 +138,10 @@ export class UserMenuComponent {
   private readonly api = inject(ApiService);
   private readonly watch = inject(SessionWatchService);
 
-  protected readonly user = inject(MeService).user;
+  private readonly me = inject(MeService);
+  protected readonly user = this.me.user;
+  // Which image answered, for the version line: EE or CE.
+  protected readonly enterprise = this.me.enterprise;
   protected readonly username = computed(() => this.user()?.username ?? '');
   // The profile photo, asked for on its own: the console reads its identity
   // from the <body> stamp the gateway writes, and a data URI does not travel

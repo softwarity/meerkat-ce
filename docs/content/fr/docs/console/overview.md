@@ -142,8 +142,12 @@ en dessous, et elle déconnecte tous les onglets de la console d'un coup.
 
 ![La fenêtre des notes de version : Meerkat 1.0.1, les notes du correctif, puis 1.0.0](img/console/release-notes.webp)
 
-Le menu du compte dit quelle version tourne : **Meerkat 1.0.1**. Un clic ouvre
+Le menu du compte dit quelle version tourne, et quelle édition : **Meerkat 1.0.1 EE**
+(ou **CE**). Un clic ouvre
 les notes de version, de la plus récente à la plus ancienne, de cette version
 jusqu'à sa version mineure - le même texte que la release GitHub. Une build de
 développement affiche la dernière version qu'elle porte, avec ce qui arrive sous
 **Next release** en tête ; une section vide indique *Missing information*.
+
+Juste en dessous, **License** ouvre l'écran de l'édition : chaque fonction
+Enterprise, où elle en est, et où elle vit.

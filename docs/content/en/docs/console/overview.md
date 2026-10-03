@@ -139,8 +139,12 @@ signs out every console tab at once.
 
 ![The release notes window: Meerkat 1.0.1, its patch notes, then 1.0.0](img/console/release-notes.webp)
 
-The account menu says which version runs: **Meerkat 1.0.1**. Click it for the
+The account menu says which version runs, and which edition: **Meerkat 1.0.1 EE**
+(or **CE**). Click it for the
 release notes, newest first, from that version down to its minor release - the
 same text as the GitHub release. A development build shows the last release it
 carries, with what is coming under **Next release** on top; an empty section
 says *Missing information*.
+
+Right under it, **License** opens the edition's screen: every Enterprise
+feature, how far it is built, and where it lives.
