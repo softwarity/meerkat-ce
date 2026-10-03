@@ -93,6 +93,16 @@ ni à une adresse IP (les navigateurs l'y ignorent), jamais par-dessus la valeur
 filtre [security-headers](/docs/filters/security-headers) d'une route a posée, et sans
 `includeSubDomains`.
 
+> [!NOTE] Seulement sur 443 - une limite des navigateurs
+> HSTS n'est envoyé que si le HTTPS est atteint sur **443**, le HTTP en clair étant sur 80. Un
+> navigateur applique la promesse à tous les ports du nom, et quand il bascule une requête en HTTPS
+> il garde le port : avec HSTS sur `8443`, il réécrirait `http://nom:8080` en `https://nom:8080` -
+> un port en clair - et toutes les adresses en clair sous ce nom, celle de la console comprise,
+> cesseraient de répondre. Sur les autres ports, la redirection seule fait le travail, à chaque
+> visite, et les réponses HTTPS portent `max-age=0`, qui fait oublier au navigateur une promesse
+> faite avant. Le même `max-age=0` est envoyé quand Force HTTPS est éteint, pour que les
+> navigateurs cessent d'insister dès leur visite HTTPS suivante plutôt qu'à la fin de la durée.
+
 > [!WARNING]
 > Un navigateur tient la promesse pendant toute la durée, même si les certificats disparaissent, et
 > ne propose plus de passer outre un mauvais certificat. Commencez par un jour ; allongez une fois le

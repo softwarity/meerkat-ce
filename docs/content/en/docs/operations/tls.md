@@ -98,6 +98,17 @@ force HTTPS on all its developer's local applications) nor to an IP address
 [security-headers](/docs/filters/security-headers) filter already set, and
 without `includeSubDomains`.
 
+> [!NOTE] Only on 443 - a browser limitation
+> HSTS is sent only when HTTPS is reached on **443**, with plain HTTP on 80. A
+> browser applies the promise to every port of the name, and when it switches a
+> request to HTTPS it keeps the port: given HSTS on `8443`, it would rewrite
+> `http://name:8080` to `https://name:8080` - a plain port - and every address in
+> the clear under that name, the console's included, would stop answering. On
+> other ports the redirect alone does the work, on every visit, and HTTPS answers
+> carry `max-age=0`, which makes a browser forget a promise made before. The same
+> `max-age=0` is sent when Force HTTPS is switched off, so browsers stop insisting
+> at their next HTTPS visit rather than when the duration runs out.
+
 > [!WARNING]
 > A browser keeps the promise for the whole duration, even if the certificates
 > are taken away, and no longer offers to continue past a bad certificate. Start

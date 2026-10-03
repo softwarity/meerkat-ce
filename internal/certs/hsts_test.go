@@ -9,7 +9,8 @@ import (
 
 // Strict-Transport-Security, gateway-wide (SSL-06): on every HTTPS answer when
 // it is set, never on plain HTTP, never over a value the service or a route
-// already chose, and not at all when it is off.
+// already chose, and max-age=0 when it is off - which makes a browser forget a
+// promise made before, instead of refusing plain HTTP for a day.
 func TestHSTSIsStampedOnHTTPSAnswersOnly(t *testing.T) {
 	d := NewRedirect()
 	plain := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) }))
@@ -30,8 +31,8 @@ func TestHSTSIsStampedOnHTTPSAnswersOnly(t *testing.T) {
 		return rec.Header().Get("Strict-Transport-Security")
 	}
 
-	if got := call(plain, true); got != "" {
-		t.Fatalf("off, yet sent: %q", got)
+	if got := call(plain, true); got != "max-age=0" {
+		t.Fatalf("off: want the promise withdrawn, got %q", got)
 	}
 	d.SetHSTS(86400)
 	if got := call(plain, true); got != "max-age=86400" {
@@ -82,5 +83,48 @@ func TestHSTSFollowsTheRedirect(t *testing.T) {
 	}
 	if got := (Settings{HSTSMaxAge: 3600}).HSTS(true); got != 3600 {
 		t.Fatalf("a chosen length: %d", got)
+	}
+}
+
+// A browser keeps the port when HSTS switches it to HTTPS, so a promise made
+// on 8443 sends http://name:8080 to https://name:8080, a plain port. Off 443
+// the promise is withdrawn instead, and the redirect does the work.
+func TestHSTSIsPromisedOnlyOn443(t *testing.T) {
+	d := NewRedirect()
+	d.SetHSTS(86400)
+	h := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for host, want := range map[string]string{
+		"app.example.com":      "max-age=86400",
+		"app.example.com:443":  "max-age=86400",
+		"app.example.com:8443": "max-age=0",
+	} {
+		r := httptest.NewRequest("GET", "https://"+host+"/", nil)
+		r.Host = host
+		r.TLS = &tls.ConnectionState{}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		if got := rec.Header().Get("Strict-Transport-Security"); got != want {
+			t.Errorf("%s: %q, want %q", host, got, want)
+		}
+	}
+}
+
+// The plain port sends the caller to where the world reaches HTTPS - the
+// published port - not to where the container listens.
+func TestTheRedirectGoesToThePublishedPort(t *testing.T) {
+	d := NewRedirect()
+	d.Set(true, ":8443")
+	d.SetPublished(func(inside int) int {
+		if inside == 8443 {
+			return 8444
+		}
+		return 0
+	})
+	h := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	r := httptest.NewRequest("GET", "http://app.example:8081/x", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	if got := rec.Header().Get("Location"); got != "https://app.example:8444/x" {
+		t.Fatalf("redirected to %q", got)
 	}
 }

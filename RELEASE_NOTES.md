@@ -102,6 +102,12 @@
   now end with an identifier generated at install, so an Enterprise and a
   community gateway side by side on `localhost` no longer sign each other out.
   Everyone signs in once after the upgrade.
+- **HSTS only on port 443.** A browser keeps the port when HSTS switches it to
+  HTTPS, so a promise made on 8443 broke every plain address of the name. Off
+  443 the redirect alone does the work, and HTTPS answers tell browsers to
+  forget an earlier promise - as they now do when Force HTTPS is switched off.
+- **The redirect to HTTPS uses the published port** (8444 for a Service
+  publishing 8443 as 8444), not the container's.
 
 ---
 

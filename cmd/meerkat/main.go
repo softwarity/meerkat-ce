@@ -28,6 +28,7 @@ import (
 	"github.com/softwarity/meerkat/internal/cluster"
 	"github.com/softwarity/meerkat/internal/config"
 	"github.com/softwarity/meerkat/internal/devtunnel"
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/expiry"
@@ -638,6 +639,21 @@ func run(o options) error {
 	// plain port for good: it is what a broken certificate gets repaired from.
 	dataRedirect := certs.NewRedirect()
 	srv.Handler = dataRedirect.Wrap(srv.Handler)
+	// Where the runtime publishes the HTTPS door, so the plain port sends
+	// callers where they can go (8444) rather than where the container
+	// listens (8443). Read now and again every few minutes: a Service edited
+	// by hand changes it with no restart.
+	go func() {
+		for {
+			ports := discovery.Self(ctx).Ports
+			dataRedirect.SetPublished(func(inside int) int { return ports[inside] })
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Minute):
+			}
+		}
+	}()
 	tlsSup := certs.NewSupervisor(st,
 		func(err error) bool { return errors.Is(err, store.ErrNoRows) },
 		certs.NewListener("data", o.tlsAddr, srv.Handler, nil),

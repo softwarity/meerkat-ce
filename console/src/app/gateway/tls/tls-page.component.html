@@ -97,6 +97,12 @@
         With HTTPS forced, browsers are told to use HTTPS only for this duration, even if the
         certificates go: start short. Not sent to localhost or an IP address.
       </p>
+      <p class="note" i18n="@@Hsts_port_note">
+        HSTS is sent only when HTTPS is reached on port 443, plain HTTP being on 80: a browser
+        applies it to every port of the name and keeps the port when it switches, so on other
+        ports it would break every plain address. There, the redirect alone does the work, and
+        browsers are told to forget a promise made before.
+      </p>
     </section>
 
     @for (p of problems(); track p) {

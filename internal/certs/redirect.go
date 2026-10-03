@@ -33,6 +33,17 @@ type Redirect struct {
 	// hsts is the Strict-Transport-Security max-age stamped on HTTPS answers,
 	// 0 for none.
 	hsts int
+	// published maps an inside port to the one the world reaches it on (a
+	// Service publishing 8443 as 8444): the caller is sent where it can go,
+	// not where the container listens. Nil: the inside port.
+	published func(inside int) int
+}
+
+// SetPublished says where the runtime publishes each inside port.
+func (d *Redirect) SetPublished(f func(inside int) int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.published = f
 }
 
 // SetHSTS says how long browsers are told to use HTTPS only, 0 for not at all.
@@ -72,11 +83,29 @@ func (d *Redirect) Wrap(next http.Handler) http.Handler {
 			// Over HTTPS: served, and told to stay here (SSL-06). Never on
 			// plain HTTP - a browser ignores it there, and a proxy that
 			// believed it would be believing a request anyone could forge.
+			//
+			// ONLY ON 443. A browser applies HSTS to every port of a name, and
+			// when it switches a request to HTTPS it keeps the port (80
+			// becoming 443 is the one exception). A promise made on 8443 sends
+			// http://name:8080 to https://name:8080 - a plain port - and every
+			// address in the clear under that name, the console's included,
+			// stops answering. Off 443 the redirect alone does the work, on
+			// every visit.
+			//
+			// And everywhere else, max-age=0: the standard way to make a
+			// browser FORGET a promise made earlier - when Force HTTPS is
+			// switched off, or by a gateway that used to make it on 8443.
+			// Without it the browser keeps refusing plain HTTP for the whole
+			// length it was told, whatever the setting says now.
 			d.mu.RLock()
 			hsts := d.hsts
 			d.mu.RUnlock()
-			if hsts > 0 && hstsHost(r.Host) {
-				w = &hstsWriter{ResponseWriter: w, value: "max-age=" + strconv.Itoa(hsts)}
+			if hstsHost(r.Host) {
+				value := "max-age=0"
+				if hsts > 0 && standardHTTPS(r.Host) {
+					value = "max-age=" + strconv.Itoa(hsts)
+				}
+				w = &hstsWriter{ResponseWriter: w, value: value}
 			}
 			next.ServeHTTP(w, r)
 			return
@@ -87,13 +116,39 @@ func (d *Redirect) Wrap(next http.Handler) http.Handler {
 		}
 		target := *r.URL
 		target.Scheme = "https"
-		target.Host = secureHost(r.Host, to)
+		target.Host = secureHost(r.Host, d.publishedAddr(to))
 		code := http.StatusPermanentRedirect
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {
 			code = http.StatusMovedPermanently
 		}
 		http.Redirect(w, r, target.String(), code)
 	})
+}
+
+// publishedAddr is the HTTPS address with the port the world reaches it on.
+func (d *Redirect) publishedAddr(tlsAddr string) string {
+	d.mu.RLock()
+	f := d.published
+	d.mu.RUnlock()
+	if f == nil {
+		return tlsAddr
+	}
+	i := strings.LastIndex(tlsAddr, ":")
+	inside, err := strconv.Atoi(tlsAddr[i+1:])
+	if err != nil {
+		return tlsAddr
+	}
+	if out := f(inside); out > 0 {
+		return ":" + strconv.Itoa(out)
+	}
+	return tlsAddr
+}
+
+// standardHTTPS says the caller reached HTTPS on 443, the one port a browser's
+// HSTS upgrade lands on.
+func standardHTTPS(hostport string) bool {
+	_, port, err := net.SplitHostPort(hostport)
+	return err != nil || port == "443"
 }
 
 // secureHost keeps the host the caller used and swaps in the HTTPS port. The
