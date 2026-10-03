@@ -53,13 +53,19 @@
     <!-- Outside the Material field on purpose: an explanation is not an action
          on the value, so it does not belong in the suffix row competing with
          the reveal/clear/vault tools. Same line, its own quiet marker. -->
+    <!-- A plain button and not a matIconButton: it has to take the focus,
+         or the tooltip never reaches a keyboard or a finger, but nothing
+         happens on a click - so no ripple and no hover disc saying there
+         will. Its name is short; the explanation is the tooltip's, which
+         matTooltip already hands to screen readers as the description -
+         carrying it in aria-label too had it read twice. -->
     <button
-      matIconButton
       type="button"
       class="field-info"
       [matTooltip]="info()"
       matTooltipPositionAtOrigin
-      [attr.aria-label]="info()"
+      i18n-aria-label="@@More_information"
+      aria-label="More information"
       (click)="$event.preventDefault()"
     ><mat-icon>info</mat-icon></button>
   }

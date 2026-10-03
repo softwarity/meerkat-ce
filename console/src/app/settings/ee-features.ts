@@ -122,6 +122,12 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     where: '/infra/opentelemetry',
     whereLabel: $localize`:@@OpenTelemetry:OpenTelemetry`,
   },
+  'SSL-05': {
+    label: $localize`:@@EE_SSL_05:ACME certificates`,
+    what: $localize`:@@EE_SSL_05_what:Have Let's Encrypt, ZeroSSL or your own authority issue and renew certificates on their own.`,
+    where: '/infra/tls',
+    whereLabel: $localize`:@@TLS:TLS`,
+  },
   'AUD-04': {
     label: $localize`:@@EE_AUD_04:Endpoint audit`,
     what: $localize`:@@EE_AUD_04_what:Record chosen operations of a route in the audit trail.`,

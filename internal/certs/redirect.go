@@ -37,6 +37,33 @@ type Redirect struct {
 	// Service publishing 8443 as 8444): the caller is sent where it can go,
 	// not where the container listens. Nil: the inside port.
 	published func(inside int) int
+	// serves says whether the HTTPS door has a certificate for a host. Nil:
+	// every host is redirected.
+	serves func(host string) bool
+}
+
+// SetServes says which hosts the HTTPS door answers for. Only those are sent
+// there: a caller reaching the gateway by a name no certificate carries - a
+// service inside the cluster calling http://meerkat:8080 - would be sent to a
+// handshake it cannot complete, and stop working the day somebody forced
+// HTTPS for the browsers.
+func (d *Redirect) SetServes(f func(host string) bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.serves = f
+}
+
+func (d *Redirect) servesHost(host string) bool {
+	d.mu.RLock()
+	f := d.serves
+	d.mu.RUnlock()
+	if f == nil {
+		return true
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return f(strings.Trim(strings.ToLower(host), "[]"))
 }
 
 // SetPublished says where the runtime publishes each inside port.
@@ -110,7 +137,7 @@ func (d *Redirect) Wrap(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if !on || exemptFromRedirect(r.URL.Path) {
+		if !on || exemptFromRedirect(r.URL.Path) || !d.servesHost(r.Host) {
 			next.ServeHTTP(w, r)
 			return
 		}

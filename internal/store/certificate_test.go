@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -35,7 +34,7 @@ func material(t *testing.T, host string) *certs.Material {
 func row(t *testing.T, id, host string) Certificate {
 	m := material(t, host)
 	return Certificate{
-		ID: id, Plane: PlaneApp, Host: host, Source: CertSourceImport,
+		ID: id, App: true, Source: CertSourceImport,
 		CertPEM: m.CertPEM, KeyPEM: m.KeyPEM, Info: m.Info,
 	}
 }
@@ -79,8 +78,7 @@ func TestASigningRequestServesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	pending := Certificate{
-		ID: "p", Plane: PlaneApp, Host: "pending.example.com",
-		Source: CertSourceCSR, CSRPEM: csrPEM, KeyPEM: keyPEM,
+		ID: "p", Source: CertSourceCSR, CSRPEM: csrPEM, KeyPEM: keyPEM,
 	}
 	if err := st.SaveCertificate(ctx, pending); err != nil {
 		t.Fatal(err)
@@ -126,9 +124,8 @@ func TestOneBadCertificateDoesNotSinkTheOthers(t *testing.T) {
 	if len(problems) != 1 || !strings.Contains(problems[0], "bad.example.com") {
 		t.Fatalf("the broken one must be named: %v", problems)
 	}
-	// Something is always presented to a client that sends no name: the first
-	// entry of the plane. There is no star to tick, because with one
-	// certificate per host there is nothing to choose between.
+	// Something is always presented to a client that sends no name: the
+	// oldest certificate placed on the plane.
 	if fallback == nil {
 		t.Fatal("a client that sends no server name must still be answered")
 	}
@@ -185,115 +182,167 @@ func TestSaveCertificateNamesWhatItRefuses(t *testing.T) {
 		t.Fatalf("the error must list the allowed sources: %v", err)
 	}
 
-	c = row(t, "y", "y.example.com")
-	c.Plane = "somewhere"
-	if err := st.SaveCertificate(ctx, c); err == nil || !strings.Contains(err.Error(), PlaneConsole) {
-		t.Fatalf("the error must list the allowed planes: %v", err)
+	// A signing request has nothing to present: placing it would open a door
+	// on a certificate that does not exist yet.
+	csrPEM, keyPEM, err := certs.NewCSR(certs.Request{DNSNames: []string{"p.example.com"}})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// A certificate belongs to the name it answers for: without one there is
-	// nothing to file it under.
-	c = row(t, "z", "z.example.com")
-	c.Host = ""
-	if err := st.SaveCertificate(ctx, c); err == nil || !strings.Contains(err.Error(), "needs a host") {
-		t.Fatalf("a certificate with no host must be refused: %v", err)
+	pending := Certificate{ID: "p", App: true, Source: CertSourceCSR, CSRPEM: csrPEM, KeyPEM: keyPEM}
+	if err := st.SaveCertificate(ctx, pending); err == nil || !strings.Contains(err.Error(), "signing request") {
+		t.Fatalf("a placed signing request must be refused: %v", err)
 	}
 }
 
-// TestTheTwoPlanesDoNotShare is the simplification made testable: the same
-// material used by both is two entries, and each plane's door only ever sees
-// its own.
-func TestTheTwoPlanesDoNotShare(t *testing.T) {
+// TestOnePieceOfMaterialServesBothPlanes is the pool made testable: one row,
+// placed twice, reaches both doors; a row in reserve reaches neither.
+func TestOnePieceOfMaterialServesBothPlanes(t *testing.T) {
 	st := certStore(t)
 	ctx := context.Background()
-	m := material(t, "localhost")
-	for i, plane := range []string{PlaneConsole, PlaneApp} {
-		c := Certificate{
-			ID: fmt.Sprintf("c%d", i), Plane: plane, Host: "localhost",
-			Source: CertSourceImport, CertPEM: m.CertPEM, KeyPEM: m.KeyPEM, Info: m.Info,
-		}
-		if err := st.SaveCertificate(ctx, c); err != nil {
-			t.Fatal(err)
-		}
+	both := row(t, "both", "localhost")
+	both.Console = true
+	if err := st.SaveCertificate(ctx, both); err != nil {
+		t.Fatal(err)
+	}
+	spare := row(t, "spare", "spare.example.com")
+	spare.App = false
+	if err := st.SaveCertificate(ctx, spare); err != nil {
+		t.Fatal(err)
 	}
 	for _, plane := range []string{PlaneConsole, PlaneApp} {
 		list, fallback, _, err := st.CertificateMaterials(ctx, plane)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(list) != 1 || fallback == nil {
-			t.Fatalf("%s: got %d materials", plane, len(list))
+		if len(list) != 1 || fallback == nil || list[0].Info.DNSNames[0] != "localhost" {
+			t.Fatalf("%s: got %d materials, want the one placed there", plane, len(list))
 		}
 	}
+	// Taking it off a plane closes that door and only that one.
+	if err := st.PlaceCertificate(ctx, "both", false, true); err != nil {
+		t.Fatal(err)
+	}
+	if list, _, _, _ := st.CertificateMaterials(ctx, PlaneConsole); len(list) != 0 {
+		t.Fatal("off the console, the console presents nothing")
+	}
+	if err := st.PlaceCertificate(ctx, "nobody", true, true); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("placing what is not there must say so: %v", err)
+	}
 }
 
-// TestBothPlanesAreSeededWithLocalhostOnce covers the case that actually bit:
-// an installation that already had TLS settings, saved before names existed.
-// The seed has to reach it - and then never come back once a name is removed.
-func TestBothPlanesAreSeededWithLocalhostOnce(t *testing.T) {
-	dir := t.TempDir()
-	st, err := Open(dir)
+// TestTheOldestPlacedIsTheFallback: a client that sends no server name keeps
+// receiving what it received, when a certificate is added next to it.
+func TestTheOldestPlacedIsTheFallback(t *testing.T) {
+	st := certStore(t)
+	ctx := context.Background()
+	first := row(t, "b-first", "first.example.com")
+	first.CreatedAt = 100
+	second := row(t, "a-second", "second.example.com")
+	second.CreatedAt = 200
+	for _, c := range []Certificate{second, first} {
+		if err := st.SaveCertificate(ctx, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, fallback, _, err := st.CertificateMaterials(ctx, PlaneApp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fallback == nil || fallback.Info.DNSNames[0] != "first.example.com" {
+		t.Fatalf("the fallback must be the oldest placed, got %v", fallback)
+	}
+}
+
+// TestCertificatesOfANameBecomePlacedMaterial runs v73 on a database of the
+// shape before it: one row per declared name, the material both planes
+// shared imported twice. It comes out as the same material placed on both,
+// once - the oldest row kept - and a request still waiting, in reserve.
+func TestCertificatesOfANameBecomePlacedMaterial(t *testing.T) {
+	dir, url := t.TempDir(), dbtest.URL(t)
+	st, err := OpenAt(dir, url)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if got := st.RawTLS(ctx); got.ConsoleName != DefaultConsoleName || len(got.AppNames) != 1 {
-		t.Fatalf("a fresh installation starts with both names: %+v", got)
+	shared := material(t, "localhost")
+	only := material(t, "shop.example.com")
+	csrPEM, csrKey, err := certs.NewCSR(certs.Request{DNSNames: []string{"later.example.com"}})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// An operator clears the application's names, and closes the gateway.
-	cfg := st.RawTLS(ctx)
-	cfg.AppNames = nil
-	if err := st.SetSetting(ctx, SettingTLS, cfg); err != nil {
+	seal := func(k string) string {
+		out, err := st.vaultCipher.Seal(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	steps := []string{
+		`DROP TABLE certificates`,
+		`CREATE TABLE certificates (
+		   id TEXT PRIMARY KEY, plane TEXT NOT NULL DEFAULT 'app', host TEXT NOT NULL DEFAULT '',
+		   source TEXT NOT NULL DEFAULT 'import', cert_pem TEXT NOT NULL DEFAULT '',
+		   key_sealed TEXT NOT NULL DEFAULT '', csr_pem TEXT NOT NULL DEFAULT '',
+		   subject TEXT NOT NULL DEFAULT '', issuer TEXT NOT NULL DEFAULT '',
+		   serial TEXT NOT NULL DEFAULT '', algo TEXT NOT NULL DEFAULT '',
+		   key_type TEXT NOT NULL DEFAULT '', dns_names TEXT NOT NULL DEFAULT '[]',
+		   ip_addresses TEXT NOT NULL DEFAULT '[]', chain BIGINT NOT NULL DEFAULT 0,
+		   self_signed BOOLEAN NOT NULL DEFAULT FALSE, not_before BIGINT NOT NULL DEFAULT 0,
+		   not_after BIGINT NOT NULL DEFAULT 0, created_at BIGINT NOT NULL DEFAULT 0,
+		   updated_at BIGINT NOT NULL DEFAULT 0)`,
+	}
+	for _, q := range steps {
+		if _, err := st.db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert := func(id, plane, host, cert, key, csr, dns string, at int64) {
+		if _, err := st.db.Exec(`INSERT INTO certificates (id, plane, host, cert_pem, key_sealed, csr_pem, dns_names, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, plane, host, cert, seal(key), csr, dns, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert("console", "console", "localhost", shared.CertPEM, shared.KeyPEM, "", `["localhost"]`, 1)
+	insert("app", "app", "localhost", shared.CertPEM, shared.KeyPEM, "", `["localhost"]`, 2)
+	insert("shop", "app", "shop.example.com", only.CertPEM, only.KeyPEM, "", `["shop.example.com"]`, 3)
+	insert("later", "app", "later.example.com", "", csrKey, csrPEM, `["later.example.com"]`, 4)
+	if _, err := st.db.Exec(`INSERT INTO settings (key, value) VALUES ('tls_seeded', 'true')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.db.setSchemaVersion(72); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	// Reopening must NOT put it back: a name removed stays removed.
-	st, err = Open(dir)
+	st, err = OpenAt(dir, url)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("the upgrade must open: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	if got := st.RawTLS(ctx); len(got.AppNames) != 0 {
-		t.Fatalf("the seed came back and undid a deliberate removal: %+v", got)
-	}
-}
-
-// TestAnInstallationThatPredatesNamesGetsThem is the one that failed in
-// practice: the tls setting existed, with no names in it, so a seed keyed on
-// "is the setting absent" never fired and the screen opened empty.
-func TestAnInstallationThatPredatesNamesGetsThem(t *testing.T) {
-	dir := t.TempDir()
-	st, err := Open(dir)
+	list, err := st.ListCertificates(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
-	// Rewind to what such an installation looks like: settings saved, no names,
-	// and no marker.
-	if err := st.SetSetting(ctx, SettingTLS, certs.Settings{Redirect: true}); err != nil {
-		t.Fatal(err)
+	got := map[string]Certificate{}
+	for _, c := range list {
+		got[c.ID] = c
 	}
-	if _, err := st.db.Exec(`DELETE FROM settings WHERE key = ?`, SettingTLSSeeded); err != nil {
-		t.Fatal(err)
+	if len(list) != 3 {
+		t.Fatalf("the twice-imported material must become one row: %d rows", len(list))
 	}
-	if err := st.Close(); err != nil {
-		t.Fatal(err)
+	if c := got["console"]; !c.Console || !c.App {
+		t.Fatalf("the oldest copy is kept, placed on both planes: %+v", c)
 	}
-
-	st, err = Open(dir)
-	if err != nil {
-		t.Fatal(err)
+	if c := got["shop"]; c.Console || !c.App {
+		t.Fatalf("a row keeps the plane it was filed under: %+v", c)
 	}
-	t.Cleanup(func() { _ = st.Close() })
-	got := st.RawTLS(ctx)
-	if got.ConsoleName != DefaultConsoleName || len(got.AppNames) != 1 {
-		t.Fatalf("an installation that predates names must receive them: %+v", got)
+	if c := got["later"]; c.Console || c.App || !c.Pending() {
+		t.Fatalf("a request still waiting stays in reserve: %+v", c)
 	}
-	if !got.Redirect {
-		t.Fatal("and keep what it had already set")
+	var marker int
+	if err := st.db.QueryRow(`SELECT COUNT(*) FROM settings WHERE key = 'tls_seeded'`).Scan(&marker); err != nil || marker != 0 {
+		t.Fatalf("the seed marker has nothing left to mark: %d %v", marker, err)
 	}
 }

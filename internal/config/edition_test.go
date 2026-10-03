@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/softwarity/meerkat/internal/edition"
@@ -57,5 +58,61 @@ func TestTheCommunityImageImportsWithoutTheEnterpriseParts(t *testing.T) {
 	}
 	if _, err := st.GetRole(ctx, "A"); err != nil {
 		t.Errorf("the rest of the document was not applied: %v", err)
+	}
+}
+
+// ACME is Enterprise (SSL-05), and it rides in the TLS setting beside two
+// fields that are not: the HTTP redirect and HSTS. So the community image
+// takes the ACME part out and keeps the rest of the setting.
+func TestTheCommunityImageImportsTLSWithoutACME(t *testing.T) {
+	if edition.Enterprise {
+		t.Skip("the community image's behaviour")
+	}
+	st := openTemp(t)
+	ctx := context.Background()
+	doc, err := Unmarshal([]byte(`{"version":1,
+		"settings":{"tls":{"redirect":true,"hstsMaxAge":31536000,"acme":{
+			"authorities":[{"id":"le","name":"Let's Encrypt","directoryUrl":"https://acme.invalid/directory","email":"ops@example.com","acceptTos":true}],
+			"orders":[{"id":"o1","authority":"le","names":["example.com"],"app":true}],
+			"enabled":true,"email":"ops@example.com","domains":["example.com"]}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Apply(ctx, st, doc, false)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if !slices.ContainsFunc(plan.NotApplied, func(s string) bool { return strings.Contains(s, "ACME") }) {
+		t.Fatalf("the plan must name the ACME part it left out, got %q", plan.NotApplied)
+	}
+	var tls map[string]any
+	if err := st.GetSetting(ctx, store.SettingTLS, &tls); err != nil {
+		t.Fatal(err)
+	}
+	if acme, ok := tls["acme"].(map[string]any); ok && len(acme) > 0 {
+		t.Errorf("the ACME part was written: %v", acme)
+	}
+	if tls["redirect"] != true || tls["hstsMaxAge"] != float64(31536000) {
+		t.Errorf("redirect and HSTS must be kept, got %v", tls)
+	}
+}
+
+// A TLS setting with nothing in its ACME part leaves nothing out, and the plan
+// says nothing about it.
+func TestAnEmptyACMEPartIsNotReported(t *testing.T) {
+	if edition.Enterprise {
+		t.Skip("the community image's behaviour")
+	}
+	st := openTemp(t)
+	doc, err := Unmarshal([]byte(`{"version":1,"settings":{"tls":{"redirect":true,"acme":{}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Apply(context.Background(), st, doc, false)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if len(plan.NotApplied) != 0 {
+		t.Fatalf("nothing was left out, got %q", plan.NotApplied)
 	}
 }

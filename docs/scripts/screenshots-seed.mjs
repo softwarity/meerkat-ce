@@ -313,12 +313,13 @@ async function seed() {
   log(`${VAULT.length} vault entries`);
 
   // Roles.
+  // A role IS its name (v71): the parent and the groups name it.
   const roleIds = {};
   for (const r of ROLES) {
     const saved = await ok(await api.post('/api/roles', {
-      data: { name: r.name, description: r.description, parentId: r.parent ? roleIds[r.parent] : '', tags: r.tags },
+      data: { name: r.name, description: r.description, parent: r.parent ? roleIds[r.parent] : '', tags: r.tags },
     }), `role ${r.name}`);
-    roleIds[r.key] = saved.id;
+    roleIds[r.key] = saved.name;
   }
   log(`${ROLES.length} roles`);
 
@@ -339,7 +340,7 @@ async function seed() {
   const groupIds = {};
   for (const g of GROUPS) {
     const saved = await ok(await api.post(`/api/tenants/${tenant}/groups`, {
-      data: { name: g.name, description: g.description, roleIds: g.roles.map((k) => roleIds[k]) },
+      data: { name: g.name, description: g.description, roles: g.roles.map((k) => roleIds[k]) },
     }), `group ${g.name}`);
     groupIds[g.name] = saved.id;
   }
@@ -376,20 +377,24 @@ async function seed() {
   }
   log(`${USERS.length} accounts, signed in on the data plane`);
 
-  // The portal, the TLS names and two certificates.
+  // The portal, and the pool of certificates: one on the console, one for two
+  // application names, and a signing request waiting in reserve.
   const settings = await ok(await api.get('/api/settings'), 'settings');
   await ok(await api.put('/api/settings', { data: { ...settings, portal: PORTAL } }), 'portal');
   for (const c of [
-    { plane: 'console', host: 'console.acme.example' },
-    { plane: 'app', host: 'apps.acme.example' },
+    { names: ['gateway.acme.example'], console: true },
+    { names: ['apps.acme.example', 'docs.acme.example'], app: true },
   ]) {
-    await ok(await api.post('/api/certificates/self-signed', { data: { ...c, days: 365 } }), `certificate ${c.host}`);
+    await ok(await api.post('/api/certificates/self-signed', { data: { ...c, organization: 'Acme Corp', days: 365 } }), `certificate ${c.names[0]}`);
   }
-  const tls = await ok(await api.get('/api/settings/tls'), 'tls');
-  await ok(await api.put('/api/settings/tls', {
-    data: { consoleName: 'console.acme.example', appNames: ['apps.acme.example', 'docs.acme.example'], redirect: false, hstsMaxAge: tls.hstsMaxAge || 0, acme: tls.acme },
-  }), 'tls names');
-  log('portal, TLS names, 2 certificates');
+  await ok(await api.post('/api/certificates/signing-request', { data: { names: ['intranet.acme.example'], organization: 'Acme Corp' } }), 'signing request');
+  // An authority, and one certificate asked of it, kept in reserve: placed,
+  // it would be asked at once, and this instance does not own the name.
+  const ca = await ok(await api.post('/api/acme/authorities', {
+    data: { provider: 'letsencrypt-staging', name: "Let's Encrypt (staging)", acceptTos: true },
+  }), 'acme authority');
+  await ok(await api.post('/api/certificates/acme', { data: { authority: ca.id, names: ['status.acme.example'] } }), 'acme order');
+  log('portal, 2 certificates placed, 1 signing request, 1 order to the authority');
 
   // OpenTelemetry: a collector address, as a compose file would name it.
   const otel = await ok(await api.get('/api/settings/telemetry'), 'telemetry');

@@ -1159,6 +1159,7 @@
         <!-- The operations whose calls are audited (AUD-04). Edited one by
              one on the Endpoint audit screen; here, a file exported from it
              replaces them at once, on this route or another one. -->
+        <div class="audit-block" [class.off]="mode() === 'redirect'" [matTooltip]="mode() === 'redirect' ? noAuditTip : ''">
         <h3 class="sub" i18n="@@Section_audit">Audit</h3>
         <p class="section-hint">
           @if (auditUpload(); as up) {
@@ -1169,7 +1170,7 @@
           }
         </p>
         <div class="css-row" ee-feature="AUD-04">
-          <button matButton="tonal" type="button" (click)="auditFile.click()" [disabled]="!route()">
+          <button matButton="tonal" type="button" (click)="auditFile.click()" [disabled]="!route() || mode() === 'redirect'">
             <mat-icon>upload_file</mat-icon>
             <ng-container i18n="@@Upload_audit">Upload audit configuration</ng-container>
           </button>
@@ -1183,6 +1184,7 @@
         @if (auditUploadError(); as err) {
           <p class="section-hint error">{{ err }}</p>
         }
+        </div>
       }
       @case ('custom') {
         <p class="section-hint" i18n="@@Custom_hint">

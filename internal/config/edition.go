@@ -44,6 +44,9 @@ func notOnCommunity(doc *Document) []string {
 	if note := unsetFields(doc, store.SettingTelemetry, "enabled", "logsPush", "audit", "auditConsole"); note {
 		out = append(out, "OpenTelemetry export (Enterprise)")
 	}
+	if dropField(doc, store.SettingTLS, "acme") {
+		out = append(out, "ACME authorities and orders (Enterprise)")
+	}
 	hours := false
 	for i := range doc.Tenants {
 		if !doc.Tenants[i].BusinessAccess.Inherited {
@@ -91,4 +94,37 @@ func unsetFields(doc *Document, key string, fields ...string) bool {
 		doc.Settings[key] = b
 	}
 	return true
+}
+
+// dropField removes one field of a setting - an object the image does not run
+// as a whole, like the ACME part of the TLS setting, where the redirect and HSTS
+// beside it stay - and says whether it carried anything. An empty object
+// goes too, without a word: there was nothing to leave out.
+func dropField(doc *Document, key, field string) bool {
+	raw, ok := doc.Settings[key]
+	if !ok {
+		return false
+	}
+	var m map[string]json.RawMessage
+	if json.Unmarshal(raw, &m) != nil {
+		return false
+	}
+	v, ok := m[field]
+	if !ok {
+		return false
+	}
+	delete(m, field)
+	if b, err := json.Marshal(m); err == nil {
+		doc.Settings[key] = b
+	}
+	var inner map[string]json.RawMessage
+	if json.Unmarshal(v, &inner) == nil {
+		for _, x := range inner {
+			if s := string(x); s != "null" && s != "false" && s != `""` && s != "[]" && s != "{}" && s != "0" {
+				return true
+			}
+		}
+		return false
+	}
+	return string(v) != "null"
 }

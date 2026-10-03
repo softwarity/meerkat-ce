@@ -51,6 +51,10 @@ type API struct {
 	// TLS is the live HTTPS state (SSL-01/02). Wired by main; nil in the tests
 	// that have no listener to open, where saving material still has to work.
 	TLS *certs.Supervisor
+	// DiscoverACME asks an authority's directory whether it answers, when an
+	// authority is saved. Nil: Authority.Discover, over the network. A test
+	// replaces it rather than reach Let's Encrypt.
+	DiscoverACME func(context.Context, certs.Authority) error
 
 	// Bus tells the other nodes what this one just reloaded (STORE-03). Wired
 	// by main; nil wherever there is one node, which is every test and every
@@ -182,6 +186,7 @@ func (a *API) Register(mux Mux) {
 	a.registerConfigPoints(mux)
 	a.registerBackup(mux)
 	a.registerCertificates(mux)
+	a.registerAuthorities(mux)
 	a.registerSchedules(mux)
 	a.registerTelemetry(mux)
 	a.registerPlug(mux)

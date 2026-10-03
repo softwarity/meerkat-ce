@@ -35,7 +35,7 @@ modifier un événement.
 
 Un import, une restauration ou un changement de configuration écrit une ligne, et son détail dit ce
 qu'il a fait : les compteurs, puis quels objets ont été ajoutés, modifiés et retirés, et pour un
-réglage les champs qui ont bougé - `setting tls (appNames)` plutôt qu'un simple « 8 updated ».
+réglage les champs qui ont bougé - `setting tls (redirect)` plutôt qu'un simple « 8 updated ».
 Plafonné à quatre-vingts noms, le reste compté.
 
 Une modification dont le diff ressort vide n'écrit **rien** : enregistrer un formulaire sans changer
@@ -195,7 +195,8 @@ laissez le service faire son audit lui-même.
 **Export**, sur l'écran Endpoint audit, télécharge les règles de la route en
 fichier JSON. Dans l'éditeur de route, la section **OpenTelemetry** propose
 **Upload audit configuration** : elle lit ce fichier, et les règles sont
-enregistrées avec la route. Les règles voyagent aussi avec l'export de la
+enregistrées avec la route. Le bouton est grisé sur une route de redirection :
+elle n'a pas d'opérations à auditer. Les règles voyagent aussi avec l'export de la
 [configuration](/docs/console/configuration).
 
 ## Filtres, rétention, et ce qui manque

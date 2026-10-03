@@ -849,13 +849,12 @@ CREATE INDEX IF NOT EXISTS config_points_at ON config_points(at);
 -- signing procedure spends its days in.
 CREATE TABLE IF NOT EXISTS certificates (
   id           TEXT PRIMARY KEY,
-  -- The HOST this certificate answers for, and the plane it belongs to. A
-  -- certificate is not floating material to be matched against a list of
-  -- names: it IS the name's certificate. The console has one, the application
-  -- has one per host it serves, and the same material used by both is simply
-  -- added twice - two entries, two keys, no shared object to reason about.
-  plane        TEXT NOT NULL DEFAULT 'app',
-  host         TEXT NOT NULL DEFAULT '',
+  -- Where the material is served (v73). A certificate is made or imported
+  -- once, into a pool, then placed on the console, the application, or both;
+  -- neither is a certificate in reserve. Its names are its own, in dns_names
+  -- and ip_addresses, read from the material rather than filed beside it.
+  on_console   BOOLEAN NOT NULL DEFAULT FALSE,
+  on_app       BOOLEAN NOT NULL DEFAULT FALSE,
   source       TEXT NOT NULL DEFAULT 'import',
   cert_pem     TEXT NOT NULL DEFAULT '',
   key_sealed   TEXT NOT NULL DEFAULT '',
@@ -1047,7 +1046,7 @@ CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);`
 // installation is stamped 69, and checkNotNewer refuses to open a database
 // stamped higher than the build knows - so restarting the count at 1 would stop
 // every existing installation from starting.
-const schemaVersion = 72
+const schemaVersion = 73
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

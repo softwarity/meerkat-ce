@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -364,5 +365,45 @@ func TestTheCommunityShelfHoldsThree(t *testing.T) {
 	// that cannot undo is a more dangerous image, not a cheaper one.
 	if code, body := f.call(t, "GET", "/api/config/history", "", f.rootC); code != http.StatusOK {
 		t.Fatalf("history on the community image: %d %s", code, body)
+	}
+}
+
+// Importing a FILE is the community image's too: the export it already had
+// would otherwise be a file with nowhere to go back. Preview, apply and shelve
+// all answer, and what keeps such an import safe is that the Enterprise parts
+// of the document are taken out on the way and named in the plan.
+func TestTheCommunityImageImportsAFile(t *testing.T) {
+	f := communityFixture(t)
+	file := `{"version":1,
+		"settings":{"branding":{"appName":"Acme","hideMark":true}},
+		"roles":[{"name":"FROM_A_FILE"}]}`
+
+	code, body := f.call(t, "POST", "/api/config/preview", file, f.rootC)
+	if code != http.StatusOK {
+		t.Fatalf("preview on the community image: %d %s", code, body)
+	}
+	if _, err := f.api.st.GetRole(context.Background(), "FROM_A_FILE"); err == nil {
+		t.Fatal("the preview wrote the role")
+	}
+
+	code, body = f.call(t, "POST", "/api/config/import", file, f.rootC)
+	if code != http.StatusOK {
+		t.Fatalf("import on the community image: %d %s", code, body)
+	}
+	if _, err := f.api.st.GetRole(context.Background(), "FROM_A_FILE"); err != nil {
+		t.Fatalf("the file was not applied: %v", err)
+	}
+	var plan struct {
+		NotApplied []string `json:"notApplied"`
+	}
+	if err := json.Unmarshal([]byte(body), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.NotApplied) != 1 || !strings.Contains(plan.NotApplied[0], "Enterprise") {
+		t.Fatalf("the plan must name the Enterprise part it left out: %q", plan.NotApplied)
+	}
+
+	if code, body := f.call(t, "POST", "/api/configurations/import?name=From%20a%20file", file, f.rootC); code != http.StatusCreated {
+		t.Fatalf("shelve a file on the community image: %d %s", code, body)
 	}
 }

@@ -1,3 +1,66 @@
+// Same frame as Plug, help drawer included.
+:host {
+  display: block;
+  height: 100%;
+}
+.wrap {
+  height: 100%;
+  background: transparent;
+}
+.wrap ::ng-deep .mat-drawer-content {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+.wrap ::ng-deep .mat-drawer {
+  width: min(760px, 96vw);
+  border-left: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-high);
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  padding: 8px 8px 8px 24px;
+}
+.drawer-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+.drawer-body {
+  padding: 0 24px 24px;
+}
+.drawer-body .lead,
+.drawer-body .hint {
+  margin: 0 0 12px;
+  line-height: 1.5;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.os {
+  margin-bottom: 12px;
+}
+.steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.steps li {
+  margin-bottom: 8px;
+}
+.steps p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+  font-size: 0.9em;
+}
+.steps .hint {
+  margin-top: 8px;
+}
+.address,
+.names {
+  display: block;
+  min-width: 0;
+}
 .banner {
   display: flex;
   align-items: center;
@@ -14,7 +77,7 @@
   padding: 0 24px 24px;
   display: grid;
   gap: 20px;
-  max-width: 900px;
+  max-width: 1100px;
 }
 .card {
   border: 1px solid var(--mat-sys-outline-variant);
@@ -22,6 +85,7 @@
   padding: 16px 20px;
   display: grid;
   gap: 12px;
+  align-content: start;
 }
 .card h2 {
   font-size: 0.95rem;
@@ -36,12 +100,91 @@
 .plane-head h2 {
   flex: 1;
 }
-.plane-actions {
-  display: flex;
-  justify-content: flex-start;
+// The two doors side by side, each a drop target.
+.planes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
 }
-/* The two addresses, read together. A screen that shows one and leaves the
-   other to a stack file makes an operator go and look it up. */
+.pool {
+  display: grid;
+  gap: 10px;
+}
+.zone {
+  display: grid;
+  gap: 8px;
+  min-height: 64px;
+  padding: 10px;
+  border: 1px dashed var(--mat-sys-outline);
+  border-radius: 10px;
+  align-content: start;
+  transition: border-color 120ms, background-color 120ms;
+}
+.zone.cdk-drop-list-receiving {
+  border-color: var(--mat-sys-primary);
+}
+.zone.cdk-drop-list-dragging {
+  border-color: var(--mat-sys-primary);
+  background: color-mix(in srgb, var(--mat-sys-primary) 8%, transparent);
+}
+.hint-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  min-height: 42px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+.placed {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container);
+  border-left: 3px solid var(--mat-sys-primary);
+  cursor: grab;
+}
+.placed.soon,
+.placed.wait {
+  border-left-color: var(--mat-sys-tertiary);
+}
+.placed.bad {
+  border-left-color: var(--mat-sys-error);
+}
+.placed code {
+  font-family: var(--mk-mono);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.placed .when {
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+}
+.grip {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--mat-sys-on-surface-variant);
+}
+.ghost {
+  min-height: 42px;
+  border: 1px dashed var(--mat-sys-primary);
+  border-radius: 8px;
+}
+.cdk-drag-preview {
+  box-shadow: var(--mat-sys-level3);
+  border-radius: 10px;
+  background: var(--mat-sys-surface-container-high);
+}
+.cdk-drag-animating {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+/* The addresses a plane is reached by, read together. */
 .links {
   display: flex;
   flex-wrap: wrap;
@@ -49,13 +192,10 @@
   font-family: var(--mk-mono);
   font-size: 0.82rem;
 }
-.links a,
-.links .off {
+.links a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-.links a {
   color: var(--mat-sys-primary);
   text-decoration: none;
 }
@@ -64,37 +204,35 @@
 .links a:hover span {
   text-decoration: underline;
 }
-.links .off {
-  color: var(--mat-sys-on-surface-variant);
-  opacity: 0.65;
-}
 .links mat-icon {
   font-size: 16px;
   width: 16px;
   height: 16px;
   overflow: visible;
 }
-/* One name and its certificate, in one block: they are one thing, and reading
-   them apart was what made the old flat list hard to work with. */
+/* One certificate of the pool: its names, its origin, its life, where it is
+   served. */
 .entry {
   display: grid;
   grid-template-columns: 1fr auto auto auto auto;
   align-items: center;
   gap: 4px 8px;
-  padding: 10px 14px;
+  padding: 8px 8px 8px 14px;
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 10px;
   position: relative;
   overflow: hidden;
+  background: var(--mat-sys-surface);
+  cursor: grab;
+}
+.entry.wait {
+  cursor: default;
 }
 .entry::before {
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
-  background: var(--mat-sys-outline);
-}
-.entry.ok::before {
   background: var(--mat-sys-primary);
 }
 .entry.soon::before,
@@ -113,63 +251,62 @@
 .entry .host code {
   font-family: var(--mk-mono);
   font-weight: 500;
-}
-.entry .host mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-  overflow: visible;
-  flex-shrink: 0;
-  color: var(--mat-sys-on-surface-variant);
-}
-.entry.ok .host mat-icon {
-  color: var(--mat-sys-primary);
-}
-.entry.soon .host mat-icon,
-.entry.wait .host mat-icon {
-  color: var(--mat-sys-tertiary);
-}
-.entry.bad .host mat-icon {
-  color: var(--mat-sys-error);
-}
-.entry .links {
-  grid-column: 1 / -1;
-  margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 .entry .says {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
   color: var(--mat-sys-on-surface-variant);
   font-size: 0.8rem;
+  padding-left: 26px;
 }
 .entry.bad .says {
   color: var(--mat-sys-error);
 }
-.automatic {
-  display: grid;
-  gap: 2px;
-  margin: 4px 0;
+.on-plane {
+  margin-left: 10px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--mat-sys-primary);
+  border: 1px solid color-mix(in srgb, var(--mat-sys-primary) 50%, transparent);
 }
-.automatic h3 {
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin: 0 0 4px;
+.badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
 }
-.auto-row {
+.badge.warn {
+  background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
+  color: var(--mat-sys-error);
+}
+.doors {
   display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.auto-row .soon {
-  font-size: 0.78rem;
-}
-.automatic code {
+  gap: 14px;
   font-family: var(--mk-mono);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
-.certs h2 {
-  font-size: 0.95rem;
+.door {
+  color: var(--mat-sys-on-surface-variant);
+  opacity: 0.7;
+}
+.door.on {
+  color: var(--mat-sys-primary);
+  opacity: 1;
   font-weight: 500;
-  margin: 0;
+}
+.door.bad {
+  color: var(--mat-sys-error);
+  opacity: 1;
 }
 .lamp {
   margin-left: auto;
@@ -202,408 +339,53 @@
   width: 20px;
   height: 20px;
 }
-.certs {
-  display: grid;
-  gap: 12px;
-}
-.cert {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto auto auto;
-  align-items: center;
-  gap: 4px 8px;
-  padding: 12px 16px 12px 18px;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 10px;
-  position: relative;
-  overflow: hidden;
-}
-.cert::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--mat-sys-primary);
-  opacity: 0.7;
-}
-.cert.pending::before {
-  background: var(--mat-sys-outline);
-}
-.cert .name {
-  font-weight: 500;
-}
-.badge {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--mat-sys-surface-container-high);
-  color: var(--mat-sys-on-surface-variant);
-}
-.badge.warn {
-  background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
-  color: var(--mat-sys-error);
-}
-.is-default mat-icon {
-  color: var(--mat-sys-primary);
-}
-.cert .hosts,
-.cert .meta {
-  grid-column: 1 / -1;
-}
-.cert .hosts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
-}
-.cert .hosts code {
-  font-family: var(--mk-mono);
-  font-size: 0.78rem;
-  color: var(--mat-sys-on-surface-variant);
-}
-.cert .meta {
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.78rem;
-}
-.validity.soon,
 .soon {
   color: var(--mat-sys-tertiary);
-  font-weight: 500;
-}
-.validity.gone {
-  color: var(--mat-sys-error);
   font-weight: 500;
 }
 .empty {
   color: var(--mat-sys-on-surface-variant);
   font-size: 0.9rem;
   padding: 8px 0;
-}
-.acme {
-  display: grid;
-  gap: 4px;
-}
-.private {
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin: 8px 0;
-}
-.private summary {
-  cursor: pointer;
-  font-size: 0.85rem;
-  color: var(--mat-sys-on-surface-variant);
-}
-/* The fields inside the fold stack. app-form-field is display:contents, so
-   its mat-form-field is what this grid actually lays out - left to flow, the
-   three of them sat side by side and squeezed the PEM box into a column four
-   characters wide. */
-.fold {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 4px;
-  margin-top: 12px;
+  margin: 0;
 }
 textarea.pem {
   font-family: var(--mk-mono);
   font-size: 0.75rem;
 }
-.issued {
-  margin-top: 8px;
-}
-.issued h3 {
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin: 0 0 4px;
-}
-.issued p {
-  margin: 2px 0;
-  font-size: 0.8rem;
-  color: var(--mat-sys-on-surface-variant);
-}
 .actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.entry {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto;
-  align-items: center;
-  gap: 4px 8px;
-  padding: 10px 14px;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 10px;
-  position: relative;
-  overflow: hidden;
-}
-.entry::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--mat-sys-outline);
-}
-.entry.ok::before {
-  background: var(--mat-sys-primary);
-}
-.entry.soon::before,
-.entry.wait::before {
-  background: var(--mat-sys-tertiary);
-}
-.entry.bad::before {
-  background: var(--mat-sys-error);
-}
-.entry .host {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.entry .host code {
-  font-family: var(--mk-mono);
-  font-weight: 500;
-}
-.entry .host mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-  overflow: visible;
-  flex-shrink: 0;
-  color: var(--mat-sys-on-surface-variant);
-}
-.entry.ok .host mat-icon {
-  color: var(--mat-sys-primary);
-}
-.entry.soon .host mat-icon,
-.entry.wait .host mat-icon {
-  color: var(--mat-sys-tertiary);
-}
-.entry.bad .host mat-icon {
-  color: var(--mat-sys-error);
-}
-.entry .links {
-  grid-column: 1 / -1;
-  margin-top: 2px;
-}
-.entry .says {
-  grid-column: 1 / -1;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.8rem;
-}
-.entry.bad .says {
-  color: var(--mat-sys-error);
-}
-.automatic {
-  display: grid;
-  gap: 2px;
-  margin: 4px 0;
-}
-.automatic h3 {
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin: 0 0 4px;
-}
-.auto-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.auto-row .soon {
-  font-size: 0.78rem;
-}
-.automatic code {
-  font-family: var(--mk-mono);
-  font-size: 0.82rem;
-}
-.certs h2 {
-  font-size: 0.95rem;
-  font-weight: 500;
-  margin: 0;
-}
-.lamp {
-  margin-left: auto;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--mat-sys-on-surface-variant);
-}
-.lamp.on {
-  color: var(--mat-sys-primary);
-  font-weight: 500;
-}
-.note {
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.82rem;
-  margin: 0;
-}
-.problem {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0;
-  color: var(--mat-sys-error);
-  font-size: 0.85rem;
-}
-.problem mat-icon {
-  flex-shrink: 0;
-  overflow: visible;
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
-}
-.certs {
-  display: grid;
-  gap: 12px;
-}
-.cert {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto auto auto;
-  align-items: center;
-  gap: 4px 8px;
-  padding: 12px 16px 12px 18px;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 10px;
-  position: relative;
-  overflow: hidden;
-}
-.cert::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--mat-sys-primary);
-  opacity: 0.7;
-}
-.cert.pending::before {
-  background: var(--mat-sys-outline);
-}
-.cert .name {
-  font-weight: 500;
-}
-.badge {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--mat-sys-surface-container-high);
-  color: var(--mat-sys-on-surface-variant);
-}
-.badge.warn {
-  background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
-  color: var(--mat-sys-error);
-}
-.is-default mat-icon {
-  color: var(--mat-sys-primary);
-}
-.cert .hosts,
-.cert .meta {
-  grid-column: 1 / -1;
-}
-.cert .hosts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
-}
-.cert .hosts code {
-  font-family: var(--mk-mono);
-  font-size: 0.78rem;
-  color: var(--mat-sys-on-surface-variant);
-}
-.cert .meta {
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.78rem;
-}
-.validity.soon,
-.soon {
-  color: var(--mat-sys-tertiary);
-  font-weight: 500;
-}
-.validity.gone {
-  color: var(--mat-sys-error);
-  font-weight: 500;
-}
-.empty {
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.9rem;
-  padding: 8px 0;
-}
-.acme {
-  display: grid;
-  gap: 4px;
-}
-.private {
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin: 8px 0;
-}
-.private summary {
-  cursor: pointer;
-  font-size: 0.85rem;
-  color: var(--mat-sys-on-surface-variant);
-}
-/* The fields inside the fold stack. app-form-field is display:contents, so
-   its mat-form-field is what this grid actually lays out - left to flow, the
-   three of them sat side by side and squeezed the PEM box into a column four
-   characters wide. */
-.fold {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 4px;
-  margin-top: 12px;
-}
-textarea.pem {
-  font-family: var(--mk-mono);
-  font-size: 0.75rem;
-}
-.issued {
-  margin-top: 8px;
-}
-.issued h3 {
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin: 0 0 4px;
-}
-.issued p {
-  margin: 2px 0;
-  font-size: 0.8rem;
-  color: var(--mat-sys-on-surface-variant);
-}
-.actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.offer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--mat-sys-primary) 45%, transparent);
-  border-radius: 10px;
-  font-size: 0.85rem;
-  color: var(--mat-sys-on-surface-variant);
-}
-.offer mat-icon {
-  color: var(--mat-sys-primary);
-  flex-shrink: 0;
-  overflow: visible;
-}
-.offer span {
-  flex: 1;
-}
-.offer button {
-  flex-shrink: 0;
 }
 .hsts {
   width: 190px;
 }
-
 .unpublished {
   color: var(--mat-sys-error);
   font-size: 0.85rem;
+}
+
+
+// An authority being asked: the icon turns while the answer is on its way.
+.grip.spin {
+  animation: spin 1.2s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.acme-door {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+// Step 1's two fields side by side: the names, and where they lead.
+.local-fields {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 0 12px;
+  margin-bottom: 4px;
 }

@@ -48,7 +48,7 @@ func armed(t *testing.T, name string) (*Manager, *autocert.Manager) {
 		Client: &acme.Client{DirectoryURL: "https://127.0.0.1:1/acme/directory"},
 	}
 	m := New()
-	m.SetACME(am, []string{name})
+	m.SetACME(map[string]*autocert.Manager{name: am})
 	return m, am
 }
 

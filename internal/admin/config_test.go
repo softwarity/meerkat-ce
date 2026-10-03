@@ -227,11 +227,14 @@ func TestConfigRefusesNonsense(t *testing.T) {
 }
 
 // An import's line in the trail names what it touched, and for a setting the
-// fields that moved: "8 updated" left the arrival of a TLS name to be
-// deduced, the day somebody asked where it came from.
+// fields that moved: "8 updated" left a TLS change to be deduced, the day
+// somebody asked where it came from.
 func TestTheImportNamesWhatItTouched(t *testing.T) {
 	f := setup(t)
-	file := "version: 1\nsettings:\n  tls:\n    consoleName: localhost\n    appNames: [localhost, meerkat.example]\n    redirect: false\n    acme: {}\n"
+	if code, out := f.call(t, "PUT", "/api/settings/tls", `{"redirect":false}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("tls: %d %s", code, out)
+	}
+	file := "version: 1\nsettings:\n  tls:\n    redirect: true\n    acme: {}\n"
 	if code, out := f.call(t, "POST", "/api/config/import", file, f.rootC); code != http.StatusOK {
 		t.Fatalf("import: %d %s", code, out)
 	}
@@ -240,7 +243,7 @@ func TestTheImportNamesWhatItTouched(t *testing.T) {
 		t.Fatalf("no import line: %v", err)
 	}
 	detail := events[0].Detail
-	if !strings.Contains(detail, "updated: setting tls (") || !strings.Contains(detail, "appNames") {
-		t.Fatalf("the import line does not name the TLS names: %q", detail)
+	if !strings.Contains(detail, "updated: setting tls (") || !strings.Contains(detail, "redirect") {
+		t.Fatalf("the import line does not name the field that moved: %q", detail)
 	}
 }

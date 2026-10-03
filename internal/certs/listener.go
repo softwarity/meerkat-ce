@@ -83,7 +83,8 @@ func (l *Listener) Start() error {
 	return nil
 }
 
-// Stop closes the door, letting in-flight requests finish.
+// Stop closes the door, letting in-flight requests finish - the way a
+// process shutting down closes it. A reconfiguration uses retire instead.
 func (l *Listener) Stop(ctx context.Context) error {
 	l.mu.Lock()
 	srv := l.srv
@@ -96,12 +97,42 @@ func (l *Listener) Stop(ctx context.Context) error {
 	return srv.Shutdown(ctx)
 }
 
+// retireGrace is how long a door closed by a reconfiguration lets the
+// requests already inside it finish.
+const retireGrace = 30 * time.Second
+
+// retire closes the door from a reconfiguration, without waiting.
+//
+// Stop waits for in-flight requests, and the request asking for this door to
+// close is one of them: a console reached over HTTPS that takes its own last
+// certificate off ran Shutdown from inside the handler Shutdown was waiting
+// for, and the answer never came. Here the port is released at once - nothing
+// new gets in, and the door can be opened again straight away - and the
+// requests already inside, that one included, finish in the background.
+func (l *Listener) retire() {
+	l.mu.Lock()
+	srv, ln := l.srv, l.ln
+	l.srv, l.ln = nil, nil
+	l.mu.Unlock()
+	if srv == nil {
+		return
+	}
+	slog.Info("meerkat https stopping", "plane", l.Plane, "addr", l.Addr)
+	_ = ln.Close()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), retireGrace)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	}()
+}
+
 // Sync reconciles the door with what the configuration asks for.
-func (l *Listener) Sync(ctx context.Context, want bool) error {
+func (l *Listener) Sync(_ context.Context, want bool) error {
 	if want {
 		return l.Start()
 	}
-	return l.Stop(ctx)
+	l.retire()
+	return nil
 }
 
 // SetConfig points the door at a TLS configuration. It is called before every

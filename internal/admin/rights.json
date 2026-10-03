@@ -1,6 +1,26 @@
 [
   {
     "method": "GET",
+    "path": "/api/acme/authorities",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/acme/authorities",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/acme/authorities/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/acme/authorities/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/admin-tokens",
     "guard": "domainAdmin"
   },
@@ -101,6 +121,11 @@
   },
   {
     "method": "POST",
+    "path": "/api/certificates/acme",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
     "path": "/api/certificates/import",
     "guard": "infraAdmin"
   },
@@ -127,6 +152,16 @@
   {
     "method": "GET",
     "path": "/api/certificates/{id}/pem",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/certificates/{id}/placement",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/certificates/{id}/retry",
     "guard": "infraAdmin"
   },
   {

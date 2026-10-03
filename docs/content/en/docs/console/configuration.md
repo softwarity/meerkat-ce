@@ -26,7 +26,8 @@ Each tab is a route of its own, so a bookmark comes back to it.
 
 The current configuration on the first row, marked as matching *Known-good
 baseline*, and two shelf rows under it - one of which carries the *Current* chip.
-*Import a file* is capped Enterprise.
+*Import a file* works in both editions; *Import from git* carries the
+Enterprise mark.
 
 ## Management
 
@@ -226,8 +227,9 @@ has proven itself.
   what the Snapshot tab is for.
 - **The community image leaves the Enterprise parts out.** A configuration
   exported from an Enterprise gateway imports into a community one without its
-  working hours, layout, hidden mark, OpenTelemetry export and directories; the
-  plan lists what it left out.
+  working hours, layout, hidden mark, OpenTelemetry export, directories and ACME
+  authorities and orders (the HTTPS redirect and HSTS stay); the plan lists what
+  it left out.
 - **Pulling from git changes nothing.** It shelves a document and shows you the
   plan. The gateway switches when somebody activates it, not when the repository
   moves.

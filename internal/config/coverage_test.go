@@ -46,7 +46,6 @@ var staysHome = map[string]string{
 	// Markers: something already happened, and it happened HERE.
 	"SettingConfigSeed":         "records that this installation was seeded",
 	"SettingVaultSeed":          "records that this installation's vault was seeded",
-	"SettingTLSSeeded":          "records that the two planes were given their first names here",
 	"SettingThemePresetsSeeded": "records that the theme presets were installed here",
 	"SettingExpiryDigestSent":   "when the last digest went out, from this node",
 }

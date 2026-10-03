@@ -36,7 +36,7 @@ endpoint can modify an event.
 
 An import, a restore or a switch of configuration writes one line, and its
 detail says what it did: the counts, then which objects were added, updated and
-removed, and for a setting the fields that moved - `setting tls (appNames)`
+removed, and for a setting the fields that moved - `setting tls (redirect)`
 rather than a bare "8 updated". Capped at eighty names, the rest counted.
 
 An update whose diff comes out empty writes **nothing**: saving a form without
@@ -197,6 +197,7 @@ deposit its contract, or let the service audit itself.
 **Export** on the Endpoint audit screen downloads the route's rules as a JSON
 file. In the route editor, the **OpenTelemetry** section has **Upload audit
 configuration**: it reads such a file, and the rules are saved with the route.
+The button is greyed on a redirect route: it has no operations to audit.
 The rules also travel with the [configuration](/docs/console/configuration)
 export.
 

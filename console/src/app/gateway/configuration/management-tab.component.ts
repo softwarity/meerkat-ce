@@ -244,14 +244,12 @@ type Row = SavedConfiguration & { current?: boolean };
               <span class="ee" i18n="@@Configurations_shelf_ee">- no limit in Enterprise</span>
             </span>
           }
-          <button matButton="outlined" ee-feature="configurations" [disabled]="busy()" (click)="picker.click()">
+          <!-- No lock: a file exported here must be able to come back in on
+               the same image. What the community image does not run is taken
+               out of the document by the server and named in the plan. -->
+          <button matButton="outlined" [disabled]="busy()" (click)="picker.click()">
             <mat-icon>upload_file</mat-icon>
             <ng-container i18n="@@Import_a_file">Import a file</ng-container>
-            <app-ee-lock
-              feature="configurations"
-              i18n-why="@@Configurations_ee_why"
-              why="Keep several configurations on one instance and switch between them."
-            />
           </button>
           <!-- The same act as importing a file, with the bytes coming from a
                repository instead of a download folder: it SHELVES and applies
@@ -324,9 +322,16 @@ type Row = SavedConfiguration & { current?: boolean };
             <mat-cell *matCellDef="let c">
               <span class="desc">{{ c.description }}</span>
               @if (!c.current && remoteOf(c); as r) {
-                <span class="git" [class]="syncOf(c)" [matTooltip]="syncTip(c, r)">
+                <!-- The state in words beside the location's name; where it
+                     is exactly, on hover, one part per line. -->
+                <span
+                  class="git"
+                  [class]="syncOf(c)"
+                  [matTooltip]="syncTip(c, r)"
+                  matTooltipClass="tooltip-lines"
+                >
                   <mat-icon>{{ syncIcon(c) }}</mat-icon>
-                  {{ r.name }}
+                  {{ r.name }} - {{ syncLabel(c) }}
                 </span>
               }
             </mat-cell>
@@ -344,7 +349,6 @@ type Row = SavedConfiguration & { current?: boolean };
                 @if (c.current) {
                   <button
                     matIconButton
-                    ee-feature="configurations"
                     [disabled]="busy()"
                     (click)="$event.stopPropagation(); saveCurrent()"
                     i18n-matTooltip="@@Save_under_a_name"
@@ -383,7 +387,6 @@ type Row = SavedConfiguration & { current?: boolean };
                 } @else {
                   <button
                     matIconButton
-                    ee-feature="configurations"
                     [disabled]="busy()"
                     (click)="$event.stopPropagation(); setAsCurrent(c)"
                     i18n-matTooltip="@@Set_as_current"
@@ -395,7 +398,6 @@ type Row = SavedConfiguration & { current?: boolean };
                   </button>
                   <button
                     matIconButton
-                    ee-feature="configurations"
                     [disabled]="busy()"
                     (click)="$event.stopPropagation(); duplicate(c)"
                     i18n-matTooltip="@@Duplicate"
@@ -644,16 +646,26 @@ export class ConfigurationManagementComponent {
     }
   }
 
-  protected syncTip(c: SavedConfiguration, r: ConfigRemote): string {
-    const where = r.url + ' (' + r.branch + ')' + (r.dir ? ' / ' + r.dir : '');
+  protected syncLabel(c: SavedConfiguration): string {
     switch (this.syncOf(c)) {
       case 'level':
-        return $localize`:@@Git_level:${where}:where: - pushed as it stands. Pull to see whether anyone else has changed it since.`;
+        return $localize`:@@Git_up_to_date:up to date`;
       case 'ahead':
-        return $localize`:@@Git_ahead:${where}:where: - changed here since it was last pushed.`;
+        return $localize`:@@Git_changed_since_push:changed since push`;
       default:
-        return $localize`:@@Git_never:${where}:where: - never pushed there yet.`;
+        return $localize`:@@Git_never_pushed:never pushed`;
     }
+  }
+
+  // Where it is, one part per line - and, when it reads up to date, what
+  // that can and cannot know: whether somebody else pushed since is a pull.
+  protected syncTip(c: SavedConfiguration, r: ConfigRemote): string {
+    const where = [r.url.replace(/^https?:\/\//, '').replace(/\.git$/, ''), $localize`:@@Git_branch_line:branch ${r.branch}:branch:`];
+    if (r.dir) where.push($localize`:@@Git_dir_line:directory ${r.dir}:dir:`);
+    if (this.syncOf(c) === 'level') {
+      where.push('', $localize`:@@Git_level_note:As of this gateway's last push or pull: pull to see whether anyone else has changed it since.`);
+    }
+    return where.join('\n');
   }
 
   // Guarded by the id: the list is re-read after every change, so `opened()`

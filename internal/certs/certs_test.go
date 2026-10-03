@@ -1,6 +1,10 @@
 package certs
 
 import (
+	"golang.org/x/crypto/acme/autocert"
+
+	"github.com/softwarity/meerkat/internal/edition"
+
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -13,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -576,7 +581,7 @@ func TestAnExpiredCertificateStandsTheRedirectDown(t *testing.T) {
 	}
 	src := &fakeSource{
 		app: []*Material{expired}, appFallback: expired,
-		settings: Settings{Redirect: true, AppNames: []string{"app.example.com"}},
+		settings: Settings{Redirect: true},
 	}
 	d := NewRedirect()
 	sup := NewSupervisor(src, func(error) bool { return true },
@@ -662,7 +667,7 @@ func TestHavingACertificateIsTheActivation(t *testing.T) {
 	console := mustSelfSigned(t, Request{DNSNames: []string{"localhost"}})
 	src := &fakeSource{
 		console: []*Material{console}, consoleFall: console,
-		settings: Settings{ConsoleName: "localhost"},
+		settings: Settings{},
 	}
 	sup := NewSupervisor(src, func(error) bool { return true },
 		NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
@@ -723,5 +728,185 @@ func TestEachPlaneOnlyEverPresentsItsOwn(t *testing.T) {
 	got, err := sup.App.GetCertificate(hello("shop.example.com"))
 	if err != nil || got != app.TLS() {
 		t.Fatalf("the application door must present its own: %v", err)
+	}
+}
+
+// TestOlderAuthoritySettingsFoldIntoOrders: before orders, a name was
+// declared per plane and the automatic ones ticked (or, briefly, listed per
+// door). What the authority could be asked for, and on which door, survives
+// as orders - one per door, one for the names both doors shared.
+func TestOlderAuthoritySettingsFoldIntoOrders(t *testing.T) {
+	got := Settings{
+		LegacyConsoleName: "Admin.example.com",
+		LegacyAppNames:    []string{"shop.example.com", "admin.example.com"},
+		ACME: ACMESettings{LegacyDomains: []string{
+			"admin.example.com", "shop.example.com", "orphan.example.com",
+		}},
+	}.Normalized()
+	if got.LegacyConsoleName != "" || got.LegacyAppNames != nil ||
+		got.ACME.LegacyDomains != nil || got.ACME.LegacyConsoleDomains != nil {
+		t.Fatalf("the older fields must go: %+v", got)
+	}
+	if fmt.Sprint(got.ACME.DomainsOn(PlaneConsole)) != "[admin.example.com]" {
+		t.Fatalf("the console's name stays on the console's door: %v", got.ACME.DomainsOn(PlaneConsole))
+	}
+	if fmt.Sprint(got.ACME.DomainsOn(PlaneApp)) != "[admin.example.com shop.example.com orphan.example.com]" {
+		t.Fatalf("every name the application could ask for stays there: %v", got.ACME.DomainsOn(PlaneApp))
+	}
+	if len(got.ACME.Orders) != 2 {
+		t.Fatalf("one order for the shared name, one for the application's: %+v", got.ACME.Orders)
+	}
+	// Folding again changes nothing: an order is named by its names.
+	again := got.Normalized()
+	if fmt.Sprint(again.ACME.Orders) != fmt.Sprint(got.ACME.Orders) {
+		t.Fatalf("normalizing twice must change nothing: %+v", again.ACME.Orders)
+	}
+	if OrderID("ca", []string{"a.example.com"}) != OrderID("ca", []string{"A.example.com"}) {
+		t.Fatal("an order's id does not depend on the case of its names")
+	}
+}
+
+// TestAnAuthorityOnlyOpensTheDoorItIsPlacedOn: an order placed on the
+// application alone arms the authority for that door; the console's must not
+// open on an account with nothing to ask for there.
+func TestAnAuthorityOnlyOpensTheDoorItIsPlacedOn(t *testing.T) {
+	m := New()
+	m.SetACME(nil)
+	if m.Serves() || m.Live(time.Now()) {
+		t.Fatal("an authority with no name on this door serves nothing here")
+	}
+	m.SetACME(map[string]*autocert.Manager{"shop.example.com": {}})
+	if !m.Serves() || !m.Answers("shop.example.com") || m.Answers("other.example.com") {
+		t.Fatal("with a name placed, the door opens for that name")
+	}
+}
+
+// TestADoorClosedFromInsideAnswers: a request arriving through an HTTPS door
+// and asking for that door to close must still get its answer - it used to
+// wait on Shutdown, which was waiting on it.
+func TestADoorClosedFromInsideAnswers(t *testing.T) {
+	m, err := SelfSigned(Request{DNSNames: []string{"localhost"}, IPAddresses: []string{"127.0.0.1"}}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr := New()
+	mgr.Set([]*Material{m}, m)
+	var l *Listener
+	l = NewListener("admin", "127.0.0.1:0", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = l.Sync(r.Context(), false)
+		_, _ = w.Write([]byte("closed"))
+	}), mgr.TLSConfig())
+	// Bind to a free port first, then reuse it: Start binds Addr.
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Addr = probe.Addr().String()
+	_ = probe.Close()
+	if err := l.Start(); err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // a test against its own certificate
+	}}
+	res, err := client.Get("https://" + l.Addr + "/")
+	if err != nil {
+		t.Fatalf("the request that closed the door got no answer: %v", err)
+	}
+	_ = res.Body.Close()
+	if l.Running() {
+		t.Fatal("and the door is closed")
+	}
+	// The port is free again at once: the door can reopen.
+	if err := l.Start(); err != nil {
+		t.Fatalf("reopening: %v", err)
+	}
+	_ = l.Stop(context.Background())
+}
+
+// TestOnlyANameWithACertificateIsRedirected: a service inside the cluster
+// calling http://meerkat-meerkat:8080 reaches the gateway by a name no
+// certificate carries. Sending it to HTTPS would send it to a handshake it
+// cannot complete - its JWKS fetch failed the day HTTPS was forced.
+func TestOnlyANameWithACertificateIsRedirected(t *testing.T) {
+	d := NewRedirect()
+	d.Set(true, ":8443")
+	d.SetServes(func(host string) bool { return host == "shop.example.com" })
+	h := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }))
+	for url, want := range map[string]int{
+		"http://shop.example.com:8080/x":                                             http.StatusMovedPermanently,
+		"http://meerkat-meerkat.canopy.svc.cluster.local:8080/.well-known/jwks.json": http.StatusTeapot,
+		"http://10.1.2.3:8080/x":                                                     http.StatusTeapot,
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		if rec.Code != want {
+			t.Errorf("%s: %d, want %d", url, rec.Code, want)
+		}
+	}
+}
+
+// TestTheOneAccountBecomesTheFirstAuthority: the single account of the
+// settings before authorities keeps working - its cache untouched, its
+// orders its own.
+func TestTheOneAccountBecomesTheFirstAuthority(t *testing.T) {
+	got := Settings{ACME: ACMESettings{
+		LegacyEnabled: true, LegacyAcceptTOS: true, LegacyEmail: "ops@example.com",
+		LegacyDomains: []string{"shop.example.com"},
+	}}.Normalized()
+	if len(got.ACME.Authorities) != 1 {
+		t.Fatalf("one authority: %+v", got.ACME.Authorities)
+	}
+	a := got.ACME.Authorities[0]
+	if a.Provider != ProviderLetsEncrypt || a.CachePrefix != "" || !a.AcceptTOS || a.Email != "ops@example.com" {
+		t.Fatalf("Let's Encrypt, the cache as it was: %+v", a)
+	}
+	if len(got.ACME.Orders) != 1 || got.ACME.Orders[0].Authority != a.ID {
+		t.Fatalf("its orders are its own: %+v", got.ACME.Orders)
+	}
+	if got.ACME.LegacyEnabled || got.ACME.LegacyEmail != "" {
+		t.Fatalf("the old fields go: %+v", got.ACME)
+	}
+}
+
+// TestARefusalSaysWhatToCheck: autocert's "no viable challenge type found"
+// is what an unreachable name looks like, and says nothing an operator can
+// act on.
+func TestARefusalSaysWhatToCheck(t *testing.T) {
+	got := explain("shop.example.com", errors.New(`acme/autocert: unable to satisfy "x" for domain "shop.example.com": no viable challenge type found`))
+	for _, want := range []string{"port 443", "DNS only", "CAA", "no viable challenge type found"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q: %s", want, got)
+		}
+	}
+	if got := explain("x", errors.New("something else")); got != "something else" {
+		t.Errorf("an unknown refusal is passed on as it is: %s", got)
+	}
+}
+
+// TestTheCommunityImageAsksNoAuthority: ACME is Enterprise. Orders a
+// configuration brought over are kept, not asked - and the screen says so,
+// since a certificate nobody renews is one that ends.
+func TestTheCommunityImageAsksNoAuthority(t *testing.T) {
+	if edition.Enterprise {
+		t.Skip("the community image's refusal")
+	}
+	src := &fakeSource{settings: Settings{ACME: ACMESettings{
+		Authorities: []Authority{{ID: "ca", Name: "LE", Provider: ProviderLetsEncrypt, AcceptTOS: true}},
+		Orders:      []ACMEOrder{{ID: "o", Authority: "ca", Names: []string{"shop.example.com"}, App: true}},
+	}}}
+	sup := NewSupervisor(src, func(error) bool { return true },
+		NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
+		NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil), NewRedirect())
+	if err := sup.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sup.Stop(context.Background()) })
+	st := sup.State()
+	if st.ACME || st.App {
+		t.Fatalf("nothing armed, no door opened on it: %+v", st)
+	}
+	if len(st.Problems) == 0 || !strings.Contains(st.Problems[0], "Enterprise") {
+		t.Fatalf("and the screen says why: %v", st.Problems)
 	}
 }

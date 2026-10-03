@@ -78,6 +78,7 @@ var agentIgnores = map[string]string{
 	"apidocs":        "the developer documentation pages, served to a browser",
 	"backup":         "a snapshot is a file to download; export_configuration is the readable half an agent can reason about",
 	"certificates":   "certificates and private keys, one of the two places this product refuses to be clever",
+	"acme":           "the ACME accounts certificates are asked of: an account binding is a credential, and opening one is accepting an authority's terms - a legal act",
 	"vault":          "secrets: the vault answers references, never values, and an agent has no business asking",
 	"admin-tokens":   "minting a control-plane token from an agent that holds one is how a perimeter stops meaning anything",
 	"auth-providers": "external identity providers carry client secrets; the check endpoint reaches a third party under our credentials",
@@ -191,8 +192,11 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"DELETE /api/admin-tokens/{id}": true, "POST /api/apidocs/token": true,
 		"POST /api/certificates/import": true, "POST /api/certificates/self-signed": true,
 		"POST /api/certificates/signing-request": true, "POST /api/certificates/{id}/adopt": true,
-		"DELETE /api/certificates/{id}": true,
-		"POST /api/config/import":       true, "POST /api/config/history/{id}/restore": true,
+		"DELETE /api/certificates/{id}": true, "PUT /api/certificates/{id}/placement": true,
+		"POST /api/certificates/acme": true,
+		"POST /api/acme/authorities":  true, "PUT /api/acme/authorities/{id}": true,
+		"DELETE /api/acme/authorities/{id}": true, "POST /api/certificates/{id}/retry": true,
+		"POST /api/config/import": true, "POST /api/config/history/{id}/restore": true,
 		"POST /api/config/history/{id}/save": true,
 		// The scheduled calls: pausing one stops it firing, running one brings
 		// its turn forward, and deleting one is deleting one. None of them

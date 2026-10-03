@@ -43,6 +43,75 @@ type migration struct {
 
 var migrations = []migration{
 	{Version: 71, Name: "a role is its name", Up: rolesKeyedByName},
+	{Version: 73, Name: "certificates are a pool, placed on planes", Up: certificatesPlaced},
+}
+
+// certificatesPlaced turns the certificate of a NAME into material PLACED on
+// a plane (v73).
+//
+// Before: certificates(plane, host) - one row per declared name, material two
+// planes shared imported twice. After: certificates(on_console, on_app) and
+// the names read from the material itself. Each row keeps the plane it was
+// filed under; two rows holding the same certificate become one, placed on
+// both - the oldest kept, so the fallback a plane presents does not change.
+// The declared names leave with the columns: the TLS settings carry them
+// until their next read (certs.Settings.Normalized), and the marker that
+// seeded them has nothing left to mark.
+func certificatesPlaced(ctx context.Context, tx *transaction) error {
+	steps := []string{
+		`ALTER TABLE certificates ADD COLUMN on_console BOOLEAN NOT NULL DEFAULT FALSE`,
+		`ALTER TABLE certificates ADD COLUMN on_app BOOLEAN NOT NULL DEFAULT FALSE`,
+		`UPDATE certificates SET on_console = (plane = 'console'), on_app = (plane = 'app') WHERE csr_pem = '' OR cert_pem <> ''`,
+	}
+	for _, q := range steps {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("%s: %w", firstLine(q), err)
+		}
+	}
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id, cert_pem, plane FROM certificates WHERE cert_pem <> '' ORDER BY created_at, id`)
+	if err != nil {
+		return err
+	}
+	first := map[string]string{}
+	var merges [][3]string // keep, drop, plane
+	for rows.Next() {
+		var id, pem, plane string
+		if err := rows.Scan(&id, &pem, &plane); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if keep, ok := first[pem]; ok {
+			merges = append(merges, [3]string{keep, id, plane})
+			continue
+		}
+		first[pem] = id
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, m := range merges {
+		col := "on_app"
+		if m[2] == "console" {
+			col = "on_console"
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE certificates SET `+col+` = TRUE WHERE id = ?`, m[0]); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM certificates WHERE id = ?`, m[1]); err != nil {
+			return err
+		}
+	}
+	for _, q := range []string{
+		`ALTER TABLE certificates DROP COLUMN host`,
+		`ALTER TABLE certificates DROP COLUMN plane`,
+		`DELETE FROM settings WHERE key = 'tls_seeded'`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("%s: %w", firstLine(q), err)
+		}
+	}
+	return nil
 }
 
 // rolesKeyedByName rebuilds the catalogue around the name (v71).

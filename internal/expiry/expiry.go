@@ -393,20 +393,31 @@ func (d *Digest) certificatesBetween(ctx context.Context, from, to int64) []expi
 	in := func(t int64) bool { return t >= from && t < to }
 	if rows, err := d.st.ListCertificates(ctx); err == nil {
 		for _, c := range rows {
-			if c.Pending() || !in(c.Info.NotAfter) {
+			if c.Pending() || !in(c.Info.NotAfter) || superseded(c, rows) {
 				continue
 			}
-			out = append(out, expiringCert{Host: c.Host, Plane: c.Plane, Source: c.Source, NotAfter: c.Info.NotAfter})
+			out = append(out, expiringCert{Host: c.Name(), Plane: placedOn(c), Source: c.Source, NotAfter: c.Info.NotAfter})
 		}
 	} else {
 		slog.Warn("expiry digest: certificates not read", "err", err)
 	}
+	// What each authority issued sits in its own corner of the cache.
 	cfg := d.st.TLSSettings(ctx)
-	if cfg.ACME.Enabled {
-		cache := certs.StoreCache{S: d.st, Missing: func(err error) bool { return errors.Is(err, store.ErrNoRows) }}
-		for _, host := range cfg.ACME.Domains {
+	cache := certs.StoreCache{S: d.st, Missing: func(err error) bool { return errors.Is(err, store.ErrNoRows) }}
+	seen := map[string]bool{}
+	for _, o := range cfg.ACME.Orders {
+		auth, ok := cfg.ACME.AuthorityByID(o.Authority)
+		if !ok {
+			continue
+		}
+		at := certs.PrefixedCache{C: cache, Prefix: auth.CachePrefix}
+		for _, host := range o.Names {
 			host = strings.ToLower(strings.TrimSpace(host))
-			if info, ok := certs.CachedInfo(ctx, cache, host); ok && in(info.NotAfter) {
+			if seen[auth.ID+host] {
+				continue
+			}
+			seen[auth.ID+host] = true
+			if info, ok := certs.CachedInfo(ctx, at, host); ok && in(info.NotAfter) {
 				out = append(out, expiringCert{Host: host, Source: "acme", NotAfter: info.NotAfter})
 			}
 		}
@@ -421,15 +432,52 @@ func certificates(n int) string {
 	return fmt.Sprintf("%d certificates", n)
 }
 
-// certName reads the way the TLS screen lists it: the host, and which plane.
-func certName(c expiringCert) string {
-	switch c.Plane {
-	case store.PlaneConsole:
-		return c.Host + " (console)"
-	case store.PlaneApp:
-		return c.Host + " (applications)"
+// superseded reports a certificate in reserve that another one has taken
+// over: every name it carries is carried by a certificate that lasts longer.
+// That is what a renewal leaves behind - the old one kept in the pool - and
+// a digest that warned about it every morning until it expired would be
+// warning about a certificate nobody serves. A certificate in reserve with no
+// successor is still named: it may be the only one somebody has for a name.
+func superseded(c store.Certificate, all []store.Certificate) bool {
+	if c.Console || c.App || len(c.Names()) == 0 {
+		return false
 	}
-	return c.Host
+	for _, n := range c.Names() {
+		covered := false
+		for _, o := range all {
+			if o.ID != c.ID && !o.Pending() && o.Info.NotAfter > c.Info.NotAfter && certs.Covers(o.Names(), n) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return false
+		}
+	}
+	return true
+}
+
+// placedOn says where a certificate of the pool is served, in the digest's
+// words: one in reserve is named with no plane.
+func placedOn(c store.Certificate) string {
+	switch {
+	case c.Console && c.App:
+		return "console, applications"
+	case c.Console:
+		return "console"
+	case c.App:
+		return "applications"
+	}
+	return ""
+}
+
+// certName reads the way the TLS screen lists it: the first name, and where
+// it is served.
+func certName(c expiringCert) string {
+	if c.Plane == "" {
+		return c.Host
+	}
+	return c.Host + " (" + c.Plane + ")"
 }
 
 // certNote says what to do about it when the answer depends on where it came

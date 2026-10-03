@@ -36,7 +36,7 @@ Tout ce que décrit la [page des fonctionnalités](/product/features), moins les
 lignes du tableau ci-dessous. Le routage avec ses onze prédicats et ses
 trente-trois filtres, les pages de connexion à vos couleurs, les comptes
 locaux, OpenID Connect et GitHub, les rôles et les groupes, le portail de
-navigation, le coffre, TLS avec ACME, les limites de débit, le journal d'audit,
+navigation, le coffre, TLS (certificats générés, importés ou signés sur demande), les limites de débit, le journal d'audit,
 les écrans de trafic et de métriques, toute la console, et le point d'entrée
 agent. En production, en entreprise, commercialement, gratuitement.
 
@@ -47,6 +47,7 @@ agent. En production, en entreprise, commercialement, gratuitement.
 | **Organisations** | Une. Elle n'est jamais nommée dans la console, parce qu'il n'y a rien dont la distinguer. | Plusieurs, avec membres, modes de groupe, propriétaire, sélection à la connexion et politique de session par organisation. |
 | **Annuaire d'entreprise** | OpenID Connect, GitHub | LDAP et Active Directory en plus, en search-then-bind. |
 | **Les rôles depuis l'annuaire** | Accordés dans Meerkat | Règles de groupe : un groupe LDAP, une équipe GitHub ou un claim OIDC devient une appartenance et ses rôles, à chaque connexion. |
+| **Certificats** | Générés, importés ou signés sur demande, placés à la main sur la console et l'application | ACME en plus : Let's Encrypt, ZeroSSL, Google ou votre step-ca les émettent et les renouvellent tout seuls, plusieurs autorités côte à côte. |
 | **Heures ouvrées** | - | Fenêtres d'accès : plages horaires, jours de la semaine, fuseau. Partiel, voir la [feuille de route](/project/roadmap). |
 | **Plusieurs passerelles** | Une passerelle sur son stockage embarqué | Actif/actif sur un PostgreSQL partagé : bus de changement, certificats partagés, aucune affinité de session à réclamer. Voir [la page cluster](/docs/deploy/kubernetes). |
 | **Supervision** | Écrans de trafic et de métriques, intégrés, rien à installer. Journaux écrits en JSON OpenTelemetry pour un agent de noeud. | Les mêmes écrans, plus l'export vers votre collecteur OpenTelemetry : traces, métriques et journaux poussés en OTLP. |

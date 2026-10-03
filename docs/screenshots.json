@@ -671,6 +671,46 @@
       ]
     },
     {
+      "file": "img/console/tls-authorities.webp",
+      "plane": "admin",
+      "path": "/infra/tls",
+      "steps": [
+        {
+          "click": "section.card button:has-text(\"ACME\")"
+        },
+        {
+          "wait": 800
+        }
+      ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/tls"
+      ]
+    },
+    {
+      "file": "img/console/tls-local.webp",
+      "plane": "admin",
+      "path": "/infra/tls",
+      "steps": [
+        {
+          "click": "button:has-text(\"On a local machine\")"
+        },
+        {
+          "wait": 800
+        }
+      ],
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/operations/tls"
+      ]
+    },
+    {
       "file": "img/console/traffic.webp",
       "plane": "admin",
       "path": "/traffic",

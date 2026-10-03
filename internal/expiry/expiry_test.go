@@ -343,9 +343,9 @@ func TestDigestReportsExpiringVaultEntries(t *testing.T) {
 func TestItNamesTheCertificateBeforeItExpires(t *testing.T) {
 	st, sent, d := fixture(t)
 	if err := st.SaveCertificate(context.Background(), store.Certificate{
-		ID: "c1", Plane: store.PlaneApp, Host: "shop.example.com", Source: store.CertSourceImport,
+		ID: "c1", App: true, Source: store.CertSourceImport,
 		KeyPEM: "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----", CertPEM: "x",
-		Info: certs.Info{NotAfter: lastDay("2026-09-13")},
+		Info: certs.Info{DNSNames: []string{"shop.example.com"}, NotAfter: lastDay("2026-09-13")},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -364,5 +364,38 @@ func TestItNamesTheCertificateBeforeItExpires(t *testing.T) {
 	}
 	if !strings.Contains(m.Subject, "1 certificate expiring") {
 		t.Errorf("the subject does not lead with it: %q", m.Subject)
+	}
+}
+
+// A renewal leaves the old certificate in the pool. Once a longer-lived one
+// carries its names it is not news; one in reserve with no successor still is.
+func TestARenewedCertificateIsNotNamed(t *testing.T) {
+	st, sent, d := fixture(t)
+	save := func(id string, app bool, names []string, last string) {
+		t.Helper()
+		if err := st.SaveCertificate(context.Background(), store.Certificate{
+			ID: id, App: app, Source: store.CertSourceImport,
+			KeyPEM: "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----", CertPEM: "x",
+			Info: certs.Info{DNSNames: names, NotAfter: lastDay(last)},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	save("old", false, []string{"shop.example.com"}, "2026-09-13")
+	save("new", true, []string{"shop.example.com", "www.example.com"}, "2027-09-13")
+	save("lonely", false, []string{"spare.example.com"}, "2026-09-12")
+	d.Now = func() time.Time { return at("2026-09-10T07:05:00Z") }
+	if err := d.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(*sent) != 1 {
+		t.Fatalf("messages: %d", len(*sent))
+	}
+	m := (*sent)[0]
+	if strings.Contains(m.Text, "shop.example.com") {
+		t.Errorf("the replaced certificate must not be named:\n%s", m.Text)
+	}
+	if !strings.Contains(m.Text, "spare.example.com") {
+		t.Errorf("a certificate in reserve with no successor is still named:\n%s", m.Text)
 	}
 }

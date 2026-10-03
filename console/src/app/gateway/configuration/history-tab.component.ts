@@ -14,7 +14,6 @@ import { RowActionsDirective } from '@softwarity/row-actions';
 import { Observable } from 'rxjs';
 import { ApiService, ConfigPlan, RestorePoint } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
-import { EeLockComponent } from '../../shared/ee-lock.component';
 import { ConfigurationYamlComponent } from './configuration-yaml.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
 
@@ -40,7 +39,6 @@ import { LiveChangesService } from '../../shared/live-changes.service';
     MatTableModule,
     MatTooltipModule,
     RowActionsDirective,
-    EeLockComponent,
     ConfigurationYamlComponent,
   ],
   styleUrl: './configuration-cards.scss',
@@ -183,7 +181,6 @@ import { LiveChangesService } from '../../shared/live-changes.service';
                        success and changes nothing. -->
                   <button
                     matIconButton
-                    ee-feature="configurations"
                     [disabled]="busy() || p.live"
                     (click)="$event.stopPropagation(); restore(p)"
                     [matTooltip]="p.live ? alreadyTip() : restoreTip()"
@@ -194,7 +191,6 @@ import { LiveChangesService } from '../../shared/live-changes.service';
                   </button>
                   <button
                     matIconButton
-                    ee-feature="configurations"
                     [disabled]="busy()"
                     (click)="$event.stopPropagation(); saveAs(p)"
                     i18n-matTooltip="@@Save_under_a_name"
@@ -220,11 +216,6 @@ import { LiveChangesService } from '../../shared/live-changes.service';
           </mat-table>
         }
 
-                <app-ee-lock
-          feature="configurations"
-          i18n-why="@@History_ee_why"
-          why="Go back to any past configuration, and keep several side by side."
-        />
       </mat-drawer-content>
 
       <mat-drawer position="end" mode="over" [opened]="opened() !== null" (closedStart)="close()">
@@ -250,7 +241,6 @@ import { LiveChangesService } from '../../shared/live-changes.service';
             </button>
             <button
               matButton="filled"
-              ee-feature="configurations"
               [disabled]="busy() || p.current"
               (click)="restore(p)"
             >

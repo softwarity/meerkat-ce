@@ -29,10 +29,26 @@ mat-form-field {
 }
 .field-info {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
   opacity: 0.6;
   /* Drop it onto the input line, past the floating label above. */
   margin-top: 8px;
 }
-.field-info:hover {
+.field-info:hover,
+.field-info:focus-visible {
   opacity: 1;
+}
+/* Reached by Tab: the focus is shown, since it is how the tooltip opens. */
+.field-info:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: -4px;
 }

@@ -85,6 +85,61 @@
   Each administrator reads their own perimeter - root every session, an
   application administrator the applications', and now an organisation's
   administrator the sessions open in their organisations.
+- **TLS: a pool of certificates, placed on the console and the application.**
+  A certificate is generated or imported once - its names are the ones it
+  carries, several names, a wildcard or an IP address included - then dragged
+  onto the console, the application, or both (or placed from its menu). No
+  more names to declare first, and no more material imported twice. A
+  certificate already answering for one of the same names on that door is
+  named, and replaced only when you say so. On upgrade, every certificate keeps
+  the plane it was on, and two copies of the same one become a single entry
+  placed on both.
+- **Each TLS door shows its ports in its title** (`HTTP:19090 HTTPS:19443`, as
+  the world reaches them) and lists only HTTPS links. The console warns when
+  none of its certificates carries the name it is reached by.
+- **The daily digest no longer names a renewed certificate** left in reserve:
+  a longer-lived certificate carries its names.
+- **Force HTTPS only redirects the names a certificate carries.** A service
+  inside the cluster calling the gateway by its service name - a JWKS fetch,
+  an internal API call - stays in plain HTTP instead of being sent to a
+  handshake it cannot complete.
+- **Taking the console's own certificate away no longer hangs.** Closing an
+  HTTPS door from a request that came through it waited on itself; the
+  console now asks first, then continues on its plain HTTP address.
+- **Importing a configuration file now works on the Community edition**:
+  "Import a file" previews the plan and applies it (or keeps it as a saved
+  configuration). Enterprise-only parts of the file - ACME included - are left
+  out and listed in the plan. Git import and export stay Enterprise.
+- **Saving under a name, setting as current, duplicating and restoring a
+  configuration are no longer locked on the Community edition** - the gateway
+  always allowed them; the console had them greyed. The Community edition keeps
+  three saved configurations at a time.
+- **A saved configuration says where it stands against git in words** -
+  *up to date*, *changed since push*, *never pushed* - beside its location;
+  the repository, branch and directory are on hover, one per line.
+- **ACME is now Enterprise.** On the community image the TLS screen still
+  generates, imports and signs certificates on request; asking an authority
+  is part of the Enterprise edition.
+- **Several ACME authorities, set up in a drawer** (Enterprise). The ACME
+  button, beside Add certificate - its tooltip says what ACME is: pick Let's Encrypt (staging or not), ZeroSSL, Google Trust
+  Services or another authority, and the form asks only what that one needs -
+  saying where to find it. Each authority saved is an *Ask* entry of Add
+  certificate, so one domain can come from Let's Encrypt and another from
+  ZeroSSL. The ACME card at the bottom of the TLS screen is gone. The account
+  set up before becomes the first authority, its certificates kept.
+- **A certificate is asked of its authority as soon as it is placed**, not at
+  the first visit. The line says *Asking the authority...*, then shows the
+  certificate - or the authority's refusal, explained (name not pointing here,
+  port 443 not reaching the gateway, a CAA record, the rate limit), with a
+  Retry button.
+- **Saving an authority checks that it answers**: a wrong URL is said at once.
+- **Five ways in, each its own dialog:** generate a self-signed certificate for
+  the names you type, import a PEM pair (pasted, chosen or dropped - each file
+  lands where it belongs), import a keystore, create a signing request, ask an
+  ACME authority.
+- **TLS explains HTTPS on a local machine**, in a drawer: the hosts file, a
+  local authority the browsers trust (mkcert), one certificate for every name
+  and its import, per system, with the names you type in the commands.
 - **Members has its membership column in single-organisation mode too**:
   join, leave and the admin badge work as in an organisation, and the
   whole-column box has members to act on.
@@ -113,6 +168,11 @@
   plain door - the one for a broken certificate - silently did nothing. Cookies
   set over HTTPS now carry the `__Host-` prefix. The console's HTTPS also tells
   browsers to forget an earlier HSTS promise.
+- **A redirect route's audit upload is greyed**, with the reason: a redirect
+  has no operations to audit.
+- **Field info icons no longer look like buttons**, still reachable with Tab
+  (the tooltip opens on focus), and a screen reader reads their explanation
+  once instead of twice.
 
 ---
 

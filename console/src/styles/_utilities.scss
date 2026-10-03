@@ -228,3 +228,12 @@ textarea.oneline {
     color: var(--mat-sys-error);
   }
 }
+
+// A tooltip that keeps its line breaks: an address read as its parts
+// (repository, branch, directory) rather than one run of text. Tooltips live
+// in the overlay, outside any component's styles, hence here.
+.tooltip-lines .mdc-tooltip__surface {
+  white-space: pre-line;
+  text-align: left;
+  max-width: 420px;
+}

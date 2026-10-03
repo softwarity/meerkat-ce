@@ -1685,8 +1685,11 @@
         "method": "POST",
         "path": "/api/certificates/self-signed",
         "body": {
-          "plane": "app",
-          "host": "e2e.test"
+          "names": [
+            "e2e.test"
+          ],
+          "app": true,
+          "replace": true
         },
         "allowedStatus": [
           201
@@ -1713,8 +1716,9 @@
         "method": "POST",
         "path": "/api/certificates/signing-request",
         "body": {
-          "plane": "app",
-          "host": "csr.e2e.test"
+          "names": [
+            "csr.e2e.test"
+          ]
         },
         "allowedStatus": [
           201
@@ -1731,6 +1735,187 @@
       "description": {
         "en": "The offline door: the request leaves for whoever runs the authority, the private key stays. Nothing here needs a route to the internet.",
         "fr": "La porte hors ligne : la demande part vers qui tient l'autorité, la clé privée reste. Rien ici n'a besoin d'un accès internet."
+      }
+    },
+    {
+      "id": "api-infra-certificate-acme-order",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/certificates/acme",
+        "body": {
+          "authority": "none",
+          "names": [
+            "acme.e2e.test"
+          ]
+        },
+        "allowedStatus": [
+          422
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Ask the ACME authority for a certificate",
+        "fr": "Demander un certificat à l'autorité ACME"
+      },
+      "description": {
+        "en": "An order sits in the certificate pool like the others and is placed the same way; the authority is asked on the first visit to a name once the order serves a door. Refused while no authority is set up, and for a wildcard or an address.",
+        "fr": "Une commande vit dans la réserve de certificats comme les autres et se place de la même façon ; l'autorité est sollicitée à la première visite d'un nom une fois la commande sur une porte. Refusé tant qu'aucune autorité n'est configurée, et pour un joker ou une adresse."
+      }
+    },
+    {
+      "id": "api-infra-acme-authorities",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/acme/authorities"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "List the ACME authorities",
+        "fr": "Lister les autorités ACME"
+      },
+      "description": {
+        "en": "The accounts certificates are asked of, and the providers the drawer offers. A literal account key never travels back.",
+        "fr": "Les comptes auprès desquels les certificats sont demandés, et les fournisseurs proposés. Une clé de compte en clair ne revient jamais."
+      }
+    },
+    {
+      "id": "api-infra-acme-authority-create",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/acme/authorities",
+        "body": {
+          "provider": "letsencrypt"
+        },
+        "allowedStatus": [
+          422
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Set up an ACME authority",
+        "fr": "Configurer une autorité ACME"
+      },
+      "description": {
+        "en": "Refused at save time rather than at renewal time: terms not accepted, a binding missing, a directory that does not answer - each named.",
+        "fr": "Refusé à l'enregistrement plutôt qu'au renouvellement : conditions non acceptées, liaison de compte manquante, répertoire qui ne répond pas - chacun nommé."
+      }
+    },
+    {
+      "id": "api-infra-acme-authority-update",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/acme/authorities/no-such",
+        "body": {
+          "provider": "letsencrypt",
+          "acceptTos": true
+        },
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Change an ACME authority",
+        "fr": "Modifier une autorité ACME"
+      },
+      "description": {
+        "en": "Another directory is another account: it gets a fresh corner of the cache.",
+        "fr": "Un autre répertoire est un autre compte : il reçoit un coin neuf du cache."
+      }
+    },
+    {
+      "id": "api-infra-acme-authority-delete",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "DELETE",
+        "path": "/api/acme/authorities/no-such",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Delete an ACME authority",
+        "fr": "Supprimer une autorité ACME"
+      },
+      "description": {
+        "en": "Refused while certificates are still asked of it, and the refusal names them.",
+        "fr": "Refusé tant que des certificats lui sont demandés, et le refus les nomme."
+      }
+    },
+    {
+      "id": "api-infra-certificate-retry",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "POST",
+        "path": "/api/certificates/no-such/retry",
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Ask an authority again",
+        "fr": "Redemander à une autorité"
+      },
+      "description": {
+        "en": "Once whatever the authority refused for is fixed - a DNS record, a closed port - the order is asked again.",
+        "fr": "Une fois corrigé ce que l'autorité a refusé - un enregistrement DNS, un port fermé - la commande est redemandée."
+      }
+    },
+    {
+      "id": "api-infra-certificate-placement",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/certificates/no-such/placement",
+        "body": {
+          "app": true
+        },
+        "allowedStatus": [
+          404
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Place a certificate on a plane",
+        "fr": "Placer un certificat sur un plan"
+      },
+      "description": {
+        "en": "A certificate is made or imported once, then served on the console, the applications, or both. Another certificate already answering for one of its names on that door is named in the refusal, and replaced only when asked.",
+        "fr": "Un certificat est fabriqué ou importé une fois, puis servi sur la console, les applications, ou les deux. Un autre certificat qui répond déjà pour l'un de ses noms sur cette porte est nommé dans le refus, et remplacé seulement sur demande."
       }
     },
     {

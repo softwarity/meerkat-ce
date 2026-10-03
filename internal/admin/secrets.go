@@ -117,21 +117,29 @@ func (a *API) secretHolders() map[string]secretHolder {
 		},
 		"tls": {
 			scope: vault.ScopeInfra,
-			load: func(ctx context.Context, _ string) (string, map[string]string, error) {
-				cfg := a.st.RawTLS(ctx)
-				// The external-account HMAC key is what a corporate ACME
-				// authority hands out to say which account this gateway
-				// registers under. It arrives by e-mail, gets pasted, and would
-				// otherwise sit in the settings row in clear.
-				return "TLS", map[string]string{"eabHmacKey": cfg.ACME.EABHMACKey}, nil
-			},
-			stash: func(ctx context.Context, _, field, value string) error {
-				cfg := a.st.RawTLS(ctx)
-				if field != "eabHmacKey" {
-					return fmt.Errorf("the TLS settings hold no secret named %q", field)
+			// One authority, named by its id: the external-account HMAC key is
+			// what a ZeroSSL or a corporate authority hands out to say which
+			// account this gateway registers under. It arrives by e-mail, gets
+			// pasted, and would otherwise sit in the settings row in clear.
+			load: func(ctx context.Context, id string) (string, map[string]string, error) {
+				auth, ok := a.st.RawTLS(ctx).ACME.AuthorityByID(id)
+				if !ok {
+					return "", nil, fmt.Errorf("no ACME authority %q", id)
 				}
-				cfg.ACME.EABHMACKey = value
-				return a.st.SetSetting(ctx, store.SettingTLS, cfg)
+				return "ACME authority " + auth.Name, map[string]string{"eabHmacKey": auth.EABHMACKey}, nil
+			},
+			stash: func(ctx context.Context, id, field, value string) error {
+				if field != "eabHmacKey" {
+					return fmt.Errorf("an ACME authority holds no secret named %q (only eabHmacKey)", field)
+				}
+				cfg := a.st.RawTLS(ctx)
+				for i := range cfg.ACME.Authorities {
+					if cfg.ACME.Authorities[i].ID == id {
+						cfg.ACME.Authorities[i].EABHMACKey = value
+						return a.st.SetSetting(ctx, store.SettingTLS, cfg)
+					}
+				}
+				return fmt.Errorf("no ACME authority %q", id)
 			},
 		},
 	}

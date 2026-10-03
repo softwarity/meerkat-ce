@@ -2,13 +2,18 @@ package certs
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/crypto/acme/autocert"
+
+	"github.com/softwarity/meerkat/internal/edition"
 )
 
 // Planes, matching store.PlaneConsole / store.PlaneApp.
@@ -20,16 +25,11 @@ const (
 // Settings is the TLS configuration as an operator sets it.
 //
 // There is no "switch HTTPS on" here, and that absence is the design: a switch
-// that can be on with nothing behind it is a switch that lies. HAVING a
-// certificate for a name is what opens that plane's HTTPS door, and deleting
-// it is what closes it.
+// that can be on with nothing behind it is a switch that lies. A certificate
+// PLACED on a plane is what opens that plane's HTTPS door, and taking it off
+// is what closes it. Nor is there a list of names: a certificate carries its
+// own, and asking for them a second time is where the two drift apart.
 type Settings struct {
-	// ConsoleName is the single name the console answers to. One, because a
-	// console is one thing reached one way - unlike the application, which
-	// fronts as many hosts as it serves.
-	ConsoleName string `json:"consoleName"`
-	// AppNames are the hosts the application answers to, wildcards included.
-	AppNames []string `json:"appNames"`
 	// Redirect forces the application's plain port over to HTTPS (SSL-06).
 	// The console's plain port is never redirected - see redirect.go.
 	Redirect bool `json:"redirect"`
@@ -40,6 +40,119 @@ type Settings struct {
 	// that leaves in clear before being redirected. 0 means DefaultHSTS.
 	HSTSMaxAge int          `json:"hstsMaxAge,omitempty"`
 	ACME       ACMESettings `json:"acme"`
+
+	// The names each plane was declared under, before certificates carried
+	// their own (v73). Read once, to sort the authority's names by plane, and
+	// never written again: see Normalized.
+	LegacyConsoleName string   `json:"consoleName,omitempty"`
+	LegacyAppNames    []string `json:"appNames,omitempty"`
+}
+
+// Normalized folds what an older installation - or a configuration exported
+// by one - said about the authority into orders (v73). Two shapes came
+// before: a name declared per plane with the automatic ones ticked, then a
+// list of names per door. Either way the names one door could ask for become
+// one order placed there, and names both doors could ask for one order placed
+// on both. What the authority may be asked for, and on which door, is
+// unchanged; the old fields go.
+func (s Settings) Normalized() Settings {
+	console := strings.ToLower(strings.TrimSpace(s.LegacyConsoleName))
+	if console != "" || len(s.LegacyAppNames) > 0 {
+		app := map[string]bool{}
+		for _, n := range lower(s.LegacyAppNames) {
+			app[n] = true
+		}
+		var appDomains []string
+		for _, d := range lower(s.ACME.LegacyDomains) {
+			if d == console && !slices.Contains(s.ACME.LegacyConsoleDomains, d) {
+				s.ACME.LegacyConsoleDomains = append(s.ACME.LegacyConsoleDomains, d)
+			}
+			if d != console || app[d] {
+				appDomains = append(appDomains, d)
+			}
+		}
+		s.ACME.LegacyDomains = appDomains
+	}
+	s.LegacyConsoleName, s.LegacyAppNames = "", nil
+	if len(s.ACME.LegacyDomains) > 0 || len(s.ACME.LegacyConsoleDomains) > 0 {
+		app, console := lower(s.ACME.LegacyDomains), lower(s.ACME.LegacyConsoleDomains)
+		var both, appOnly, consoleOnly []string
+		for _, d := range app {
+			if slices.Contains(console, d) {
+				both = append(both, d)
+			} else {
+				appOnly = append(appOnly, d)
+			}
+		}
+		for _, d := range console {
+			if !slices.Contains(app, d) {
+				consoleOnly = append(consoleOnly, d)
+			}
+		}
+		for _, o := range []ACMEOrder{
+			{Names: both, Console: true, App: true},
+			{Names: consoleOnly, Console: true},
+			{Names: appOnly, App: true},
+		} {
+			if len(o.Names) == 0 {
+				continue
+			}
+			o.ID = OrderID("", o.Names)
+			if !slices.ContainsFunc(s.ACME.Orders, func(x ACMEOrder) bool { return x.ID == o.ID }) {
+				s.ACME.Orders = append(s.ACME.Orders, o)
+			}
+		}
+	}
+	s.ACME.LegacyDomains, s.ACME.LegacyConsoleDomains = nil, nil
+	// The one account becomes the first authority, and keeps the cache as it
+	// is - no prefix - so what it already issued is still found. Its orders,
+	// which named no authority, are its own.
+	a := &s.ACME
+	if len(a.Authorities) == 0 && (a.LegacyEnabled || a.LegacyDirectoryURL != "" || a.LegacyAcceptTOS || len(a.Orders) > 0) {
+		provider := ProviderCustom
+		switch strings.TrimSpace(a.LegacyDirectoryURL) {
+		case "", LetsEncryptURL:
+			provider = ProviderLetsEncrypt
+		case LetsEncryptStagingURL:
+			provider = ProviderLetsEncryptStaging
+		}
+		a.Authorities = []Authority{Authority{
+			ID: "ca-default", Provider: provider, DirectoryURL: a.LegacyDirectoryURL,
+			Email: a.LegacyEmail, RootCA: a.LegacyRootCA, EABKeyID: a.LegacyEABKeyID,
+			EABHMACKey: a.LegacyEABHMACKey, AcceptTOS: a.LegacyAcceptTOS,
+		}.Normalize()}
+	}
+	a.LegacyEnabled, a.LegacyDirectoryURL, a.LegacyEmail, a.LegacyRootCA = false, "", "", ""
+	a.LegacyEABKeyID, a.LegacyEABHMACKey, a.LegacyAcceptTOS = "", "", false
+	for i := range a.Orders {
+		if a.Orders[i].Authority == "" && len(a.Authorities) > 0 {
+			a.Orders[i].Authority = a.Authorities[0].ID
+		}
+	}
+	return s
+}
+
+// ACMEOrder is a certificate asked of the authority: the names, and the doors
+// it is served on. It sits in the pool beside the certificates made or
+// imported by hand, and is placed the same way; what differs is where the
+// material comes from - the authority, fetched on the first visit and renewed
+// before it ends - and where it lives, the ACME cache.
+type ACMEOrder struct {
+	ID string `json:"id"`
+	// Authority is the ID of the authority it is asked of.
+	Authority string   `json:"authority"`
+	Names     []string `json:"names"`
+	Console   bool     `json:"console,omitempty"`
+	App       bool     `json:"app,omitempty"`
+	CreatedAt int64    `json:"createdAt,omitempty"`
+}
+
+// OrderID names an order by its authority and names: the same request, made
+// twice, is one order - which is also what keeps an order folded from older
+// settings the same order on every read.
+func OrderID(authority string, names []string) string {
+	h := sha256.Sum256([]byte(authority + " " + strings.Join(lower(names), " ")))
+	return "acme-" + hex.EncodeToString(h[:6])
 }
 
 // MaxHSTS is the longest HSTS promise the console lets an installation make:
@@ -64,32 +177,60 @@ func (s Settings) HSTS(redirecting bool) int {
 	return DefaultHSTS
 }
 
-// Names returns every declared name, console first.
-func (s Settings) Names() []string {
-	out := make([]string, 0, len(s.AppNames)+1)
-	if n := strings.ToLower(strings.TrimSpace(s.ConsoleName)); n != "" {
-		out = append(out, n)
-	}
-	return append(out, lower(s.AppNames)...)
+// ACMESettings are the authorities and what is asked of them.
+type ACMESettings struct {
+	// Authorities are the ACME accounts set up, in the order they were.
+	Authorities []Authority `json:"authorities,omitempty"`
+	// Orders are the certificates asked of an authority, each placed on the
+	// doors it serves. A door only ever asks for what is placed on it.
+	Orders []ACMEOrder `json:"orders,omitempty"`
+
+	// The one account of the settings before authorities (v73), read once
+	// and folded into an authority by Normalized.
+	LegacyEnabled      bool   `json:"enabled,omitempty"`
+	LegacyDirectoryURL string `json:"directoryUrl,omitempty"`
+	LegacyEmail        string `json:"email,omitempty"`
+	LegacyRootCA       string `json:"rootCa,omitempty"`
+	LegacyEABKeyID     string `json:"eabKeyId,omitempty"`
+	LegacyEABHMACKey   string `json:"eabHmacKey,omitempty"`
+	LegacyAcceptTOS    bool   `json:"acceptTos,omitempty"`
+	// The names per door of the settings before orders, read once and folded
+	// by Normalized.
+	LegacyDomains        []string `json:"domains,omitempty"`
+	LegacyConsoleDomains []string `json:"consoleDomains,omitempty"`
 }
 
-// ACMESettings is the automatic authority. Every field that makes it work
-// offline is here on purpose: the directory is a URL, the root is a PEM, and
-// the external account binding is what a corporate authority demands.
-type ACMESettings struct {
-	Enabled      bool   `json:"enabled"`
-	DirectoryURL string `json:"directoryUrl"`
-	Email        string `json:"email"`
-	// Domains is the closed set the authority may be asked for. It is not a
-	// list to maintain: the console ticks a box on a declared name, and that
-	// is what puts it here. One authority, one account - splitting ACME per
-	// plane would register twice with the same authority for the same machine,
-	// for nothing.
-	Domains    []string `json:"domains"`
-	RootCA     string   `json:"rootCa"`
-	EABKeyID   string   `json:"eabKeyId"`
-	EABHMACKey string   `json:"eabHmacKey"`
-	AcceptTOS  bool     `json:"acceptTos"`
+// DomainsOn is every name the authority may be asked for on one door: the
+// names of the orders placed there.
+func (a ACMESettings) DomainsOn(plane string) []string {
+	var out []string
+	for _, o := range a.Orders {
+		if (plane == PlaneConsole && o.Console) || (plane == PlaneApp && o.App) {
+			for _, n := range lower(o.Names) {
+				if !slices.Contains(out, n) {
+					out = append(out, n)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// placed is every name an order of one authority placed on a door holds:
+// that authority's closed list.
+func (a ACMESettings) placed(authority string) []string {
+	var out []string
+	for _, o := range a.Orders {
+		if o.Authority != authority || (!o.Console && !o.App) {
+			continue
+		}
+		for _, n := range lower(o.Names) {
+			if !slices.Contains(out, n) {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
 }
 
 // Source is what a supervisor reads from. It is an interface so this package
@@ -140,6 +281,9 @@ type Supervisor struct {
 
 	mu    sync.Mutex
 	state State
+
+	// issues is what happened to each name asked of an authority (request.go).
+	issues issueBook
 }
 
 // NewSupervisor wires the two managers to the two HTTPS doors and to the
@@ -200,36 +344,67 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 	}
 	problems = append(problems, appProblems...)
 
-	armed := false
-	if cfg.ACME.Enabled {
+	// One client per authority, each with its own account and its own corner
+	// of the cache; each door maps a name to the client that asks for it. An
+	// authority with nothing placed is not armed at all.
+	consoleBy, appBy := map[string]*autocert.Manager{}, map[string]*autocert.Manager{}
+	clients := map[string]*autocert.Manager{}
+	authorities := cfg.ACME.Authorities
+	// ACME is Enterprise (SSL-05). On the community image, what a
+	// configuration brought over is kept and not asked - and said, since a
+	// certificate nobody renews is one that ends.
+	if !edition.Enterprise {
+		placed := 0
+		for _, a := range authorities {
+			placed += len(cfg.ACME.placed(a.ID))
+		}
+		if placed > 0 {
+			problems = append(problems, fmt.Sprintf(
+				"ACME is part of the Enterprise edition: %d name(s) placed on a door are kept, and not asked of any authority", placed))
+		}
+		authorities = nil
+	}
+	for _, auth := range authorities {
+		hosts := cfg.ACME.placed(auth.ID)
+		if len(hosts) == 0 {
+			continue
+		}
 		am, aerr := NewACME(ACMEOptions{
-			DirectoryURL: cfg.ACME.DirectoryURL,
-			Email:        cfg.ACME.Email,
-			Hosts:        cfg.ACME.Domains,
-			RootCA:       cfg.ACME.RootCA,
-			EABKeyID:     cfg.ACME.EABKeyID,
-			EABHMACKey:   cfg.ACME.EABHMACKey,
-			AcceptTOS:    cfg.ACME.AcceptTOS,
-			Cache:        s.cache,
+			DirectoryURL: auth.Directory(),
+			Email:        auth.Email,
+			Hosts:        hosts,
+			RootCA:       auth.RootCA,
+			EABKeyID:     auth.EABKeyID,
+			EABHMACKey:   auth.EABHMACKey,
+			AcceptTOS:    auth.AcceptTOS,
+			Cache:        PrefixedCache{C: s.cache, Prefix: auth.CachePrefix},
 		})
 		if aerr != nil {
 			// A broken authority must not take the installed certificates down
 			// with it: what was serving yesterday keeps serving, and the
 			// problem is named on screen.
-			problems = append(problems, "automatic authority: "+aerr.Error())
-		} else {
-			// The authority answers for whichever names were ticked, on
-			// whichever plane declared them.
-			console, app := splitDomains(cfg)
-			s.Console.SetACME(am, console)
-			s.App.SetACME(am, app)
-			armed = true
+			problems = append(problems, fmt.Sprintf("authority %s: %v", orName(auth), aerr))
+			continue
+		}
+		clients[auth.ID] = am
+	}
+	for _, o := range cfg.ACME.Orders {
+		am := clients[o.Authority]
+		if am == nil {
+			continue
+		}
+		for _, n := range lower(o.Names) {
+			if o.Console {
+				consoleBy[n] = am
+			}
+			if o.App {
+				appBy[n] = am
+			}
 		}
 	}
-	if !armed {
-		s.Console.SetACME(nil, nil)
-		s.App.SetACME(nil, nil)
-	}
+	s.Console.SetACME(consoleBy)
+	s.App.SetACME(appBy)
+	armed := len(clients) > 0
 	s.Console.Set(consoleList, consoleFallback)
 	s.App.Set(appList, appFallback)
 
@@ -262,6 +437,7 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 			"every application certificate has expired: the plain port keeps answering rather than sending callers to a door none of them will open")
 	}
 	s.redirect.Set(redirect, s.appLn.Addr)
+	s.redirect.SetServes(s.App.Answers)
 	// HSTS stands with the redirect, down included: when every certificate
 	// has expired and the redirect retreats, telling browsers to insist on
 	// HTTPS would be the one thing left locking them out.
@@ -276,25 +452,15 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 	for _, p := range problems {
 		slog.Warn("tls", "problem", p)
 	}
+	s.request(cfg)
 	return failed
 }
 
-// splitDomains sorts the authority's closed list by the plane that declared
-// each name, so the console's door is never handed an application certificate.
-func splitDomains(cfg Settings) (console, app []string) {
-	want := map[string]bool{}
-	for _, d := range lower(cfg.ACME.Domains) {
-		want[d] = true
+func orName(a Authority) string {
+	if a.Name != "" {
+		return a.Name
 	}
-	if n := strings.ToLower(strings.TrimSpace(cfg.ConsoleName)); n != "" && want[n] {
-		console = append(console, n)
-	}
-	for _, n := range lower(cfg.AppNames) {
-		if want[n] {
-			app = append(app, n)
-		}
-	}
-	return console, app
+	return a.ID
 }
 
 // Stop closes both HTTPS doors, for a graceful shutdown.
@@ -304,28 +470,6 @@ func (s *Supervisor) Stop(ctx context.Context) error {
 		err = aerr
 	}
 	return err
-}
-
-// Check builds an authority from settings WITHOUT arming it, so the console
-// can refuse a broken configuration at save time instead of at renewal time.
-func Check(cfg ACMESettings, cache autocert.Cache) error {
-	if !cfg.Enabled {
-		return nil
-	}
-	_, err := NewACME(ACMEOptions{
-		DirectoryURL: cfg.DirectoryURL,
-		Email:        cfg.Email,
-		Hosts:        cfg.Domains,
-		RootCA:       cfg.RootCA,
-		EABKeyID:     cfg.EABKeyID,
-		EABHMACKey:   cfg.EABHMACKey,
-		AcceptTOS:    cfg.AcceptTOS,
-		Cache:        cache,
-	})
-	if err != nil {
-		return fmt.Errorf("automatic authority: %w", err)
-	}
-	return nil
 }
 
 // lower normalises a name list once, so the manager compares a server name

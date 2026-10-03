@@ -33,7 +33,7 @@ to deploy something less safe in order to pay less.
 Everything the [features page](/product/features) describes, minus the rows in
 the table below. Routing with its eleven predicates and thirty-three filters,
 the sign-in pages wearing your colours, local accounts, OpenID Connect and
-GitHub, roles and groups, the navigation portal, the vault, TLS with ACME, rate
+GitHub, roles and groups, the navigation portal, the vault, TLS (generated, imported or signed on request), rate
 limits, the audit trail, the traffic and metrics screens, the whole console,
 and the agent endpoint. In production, in a company, commercially, for free.
 
@@ -44,6 +44,7 @@ and the agent endpoint. In production, in a company, commercially, for free.
 | **Organisations** | One. It is never named in the console, because there is nothing to tell it apart from. | Several, with members, group modes, an owner, selection at sign-in and a session policy per organisation. |
 | **Corporate directory** | OpenID Connect, GitHub | LDAP and Active Directory as well, search-then-bind. |
 | **Roles from the directory** | Granted in Meerkat | Group rules: an LDAP group, a GitHub team or an OIDC claim becomes a membership and its roles, at each sign-in. |
+| **Certificates** | Generated, imported or signed on request, placed on the console and the application by hand | ACME as well: Let's Encrypt, ZeroSSL, Google or your own step-ca issue and renew them on their own, several authorities side by side. |
 | **Business hours** | - | Access windows: time ranges, week days, time zone. Partial - see the [roadmap](/project/roadmap). |
 | **Several gateways** | One gateway on its embedded storage | Active/active on one shared PostgreSQL: change bus, shared certificates, no session affinity to ask for. See [the cluster page](/docs/deploy/kubernetes). |
 | **Monitoring** | Traffic and metrics screens, built in, nothing to install. Logs written as OpenTelemetry JSON for a node agent. | The same screens, plus export to your OpenTelemetry collector: traces, metrics and logs pushed over OTLP. |

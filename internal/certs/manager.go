@@ -22,8 +22,9 @@ type Manager struct {
 	mu        sync.RWMutex
 	materials []*Material
 	fallback  *Material
-	acme      *autocert.Manager
-	acmeHosts []string
+	// acme maps each name an authority may be asked for on this door to the
+	// client of that authority. Empty: no authority here.
+	acme map[string]*autocert.Manager
 	// serialise makes the ORDER one-at-a-time across the gateways sharing a
 	// database (issue.go). Nil on a single node.
 	serialise Serialiser
@@ -52,12 +53,22 @@ func (m *Manager) Set(materials []*Material, fallback *Material) {
 	m.fallback = fallback
 }
 
-// SetACME installs (or removes, with nil) the automatic authority, and the
-// closed list of hosts it may ask for.
-func (m *Manager) SetACME(am *autocert.Manager, hosts []string) {
+// SetACME installs the authorities of this door: which client is asked for
+// which name. Nil or empty removes them.
+func (m *Manager) SetACME(byHost map[string]*autocert.Manager) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.acme, m.acmeHosts = am, hosts
+	m.acme = byHost
+}
+
+// acmeHosts is the closed list of this door, sorted, for an error to name.
+func (m *Manager) acmeHosts() []string {
+	out := make([]string, 0, len(m.acme))
+	for h := range m.acme {
+		out = append(out, h)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // Serves reports whether anything at all can answer a handshake. Switching TLS
@@ -66,7 +77,9 @@ func (m *Manager) SetACME(am *autocert.Manager, hosts []string) {
 func (m *Manager) Serves() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return len(m.materials) > 0 || m.fallback != nil || m.acme != nil
+	// An authority counts only with names to ask for on THIS door: armed for
+	// the application alone, it must not open the console's door on nothing.
+	return len(m.materials) > 0 || m.fallback != nil || len(m.acme) > 0
 }
 
 // Live reports whether anything that can be presented is CURRENTLY VALID.
@@ -80,7 +93,7 @@ func (m *Manager) Serves() bool {
 func (m *Manager) Live(now time.Time) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if m.acme != nil {
+	if len(m.acme) > 0 {
 		return true
 	}
 	for _, mat := range m.materials {
@@ -91,29 +104,51 @@ func (m *Manager) Live(now time.Time) bool {
 	return false
 }
 
+// Answers reports whether a handshake for host would get a certificate made
+// for it: one placed here carries it, or the authority may be asked for it.
+// The fallback does not count - it answers, and the browser refuses it.
+func (m *Manager) Answers(host string) bool {
+	m.mu.RLock()
+	materials, byHost := m.materials, m.acme
+	m.mu.RUnlock()
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	if host == "" {
+		return false
+	}
+	if pick(materials, host, time.Now()) != nil {
+		return true
+	}
+	return byHost[host] != nil
+}
+
 // GetCertificate is the TLS callback. The order it tries things in is the
 // whole design, so it is worth reading top to bottom.
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	m.mu.RLock()
-	materials, fallback, am, hosts := m.materials, m.fallback, m.acme, m.acmeHosts
+	materials, fallback, byHost := m.materials, m.fallback, m.acme
 	serialise := m.serialise
+	hosts := m.acmeHosts()
 	m.mu.RUnlock()
+
+	name := strings.ToLower(strings.TrimSuffix(hello.ServerName, "."))
 
 	// FIRST, before anything else: a TLS-ALPN-01 challenge. The authority
 	// connects asking for the very domain we already hold a certificate for,
 	// and expects the challenge certificate rather than the real one. Answering
 	// with the real one here is how a renewal silently stops working weeks
-	// before the expiry nobody is watching.
-	if am != nil && slices.Contains(hello.SupportedProtos, acme.ALPNProto) {
-		return am.GetCertificate(hello)
+	// before the expiry nobody is watching. The name says which authority is
+	// asking.
+	if slices.Contains(hello.SupportedProtos, acme.ALPNProto) {
+		if am := byHost[name]; am != nil {
+			return am.GetCertificate(hello)
+		}
 	}
 
-	name := strings.ToLower(strings.TrimSuffix(hello.ServerName, "."))
 	if name != "" {
 		if c := pick(materials, name, time.Now()); c != nil {
 			return c.TLS(), nil
 		}
-		if am != nil && slices.Contains(hosts, name) {
+		if am := byHost[name]; am != nil {
 			// The one path that can ORDER a certificate, and therefore the
 			// one that other gateways must not walk at the same time.
 			return m.issue(hello, am, serialise, name)
@@ -193,7 +228,7 @@ func served(materials []*Material, acmeHosts []string) string {
 // challenge arrives on this same listener.
 func (m *Manager) TLSConfig() *tls.Config {
 	m.mu.RLock()
-	withACME := m.acme != nil
+	withACME := len(m.acme) > 0
 	m.mu.RUnlock()
 	protos := []string{"h2", "http/1.1"}
 	if withACME {

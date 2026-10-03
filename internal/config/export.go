@@ -286,9 +286,45 @@ var settingSecrets = []struct {
 	// object at path (the telemetry's headers are named by whoever set them).
 	field string
 	label string
+	// each, when set, names a LIST under path whose every object holds the
+	// field - the ACME authorities - and idKey the key naming each object.
+	each, idKey string
 }{
 	{setting: store.SettingTelemetry, path: []string{"headers"}, label: "OpenTelemetry"},
+	{setting: store.SettingTLS, path: []string{"acme"}, each: "authorities", idKey: "id", field: "eabHmacKey", label: "ACME authority"},
+	// The one account of the settings before authorities (v73).
 	{setting: store.SettingTLS, path: []string{"acme"}, field: "eabHmacKey", label: "TLS"},
+}
+
+// secretHolder is one object a declared secret field sits in, and the id it
+// is reported under.
+type secretHolder struct {
+	id  string
+	obj map[string]any
+}
+
+// holdersOf walks a setting's JSON to the objects a declaration names.
+func holdersOf(whole map[string]any, path []string, each, idKey string) []secretHolder {
+	holder := whole
+	for _, step := range path {
+		next, ok := holder[step].(map[string]any)
+		if !ok {
+			return nil
+		}
+		holder = next
+	}
+	if each == "" {
+		return []secretHolder{{obj: holder}}
+	}
+	list, _ := holder[each].([]any)
+	var out []secretHolder
+	for _, item := range list {
+		if obj, ok := item.(map[string]any); ok {
+			id, _ := obj[idKey].(string)
+			out = append(out, secretHolder{id: id, obj: obj})
+		}
+	}
+	return out
 }
 
 // stripSettingSecrets empties a literal wherever settingSecrets says one can
@@ -305,30 +341,20 @@ func stripSettingSecrets(doc *Document) []Literal {
 		if err := json.Unmarshal(raw, &whole); err != nil {
 			continue
 		}
-		holder := whole
-		for _, step := range decl.path {
-			next, ok := holder[step].(map[string]any)
-			if !ok {
-				holder = nil
-				break
-			}
-			holder = next
-		}
-		if holder == nil {
-			continue
-		}
 		changed := false
-		for key, value := range holder {
-			if decl.field != "" && key != decl.field {
-				continue
+		for _, h := range holdersOf(whole, decl.path, decl.each, decl.idKey) {
+			for key, value := range h.obj {
+				if decl.field != "" && key != decl.field {
+					continue
+				}
+				text, ok := value.(string)
+				if !ok || text == "" || vault.IsRef(text) {
+					continue
+				}
+				h.obj[key] = ""
+				changed = true
+				found = append(found, Literal{Holder: decl.setting, ID: h.id, Label: decl.label, Field: key})
 			}
-			text, ok := value.(string)
-			if !ok || text == "" || vault.IsRef(text) {
-				continue
-			}
-			holder[key] = ""
-			changed = true
-			found = append(found, Literal{Holder: decl.setting, Label: decl.label, Field: key})
 		}
 		if !changed {
 			continue
@@ -352,21 +378,14 @@ func settingSecretRefs(doc *Document, add func(string)) {
 		if err := json.Unmarshal(raw, &whole); err != nil {
 			continue
 		}
-		holder := whole
-		for _, step := range decl.path {
-			next, ok := holder[step].(map[string]any)
-			if !ok {
-				holder = nil
-				break
-			}
-			holder = next
-		}
-		for key, value := range holder {
-			if decl.field != "" && key != decl.field {
-				continue
-			}
-			if text, ok := value.(string); ok {
-				add(text)
+		for _, h := range holdersOf(whole, decl.path, decl.each, decl.idKey) {
+			for key, value := range h.obj {
+				if decl.field != "" && key != decl.field {
+					continue
+				}
+				if text, ok := value.(string); ok {
+					add(text)
+				}
 			}
 		}
 	}

@@ -2,6 +2,13 @@
   display: grid;
   gap: 4px;
   min-width: 520px;
+  border-radius: 8px;
+  outline: 2px dashed transparent;
+  outline-offset: -4px;
+}
+// A file held over the dialog: the whole of it takes the drop.
+.body.over {
+  outline-color: var(--mat-sys-primary);
 }
 .split {
   display: grid;
@@ -13,32 +20,50 @@
   font-size: 0.85rem;
   margin: 0 0 8px;
 }
-.or {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin: 8px 0;
-}
-.or::before,
-.or::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--mat-sys-outline-variant);
-}
 .file {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
 }
-.file .picked {
+.picked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px 6px;
+  flex-wrap: wrap;
   color: var(--mat-sys-on-surface-variant);
   font-size: 0.85rem;
+}
+.picked mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+.drop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px dashed var(--mat-sys-outline);
+  border-radius: 10px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+}
+.drop > span {
+  flex: 1;
+}
+.drop.held {
+  border-style: solid;
+  border-color: var(--mat-sys-primary);
+}
+.drop.held mat-icon {
+  color: var(--mat-sys-primary);
+}
+.error {
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+  margin: 4px 0 0;
 }
 textarea.pem {
   font-family: var(--mk-mono);

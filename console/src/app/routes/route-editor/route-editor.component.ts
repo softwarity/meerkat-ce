@@ -663,6 +663,9 @@ export class RouteEditorComponent {
   // Said on the sections a terminal route silences, so the reason is where the
   // question is rather than in a log nobody reads.
   protected readonly proxies = computed(() => this.mode() === "proxy");
+  // Audit names operations of an API, and a redirect has none: the block
+  // stays on screen, greyed, with the reason.
+  protected readonly noAuditTip = $localize`:@@No_audit_on_redirect:A redirect has no operations to audit.`;
   protected readonly notProxiedTip = $localize`:@@Not_proxied_tip:This route answers by itself: nothing goes upstream, so no incoming filters and no identity.`;
 
   protected onSectionPick(s: Section): void {

@@ -7,14 +7,14 @@ summary: The four ways a certificate gets in, what lives in the database, and wh
 
 # TLS and certificates
 
-A certificate belongs to a **name** (SSL-08). The console has one name and one
-certificate; the application has one per host it serves. Material used by both is added
-twice - two entries and two keys are cheaper to understand than one shared object plus
-the rule that works out which name it covers.
+A certificate goes into a **pool** once, and is **placed** on the console, the
+application, or both (SSL-08). Its names are its own - what the material says it answers
+for - so a certificate carrying several names, a wildcard or an IP address serves every one
+of them, and material both planes use is one entry, not two copies to keep in step.
 
-There is no "switch HTTPS on": **having a certificate is what opens the door**, and
-deleting it is what closes it. A switch that can be on with nothing behind it is a switch
-that lies.
+There is no "switch HTTPS on": **a certificate placed on a plane is what opens its door**,
+and taking it off is what closes it. A switch that can be on with nothing behind it is a
+switch that lies.
 
 ![The TLS screen](img/console/tls.webp)
 
@@ -65,12 +65,43 @@ a callback, so the listener never moves and no connection is dropped. Opening a 
 **first** and returns the failure before anything has changed - a taken port must not leave
 an operator with no HTTPS at all.
 
+## On a local machine
+
+A laptop or a lab has no public name and no public authority, and a self-signed certificate
+makes every browser complain. The **On a local machine** button of the TLS screen opens the
+steps, per system (macOS, Linux, Windows), with the names you type - the one the console is
+reached by to start with - already in the commands:
+
+1. **The hosts file** points the names at the gateway - `127.0.0.1` when it runs on the same
+   machine (Docker, a local Kubernetes), its address otherwise - a VM, minikube, another
+   machine; the console offers the address it was reached by when that is one. `localhost`
+   needs no line.
+2. **A local authority**, made by [mkcert](https://github.com/FiloSottile/mkcert) and trusted by
+   this machine: the system store, Chrome, Edge, Safari, and Firefox through `nss`. Restart the
+   browsers afterwards.
+3. **One certificate for every name**, signed by that authority: `meerkat.pem` and its
+   `meerkat-key.pem`.
+4. **Import** it - Import a PEM pair, the two files dropped on the dialog - then drag it onto
+   the console and onto the application.
+
+![The drawer with the steps for HTTPS on a local machine: the names, the hosts file, a local authority, one certificate, the import](img/console/tls-local.webp)
+
+> [!WARNING]
+> The authority's private key stays in the folder `mkcert -CAROOT` prints. Whoever holds it can
+> sign for any name this machine believes: never share it - another machine makes its own.
+
 ## Which certificate answers a handshake
 
-By the name the client asked for. A handshake that names no host - a client reaching the
-gateway by address, or anything older than the SNI extension - gets the **fallback**, and
-without one it gets an error naming what *is* served, which is more useful than a random
-certificate it will reject anyway.
+By the name the client asked for, among the certificates placed on that plane: the one that
+carries it, and when two do, the one valid longest. A handshake that names no host - a client
+reaching the gateway by address, or anything older than the SNI extension - gets the
+**fallback**, the oldest certificate placed on the plane; and with nothing placed it gets an
+error naming what *is* served, which is more useful than a random certificate it will reject
+anyway.
+
+Placing a certificate where another one already answers for one of its names is refused
+until the caller says **replace** (`PUT /api/certificates/{id}/placement` with
+`"replace": true`): the one replaced leaves that door and stays in the pool.
 
 Switching TLS on with nothing to present is refused: it would turn a working port into one
 that refuses every visitor.
@@ -78,7 +109,10 @@ that refuses every visitor.
 ## The plain port can redirect
 
 On the **data plane only**, the plain port can redirect to the HTTPS one (SSL-06). The two
-health probes are exempt: a `308` reads as "not ready".
+health probes are exempt: a `308` reads as "not ready". So is any request for a name no
+certificate placed on the application carries: a service inside the cluster calling
+`http://meerkat-meerkat.ns.svc:8080` - a JWKS fetch, an internal API call - would be sent to
+a certificate for another name, signed by an authority it does not trust, and fail.
 
 With the redirect on, every HTTPS answer of the data plane also carries **HSTS**
 (`Strict-Transport-Security: max-age=...`). The redirect cannot protect the
@@ -116,21 +150,45 @@ without `includeSubDomains`.
 
 ## ACME is not Let's Encrypt
 
-The directory is a **URL**, and that is the whole point: half the installations Meerkat is
-meant for have no route to the internet at all. An internal `step-ca`, an EJBCA, a Windows
-authority with the ACME role - any of them answers here.
+ACME is part of the **Enterprise** edition. A configuration imported on the
+community image leaves its authorities and orders out, and its plan names them. A
+gateway moved from the Enterprise image to the community one keeps what its
+database holds but asks no authority, and the TLS screen says so: those
+certificates will not be renewed.
+
+An installation sets up as many **authorities** as it deals with - Let's Encrypt for
+one domain, ZeroSSL for a customer's, the company's `step-ca` for internal names -
+each a named ACME account (SSL-05). The directory of a custom one is a **URL**, and
+that is the whole point: half the installations Meerkat is meant for have no route
+to the internet at all. An internal `step-ca`, an EJBCA, a Windows authority with the
+ACME role - any of them answers here.
 
 | Field | What it is for |
 |---|---|
-| Directory URL | the authority. Empty means Let's Encrypt; staging is offered as a starting point |
-| Contact e-mail | where the authority warns about expiries. Required by some private ones |
-| Hosts | the **closed** list of names that may be requested |
+| Provider | a known one fixes the directory and says what else it needs; *Another authority* carries its own URL |
 | Root CA | the authority signing the ACME **server's own** HTTPS certificate, in PEM - a private ACME server usually is behind a private certificate |
-| EAB key id and HMAC key | External Account Binding: which account this gateway registers under. Public authorities ignore it, most private ones refuse without it |
+| EAB key id and HMAC key | External Account Binding: which account this gateway registers under. ZeroSSL and Google require it, Let's Encrypt ignores it |
+| Contact e-mail | some authorities require one; expiry is watched by the daily digest |
 | Terms accepted | a legal act, so it is never assumed |
 
-The host list is never empty: an open policy lets anyone reach the gateway by address with
-a made-up SNI and burn the authority's rate limit on names nobody owns.
+Each authority keeps its account key and what it issued in **its own corner of the
+shared cache**; changing its directory gives it a fresh one, since an account
+registered at one authority is worthless at another.
+
+The names are not a field of the account: they are **orders** in the certificate pool
+(*Ask* followed by the authority's name), each placed on the console, the application
+or both, like any certificate. A door asks an authority only for the names of the orders
+placed on it, and the list is closed: an open policy would let anyone reach the gateway
+by address with a made-up SNI and burn the authority's rate limit on names nobody owns.
+An authority with no order placed is not armed at all.
+
+**Placing an order sends the request at once**, in the background, through the same
+path a handshake would take - the cluster lock included - rather than waiting for the
+first visitor to meet the whole exchange or its failure. The node that asked keeps
+what happened (requesting, or the authority's refusal, explained) for the pool to
+show; the certificate itself lands in the shared cache every node reads. The orders
+and authorities travel with a configuration export - an account's HMAC key as a
+`$name`, never as a literal; what the authority issued stays in the cache.
 
 ## What lives in the database
 
@@ -166,7 +224,9 @@ A certificate written on one node is reloaded by the others through the change b
 The console shows each certificate's countdown, and the
 [daily digest](/docs/console/mail-relay) mails it to the administrators: the
 certificates expiring within its horizon, then the ones that have expired. An
-automatic one that reaches that window is one whose renewal has been failing.
+automatic one that reaches that window is one whose renewal has been failing. A
+certificate in reserve whose names a longer-lived certificate carries - what a renewal
+leaves behind - is not named.
 
 ## What is missing
 

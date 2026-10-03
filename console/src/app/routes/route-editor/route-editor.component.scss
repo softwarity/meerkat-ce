@@ -672,3 +672,8 @@ footer .gaps {
   --mat-button-text-label-text-color: var(--mat-sys-error);
   --mat-button-text-icon-color: var(--mat-sys-error);
 }
+
+// Audit on a redirect: kept in place, greyed - there are no operations.
+.audit-block.off {
+  opacity: 0.5;
+}

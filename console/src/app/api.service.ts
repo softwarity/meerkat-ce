@@ -1232,14 +1232,13 @@ export interface CsrInfo {
   keyType: string;
 }
 
-// A certificate belongs to a NAME. The console has one, the application has
-// one per host it serves, and material used by both is added twice: two
-// entries are cheaper to understand than one shared object plus the rule that
-// works out which name it covers.
+// One piece of material in the pool. Its names are its own (info.dnsNames,
+// info.ipAddresses); it is made or imported once, then placed on the console,
+// the application, or both. Neither is a certificate in reserve.
 export interface Certificate {
   id: string;
-  plane: 'console' | 'app';
-  host: string;
+  console: boolean;
+  app: boolean;
   // 'import' | 'self-signed' | 'csr'
   source: string;
   info: CertInfo;
@@ -1247,40 +1246,71 @@ export interface Certificate {
   updatedAt: number;
   // A signing request with no answer yet: it holds a key and serves nothing.
   pending: boolean;
-  // The material does not answer for the host it is filed under.
-  mismatch: boolean;
   csr?: CsrInfo;
+  // An order to an authority (source 'acme'): its authority, the names it
+  // already answered, and - for a name not issued yet - where the request
+  // stands: 'requesting', or 'failed' with the authority's own error.
+  authority?: string;
+  authorityName?: string;
+  waiting?: boolean;
+  issued?: string[];
+  status?: string;
+  error?: string;
 }
 
-// Where a new certificate is filed: which plane, and for which host. It
-// carries no host LIST - the host is the entry it is created for, declared
-// once on the screen.
-export interface CertEntry {
+// Where a certificate is served. Optional on the creation doors; replace takes
+// the certificates already answering for one of the same names off that door.
+export interface CertPlacement {
+  console?: boolean;
+  app?: boolean;
+  replace?: boolean;
+}
+
+// A placement refused: who is in the way, on which door, for which names.
+export interface CertConflict {
+  id: string;
   plane: 'console' | 'app';
-  host: string;
+  names: string[];
 }
 
 // A generation form. Days only applies to a self-signed one.
-export interface CertRequest extends CertEntry {
+export interface CertRequest extends CertPlacement {
+  names: string[];
   commonName?: string;
   organization?: string;
   keyType?: string;
   days?: number;
 }
 
-export interface AcmeSettings {
-  enabled: boolean;
-  // The directory is a URL and not a vendor list on purpose: half the rooms
-  // Meerkat runs in have no route to the internet, and an internal step-ca or
-  // an enterprise authority answers here just as well.
+// An ACME authority: one account certificates are asked of (SSL-05). Set up
+// in the TLS screen's drawer; each one is a way in of Add certificate.
+export interface AcmeAuthority {
+  id: string;
+  name: string;
+  // A known provider fixes the directory; 'custom' carries its own.
+  provider: string;
   directoryUrl: string;
-  email: string;
-  domains: string[];
-  // The root that signs the ACME SERVER's own certificate, for a private one.
-  rootCa: string;
-  eabKeyId: string;
-  eabHmacKey: string;
+  email?: string;
+  // The root that signs the authority's OWN https certificate, for a private one.
+  rootCa?: string;
+  eabKeyId?: string;
+  // A vault reference, or '' when a literal is held (eabSecretSet).
+  eabHmacKey?: string;
   acceptTos: boolean;
+  eabSecretSet?: boolean;
+  // The names its orders ask for: what deleting it would orphan.
+  uses?: string[];
+}
+
+// A provider the drawer offers by name, and what it needs.
+export interface AcmeProvider {
+  id: string;
+  label: string;
+  directory: string;
+  terms: string;
+  needsEab: boolean;
+  where?: string;
+  note?: string;
 }
 
 // What the supervisor last managed to do, which is not always what was asked.
@@ -1299,24 +1329,17 @@ export interface TlsState {
   redirecting: boolean;
 }
 
-// There is no "switch HTTPS on" here, and the absence is the design: having a
-// certificate for a name is what opens that plane's door, and deleting it is
+// There is no "switch HTTPS on" here, and the absence is the design: a
+// certificate placed on a plane is what opens its door, and taking it off is
 // what closes it.
 export interface TlsSettings {
-  // The console answers to ONE name. The application fronts as many hosts as
-  // it serves - that asymmetry is why they are two fields.
-  consoleName: string;
-  appNames: string[];
   // Force the application's plain port over to HTTPS. The console's plain port
   // is never redirected: it is what a broken certificate gets repaired from.
   redirect: boolean;
   // Strict-Transport-Security on every HTTPS answer of the application plane,
   // in seconds; absent or 0 sends nothing.
   hstsMaxAge?: number;
-  acme: AcmeSettings;
-  eabSecretSet: boolean;
   state: TlsState;
-  issued?: Record<string, CertInfo>;
   // Where the runtime publishes this gateway's ports, inside -> outside
   // (JSON keys are strings). Absent ports are not published.
   published?: { ports?: Record<string, number>; source?: string; why?: string };
@@ -2877,7 +2900,7 @@ export class ApiService {
   // Import: a PEM pair, or a PKCS#12 keystore as base64. One endpoint, because
   // to an operator it is one gesture - "here is what I already have".
   importCertificate(
-    body: CertEntry & {
+    body: CertPlacement & {
       certPem?: string;
       keyPem?: string;
       keystore?: string;
@@ -2891,6 +2914,35 @@ export class ApiService {
     return this.http.post<Certificate>('/api/certificates/self-signed', req);
   }
 
+  // An order to the authority: in the pool like the others, issued on the
+  // first visit once it is placed on a door.
+  createAcmeOrder(req: { authority: string; names: string[] } & CertPlacement): Observable<Certificate> {
+    return this.http.post<Certificate>('/api/certificates/acme', req);
+  }
+
+  // Ask again, once whatever the authority refused for is fixed.
+  retryAcmeOrder(id: string): Observable<Certificate> {
+    return this.http.post<Certificate>(`/api/certificates/${encodeURIComponent(id)}/retry`, {});
+  }
+
+  listAcmeAuthorities(): Observable<{ authorities: AcmeAuthority[]; providers: AcmeProvider[] }> {
+    return this.http.get<{ authorities: AcmeAuthority[]; providers: AcmeProvider[] }>(
+      '/api/acme/authorities',
+    );
+  }
+
+  // Saved is checked: the server asks the authority's directory before it
+  // keeps anything, and says what is missing.
+  saveAcmeAuthority(a: Partial<AcmeAuthority>, id?: string): Observable<AcmeAuthority> {
+    return id
+      ? this.http.put<AcmeAuthority>(`/api/acme/authorities/${encodeURIComponent(id)}`, a)
+      : this.http.post<AcmeAuthority>('/api/acme/authorities', a);
+  }
+
+  deleteAcmeAuthority(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/acme/authorities/${encodeURIComponent(id)}`);
+  }
+
   createSigningRequest(req: CertRequest): Observable<Certificate> {
     return this.http.post<Certificate>('/api/certificates/signing-request', req);
   }
@@ -2899,6 +2951,13 @@ export class ApiService {
     return this.http.post<Certificate>(`/api/certificates/${encodeURIComponent(id)}/adopt`, {
       certPem,
     });
+  }
+
+  placeCertificate(id: string, placement: CertPlacement): Observable<Certificate> {
+    return this.http.put<Certificate>(
+      `/api/certificates/${encodeURIComponent(id)}/placement`,
+      placement,
+    );
   }
 
   deleteCertificate(id: string): Observable<void> {
@@ -2923,13 +2982,7 @@ export class ApiService {
     return this.http.get<TlsSettings>('/api/settings/tls');
   }
 
-  saveTls(body: {
-    consoleName: string;
-    appNames: string[];
-    redirect: boolean;
-    hstsMaxAge: number;
-    acme: AcmeSettings;
-  }): Observable<TlsSettings> {
+  saveTls(body: { redirect: boolean; hstsMaxAge: number }): Observable<TlsSettings> {
     return this.http.put<TlsSettings>('/api/settings/tls', body);
   }
 

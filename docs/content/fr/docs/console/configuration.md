@@ -27,7 +27,8 @@ Chaque onglet est une route à lui, donc un marque-page y revient.
 
 La configuration courante en première ligne, signalée comme identique à
 *Known-good baseline*, et deux lignes d'étagère en dessous, dont l'une porte la
-pastille *Current*. *Import a file* porte la pastille Enterprise.
+pastille *Current*. *Import a file* marche dans les deux éditions ; *Import from
+git* porte la pastille Enterprise.
 
 ## Management
 
@@ -235,8 +236,9 @@ jusqu'à ce que le nouveau ait fait ses preuves.
   sont pas. C'est à cela que sert l'onglet Snapshot.
 - **L'image communautaire laisse de côté les parties Enterprise.** Une configuration
   exportée d'une passerelle Enterprise s'importe dans une communautaire sans ses heures
-  de travail, sa mise en page, sa marque masquée, son export OpenTelemetry ni ses
-  annuaires ; le plan liste ce qui a été laissé de côté.
+  de travail, sa mise en page, sa marque masquée, son export OpenTelemetry, ses
+  annuaires ni ses autorités et commandes ACME (la redirection HTTPS et HSTS
+  restent) ; le plan liste ce qui a été laissé de côté.
 - **Tirer depuis git ne change rien.** Ça range un document et ça vous montre le
   plan. La passerelle bascule quand quelqu'un active, pas quand le dépôt bouge.
 - **Un emplacement appartient à cette installation, pas au document.** Il n'est

@@ -501,8 +501,8 @@ func TestATouchedThemeCarriesItsColours(t *testing.T) {
 // The contrast with branding is the point. A logo IS exported - it is a data
 // URI inside a setting, and decoration is meant to travel. A certificate is
 // not decoration: it is material, obtained where it is used. What travels
-// instead is the INTENT - which names this gateway answers to, and which
-// authority may issue for them.
+// instead is the INTENT - which authority may issue, and for which names on
+// which door.
 func TestACertificateNeverTravels(t *testing.T) {
 	st := openTemp(t)
 	ctx := context.Background()
@@ -513,15 +513,19 @@ func TestACertificateNeverTravels(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := st.SaveCertificate(ctx, store.Certificate{
-		ID: "c1", Plane: store.PlaneApp, Host: "shop.example.com",
+		ID: "c1", App: true,
 		Source: store.CertSourceSelfSigned, CertPEM: m.CertPEM, KeyPEM: m.KeyPEM, Info: m.Info,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetSetting(ctx, store.SettingTLS, certs.Settings{
-		ConsoleName: "admin.example.com",
-		AppNames:    []string{"shop.example.com"},
-		ACME:        certs.ACMESettings{Enabled: true, Domains: []string{"shop.example.com"}},
+		ACME: certs.ACMESettings{
+			Authorities: []certs.Authority{{ID: "ca-1", Name: "ZeroSSL", Provider: certs.ProviderZeroSSL,
+				EABKeyID: "kid", EABHMACKey: "literal-hmac-key", AcceptTOS: true}},
+			Orders: []certs.ACMEOrder{
+				{ID: "o1", Authority: "ca-1", Names: []string{"shop.example.com"}, App: true},
+				{ID: "o2", Authority: "ca-1", Names: []string{"admin.example.com"}, Console: true},
+			}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -543,13 +547,9 @@ func TestACertificateNeverTravels(t *testing.T) {
 		}
 	}
 	// The material does not, in any shape.
-	for _, forbidden := range []string{"PRIVATE KEY", "BEGIN CERTIFICATE", "certPem", "keyPem"} {
+	for _, forbidden := range []string{"PRIVATE KEY", "BEGIN CERTIFICATE", "certPem", "keyPem", "literal-hmac-key"} {
 		if strings.Contains(out, forbidden) {
 			t.Fatalf("an export carried %q - a document that calls itself public must never hold key material", forbidden)
 		}
-	}
-	// And neither does the marker that only means something here.
-	if strings.Contains(out, store.SettingTLSSeeded) {
-		t.Fatal("the seed marker belongs to the install that wrote it")
 	}
 }
