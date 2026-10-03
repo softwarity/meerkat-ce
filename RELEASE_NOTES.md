@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.1.0
+
 - **Endpoint audit rules travel as a file.** Export them from Endpoint audit,
   upload them onto any route from its OpenTelemetry section.
 - **Saving a route in the editor no longer drops its endpoint audit.**
