@@ -536,7 +536,7 @@ jobs:
             GO_TAGS=ee
             EDITION=ee
       - run: echo "published ghcr.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.2
       # Signed BY DIGEST, which is why this belongs here and not in the release
       # job: the release re-tags this very digest under its semver without
       # rebuilding, so the signature made now is still the signature of what

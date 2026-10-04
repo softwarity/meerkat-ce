@@ -174,7 +174,7 @@ jobs:
             $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Inspect
         run: docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.meta.outputs.version }}"
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.2
       # What gets signed is the manifest LIST this job just assembled, and the
       # digest has to be read back from the registry: `imagetools create`
       # prints nothing, and the per-architecture digests the build jobs handed

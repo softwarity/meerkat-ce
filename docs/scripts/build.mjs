@@ -27,6 +27,7 @@ function run(command, args) {
 run('node', ['scripts/gen-version.mjs']);
 run('node', ['scripts/gen-tests.mjs']);
 run('node', ['scripts/gen-rights.mjs']);
+run('node', ['scripts/gen-test-plan.mjs']);
 // Before the content: the deployment page links to these files, and the
 // content build refuses a download with nothing behind it.
 run('node', ['scripts/gen-deploy.mjs']);
