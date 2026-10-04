@@ -30,6 +30,14 @@ L'en-tête `Host` et la valeur que Go met sur le fil sont posés tous les deux,
 et c'est tout l'intérêt : n'en poser qu'un les met en désaccord, et c'est le bug
 d'hôte virtuel qui coûte un après-midi.
 
+**La console l'ajoute d'elle-même** à une nouvelle route dont l'amont est une
+application atteinte directement : un service du cluster, un conteneur, une adresse
+privée. Une telle application est seule derrière son adresse et lit l'hôte reçu - pour
+vérifier l'origine d'un WebSocket (le canal temps réel de Grafana refuse une connexion
+dont l'origine n'est pas l'hôte qu'il a reçu), pour écrire ses liens. Le filtre
+apparaît dans la liste au moment où l'adresse est saisie, et se retire comme un autre.
+Un nom public n'en reçoit pas, et une route existante n'est jamais modifiée.
+
 Deux pièges à connaître :
 
 - Un amont qui choisit un site **par son nom** reçoit le nom public au lieu de celui qu'il connaît, et répond son site par défaut. C'est à cela que sert [set-host](/docs/filters/set-host).

@@ -173,3 +173,42 @@ rail-nav .rail-items {
   // about. Thin where the browser offers it, overlaid on macOS anyway.
   scrollbar-width: thin;
 }
+
+// ── What the console does NOT paint ──────────────────────────────────────────
+// Two Material surfaces are opaque by default and have no reason to be: an
+// OUTLINED card is drawn by its border, and a table's own background is the
+// page's. Opaque, they also paint over whatever the page carries underneath -
+// which is how a dozen screens in a row each lost the same background.
+//
+// Said as TOKENS, and here at the end rather than in the overrides sheet,
+// because this is how Material colours them: `.mat-mdc-card-outlined` reads
+// background-color from var(--mat-card-outlined-container-color). A rule of
+// ours with the same specificity loses to the theme's, which is emitted after
+// the @use block above - the variable is the only lever that does not depend
+// on who was written last.
+:root {
+  --mat-card-outlined-container-color: transparent;
+  --mat-table-background-color: transparent;
+
+  // What a row looks like when it is banded, and under the pointer. Named
+  // here because five screens had each decided it for themselves, with four
+  // different values: two opaque surfaces, one veil of on-surface at 5%, and
+  // whatever the shared mixin said for everyone else. A table reads them
+  // through styles/_table.scss; a list of divs that behaves like rows - the
+  // anomalies screen - reads the same variable directly, which is the whole
+  // point of naming it rather than repeating a colour.
+  //
+  // The band LIGHTENS and the hover DARKENS, on purpose: the pointer has to be
+  // told apart from the banding at a glance, and a hover that lightened an
+  // already-lighter row said nothing on every second line.
+  --mk-row-band: color-mix(in srgb, var(--mat-sys-on-surface) 2.5%, transparent);
+  --mk-row-hover: color-mix(in srgb, #000 14%, transparent);
+  --mk-row-hover-opaque: color-mix(in srgb, #000 14%, var(--mat-sys-surface));
+  --mk-row-band-opaque: color-mix(in srgb, var(--mat-sys-on-surface) 2.5%, var(--mat-sys-surface));
+}
+// The one surface that has to stop the light: rows pass UNDER a sticky header,
+// and a transparent one reads them through its own labels.
+mat-header-row,
+.mat-mdc-header-row {
+  background: var(--mat-sys-surface-container-high);
+}

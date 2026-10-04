@@ -16,6 +16,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/admin/ui"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -142,7 +143,12 @@ func serveStampedIndex(w http.ResponseWriter, r *http.Request, fsys fs.FS, name 
 	if st != nil && sm != nil {
 		attrs = consoleBodyAttrs(r, st, sm)
 	}
-	if attrs == "" {
+	// The evaluation watermark (EVAL-04) rides the same stamp. It is a style
+	// block rather than a change to the console's build: the bundle is the
+	// same in all three images, and what differs is the binary that serves it.
+	// Empty in the two shipped images, where the string it comes from was
+	// never filled, and then there is nothing to rewrite at all.
+	if attrs == "" && evalmark.ConsoleCSS == "" {
 		http.ServeFileFS(w, r, fsys, name)
 		return
 	}
@@ -151,7 +157,13 @@ func serveStampedIndex(w http.ResponseWriter, r *http.Request, fsys fs.FS, name 
 		http.ServeFileFS(w, r, fsys, name)
 		return
 	}
-	stamped := bytes.Replace(body, []byte("<body"), []byte("<body "+attrs), 1)
+	stamped := body
+	if attrs != "" {
+		stamped = bytes.Replace(stamped, []byte("<body"), []byte("<body "+attrs), 1)
+	}
+	if css := evalmark.ConsoleCSS; css != "" {
+		stamped = bytes.Replace(stamped, []byte("</head>"), []byte("<style>"+css+"</style></head>"), 1)
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Length", strconv.Itoa(len(stamped)))
 	_, _ = w.Write(stamped)

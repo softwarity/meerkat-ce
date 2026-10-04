@@ -1,13 +1,13 @@
 <div class="frame" (document:keydown)="onKey($event)">
   <header class="topbar">
-    <a class="brand" [routerLink]="path('softwarity/index')">
+    <a class="brand" [routerLink]="path('softwarity/index')" [queryParams]="langQuery()">
       <img src="img/softwarity.svg" alt="Softwarity" />
       <span class="word">Softwarity</span>
     </a>
     <!-- The company and the product are two names and two destinations: one
          goes to who we are, the other to the site's front page. The rail has
          no entry for it - this button IS the home. -->
-    <a class="product" [class.on]="atHome()" [routerLink]="path('index')">
+    <a class="product" [class.on]="atHome()" [routerLink]="path('index')" [queryParams]="langQuery()">
       <mat-icon svgIcon="meerkat" />
       <span class="hide-narrow">Meerkat</span>
     </a>
@@ -82,7 +82,7 @@
       @for (area of areas(); track area.id) {
         <rail-nav-item
           [label]="area.short"
-          [routerLink]="path(area.home)"
+          [routerLink]="path(area.home)" [queryParams]="langQuery()"
           [active]="area.id === currentArea()"
         >
           @if (svgIcon(area); as mark) {
@@ -106,8 +106,8 @@
             <a href="https://github.com/softwarity/meerkat-ce" target="_blank" rel="noopener">GitHub</a>
             <a href="https://hub.docker.com/r/softwarity/meerkat" target="_blank" rel="noopener">Image</a>
             <a href="https://github.com/softwarity/meerkat-ce/releases" target="_blank" rel="noopener">Releases</a>
-            <a [routerLink]="path('softwarity/index')">Softwarity</a>
-            <a [routerLink]="path('project/roadmap')">{{ areaLabel('project') }}</a>
+            <a [routerLink]="path('softwarity/index')" [queryParams]="langQuery()">Softwarity</a>
+            <a [routerLink]="path('project/roadmap')" [queryParams]="langQuery()">{{ areaLabel('project') }}</a>
           </div>
           <div class="foot-made">
             <img src="img/softwarity.svg" alt="Softwarity" />

@@ -3081,6 +3081,17 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 			// without strip-prefix must not carry a stranger's idea of its
 			// own prefix either. Same reasoning as the identity headers.
 			pr.Out.Header.Del(routing.ForwardedPrefixHeader)
+			// Only the encodings the gateway can read back: an upstream that
+			// answers in one it cannot (zstd, which browsers offer and CDNs
+			// prefer) hands over a body nothing can be injected into, and the
+			// page arrives without its portal - silently.
+			if offered := pr.Out.Header.Get("Accept-Encoding"); offered != "" {
+				if readable := filtering.AcceptReadable(offered); readable != "" {
+					pr.Out.Header.Set("Accept-Encoding", readable)
+				} else {
+					pr.Out.Header.Del("Accept-Encoding")
+				}
+			}
 			// The journey's name goes on, always (OBS-04). What the caller
 			// sent travels untouched - it is what stitches their spans to the
 			// service's - and when nobody sent anything we put ours, with the
@@ -3160,6 +3171,18 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 				return err
 			}
 		}
+		// What a service published under a prefix writes from its own root:
+		// its redirects, and the <base> of its pages. After the route's
+		// filters, so an explicit rewrite-location has had its say.
+		routing.BringLocationHome(res)
+		if prefix := routing.StrippedPrefix(res.Request); prefix != "" {
+			if err := filtering.RewriteHTMLFunc(nil, func(_ *http.Response, body []byte) []byte {
+				return routing.PublishBase(body, prefix)
+			})(res); err != nil {
+				return err
+			}
+		}
+		filtering.Sealed(res.Header)
 		return nil
 	}
 	return proxy, nil
@@ -3249,6 +3272,7 @@ func filterOwnResponse(next http.Handler, filters []routing.ResponseFilter) http
 				return
 			}
 		}
+		filtering.Sealed(res.Header)
 		body, err := io.ReadAll(res.Body)
 		_ = res.Body.Close()
 		if err != nil {

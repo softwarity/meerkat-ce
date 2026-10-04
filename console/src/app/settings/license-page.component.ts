@@ -42,15 +42,26 @@ interface FeatureRow {
             <mat-icon>{{ e.enterprise ? 'workspace_premium' : 'public' }}</mat-icon>
             <div class="grow">
               <div class="title">
-                @if (e.enterprise) {
+                @if (e.notice) {
+                  <ng-container i18n="@@Evaluation_edition">Evaluation edition</ng-container>
+                } @else if (e.enterprise) {
                   <ng-container i18n="@@Enterprise_edition">Enterprise edition</ng-container>
                 } @else {
                   <ng-container i18n="@@Community_edition">Community edition</ng-container>
                 }
               </div>
-              <p class="hint" i18n="@@License_perpetual_hint">
-                A license is perpetual: its term only covers updates, nothing gets switched off.
-              </p>
+              <!-- The perpetual promise is for the images one BUYS. Printing
+                   it on an evaluation build would promise the opposite of what
+                   that build is licensed for, so the notice takes its place -
+                   and it is the notice itself, straight from the binary, not a
+                   second sentence that could drift from it. -->
+              @if (e.notice) {
+                <p class="hint">{{ e.notice }}</p>
+              } @else {
+                <p class="hint" i18n="@@License_perpetual_hint">
+                  A license is perpetual: its term only covers updates, nothing gets switched off.
+                </p>
+              }
             </div>
           </div>
         </mat-card>

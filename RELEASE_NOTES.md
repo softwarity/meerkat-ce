@@ -2,6 +2,40 @@
 
 ## NEXT RELEASE
 
+- **An application published under a prefix it does not know about works.** Three
+  things sent the browser out of the route, each without an error:
+  the page's `<base href="/">`, which made its scripts resolve at the gateway's root -
+  the prefix is now put in front of it; a redirect to the application's own address
+  or to a path from its root - it now comes back under the route; and the trailing
+  slash `strip-prefix` dropped, which made a static host answer every page with a
+  redirect to itself. `X-Forwarded-Prefix` was wrong on such paths too.
+- **Pages served by a CDN get their portal.** Browsers offer zstd and CDNs answer in
+  it; the gateway cannot read it, so nothing was injected into those pages. It no
+  longer asks upstreams for an encoding it cannot read back.
+- **A third image, to evaluate the Enterprise edition without a time limit.**
+  Every feature, no counter, no date, nothing that switches the data plane off:
+  a trial that bridles what it is meant to sell stops selling it, and a counter
+  kept in a database the evaluator administers resets with one statement. What
+  the image carries instead is a notice on each surface somebody reads - a
+  banner on the pages the gateway serves, a line in the user button's menu, a
+  foot on transactional mail, a watermark across the console, and the Licence
+  screen saying what this build is licensed for. That is what makes it
+  unusable in front of a production without taking anything away from an
+  evaluation. The notice answers to the build alone: no setting removes it, and
+  hiding the Meerkat mark - which the Enterprise licence does buy - does not
+  touch it. `docker pull softwarity/meerkat:eval`, and `X.Y.Z-eval` for a
+  release.
+- **The portal and the user button show on pages that carry a Content-Security-Policy.**
+  A page that lists the scripts it accepts - an Angular build does, in a `<meta>` -
+  had the browser refuse the gateway's own, and came out without its portal, with
+  nothing but a line in the browser's console. The gateway now signs the scripts it
+  injects with a nonce and tells the page's policy about it; nothing else is opened.
+- **A new route to an internal application keeps the caller's Host.** Typing an
+  upstream that is a service of the cluster, a container or a private address adds
+  `preserve-host` to the route's filters - where it shows and can be removed. It is
+  what an application reached directly needs to accept a WebSocket (Grafana's live
+  channel refuses one whose origin is not the Host it received) and to write its
+  links. A public name gets nothing, and existing routes are not touched.
 - **The developer tunnel's volume mount no longer needs root** (plug 2.21.8), which is
   what kept it out of OpenShift and OKD. The helper that serves the volume over SMB
   runs as the workload's own user, without any privilege: the developer reaches
@@ -12,7 +46,7 @@
   namespace enforcing Pod Security `restricted`: the image's user is numeric, `/data`
   is writable by the root group, and the chart sets a security context (non-root, no
   capability, no privilege escalation, default seccomp) without pinning a uid.
-- **Both images are signed**, with cosign and no key: the signature carries the
+- **All three images are signed**, with cosign and no key: the signature carries the
   identity of the workflow that built the image, so there is no public key to go
   and fetch. Install has the `cosign verify` command and a Kyverno policy that
   refuses an unsigned image cluster-wide. What is signed is the digest, and

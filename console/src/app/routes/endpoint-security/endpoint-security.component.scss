@@ -17,30 +17,28 @@
 
   .title {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     min-width: 0;
+    flex: none;
 
+    // The same title as the Routes screen wears (routes-page), because these
+    // are screens of the same rank and a heading that changes size from one to
+    // the next reads as a different level of the application.
     h2 {
       margin: 0;
-      font: var(--mat-sys-title-medium);
-    }
-    .meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--mat-sys-on-surface-variant);
-      font-size: 0.8rem;
-    }
-    .badge {
-      padding: 1px 8px;
-      border-radius: 999px;
-      background: var(--mat-sys-surface-container-high);
-      font-family: var(--mk-mono);
-      font-size: 0.72rem;
+      font-size: 1.15rem;
+      font-weight: 500;
     }
   }
+  // Next to the title, the way the search sits next to "Routes" - not pushed
+  // against the far edge, where it answered a question nobody had asked yet.
   .picker {
     min-width: 280px;
+  }
+  // The pushing moves here, to the action: the selector says WHICH route is
+  // being read and belongs beside the title, the export is what one does with
+  // the screen and belongs against the right edge with the other actions.
+  .export {
     margin-left: auto;
   }
   .intro {
@@ -130,18 +128,26 @@ mat-slide-toggle + * {
   overflow: auto;
 }
 
+.api-version {
+  font-family: var(--mk-mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 table.ops {
   width: 100%;
   background: transparent;
+  // No rule between rows: the banding below separates them, and a line every
+  // 48px over a column of paths is one more thing to read past. The header
+  // keeps its own, because that one marks where the data starts.
+  --mat-table-row-item-outline-width: 0;
 
   th {
     background: var(--mat-sys-surface-container);
     color: var(--mat-sys-on-surface-variant);
     font-weight: 600;
-    border-bottom-color: var(--mat-sys-outline-variant);
-  }
-  td {
-    border-bottom-color: var(--mat-sys-outline-variant);
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
   }
   .c-status {
     width: 116px;
@@ -156,11 +162,32 @@ table.ops {
 .op-row {
   cursor: pointer;
 
+  // Banded like every other table of the console (styles/_table.scss), which
+  // these three screens never were - they are read by scanning a column of
+  // paths, which is exactly what banding is for.
+  //
+  // Every state here is a VEIL - never a surface colour. A surface is opaque
+  // by definition, so a row painted with one also paints over what the page
+  // carries underneath. And the two colours come from the console's own
+  // variables (styles.scss), not from a mix repeated here: this screen is not
+  // a mat-table, so it cannot take the shared mixin, but it must not be a
+  // second opinion on what a banded row looks like.
+  &:nth-child(even) {
+    background: var(--mk-row-band);
+  }
+  // After the banding, which it ties on specificity and therefore wins by order.
+  //
+  // DARKER, not lighter: the row under the cursor used to take
+  // surface-container-low, which sits below the surface on a dark theme, and a
+  // veil of on-surface would have lightened it instead - the opposite move,
+  // and one the banding already makes. Black veils the row in both schemes,
+  // and the pointer stays where the eye expects it.
   &:hover {
-    background: var(--mat-sys-surface-container-low);
+    background: var(--mk-row-hover);
   }
   &.open {
-    background: var(--mat-sys-surface-container);
+    // One notch past the hover, same family, same direction.
+    background: color-mix(in srgb, #000 20%, transparent);
   }
   // The override accent rides the first CELL (not the row): a cell box-shadow
   // paints above the row's hover background, so it survives hover.

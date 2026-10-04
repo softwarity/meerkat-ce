@@ -149,6 +149,6 @@ product or service - internal and production use in your company is explicitly
 permitted. Each release automatically becomes **Apache 2.0 two years** after
 its publication. The Enterprise code under `ee/` is source-visible and usable
 only under a Softwarity commercial agreement; see
-[the editions](https://www.softwarity.io/en/product/editions).
+[the editions](https://www.softwarity.io/product/editions).
 
 Edited by **[Softwarity](https://www.softwarity.io/)**.

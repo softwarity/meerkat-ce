@@ -68,15 +68,20 @@ interface SearchFile {
 }
 
 const LANG_KEY = 'meerkat-site-lang';
+// The query parameter that names a language: ?lg=fr. It is the name Meerkat's
+// own routes use when they carry the language in the query, so a gateway in
+// front of this site drives its language with no setting on either side.
+export const LANG_PARAM = 'lg';
 const SCHEME_KEY = 'meerkat-site-scheme';
 export type Scheme = 'system' | 'light' | 'dark';
 
 @Injectable({ providedIn: 'root' })
 export class SiteService {
-  // The language is READ FROM THE URL and kept nowhere else: an address sent to
-  // someone else has to open in the language it was written in. What IS kept is
-  // the choice a reader made in the menu, and it decides one thing only - where
-  // an address with no language in it lands.
+  // An address names a PAGE, not a language: /docs/start/install is the same
+  // page for everyone, read in the language the reader's browser asks for.
+  // ?lg=fr forces one - which is how a link is sent "in French", and how a
+  // gateway in front of the site decides. What is kept beside that is the
+  // choice a reader made in the menu, which outranks the browser's.
   readonly scheme = signal<Scheme>(this.storedScheme());
 
   // ---- the picture viewer --------------------------------------------------
@@ -125,7 +130,50 @@ export class SiteService {
     } catch {
       // Private browsing: fall through to what the browser asks for.
     }
-    return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+    // The browser's own list, in its order - what it sends as Accept-Language.
+    // A static site never sees that header; this is the same list, read from
+    // the other side.
+    for (const wanted of navigator.languages ?? [navigator.language]) {
+      const code = (wanted ?? '').toLowerCase().split('-')[0];
+      if (LANGS.includes(code as Lang)) return code as Lang;
+    }
+    return 'en';
+  }
+
+  // The language an address forces, or null when it leaves the choice open.
+  forcedLang(url: string): Lang | null {
+    const asked = new URLSearchParams(url.split('#')[0].split('?')[1] ?? '').get(LANG_PARAM)?.toLowerCase();
+    return LANGS.includes(asked as Lang) ? (asked as Lang) : null;
+  }
+
+  // The language a page is read in: what the address forces, or what the
+  // reader prefers.
+  langOf(url: string): Lang {
+    return this.forcedLang(url) ?? this.preferredLang();
+  }
+
+  // The page an address names. The trailing slash is GitHub Pages': every page
+  // is a directory holding an index.html, so /docs answers a 301 to /docs/.
+  slugOf(url: string): string {
+    const path = url.split('?')[0].split('#')[0];
+    return path.replace(/^\/+/, '').replace(/\/+$/, '') || 'index';
+  }
+
+  // What a link carries beside its path: the forced language, kept from page
+  // to page so a visit that started "in French" stays there, and nothing
+  // otherwise - an address with no language in it stays one.
+  langQuery(url: string): Record<string, string> {
+    const forced = this.forcedLang(url);
+    return forced ? { [LANG_PARAM]: forced } : {};
+  }
+
+  // The address of a page from where the reader is, as one string: the path,
+  // the forced language if there is one, and the heading to land on.
+  href(url: string, slug: string, at = ''): string {
+    const query = new URLSearchParams(this.langQuery(url));
+    if (at) query.set('at', at);
+    const q = query.toString();
+    return this.pathFor(slug) + (q ? `?${q}` : '');
   }
 
   // Called when a reader PICKS a language, and at no other moment. Writing it
@@ -196,8 +244,8 @@ export class SiteService {
   // else in the site has to know that the home page has no slug segment and
   // that the current documentation version has no version segment.
 
-  pathFor(lang: Lang, slug: string): string {
-    return slug === 'index' ? `/${lang}` : `/${lang}/${slug}`;
+  pathFor(slug: string): string {
+    return slug === 'index' ? '/' : `/${slug}`;
   }
 
   // Which documentation version a slug belongs to. Everything outside the

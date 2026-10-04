@@ -30,6 +30,7 @@ import (
 	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/expiry"
 	"github.com/softwarity/meerkat/internal/gateway"
@@ -229,9 +230,15 @@ func run(o options) error {
 	//
 	// The machine-readable `edition` attribute stays on the data plane's own
 	// line, where a collector looks for it.
-	if edition.Enterprise {
+	// The evaluation image says so here, because a journal is where someone
+	// checks what is actually running after a deployment.
+	switch {
+	case evalmark.StartupNote != "":
+		slog.Info("Meerkat Enterprise edition, "+evalmark.StartupNote+" build",
+			"version", version.Version, "note", "not licensed for production use")
+	case edition.Enterprise:
 		slog.Info("Meerkat Enterprise edition", "version", version.Version)
-	} else {
+	default:
 		slog.Info("Meerkat Community edition", "version", version.Version)
 	}
 	if err := settleTenancy(ctx, st, tenancy); err != nil {

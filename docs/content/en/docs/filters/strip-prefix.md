@@ -47,6 +47,13 @@ Whatever a caller sent under that name is purged, on every route, even one with 
 `strip-prefix`: a caller posing their own prefix would make the service write its
 links wherever they asked.
 
+**On the way back, the prefix is restored** on the two things a browser follows
+without asking: a page's `<base href>` (`<base href="/">` becomes
+`<base href="/demo/">`, or its scripts are looked for at the gateway's root) and the
+`Location` of a redirect the service writes from its own root or to its own address.
+A base or a redirect already under the prefix, relative, or to another site is left
+alone.
+
 Two `strip-prefix` in a row work: the announced prefix widens to what was actually
 consumed rather than being overwritten.
 

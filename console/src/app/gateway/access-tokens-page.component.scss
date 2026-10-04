@@ -54,6 +54,11 @@ mat-drawer-content {
 .table-wrap {
   @include table.frame;
 }
+// Banded like every other table of the console. This screen took the frame
+// from the shared sheet and stopped there, so it was the only list read by
+// scanning a column that had nothing to scan along - and the one place where
+// the hover said nothing either.
+@include table.banded-rows;
 .empty {
   padding: 48px;
   color: var(--mat-sys-on-surface-variant);

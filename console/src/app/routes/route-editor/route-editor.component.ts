@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   computed,
+  effect,
   inject,
   input,
   linkedSignal,
@@ -93,7 +94,7 @@ import {
   cleanSpecs,
   humanize,
 } from "../predicates/args";
-import { missingArgs, upstreamProblem } from "./gaps";
+import { internalUpstream, missingArgs, upstreamProblem } from "./gaps";
 import { PredicatesComponent } from "../predicates/predicates.component";
 import { COMMON_LOCALES } from "../../shared/common-locales";
 import { canonicalTag, languageName } from "../../shared/language-name";
@@ -788,7 +789,40 @@ export class RouteEditorComponent {
     type: "language",
   });
 
+  // The Host a NEW route sends upstream, chosen from the upstream itself: an
+  // application reached directly (a service of the cluster, a container, a
+  // private address) gets the caller's Host, so preserve-host is added to its
+  // filters as the address is typed - where it shows, and can be removed. A
+  // public name gets nothing: it has to be called by its own.
+  //
+  // New routes only. A stored route says what it sends by the filters it
+  // carries, and this must not rewrite one somebody already set up.
+  private hostAdded = false; // preserve-host is there because we put it
+  private hostDeclined = false; // it was removed by hand: do not put it back
+
   constructor() {
+    effect(() => {
+      if (this.route() !== null) return;
+      const d = this.draft();
+      if (!d.upstream.trim()) {
+        this.hostAdded = this.hostDeclined = false;
+        return;
+      }
+      const internal = this.mode() === "proxy" && internalUpstream(d.upstream);
+      const carries = d.filters.some((f) => f.type === "preserve-host" || f.type === "set-host");
+      if (this.hostAdded && internal && !carries) {
+        this.hostAdded = false;
+        this.hostDeclined = true;
+        return;
+      }
+      if (internal && !carries && !this.hostDeclined) {
+        this.hostAdded = true;
+        this.draft.update((x) => ({ ...x, filters: [...x.filters, { type: "preserve-host" }] }));
+      } else if (!internal && this.hostAdded) {
+        this.hostAdded = false;
+        this.draft.update((x) => ({ ...x, filters: x.filters.filter((f) => f.type !== "preserve-host") }));
+      }
+    });
     // Whether the installation exports traces, for the OpenTelemetry section.
     // Silent on failure and OPTIMISTIC: a state that could not be read must
     // not grey out two switches somebody came to set, so the section draws as

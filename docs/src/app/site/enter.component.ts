@@ -1,20 +1,23 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { SiteService } from './site.service';
+import { LANG_PARAM } from './site.service';
 
-// The door for an address with no language in it: / , /docs/..., an old link.
-// It keeps the path and prepends the language the reader asked for, so a
-// bookmark made before languages existed still lands on its page.
+// The door for an address written when the language was its first segment:
+// /fr/docs/start/install. Those addresses were sent, indexed and bookmarked,
+// so they keep opening - on the same page, in the language they named, at the
+// address that page has now (/docs/start/install?lg=fr).
 @Component({
   selector: 'app-enter',
   template: '',
 })
 export class EnterComponent {
   constructor() {
-    const site = inject(SiteService);
     const router = inject(Router);
-    const lang = site.preferredLang();
-    const path = router.url.split('?')[0].split('#')[0].replace(/^\//, '');
-    void router.navigateByUrl(`/${lang}${path ? `/${path}` : ''}`, { replaceUrl: true });
+    const tree = router.parseUrl(router.url);
+    const [lang, ...rest] = (tree.root.children['primary']?.segments ?? []).map((s) => s.path);
+    void router.navigate(['/', ...rest], {
+      queryParams: { ...tree.queryParams, [LANG_PARAM]: lang },
+      replaceUrl: true,
+    });
   }
 }

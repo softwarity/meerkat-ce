@@ -35,23 +35,17 @@ const head = [
 const escape = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-let written = 0;
-for (const lang of LANGS) {
-  const dir = join(SITE, lang, 'p');
-  for (const file of await readdir(dir)) {
-    if (!file.endsWith('.json')) continue;
-    const page = JSON.parse(await readFile(join(dir, file), 'utf8'));
-    const slug = page.slug;
-    const path = slug === 'index' ? `${lang}` : `${lang}/${slug}`;
-    // Same rule as the runtime: the company is the brand, Meerkat is the
-    // product, and the tab says which of the two the page is about.
-    const house = page.area === 'softwarity' || page.area === 'project' ? 'Softwarity' : 'Meerkat';
-    const title = slug === 'index' ? `${page.title} | Softwarity` : `${page.title} | ${house}`;
-    // With the trailing slash Pages itself serves: every page is a directory,
-    // so /en answers a 301 to /en/, and a canonical that redirects is one
-    // nobody should have written.
-    const url = `${ORIGIN}${base}${path}/`;
-    const html = `<!doctype html>
+// One file for a page: its head, and the shell.
+//
+//   canonical  the address search engines keep for this file
+//   alternates the same page in each language, for a crawler: an address names
+//              a page and ?lg= names the language it is read in
+function document(lang, page, canonical, alternates) {
+  // Same rule as the runtime: the company is the brand, Meerkat is the
+  // product, and the tab says which of the two the page is about.
+  const house = page.area === 'softwarity' || page.area === 'project' ? 'Softwarity' : 'Meerkat';
+  const title = page.slug === 'index' ? `${page.title} | Softwarity` : `${page.title} | ${house}`;
+  return `<!doctype html>
 <html lang="${lang}">
 <head>
 <meta charset="utf-8">
@@ -59,9 +53,10 @@ for (const lang of LANGS) {
 <base href="${base}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="${escape(page.summary)}">
-<link rel="canonical" href="${url}">
+<link rel="canonical" href="${canonical}">
+${alternates.join('\n')}
 <meta property="og:type" content="article">
-<meta property="og:url" content="${url}">
+<meta property="og:url" content="${canonical}">
 <meta property="og:title" content="${escape(page.title)}">
 <meta property="og:description" content="${escape(page.summary)}">
 <meta name="author" content="Softwarity">
@@ -73,9 +68,52 @@ ${head.join('\n')}
 <body><app-root></app-root></body>
 </html>
 `;
-    const target = join(OUT, path, 'index.html');
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, html);
+}
+
+async function write(path, html) {
+  const target = join(OUT, path, 'index.html');
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, html);
+}
+
+// Which languages a page exists in, to say so in its head.
+const langsOf = new Map();
+const pages = new Map();
+for (const lang of LANGS) {
+  const dir = join(SITE, lang, 'p');
+  for (const file of await readdir(dir)) {
+    if (!file.endsWith('.json')) continue;
+    const page = JSON.parse(await readFile(join(dir, file), 'utf8'));
+    pages.set(`${lang}/${page.slug}`, page);
+    langsOf.set(page.slug, [...(langsOf.get(page.slug) ?? []), lang]);
+  }
+}
+
+let written = 0;
+for (const [slug, langs] of langsOf) {
+  // With the trailing slash Pages itself serves: every page is a directory,
+  // so /docs answers a 301 to /docs/, and a canonical that redirects is one
+  // nobody should have written.
+  const path = slug === 'index' ? '' : `${slug}/`;
+  const bare = `${ORIGIN}${base}${path}`;
+  const alternates = [
+    ...langs.map((l) => `<link rel="alternate" hreflang="${l}" href="${bare}?lg=${l}">`),
+    `<link rel="alternate" hreflang="x-default" href="${bare}">`,
+  ];
+  // The page itself, at the address that names no language. Its head is in
+  // the first language it exists in - a crawler reads one - and the reader's
+  // own is chosen when the application starts.
+  if (slug !== 'index') {
+    // The home page is the index.html the builder wrote; it is left alone.
+    await write(path, document(langs[0], pages.get(`${langs[0]}/${slug}`), bare, alternates));
+    written++;
+  }
+  // And the addresses of before, /en/... and /fr/..., which were sent and
+  // indexed: they answer 200 with their own head, name the new address as the
+  // canonical one, and the application takes the reader there.
+  for (const lang of langs) {
+    const old = slug === 'index' ? lang : `${lang}/${slug}`;
+    await write(old, document(lang, pages.get(`${lang}/${slug}`), `${bare}?lg=${lang}`, alternates));
     written++;
   }
 }

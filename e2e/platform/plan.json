@@ -3347,6 +3347,74 @@
    ],
    "en": "cosign verify succeeds on the image under test with the workflow's identity, for the digest and for each architecture; an unsigned or re-pushed image fails.",
    "fr": "cosign verify réussit sur l'image testée avec l'identité du workflow, pour le digest et pour chaque architecture ; une image non signée ou repoussée échoue."
+  },
+  {
+   "id": "EVAL-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "EVAL"
+   ],
+   "en": "The evaluation image reports edition eval at startup, serves every Enterprise feature the EE image serves, and never stops the data plane: the same smoke chain passes on day one and with the clock moved a year forward.",
+   "fr": "L'image d'évaluation annonce l'édition eval au démarrage, sert toutes les fonctions Enterprise que sert l'image EE, et n'arrête jamais le plan de données : la même chaîne de fumée passe au premier jour et l'horloge avancée d'un an."
+  },
+  {
+   "id": "EVAL-02",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "EVAL"
+   ],
+   "en": "Every built-in page carries the evaluation notice, in each locale, and it survives a brand configured to hide the mark; the EE image shows none of it.",
+   "fr": "Chaque page intégrée porte la mention d'évaluation, dans chaque langue, et elle survit à une marque configurée pour masquer la signature ; l'image EE n'en montre rien."
+  },
+  {
+   "id": "EVAL-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "EVAL"
+   ],
+   "en": "The user button injected into a proxied page carries the notice when opened, through gzip and brotli, and a response over the rewrite ceiling still arrives whole.",
+   "fr": "Le bouton utilisateur injecté dans une page relayée porte la mention à l'ouverture, en gzip comme en brotli, et une réponse au-dessus du plafond de réécriture arrive toujours entière."
+  },
+  {
+   "id": "EVAL-04",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "EVAL"
+   ],
+   "en": "The console shows the evaluation watermark on a dense screen in both colour schemes, behind the content, and every row stays clickable.",
+   "fr": "La console affiche le filigrane d'évaluation sur un écran dense dans les deux schémas de couleur, derrière le contenu, et chaque ligne reste cliquable."
+  },
+  {
+   "id": "EVAL-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE",
+    "EVAL"
+   ],
+   "en": "No card, table or row of the console paints an opaque background over the page; the sticky header and the frozen columns are the two stated exceptions, and every banded table hovers the same colour.",
+   "fr": "Aucune carte, table ou ligne de la console ne pose un fond opaque sur la page ; l'en-tête collant et les colonnes gelées sont les deux exceptions assumées, et toute table bandée survole de la même couleur."
   }
  ],
  "platform": [

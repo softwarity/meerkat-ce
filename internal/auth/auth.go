@@ -28,6 +28,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/session"
@@ -726,7 +727,7 @@ const flowTop = `<!doctype html>
   </style>
 </head>
 <body class="{{if .List}}list {{end}}mk-{{.Layout.Name}}{{if .Layout.Side}} side-{{.Layout.Side}}{{end}}{{if .Brand.HasBackground}} has-bg{{end}}{{if ne .Scheme "auto"}} mk-scheme-{{.Scheme}}{{end}}">
-  <main class="watch">
+{{.EvalBanner}}  <main class="watch">
     <div class="brand">
     <div class="mark{{if .Brand.Meerkat}} pulse{{end}}" aria-hidden="true">
       {{if .Brand.LogoURL}}<img class="applogo{{with .Brand.LogoSize}} {{.}}{{end}}" src="{{.Brand.LogoURL}}" alt="">{{end}}
@@ -2012,9 +2013,11 @@ func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageL
 		// The whole catalogue, so the Layout tab changes arrangement by
 		// changing a class - see allLayoutsCSS.
 		LayoutCSS: template.CSS(allLayoutsCSS()), //nolint:gosec // built-in blocks
-		Preview:   true,
-		Brand:     toBrandView(b),
-		Title:     "Theme preview - Meerkat",
+		//nolint:gosec // a constant from ee/eval, never anyone's input
+		EvalBanner: template.HTML(evalmark.FlowBanner),
+		Preview:    true,
+		Brand:      toBrandView(b),
+		Title:      "Theme preview - Meerkat",
 		// The language the caller asked for, not English. Every page here is
 		// translated, and a preview that always spoke English could show the
 		// palette and never the TEXT - which is half of what a page looks

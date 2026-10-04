@@ -20,29 +20,6 @@
         <ng-container i18n="@@Endpoint_security">Endpoint security</ng-container>
       }
     </h2>
-    @if (data(); as d) {
-      <!-- Two numbers that look alike and answer different questions: the
-           FORMAT this document is written in (OpenAPI 3.0.0), and the version
-           the API declares for ITSELF (info.version). Side by side and bare,
-           "3.0.0 v0.0.1" read as one thing versioned twice. Naming them is the
-           whole fix - a tooltip on top would be explaining a label. -->
-      <span class="meta">
-        @if (d.title) {<span>{{ d.title }}</span>}
-        @if (d.format) {
-          <span class="badge" i18n="@@OpenAPI_format_badge">OpenAPI {{ d.format }}</span>
-        }
-        @if (d.version) {
-          <span class="badge" i18n="@@API_version_badge">API {{ d.version }}</span>
-        }
-        <!-- The route's own prefix, which every path below carries and which is
-             therefore the same on every line. Said once here; the column shows
-             what differs. The rules still store the whole path - it is the
-             coordinate the gateway compares. -->
-        @if (prefix(); as p) {
-          <span class="badge prefix"><code>{{ p }}</code></span>
-        }
-      </span>
-    }
   </div>
 
   <mat-form-field class="picker" subscriptSizing="dynamic">
@@ -57,7 +34,7 @@
   @if (intent() === 'audit' && selectedId()) {
     <!-- The rules as a file: what the route editor's OpenTelemetry section
          uploads, onto this route or another one. -->
-    <button matButton="tonal" type="button" ee-feature="AUD-04" (click)="exportAudit()">
+    <button class="export" matButton="tonal" type="button" ee-feature="AUD-04" (click)="exportAudit()">
       <mat-icon>download</mat-icon>
       <ng-container i18n="@@Export">Export</ng-container>
     </button>
@@ -118,7 +95,18 @@
       class="ops"
     >
       <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef class="c-status"></th>
+        <!-- The version the API declares for ITSELF (info.version), in the one
+             header cell that had nothing to say. The FORMAT the document is
+             written in (OpenAPI 3.0.0) is gone: it is a fact about the file,
+             not about who may call these operations, and side by side the two
+             numbers read as one thing versioned twice. The route's name and
+             its prefix are gone too - the selector beside the title says
+             which route this is, and the prefix is on every line below. -->
+        <th mat-header-cell *matHeaderCellDef class="c-status">
+          @if (data()?.version; as v) {
+            <span class="api-version" i18n="@@API_version_badge">API {{ v }}</span>
+          }
+        </th>
         <td mat-cell *matCellDef="let o" class="c-status">
           <!-- The badges say what is posed AND are the way in: clicking the
                access half or the bound half opens the same drawer with that

@@ -5,7 +5,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
-import { Lang, LANGS, WORDS } from './i18n';
+import { Lang, WORDS } from './i18n';
 import { Nav, NavArea, NavSection, Page, Shot, SiteService } from './site.service';
 import { BenchmarkComponent } from './widgets/benchmark.component';
 
@@ -36,16 +36,12 @@ export class PageComponent {
     { initialValue: this.router.url },
   );
 
-  protected readonly lang = computed<Lang>(() => {
-    const first = this.url().split('?')[0].split('/')[1];
-    return (LANGS as readonly string[]).includes(first) ? (first as Lang) : 'en';
-  });
+  // See the shell: the address names the page, and the language only when it
+  // forces one.
+  protected readonly lang = computed<Lang>(() => this.site.langOf(this.url()));
   protected readonly words = computed(() => WORDS[this.lang()]);
-  protected readonly slug = computed(() => {
-    const path = this.url().split('?')[0].split('#')[0];
-    // See the shell: /en/ and /en are the same page, and Pages serves the first.
-    return path.split('/').slice(2).join('/').replace(/\/$/, '') || 'index';
-  });
+  protected readonly langQuery = computed(() => this.site.langQuery(this.url()));
+  protected readonly slug = computed(() => this.site.slugOf(this.url()));
 
   protected readonly page = signal<Page | null>(null);
   protected readonly missing = signal(false);
@@ -146,11 +142,11 @@ export class PageComponent {
   }
 
   protected path(slug: string): string {
-    return this.site.pathFor(this.lang(), slug);
+    return this.site.pathFor(slug);
   }
 
   protected homePath(): string {
-    return `/${this.lang()}`;
+    return '/';
   }
 
   protected label(version: string): string {
@@ -161,7 +157,7 @@ export class PageComponent {
     const nav = this.nav();
     if (!nav) return;
     const target = await this.site.sameIn(this.lang(), this.slug(), nav, version);
-    void this.router.navigateByUrl(this.path(target));
+    void this.router.navigateByUrl(this.site.href(this.url(), target));
   }
 
   // What a reader sees only on paper: the address, so the document can be
@@ -235,7 +231,7 @@ export class PageComponent {
         target = target.replace('docs/', `docs/${prefix}/`);
       }
       const at = a.dataset['at'];
-      const url = this.path(target) + (at ? `?at=${at}` : '');
+      const url = this.site.href(this.url(), target, at);
       a.setAttribute('href', this.router.serializeUrl(this.router.parseUrl(url)));
       a.addEventListener('click', (event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -50,6 +51,13 @@ type editionInfo struct {
 	// Features are the Enterprise rows of FEATURES.md, as the binary carries
 	// it (CONSOLE-14): the License screen names each and says where it lives.
 	Features []EditionFeature `json:"features"`
+	// Notice is the evaluation image's sentence, empty in both shipped images.
+	// It is not a flag and nothing reads it as one: it is the text itself,
+	// filled by ee/eval the same way the pages and the console's watermark are
+	// (EVAL-01), and the License screen shows it INSTEAD of the perpetual
+	// licence wording - which would be a lie on a build that is licensed for
+	// evaluation only.
+	Notice string `json:"notice,omitempty"`
 }
 
 // EditionFeature is one Enterprise row of the contract.
@@ -67,6 +75,7 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 		Tenancy:    a.st.Tenancy(ctx),
 		DataOrigin: a.dataOrigin(r),
 		Features:   a.EnterpriseFeatures,
+		Notice:     evalmark.MailNote,
 	}
 	if info.Features == nil {
 		info.Features = []EditionFeature{}

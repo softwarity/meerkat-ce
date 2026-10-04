@@ -32,14 +32,14 @@
           @if (section.name && siblings().length > 1) {
             <a
               class="beside-head"
-              [routerLink]="path(section.pages[0].slug)"
+              [routerLink]="path(section.pages[0].slug)" [queryParams]="langQuery()"
               [class.open]="section.name === openSection()"
               >{{ section.name }}<span class="beside-count">{{ section.pages.length }}</span></a
             >
           }
           @if (section.name === openSection() || siblings().length === 1) {
             @for (item of section.pages; track item.slug) {
-              <a [routerLink]="path(item.slug)" [class.on]="item.slug === p.slug">{{ item.title }}</a>
+              <a [routerLink]="path(item.slug)" [queryParams]="langQuery()" [class.on]="item.slug === p.slug">{{ item.title }}</a>
             }
           }
         }
@@ -79,7 +79,7 @@
     <article class="body">
       <h1>404</h1>
       <p>{{ words().notFound }}</p>
-      <p><a [routerLink]="homePath()">{{ words().backHome }}</a></p>
+      <p><a [routerLink]="homePath()" [queryParams]="langQuery()">{{ words().backHome }}</a></p>
     </article>
   </div>
 }

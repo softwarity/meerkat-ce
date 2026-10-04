@@ -289,7 +289,7 @@ func init() {
 	registerFilter(filterDef{
 		Type: "strip-prefix", Phase: phaseRequest,
 		Doc:     "Removes the first N segments of the path before proxying.",
-		Details: "The gateway publishes /demo/orders, the service only knows /orders. With 1, the first segment is removed. Tell the service where it lives with X-Forwarded-Prefix, or the links it builds will point outside the route.",
+		Details: "The gateway publishes /demo/orders, the service only knows /orders. With 1, the first segment is removed. Tell the service where it lives with X-Forwarded-Prefix, or the links it builds will point outside the route. On the way back the prefix is restored on what the browser follows: the <base href> of a page and the Location of a redirect.",
 		Params: []Param{
 			{Name: "parts", Kind: KindInt, Default: 1, Doc: "number of leading segments to remove"},
 			{Name: "announcePrefix", Kind: KindBool, Default: true,
@@ -302,18 +302,27 @@ func init() {
 			}
 			announce := a.boolean("announcePrefix")
 			return func(pr *httputil.ProxyRequest) {
-				pr.Out.URL.Path = StripSegments(pr.Out.URL.Path, n)
-				pr.Out.URL.RawPath = ""
-				if !announce {
-					return
+				in := pr.Out.URL.Path
+				out := StripSegments(in, n)
+				// The trailing slash is the caller's, and it travels: a static
+				// host answers "/docs" with a redirect to "/docs/", so a slash
+				// lost here turns every page of a site into a redirect to the
+				// page that was asked for - and to the upstream's own address.
+				if strings.HasSuffix(in, "/") && !strings.HasSuffix(out, "/") {
+					out += "/"
 				}
+				pr.Out.URL.Path = out
+				pr.Out.URL.RawPath = ""
 				// What was consumed, taken as the DIFFERENCE between what the
 				// caller asked for and what is left - not as "the first n
 				// segments of the inbound path". The difference is right when
 				// two strip-prefix filters follow one another (each one widens
-				// the announced prefix instead of overwriting it with its own
-				// share), and it costs one comparison.
-				if prefix := strings.TrimSuffix(pr.In.URL.Path, pr.Out.URL.Path); prefix != "" {
+				// the prefix instead of overwriting it with its own share).
+				// Kept for the way back too: a redirect and a page's <base> are
+				// written by a service that does not know it (published.go).
+				prefix := strings.TrimSuffix(strings.TrimSuffix(pr.In.URL.Path, out), "/")
+				pr.Out = withStripped(pr.Out, prefix)
+				if announce && prefix != "" {
 					pr.Out.Header.Set(ForwardedPrefixHeader, prefix)
 				}
 			}, nil

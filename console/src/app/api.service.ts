@@ -1042,6 +1042,10 @@ export interface Edition {
   configurationCap: number;
   // The Enterprise rows of FEATURES.md (CONSOLE-14).
   features?: { id: string; status: 'done' | 'partial' | 'planned' | 'retired'; edition: string }[];
+  // The evaluation image's notice, absent from both shipped images. Not a
+  // flag: the sentence itself, which the License screen shows in place of the
+  // perpetual-licence wording.
+  notice?: string;
 }
 
 // One field's before/after inside an audit event (from/to are the decoded JSON

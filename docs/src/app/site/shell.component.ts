@@ -13,7 +13,7 @@ import {
 } from '@softwarity/rail-nav';
 import { filter, map, startWith } from 'rxjs';
 import { Lang, LANG_NAMES, LANGS, WORDS } from './i18n';
-import { Hit, Nav, NavArea, Scheme, Shot, SiteService } from './site.service';
+import { Hit, LANG_PARAM, Nav, NavArea, Scheme, Shot, SiteService } from './site.service';
 import { VersionService } from '../version.service';
 
 const MEERKAT_MARK = `
@@ -74,8 +74,8 @@ export class ShellComponent {
   protected readonly schemes: Scheme[] = ['system', 'light', 'dark'];
   protected readonly scheme = this.site.scheme;
 
-  // The address is the truth: language and page both come from it, so a link
-  // someone was sent opens on what it says.
+  // The address is the truth for the page, and for the language when it
+  // forces one (?lg=fr); otherwise the reader's own preference decides.
   private readonly url = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
@@ -85,19 +85,12 @@ export class ShellComponent {
     { initialValue: this.router.url },
   );
 
-  protected readonly lang = computed<Lang>(() => {
-    const first = this.url().split('?')[0].split('/')[1];
-    return (LANGS as readonly string[]).includes(first) ? (first as Lang) : 'en';
-  });
+  protected readonly lang = computed<Lang>(() => this.site.langOf(this.url()));
   protected readonly words = computed(() => WORDS[this.lang()]);
+  // What every link of the shell carries: the forced language, or nothing.
+  protected readonly langQuery = computed(() => this.site.langQuery(this.url()));
 
-  protected readonly slug = computed(() => {
-    const path = this.url().split('?')[0].split('#')[0];
-    // The trailing slash is GitHub Pages': it answers /en with a 301 to /en/,
-    // because every page of this site is a directory holding an index.html.
-    const rest = path.split('/').slice(2).join('/').replace(/\/$/, '');
-    return rest || 'index';
-  });
+  protected readonly slug = computed(() => this.site.slugOf(this.url()));
 
   protected readonly nav = signal<Nav | null>(null);
   private readonly allAreas = computed<NavArea[]>(() => this.nav()?.areas ?? []);
@@ -177,21 +170,24 @@ export class ShellComponent {
   }
 
   protected path(slug: string): string {
-    return this.site.pathFor(this.lang(), slug);
+    return this.site.pathFor(slug);
   }
 
   // The same page in the other language. Content is written page for page in
-  // both, so the address holds - and when it does not, the language's home is
-  // a better answer than a dead link.
+  // both, so the address holds - and when it does not, the home page is a
+  // better answer than a dead link. The choice is written in the address
+  // (?lg=fr), so what the reader copies from the bar opens in what they read,
+  // and it is remembered for the addresses that say nothing.
   protected async switchLang(lang: Lang): Promise<void> {
     const slug = this.slug();
     this.site.rememberLang(lang);
+    let target = slug;
     try {
       await this.site.page(lang, slug);
-      void this.router.navigateByUrl(this.site.pathFor(lang, slug));
     } catch {
-      void this.router.navigateByUrl(`/${lang}`);
+      target = 'index';
     }
+    void this.router.navigateByUrl(`${this.site.pathFor(target)}?${LANG_PARAM}=${lang}`);
   }
 
   protected closeShot(): void {
@@ -233,7 +229,7 @@ export class ShellComponent {
 
   protected async goto(slug: string): Promise<void> {
     this.closeSearch();
-    void this.router.navigateByUrl(this.path(slug));
+    void this.router.navigateByUrl(this.site.href(this.url(), slug));
   }
 
   private async runSearch(value: string): Promise<void> {

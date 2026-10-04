@@ -3,6 +3,7 @@ package auth
 import (
 	"sync"
 
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -29,9 +30,9 @@ func layoutCSS(l store.PageLayout) string {
 	defer registryMu.RUnlock()
 	b, ok := registry[l.Name]
 	if !ok {
-		return framedCSS // centered: the chrome's own arrangement
+		return framedCSS + evalmark.FlowCSS // centered: the chrome's own arrangement
 	}
-	return b.css + b.right + framedCSS
+	return b.css + b.right + framedCSS + evalmark.FlowCSS
 }
 
 // Known reports whether THIS build can draw an arrangement. The chrome asks
@@ -61,7 +62,7 @@ func allLayoutsCSS() string {
 			css += b.css + b.right
 		}
 	}
-	return css + framedCSS
+	return css + framedCSS + evalmark.FlowCSS
 }
 
 type layoutBlock struct{ css, right string }

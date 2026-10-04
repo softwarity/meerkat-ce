@@ -8,9 +8,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(
       routes,
-      // Real paths, not a hash: the language and the documentation version are
-      // in the address, and an address is what gets sent, indexed and
-      // bookmarked. GitHub Pages serves the shell for any path through a
+      // Real paths, not a hash: the page and the documentation version are in
+      // the address, and an address is what gets sent, indexed and bookmarked. GitHub Pages serves the shell for any path through a
       // file written for every page - see scripts/static-pages.mjs.
       withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' }),
     ),

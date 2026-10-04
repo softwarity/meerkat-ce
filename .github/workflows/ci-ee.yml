@@ -473,6 +473,8 @@ jobs:
     outputs:
       # What was pushed, exactly: the release re-tags this and nothing else.
       digest: ${{ steps.build.outputs.digest }}
+      # Same, for the evaluation image (EVAL-01).
+      eval-digest: ${{ steps.build-eval.outputs.digest }}
     steps:
       - id: token
         uses: actions/create-github-app-token@v2
@@ -555,6 +557,55 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes --recursive "ghcr.io/softwarity/meerkat@${DIGEST}"
+
+      # THE EVALUATION IMAGE (EVAL-01). The Enterprise build plus ee/eval, and
+      # nothing else: every feature, no time limit, no counter, no switch that
+      # stops the data plane. What it adds is a notice on each surface someone
+      # reads, which is what makes it unusable in front of a production
+      # without taking anything away from an evaluation.
+      #
+      # On DOCKER HUB, beside the community image, and not on GH Packages
+      # where the Enterprise one lives: an image nobody outside the org can
+      # pull is an image nobody can evaluate. Publishing it in the open is
+      # safe because the mirror strips ee/ from the public tree (mirror-ce),
+      # so the sources that would rebuild it without its marks are not out
+      # there.
+      #
+      # `eval` is to this image what `latest` is to the other two. The release
+      # job adds X.Y.Z-eval, and only the full version: `1.2-eval` and
+      # `1-eval` would be floating tags on a build whose whole point is to be
+      # identifiable.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
+      - id: build-eval
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: docker.io/softwarity/meerkat:eval
+          labels: |
+            org.opencontainers.image.source=https://github.com/softwarity/meerkat
+            org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
+          build-args: |
+            VERSION=dev
+            GIT_REV=${{ steps.meta.outputs.rev }}
+            BUILD_DATE=${{ steps.meta.outputs.date }}
+            GO_TAGS=ee eval
+            EDITION=ee
+      - run: echo "published docker.io/softwarity/meerkat:eval @ ${{ steps.build-eval.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      # Signed by digest like the other two (DEPLOY-08): an evaluation image is
+      # the one most likely to be pulled by somebody who has never met us, and
+      # the signature is what says it came from this workflow rather than from
+      # whoever re-published it with the notices taken out.
+      - name: Sign the evaluation image
+        env:
+          DIGEST: ${{ steps.build-eval.outputs.digest }}
+        run: cosign sign --yes --recursive "docker.io/softwarity/meerkat@${DIGEST}"
 
   # THE RELEASE. This job waits on the `release` environment - a reviewer is
   # required there - and does nothing until somebody approves it. Approving
@@ -701,6 +752,22 @@ jobs:
             ghcr.io/softwarity/meerkat:${{ steps.next.outputs.version }}
             ghcr.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
             ghcr.io/softwarity/meerkat:${{ steps.next.outputs.major }}
+
+      # The evaluation image: the digest the image job pushed, stamped with the
+      # version the same way, and tagged X.Y.Z-eval. The floating `eval` tag
+      # already points at this digest - it was pushed as `eval` - so there is
+      # nothing to move here.
+      - name: Stamp and tag the evaluation image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker
+          file: docker/Dockerfile.stamp
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            BASE=docker.io/softwarity/meerkat@${{ needs.image.outputs.eval-digest }}
+            VERSION=${{ steps.next.outputs.version }}
+          tags: docker.io/softwarity/meerkat:${{ steps.next.outputs.version }}-eval
 
       # The community image: is Docker Hub's `latest` the mirror's build of
       # this very commit? The mirror commit names the private one in its

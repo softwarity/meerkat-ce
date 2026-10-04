@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -105,7 +106,12 @@ func containsFold(list []string, v string) bool {
 func (h *Handler) userButtonJS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")
-	_, _ = w.Write([]byte(userButtonJS))
+	// The evaluation line (EVAL-03) is spliced into the menu's markup, which
+	// is the only place it appears: the button itself and the page around it
+	// are untouched, so a hosted application's layout cannot move because of
+	// it. Empty in the two shipped images, where the substitution removes the
+	// placeholder and leaves the script byte-identical to what it always was.
+	_, _ = w.Write([]byte(strings.Replace(userButtonJS, "__MK_EVAL__", evalmark.MenuEntry, 1)))
 }
 
 type userButtonTenant struct {
@@ -826,7 +832,7 @@ const userButtonJS = `(() => {
           : '<span class="avatar">' + esc(auth ? (data.initials || '?') : '-') + '</span>') +
         (namePos === 'after' && auth ? '<span class="name">' + esc(data.username) + '</span>' : '') +
         '</button>' +
-        '<div class="menu" id="menu" role="menu">' + items.join('') + '</div>' +
+        '<div class="menu" id="menu" role="menu">' + items.join('') + '__MK_EVAL__</div>' +
         '</div>';
 
       const menu = this.shadowRoot.getElementById('menu');

@@ -5,6 +5,8 @@ import (
 	"html"
 	"html/template"
 	"strings"
+
+	"github.com/softwarity/meerkat/internal/evalmark"
 )
 
 // One look for every e-mail the gateway sends (NOTIF-01).
@@ -178,6 +180,7 @@ var shell = template.Must(template.New("mail").Parse(`<!doctype html>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-size:12px;color:{{.Muted}};">{{.AppName}}</p>
+    {{if .EvalNote}}<p style="margin:6px 0 0;font-size:11px;color:{{.Muted}};">{{.EvalNote}}</p>{{end}}
   </td></tr>
 </table>
 </body></html>`))
@@ -196,11 +199,13 @@ func renderHTML(brand Brand, palette map[string]string, spec Spec) string {
 	data := struct {
 		Spec
 		AppName                                              string
+		EvalNote                                             string
 		LogoURL                                              template.URL
 		Page, Card, Text, Muted, Outline, Primary, OnPrimary string
 	}{
 		Spec:      spec,
 		AppName:   brand.AppName,
+		EvalNote:  evalmark.MailNote,
 		Page:      color("surfaceContainer", "#e6e9ef"),
 		Card:      color("surface", "#eff1f5"),
 		Text:      color("onSurface", "#4c4f69"),

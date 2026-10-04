@@ -47,6 +47,13 @@ Ce qu'un appelant envoie sous ce nom est purgé, sur toutes les routes, même ce
 sans `strip-prefix` : un appelant qui poserait son propre préfixe ferait écrire au
 service des liens là où il l'a demandé.
 
+**Au retour, le préfixe est remis** sur les deux choses que le navigateur suit sans
+rien demander : le `<base href>` d'une page (`<base href="/">` devient
+`<base href="/demo/">`, sinon ses scripts sont cherchés à la racine de la passerelle)
+et le `Location` d'une redirection que le service écrit depuis sa propre racine ou
+vers sa propre adresse. Une base ou une redirection déjà sous le préfixe, relative,
+ou vers un autre site n'est pas touchée.
+
 Deux `strip-prefix` à la suite fonctionnent : le préfixe annoncé s'élargit à ce qui
 a réellement été consommé au lieu d'être écrasé.
 

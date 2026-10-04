@@ -73,9 +73,7 @@ mat-row:last-of-type {
 .clickable {
   cursor: pointer;
 }
-.clickable:hover {
-  background: var(--mat-sys-surface-container-high);
-}
+// The hover colour belongs to the shared mixin below (styles/_table.scss).
 .name {
   font-family: var(--mk-mono);
   font-weight: 500;

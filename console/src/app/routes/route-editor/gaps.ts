@@ -49,3 +49,33 @@ export function upstreamProblem(raw: string): string {
   }
   return '';
 }
+
+// Whether an upstream is an application reached directly - a service of the
+// cluster, a container, a machine of the private network - rather than a name
+// on the internet. It decides one default: such an application is alone behind
+// its address and reads the Host it is called by (to check a WebSocket's
+// origin, to write its links), so a new route to it keeps the caller's Host.
+// A public name is the opposite case: a host that serves many sites picks by
+// name, and has to be given its own.
+export function internalUpstream(raw: string): boolean {
+  let host: string;
+  try {
+    host = new URL((raw ?? '').trim()).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (!host) return false;
+  // An IPv6 literal arrives in brackets: loopback and unique local addresses.
+  if (host.startsWith('[')) {
+    const v6 = host.slice(1, -1);
+    return v6 === '::1' || /^f[cd]/.test(v6) || v6.startsWith('fe80');
+  }
+  const v4 = host.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+  }
+  // No dot: a container or a service called by its short name.
+  if (!host.includes('.')) return true;
+  return ['.svc', '.cluster.local', '.local', '.internal', '.lan', '.localhost', '.test'].some((end) => host.endsWith(end));
+}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/tracing"
@@ -204,6 +205,13 @@ type flowChrome struct {
 	// is what makes the class mean something.
 	Layout    store.PageLayout
 	LayoutCSS template.CSS
+	// EvalBanner is the evaluation image's notice (EVAL-02), empty everywhere
+	// else. It is DATA rather than something folded into the template's source
+	// because the pages are built from package-level variables, at init(), and
+	// nothing orders internal/auth's init against ee/eval's - the two packages
+	// do not depend on each other. Read here, at render time, it is filled
+	// whatever order the two ran in.
+	EvalBanner template.HTML
 	// Preview marks the console's specimen. It is served INSIDE an iframe, and
 	// a served page in an iframe goes compact - brand off, background off,
 	// arrangement overridden. Here that is wrong twice over: the frame is a
@@ -292,7 +300,8 @@ func (h *Handler) flowData(r *http.Request, titleKey string) flowChrome {
 		TraceID:      tracing.ID(r.Context()),
 		ThemeCSS:     css,
 		Layout:       layout,
-		LayoutCSS:    template.CSS(layoutCSS(layout)), //nolint:gosec // a closed catalogue of built-in blocks
+		LayoutCSS:    template.CSS(layoutCSS(layout)),    //nolint:gosec // a closed catalogue of built-in blocks
+		EvalBanner:   template.HTML(evalmark.FlowBanner), //nolint:gosec // a constant from ee/eval, never anyone's input
 		Brand:        brand,
 		Title:        t[titleKey],
 		Lang:         p.Lang,

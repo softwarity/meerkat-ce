@@ -28,7 +28,10 @@
   border-radius: var(--mat-sys-corner-medium, 8px);
 }
 
-@mixin banded-rows($band: 4%, $hover: 9%, $row-height: 48px) {
+// The two colours come from --mk-row-band / --mk-row-hover, declared once in
+// styles.scss: a table is not the only thing in the console drawn as rows, and
+// a mixin cannot serve a list of divs.
+@mixin banded-rows($row-height: 48px) {
   mat-table {
     --mat-table-row-item-outline-width: 0;
     background: transparent;
@@ -72,13 +75,33 @@
     align-self: center;
     line-height: 1.25;
   }
-  mat-row:nth-child(even),
-  mat-row:nth-child(even) mat-cell {
-    background: color-mix(in srgb, var(--mat-sys-on-surface) #{$band}, var(--mat-sys-surface));
+  // Mixed towards TRANSPARENT, not towards the surface colour. On a plain
+  // surface the two are pixel-identical - the same veil over the same ground -
+  // but an opaque result also paints over whatever the ground is carrying, and
+  // a banded table then hides it row by row. Transparent, the band is a veil:
+  // it separates the rows and lets the ground through.
+  //
+  // On the ROW ALONE, which an opaque colour did not have to care about: two
+  // veils of 4% stacked on a cell are not 4%, they are nearly 8%, so painting
+  // the row and its cells both - as this did - banded the cells twice as hard
+  // as the gaps between them.
+  mat-row:nth-child(even) {
+    background: var(--mk-row-band);
   }
   // After the banding, which it ties on specificity and therefore wins by order.
-  mat-row:hover,
-  mat-row:hover mat-cell {
-    background: color-mix(in srgb, var(--mat-sys-on-surface) #{$hover}, var(--mat-sys-surface));
+  mat-row:hover {
+    background: var(--mk-row-hover);
+  }
+  // A STICKY cell is the exception, and it stays opaque: the columns pass
+  // underneath it, so a veil there reads the moving text through the frozen
+  // one. Tried transparent, to let the watermark cross the frozen column -
+  // and the answer is no: the column exists to be readable while the rest
+  // moves. It keeps the old mix, towards the surface, and therefore hides
+  // what the page carries. That is the price of a frozen column.
+  mat-row:nth-child(even) .mat-mdc-table-sticky {
+    background: var(--mk-row-band-opaque);
+  }
+  mat-row:hover .mat-mdc-table-sticky {
+    background: var(--mk-row-hover-opaque);
   }
 }

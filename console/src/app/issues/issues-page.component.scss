@@ -103,8 +103,10 @@ mat-drawer-content {
 .clickable {
   cursor: pointer;
 }
+// Not a mat-table - a list of divs - so it cannot take the mixin. It reads
+// the SAME variable the mixin reads, which is why that variable exists.
 .clickable:hover {
-  background: color-mix(in srgb, var(--mat-sys-on-surface) 5%, transparent);
+  background: var(--mk-row-hover);
 }
 .line1 {
   display: flex;

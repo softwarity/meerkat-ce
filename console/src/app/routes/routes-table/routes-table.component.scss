@@ -21,9 +21,11 @@ mat-row.clickable {
   cursor: pointer;
   transition: background 0.12s;
 }
-mat-row.clickable:hover {
-  background: var(--mat-sys-surface-container);
-}
+// No local hover BACKGROUND: it belongs to the shared mixin
+// (styles/_table.scss). mat-row.clickable:hover outranks mat-row:hover on
+// specificity, so a rule here silently overrode whatever the console had
+// decided for every other table - and did it with a different colour on each
+// screen, opaque, which also stopped the page's background at the row.
 /* Whether the route's target is there. The slot keeps its width when empty so
    the names stay aligned. */
 .heart-slot {

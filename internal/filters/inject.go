@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/andybalholm/brotli"
 )
@@ -49,7 +50,10 @@ func InjectAtBodyStartFunc(f func(*http.Response) string) func(*http.Response) e
 		if len(frag) == 0 {
 			return nil
 		}
-		return rewriteHTMLBody(res, func(body []byte) []byte { return injectAtBodyStart(body, frag) })
+		return rewriteHTMLBody(res, func(body []byte) []byte {
+			body, frag := admitScripts(res, body, frag)
+			return injectAtBodyStart(body, frag)
+		})
 	}
 }
 
@@ -88,7 +92,10 @@ func InjectAfterHeadFunc(f func(*http.Response) string) func(*http.Response) err
 		if len(frag) == 0 {
 			return nil
 		}
-		return rewriteHTMLBody(res, func(body []byte) []byte { return injectAfterHead(body, frag) })
+		return rewriteHTMLBody(res, func(body []byte) []byte {
+			body, frag := admitScripts(res, body, frag)
+			return injectAfterHead(body, frag)
+		})
 	}
 }
 
@@ -158,14 +165,36 @@ func isDocument(body []byte) bool {
 // browsers actually negotiate now, and a gateway that cannot read it stops
 // injecting anything the day an upstream turns compression on (ROUTE-14).
 //
-// zstd is deliberately absent: it is negotiated by almost nothing yet, and an
-// unread encoding costs an injection, not a page.
+// zstd is not read here. It used to be "negotiated by almost nothing"; it is
+// now what a browser offers and what a CDN answers by default, and a body the
+// gateway cannot read is a page that arrives without anything the gateway
+// adds - no portal, no user button - and without an error anywhere. So the
+// gateway does not ask for it: AcceptReadable trims what goes upstream to the
+// codecs listed here, and the upstream answers in one of them.
 func canRecode(encoding string) bool {
 	switch encoding {
 	case "", "identity", "gzip", "br":
 		return true
 	}
 	return false
+}
+
+// AcceptReadable is the Accept-Encoding to send upstream for what a caller
+// offered: the codecs canRecode knows, in the caller's order and with its
+// preferences. Empty when the caller offered none of them - then the header is
+// dropped and the upstream answers plain.
+func AcceptReadable(offered string) string {
+	var keep []string
+	for _, part := range strings.Split(offered, ",") {
+		coding := strings.ToLower(strings.TrimSpace(part))
+		if i := strings.IndexByte(coding, ';'); i >= 0 {
+			coding = strings.TrimSpace(coding[:i])
+		}
+		if coding != "" && canRecode(coding) {
+			keep = append(keep, strings.TrimSpace(part))
+		}
+	}
+	return strings.Join(keep, ", ")
 }
 
 func decode(encoding string, data []byte) ([]byte, error) {
