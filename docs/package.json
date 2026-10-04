@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "node scripts/gen-version.mjs && node scripts/gen-tests.mjs && node scripts/gen-rights.mjs && node scripts/gen-deploy.mjs && node scripts/build-site.mjs && ng serve",
+    "start": "node scripts/gen-version.mjs && node scripts/gen-tests.mjs && node scripts/gen-rights.mjs && node scripts/gen-test-plan.mjs && node scripts/gen-deploy.mjs && node scripts/build-site.mjs && ng serve",
     "build": "node scripts/build.mjs",
-    "content": "node scripts/gen-tests.mjs && node scripts/gen-rights.mjs && node scripts/gen-deploy.mjs && node scripts/build-site.mjs",
+    "content": "node scripts/gen-tests.mjs && node scripts/gen-rights.mjs && node scripts/gen-test-plan.mjs && node scripts/gen-deploy.mjs && node scripts/build-site.mjs",
     "docs:freeze": "node scripts/freeze-docs.mjs",
     "watch": "ng build --watch --configuration development",
     "screenshots": "node scripts/screenshots.mjs"

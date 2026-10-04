@@ -24,6 +24,7 @@
 //   - area: the rail entries, declared once in content/areas.json.
 
 import { mkdir, readFile, readdir, rm, writeFile, stat } from 'node:fs/promises';
+import { loadFacts } from './facts.mjs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -450,6 +451,8 @@ for (const lang of LANGS) {
   }
 }
 
+// Measured and counted figures, written {{memory.idle}} in the prose (facts.mjs).
+const withFacts = await loadFacts();
 const areas = JSON.parse(await readFile(join(CONTENT, 'areas.json'), 'utf8'));
 const versionsFile = JSON.parse(await readFile(join(CONTENT, 'versions.json'), 'utf8'));
 const frozen = versionsFile.versions || [];
@@ -503,7 +506,7 @@ for (const a of areas) {
 async function readTree(root, slugBase, sink, lang) {
   for await (const file of markdownFiles(root)) {
     const shown = relative(CONTENT, file);
-    const raw = await readFile(file, 'utf8');
+    const raw = withFacts(await readFile(file, 'utf8'), file);
     const { meta, body } = frontMatter(raw, shown);
     if (!meta.title) throw new Error(`${shown}: the front matter needs a title`);
     const tail = relative(root, file).replace(/\.md$/, '').split(/[\\/]/).join('/');
@@ -545,7 +548,7 @@ for (const lang of LANGS) {
   }
   for (const entry of await readdir(join(CONTENT, lang), { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
-    const raw = await readFile(join(CONTENT, lang, entry.name), 'utf8');
+    const raw = withFacts(await readFile(join(CONTENT, lang, entry.name), 'utf8'), entry.name);
     const shown = `${lang}/${entry.name}`;
     const { meta, body } = frontMatter(raw, shown);
     if (!meta.title) throw new Error(`${shown}: the front matter needs a title`);

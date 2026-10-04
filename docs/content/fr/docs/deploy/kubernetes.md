@@ -178,7 +178,8 @@ spec:
               memory: 512Mi
           securityContext:
             runAsNonRoot: true
-            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
@@ -342,6 +343,62 @@ subjects:
 #   serviceAccountName: meerkat
 ```
 :::
+
+## OpenShift et OKD
+
+La même image et le même chart s'installent sur OpenShift et OKD sous la SCC par
+défaut `restricted-v2` : aucune SCC supplémentaire à accorder, aucune valeur à changer,
+rien qui tourne en root. Trois choix le rendent vrai, et ils sont à connaître avant de
+surcharger quoi que ce soit :
+
+- **Aucun uid dans le pod.** OpenShift ne lance pas l'utilisateur de l'image : il tire
+  un uid de la plage du namespace, ajoute le groupe 0, et refuse un pod qui fixe le sien -
+  `runAsUser: Invalid value: 65532: must be in the ranges: [...]`. Ni le chart ni le
+  manifeste ci-dessus ne posent donc `runAsUser`, `runAsGroup` ou `fsGroup`. **Ne les
+  remettez pas** dans vos valeurs : ils n'apportent rien ailleurs, l'image porte déjà
+  son uid.
+- **`/data` appartient au groupe root, et le groupe écrit.** Quel que soit l'uid choisi
+  par OpenShift, il est dans le groupe 0 : le store écrit son premier fichier même là
+  où `/data` est un simple répertoire et non un volume monté.
+- **Le `USER` de l'image est numérique (65532).** Sur un namespace Kubernetes ordinaire
+  qui impose Pod Security `restricted`, le kubelet refuse une image dont l'utilisateur
+  est un nom, faute de pouvoir prouver qu'il n'est pas root. Un nombre passe, là comme
+  sur OpenShift.
+
+Le reste convient déjà : tous les ports écoutés sont au-dessus de 1024, la passerelle
+n'a besoin d'aucune capacité, d'aucune élévation de privilèges ni d'aucun chemin de
+l'hôte, et l'accès en lecture que demande l'éditeur de routes (plus haut) est un Role
+ordinaire.
+
+**L'exposer.** Une **Route** remplace l'Ingress, une par plan, avec la même règle :
+rien ne pointe vers le plan de contrôle sans que vous le vouliez.
+
+```yaml
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: meerkat
+spec:
+  host: apps.example.com
+  to:
+    kind: Service
+    name: meerkat
+  port:
+    targetPort: app
+  tls:
+    # edge : le routeur porte le certificat et Meerkat voit du HTTP avec
+    # X-Forwarded-Proto: https. passthrough si c'est la passerelle qui porte le
+    # certificat - ce qu'exige ACME, dont le défi TLS-ALPN doit atteindre
+    # Meerkat intact.
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+```
+
+> [!NOTE] Vérifié chaque nuit
+> Ce qui précède n'est pas une promesse : chaque nuit, la CI installe ce chart sur
+> MicroShift (OpenShift construit depuis OKD), sous la SCC `restricted-v2`, et
+> vérifie l'uid attribué, l'écriture de `/data` et les deux Routes. Voir la
+> [plateforme de test](/project/test-platform).
 
 ## Avant de dire que c'est fini
 

@@ -16,6 +16,8 @@
 /content/fr/project/tests.md
 /content/en/project/rights.md
 /content/fr/project/rights.md
+/content/en/project/test-plan.md
+/content/fr/project/test-plan.md
 
 # scratch PNGs from scripts/screenshots.mjs, before conversion
 /.screenshots/

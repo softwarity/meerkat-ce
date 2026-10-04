@@ -13,7 +13,7 @@ ARG NODE_VERSION=24
 # A RELEASE, pinned. The bare `hosted` tag is moved by plug's CI on every push
 # to its main branch, so an image built from it carries whatever plug was
 # being worked on that morning. Bump this line when plug publishes a release.
-ARG PLUG_VERSION=2.20.2-hosted
+ARG PLUG_VERSION=2.21.8-hosted
 ARG EDITION=ce
 
 # ONE build for every architecture: the console and the binary are made on the
@@ -86,13 +86,29 @@ FROM payload-${EDITION} AS payload
 # image to make it run was building a contraption around a base that had
 # already said no.
 FROM alpine:3.24
-RUN adduser -D -u 65532 nonroot && mkdir -p /data && chown nonroot:nonroot /data
+# /data belongs to the root GROUP, not to the user, and the group may write:
+# OpenShift draws an arbitrary uid from the namespace range and adds group 0,
+# so 65532:65532 mode 755 is read-only there and the store fails on its first
+# write. A mounted volume hides that - the kubelet's fsGroup rewrites the
+# ownership - so it only bites where /data is a plain directory. Everywhere
+# else the process is still 65532 and still the owner: nothing changes.
+RUN adduser -D -u 65532 nonroot && mkdir -p /data && chown 65532:0 /data && chmod g+rwX /data
 COPY --from=build /meerkat /meerkat
 # The plug client and the script that hands it out, from plug's own image.
 # Empty in the community one, where nothing runs an agent.
 COPY --from=payload /opt/plug /opt/plug
 COPY --from=payload /usr/local/bin/ /usr/local/bin/
-USER nonroot
+# The mount helper. When a developer mounts a volume, the agent starts a
+# helper beside the workload running THIS image as `plug-agent mount-serve`
+# (copied above). The SMB server is compiled into that binary, so there is no
+# package to install for it - and one image to mirror into a disconnected
+# cluster, not two.
+# NUMERIC, and the number is the point: Pod Security Standards `restricted`
+# set runAsNonRoot without allocating a uid, and the kubelet then refuses an
+# image whose USER is a name - "image has non-numeric user (nonroot), cannot
+# verify user is non-root". It is the uid adduser created above, so nothing
+# else moves.
+USER 65532
 # ABSOLUTE, and that is the whole point. The flag's default is the RELATIVE
 # path "data", which resolves against the working directory. The database
 # therefore landed in the container's own layer while a volume sat unused on

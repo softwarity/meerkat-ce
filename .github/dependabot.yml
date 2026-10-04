@@ -23,7 +23,7 @@ version: 2
 # that broke.
 #
 # Majors are grouped with the rest deliberately: this project follows the
-# latest major of Angular and of the actions it uses (see CLAUDE.md), so a
+# latest major of Angular and of the actions it uses, so a
 # major is the update, not an exception to it.
 updates:
   - package-ecosystem: gomod

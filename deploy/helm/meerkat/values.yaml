@@ -125,6 +125,32 @@ tolerations: []
 affinity: {}
 podAnnotations: {}
 
+# What the pod is allowed to be: no root, no new privileges, no capabilities,
+# and the runtime's default seccomp profile. The gateway needs none of it -
+# every port it listens on is above 1024, and it writes to /data.
+#
+# Deliberately WITHOUT runAsUser, runAsGroup and fsGroup, and that is not an
+# oversight to tidy up later. OpenShift (the `restricted` SCC) draws the uid
+# and the fsGroup itself from the namespace's range and rejects a pod that
+# names its own: "runAsUser: Invalid value: 65532: must be in the ranges:
+# [1000680000, 1000689999]". Pin a uid here and the chart stops installing
+# there, while gaining nothing anywhere else - the image already carries the
+# uid it runs as, and /data is group-writable so an allocated uid can write.
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Same, per container. readOnlyRootFilesystem is NOT here: a database snapshot
+# is written to a temporary file before it is served (internal/admin, VACUUM
+# INTO needs a destination on disk), so a read-only root would break the
+# backup download - and only that, days after the install, in the one place
+# nobody tests. Adding it means mounting an emptyDir on /tmp with it.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
 # Read-only access to the gateway's own namespace: the services (route
 # discovery) and its own pod (the ports it is published on). Set false where
 # a service account may read nothing.

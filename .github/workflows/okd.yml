@@ -1,0 +1,81 @@
+# Meerkat on a real OpenShift: MicroShift built from OKD, one node, in a
+# container on the runner. e2e/platform/okd/run.sh says what is checked - the
+# restricted-v2 SCC admitting the pod under a uid it chose, the Routes, and the
+# developer tunnel's mount helper.
+#
+# Every night and on demand, not on every push: the cluster takes minutes to
+# come up and tests the image and the chart, which most commits do not touch.
+# A change to docker/ or deploy/helm is the moment to dispatch it by hand.
+#
+# Runs on the community mirror, like everything else. The Enterprise leg clones
+# the private tree with the App's token, as ci-ee.yml does.
+name: OKD
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: okd
+  cancel-in-progress: true
+
+jobs:
+  community:
+    name: MicroShift (community image)
+    if: github.repository == 'softwarity/meerkat-ce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      # One architecture, loaded into the runner's Docker: the script copies it
+      # from there into the cluster. Nothing is pushed.
+      - name: Build the image under test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: EDITION=ce
+          tags: meerkat:okd
+          load: true
+      - name: Meerkat on MicroShift
+        run: e2e/platform/okd/run.sh meerkat:okd ce
+
+  enterprise:
+    name: MicroShift (Enterprise image)
+    if: github.repository == 'softwarity/meerkat-ce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: enterprise
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
+      - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the image under test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            EDITION=ee
+            GO_TAGS=ee
+          tags: meerkat:okd
+          load: true
+      - name: Meerkat on MicroShift
+        run: e2e/platform/okd/run.sh meerkat:okd ee

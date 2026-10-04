@@ -20,7 +20,7 @@ AIR := $(shell command -v air 2>/dev/null || echo "$$(go env GOPATH)/bin/air")
 #   make dev     the Enterprise product - what .air.toml builds (`-tags ee`)
 #   make dev-ce  the community one, where ee/ is not compiled in at all
 #
-# The tag lives in .air.toml, so typing `air` by hand (the way DEV.md passes
+# The tag lives in .air.toml, so typing `air` by hand (the way the README passes
 # -addr/-console-url) builds the same binary as `make dev`. Anything after `--`
 # goes to MEERKAT, never to the build.
 dev:
@@ -114,7 +114,7 @@ ldap-up:
 
 # The last metre: register the seeded directory as an authority on a RUNNING
 # gateway, so trying an LDAP sign-in is a click instead of five fields typed
-# from memory. Needs `make ldap-up` and a gateway (see DEV.md).
+# from memory. Needs `make ldap-up` and a gateway (see the README).
 ldap-demo:
 	@go run ./test/ldap/demo
 

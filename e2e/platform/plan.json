@@ -1,0 +1,3703 @@
+{
+ "_why": "The test plan, one entry per FEATURES.md row plus the platform-wide checks. Read by docs/scripts/gen-test-plan.mjs into the site's Test plan page; maintained by hand beside FEATURES.md.",
+ "targets": {
+  "U": {
+   "en": "Go unit and package tests (make test / test-ee)",
+   "fr": "Tests unitaires et de paquet Go (make test / test-ee)"
+  },
+  "I": {
+   "en": "Integration suite (Playwright) against one gateway process, CE and EE",
+   "fr": "Suite d'intégration (Playwright) contre un processus, CE et EE"
+  },
+  "C1": {
+   "en": "docker compose, one instance, SQLite - the published docker-compose.yml / .ee.yml",
+   "fr": "docker compose, une instance, SQLite - les docker-compose.yml / .ee.yml publiés"
+  },
+  "CC": {
+   "en": "docker compose cluster: 3 gateways + PostgreSQL + a load balancer (EE)",
+   "fr": "Cluster docker compose : 3 passerelles + PostgreSQL + un répartiteur (EE)"
+  },
+  "S1": {
+   "en": "Docker Swarm, one replica - the published stack.swarm.yml",
+   "fr": "Docker Swarm, une réplique - le stack.swarm.yml publié"
+  },
+  "SC": {
+   "en": "Docker Swarm, 3 replicas on PostgreSQL (EE)",
+   "fr": "Docker Swarm, 3 réplicas sur PostgreSQL (EE)"
+  },
+  "K1": {
+   "en": "kind + the Helm chart, values-ce-one-node / values-ee-one-node",
+   "fr": "kind + le chart Helm, values-ce-one-node / values-ee-one-node"
+  },
+  "KC": {
+   "en": "kind + the Helm chart, values-ee-cluster on PostgreSQL (EE)",
+   "fr": "kind + le chart Helm, values-ee-cluster sur PostgreSQL (EE)"
+  },
+  "KO": {
+   "en": "kind with OpenShift's rules: namespace under Pod Security 'restricted', the pod run as an arbitrary uid from a namespace range with group 0 (what the restricted SCC does), the chart's values unchanged",
+   "fr": "kind avec les règles d'OpenShift : namespace en Pod Security 'restricted', pod lancé sous un uid arbitraire tiré d'une plage avec le groupe 0 (ce que fait la SCC restricted), valeurs du chart inchangées"
+  },
+  "OK": {
+   "en": "MicroShift built from OKD, one node in a container on the runner: the real restricted-v2 SCC and the real router (e2e/platform/okd/run.sh), every night",
+   "fr": "MicroShift construit depuis OKD, un nœud dans un conteneur sur le runner : la vraie SCC restricted-v2 et le vrai routeur (e2e/platform/okd/run.sh), chaque nuit"
+  }
+ },
+ "features": [
+  {
+   "id": "AUTH-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Every sign-in page renders and submits through the image, in light and dark, on a fresh install.",
+   "fr": "Chaque page de connexion s'affiche et se soumet via l'image, en clair et sombre, sur une installation neuve."
+  },
+  {
+   "id": "AUTH-02",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Password sign-in through the shipped image: right password in, wrong one refused, the session cookie set on each scheme.",
+   "fr": "Connexion par mot de passe via l'image livrée : bon mot de passe accepté, mauvais refusé, cookie de session posé sur chaque schéma."
+  },
+  {
+   "id": "AUTH-03",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "C1",
+    "KC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Search-then-bind against OpenLDAP and Samba AD on the platform network; groups collected; CE refuses the provider.",
+   "fr": "Search-then-bind contre OpenLDAP et Samba AD sur le réseau de la plateforme ; groupes collectés ; la CE refuse le fournisseur."
+  },
+  {
+   "id": "AUTH-04",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "OIDC sign-in against Dex on the platform network, behind the published ports (redirect URI = the outside address).",
+   "fr": "Connexion OIDC contre Dex sur le réseau de la plateforme, derrière les ports publiés (URI de retour = l'adresse extérieure)."
+  },
+  {
+   "id": "AUTH-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Step ordering (password, code, organisation) on the image; a pending step cannot be skipped by URL.",
+   "fr": "Ordre des étapes (mot de passe, code, organisation) sur l'image ; une étape en attente ne se saute pas par URL."
+  },
+  {
+   "id": "AUTH-06",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "The JWT a service receives verifies against /.well-known/jwks.json, from ANY node of a cluster.",
+   "fr": "Le JWT reçu par un service se vérifie contre /.well-known/jwks.json, depuis N'IMPORTE quel nœud du cluster."
+  },
+  {
+   "id": "AUTH-07",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "U",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Key rotation on one node: the others sign with the new key and still publish the old one until it expires.",
+   "fr": "Rotation de clé sur un nœud : les autres signent avec la nouvelle et publient encore l'ancienne jusqu'à expiration."
+  },
+  {
+   "id": "AUTH-08",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Session cookie: per-install suffix, __Host- over HTTPS, survives a pod restart (state in the store), valid on every node.",
+   "fr": "Cookie de session : suffixe par installation, __Host- en HTTPS, survit à un redémarrage (état en base), valable sur chaque nœud."
+  },
+  {
+   "id": "AUTH-09",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "API tokens: data-plane token reaches a route, admin token reaches the API, neither reaches the other plane.",
+   "fr": "Jetons d'API : un jeton data atteint une route, un jeton admin atteint l'API, aucun n'atteint l'autre plan."
+  },
+  {
+   "id": "AUTH-10",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Policy refusals named; temporary password expires after its window.",
+   "fr": "Refus de politique nommés ; un mot de passe temporaire expire après sa fenêtre."
+  },
+  {
+   "id": "AUTH-11",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Repeated failures answer 429, and the counter is shared: failing on node A then B still trips it.",
+   "fr": "Les échecs répétés répondent 429, et le compteur est partagé : échouer sur A puis sur B le déclenche quand même."
+  },
+  {
+   "id": "AUTH-12",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Self sign-up with the mail sink: account pending, verification mail received, account usable.",
+   "fr": "Auto-inscription avec le puits SMTP : compte en attente, mail de vérification reçu, compte utilisable."
+  },
+  {
+   "id": "AUTH-13",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "History lists the sign-in with this browser badged.",
+   "fr": "L'historique liste la connexion, ce navigateur signalé."
+  },
+  {
+   "id": "AUTH-14",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Sign-out on node A ends the session on node B too.",
+   "fr": "Une déconnexion sur le nœud A termine la session sur le nœud B aussi."
+  },
+  {
+   "id": "AUTH-15",
+   "priority": "P2",
+   "feasibility": "hard",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Passkey enrol and sign-in with a virtual authenticator (Chromium CDP), behind HTTPS on the published port.",
+   "fr": "Enrôlement et connexion passkey avec un authentificateur virtuel (CDP Chromium), en HTTPS sur le port publié."
+  },
+  {
+   "id": "AUTH-16",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Code by e-mail: code received in the mail sink, accepted once, expired after its TTL.",
+   "fr": "Code par e-mail : code reçu dans le puits SMTP, accepté une fois, expiré après son TTL."
+  },
+  {
+   "id": "AUTH-17",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A passwordless account signs in by passkey or code only.",
+   "fr": "Un compte sans mot de passe se connecte par passkey ou code seulement."
+  },
+  {
+   "id": "AUTH-18",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "No two factors of the same kind counted twice.",
+   "fr": "Deux facteurs de même nature ne comptent pas double."
+  },
+  {
+   "id": "AUTH-19",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (SAML).",
+   "fr": "Non construit (SAML)."
+  },
+  {
+   "id": "AUTH-20",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (Kerberos).",
+   "fr": "Non construit (Kerberos)."
+  },
+  {
+   "id": "AUTH-21",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Forgotten password: mail in the sink, link works once, old sessions revoked.",
+   "fr": "Mot de passe oublié : mail dans le puits, lien valable une fois, anciennes sessions révoquées."
+  },
+  {
+   "id": "AUTH-22",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "E-mail verification mail received and honoured.",
+   "fr": "Mail de vérification reçu et pris en compte."
+  },
+  {
+   "id": "AUTH-23",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Security alerts sent for the events covered.",
+   "fr": "Alertes de sécurité envoyées pour les événements couverts."
+  },
+  {
+   "id": "AUTH-24",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Local authority can be disabled while an external one signs in.",
+   "fr": "L'autorité locale se désactive pendant qu'une externe connecte."
+  },
+  {
+   "id": "MFA-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "TOTP enrol and challenge (code computed by the test), secret sealed in the store (no base32 secret in a DB dump).",
+   "fr": "Enrôlement et défi TOTP (code calculé par le test), secret scellé en base (aucun secret base32 dans un dump)."
+  },
+  {
+   "id": "MFA-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Backup code by e-mail through the mail sink.",
+   "fr": "Code de secours par e-mail via le puits SMTP."
+  },
+  {
+   "id": "MFA-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Trusted browser skips the challenge for its TTL, then asks again.",
+   "fr": "Un navigateur de confiance saute le défi pendant son TTL, puis le redemande."
+  },
+  {
+   "id": "MFA-04",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Mandatory MFA forces enrolment at next sign-in.",
+   "fr": "Le MFA obligatoire impose l'enrôlement à la connexion suivante."
+  },
+  {
+   "id": "MFA-05",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A sign-in started on node A finishes on node B (flow state in the store).",
+   "fr": "Une connexion commencée sur le nœud A se termine sur le nœud B (état du flux en base)."
+  },
+  {
+   "id": "RBAC-01",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A parent role implies its children at a route.",
+   "fr": "Un rôle parent implique ses enfants sur une route."
+  },
+  {
+   "id": "RBAC-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Group roles reach the JWT sent upstream.",
+   "fr": "Les rôles du groupe arrivent dans le JWT envoyé à l'amont."
+  },
+  {
+   "id": "RBAC-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Per-organisation groups do not leak across organisations.",
+   "fr": "Les groupes par organisation ne fuient pas d'une organisation à l'autre."
+  },
+  {
+   "id": "RBAC-04",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "The access matrix: every admin endpoint x every profile, allowed and refused (scenarios.json) - played against the IMAGE too.",
+   "fr": "La matrice d'accès : chaque endpoint admin x chaque profil, autorisé et refusé (scenarios.json) - jouée aussi contre l'IMAGE."
+  },
+  {
+   "id": "RBAC-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Capabilities narrow the console and the API alike.",
+   "fr": "Les capacités restreignent console et API pareillement."
+  },
+  {
+   "id": "RBAC-06",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Route access levels (public, signed in, organisation, role) on the data plane of the image.",
+   "fr": "Niveaux d'accès d'une route (public, connecté, organisation, rôle) sur le data plane de l'image."
+  },
+  {
+   "id": "RBAC-07",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Per-endpoint rules from a deposited OpenAPI: closed operation refused, exception allowed.",
+   "fr": "Règles par endpoint depuis un OpenAPI déposé : opération fermée refusée, exception autorisée."
+  },
+  {
+   "id": "RBAC-09",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Roles reach the upstream in the configured header shape.",
+   "fr": "Les rôles arrivent à l'amont dans la forme d'en-tête configurée."
+  },
+  {
+   "id": "RBAC-10",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Group rules from an LDAP group / OIDC claim assign membership at sign-in; CE refuses.",
+   "fr": "Les règles de groupe depuis un groupe LDAP / claim OIDC posent l'appartenance à la connexion ; la CE refuse."
+  },
+  {
+   "id": "RBAC-11",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (impersonation).",
+   "fr": "Non construit (impersonation)."
+  },
+  {
+   "id": "MODEL-01",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Custom account fields validated and forwarded.",
+   "fr": "Champs de compte validés et transmis."
+  },
+  {
+   "id": "MODEL-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An account outside its window is refused at sign-in with the date.",
+   "fr": "Un compte hors de sa fenêtre est refusé à la connexion, avec la date."
+  },
+  {
+   "id": "TENANT-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Organisations: CE has one, EE several (multi mode switch refused on CE).",
+   "fr": "Organisations : une en CE, plusieurs en EE (le passage en multi refusé en CE)."
+  },
+  {
+   "id": "TENANT-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Membership join/leave and admin badge in both modes.",
+   "fr": "Adhésion/retrait et badge admin dans les deux modes."
+  },
+  {
+   "id": "TENANT-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Organisation chooser at sign-in, active organisation in the JWT.",
+   "fr": "Choix de l'organisation à la connexion, organisation active dans le JWT."
+  },
+  {
+   "id": "TENANT-04",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Working hours refuse outside the window (clock injected); ignored on CE.",
+   "fr": "Les heures ouvrées refusent hors fenêtre (horloge injectée) ; ignorées en CE."
+  },
+  {
+   "id": "TENANT-05",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Session TTL per organisation.",
+   "fr": "TTL de session par organisation."
+  },
+  {
+   "id": "TENANT-06",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Tenant isolation: an organisation's admin cannot read or write another's objects (matrix).",
+   "fr": "Isolation : l'admin d'une organisation ne lit ni n'écrit les objets d'une autre (matrice)."
+  },
+  {
+   "id": "TENANT-07",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Export carries organisations as documented.",
+   "fr": "L'export emporte les organisations comme documenté."
+  },
+  {
+   "id": "TENANT-08",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Single/multi mode switch, and CE stays single.",
+   "fr": "Bascule mono/multi, et la CE reste mono."
+  },
+  {
+   "id": "ROUTE-01",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A route saved through the API serves at once, on every node of a cluster (change bus), without restart.",
+   "fr": "Une route enregistrée via l'API sert aussitôt, sur chaque nœud d'un cluster (bus de changement), sans redémarrage."
+  },
+  {
+   "id": "SVC-01",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A self-contained route (target in the route) proxies with no other object.",
+   "fr": "Une route autoportante (cible dans la route) proxifie sans autre objet."
+  },
+  {
+   "id": "ROUTE-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Route attributes (strip prefix, host rewrite, headers) as seen by httpbin.",
+   "fr": "Attributs de route (strip prefix, réécriture d'hôte, en-têtes) vus par httpbin."
+  },
+  {
+   "id": "SVC-02",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "S1",
+    "K1",
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Discovery lists containers / swarm services / k8s services with the rights the chart and compose files grant; published ports read on each.",
+   "fr": "La découverte liste conteneurs / services swarm / services k8s avec les droits accordés par le chart et les compose ; ports publiés lus sur chacun."
+  },
+  {
+   "id": "ROUTE-03",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Each of the eleven predicates matches and refuses as documented, against httpbin.",
+   "fr": "Chacun des onze prédicats matche et refuse comme documenté, contre httpbin."
+  },
+  {
+   "id": "SVC-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Simple route wizard result serves.",
+   "fr": "Le résultat de l'assistant de route simple sert."
+  },
+  {
+   "id": "ROUTE-04",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Request filters (headers, rewrite, body limits) observed upstream on httpbin.",
+   "fr": "Filtres de requête (en-têtes, réécriture, limites de corps) observés à l'amont sur httpbin."
+  },
+  {
+   "id": "SVC-04",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Upstream health shown down when the service is scaled to 0, up when back.",
+   "fr": "Santé de l'amont affichée basse quand le service passe à 0, haute à son retour."
+  },
+  {
+   "id": "ROUTE-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Response filters (headers, CORS, cache-control) on proxied and own answers.",
+   "fr": "Filtres de réponse (en-têtes, CORS, cache-control) sur réponses proxifiées et propres."
+  },
+  {
+   "id": "SVC-05",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (applications).",
+   "fr": "Non construit (applications)."
+  },
+  {
+   "id": "SVC-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Endpoint inventory from a deposited spec.",
+   "fr": "Inventaire d'endpoints depuis une spec déposée."
+  },
+  {
+   "id": "ROUTE-07",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Timeouts: a slow upstream (delay endpoint) gets 504 at the configured time, not before.",
+   "fr": "Timeouts : un amont lent (endpoint delay) reçoit 504 au délai configuré, pas avant."
+  },
+  {
+   "id": "ROUTE-08",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Rate limit answers 429 past the bound, and the bound is shared across nodes.",
+   "fr": "La limite de débit répond 429 au-delà du seuil, et le seuil est partagé entre nœuds."
+  },
+  {
+   "id": "ROUTE-09",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Circuit breaker opens on a failing upstream (status endpoint) and half-opens after the delay.",
+   "fr": "Le disjoncteur s'ouvre sur un amont en échec (endpoint status) et se rouvre à moitié après le délai."
+  },
+  {
+   "id": "ROUTE-10",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A fresh install answers no route by default (no open proxy).",
+   "fr": "Une installation neuve ne répond à aucune route par défaut (pas de proxy ouvert)."
+  },
+  {
+   "id": "ROUTE-11",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Upstream probe marks a route's target reachable or not.",
+   "fr": "La sonde marque la cible d'une route joignable ou non."
+  },
+  {
+   "id": "ROUTE-12",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Route export re-imports to the same routes.",
+   "fr": "L'export des routes se réimporte à l'identique."
+  },
+  {
+   "id": "ROUTE-13",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "WebSocket through the gateway (echo service), through every ingress of each target.",
+   "fr": "WebSocket à travers la passerelle (service echo), par chaque entrée de chaque cible."
+  },
+  {
+   "id": "ROUTE-14",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "h2 negotiated over the HTTPS door (ALPN); upstream compression passed through.",
+   "fr": "h2 négocié sur la porte HTTPS (ALPN) ; compression de l'amont transmise."
+  },
+  {
+   "id": "ROUTE-15",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Routing tester names the winning route.",
+   "fr": "Le testeur de routage nomme la route gagnante."
+  },
+  {
+   "id": "ROUTE-16",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Single target enforced.",
+   "fr": "Cible unique imposée."
+  },
+  {
+   "id": "ROUTE-17",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Template response renders the caller's identity.",
+   "fr": "La réponse par gabarit rend l'identité de l'appelant."
+  },
+  {
+   "id": "ROUTE-18",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Roles header sent upstream.",
+   "fr": "En-tête des rôles envoyé à l'amont."
+  },
+  {
+   "id": "ROUTE-19",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "REMOTE_USER header sent upstream.",
+   "fr": "En-tête REMOTE_USER envoyé à l'amont."
+  },
+  {
+   "id": "ROUTE-20",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "gRPC unary and streaming through the gateway (grpc echo), grpc-status counted; h2c and TLS upstreams.",
+   "fr": "gRPC unaire et en flux à travers la passerelle (grpc echo), grpc-status compté ; amonts h2c et TLS."
+  },
+  {
+   "id": "ROUTE-21",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (extensions).",
+   "fr": "Non construit (extensions)."
+  },
+  {
+   "id": "UIF-01",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An app published under a prefix loads its assets (mount slash redirect).",
+   "fr": "Une appli publiée sous un préfixe charge ses ressources (redirection du slash)."
+  },
+  {
+   "id": "UIF-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "HTML injection present on UI routes, absent on API routes.",
+   "fr": "Injection HTML présente sur les routes UI, absente sur les routes API."
+  },
+  {
+   "id": "UIF-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "User button renders and signs out.",
+   "fr": "Le bouton utilisateur s'affiche et déconnecte."
+  },
+  {
+   "id": "UIF-04",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Live channel delivers an event published on another node.",
+   "fr": "Le canal live livre un événement publié sur un autre nœud."
+  },
+  {
+   "id": "UIF-05",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Language picker switches the page locale.",
+   "fr": "Le sélecteur de langue change la locale de la page."
+  },
+  {
+   "id": "UIF-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Per-route CSS injected.",
+   "fr": "CSS par route injecté."
+  },
+  {
+   "id": "UIF-07",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Rewritten OpenAPI spec served under the route prefix.",
+   "fr": "Spec OpenAPI réécrite servie sous le préfixe de la route."
+  },
+  {
+   "id": "PORTAL-01",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Portal bar lists the routes the user may reach.",
+   "fr": "La barre du portail liste les routes accessibles."
+  },
+  {
+   "id": "PORTAL-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Application catalogue renders.",
+   "fr": "Le catalogue d'applications s'affiche."
+  },
+  {
+   "id": "SAUTH-01",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Identity forwarding modes seen by httpbin.",
+   "fr": "Modes de transmission d'identité vus par httpbin."
+  },
+  {
+   "id": "SAUTH-02",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (send-auth credentials in the vault).",
+   "fr": "Non construit (identifiants send-auth au coffre)."
+  },
+  {
+   "id": "SAUTH-03",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Post-auth script not built.",
+   "fr": "Script post-auth non construit."
+  },
+  {
+   "id": "SAUTH-04",
+   "priority": "-",
+   "feasibility": "out",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Retired (JWKS is enough).",
+   "fr": "Retirée (le JWKS suffit)."
+  },
+  {
+   "id": "SAUTH-05",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (OIDC provider).",
+   "fr": "Non construit (fournisseur OIDC)."
+  },
+  {
+   "id": "VAULT-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A $name reference resolves at use, the value never travels back.",
+   "fr": "Une référence $nom se résout à l'usage, la valeur ne revient jamais."
+  },
+  {
+   "id": "VAULT-02",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "CC",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Master key rotation with MEERKAT_VAULT_KEY_PREVIOUS: restart, everything re-sealed, old key removable; rolling across cluster nodes.",
+   "fr": "Rotation de la clé maîtresse avec MEERKAT_VAULT_KEY_PREVIOUS : redémarrage, tout rescellé, ancienne clé retirable ; en rolling sur les nœuds."
+  },
+  {
+   "id": "VAULT-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Portable vault export/import with its passphrase.",
+   "fr": "Export/import du coffre portable avec sa phrase de passe."
+  },
+  {
+   "id": "VAULT-04",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (external vault).",
+   "fr": "Non construit (coffre externe)."
+  },
+  {
+   "id": "VAULT-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A literal in a sensitive field is refused or moved to the vault.",
+   "fr": "Un littéral dans un champ sensible est refusé ou rangé au coffre."
+  },
+  {
+   "id": "VAULT-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Reminder date feeds the digest.",
+   "fr": "La date de rappel alimente le digest."
+  },
+  {
+   "id": "SSL-01",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Self-signed, PEM import, keystore import, CSR + adopt - each serves on the HTTPS door of the image.",
+   "fr": "Auto-signé, import PEM, keystore, CSR + adoption - chacun sert sur la porte HTTPS de l'image."
+  },
+  {
+   "id": "SSL-02",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "S1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "HTTPS doors open on placement and are reachable on the PUBLISHED ports of each target; the TLS screen links match.",
+   "fr": "Les portes HTTPS s'ouvrent au placement et sont joignables sur les ports PUBLIÉS de chaque cible ; les liens de l'écran TLS correspondent."
+  },
+  {
+   "id": "SSL-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "TLS secrets via the vault.",
+   "fr": "Secrets TLS via le coffre."
+  },
+  {
+   "id": "SSL-04",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Expiry digest names a certificate inside its window (clock injected) in the mail sink.",
+   "fr": "Le digest d'expiration cite un certificat dans sa fenêtre (horloge injectée) dans le puits SMTP."
+  },
+  {
+   "id": "SSL-05",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "CC",
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "ACME against Pebble on the platform network: authority saved, order placed -> issued over TLS-ALPN, renewed; in a cluster issued ONCE (lock); CE refuses.",
+   "fr": "ACME contre Pebble sur le réseau de la plateforme : autorité enregistrée, commande placée -> émise par TLS-ALPN, renouvelée ; en cluster émise UNE fois (verrou) ; la CE refuse."
+  },
+  {
+   "id": "SSL-06",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Force HTTPS redirects only names a certificate carries; a service calling by cluster name stays plain; HSTS only on 443.",
+   "fr": "Force HTTPS ne redirige que les noms portés par un certificat ; un service appelant par nom de cluster reste en clair ; HSTS seulement sur 443."
+  },
+  {
+   "id": "SSL-07",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (HTTP/3).",
+   "fr": "Non construit (HTTP/3)."
+  },
+  {
+   "id": "SSL-08",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Placement on a plane reloads the door on every node; conflict named; fallback = oldest placed.",
+   "fr": "Le placement recharge la porte sur chaque nœud ; conflit nommé ; repli = plus ancien placé."
+  },
+  {
+   "id": "NOTIF-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "SMTP relay test mail arrives in the sink (STARTTLS and plain).",
+   "fr": "Le mail de test du relais arrive dans le puits (STARTTLS et clair)."
+  },
+  {
+   "id": "NOTIF-02",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (Web Push).",
+   "fr": "Non construit (Web Push)."
+  },
+  {
+   "id": "NOTIF-03",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "WebSocket channel events reach a client connected to another node.",
+   "fr": "Les événements du canal WebSocket atteignent un client connecté à un autre nœud."
+  },
+  {
+   "id": "NOTIF-04",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Daily digest sent ONCE per day across a cluster (advisory lock), at the configured hour.",
+   "fr": "Digest quotidien envoyé UNE fois par jour sur un cluster (verrou consultatif), à l'heure configurée."
+  },
+  {
+   "id": "SCHED-01",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A scheduled call fires once per tick across all nodes, against httpbin.",
+   "fr": "Un appel planifié part une fois par échéance sur l'ensemble des nœuds, contre httpbin."
+  },
+  {
+   "id": "SCHED-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A one-off task fires once.",
+   "fr": "Une tâche ponctuelle part une fois."
+  },
+  {
+   "id": "SCHED-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Run history lists runs and replays one.",
+   "fr": "L'historique liste les exécutions et en rejoue une."
+  },
+  {
+   "id": "SCHED-04",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Retry bounded on a failing upstream.",
+   "fr": "Reprise bornée sur un amont en échec."
+  },
+  {
+   "id": "SCHED-05",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Service-requested delay honoured.",
+   "fr": "Report demandé par le service respecté."
+  },
+  {
+   "id": "I18N-01",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Sign-in pages served in each of the 20 languages from Accept-Language, no key left untranslated.",
+   "fr": "Pages de connexion servies dans chacune des 20 langues depuis Accept-Language, aucune clé non traduite."
+  },
+  {
+   "id": "THEME-01",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Global theme applied to the sign-in pages.",
+   "fr": "Thème global appliqué aux pages de connexion."
+  },
+  {
+   "id": "I18N-02",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Backend errors localised.",
+   "fr": "Erreurs backend localisées."
+  },
+  {
+   "id": "THEME-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Branding applied; hiding the mark refused on CE.",
+   "fr": "Marque appliquée ; masquer la marque refusé en CE."
+  },
+  {
+   "id": "I18N-03",
+   "priority": "-",
+   "feasibility": "out",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Decision (console in English), nothing to test.",
+   "fr": "Décision (console en anglais), rien à tester."
+  },
+  {
+   "id": "THEME-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Shared palette used by pages and console.",
+   "fr": "Palette partagée utilisée par pages et console."
+  },
+  {
+   "id": "I18N-04",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A route serves only the languages it declares.",
+   "fr": "Une route ne sert que les langues qu'elle déclare."
+  },
+  {
+   "id": "THEME-04",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "M3 editor saves a theme that pages use.",
+   "fr": "L'éditeur M3 enregistre un thème utilisé par les pages."
+  },
+  {
+   "id": "THEME-05",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Light/dark follows the user choice.",
+   "fr": "Clair/sombre suit le choix de l'utilisateur."
+  },
+  {
+   "id": "THEME-08",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A named theme selectable.",
+   "fr": "Un thème nommé se sélectionne."
+  },
+  {
+   "id": "THEME-07",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Template previews render with their data set.",
+   "fr": "Les aperçus de gabarits s'affichent avec leur jeu de données."
+  },
+  {
+   "id": "I18N-05",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A language override in the store wins over the embedded catalogue.",
+   "fr": "Une surcharge de langue en base l'emporte sur le catalogue embarqué."
+  },
+  {
+   "id": "THEME-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Brand background rendered.",
+   "fr": "Fond de marque affiché."
+  },
+  {
+   "id": "CONSOLE-01",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "The console loads from the image on the admin port of each target and signs in.",
+   "fr": "La console se charge depuis l'image sur le port admin de chaque cible et se connecte."
+  },
+  {
+   "id": "CONSOLE-02",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Menus follow the rights of each profile (console-nav).",
+   "fr": "Les menus suivent les droits de chaque profil (console-nav)."
+  },
+  {
+   "id": "CONSOLE-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Route editor saves every section and the route serves.",
+   "fr": "L'éditeur de route enregistre chaque section et la route sert."
+  },
+  {
+   "id": "CONSOLE-04",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Endpoint security screen edits rules that apply.",
+   "fr": "L'écran de sécurité des endpoints édite des règles qui s'appliquent."
+  },
+  {
+   "id": "CONSOLE-05",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Export a file from CE and import it into EE and back; the plan names what CE leaves out.",
+   "fr": "Exporter un fichier depuis la CE, l'importer dans l'EE et retour ; le plan nomme ce que la CE laisse de côté."
+  },
+  {
+   "id": "CONSOLE-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Settings screens save.",
+   "fr": "Les écrans de réglages enregistrent."
+  },
+  {
+   "id": "CONSOLE-07",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Users screen: create, temporary password, reset.",
+   "fr": "Écran des utilisateurs : création, mot de passe temporaire, reset."
+  },
+  {
+   "id": "CONSOLE-08",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Sessions screen scoped per admin perimeter.",
+   "fr": "Écran des sessions limité au périmètre de l'admin."
+  },
+  {
+   "id": "CONSOLE-09",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Profile edits saved.",
+   "fr": "Modifications du profil enregistrées."
+  },
+  {
+   "id": "CONSOLE-10",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Account deletion revokes sessions.",
+   "fr": "La suppression d'un compte révoque ses sessions."
+  },
+  {
+   "id": "CONSOLE-11",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Console on its own port, never on the data plane (data port answers no /api).",
+   "fr": "Console sur son port, jamais sur le data plane (le port data ne répond aucun /api)."
+  },
+  {
+   "id": "CONSOLE-12",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Routes screen reorders and toggles.",
+   "fr": "L'écran des routes réordonne et bascule."
+  },
+  {
+   "id": "CONSOLE-13",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A change made on node A refreshes a console open on node B.",
+   "fr": "Un changement fait sur le nœud A rafraîchit une console ouverte sur le nœud B."
+  },
+  {
+   "id": "CONSOLE-14",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "License page lists the EE features, locked on CE.",
+   "fr": "La page licence liste les fonctions EE, verrouillées en CE."
+  },
+  {
+   "id": "CONSOLE-15",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Version and release notes match the image's stamped version.",
+   "fr": "Version et notes de version correspondent à la version tamponnée de l'image."
+  },
+  {
+   "id": "LIFE-01",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "S1",
+    "K1",
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "First start of each image on each target: admin bootstrap from env, readiness green, no route open.",
+   "fr": "Premier démarrage de chaque image sur chaque cible : admin depuis l'env, readiness verte, aucune route ouverte."
+  },
+  {
+   "id": "LIFE-02",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Declarative seed from a mounted file (ConfigMap / compose volume) applied once.",
+   "fr": "Seed déclaratif depuis un fichier monté (ConfigMap / volume compose) appliqué une fois."
+  },
+  {
+   "id": "LIFE-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Developer mode switch gates dev features.",
+   "fr": "L'interrupteur mode développeur conditionne les fonctions dev."
+  },
+  {
+   "id": "LIFE-04",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "API docs pages served.",
+   "fr": "Pages de doc d'API servies."
+  },
+  {
+   "id": "LIFE-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A route in maintenance answers its unavailable page (503).",
+   "fr": "Une route en maintenance répond sa page d'indisponibilité (503)."
+  },
+  {
+   "id": "DEV-01",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Dev capability gates dev screens.",
+   "fr": "La capacité dev conditionne les écrans dev."
+  },
+  {
+   "id": "DEV-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Developer key deposited and revoked.",
+   "fr": "Clé développeur déposée et révoquée."
+  },
+  {
+   "id": "DEV-03",
+   "priority": "P2",
+   "feasibility": "hard",
+   "targets": [
+    "S1",
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "plug: workstation reaches a cluster service through the gateway tunnel (reuse plug's e2e cells).",
+   "fr": "plug : le poste atteint un service du cluster par le tunnel de la passerelle (réutiliser les cellules e2e de plug)."
+  },
+  {
+   "id": "DEV-04",
+   "priority": "P2",
+   "feasibility": "hard",
+   "targets": [
+    "S1",
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "plug: a cluster service is substituted by a local process and restored on exit.",
+   "fr": "plug : un service du cluster est substitué par un processus local et rétabli à la sortie."
+  },
+  {
+   "id": "DEV-05",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (substitution scope).",
+   "fr": "Non construit (portée des substitutions)."
+  },
+  {
+   "id": "DEV-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Users are told a substitution is active.",
+   "fr": "Les utilisateurs sont prévenus qu'une substitution est active."
+  },
+  {
+   "id": "DEV-07",
+   "priority": "P3",
+   "feasibility": "hard",
+   "targets": [
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Substitution removed when the developer disconnects.",
+   "fr": "Substitution retirée à la déconnexion du développeur."
+  },
+  {
+   "id": "DEV-08",
+   "priority": "P3",
+   "feasibility": "hard",
+   "targets": [
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Two developers on two names.",
+   "fr": "Deux développeurs sur deux noms."
+  },
+  {
+   "id": "DEV-09",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Test tooling endpoints answer.",
+   "fr": "Les endpoints d'outillage de test répondent."
+  },
+  {
+   "id": "DEV-10",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "UI test mode.",
+   "fr": "Mode test UI."
+  },
+  {
+   "id": "DEV-11",
+   "priority": "P3",
+   "feasibility": "medium",
+   "targets": [
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Tunnel security frame enforced.",
+   "fr": "Cadre de sécurité du tunnel appliqué."
+  },
+  {
+   "id": "DEV-12",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Console in dev mode.",
+   "fr": "Console en mode dev."
+  },
+  {
+   "id": "CFG-01",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Saved configurations listed, CE capped at three.",
+   "fr": "Configurations enregistrées listées, CE plafonnée à trois."
+  },
+  {
+   "id": "CFG-02",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Set as current applies on every node.",
+   "fr": "Set as current s'applique sur chaque nœud."
+  },
+  {
+   "id": "CFG-03",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A configuration file at first start becomes the active one (mounted file).",
+   "fr": "Un fichier de configuration au premier démarrage devient l'actif (fichier monté)."
+  },
+  {
+   "id": "CFG-04",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Compare shows added/removed/changed.",
+   "fr": "La comparaison montre ajouts/suppressions/modifications."
+  },
+  {
+   "id": "CFG-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Export round-trips (ZIP with assets).",
+   "fr": "L'export fait l'aller-retour (ZIP avec ressources)."
+  },
+  {
+   "id": "CFG-06",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Restore points: restore one, state matches.",
+   "fr": "Points de reprise : en restaurer un, l'état correspond."
+  },
+  {
+   "id": "CFG-07",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "CC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Git locations against a Gitea on the platform: pull replaces, push replaces only the directory, two platforms share a repo; CE refuses.",
+   "fr": "Emplacements git contre un Gitea de la plateforme : pull remplace, push ne remplace que le dossier, deux plateformes partagent un dépôt ; la CE refuse."
+  },
+  {
+   "id": "PAGE-01",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Vanilla pages render without JS errors.",
+   "fr": "Les pages vanilla s'affichent sans erreur JS."
+  },
+  {
+   "id": "PAGE-02",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Layouts selectable on EE, centred only on CE.",
+   "fr": "Layouts sélectionnables en EE, centré seul en CE."
+  },
+  {
+   "id": "PAGE-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Overridden translations shown.",
+   "fr": "Traductions surchargées affichées."
+  },
+  {
+   "id": "PAGE-04",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Web components load.",
+   "fr": "Les web components se chargent."
+  },
+  {
+   "id": "PAGE-05",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Embedded console served.",
+   "fr": "Console embarquée servie."
+  },
+  {
+   "id": "PAGE-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Console layout.",
+   "fr": "Layout de la console."
+  },
+  {
+   "id": "PAGE-07",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Softwarity components render.",
+   "fr": "Les composants softwarity s'affichent."
+  },
+  {
+   "id": "QUOTA-01",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Quotas count per caller and are shared across nodes.",
+   "fr": "Les quotas comptent par appelant et sont partagés entre nœuds."
+  },
+  {
+   "id": "QUOTA-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "429 carries Retry-After.",
+   "fr": "Le 429 porte Retry-After."
+  },
+  {
+   "id": "QUOTA-03",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (consumption).",
+   "fr": "Non construit (consommation)."
+  },
+  {
+   "id": "QUOTA-04",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (cluster quota counters).",
+   "fr": "Non construit (compteurs de quotas en cluster)."
+  },
+  {
+   "id": "QUOTA-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Per-endpoint quota refuses one operation, not its neighbour.",
+   "fr": "Le quota par endpoint refuse une opération, pas sa voisine."
+  },
+  {
+   "id": "AUD-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Every admin mutation appears in the trail with actor and diff, whichever node took it.",
+   "fr": "Chaque mutation admin apparaît au journal avec acteur et diff, quel que soit le nœud."
+  },
+  {
+   "id": "AUD-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Retention purges old events; CSV export (EE) refused on CE.",
+   "fr": "La rétention purge les vieux événements ; l'export CSV (EE) refusé en CE."
+  },
+  {
+   "id": "AUD-03",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Audit events reach an OpenTelemetry Collector on the platform (file exporter checked).",
+   "fr": "Les événements d'audit atteignent un Collector OpenTelemetry de la plateforme (exporteur fichier vérifié)."
+  },
+  {
+   "id": "AUD-04",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Endpoint audit records chosen operations to the collector; CE keeps rules unapplied.",
+   "fr": "L'audit des endpoints enregistre les opérations choisies vers le collecteur ; la CE garde les règles sans les appliquer."
+  },
+  {
+   "id": "ISSUE-01",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An issue filed from a page lands in the console.",
+   "fr": "Un signalement depuis une page arrive dans la console."
+  },
+  {
+   "id": "ISSUE-02",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Issue screenshots stored.",
+   "fr": "Captures des signalements stockées."
+  },
+  {
+   "id": "ISSUE-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Issue follow-up in the console.",
+   "fr": "Suivi des signalements en console."
+  },
+  {
+   "id": "ISSUE-04",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Issue switch hides the button.",
+   "fr": "L'interrupteur masque le bouton."
+  },
+  {
+   "id": "ISSUE-05",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (connectors).",
+   "fr": "Non construit (connecteurs)."
+  },
+  {
+   "id": "ISSUE-06",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Not built (numbered annotations).",
+   "fr": "Non construit (annotations numérotées)."
+  },
+  {
+   "id": "MCP-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "MCP endpoint answers initialize and tools/list through the image with an agent token.",
+   "fr": "Le point MCP répond initialize et tools/list via l'image avec un jeton d'agent."
+  },
+  {
+   "id": "MCP-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Agent token scope: read-only token refused on writes.",
+   "fr": "Portée du jeton d'agent : un jeton lecture seule refusé en écriture."
+  },
+  {
+   "id": "MCP-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Agent actions audited under the token's account.",
+   "fr": "Actions de l'agent auditées sous le compte du jeton."
+  },
+  {
+   "id": "MCP-04",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Business tools round-trip (save_route, list_routes).",
+   "fr": "Les outils métier font l'aller-retour (save_route, list_routes)."
+  },
+  {
+   "id": "MCP-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Direct write plus restore point.",
+   "fr": "Écriture directe et point de reprise."
+  },
+  {
+   "id": "MCP-07",
+   "priority": "P3",
+   "feasibility": "medium",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "OAuth plug-in flow for an MCP client.",
+   "fr": "Flux de branchement OAuth pour un client MCP."
+  },
+  {
+   "id": "MCP-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Export/import tools for the agent.",
+   "fr": "Outils d'export/import pour l'agent."
+  },
+  {
+   "id": "SEC-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Cross-site form posts refused (Origin/SameSite).",
+   "fr": "Envois de formulaire inter-sites refusés (Origin/SameSite)."
+  },
+  {
+   "id": "SEC-02",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "CORS answers only the configured origin.",
+   "fr": "CORS ne répond qu'à l'origine configurée."
+  },
+  {
+   "id": "SEC-03",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Security headers present on pages and console from the image.",
+   "fr": "En-têtes de sécurité présents sur pages et console depuis l'image."
+  },
+  {
+   "id": "SEC-04",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "No secret in clear: grep a DB dump and the logs for passwords, TOTP secrets, private keys, tokens.",
+   "fr": "Aucun secret en clair : rechercher dans un dump de base et dans les logs mots de passe, secrets TOTP, clés privées, jetons."
+  },
+  {
+   "id": "SEC-05",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Password hashing parameters.",
+   "fr": "Paramètres de hachage des mots de passe."
+  },
+  {
+   "id": "SEC-06",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Encryption at rest: sealed columns unreadable without the vault key; a node with another key says so.",
+   "fr": "Chiffrement au repos : colonnes scellées illisibles sans la clé du coffre ; un nœud avec une autre clé le dit."
+  },
+  {
+   "id": "SEC-07",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Revoking a session or token takes effect on every node at once.",
+   "fr": "Révoquer une session ou un jeton prend effet sur chaque nœud aussitôt."
+  },
+  {
+   "id": "SEC-08",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Security events in the trail.",
+   "fr": "Événements de sécurité au journal."
+  },
+  {
+   "id": "SEC-09",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Sign-in and forgotten password answer the same for known and unknown accounts (timing within bounds).",
+   "fr": "Connexion et mot de passe oublié répondent pareil pour comptes connus et inconnus (temps dans les bornes)."
+  },
+  {
+   "id": "SEC-10",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "No personal page cached (Cache-Control: no-store).",
+   "fr": "Aucune page personnelle en cache (Cache-Control: no-store)."
+  },
+  {
+   "id": "PERF-01",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A slow upstream does not slow the others (concurrent load).",
+   "fr": "Un amont lent ne ralentit pas les autres (charge concurrente)."
+  },
+  {
+   "id": "PERF-05",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Benchmarks published per arch (existing CI).",
+   "fr": "Bancs publiés par architecture (CI existante)."
+  },
+  {
+   "id": "PERF-02",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Streaming: a large download and an SSE stream pass without buffering (memory flat).",
+   "fr": "Streaming : un gros téléchargement et un flux SSE passent sans mise en tampon (mémoire stable)."
+  },
+  {
+   "id": "PERF-03",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "CC",
+    "SC",
+    "KC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Active/active: two or three gateways on one PostgreSQL behind a load balancer; any node serves any session.",
+   "fr": "Actif/actif : deux ou trois passerelles sur un PostgreSQL derrière un répartiteur ; n'importe quel nœud sert n'importe quelle session."
+  },
+  {
+   "id": "PERF-04",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Shared state: sessions, rate limits, locks, change bus across nodes.",
+   "fr": "État partagé : sessions, limites de débit, verrous, bus de changement entre nœuds."
+  },
+  {
+   "id": "PERF-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Validator on a rewritten page.",
+   "fr": "Validateur sur une page réécrite."
+  },
+  {
+   "id": "OBS-01",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Traffic dashboard sums every node of a cluster.",
+   "fr": "Le tableau de bord somme tous les nœuds d'un cluster."
+  },
+  {
+   "id": "OBS-02",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "K1",
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Liveness/readiness/startup probes as the chart and compose use them; readiness drops while migrating.",
+   "fr": "Sondes liveness/readiness/startup telles que le chart et compose les utilisent ; readiness tombe pendant une migration."
+  },
+  {
+   "id": "OBS-03",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Log level change propagated to all nodes and reverted after 30 minutes (clock injected).",
+   "fr": "Changement de niveau de log propagé à tous les nœuds et rétabli après 30 minutes (horloge injectée)."
+  },
+  {
+   "id": "OBS-04",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "traceparent reaches the upstream in both editions; spans exported to the collector in EE only.",
+   "fr": "traceparent atteint l'amont dans les deux éditions ; spans exportés au collecteur en EE seulement."
+  },
+  {
+   "id": "OBS-05",
+   "priority": "-",
+   "feasibility": "out",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Retired (the Collector does it).",
+   "fr": "Retirée (le Collector s'en charge)."
+  },
+  {
+   "id": "OBS-06",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Metrics and logs pushed over OTLP to the collector.",
+   "fr": "Métriques et logs poussés en OTLP au collecteur."
+  },
+  {
+   "id": "DEPLOY-01",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "S1",
+    "K1",
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "One image per edition runs unchanged on compose, swarm and kind; edition reported matches.",
+   "fr": "Une image par édition tourne telle quelle sur compose, swarm et kind ; l'édition annoncée correspond."
+  },
+  {
+   "id": "DEPLOY-02",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Every documented environment variable has its effect (table-driven from the docs).",
+   "fr": "Chaque variable d'environnement documentée a son effet (piloté par la table de la doc)."
+  },
+  {
+   "id": "DEPLOY-03",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Runs with no external dependency (SQLite, no network egress).",
+   "fr": "Tourne sans dépendance externe (SQLite, sans sortie réseau)."
+  },
+  {
+   "id": "DEPLOY-04",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "CI itself (this plan's runner).",
+   "fr": "La CI elle-même (le lanceur de ce plan)."
+  },
+  {
+   "id": "DEPLOY-05",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Edition truth: the CE image refuses every EE endpoint and locks every EE control; the EE image allows them.",
+   "fr": "Vérité d'édition : l'image CE refuse chaque endpoint EE et verrouille chaque contrôle EE ; l'image EE les permet."
+  },
+  {
+   "id": "DEPLOY-06",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "CC",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Upgrade from the previous release on SQLite and PostgreSQL: migrations run, data kept, rollback to the older binary refused cleanly.",
+   "fr": "Montée depuis la release précédente sur SQLite et PostgreSQL : migrations jouées, données gardées, retour à l'ancien binaire refusé proprement."
+  },
+  {
+   "id": "DEPLOY-07",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "S1",
+    "K1",
+    "CC",
+    "KC",
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "The published files (docker-compose.yml, .ee.yml, stack.swarm.yml, helm values) deploy as shipped - the platform uses THEM, rewritten only for the image tag (asserted).",
+   "fr": "Les fichiers publiés (docker-compose.yml, .ee.yml, stack.swarm.yml, valeurs helm) se déploient tels quels - la plateforme utilise CEUX-LÀ, réécrits seulement pour le tag d'image (vérifié)."
+  },
+  {
+   "id": "STORE-01",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Standalone on SQLite in a volume; restart keeps everything.",
+   "fr": "Autonome sur SQLite dans un volume ; un redémarrage garde tout."
+  },
+  {
+   "id": "STORE-02",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "CC",
+    "KC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Same suite on PostgreSQL (existing CI job) and through the image.",
+   "fr": "Même suite sur PostgreSQL (job CI existant) et via l'image."
+  },
+  {
+   "id": "STORE-07",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A database seeded by the previous release opens with this one (fixture DB per release).",
+   "fr": "Une base amorcée par la release précédente s'ouvre avec celle-ci (base de référence par release)."
+  },
+  {
+   "id": "STORE-03",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "CC",
+    "KC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Cluster store: two nodes, one database, no split brain on locks.",
+   "fr": "Store en cluster : deux nœuds, une base, aucun split brain sur les verrous."
+  },
+  {
+   "id": "STORE-04",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Nothing stored on local disk besides /data (read-only rootfs works with an emptyDir on /tmp, snapshot download included).",
+   "fr": "Rien sur le disque local hors /data (rootfs en lecture seule avec un emptyDir sur /tmp, téléchargement du snapshot compris)."
+  },
+  {
+   "id": "STORE-08",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A stale write answers 409 and the console offers reload.",
+   "fr": "Une écriture périmée répond 409 et la console propose de recharger."
+  },
+  {
+   "id": "STORE-05",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Backup snapshot downloaded and restored by the documented procedure.",
+   "fr": "Snapshot de sauvegarde téléchargé et restauré par la procédure documentée."
+  },
+  {
+   "id": "STORE-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Audit trail export (CSV).",
+   "fr": "Export du journal (CSV)."
+  },
+  {
+   "id": "QUAL-01",
+   "priority": "-",
+   "feasibility": "out",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "This plan.",
+   "fr": "Ce plan."
+  },
+  {
+   "id": "QUAL-02",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Docs links and screenshots checked (screenshots.mjs --check).",
+   "fr": "Liens et captures de la doc vérifiés (screenshots.mjs --check)."
+  },
+  {
+   "id": "DEPLOY-08",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "cosign verify succeeds on the image under test with the workflow's identity, for the digest and for each architecture; an unsigned or re-pushed image fails.",
+   "fr": "cosign verify réussit sur l'image testée avec l'identité du workflow, pour le digest et pour chaque architecture ; une image non signée ou repoussée échoue."
+  }
+ ],
+ "platform": [
+  {
+   "id": "X-01",
+   "priority": "P0",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "S1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Smoke on every target: image starts, admin signs in, a route proxies to httpbin, the admin API answers, the console loads.",
+   "fr": "Fumée sur chaque cible : l'image démarre, l'admin se connecte, une route proxifie vers httpbin, l'API admin répond, la console se charge.",
+   "category": "Deployment"
+  },
+  {
+   "id": "X-02",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "CC",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Upgrade in place from the previous release (found, not pinned): compose pull + up, helm upgrade, stack deploy - data and sessions kept.",
+   "fr": "Montée en place depuis la release précédente (trouvée, pas figée) : compose pull + up, helm upgrade, stack deploy - données et sessions gardées.",
+   "category": "Upgrade"
+  },
+  {
+   "id": "X-03",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Downgrade refused: the previous image on a newer database stops with a message naming both versions.",
+   "fr": "Retour refusé : l'image précédente sur une base plus récente s'arrête avec un message nommant les deux versions.",
+   "category": "Upgrade"
+  },
+  {
+   "id": "X-04",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "KC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Rolling update of a 3-replica deployment under constant traffic: no request lost beyond the drain window.",
+   "fr": "Mise à jour roulante d'un déploiement à 3 réplicas sous trafic constant : aucune requête perdue au-delà de la fenêtre de drainage.",
+   "category": "Cluster"
+  },
+  {
+   "id": "X-05",
+   "priority": "P0",
+   "feasibility": "medium",
+   "targets": [
+    "CC",
+    "KC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Kill a node during traffic: the others keep serving, sessions survive, the lock holder changes.",
+   "fr": "Tuer un nœud pendant le trafic : les autres continuent, les sessions survivent, le détenteur du verrou change.",
+   "category": "Cluster"
+  },
+  {
+   "id": "X-06",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "CC",
+    "KC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "PostgreSQL restart: nodes reconnect, readiness drops and comes back, no data lost.",
+   "fr": "Redémarrage de PostgreSQL : les nœuds se reconnectent, readiness tombe et revient, aucune donnée perdue.",
+   "category": "Cluster"
+  },
+  {
+   "id": "X-07",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Exactly-once jobs across nodes: scheduled call, daily digest, ACME issuance, retention purge.",
+   "fr": "Tâches exactement une fois entre nœuds : appel planifié, digest quotidien, émission ACME, purge de rétention.",
+   "category": "Cluster"
+  },
+  {
+   "id": "X-08",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "S1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Published ports read from the runtime (Docker socket, swarm service, k8s Service) and used in the TLS links and redirects.",
+   "fr": "Ports publiés lus depuis le runtime (socket Docker, service swarm, Service k8s) et utilisés dans les liens TLS et les redirections.",
+   "category": "Deployment"
+  },
+  {
+   "id": "X-09",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Helm: install, upgrade with --reuse-values (new defaults still applied), uninstall leaves no orphan; chart values matrix (one node CE/EE, cluster EE).",
+   "fr": "Helm : installation, montée avec --reuse-values (nouveaux défauts appliqués), désinstallation sans orphelin ; matrice de valeurs (un nœud CE/EE, cluster EE).",
+   "category": "Deployment"
+  },
+  {
+   "id": "X-10",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "S1",
+    "SC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Swarm: secrets and configs mounted, replicas converge, update order start-first.",
+   "fr": "Swarm : secrets et configs montés, réplicas convergés, mise à jour start-first.",
+   "category": "Deployment"
+  },
+  {
+   "id": "X-11",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Edition matrix: the same scenario file played against CE and EE, each expecting its own answers (422/lock vs allowed).",
+   "fr": "Matrice d'édition : le même fichier de scénarios joué contre CE et EE, chacun attendant ses réponses (422/verrou vs autorisé).",
+   "category": "Edition"
+  },
+  {
+   "id": "X-12",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Configuration portability: export from EE, import into CE (EE parts named and left out), export from CE, import into EE.",
+   "fr": "Portabilité de configuration : export depuis l'EE, import dans la CE (parties EE nommées et écartées), export depuis la CE, import dans l'EE.",
+   "category": "Edition"
+  },
+  {
+   "id": "X-13",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Image hygiene: non-root user, no capability, no privilege escalation, no shell needed, Trivy scan without critical CVE; read-only root filesystem with an emptyDir on /tmp (the snapshot download writes a temporary file).",
+   "fr": "Hygiène de l'image : utilisateur non root, aucune capacité, aucune élévation de privilèges, pas besoin de shell, scan Trivy sans CVE critique ; rootfs en lecture seule avec un emptyDir sur /tmp (le téléchargement du snapshot écrit un fichier temporaire).",
+   "category": "Security"
+  },
+  {
+   "id": "X-14",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "arm64 image runs the smoke suite (native runner).",
+   "fr": "L'image arm64 joue la suite de fumée (runner natif).",
+   "category": "Deployment"
+  },
+  {
+   "id": "X-15",
+   "priority": "P2",
+   "feasibility": "hard",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Soak: 4 hours of mixed traffic on a cluster; memory and goroutines flat, no error budget burnt.",
+   "fr": "Endurance : 4 heures de trafic mixte sur un cluster ; mémoire et goroutines stables, aucun budget d'erreur consommé.",
+   "category": "Soak"
+  },
+  {
+   "id": "X-16",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Load smoke: N requests/s through the image within a latency budget, published beside the benchmarks.",
+   "fr": "Charge rapide : N requêtes/s via l'image dans un budget de latence, publié à côté des bancs.",
+   "category": "Performance"
+  },
+  {
+   "id": "X-17",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "C1",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Behind a reverse proxy (Traefik/ingress-nginx): X-Forwarded-* trusted only from it, client IP right in logs and rate limits.",
+   "fr": "Derrière un reverse proxy (Traefik/ingress-nginx) : X-Forwarded-* acceptés seulement de lui, IP cliente juste dans les logs et limites.",
+   "category": "Deployment"
+  },
+  {
+   "id": "X-18",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Graceful shutdown: SIGTERM drains in-flight requests, closes HTTPS doors, exits 0 within the grace period.",
+   "fr": "Arrêt propre : SIGTERM draine les requêtes en cours, ferme les portes HTTPS, sort en 0 dans le délai de grâce.",
+   "category": "Lifecycle"
+  },
+  {
+   "id": "X-19",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "Vault key mismatch between nodes is detected and named, never silently half-working.",
+   "fr": "Une clé de coffre différente entre nœuds est détectée et nommée, jamais à moitié fonctionnelle en silence.",
+   "category": "Cluster"
+  },
+  {
+   "id": "X-20",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Time and timezone: TZ env honoured in digests and schedules.",
+   "fr": "Heure et fuseau : variable TZ respectée dans digests et planifications.",
+   "category": "Lifecycle"
+  },
+  {
+   "id": "X-21",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "category": "Deployment",
+   "en": "OpenShift compatibility on kind: the chart installs under Pod Security 'restricted' with an arbitrary uid and group 0, no runAsUser/fsGroup pinned by the chart; the gateway writes /data, migrates, serves, and the snapshot download works.",
+   "fr": "Compatibilité OpenShift sur kind : le chart s'installe en Pod Security 'restricted' avec un uid arbitraire et le groupe 0, sans runAsUser/fsGroup fixé par le chart ; la passerelle écrit /data, migre, sert, et le téléchargement du snapshot fonctionne."
+  },
+  {
+   "id": "X-22",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "KO"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "category": "Deployment",
+   "en": "Static check of the rendered chart for every values file: no pinned uid, no privileged field, no hostPath, no port below 1024 (kube-linter / a rule script), so a change that would break OpenShift fails on the push, not at a customer's.",
+   "fr": "Contrôle statique du chart rendu pour chaque fichier de valeurs : aucun uid fixé, aucun champ privilégié, aucun hostPath, aucun port sous 1024 (kube-linter / un script de règles), pour qu'un changement qui casserait OpenShift échoue au push, pas chez un client."
+  },
+  {
+   "id": "X-23",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "OK"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "category": "Deployment",
+   "en": "A real OpenShift (MicroShift from OKD): the published chart admitted by the restricted-v2 SCC under a uid the cluster chose, the store writing /data, both planes behind Routes, the mount helper admitted and serving a volume as the workload's uid.",
+   "fr": "Un vrai OpenShift (MicroShift depuis OKD) : le chart publié admis par la SCC restricted-v2 sous un uid choisi par le cluster, le store qui écrit /data, les deux plans derrière des Routes, le helper de montage admis et servant un volume sous l'uid du workload."
+  }
+ ]
+}

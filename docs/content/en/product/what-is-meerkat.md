@@ -36,8 +36,8 @@ on one port and its administration console on another. Nothing else has to be
 installed for it to run.
 
 In figures: the Community image weighs **70 MB** - under 20 MB to download,
-once the layers are compressed - and the binary depends on **twelve direct
-libraries**, in pure Go: no CGO, so nothing to install on the host and nothing
+once the layers are compressed - and the binary depends on **9 direct
+libraries** (14 for the Enterprise edition), in pure Go: no CGO, so nothing to install on the host and nothing
 that compiles differently from one machine to the next. That is what makes the
 "1 pod" line of [the case](/product/the-case) something other than theory.
 

@@ -37,7 +37,7 @@ n'a besoin d'être installé pour la faire tourner.
 
 Ce que ça donne en chiffres : l'image Community pèse **70 Mo** - moins de 20 Mo
 à télécharger, une fois les couches compressées - et le binaire ne dépend que de
-**douze bibliothèques directes**, en Go pur : pas de CGO, donc rien à installer
+**9 bibliothèques directes** (14 pour l'édition Enterprise), en Go pur : pas de CGO, donc rien à installer
 sur l'hôte et rien qui se compile différemment selon la machine. C'est ce qui
 rend la ligne « 1 pod » du [dossier](/product/the-case) tenable plutôt que
 théorique.

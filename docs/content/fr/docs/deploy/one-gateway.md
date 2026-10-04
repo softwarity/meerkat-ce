@@ -143,6 +143,8 @@ la seule qui ne peut pas marcher, avec un agent qui dit chaque minute qu'il ne
 peut pas faire son travail. `plug.enabled: false` refuse tout de même le grant,
 pour une installation qui veut la surface de développement sans le tunnel.
 
+Sur OpenShift ou OKD, le chart s'installe tel quel, sous la SCC par défaut - voir [OpenShift et OKD](/docs/deploy/kubernetes#openshift-et-okd) avant de surcharger son contexte de sécurité.
+
 ## Déclarer une passerelle de production
 
 `MEERKAT_PRODUCTION` (`production: true` dans le chart) ferme ici toute la

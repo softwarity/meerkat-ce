@@ -104,7 +104,7 @@ func main() {
 func run() error {
 	admin := env("MEERKAT_ADMIN_URL", "http://localhost:9092")
 	user := env("MEERKAT_ADMIN_USER", "admin")
-	// The password DEV.md seeds a development store with. Not a secret: it is
+	// The password the README seeds a development store with. Not a secret: it is
 	// printed in that file, and this program only ever talks to a gateway one
 	// is already running on one's own machine.
 	pass := env("MEERKAT_ADMIN_PASSWORD", "test1234")
@@ -161,7 +161,7 @@ func (c *client) signIn(user, pass string) error {
 	form := url.Values{"username": {user}, "password": {pass}}
 	resp, err := c.http.PostForm(c.base+"/login", form)
 	if err != nil {
-		return fmt.Errorf("no gateway answering on %s (start one, see DEV.md): %w", c.base, err)
+		return fmt.Errorf("no gateway answering on %s (start one, see the README): %w", c.base, err)
 	}
 	_ = resp.Body.Close()
 	if err := c.do("GET", "/api/auth-providers", nil, nil); err != nil {

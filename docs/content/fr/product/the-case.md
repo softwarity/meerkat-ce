@@ -102,7 +102,7 @@ de chaque produit recommande en production.
 | Supervision | kube-prometheus-stack | 5 pods, plus 1 par nœud | sa propre base de séries | 512 Mo au minimum pour Grafana |
 | Audit | Retraced | 5 services | PostgreSQL, Elasticsearch et NSQ | non publiée |
 | Poste vers cluster | opérateur mirrord | 1 pod, plus un job par session | licence Team obligatoire | non publiée |
-| **Tout le socle** | **Meerkat** | **1 pod, ou 3 en cluster** | **base embarquée, ou PostgreSQL** | **22 Mo au repos** |
+| **Tout le socle** | **Meerkat** | **1 pod, ou 3 en cluster** | **base embarquée, ou PostgreSQL** | **{{memory.idle}} Mo au repos, {{memory.peak}} en charge** |
 
 ::: figure stack
 La même porte d'entrée, des deux façons. À gauche une requête traverse deux
@@ -114,7 +114,7 @@ Cela fait **environ 38 pods et cinq moteurs de stockage** à installer,
 sécuriser, mettre à jour et sauvegarder - et une requête traverse deux de ces
 produits avant d'atteindre vos services.
 
-L'autre façon : **un pod, 22 Mo au repos**, mesuré par la CI sur un runner x64.
+L'autre façon : **un pod, {{memory.idle}} Mo au repos et {{memory.peak}} en pleine charge**, mesuré par la CI sur un runner x64.
 Trois pods et un PostgreSQL quand vous la voulez
 [hautement disponible](/docs/deploy/kubernetes).
 
@@ -217,11 +217,11 @@ câblage entre produits, et le développement qu'aucun produit ne couvre.
 Un chiffre sans sa méthode ne vaut rien, alors la voici, et les sources avec.
 
 **Ce qui est mesuré.** La mémoire et le débit viennent du banc de la CI de ce
-projet (`tools/bench`), dernière exécution le **17 septembre 2026** sur les
+projet (`tools/bench`), dernière exécution le **{{memory.date.fr}}** sur les
 runners GitHub x64 et arm64, mémoire du conteneur relevée au repos **et sous
 charge**. L'état des fonctions est lu dans le code, pas dans un plan :
-[l'inventaire public du dépôt](/product/features) au **16 septembre 2026**
-donne 106 fonctions livrées, 87 livrées en partie et 21 à venir.
+[l'inventaire public du dépôt](/product/features) donne aujourd'hui
+{{features.built}} fonctions livrées, {{features.partial}} livrées en partie et {{features.todo}} à venir.
 
 **Ce qui est relevé.** Les prix sont les prix **publics**, en dollars US hors
 taxes, lus sur les pages officielles le **16 septembre 2026**, sans remise

@@ -42,6 +42,65 @@ L'image pose `MEERKAT_DATA=/data` et déclare ce volume. Elle tourne sous un
 utilisateur non privilégié (uid 65532), et le point d'entrée est le binaire
 lui-même : tout ce qui suit le nom de l'image est donc un drapeau.
 
+## Vérifier la signature
+
+Les deux images sont signées à la construction, avec
+[cosign](https://docs.sigstore.dev/) et sans clé. Il n'y a aucune clé publique
+à aller chercher : la signature porte l'identité du workflow GitHub Actions qui
+a produit l'image, et c'est cette identité que l'on vérifie.
+
+```bash
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/softwarity/meerkat-ce/\.github/workflows/' \
+  docker.io/softwarity/meerkat:latest
+```
+
+La même commande vérifie l'image Enterprise sur `ghcr.io/softwarity/meerkat`,
+une fois connecté à ce registre. Les deux sont construites par des workflows qui
+vivent dans le miroir public, `softwarity/meerkat-ce`, et c'est donc ce dépôt
+que nomme l'identité : les sources Enterprise sont privées, la chaîne qui les
+construit ne l'est pas. La commande affiche l'identité exacte qu'elle a
+acceptée, de quoi épingler un fichier précis plutôt qu'un répertoire.
+
+Ce qui est signé, c'est le **digest**, et récursivement : la liste de manifestes
+plus chaque image par architecture qu'elle désigne. Deux conséquences utiles. Un
+client qui a tiré l'image arm64 vérifie ce qu'il exécute vraiment, pas sa
+voisine. Et une release, qui réétiquette sous son numéro de version un digest
+déjà testé sans rien reconstruire, emporte la signature avec elle : rien n'est
+re-signé puisque rien n'est reconstruit.
+
+Pour refuser une image non signée à l'échelle d'un cluster plutôt que de
+vérifier à la main, les deux mêmes valeurs vont dans une politique Kyverno :
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: meerkat-signed
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: verify-meerkat
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      verifyImages:
+        - imageReferences:
+            - "docker.io/softwarity/meerkat*"
+            - "ghcr.io/softwarity/meerkat*"
+          attestors:
+            - entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: "https://github.com/softwarity/meerkat-ce/.github/workflows/*"
+```
+
+Vérifiez `validationFailureAction` contre votre version de Kyverno : les
+récentes ont déplacé cet interrupteur dans la règle, et une politique qui
+atterrit en mode audit signale au lieu de refuser.
+
 ## Construire le binaire
 
 Ce qui est publié, ce sont les images ; le binaire se construit depuis les

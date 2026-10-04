@@ -130,8 +130,14 @@ jobs:
     timeout-minutes: 30
     needs: [preflight, build]
     if: needs.preflight.outputs.publish == 'true'
+    # id-token: write is what cosign needs to sign keyless, and it has to be
+    # granted TWICE: a called workflow can only narrow what its caller handed
+    # it, never widen it, so ci.yml grants it on the job that calls this file.
+    # Forget it there and the failure reads exactly like a missing permission
+    # here, which sends you looking in the wrong file.
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Download digests
         uses: actions/download-artifact@v8
@@ -168,3 +174,18 @@ jobs:
             $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Inspect
         run: docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.meta.outputs.version }}"
+      - uses: sigstore/cosign-installer@v4
+      # What gets signed is the manifest LIST this job just assembled, and the
+      # digest has to be read back from the registry: `imagetools create`
+      # prints nothing, and the per-architecture digests the build jobs handed
+      # over are its children, not it.
+      #
+      # --recursive then covers the index AND those children, because a client
+      # pulls one architecture and verifies what it pulled.
+      - name: Sign the manifest list
+        env:
+          TAG: ${{ steps.meta.outputs.version }}
+        run: |
+          digest=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{.Manifest.Digest}}')
+          echo "signing ${IMAGE}@${digest}" | tee -a "$GITHUB_STEP_SUMMARY"
+          cosign sign --yes --recursive "${IMAGE}@${digest}"

@@ -139,6 +139,8 @@ combination that cannot work, with an agent saying every minute that it cannot
 do its job. `plug.enabled: false` still refuses the grant outright, for an
 installation that wants the developer surface without the tunnel.
 
+On OpenShift or OKD the chart installs as it is, under the default SCC - see [OpenShift and OKD](/docs/deploy/kubernetes#openshift-and-okd) before overriding its security context.
+
 ## Declaring a gateway production
 
 `MEERKAT_PRODUCTION` (`production: true` in the chart) closes the whole

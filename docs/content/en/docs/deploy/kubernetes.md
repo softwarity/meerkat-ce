@@ -173,7 +173,8 @@ spec:
               memory: 512Mi
           securityContext:
             runAsNonRoot: true
-            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
@@ -334,6 +335,59 @@ subjects:
 #   serviceAccountName: meerkat
 ```
 :::
+
+## OpenShift and OKD
+
+The same image and the same chart install on OpenShift and OKD under the default
+`restricted-v2` SCC: no extra SCC to grant, no value to change, nothing run as root.
+Three choices make that true, and they are worth knowing before overriding anything:
+
+- **No uid in the pod.** OpenShift does not run the image's user: it draws a uid from
+  the namespace's range, adds group 0, and rejects a pod that names its own -
+  `runAsUser: Invalid value: 65532: must be in the ranges: [...]`. So neither the chart
+  nor the manifest above sets `runAsUser`, `runAsGroup` or `fsGroup`. **Do not add them
+  back** in your values: it buys nothing anywhere else, since the image already carries
+  its uid.
+- **`/data` belongs to the root group, and the group writes.** Whatever uid OpenShift
+  picks, it is in group 0, so the store can write its first file even where `/data` is
+  a plain directory rather than a mounted volume.
+- **The image's `USER` is numeric (65532).** On a plain Kubernetes namespace enforcing
+  Pod Security `restricted`, the kubelet refuses an image whose user is a name, since it
+  cannot prove it is not root. A number passes both there and on OpenShift.
+
+Everything else already fits: every port the gateway listens on is above 1024, it
+needs no capability, no privilege escalation and no host path, and the read-only access
+the route editor asks for (above) is an ordinary Role.
+
+**Exposing it.** A **Route** replaces the Ingress, one per plane, with the same rule:
+nothing points at the control plane unless you mean it to.
+
+```yaml
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: meerkat
+spec:
+  host: apps.example.com
+  to:
+    kind: Service
+    name: meerkat
+  port:
+    targetPort: app
+  tls:
+    # edge: the router holds the certificate and Meerkat sees HTTP with
+    # X-Forwarded-Proto: https. passthrough instead when the gateway holds the
+    # certificate itself - which ACME needs, since the TLS-ALPN challenge must
+    # reach Meerkat untouched.
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+```
+
+> [!NOTE] Checked every night
+> The above is not a promise: every night the CI installs this chart on MicroShift
+> (OpenShift built from OKD), under the `restricted-v2` SCC, and checks the uid it
+> was given, the write to `/data` and both Routes. See the
+> [test platform](/project/test-platform).
 
 ## Before calling it done
 

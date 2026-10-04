@@ -463,6 +463,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: enterprise
+    # id-token: write is the whole cost of signing keyless - it lets the runner
+    # ask GitHub for the OIDC token cosign trades for a short-lived signing
+    # certificate. There is no key to keep anywhere. A job-level block REPLACES
+    # the workflow's, so contents: read is repeated rather than inherited.
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       # What was pushed, exactly: the release re-tags this and nothing else.
       digest: ${{ steps.build.outputs.digest }}
@@ -529,6 +536,25 @@ jobs:
             GO_TAGS=ee
             EDITION=ee
       - run: echo "published ghcr.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: sigstore/cosign-installer@v4
+      # Signed BY DIGEST, which is why this belongs here and not in the release
+      # job: the release re-tags this very digest under its semver without
+      # rebuilding, so the signature made now is still the signature of what
+      # ships. A signature attached to a tag would have had to be redone, and
+      # would have drifted the day somebody moved the tag.
+      #
+      # --recursive signs the two per-architecture manifests the index points
+      # at, not only the index. Without it a client that pulled the amd64 image
+      # verifies the thing it is NOT running, finds no signature for the thing
+      # it is, and the policy fails on a correct image.
+      #
+      # The registry credentials are the ones docker/login-action put in place
+      # above: cosign pushes the signature as an OCI artifact beside the image,
+      # in the same package, and needs nothing of its own.
+      - name: Sign the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes --recursive "ghcr.io/softwarity/meerkat@${DIGEST}"
 
   # THE RELEASE. This job waits on the `release` environment - a reviewer is
   # required there - and does nothing until somebody approves it. Approving

@@ -347,6 +347,11 @@ jobs:
       && ((github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
+      # Granted HERE as well as in the called workflow, and it is not a
+      # duplicate: a called workflow can only narrow the permissions its
+      # caller hands it. Without this line cosign gets no OIDC token over
+      # there and the image ships unsigned.
+      id-token: write
     # Without this the registry credentials never reach the reusable workflow:
     # a called workflow gets no repository secret unless the caller passes it,
     # and the preflight would report "not set" forever.

@@ -37,3 +37,10 @@ vault.key
 tools/hammer.env
 # What a benchmark run leaves behind: the binaries it built and its raw figures.
 tools/bench/out/
+
+# Working notes and material that stay on the machine: session handoff and
+# assistant instructions, the sales presentations, test runner leftovers.
+/memory.md
+/CLAUDE.md
+/meerkat-presentation-*.html
+/test-results/

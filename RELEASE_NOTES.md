@@ -2,6 +2,22 @@
 
 ## NEXT RELEASE
 
+- **The developer tunnel's volume mount no longer needs root** (plug 2.21.8), which is
+  what kept it out of OpenShift and OKD. The helper that serves the volume over SMB
+  runs as the workload's own user, without any privilege: the developer reaches
+  exactly what the workload does. It runs the Meerkat image itself, with the SMB
+  server compiled in: a disconnected cluster mirrors one image, and that image
+  carries no Samba.
+- **Runs on OpenShift and OKD** under the default `restricted-v2` SCC, and on any
+  namespace enforcing Pod Security `restricted`: the image's user is numeric, `/data`
+  is writable by the root group, and the chart sets a security context (non-root, no
+  capability, no privilege escalation, default seccomp) without pinning a uid.
+- **Both images are signed**, with cosign and no key: the signature carries the
+  identity of the workflow that built the image, so there is no public key to go
+  and fetch. Install has the `cosign verify` command and a Kyverno policy that
+  refuses an unsigned image cluster-wide. What is signed is the digest, and
+  recursively, so a release keeps the signature of the digest it re-tags.
+
 ---
 
 ## 1.1.0

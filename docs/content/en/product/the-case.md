@@ -100,7 +100,7 @@ production.
 | Monitoring | kube-prometheus-stack | 5 pods, plus 1 per node | its own series database | 512 MB minimum for Grafana |
 | Audit | Retraced | 5 services | PostgreSQL, Elasticsearch and NSQ | not published |
 | Workstation to cluster | mirrord Operator | 1 pod, plus one job per session | a Team licence is required | not published |
-| **The whole baseline** | **Meerkat** | **1 pod, or 3 clustered** | **embedded database, or PostgreSQL** | **22 MB at rest** |
+| **The whole baseline** | **Meerkat** | **1 pod, or 3 clustered** | **embedded database, or PostgreSQL** | **{{memory.idle}} MB at rest, {{memory.peak}} under load** |
 
 ::: figure stack
 The same front door, both ways. On the left a request crosses two products
@@ -111,7 +111,7 @@ That is **about 38 pods and five storage engines** to install, secure, upgrade
 and back up - and a request crosses two of those products before it reaches
 your services.
 
-The other way: **one pod, 22 MB idle**, measured by the CI on an x64 runner.
+The other way: **one pod, {{memory.idle}} MB idle and {{memory.peak}} under full load**, measured by the CI on an x64 runner.
 Three pods and one PostgreSQL when you want it
 [highly available](/docs/deploy/kubernetes).
 
@@ -214,11 +214,11 @@ A figure without its method is worth nothing, so here is the method, and the
 sources with it.
 
 **What is measured.** Memory and throughput come from this project's own CI
-bench (`tools/bench`), last run on **17 September 2026** on the GitHub x64 and
+bench (`tools/bench`), last run on **{{memory.date.en}}** on the GitHub x64 and
 arm64 runners, with the container's memory read at rest **and under load**. The
 state of each feature is read from the code rather than from a plan: [the
-repository's public inventory](/product/features) on **16 September 2026**
-gives 106 features delivered, 87 delivered in part and 21 to come.
+repository's public inventory](/product/features) gives today
+{{features.built}} features delivered, {{features.partial}} delivered in part and {{features.todo}} to come.
 
 **What is gathered.** The prices are the PUBLIC prices, in US dollars before
 tax, read from the official pages on **16 September 2026**, with no negotiated

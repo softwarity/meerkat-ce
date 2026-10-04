@@ -23,20 +23,20 @@ audit. Un binaire, zéro dépendance.
 ::: stats
 ### 1 binaire
 à déployer
-### 22 Mo
-de mémoire au repos
+### {{memory.idle}} à {{memory.peak}} Mo
+de mémoire, du repos à la pleine charge
 ### 0
 dépendance requise
-### 114
+### {{features.built}}
 fonctions livrées
 ### 20
 langues servies
 :::
 
-Mémoire mesurée par la CI de ce projet sur un runner x64 : 22 Mo au repos, et
-**37 Mo au plus fort de la charge**. Les 114 fonctions sont celles cochées dans
+Mémoire mesurée par la CI de ce projet sur un runner x64 : {{memory.idle}} Mo au repos, et
+**{{memory.peak}} Mo au plus fort de la charge**. Les {{features.built}} fonctions sont celles cochées dans
 [l'inventaire du produit](/product/features), dont l'état est lu dans le code ;
-87 autres y sont livrées en partie et 21 restent à venir. Ce qu'elle coûte à une
+{{features.partial}} autres y sont livrées en partie et {{features.todo}} restent à venir. Ce qu'elle coûte à une
 requête est mesuré aussi, à côté de Kong, APISIX et Traefik sur la même machine
 dans la même exécution : [les chiffres](/product/performance), recalculés à
 chaque commit.
