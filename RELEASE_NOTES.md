@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.2.0
+
 - **An application published under a prefix it does not know about works.** Three
   things sent the browser out of the route, each without an error:
   the page's `<base href="/">`, which made its scripts resolve at the gateway's root -
