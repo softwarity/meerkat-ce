@@ -17,8 +17,13 @@
 # that does not is installed on ports of its own, with an admin password drawn
 # here and written to deploy/local/<release>.password.local - never printed.
 #
-# The images are not pushed anywhere: the cluster has to see the local Docker
-# images (Docker Desktop does; kind needs `kind load docker-image`).
+# The images are not pushed anywhere. Where the cluster's nodes are containers
+# of this Docker (kind, Docker Desktop), each image is copied into them before
+# the release is touched: relying on the node to fetch it is how a gateway
+# ended up down, waiting for an image that was sitting next to it.
+#
+# A rollout that does not finish is rolled back: this replaces a running
+# gateway, and a failed look at a change must not leave nothing running.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -46,7 +51,15 @@ for edition in "${editions[@]}"; do
     --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -t "meerkat:$tag" . >/dev/null
 
+  for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    if docker inspect "$node" >/dev/null 2>&1; then
+      docker save "meerkat:$tag" | docker exec -i "$node" ctr -n k8s.io images import - >/dev/null
+    fi
+  done
+
+  existed=false
   if helm status "$release" -n "$NAMESPACE" >/dev/null 2>&1; then
+    existed=true
     # The chart's new defaults, then what this release was given.
     helm upgrade "$release" deploy/helm/meerkat -n "$NAMESPACE" --reset-then-reuse-values \
       --set image.repository=meerkat --set image.tag="$tag" >/dev/null
@@ -65,8 +78,21 @@ for edition in "${editions[@]}"; do
     echo "   first install: admin password in $secret"
   fi
   deploy=$(kubectl -n "$NAMESPACE" get deploy -l "app.kubernetes.io/instance=$release" -o name | head -1)
-  kubectl -n "$NAMESPACE" rollout status "$deploy" --timeout=240s | tail -1
+  if ! kubectl -n "$NAMESPACE" rollout status "$deploy" --timeout=240s | tail -1; then
+    kubectl -n "$NAMESPACE" get pods -l "app.kubernetes.io/instance=$release" >&2
+    if $existed; then
+      echo "   $release did not come up: back to what was running" >&2
+      helm rollback "$release" -n "$NAMESPACE" >/dev/null
+    fi
+    exit 1
+  fi
   # The image that runs is the one just built, and it is the edition asked for.
-  kubectl -n "$NAMESPACE" logs "$deploy" | grep -q "$says" || { echo "   $release does not say '$says'" >&2; exit 1; }
+  # A few tries: the new pod is Ready before its first lines can be read.
+  said=false
+  for _ in 1 2 3 4 5 6; do
+    if kubectl -n "$NAMESPACE" logs "$deploy" 2>/dev/null | grep -q "$says"; then said=true; break; fi
+    sleep 2
+  done
+  $said || { echo "   $release does not say '$says'" >&2; exit 1; }
   echo "   $release runs meerkat:$tag ($says), app :${ports[0]}/:${ports[1]}, console :${ports[2]}/:${ports[3]} on a first install"
 done
