@@ -1,4 +1,5 @@
 import { CdkDrag, CdkDragDrop, CdkDragPlaceholder, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
+import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, DestroyRef, inject, LOCALE_ID, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -58,6 +59,7 @@ type Os = 'macos' | 'linux' | 'windows';
     CdkDragPlaceholder,
     CdkDropList,
     CdkDropListGroup,
+    NgTemplateOutlet,
     MatButtonModule,
     MatButtonToggleModule,
     MatCheckboxModule,
@@ -365,6 +367,10 @@ export class TlsPageComponent {
   }
 
   // ── placement ──────────────────────────────────────────────────────────────
+
+  // The certificate being dragged out of the pool, if any: its row stays in
+  // the pool while the copy is in the air (see the template).
+  protected readonly lifting = signal<string | null>(null);
 
   // Dropped somewhere. Into a plane: served there - and taken off the plane it
   // was dragged from, since a drag is a move. Back into the pool: taken off

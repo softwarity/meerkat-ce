@@ -172,9 +172,41 @@
   color: var(--mat-sys-on-surface-variant);
 }
 .ghost {
+  /* The border is inside the height: the gap is exactly the row it replaces. */
+  box-sizing: border-box;
   min-height: 42px;
   border: 1px dashed var(--mat-sys-primary);
   border-radius: 8px;
+}
+/* The pool never shows a gap. A row dragged out of it leaves itself behind:
+   the drag's placeholder while it is still over the pool, the .standing row
+   once the placeholder has followed the pointer into a plane. One or the
+   other, never both - and never neither, or the pool would shrink and the
+   planes under it would slide away from the pointer aiming at them. */
+.pool .ghost-row,
+.entry.standing {
+  pointer-events: none;
+  opacity: 0.55;
+}
+.pool:has(> .ghost-row) .entry.standing {
+  display: none;
+}
+/* In a plane the same placeholder is the landing spot: a plane's row, empty. */
+.zone .ghost-row {
+  display: block;
+  min-height: 42px;
+  padding: 0;
+  border: 1px dashed var(--mat-sys-primary);
+  border-radius: 8px;
+  background: none;
+  box-sizing: border-box;
+}
+.zone .ghost-row > * {
+  display: none;
+}
+/* A certificate brought back from a plane was in the pool all along. */
+.pool .ghost {
+  display: none;
 }
 .cdk-drag-preview {
   box-shadow: var(--mat-sys-level3);

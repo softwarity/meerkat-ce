@@ -173,80 +173,105 @@
         (cdkDropListDropped)="dropped($event)"
       >
         @for (c of certificates(); track c.id) {
-          <!-- One certificate of the pool: its names, where it came from, how
-               long it lasts, and where it is served. Written here and not in
-               a template: a cdkDrag finds its list by where it is DECLARED. -->
-          <div class="entry {{ level(c) }}" cdkDrag [cdkDragData]="c" [cdkDragDisabled]="c.pending">
-            <span class="host">
-              <mat-icon class="grip" [class.spin]="c.status === 'requesting'">{{ c.pending ? icon(c) : c.status === 'requesting' ? 'progress_activity' : 'drag_indicator' }}</mat-icon>
-              <code>{{ namesOf(c).join(', ') }}</code>
-            </span>
-            <span class="badge" [class.warn]="c.info.selfSigned && !c.pending"
-              [matTooltip]="c.info.selfSigned && !c.pending ? selfSignedWarning : ''"
-              >{{ sourceLabel(c) }}</span
-            >
-            @if (c.pending) {
-              <button matButton="tonal" (click)="adopt(c)">
-                <mat-icon>how_to_reg</mat-icon>
-                <ng-container i18n="@@Adopt">Adopt</ng-container>
-              </button>
-            }
-            @if (c.status === 'failed') {
-              <button matButton="tonal" (click)="retry(c)">
-                <mat-icon>refresh</mat-icon>
-                <ng-container i18n="@@Retry">Retry</ng-container>
-              </button>
-            }
-            @if (c.source !== 'acme') {
-              <button matIconButton (click)="download(c)" i18n-matTooltip="@@Download" matTooltip="Download">
-                <mat-icon>download</mat-icon>
-              </button>
-            }
-            <button matIconButton [matMenuTriggerFor]="actions" i18n-matTooltip="@@Actions" matTooltip="Actions">
-              <mat-icon>more_vert</mat-icon>
-            </button>
-            <mat-menu #actions>
-              @if (!c.pending) {
-                @for (plane of planes; track plane) {
-                  <button mat-menu-item (click)="toggle(c, plane)">
-                    <mat-icon>{{ c[plane] ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-                    <span i18n="@@Serve_on_plane">Serve on {{ planeLabel(plane) }}</span>
-                  </button>
-                }
-              }
-              <button mat-menu-item (click)="remove(c)">
-                <mat-icon>delete</mat-icon>
-                <span i18n="@@Delete">Delete</span>
-              </button>
-            </mat-menu>
-            <span class="says">
-              {{ says(c) }}
-              @if (!c.pending && !c.waiting) {
-                &nbsp;-&nbsp;{{ c.info.keyType }}
-                @if (c.info.chain === 0 && !c.info.selfSigned) {
-                  &nbsp;-&nbsp;<span
-                    class="soon"
-                    i18n-matTooltip="@@No_chain_tooltip"
-                    matTooltip="Without intermediates, some browsers will reject it."
-                    i18n="@@No_intermediate"
-                    >No intermediate</span
-                  >
-                }
-              }
-              @for (plane of planes; track plane) {
-                @if (c[plane]) {
-                  <span class="on-plane">{{ planeLabel(plane) }}</span>
-                }
-              }
-            </span>
-            <div *cdkDragPlaceholder class="ghost"></div>
+          <!-- One certificate of the pool. The row itself is written here and
+               not in a template: a cdkDrag finds its list by where it is
+               DECLARED. What it shows is in entryBody, below. -->
+          <div
+            class="entry {{ level(c) }}"
+            cdkDrag
+            [cdkDragData]="c"
+            [cdkDragDisabled]="c.pending"
+            (cdkDragStarted)="lifting.set(c.id)"
+            (cdkDragEnded)="lifting.set(null)"
+          >
+            <ng-container *ngTemplateOutlet="entryBody; context: { $implicit: c }" />
+            <!-- Dragging from the pool PLACES a certificate, it does not move
+                 it: it is still in the pool afterwards, and can be placed
+                 again. So what is left behind is the row itself, not a gap. -->
+            <div *cdkDragPlaceholder class="entry {{ level(c) }} ghost-row">
+              <ng-container *ngTemplateOutlet="entryBody; context: { $implicit: c }" />
+            </div>
           </div>
+          <!-- The placeholder above follows the pointer into a plane, where it
+               marks the landing spot. This row takes its place in the pool the
+               moment it leaves - the stylesheet shows one or the other. -->
+          @if (lifting() === c.id) {
+            <div class="entry {{ level(c) }} standing" aria-hidden="true">
+              <ng-container *ngTemplateOutlet="entryBody; context: { $implicit: c }" />
+            </div>
+          }
         } @empty {
           <p class="empty" i18n="@@No_certificate_yet">
             No certificate yet. Generate one, import one, or ask an authority below.
           </p>
         }
       </div>
+      <!-- What a row of the pool shows: its names, where it came from, how long
+           it lasts, and where it is served. -->
+      <ng-template #entryBody let-c>
+        <span class="host">
+          <mat-icon class="grip" [class.spin]="c.status === 'requesting'">{{ c.pending ? icon(c) : c.status === 'requesting' ? 'progress_activity' : 'drag_indicator' }}</mat-icon>
+          <code>{{ namesOf(c).join(', ') }}</code>
+        </span>
+        <span class="badge" [class.warn]="c.info.selfSigned && !c.pending"
+          [matTooltip]="c.info.selfSigned && !c.pending ? selfSignedWarning : ''"
+          >{{ sourceLabel(c) }}</span
+        >
+        @if (c.pending) {
+          <button matButton="tonal" (click)="adopt(c)">
+            <mat-icon>how_to_reg</mat-icon>
+            <ng-container i18n="@@Adopt">Adopt</ng-container>
+          </button>
+        }
+        @if (c.status === 'failed') {
+          <button matButton="tonal" (click)="retry(c)">
+            <mat-icon>refresh</mat-icon>
+            <ng-container i18n="@@Retry">Retry</ng-container>
+          </button>
+        }
+        @if (c.source !== 'acme') {
+          <button matIconButton (click)="download(c)" i18n-matTooltip="@@Download" matTooltip="Download">
+            <mat-icon>download</mat-icon>
+          </button>
+        }
+        <button matIconButton [matMenuTriggerFor]="actions" i18n-matTooltip="@@Actions" matTooltip="Actions">
+          <mat-icon>more_vert</mat-icon>
+        </button>
+        <mat-menu #actions>
+          @if (!c.pending) {
+            @for (plane of planes; track plane) {
+              <button mat-menu-item (click)="toggle(c, plane)">
+                <mat-icon>{{ c[plane] ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+                <span i18n="@@Serve_on_plane">Serve on {{ planeLabel(plane) }}</span>
+              </button>
+            }
+          }
+          <button mat-menu-item (click)="remove(c)">
+            <mat-icon>delete</mat-icon>
+            <span i18n="@@Delete">Delete</span>
+          </button>
+        </mat-menu>
+        <span class="says">
+          {{ says(c) }}
+          @if (!c.pending && !c.waiting) {
+            &nbsp;-&nbsp;{{ c.info.keyType }}
+            @if (c.info.chain === 0 && !c.info.selfSigned) {
+              &nbsp;-&nbsp;<span
+                class="soon"
+                i18n-matTooltip="@@No_chain_tooltip"
+                matTooltip="Without intermediates, some browsers will reject it."
+                i18n="@@No_intermediate"
+                >No intermediate</span
+              >
+            }
+          }
+          @for (plane of planes; track plane) {
+            @if (c[plane]) {
+              <span class="on-plane">{{ planeLabel(plane) }}</span>
+            }
+          }
+        </span>
+      </ng-template>
     </section>
 
     <!-- The two doors, side by side: what each one presents. -->
