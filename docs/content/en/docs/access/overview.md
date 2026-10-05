@@ -68,7 +68,7 @@ room when the account belongs nowhere, and otherwise `/refused`, which names the
 rule that turned them away and offers what this session *can* open.
 
 A refusal on a **service route** is a `403` with a sentence: nobody reads a page
-in a `curl`. A caller with no session at all gets `401` and, on a navigation, a
+in a `curl`. A caller with no session at all gets a `401` or, on a navigation, a
 redirect to the sign-in page.
 
 ## What is not there

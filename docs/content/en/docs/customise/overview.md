@@ -40,11 +40,10 @@ your product's surface.
 - **Per organisation.** There is no per-tenant theme, branding or portal. That would be the
  product's first per-tenant visual override: it is planned, and written down rather than
  half-built.
-- **Per application.** A group of routes sharing their own branding and locales does not exist, and
- it does not exist: the configuration is global and a route belongs to no group.
+- **Per application.** A group of routes sharing their own branding and locales does not exist:
+ the configuration is global and a route belongs to no group.
 - **Your own HTML for the flow pages.** The arrangement is a closed catalogue of layouts shipped
  with the product; replacing a page's markup is not built.
-- **The language catalogues.** Twenty languages are embedded; adding one is still a rebuild.
 
 ## What travels
 

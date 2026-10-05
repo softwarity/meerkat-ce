@@ -2,108 +2,113 @@
 title: Les pages intégrées
 section: Personnalisation
 order: 249
-summary: Quelles pages la passerelle sert elle-même, comment elles sont disposées, et en combien de langues.
+summary: Les pages que la gateway sert elle-même, leur disposition, et les langues dans lesquelles elles existent.
 ---
 
 # Les pages intégrées
 
-Ce sont les pages auxquelles Meerkat répond lui-même, devant vos applications. C'est du HTML rendu par
-le serveur - pas de framework, pas de bundle, rien récupéré d'un CDN - et elles lisent les jetons du
-thème, donc elles suivent votre palette sans recompilation.
+Ce sont les pages que Meerkat sert lui-même, devant vos applications. Il s'agit de simple
+HTML produit par le serveur - pas de framework, pas de bundle, rien qui vienne d'un CDN - et
+elles lisent les jetons du thème : elles suivent donc votre palette sans recompilation.
 
 | Page | Où elle apparaît |
 |---|---|
-| `/login` | le formulaire de connexion, et les boutons des autorités externes |
-| `/totp` et `/totp-enroll` | la vérification et l'enrôlement d'un second facteur |
-| `/update-password` | un mot de passe que la passerelle exige de changer |
-| `/forgot-password`, `/reset-password` | le flux de réinitialisation |
-| `/register`, `/confirm`, `/account-pending` | l'inscription et sa confirmation |
-| `/select-tenant`, `/select-group` | le choix de l'organisation ou du groupe dans lequel agir |
-| `/refused` | pourquoi un appelant ne peut pas passer |
-| `/profile` et ses sous-pages | les pages du compte : mot de passe, second facteur, passkeys, autorités, historique, jetons |
-| la page d'indisponibilité | une route dont le service est tombé, ou le commutateur global |
+| `/login` | le formulaire de connexion et les boutons des autorités externes |
+| `/totp` et `/totp-enroll` | la vérification et l'enregistrement d'un second facteur |
+| `/update-password` | un mot de passe que la gateway vous impose de changer |
+| `/forgot-password`, `/reset-password` | la réinitialisation du mot de passe |
+| `/register`, `/confirm`, `/account-pending` | l'auto-inscription et sa confirmation |
+| `/select-tenant`, `/select-group` | le choix de l'organisation ou du groupe au nom duquel agir |
+| `/refused` | la raison pour laquelle un appelant ne passe pas |
+| `/profile` et ses sous-pages | les pages du compte lui-même : mot de passe, second facteur, passkeys, autorités, historique, jetons |
+| la page d'indisponibilité | une route dont le service est arrêté, ou l'interrupteur global |
 
 ## Un écran, trois onglets, un aperçu
 
-Couleurs, disposition et identité étaient trois métiers, chacun avec ses options d'un côté et le
-**même** aperçu de l'autre, chacun montrant une page que les deux autres décident aussi. C'est un seul
-sujet - ce que le visiteur voit - donc c'est une entrée avec trois onglets, et les onglets sont à gauche
-seulement. L'aperçu ne bouge jamais, et le carrousel de thèmes reste dessous sur les trois : essayer une
-couleur pendant qu'on juge une disposition est le sens normal, pas un cas particulier.
+Les couleurs, la disposition et l'identité formaient trois tâches distinctes, avec pour
+chacune ses options d'un côté et le **même** aperçu de l'autre, chacune montrant une page
+dont les deux autres décident aussi. Il s'agit d'un seul sujet - ce que voit le visiteur -
+et donc d'une seule entrée à trois onglets, les onglets n'occupant que la partie gauche.
+L'aperçu ne bouge jamais, et le carrousel des thèmes reste dessous dans les trois onglets :
+essayer une couleur tout en jugeant une disposition est la façon normale de travailler, pas
+un cas particulier.
 
-Les onglets sont de vraies URL, donc un marque-page sur la galerie de dispositions revient sur la
-galerie de dispositions.
+Les onglets sont de vraies URL : un marque-page posé sur la galerie des dispositions ramène
+à la galerie des dispositions.
 
 ## La disposition
 
-Un catalogue fermé de gabarits, chacun étant un bloc de CSS livré avec le produit :
+Un catalogue fermé de dispositions, chacune étant un bloc de CSS livré avec le produit :
 
-| Gabarit | À quoi ça ressemble |
+| Disposition | Ce que cela donne |
 |---|---|
-| `centered` | la marque au-dessus, la carte au milieu, le fond derrière tout. Le défaut |
-| `split` | l'image prend une moitié pleine hauteur avec la marque dessus, le formulaire prend l'autre |
-| `drawer` | l'image reste entière et un panneau opaque est posé contre un bord, portant marque et formulaire |
-| `banner` | la marque dans un bandeau en haut, la carte dessous |
-| `bare` | pas de carte du tout : les champs sont posés sur le fond |
+| `centered` | la marque en haut, la carte au milieu, le fond derrière l'ensemble. C'est la valeur par défaut |
+| `split` | l'image occupe une moitié de l'écran sur toute la hauteur et porte la marque, le formulaire occupe l'autre |
+| `drawer` | l'image reste entière et un panneau opaque, plaqué contre un bord, porte la marque et le formulaire |
+| `banner` | la marque dans un bandeau en haut de l'écran, la carte en dessous |
+| `bare` | aucune carte : les champs reposent directement sur le fond |
 
-`split` et `drawer` sont faits de deux moitiés, donc ils portent un **côté** : gauche ou droite. Les
-autres l'ignorent, et le champ est effacé plutôt que gardé et silencieusement inutilisé.
+`split` et `drawer` sont faites de deux moitiés et demandent donc un **côté** : gauche ou
+droite. Les autres l'ignorent, et le champ est vidé plutôt que conservé sans servir à rien.
 
-> [!NOTE] Enterprise edition
-> Changer la disposition fait partie du white-label, le même achat que retirer la mention : faire que
-> ces pages ressemblent à votre produit plutôt qu'au nôtre.
+> [!NOTE] Édition Enterprise
+> Changer la disposition fait partie de la marque blanche, le même achat que le retrait de la
+> mention : il s'agit de donner à ces pages l'apparence de votre produit plutôt que du nôtre.
 
-Trois choses en découlent, et chacune est délibérée. Un enregistrement de réglages porte toute la
-charge utile, donc tous les autres écrans renvoient la disposition courante sans y toucher - la garde
-porte sur le **changement** et non sur la valeur, sinon enregistrer une langue sur une instance
-communautaire serait refusé. Une disposition déjà en place **continue d'être servie** si une licence
-expire : le modèle est perpétuel, et un fichier périmé qui redessinerait en silence la page de
-connexion de tous les clients est le « ça marchait hier » que ce produit refuse. Et revenir à
-`centered` est **toujours** permis, sinon une instance pourrait rester coincée sur une disposition
-qu'elle ne peut plus quitter.
+Trois conséquences en découlent, toutes voulues. Un enregistrement des réglages transporte
+la totalité des données, si bien que tous les autres écrans renvoient la disposition en
+cours sans y toucher - le contrôle porte sur le **changement**, pas sur la valeur, faute de
+quoi enregistrer une langue sur une instance Community serait refusé. Une disposition déjà en
+place **continue d'être servie** si une licence arrive à échéance : le modèle est perpétuel,
+et un fichier expiré qui redessinerait sans prévenir la page de connexion de tous vos clients
+serait exactement le "ça marchait hier" dont ce produit ne veut pas. Enfin, revenir à
+`centered` est **toujours** permis, sans quoi une instance pourrait rester bloquée sur une
+disposition qu'elle ne peut plus quitter.
 
 ## Clair, sombre, ou le choix du visiteur
 
-L'intégrateur tranche d'abord, en décochant un schéma sur l'aperçu :
+L'intégrateur décide en premier, en décochant un mode sur l'aperçu :
 
-| Réglage | Ce que les pages font |
+| Réglage | Ce que font les pages |
 |---|---|
-| le visiteur décide | son système pour commencer, puis une bascule qui se souvient |
-| clair | clair uniquement, et la bascule disparaît |
-| sombre | sombre uniquement, et la bascule disparaît |
+| le visiteur décide | elles suivent d'abord son système, puis un bouton de bascule dont le choix est retenu |
+| clair | clair uniquement, et le bouton de bascule disparaît |
+| sombre | sombre uniquement, et le bouton de bascule disparaît |
 
-Imposer n'est pas un caprice. Ces pages sont **devant** une application qui ne connaît peut-être qu'un
-seul aspect : une page de connexion qui suit le système sombre du visiteur, et qui passe la main à un
-portail uniquement clair, se lit comme deux produits - et vous ne pouvez pas corriger ça de votre côté.
+Imposer un mode n'a rien d'un caprice. Ces pages sont placées **devant** une application qui
+ne connaît peut-être qu'une seule apparence : une page de connexion qui suit le système en
+mode sombre du visiteur, puis passe la main à un portail qui n'existe qu'en clair, donne
+l'impression de deux produits différents - et vous ne pouvez pas le corriger de votre côté.
 
-Quand le visiteur choisit, son choix vit dans un cookie pendant un an **et** sur son compte, donc il est
-reposé sur un navigateur qui ne l'a jamais vu - exactement comme sa langue. Voir
-[clair et sombre](/docs/customise/color-scheme) pour ce qu'une application proxifiée en fait.
+Quand le visiteur choisit, son choix est conservé un an dans un cookie **et** sur son compte.
+Il est donc rétabli sur un navigateur qui ne l'a jamais vu - exactement comme sa langue. Voir
+[clair et sombre](/docs/customise/color-scheme) pour ce qu'en fait une application placée
+derrière la gateway.
 
 ## Les langues
 
-Vingt catalogues sont embarqués dans le binaire, un fichier JSON par langue : arabe, allemand, anglais,
-espagnol, français, hébreu, hindi, indonésien, italien, japonais, coréen, néerlandais, polonais,
-portugais, russe, thaï, turc, ukrainien, vietnamien et chinois simplifié.
+Vingt catalogues sont embarqués dans le binaire, à raison d'un fichier JSON par langue :
+arabe, allemand, anglais, espagnol, français, hébreu, hindi, indonésien, italien, japonais,
+coréen, néerlandais, polonais, portugais, russe, thaï, turc, ukrainien, vietnamien et chinois
+simplifié.
 
-L'anglais fait référence : chaque autre catalogue lui est comparé au démarrage, et une clé qu'un
-catalogue ne porte pas retombe sur l'anglais plutôt que d'afficher un blanc. Les messages d'erreur du
-backend sont localisés de la même façon.
+L'anglais sert de référence : chaque autre catalogue lui est comparé au démarrage, et une clé
+absente d'un catalogue est remplacée par son texte anglais plutôt que par un blanc. Les
+messages d'erreur du serveur sont traduits de la même manière.
 
-La langue vient du choix du visiteur - un cookie et son compte - et sinon de ce que son navigateur
-demande. Les langues *offertes* sont l'union de ce que les routes UI
-déclarent parler (**Routes > une route > Locales**) : il n'y a pas de réserve à élargir, une route
-apporte les siennes.
+La langue vient du choix du visiteur - un cookie et son compte - et, à défaut, de ce que
+demande son navigateur. Les langues *proposées* sont la réunion de celles dans lesquelles les
+routes d'interface déclarent être écrites (**Routes > une route > Locales**) : il n'y a pas
+de réserve à élargir, chaque route apporte les siennes.
 
 > [!WARNING]
-> La console, elle, est **en anglais uniquement**, et c'est une décision plutôt qu'un manque :
-> c'est un outil d'exploitant. Les pages ci-dessus sont celles que vos utilisateurs voient, et
-> celles-là sont traduites.
+> La console, elle, n'existe **qu'en anglais**, et c'est une décision, pas une lacune : c'est
+> un outil d'exploitant. Les pages décrites ci-dessus sont celles que voient vos
+> utilisateurs, et celles-là sont traduites.
 
 ## Ce qui manque
 
-- **Votre propre HTML.** La disposition est un catalogue ; remplacer le balisage d'une page par votre
- gabarit n'est pas construit.
-- **Des catalogues surchargeables** : ajouter une langue reste une recompilation.
-- La page de sélection de variante du développeur, qui n'a de sens qu'une fois la portée des
- substitutions par développeur construite.
+- **Votre propre HTML.** La disposition se choisit dans un catalogue ; remplacer le balisage
+ d'une page par votre propre modèle n'est pas possible.
+- La page où le développeur choisit sa variante, qui n'aura de sens que lorsque les
+ surcharges pourront être limitées à un développeur.

@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+- **The Compose and Swarm files take their image from `MEERKAT_IMAGE`.** The same
+  published file runs the community image, the evaluation one or the image built for
+  a licence, without being edited; unset, nothing changes.
+
 ---
 
 ## 1.2.0

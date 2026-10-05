@@ -134,11 +134,12 @@ Another account's session is never theirs to close, whatever id a form carries.
 
 Administrators read them on **Sessions**, in the rail: who, which browser and
 address, which plane, since when - filtered by account, paged. Each reads their
-own perimeter. Root reads both planes; an application administrator the
-applications' sessions, every organisation, since who runs the console, and
-from where, is root's business; an organisation's administrator the sessions
-open in the organisations they administer, and can end only those. Ending one writes
-`session.revoke` to the [audit trail](/docs/operations/audit).
+own perimeter. Root reads both planes. An application administrator reads the
+applications' sessions, across every organisation, but not the console's: who
+runs the console, and from where, is root's business. An organisation's
+administrator reads the sessions open in the organisations they administer, and
+can end only those. Ending one writes `session.revoke` to the
+[audit trail](/docs/operations/audit).
 
 ![Sessions: who is signed in, from which browser and address, on which plane, and since when](img/console/sessions.webp)
 

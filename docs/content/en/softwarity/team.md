@@ -20,8 +20,8 @@ a discussion there stays where the answer will be useful to somebody else.
 ::: grid
 ### Commercial
 
-For the Enterprise edition, a support agreement or an integration: the contact
-channel is being set up and its address will be here.
+For the Team and Enterprise editions, a support agreement or an integration:
+the contact channel is being set up and its address will be here.
 
 ### Security
 

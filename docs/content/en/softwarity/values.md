@@ -22,7 +22,7 @@ gateway needs a shared database, so that is exactly when a database appears.
 Two-factor, passkeys, TLS, the vault, the audit trail: those are in the free
 image, and they always will be. Selling them would be selling safety to the
 people least able to pay for it. What the paid edition carries is scale and
-organisation - several tenants, external directories, clustering - not the
+organisation - several organisations, external directories, clustering - not the
 lock on your own front door.
 
 ## An error is a place to be helpful

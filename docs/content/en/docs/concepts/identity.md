@@ -66,8 +66,9 @@ peer address, never on a forwarding header.
 
 > [!NOTE]
 > Data-plane tokens carry no perimeter yet: they are minted with full scope, and
-> they silently capture whichever group the session had. There is no console
-> screen for them either - the self-service page is the only place.
+> they silently capture whichever group the session had. The console lists
+> them and can revoke them (**Access tokens**), but never creates one: a token
+> is issued only by its owner, from the self-service page.
 
 ## Where accounts come from
 
@@ -104,8 +105,8 @@ language and the installation's theme. The order is fixed:
 With no organisation at all, the person lands in a waiting room that explains
 how to ask for access, rather than on a refusal.
 
-The control plane skips steps 2's tenant half entirely: the console has no
-organisation to choose.
+The control plane skips step 3 entirely: the console has no organisation to
+choose.
 
 ## Read more
 

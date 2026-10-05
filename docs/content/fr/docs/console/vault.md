@@ -2,81 +2,85 @@
 title: Coffre
 section: La console
 order: 180
-summary: Toutes les valeurs et les secrets que la configuration désigne, référencés par $nom.
+summary: Toutes les valeurs et tous les secrets nommés auxquels la configuration fait référence, sous la forme $name.
 ---
 
 # Coffre
 
-L'entrée **Vault** du rail porte toutes les valeurs auxquelles la configuration se réfère,
-en un seul endroit. Deux genres vivent dans le même espace de noms :
+L'entrée **Vault** du rail rassemble, en un seul endroit, toutes les valeurs auxquelles
+la configuration fait référence. Deux types d'entrée partagent le même espace de noms :
 
-| Genre | Relu | Pour |
+| Type | Relecture | Usage |
 |---|---|---|
-| **Secret** | Jamais. Chiffré au repos, et l'API dit qu'il est posé, pas ce qu'il vaut | Un secret client, un mot de passe SMTP, une clé HMAC |
-| **Valeur** | Oui, en clair | Une URL, un base DN, un client id - tout ce qui n'est pas secret mais change d'un environnement à l'autre |
+| **Secret** | Jamais. Il est chiffré au repos, et l'API indique qu'il est défini, pas ce qu'il contient | Un secret client, un mot de passe SMTP, une clé HMAC |
+| **Valeur** | Oui, en clair | Une URL, un DN de base, un identifiant client - tout ce qui n'est pas secret mais change d'un environnement à l'autre |
 
-Les deux se référencent pareil, **`$nom`**, partout où un champ l'accepte. C'est tout
-l'intérêt : promouvoir une valeur en secret ne touche jamais à ce qui pointe dessus.
+Les deux se référencent de la même manière, par **`$name`**, partout où un champ accepte
+une référence. C'est tout l'intérêt : transformer une valeur en secret ne change rien à
+ce qui pointe dessus.
 
-![L'écran Vault : trois entrées - deux secrets et une valeur - avec leur genre, leur valeur et ce qui les utilise](img/console/vault.webp)
+![L'écran Vault : trois entrées - deux secrets et une valeur - avec leur type, leur valeur et ce qui les utilise](img/console/vault.webp)
 
-Deux secrets qui affichent *encrypted, never shown*, une valeur lisible en clair, et la
-colonne *Used by* qui nomme la route pointant sur chacune.
+Deux secrets, qui affichent *encrypted, never shown*, une valeur lisible en clair, et la
+colonne *Used by*, qui nomme la route pointant sur chaque entrée.
 
 ## La liste
 
-Nom et description, genre, valeur (ou *encrypted, never shown*), et **Used by** - la
-colonne qui distingue une entrée vivante d'un reste. Cliquer une ligne ouvre l'éditeur ;
-le + crée une entrée.
+Le nom et la description, le type, la valeur (ou *encrypted, never shown*) et **Used
+by**, la colonne qui permet de distinguer une entrée utilisée d'un reliquat. Un clic sur
+une ligne ouvre l'éditeur ; le + crée une entrée.
 
-Une entrée porte :
+Une entrée comprend :
 
-- **Name** - ce que `$nom` dira.
-- **Kind** - valeur ou secret, choisi sur un bouton à deux positions.
-- **Value** - tapée une seule fois pour un secret.
-- **Description** - pour celui qui la retrouvera dans six mois.
-- **Reminder date** - le jour où le secret expire à sa source. **C'est purement un
-  rappel** : la passerelle ne peut pas savoir qu'un jeton a été renouvelé chez le
-  fournisseur, donc `$nom` continue de résoudre. La date nourrit le
-  [digest quotidien](/docs/console/mail-relay), qui liste ce qui approche et ce qui
-  vient de passer - jamais la valeur.
+- **Name** - ce que désignera `$name`.
+- **Kind** - valeur ou secret, à choisir avec un bouton à bascule.
+- **Value** - saisie une seule fois dans le cas d'un secret.
+- **Description** - pour la personne qui retrouvera l'entrée dans six mois.
+- **Reminder date** - le jour où le secret expire chez celui qui l'a émis. **Ce n'est
+  qu'un rappel** : la gateway ne peut pas savoir qu'un jeton a été renouvelé chez le
+  fournisseur, et `$name` continue donc d'être résolu. Cette date alimente le
+  [récapitulatif quotidien](/docs/console/mail-relay), qui liste les échéances proches
+  et celles qui viennent de passer - jamais la valeur.
 
 ## D'où viennent les entrées
 
-La plupart naissent du champ qui en a besoin. Un champ sensible propose **Move into the
-vault**, et refuse d'être enregistré en littéral : l'administrateur tient la valeur, c'est
-donc lui qui la range. Un champ qui accepte une valeur en clair propose la même chose pour
-les valeurs.
+La plupart sont créées depuis le champ qui en a besoin. Un champ sensible propose
+**Move into the vault** et refuse d'être enregistré sous forme littérale :
+l'administrateur détient la valeur, c'est donc à lui de la ranger. Un champ qui accepte
+une valeur en clair propose la même chose pour les valeurs.
 
-L'ordre habituel est donc l'inverse de celui qu'on attend : vous remplissez un relais, une
-autorité ou un certificat, et l'entrée du coffre apparaît comme conséquence.
+L'ordre habituel est donc l'inverse de celui que vous pourriez attendre : vous
+renseignez un relais de messagerie, une autorité ou un certificat, et l'entrée du coffre
+en découle.
 
-## Le coffre comme fichier
+## Le coffre sous forme de fichier
 
-**Export** écrit le coffre en un seul fichier chiffré, sous une phrase secrète que Meerkat
-ne garde pas. **Import** le relit. C'est la moitié qu'un export de configuration n'emporte
-jamais : c'est elle qui amorce un second environnement ou déménage une passerelle.
+**Export** écrit le coffre dans un seul fichier chiffré, protégé par une phrase secrète
+que Meerkat ne conserve pas. **Import** relit un tel fichier. C'est la moitié qu'un
+export de configuration ne contient jamais, et c'est elle qui permet d'amorcer un second
+environnement ou de déménager une gateway.
 
 > [!WARNING]
-> Un coffre exporté vaut exactement ce que vaut sa phrase secrète, et ranger les deux
-> ensemble annule le chiffrement. C'est vrai aussi d'un
-> [instantané](/docs/console/configuration) dont la clé maîtresse est à côté de la base.
+> Un coffre exporté ne vaut que ce que vaut sa phrase secrète, et conserver les deux au
+> même endroit annule le chiffrement. Il en va de même d'un
+> [snapshot](/docs/console/configuration) dont la clé maîtresse est stockée à côté de
+> la base de données.
 
-## Ce que vous voyez
+## Ce que vous pouvez voir
 
-Le coffre se limite à l'appelant : un infra admin voit les entrées d'infra, un app admin
-celles de l'application. L'écran est ouvert à quiconque administre un plan qui porte des
-entrées.
+Le coffre se restreint de lui-même au périmètre de l'appelant : un administrateur infra
+voit les entrées de l'infra, un administrateur applicatif celles de l'application.
+L'écran est ouvert à quiconque administre un plan qui contient des entrées.
 
 ## Pièges
 
-- **Une référence est publique, un littéral jamais.** `$stripe_key` peut apparaître dans
-  un export, un diff ou une capture d'écran sans conséquence. C'est toute la raison d'être
-  du coffre.
-- **Un secret ne se relit pas**, ni par vous ni par l'API. Le perdre veut dire le remplacer
-  à la source.
-- **Un import de configuration peut laisser des trous** : des entrées que le fichier
-  désigne et que cette passerelle n'a pas. L'import les liste pour que vous les
-  remplissiez tout de suite.
-- **Supprimer une entrée utilisée** casse ce qui pointait dessus. Lisez d'abord la colonne
-  *Used by*.
+- **Une référence est publique, un littéral ne l'est jamais.** `$stripe_key` peut
+  apparaître dans un export, un diff ou une capture d'écran sans conséquence. C'est
+  toute la raison d'être du coffre.
+- **Un secret ne peut pas être relu**, ni par vous ni par l'API. Si vous le perdez, il
+  faut le remplacer à la source.
+- **Un import de configuration peut laisser des manques** : des entrées auxquelles le
+  fichier fait référence et que cette gateway n'a pas. L'import en dresse la liste
+  pour que vous puissiez les renseigner immédiatement.
+- **Supprimer une entrée utilisée** casse tout ce qui pointait dessus. Consultez
+  d'abord la colonne *Used by*.

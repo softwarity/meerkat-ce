@@ -7,101 +7,106 @@ summary: Piloter Meerkat sans navigateur - un jeton pour un script, une connexio
 
 # Jetons d'accès, MCP et API
 
-Trois écrans, un sujet : travailler sur cette passerelle depuis l'extérieur de la
+Trois écrans pour un même sujet : intervenir sur cette gateway sans passer par la
 console.
 
-- **Access tokens** est sur les deux plans. Sous **Infra**, il frappe des jetons
-  de console pour un script ou un pipeline. Sous **Application**, il liste aussi
-  les jetons d'application : un admin d'application voit ceux de tout le monde
-  et peut les révoquer.
-- **Infra > MCP** (admins infra) branche un assistant, et ne produit aucune
-  clé.
-- **API** (rail) est la référence des appels que les deux font.
+- **Access tokens** figure sur les deux plans. Sous **Infra**, l'écran émet des jetons
+  de console destinés à un script ou à un pipeline. Sous **Application**, il liste en
+  plus les jetons d'application : un administrateur d'application voit ceux de tous
+  les comptes et peut les révoquer.
+- **Infra > MCP** (administrateurs infra) connecte un assistant, sans produire la
+  moindre clé.
+- **API** (dans le rail) est la référence des appels que font l'un et l'autre.
 
 ## Access tokens
 
-Un jeton d'administration ouvre l'API de la console sans navigateur. Il agit **avec vos
-propres pouvoirs**, restreints par son périmètre, et s'authentifie sur le port
-d'administration en `Authorization: Bearer mk_...`.
+Un jeton d'administration donne accès à l'API de la console sans navigateur. Il agit
+**avec vos propres pouvoirs**, réduits par son périmètre, et s'authentifie sur le port
+d'administration avec `Authorization: Bearer mk_...`.
 
-![L'écran Access tokens : trois jetons de console et deux jetons d'application, avec leur propriétaire, leur plan, leur périmètre et leur dernier usage](img/console/access-tokens.webp)
+![L'écran Access tokens : trois jetons de console et deux jetons d'application, avec leur propriétaire, leur plan, leur périmètre et leur dernière utilisation](img/console/access-tokens.webp)
 
-Cinq jetons : trois pour la console - full access depuis `10.20.0.0/16` seulement,
-read only, et scheduled calls only - et deux jetons d'application créés par leurs
-propriétaires sur leur profil. Une ligne ouvre son tiroir.
+Cinq jetons : trois pour la console - un accès complet depuis `10.20.0.0/16`
+uniquement, un en lecture seule et un réservé aux appels planifiés - et deux jetons
+d'application que leurs propriétaires ont créés depuis leur profil. Un clic sur une
+ligne ouvre son tiroir.
 
-En créer un pose cinq questions :
+La création d'un jeton demande quatre informations :
 
-| Champ | Ce qu'il décide |
+| Champ | Ce qu'il détermine |
 |---|---|
-| **Token name** | Ce que vous reconnaîtrez dans la liste et dans le journal d'audit |
-| **Perimeter** | *Scheduled calls only* n'ouvre que `/api/schedules` ; *Read only* lit et lance les testeurs ; *Full access* fait tout ce que vous pouvez faire |
-| **Acts on** | Le plan de routage, l'identité applicative, ou tout ce que vous pouvez faire |
-| **Used from** | Des adresses ou des plages CIDR, séparées par des virgules. Jugées sur l'adresse qui se connecte, jamais sur un en-tête transmis |
-| **Expiry** | Jamais, 30 jours, 90 jours, ou un an |
+| **Token name** | Le nom sous lequel vous le retrouverez dans la liste et dans le journal d'audit |
+| **Perimeter** | *Scheduled calls only* donne accès à `/api/schedules` et à rien d'autre ; *Read only* lit et lance les testeurs ; *Full access* couvre tout ce que vous pouvez faire |
+| **Used from** | Des adresses ou des plages CIDR séparées par des virgules. La vérification porte sur l'adresse qui se connecte, jamais sur un en-tête transmis |
+| **Expiry** | Jamais, 30 jours, 90 jours ou 1 an |
 
-**Un périmètre ne fait que retirer** : au plus ce que vous êtes. Un jeton de portée
-gateway frappé par root pilote les routes et rien d'autre.
+**Un périmètre ne fait que retirer des droits** : un jeton peut au plus ce que vous
+pouvez. Un jeton en lecture seule émis par root lit tout ce que voit root et ne modifie
+rien.
 
-Le secret est **montré une seule fois**. Copiez-le alors ; il ne se récupère pas.
-Gardez-le dans une variable d'environnement plutôt que dans un fichier, parce qu'un
-fichier de configuration est une chose que les gens commitent.
+Le secret n'est **affiché qu'une seule fois**. Copiez-le à ce moment-là : il est
+impossible de le retrouver ensuite. Conservez-le dans une variable d'environnement
+plutôt que dans un fichier, car un fichier de configuration finit souvent dans un
+commit.
 
-Ensuite, chaque ligne propose : l'interrupteur (le jeton cesse de marcher, et peut
-être rallumé), **Edit** pour changer ce qu'il peut faire sans toucher au secret, **New
-secret** pour le tourner, et **Revoke**. La ligne montre le périmètre, le préfixe, la
-date de création, l'expiration et le dernier usage.
+Par la suite, chaque ligne propose : l'interrupteur d'activation (le jeton cesse de
+fonctionner et peut être réactivé), **Edit** pour modifier ce qu'il autorise sans
+toucher au secret, **New secret** pour renouveler le secret, et **Revoke**. La ligne
+indique le périmètre, le préfixe, la date de création, la date d'expiration et la
+dernière utilisation.
 
 > [!WARNING]
-> Un nouveau secret prend effet immédiatement. Ce qui utilise l'ancien est refusé
-> jusqu'à ce que le nouveau soit en place.
+> Un nouveau secret prend effet immédiatement. Tout ce qui utilise encore l'ancien est
+> refusé tant que le nouveau n'est pas en place.
 
 ## MCP
 
-Meerkat répond au Model Context Protocol sur le port d'administration, pour qu'un
-assistant puisse lire cette passerelle et y travailler avec vous. Il n'y a pas de port
-à ouvrir : le point d'entrée est là où votre console est déjà.
+Meerkat répond au Model Context Protocol sur le port d'administration : un assistant
+peut ainsi lire cette gateway et y travailler avec vous. Aucun port à ouvrir :
+l'endpoint se trouve là où se trouve déjà votre console.
 
-![L'écran MCP : l'interrupteur du point d'entrée, le sélecteur de client avec la commande à coller, et aucune connexion](img/console/mcp.webp)
+![L'écran MCP : l'interrupteur de l'endpoint, le sélecteur de client avec la commande à coller, et une liste d'agents connectés encore vide](img/console/mcp.webp)
 
-Le point d'entrée est allumé et montre son URL, le sélecteur de client est sur
-Claude Code avec la commande d'une ligne prête à copier, et aucun agent n'est
-encore branché.
+L'endpoint est activé et affiche son URL, le sélecteur de client est positionné sur
+Claude Code avec la commande d'une ligne prête à être copiée, et aucun agent n'est
+encore connecté.
 
-Il est livré **éteint**. L'interrupteur en haut l'allume et montre l'URL.
+Il est livré **désactivé**. L'interrupteur en haut de l'écran l'active et affiche l'URL.
 
-**Connect an agent** donne la commande exacte pour Claude Code, Gemini CLI, Kimi CLI,
-Codex CLI, ou un bloc JSON générique pour le reste. Le premier appel ouvre votre
-navigateur sur cette console : vous vous connectez, vous choisissez ce que l'agent peut
-faire, et **aucune clé n'est jamais écrite dans un fichier**.
+**Connect an agent** fournit la commande exacte pour Claude Code, Gemini CLI, Kimi CLI
+et Codex CLI, ou un bloc JSON générique pour tout autre client. Le premier appel ouvre
+votre navigateur sur cette console : vous vous connectez, vous choisissez ce que
+l'agent a le droit de faire, et **aucune clé n'est jamais écrite dans un fichier**.
 
-**Connected agents** liste ce qui est branché, avec le périmètre de chacun et son
-dernier usage, et en débranche un d'un clic.
+**Connected agents** liste les agents connectés, avec le périmètre de chacun et la date
+de sa dernière utilisation, et permet d'en déconnecter un en un clic.
 
-Pour un client qui ne sait pas s'authentifier par un navigateur, le panneau *My client
-cannot do that* montre la même commande avec un en-tête porteur, et renvoie vers Access
-tokens.
+Pour un client incapable de s'authentifier par un navigateur, le panneau *My client
+cannot do that* affiche la même commande avec un en-tête Bearer et renvoie vers
+Access tokens.
 
-Chaque changement fait par un agent est écrit dans le journal d'audit avec le nom du
-jeton à côté de celui du compte - *admin, via claude-desktop* et non *admin* - et un
-[point de reprise](/docs/console/configuration) est écrit après, comme pour tout
-autre changement.
+Chaque modification faite par un agent est inscrite dans le journal d'audit avec le nom
+du jeton à côté de celui du compte - *admin, via claude-desktop*, et non *admin* - et
+un [point de reprise](/docs/console/configuration) est créé à sa suite, comme pour toute
+autre modification.
 
 ## API
 
-L'entrée **API** du rail montre la référence REST du plan de contrôle - la page
-swagger-ui que la passerelle sert - et les appels sont essayés **avec votre vraie
-session** : être dans la console EST l'autorisation. C'est la même surface qu'un jeton
-pilote.
+L'entrée **API** du rail affiche la référence REST du plan de contrôle - la page
+swagger-ui que sert la gateway - et les appels s'y essaient **avec votre véritable
+session** : être dans la console vaut autorisation. C'est la même surface que celle
+que pilote un jeton.
 
 ## Pièges
 
-- **Read only est le défaut à la frappe**, et c'est en général ce qu'on veut. Elargir
-  est une modification ; un jeton full access qui fuit ne l'est pas.
-- **Un jeton agit comme vous.** Supprimer le compte qui le possède emporte ses
+- **Read only est la valeur par défaut à la création**, et c'est en général ce qu'il
+  vous faut. Élargir un périmètre se fait en une modification ; rattraper la fuite d'un
+  jeton à accès complet, non.
+- **Un jeton agit en votre nom.** Supprimer le compte qui le détient lui retire ses
   pouvoirs.
-- **Un agent branché n'est pas dans la liste des jetons.** C'est une connexion, et elle
-  se voit et se coupe sous MCP.
-- **Le périmètre des appels planifiés existe pour les services** : une crédentiale qui
-  vit dans un manifeste de déploiement est celle qui a le plus de chances de fuiter et le
-  moins d'être tournée. Voir [les appels planifiés](/docs/operations/scheduler).
+- **Un agent connecté n'apparaît pas dans la liste des jetons.** C'est une connexion :
+  elle se consulte et se coupe sous MCP.
+- **Le périmètre des appels planifiés existe pour les services backend** : un
+  identifiant qui vit dans un manifeste de déploiement est celui qui risque le plus de
+  fuiter et qui a le moins de chances d'être renouvelé. Voir
+  [les appels planifiés](/docs/operations/scheduler).

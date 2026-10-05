@@ -1,109 +1,118 @@
 ---
-title: Général et Security
+title: Général et sécurité
 section: La console
 order: 166
-summary: Ce qu'est cette installation, les langues qu'elle parle, et les politiques sous lesquelles vivent tous les comptes.
+summary: Ce qu'est cette installation, les langues qu'elle parle, et les politiques auxquelles tous les comptes sont soumis.
 ---
 
-# Général et Security
+# Général et sécurité
 
-Trois écrans en tête du plan **Application**. Ils portent ce qui est vrai de toute
-l'application, et y écrire demande la capacité `app admin` (ou `root`).
+Deux écrans du plan **Application**. Ils regroupent ce qui vaut pour l'application
+entière, et il faut la capacité `app admin` (ou `root`) pour y écrire.
 
 ## General
 
-![L'écran General : l'interrupteur des organisations, le mode développeur, et la grille hebdomadaire des heures ouvrées](img/console/general.webp)
+![L'écran General : l'interrupteur des organisations, le mode développeur et la grille hebdomadaire des heures ouvrées](img/console/general.webp)
 
-Les deux interrupteurs, puis les heures ouvrées : un fuseau et une ligne par
-jour, chacune avec sa fenêtre et un + pour en ajouter une seconde.
+Les deux interrupteurs, puis les heures ouvrées : un fuseau horaire et une ligne par
+jour, chacune avec sa plage horaire et un + pour en ajouter une seconde.
 
-Deux affirmations sur ce que cette installation **est**, et une fenêtre d'accès.
+Deux déclarations sur ce que cette installation **est**, et une plage d'accès.
 
-**Several organisations.** Eteint, cette passerelle sert une organisation et ne la
-nomme jamais : ses groupes et ses membres sont administrés ici même, sous Application.
-Allumé, les organisations obtiennent leur entrée dans le rail. Redescendre à une seule
-organisation demande d'abord, et compte ce qui cesse d'être servi : rien n'est supprimé,
-et rebasculer ramène aussitôt les organisations et leurs accès.
-
-> [!NOTE]
-> Edition Enterprise : plusieurs organisations.
-
-**Developer mode.** Allumé, les comptes qui portent la capacité `dev` obtiennent leur
-outillage sur les applications que cette passerelle sert : le menu Developer dans le
-bouton utilisateur, le mode test de l'UI, la doc API des routes. Eteint, rien de tout
-cela n'existe, quel que soit le nombre de comptes qui portent la capacité. Gratuit dans
-les deux éditions.
-
-Si la passerelle est déclarée de production là où elle tourne, l'interrupteur est
-désactivé et le dit : la surface développeur reste fermée quoi que dise la console, pour
-qu'une base restaurée depuis une préproduction ne puisse pas la rouvrir.
-
-**Working hours** est la fenêtre d'accès de toute l'application, que chaque organisation
-hérite sauf si elle définit la sienne.
+**Several organisations.** Désactivé, cette gateway sert une seule organisation et
+ne la nomme jamais : ses groupes et ses membres s'administrent ici même, sous
+Application. Activé, les organisations ont leur propre entrée dans le rail. **Revenir**
+à une seule organisation demande d'abord confirmation, en comptant ce qui cessera
+d'être servi : rien n'est supprimé, et réactiver l'option rétablit aussitôt les
+organisations et leurs accès.
 
 > [!NOTE]
-> Edition Enterprise : les heures ouvrées.
+> Édition Enterprise : plusieurs organisations.
 
-> **Les locales ont déménagé.** Une réserve de langues valable pour toute la gateway
-> vivait ici, chaque route décochant celles qu'elle ne prenait pas en charge. Cela se lit
-> à l'envers : personne ne sait ce qu'une gateway parle, les applications derrière elle
-> le savent. Une route déclare désormais ce en quoi elle est écrite, dans
-> **Routes > (une route) > Locales**, et ce que l'installation offre est l'union de ces
-> déclarations - déployez une route qui parle polonais et la page de connexion offre le
-> polonais, retirez-la et l'offre rétrécit avec elle. Rien à tenir en phase, et aucun
-> écran qu'il faut penser à élargir.
+**Developer mode.** Activé, les comptes dotés de la capacité `dev` disposent de leurs
+outils sur les applications que sert cette gateway : le menu Developer du bouton
+utilisateur, le mode de test de l'interface, la documentation d'API des routes.
+Désactivé, rien de tout cela n'existe, quel que soit le nombre de comptes dotés de la
+capacité. Gratuit dans les deux éditions.
+
+Si la gateway est déclarée en production là où elle tourne, l'interrupteur est
+grisé et l'indique : la surface développeur reste fermée quoi qu'en dise la console,
+si bien qu'une base de données restaurée depuis la préproduction ne peut pas la
+rouvrir.
+
+**Working hours** définit la plage d'accès de toute l'application : chaque organisation
+en hérite, sauf si elle définit la sienne.
+
+> [!NOTE]
+> Édition Enterprise : les heures ouvrées.
+
+> **Les langues ont déménagé.** Une liste de langues commune à toute la gateway se
+> trouvait auparavant ici, et chaque route décochait celles qu'elle ne prenait pas en
+> charge. C'était prendre le problème à l'envers : personne ne sait quelles langues
+> parle une gateway, ce sont les applications placées derrière elle qui le savent.
+> Une route déclare désormais les langues dans lesquelles elle est écrite, sous
+> **Routes > (une route) > Locales**, et l'installation propose l'union de ces
+> déclarations - déployez une route qui parle polonais et la page de connexion propose
+> le polonais, retirez-la et l'offre se réduit d'autant. Rien à synchroniser, et aucun
+> écran à penser à compléter.
 
 ## Security
 
-Les politiques sous lesquelles vivent tous les comptes. Un bouton Save en bas pour tout
-l'écran.
+Les politiques auxquelles tous les comptes sont soumis. Un seul bouton Save, en bas,
+pour tout l'écran.
 
-![L'écran Security sur la politique de mot de passe : les genres de caractères, l'historique, l'expiration et la durée d'un mot de passe temporaire](img/console/security.webp)
+![L'écran Security sur la politique de mots de passe : les types de caractères, l'historique, l'expiration et la durée de validité d'un mot de passe temporaire](img/console/security.webp)
 
-- **Two-factor** - exiger un second facteur pour tout le monde ; les organisations et
-  les membres peuvent surcharger. A côté, **un code à usage unique par courriel** comme
-  secours pour un utilisateur enrôlé qui n'atteint pas son authentificateur : il faut un
-  [relais mail](/docs/console/mail-relay), et il n'apparaît que pour les comptes qui
-  portent une adresse et ont déjà configuré un authentificateur.
-- **Session TTL** - combien de temps une session vit avant qu'il faille se reconnecter.
-- **Passwords** - ce qu'un nouveau mot de passe doit contenir : longueur, et combien de
-  minuscules, majuscules, chiffres et caractères spéciaux. **Zéro veut dire que la règle
-  n'est pas demandée**, et une règle non demandée n'est pas montrée aux utilisateurs non
-  plus. L'écran prévisualise exactement la liste qu'ils liront. Si les genres exigent
-  déjà plus de caractères que la longueur, il dit que la longueur sera relevée à
-  l'enregistrement.
-  - **No reuse of the last N** - les anciens mots de passe sont gardés en empreintes et
-    comparés au choix d'un nouveau, celui en usage compris.
-  - **Expires after (days)** - vérifié à la connexion, pas par une horloge : un mot de
-    passe expiré envoie la personne sur la page de changement plutôt que de terminer une
-    session dans laquelle elle travaille. Un mot de passe dont l'âge est inconnu n'expire
-    jamais.
-  - **Temporary (hours)** - combien de temps marche un mot de passe émis par un
-    administrateur avant que son titulaire le remplace. Au-delà, la connexion est
-    refusée. La fenêtre qui affiche le mot de passe dit combien de temps il marche.
-  - **Force a change for everyone** (root) fait changer chaque compte local à sa
-    prochaine connexion, sauf le vôtre. Un compte à la fois se fait dans
-    [Users](/docs/console/users).
-- **Rate limiting** - connexions échouées par adresse et par compte dans la fenêtre, et
-  codes de second facteur erronés par compte. Zéro désactive un limiteur.
-- **Passkeys** - laisser les utilisateurs enregistrer des passkeys et se connecter avec,
-  à la place du mot de passe et du second facteur.
-- **API tokens** - laisser les utilisateurs frapper des jetons d'accès personnels depuis
-  leur profil, pour appeler les routes API derrière la passerelle sans session de
-  navigateur. Un jeton agit avec le contexte de l'utilisateur au moment de sa création.
-  Ce sont les jetons des utilisateurs, pas les
+- **Two-factor** - impose un second facteur à tout le monde ; les organisations et les
+  membres peuvent déroger à ce réglage. Juste à côté, **un code à usage unique envoyé
+  par e-mail** sert de solution de secours à un utilisateur déjà enrôlé qui n'a pas
+  accès à son application d'authentification : il nécessite un
+  [relais de messagerie](/docs/console/mail-relay) et n'est proposé qu'aux comptes qui
+  ont une adresse et ont déjà configuré une application d'authentification.
+- **Session TTL** - la durée de vie d'une session avant que l'utilisateur doive se
+  reconnecter.
+- **Passwords** - ce que doit contenir un nouveau mot de passe : sa longueur, et le
+  nombre de minuscules, de majuscules, de chiffres et de caractères spéciaux. **Zéro
+  signifie que la règle n'est pas exigée**, et une règle qui n'est pas exigée n'est pas
+  non plus montrée aux utilisateurs. L'écran affiche un aperçu exact de la liste que
+  liront vos utilisateurs. Si les types de caractères exigent déjà plus de caractères
+  que la longueur, il signale que la longueur sera relevée à l'enregistrement.
+  - **No reuse of the last N** - les anciens mots de passe sont conservés sous forme
+    d'empreintes et comparés au nouveau mot de passe choisi, celui en cours compris.
+  - **Expires after (days)** - vérifié à la connexion, et non par une horloge : un mot
+    de passe expiré envoie la personne sur la page de changement, au lieu de mettre fin
+    à une session dans laquelle elle travaille. Un mot de passe dont l'âge est inconnu
+    n'expire jamais.
+  - **Temporary (hours)** - la durée pendant laquelle un mot de passe attribué par un
+    administrateur fonctionne avant que son titulaire le remplace. Passé ce délai, la
+    connexion avec ce mot de passe est refusée. La boîte de dialogue qui affiche le mot
+    de passe indique sa durée de validité.
+  - **Force a change for everyone** (root) oblige chaque compte local à changer de mot
+    de passe à sa prochaine connexion, le vôtre excepté. Pour un seul compte à la fois,
+    passez par [Users](/docs/console/users).
+- **Rate limiting** - le nombre d'échecs de connexion par adresse et par compte sur une
+  période donnée, et le nombre de codes de second facteur erronés par compte. Zéro
+  désactive une limite.
+- **Passkeys** - autorise les utilisateurs à enregistrer des passkeys et à s'en servir
+  pour se connecter, à la place du mot de passe et du second facteur.
+- **API tokens** - autorise les utilisateurs à créer des jetons d'accès personnels
+  depuis leur profil, pour appeler les routes d'API situées derrière la gateway sans
+  session de navigateur. Un jeton agit avec le contexte qu'avait l'utilisateur au
+  moment de sa création. Il s'agit des jetons des utilisateurs, pas des
   [jetons d'administration](/docs/console/access-and-agents).
-- **Trusted browsers** - laisser les utilisateurs sauter le challenge du second facteur
-  sur un navigateur qu'ils marquent comme sûr, pour une durée que vous choisissez.
+- **Trusted browsers** - autorise les utilisateurs à ne plus saisir le second facteur
+  sur un navigateur qu'ils déclarent de confiance, pendant une durée que vous
+  choisissez.
 
 ## Pièges
 
-- **General enregistre au bouton, mais pas ses deux interrupteurs.** Le mode
-  d'organisation et le mode développeur prennent effet au clic ; les heures ouvrées
+- **General enregistre avec le bouton, mais pas ses deux interrupteurs.** Le mode
+  d'organisation et le mode développeur prennent effet dès le clic ; les heures ouvrées
   attendent Save.
-- **Les langues sont celles de l'application, pas de la console.** La console est en
-  anglais seulement.
-- **Une politique de mot de passe vide accepte n'importe quoi**, aussi court que ce soit.
-  L'écran le dit en toutes lettres.
-- **Session TTL est sur Security, pas sur General** : combien de temps on reste connecté
-  est une politique de sécurité, à côté du second facteur qui garde la même session.
+- **Les langues sont celles des applications, pas celles de la console.** La console
+  n'existe qu'en anglais, et ce que proposent les pages intégrées vient des routes.
+- **Une politique de mots de passe vide accepte n'importe quoi**, même un mot de passe
+  très court. L'écran le dit en toutes lettres.
+- **Session TTL se trouve dans Security, pas dans General** : la durée pendant laquelle
+  on reste connecté est une politique de sécurité, au même titre que le second facteur
+  qui protège cette même session.

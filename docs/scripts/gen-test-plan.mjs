@@ -55,28 +55,28 @@ const mentions = (id, texts) => {
 
 const STATE = {
   en: { x: 'built', '~': 'partly built', ' ': 'not built', '-': 'retired' },
-  fr: { x: 'construite', '~': 'en partie', ' ': 'non construite', '-': 'retirée' },
+  fr: { x: 'construite', '~': 'en partie construite', ' ': 'non construite', '-': 'retirée' },
 };
 const FEAS = {
   en: { easy: 'easy', medium: 'medium', hard: 'hard', blocked: 'not built', out: 'nothing to test' },
-  fr: { easy: 'facile', medium: 'moyen', hard: 'difficile', blocked: 'non construite', out: 'rien à tester' },
+  fr: { easy: 'facile', medium: 'moyenne', hard: 'difficile', blocked: 'non construite', out: 'rien à tester' },
 };
 const FAMILY = {
   AUTH: ['Sign-in', 'Connexion'], MFA: ['Second factor', 'Second facteur'], RBAC: ['Roles and access', 'Rôles et accès'],
   MODEL: ['Account model', 'Modèle de compte'], TENANT: ['Organisations', 'Organisations'], ROUTE: ['Routing', 'Routage'],
-  SVC: ['Services', 'Services'], UIF: ['Injected UI', 'UI injectée'], PORTAL: ['Portal', 'Portail'],
-  SAUTH: ['Identity to the upstream', "Identité vers l'amont"], VAULT: ['Vault', 'Coffre'], SSL: ['TLS', 'TLS'],
+  SVC: ['Services', 'Services'], UIF: ['Injected UI', 'Interface injectée'], PORTAL: ['Portal', 'Portail'],
+  SAUTH: ['Identity to the upstream', "Identité transmise à l'upstream"], VAULT: ['Vault', 'Coffre'], SSL: ['TLS', 'TLS'],
   NOTIF: ['Notifications', 'Notifications'], SCHED: ['Scheduled calls', 'Appels planifiés'], I18N: ['Languages', 'Langues'],
   THEME: ['Themes', 'Thèmes'], CONSOLE: ['Console', 'Console'], LIFE: ['Lifecycle', 'Cycle de vie'],
   DEV: ['Developer tunnel', 'Tunnel développeur'], CFG: ['Configurations', 'Configurations'], PAGE: ['Pages', 'Pages'],
   QUOTA: ['Quotas', 'Quotas'], AUD: ['Audit', 'Audit'], ISSUE: ['Issues', 'Signalements'], MCP: ['Agents (MCP)', 'Agents (MCP)'],
-  SEC: ['Security', 'Sécurité'], PERF: ['Performance and cluster', 'Performance et cluster'], OBS: ['Observability', 'Observabilité'],
+  SEC: ['Security', 'Sécurité'], PERF: ['Performance and cluster', 'Performances et cluster'], OBS: ['Observability', 'Observabilité'],
   DEPLOY: ['Deployment', 'Déploiement'], STORE: ['Storage', 'Stockage'], QUAL: ['Quality', 'Qualité'],
 };
 
 const AREA = {
   Deployment: 'Déploiement', Upgrade: 'Montée de version', Cluster: 'Cluster', Edition: 'Édition',
-  Security: 'Sécurité', Soak: 'Endurance', Performance: 'Performance', Lifecycle: 'Cycle de vie',
+  Security: 'Sécurité', Soak: 'Endurance', Performance: 'Performances', Lifecycle: 'Cycle de vie',
 };
 
 const W = {
@@ -109,24 +109,24 @@ const W = {
   },
   fr: {
     title: 'Plan de test',
-    summary: "Chaque fonction, ce que la plateforme de test doit prouver à son sujet, sur quelles cibles et éditions, et dans quel ordre.",
+    summary: "Pour chaque fonctionnalité, ce que la plateforme de test doit prouver, sur quelles cibles, dans quelles éditions et dans quel ordre.",
     intro:
-      "Cette page est assemblée à partir de trois sources : `e2e/platform/plan.json` (ce que chaque fonction doit prouver, où, avec quelle urgence et quelle difficulté), " +
-      "`FEATURES.md` (où en est la fonction) et les sources de test (qui la citent déjà). La plateforme elle-même - cibles, services de test, " +
-      'chaîne CI - est décrite sur [Plateforme de test](/project/test-platform).',
+      "Cette page est assemblée à partir de trois sources : `e2e/platform/plan.json` (ce que chaque fonctionnalité doit prouver, où, avec quelle urgence et quelle difficulté), " +
+      "`FEATURES.md` (l'état d'avancement de la fonctionnalité) et les sources des tests (ceux qui la citent déjà). La plateforme elle-même - cibles, services de test, " +
+      'chaîne de CI - est décrite sur la page [Plateforme de test](/project/test-platform). Les titres des fonctionnalités viennent de FEATURES.md.',
     targets: 'Les cibles',
     legend: 'Les priorités',
     prios: [
-      ['P0', "bloque une release : l'image, les cibles, le cluster et la montée de version"],
-      ['P1', "les fonctions pour lesquelles on déploie Meerkat, prouvées via l'image"],
-      ['P2', 'le reste de ce qui est construit, prouvé là où la plateforme apporte ce que les tests unitaires ne peuvent pas'],
-      ['P3', "assez couvert par les suites unitaire et d'intégration ; sur la plateforme quand c'est commode"],
+      ['P0', "bloque la publication d'une version : l'image, les cibles, le cluster et la montée de version"],
+      ['P1', "les fonctionnalités pour lesquelles on déploie Meerkat, prouvées à travers l'image"],
+      ['P2', 'le reste de ce qui est construit, prouvé là où la plateforme apporte ce que les tests unitaires ne peuvent pas apporter'],
+      ['P3', "suffisamment couvert par les suites unitaires et d'intégration ; sur la plateforme quand l'occasion se présente"],
       ['-', 'non construite, retirée, ou rien à tester'],
     ],
     totals: 'En chiffres',
-    platform: 'Contrôles de plateforme',
-    platformIntro: "Ce qui n'appartient à aucune fonction : déployer, monter de version, perdre un nœud, tenir des heures.",
-    cols: ['ID', 'Fonction', 'Ce qui doit être prouvé', 'Cibles', 'Éditions', 'Priorité', 'Faisabilité', "Tests qui la citent aujourd'hui"],
+    platform: "Contrôles à l'échelle de la plateforme",
+    platformIntro: "Ce qui ne relève d'aucune fonctionnalité en particulier : déployer, monter de version, perdre un nœud, tourner pendant des heures.",
+    cols: ['ID', 'Fonctionnalité', 'Ce qui doit être prouvé', 'Cibles', 'Éditions', 'Priorité', 'Faisabilité', "Tests qui la citent aujourd'hui"],
     pcols: ['ID', 'Domaine', 'Ce qui doit être prouvé', 'Cibles', 'Éditions', 'Priorité', 'Faisabilité'],
     unit: 'Go',
     it: 'e2e',

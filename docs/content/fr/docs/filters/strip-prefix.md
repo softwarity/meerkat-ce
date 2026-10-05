@@ -2,21 +2,21 @@
 title: strip-prefix
 section: Filtres
 order: 93
-summary: Retire les N premiers segments du chemin avant de proxifier.
+summary: Retire les N premiers segments du chemin avant l'envoi à l'upstream.
 ---
 
 # strip-prefix
 
-La gateway publie `/demo/orders`, le service ne connaît que `/orders`. Le filtre le
-plus utilisé du catalogue : c'est lui qui permet de monter une application sous un
-chemin de votre choix sans que l'application le sache.
+La gateway publie `/demo/orders`, le service ne connaît que `/orders`. C'est le
+filtre le plus utilisé du catalogue : il permet de monter une application sous le
+chemin de votre choix sans qu'elle en sache rien.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
-| `parts` | entier | non | Nombre de segments de tête retirés. Défaut : `1`. Au moins `1`. |
-| `announcePrefix` | booléen | non | Dire au service où il est publié, en `X-Forwarded-Prefix`. Défaut : `true`. |
+| `parts` | entier | non | Nombre de segments retirés en tête du chemin. Par défaut : `1`. Au moins `1`. |
+| `announcePrefix` | booléen | non | Indique au service où il est publié, dans `X-Forwarded-Prefix`. Par défaut : `true`. |
 
 ## Exemple
 
@@ -32,31 +32,31 @@ filters:
       parts: 1
 ```
 
-`/demo/orders/8814` arrive au service en `/orders/8814`, avec
+`/demo/orders/8814` arrive au service sous la forme `/orders/8814`, avec
 `X-Forwarded-Prefix: /demo`.
 
 ## Notes
 
-`X-Forwarded-Prefix` est ce par quoi un service qui **construit** ses liens
-apprend où il vit. Sans lui, une application qui voit `/orders` écrit `/orders`, le
-navigateur suit, et ça atterrit hors de la route. Spring lit cet en-tête par son
-`ForwardedHeaderFilter`, nginx le pose ; un service qui ne fait que répondre n'en a
-pas besoin.
+C'est par `X-Forwarded-Prefix` qu'un service qui **construit** ses propres liens
+apprend où il est publié. Sans lui, une application qui voit `/orders` écrit
+`/orders`, le navigateur suit le lien, et il aboutit hors de la route. Spring lit
+cet en-tête avec `ForwardedHeaderFilter`, nginx l'écrit ; un service qui se
+contente de répondre n'en a pas besoin.
 
-Ce qu'un appelant envoie sous ce nom est purgé, sur toutes les routes, même celles
-sans `strip-prefix` : un appelant qui poserait son propre préfixe ferait écrire au
-service des liens là où il l'a demandé.
+Ce qu'un appelant a envoyé sous ce nom est purgé, sur toutes les routes, même
+celles qui n'ont pas de `strip-prefix` : un appelant qui fournirait son propre
+préfixe ferait écrire au service ses liens là où il l'a décidé.
 
-**Au retour, le préfixe est remis** sur les deux choses que le navigateur suit sans
-rien demander : le `<base href>` d'une page (`<base href="/">` devient
-`<base href="/demo/">`, sinon ses scripts sont cherchés à la racine de la passerelle)
-et le `Location` d'une redirection que le service écrit depuis sa propre racine ou
-vers sa propre adresse. Une base ou une redirection déjà sous le préfixe, relative,
-ou vers un autre site n'est pas touchée.
+**Au retour, le préfixe est rétabli** sur les deux éléments qu'un navigateur suit
+sans rien demander : le `<base href>` d'une page (`<base href="/">` devient
+`<base href="/demo/">`, faute de quoi ses scripts sont cherchés à la racine de la
+gateway) et le `Location` d'une redirection que le service écrit depuis sa
+propre racine ou vers sa propre adresse. Une base ou une redirection déjà sous le
+préfixe, relative, ou vers un autre site n'est pas modifiée.
 
 Deux `strip-prefix` à la suite fonctionnent : le préfixe annoncé s'élargit à ce qui
-a réellement été consommé au lieu d'être écrasé.
+a réellement été retiré, au lieu d'être écrasé.
 
-Une application qui construit des liens absolus veut en général aussi
-[preserve-host](/docs/filters/preserve-host) : le préfixe dit où, l'hôte dit sous
+Une application qui construit des liens absolus a généralement besoin aussi de
+[preserve-host](/docs/filters/preserve-host) : le préfixe dit où, le Host dit sous
 quel nom.

@@ -2,87 +2,86 @@
 title: Démarrage rapide
 section: Démarrer
 order: 2
-summary: Lancer la gateway, se connecter à la console, et voir passer du trafic - en cinq minutes environ.
+summary: Lancez la gateway, connectez-vous à la console et regardez passer le trafic - en cinq minutes environ.
 ---
 
 # Démarrage rapide
 
 Deux ports, un conteneur, aucune base de données à installer. À la fin de cette
-page vous avez une gateway qui tourne, un compte administrateur, et une requête
-qui est passée par elle.
+page, vous disposez d'une gateway en marche, d'un compte administrateur et
+d'une requête qui l'a traversée.
 
 ## Lancer la gateway
 
-```bash
-docker run -d --name meerkat \
-  -p 8080:8080 -p 9090:9090 \
-  -e MEERKAT_ADMIN_PASSWORD='choisissez-en-un' \
-  -v meerkat-data:/data \
-  docker.io/softwarity/meerkat:latest
-```
+Choisissez votre édition et votre plateforme : les commandes et les fichiers
+ci-dessous s'y adaptent.
 
-Les deux ports publiés sont deux métiers différents :
+::: widget install
+:::
 
-| Port | Plan | Qui l'atteint |
+Les deux ports publiés remplissent deux fonctions distinctes :
+
+| Port | Plan | Qui s'y connecte |
 |---|---|---|
-| 8080 | plan de données | vos utilisateurs - c'est celui qui fait face au réseau |
-| 9090 | plan de contrôle | la console d'administration - gardez-le interne |
+| 8080 | plan de données | vos utilisateurs - c'est le port exposé au réseau |
+| 9090 | plan de contrôle | la console d'administration - gardez-le en interne |
 
 `/data` contient tout ce que la gateway sait : les routes, les comptes, le
-coffre, les certificats. Sauvegardez ce volume et vous avez sauvegardé la
-gateway.
+coffre, les certificats. Sauvegarder ce volume, c'est sauvegarder la gateway.
 
 > [!WARNING]
-> Ne publiez jamais le plan de contrôle sur Internet. C'est la console et l'API
-> d'administration ; rien là-dedans n'est destiné à être public.
+> N'exposez jamais le plan de contrôle sur Internet. Il porte la console et
+> l'API d'administration ; rien de tout cela n'a vocation à être public.
 
 ## Le premier administrateur
 
-À son tout premier démarrage - et seulement quand la table des comptes est
-vide - la gateway crée un compte, `admin`, avec les droits globaux.
+À son tout premier démarrage - et uniquement si la table des comptes est
+vide - la gateway crée un compte, `admin`, doté des droits globaux.
 
-- Si `MEERKAT_ADMIN_PASSWORD` est définie, c'est son mot de passe.
-- Sinon, un mot de passe est généré et écrit **une seule fois** dans le journal, sur une ligne d'avertissement. Le compte est alors marqué pour changer de mot de passe à la première connexion.
+- Si `MEERKAT_ADMIN_PASSWORD` est définie, sa valeur devient le mot de passe de ce compte.
+- Sinon, un mot de passe est généré et écrit **une seule fois** dans le journal, sur une ligne d'avertissement. Le compte devra alors changer de mot de passe à sa première connexion.
 
 ```bash
 docker logs meerkat | grep 'admin account created'
 ```
 
 > [!NOTE]
-> La variable n'est lue que tant qu'aucun compte n'existe. La définir plus tard
-> ne change rien, et ce n'est pas un moyen de réinitialiser un mot de passe
+> La variable n'est lue que tant qu'il n'existe aucun compte. La définir plus
+> tard ne change rien : elle ne permet pas de réinitialiser un mot de passe
 > oublié.
 
 ## Se connecter à la console
 
-Ouvrez **http://localhost:9090** et connectez-vous en `admin`. Si le mot de
-passe a été généré, la console en réclame un nouveau avant de vous laisser aller
-ailleurs.
+Ouvrez **http://localhost:9090** et connectez-vous avec le compte `admin`. Si le
+mot de passe a été généré, la console vous en demande un nouveau avant de vous
+laisser aller plus loin.
 
-La console a elle-même deux plans dans sa navigation de gauche : **Infra** pour
-l'installation (routes, TLS, autorités d'authentification, configuration) et
-**Application** pour ce que vos utilisateurs rencontrent (comptes, rôles, pages
-intégrées, portail).
+## Faire passer une première requête
 
-## Voir passer du trafic
+Une gateway neuve est **vide** : elle n'a aucune route, donc toutes les adresses
+du port 8080 répondent 404. Donnez-lui en une, qui pointe vers un service de
+test public :
 
-Une gateway neuve démarre **vide** : aucune route, donc chaque chemin du plan de
-données répond 404 tant que vous n'avez pas dit ce qu'elle sert. Les pages de
-connexion sont déjà là (`http://localhost:8080/login`) : elles appartiennent à la
-gateway, pas à une route.
+1. Dans la console, ouvrez **Infra > Routes** et cliquez sur **New route**.
+   Nommez-la `demo`.
+2. Dans **Target**, gardez **Proxy** et saisissez l'upstream :
+   `https://httpbin.org`.
+3. Dans **Predicates**, ajoutez un prédicat **path** avec le motif `/demo/**`.
+4. Dans **Incoming**, ajoutez un filtre **strip-prefix** avec `1` segment : le
+   service de test connaît `/get`, pas `/demo/get`.
+5. Cliquez sur **Save**. La route sert aussitôt, sans rien redémarrer.
 
-Ajoutez-en une dans la console, **Infra, Routes**, ou par l'API - pointer vers un
-service de test public suffit pour voir passer un appel :
+Ouvrez ensuite **[http://localhost:8080/demo/get](http://localhost:8080/demo/get)**
+dans votre navigateur.
 
-```bash
-curl -i http://localhost:8080/demo/get
-```
-
-avec une route qui prend `/demo/**`, retire un segment, et vise
-`https://httpbin.org`. [Votre première route](/docs/start/first-route) le fait pas
-à pas.
+Ce que vous voyez est la réponse de httpbin : la requête telle que le service
+l'a reçue, avec les en-têtes que la gateway a ajoutés au passage. L'appel est
+entré par la gateway et ressorti vers le service. Ouvrez **Metrics** dans la
+console pour le voir compté, sur la route `demo`.
 
 ## Ensuite
 
-Faire pointer une route vers un de vos propres services : [Votre première
-route](/docs/start/first-route).
+Cette route est ouverte à tous et pointe vers le service de quelqu'un d'autre.
+[Votre première route](/docs/start/first-route) place un de vos services
+derrière la gateway, dit qui peut l'atteindre, et la vérifie avant vos
+utilisateurs.

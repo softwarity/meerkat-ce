@@ -133,10 +133,10 @@ The grant **follows the tunnel** rather than a switch of its own.
 `production: true` closes the developer surface: the gateway opens no tunnel,
 and the chart then grants strictly nothing - a right nobody exercises is
 surface for nothing. Otherwise the tunnel can open - it does once it is switched
-on under **Infra, Plug** - so the deployment grants what it may be asked to use, which is why `plug.enabled` defaults to
-**true**: the other way round - the tunnel open, the rights missing - is the one
-combination that cannot work, with an agent saying every minute that it cannot
-do its job. `plug.enabled: false` still refuses the grant outright, for an
+on under **Infra, Plug** - so the deployment grants what it may be asked to use,
+which is why `plug.enabled` defaults to **true**: the other way round - the
+tunnel open, the rights missing - is the one combination that cannot work, with
+an agent saying every minute that it cannot do its job. `plug.enabled: false` still refuses the grant outright, for an
 installation that wants the developer surface without the tunnel.
 
 On OpenShift or OKD the chart installs as it is, under the default SCC - see [OpenShift and OKD](/docs/deploy/kubernetes#openshift-and-okd) before overriding its security context.

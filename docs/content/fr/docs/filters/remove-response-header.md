@@ -2,13 +2,13 @@
 title: remove-response-header
 section: Filtres
 order: 78
-summary: Retire un en-tête de réponse avant qu'il n'atteigne le client.
+summary: Retire un en-tête de la réponse avant qu'elle n'atteigne le client.
 ---
 
 # remove-response-header
 
-Retire un en-tête de la réponse. Son usage quotidien, c'est ce qu'un service dit
-de lui-même : son framework, sa version, le nom de la machine qui a répondu.
+Retire un en-tête de la réponse. Son usage courant : ce qu'un service dit de
+lui-même, à savoir son framework, sa version, le nom de la machine qui a répondu.
 
 ## Paramètres
 
@@ -27,8 +27,10 @@ filters:
 
 ## Notes
 
-Toutes les valeurs sous ce nom partent avant que la réponse n'atteigne le client.
+Toutes les valeurs portées par ce nom disparaissent avant que la réponse
+n'atteigne le client.
 
-Quand c'est la valeur qui pose problème plutôt que l'en-tête, utilisez
-[rewrite-response-header](/docs/filters/rewrite-response-header) : retirer
-`Server` en dit autant à un lecteur attentif que de le laisser.
+Quand c'est la valeur qui pose problème et non l'en-tête, utilisez
+[rewrite-response-header](/docs/filters/rewrite-response-header) : supprimer
+purement et simplement `Server` en dit autant à un lecteur attentif que de le
+laisser.

@@ -2,13 +2,13 @@
 title: remove-request-header
 section: Filtres
 order: 77
-summary: Retire un en-tête de requête avant de proxifier.
+summary: Retire un en-tête de la requête avant l'envoi à l'upstream.
 ---
 
 # remove-request-header
 
-Empêche un en-tête d'atteindre le service : quelque chose que l'appelant n'a pas à
-envoyer, ou un nom que l'application lirait comme une instruction.
+Empêche un en-tête d'atteindre le service - un en-tête que l'appelant n'a pas à
+envoyer, ou un nom que l'application lirait comme une consigne.
 
 ## Paramètres
 
@@ -27,9 +27,10 @@ filters:
 
 ## Notes
 
-Toutes les valeurs sous ce nom partent. Les noms d'en-tête ne sont pas sensibles à
-la casse : `x-internal-debug` et `X-Internal-Debug` sont le même en-tête.
+Toutes les valeurs portées par ce nom disparaissent. Les noms d'en-tête sont
+insensibles à la casse : `x-internal-debug` et `X-Internal-Debug` désignent le
+même en-tête.
 
 Pour retirer un cookie, utilisez
-[remove-request-cookie](/docs/filters/remove-request-cookie) : les cookies
-partagent tous un seul en-tête, et le supprimer emporterait la session.
+[remove-request-cookie](/docs/filters/remove-request-cookie) : tous les cookies
+partagent un seul en-tête, et le supprimer emporterait la session avec lui.

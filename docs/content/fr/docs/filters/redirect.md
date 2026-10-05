@@ -2,25 +2,25 @@
 title: redirect
 section: Filtres
 order: 73
-summary: Répond une redirection au lieu de proxifier.
+summary: Répond par une redirection, sans rien transmettre à l'upstream.
 ---
 
 # redirect
 
-Répond une redirection sans rien appeler. Pour un chemin qui a déménagé, un
-raccourci qui doit atterrir ailleurs, ou une ancienne porte d'entrée maintenue
-après une migration.
+Répond par une redirection sans appeler quoi que ce soit. Pour un chemin qui a
+déménagé, un raccourci qui doit mener ailleurs, ou un ancien point d'entrée
+maintenu en vie après une migration.
 
-C'est un filtre **terminal** : rien n'est proxifié et aucun amont n'est appelé.
+C'est un filtre **terminal** : rien n'est transmis et aucun upstream n'est appelé.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
-| `location` | chaîne | oui | Où l'appelant est envoyé, en absolu ou en relatif. |
-| `status` | entier | non | Le statut de redirection, un `3xx`. Défaut : `302`. |
+| `location` | chaîne | oui | L'adresse vers laquelle l'appelant est envoyé, absolue ou relative. |
+| `status` | entier | non | Le statut de la redirection, en `3xx`. Par défaut : `302`. |
 
-Un statut hors des `3xx` est refusé à l'enregistrement de la route.
+Un statut hors de la plage `3xx` est refusé à l'enregistrement de la route.
 
 ## Exemple
 
@@ -34,10 +34,10 @@ filters:
 
 ## Notes
 
-Le `301` est permanent et les navigateurs le retiennent longtemps : c'est une
-décision qu'on ne peut plus reprendre pour ceux qui l'ont déjà reçue. Le `307` est
-temporaire et conserve la méthode, donc un `POST` reste un `POST`.
+`301` est permanent et les navigateurs s'en souviennent longtemps : c'est une
+décision sur laquelle vous ne pourrez pas revenir pour ceux qui l'ont déjà reçue.
+`307` est temporaire et conserve la méthode : un `POST` reste un `POST`.
 
-Une route qui redirige n'a pas besoin d'amont. Ses filtres de requête sont
-abandonnés, puisque rien n'est proxifié ; les filtres de réponse s'appliquent
+Une route qui redirige n'a pas besoin d'upstream. Ses filtres de requête sont
+ignorés, puisque rien n'est transmis ; ses filtres de réponse s'appliquent
 toujours.

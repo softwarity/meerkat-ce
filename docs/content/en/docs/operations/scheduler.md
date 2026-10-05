@@ -2,7 +2,7 @@
 title: Scheduled calls
 section: Operations
 order: 212
-summary: The gateway calls your services at the hour you name, with the identity of the account the schedule belongs to, and with no broker to install.
+summary: The gateway calls your services at the hour you name, carrying the roles the schedule asks for, and with no broker to install.
 ---
 
 # Scheduled calls
@@ -222,8 +222,8 @@ http://meerkat:9090/api/schedules
 
 A control-plane token whose **perimeter is `schedules`**: it opens this API and
 nothing else on this port - not the configuration, not the accounts, not the
-routes. Narrow on purpose: it lives in a deployment manifest, often in another team's repository, and it
-is the one nobody remembers to rotate.
+routes. Narrow on purpose: it lives in a deployment manifest, often in another
+team's repository, and it is the one nobody remembers to rotate.
 
 **What the calls may reach** is not decided here: it is the schedule's own
 `roles` field. So one backend keeps **one token** and schedules for as many
@@ -507,7 +507,7 @@ thing, you need a broker.
 
 ## What the operator sees
 
-**Scheduler**, in the rail, lists everything scheduled, filtered by account,
+**Scheduler**, in the rail, lists everything scheduled, filtered by
 organisation and service, updated live: a run starting, advancing and finishing
 appears without refreshing anything. Three actions live there, and they are the
 ones wanted at two in the morning: pause, bring the next turn forward, remove.

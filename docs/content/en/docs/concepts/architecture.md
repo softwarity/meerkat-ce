@@ -71,7 +71,7 @@ Your routes, and the pages the gateway serves in its own name:
 
 ## What lives on the control plane
 
-- `/api/...` - the admin API, about a hundred and fifty endpoints.
+- `/api/...` - the admin API, about two hundred endpoints.
 - `/` - the console, an Angular application embedded in the binary. English only, with no locale segment: it is an operator's tool.
 - `/login`, `/logout` - the console's own sign-in, so that origin is self-sufficient.
 - `/mcp` - the endpoint an agent connects to.

@@ -2,50 +2,116 @@
 title: Ce qu'est Meerkat
 section: Le produit
 order: 1
-summary: Une porte unique devant vos applications internes, qui prend en charge tout ce qui n'est pas le métier de vos équipes.
+summary: Un point d'entrée unique devant vos applications internes, qui se charge de tout ce qui n'est pas le cœur de métier de vos équipes.
 ---
 
 # Ce qu'est Meerkat
 
 Meerkat est une **app-gateway** : une porte unique devant les applications de
-votre organisation. Les requêtes arrivent sur Meerkat, il décide quoi en faire,
-puis il les transmet.
+votre organisation. Les requêtes arrivent à Meerkat, qui décide quoi en faire,
+puis les transmet.
 
-Ce qu'il prend en charge, pour que vos services n'aient pas à le faire :
+Ce dont il se charge, pour que vos services n'aient pas à le faire :
 
-- **Qui appelle** - pages de connexion, SSO, double facteur, jetons d'API, sessions.
-- **Qui a le droit de passer** - rôles, groupes, organisations, règles par route et par endpoint.
-- **Comment la requête voyage** - routage, réécriture, en-têtes, limites de débit, TLS.
-- **Ce qui se passe** - trafic, journal d'audit, métriques, santé des amonts.
+- **Qui appelle** - pages de connexion, authentification unique (SSO), plusieurs facteurs, jetons d'API, sessions.
+- **Qui peut passer** - rôles, groupes, organisations, règles par route et par endpoint.
+- **Comment la requête voyage** - routage, réécriture, en-têtes, rate limits, TLS.
+- **Ce qui se passe** - trafic, journal d'audit, métriques, santé des upstreams.
 
 ## Pourquoi une gateway
 
+Une application n'est plus un seul programme : c'est une dizaine de services,
+écrits par des équipes différentes. Une gateway place une porte unique devant
+eux. Le navigateur ne parle qu'à cette porte ; c'est elle qui décide qui entre
+et où va chaque requête, et les services derrière reçoivent des requêtes déjà
+vérifiées.
+
+::: figure gateway
+Une requête entre par la gateway, qui connecte l'utilisateur, vérifie ses
+droits, route et enregistre, puis la remet au bon service avec un JWT signé.
+Une requête sans le droit s'arrête à la porte.
+:::
+
+
 Une application interne démarre en général sans rien de tout cela. Puis il lui
-faut une page de connexion, alors quelqu'un l'écrit. Puis une deuxième
-application a besoin de la même, et les deux ne s'accordent pas sur ce qu'est
-une session. Meerkat est l'endroit où ces questions sont tranchées une fois.
+faut une page de connexion, et quelqu'un l'écrit. Puis une façon de réinitialiser
+un mot de passe oublié, donc d'envoyer des e-mails. Puis un second facteur, parce
+que la sécurité l'a demandé. Puis le client veut se connecter avec son propre
+annuaire : Active Directory pour l'un, Azure pour le suivant. Puis les sessions
+doivent expirer, et être révoquées quand quelqu'un s'en va.
+
+Pendant ce temps, une deuxième application a besoin de la même chose, et les
+deux ne s'entendent pas sur ce qu'est une session. Une troisième arrive, écrite
+par une autre équipe, dans un autre langage.
+
+Viennent ensuite les questions que personne n'avait prévues. Qui peut voir cet
+écran, et qui en décide ? Qui a modifié ce réglage mardi dernier : le journal
+d'audit. Pourquoi cette page est lente : les traces, du navigateur jusqu'à la
+base de données. Que s'est-il passé à 3 heures du matin : les logs, en un seul
+endroit plutôt qu'un par service. Combien d'appels un client peut-il faire : les
+rate limits. Les certificats, qui expirent. La page de maintenance, pour le soir
+de la mise à jour.
+
+**Rien de tout cela n'est votre métier.** C'est ce dont chaque application a
+besoin avant de pouvoir faire ce pour quoi elle existe, et cela finit écrit dans
+chacune d'elles, maintenu dans chacune, relu par la sécurité dans chacune - un
+peu différemment à chaque fois. Meerkat est l'endroit où l'on répond à ces
+questions une fois pour toutes, devant toutes vos applications, pour que vos
+équipes écrivent la partie qu'elles seules savent écrire.
+
+## Pourquoi une APP gateway plutôt qu'une API gateway
+
+Une **API gateway** - Kong, APISIX, Traefik - répond à une seule de ces
+questions : comment une requête est routée. Tout le reste est un plugin à
+configurer, ou un produit à installer à côté : un fournisseur d'identité pour
+la connexion, un proxy d'authentification, un gestionnaire de secrets, une
+stack de métriques, un collecteur de logs, un gestionnaire de certificats, un
+tunnel pour que les développeurs testent contre le cluster (mirrord,
+Telepresence), des écrans à construire vous-même. Cinquante pièces à choisir,
+déployer, sécuriser et mettre à jour, et à faire tenir ensemble.
+
+Une **APP gateway** réunit tout cela, sur étagère et prête à l'emploi : les
+pages de connexion, les comptes et les rôles, le coffre, le journal d'audit,
+les traces, les certificats, le tunnel développeur et la console qui les
+pilote sont dans la même image, et fonctionnent déjà ensemble. Vous la démarrez, vous ajoutez vos
+applications.
+
+Tout-en-un ne veut pas dire fermé. Ce que votre entreprise exploite déjà reste
+aux commandes, et Meerkat s'y branche :
+
+- **Votre fournisseur d'identité** - Entra ID, Okta, Google, Keycloak ou tout
+  fournisseur OpenID Connect, ainsi que LDAP ou Active Directory - connecte les
+  utilisateurs ; Meerkat ne vous demande pas de déplacer vos comptes.
+- **Votre stack d'observabilité** reçoit ce que voit Meerkat, en
+  OpenTelemetry : les traces du navigateur jusqu'à vos services, les
+  métriques, les logs et le journal d'audit, envoyés à votre collecteur puis à
+  Grafana, Datadog, Elastic ou ce que vous utilisez. Les logs sont aussi écrits
+  en JSON pour l'agent déjà présent sur vos nœuds.
+- **Vos services** gardent leurs propres contrôles s'ils le souhaitent : le JWT
+  qu'ils reçoivent se vérifie avec les clés publiées par la gateway.
+- **Votre PKI** reste l'autorité : importez vos certificats, ou laissez votre
+  propre serveur ACME les émettre.
+- **Votre git** porte la configuration, un répertoire par plateforme, relue
+  comme le reste de votre code.
+- **Votre automatisation** pilote le tout par l'API d'administration, ou un
+  agent IA par MCP.
+
+Les écrans intégrés sont là pour que vous n'ayez besoin de rien d'autre pour
+démarrer - pas pour vous empêcher d'utiliser ce que vous avez.
 
 > [!NOTE]
-> Meerkat proxifie vos applications telles qu'elles sont. Il ne leur demande ni
-> d'embarquer une bibliothèque, ni de parler un protocole à lui.
+> Meerkat se place devant vos applications telles qu'elles sont. Il ne leur
+> demande ni d'embarquer une bibliothèque, ni de parler un protocole qui lui
+> serait propre.
 
-## Un seul binaire
+## Une seule image
 
-La gateway est un unique binaire Go sans dépendance : elle sert le plan de
-données sur un port et sa console d'administration sur un autre. Rien d'autre
-n'a besoin d'être installé pour la faire tourner.
+La gateway est écrite en Go pur et se livre en une seule image. Elle se déploie
+sur Docker, Swarm ou Kubernetes, et il n'y a rien d'autre à déployer pour
+l'utiliser : ni base de données à côté, ni cache, ni broker de messages. Elle
+sert vos applications sur un port et sa console d'administration sur un autre.
 
-Ce que ça donne en chiffres : l'image Community pèse **70 Mo** - moins de 20 Mo
-à télécharger, une fois les couches compressées - et le binaire ne dépend que de
-**9 bibliothèques directes** (14 pour l'édition Enterprise), en Go pur : pas de CGO, donc rien à installer
-sur l'hôte et rien qui se compile différemment selon la machine. C'est ce qui
-rend la ligne « 1 pod » du [dossier](/product/the-case) tenable plutôt que
-théorique.
-
-L'image Enterprise pèse **190 Mo**, et l'écart n'est pas la passerelle : ce sont
-les **clients [plug](/product/dev-mode)** qu'elle distribue elle-même, un binaire
-signé par système et par architecture, soit 80 Mo qu'un développeur récupère
-depuis la passerelle plutôt que depuis un site de téléchargement.
+En chiffres : l'image Community pèse **70 Mo**, l'image Enterprise **200 Mo**.
 
 ## Pourquoi ce nom
 
@@ -54,10 +120,11 @@ Le suricate, en sentinelle.
 :::
 
 
-Le suricate est la sentinelle de la nature : il monte la garde à l'entrée du
-terrier et donne l'alerte, pour que le reste de la colonie travaille sans avoir
-à s'inquiéter de rien. C'est exactement ce que cette passerelle fait pour vos
-services. Même le tunnel [plug](https://github.com/softwarity/plug) entre dans
-le tableau : c'est par lui que la machine d'un développeur se creuse un chemin
-jusqu'au terrier. Et comme un groupe de suricates s'appelle une *mob*, vous
-savez déjà comment nommer un cluster de nœuds Meerkat.
+Le suricate (*meerkat* en anglais) est la sentinelle de la nature : il monte la
+garde à l'entrée du terrier et donne l'alerte, pour que le reste de la colonie
+vaque à ses occupations sans s'inquiéter de rien. C'est exactement ce que cette
+gateway fait pour vos services. Même le tunnel
+[plug](https://github.com/softwarity/plug) trouve sa place dans l'image : c'est
+par lui que la machine d'un développeur creuse sa galerie jusqu'au terrier. Et
+comme, en anglais, un groupe de suricates s'appelle un *mob*, vous savez déjà
+comment appeler un cluster de nœuds Meerkat.

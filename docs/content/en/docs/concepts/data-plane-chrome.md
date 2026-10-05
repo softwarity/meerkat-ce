@@ -124,6 +124,6 @@ the ones the upstream hashed, and goes out as `no-cache`: the browser asks befor
 reusing it, so a configuration change is seen at the next load. Asking costs
 nothing when nothing changed: the page gets an `ETag` of its own, a hash of the
 bytes actually sent, and the gateway answers a matching `If-None-Match` with an
-empty `304`. Change something in the console and the bytes, so the hash, change
-with it. A response carrying an identity is marked `no-store, private` instead,
+empty `304`. Change something in the console and the bytes, and so the hash,
+change with it. A response carrying an identity is marked `no-store, private` instead,
 with no validator, so no shared cache can hand one person's page to another.

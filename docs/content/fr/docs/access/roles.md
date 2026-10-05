@@ -2,29 +2,30 @@
 title: Rôles et groupes
 section: Contrôle d'accès
 order: 132
-summary: Un catalogue de rôles pour toute la gateway, des groupes par organisation, et comment les rôles effectifs d'une personne sont calculés.
+summary: Un catalogue de rôles pour toute la gateway, des groupes par organisation, et la manière dont se calculent les rôles effectifs d'une personne.
 ---
 
 # Rôles et groupes
 
-Les rôles sont les noms dans lesquels vos règles s'écrivent - `orders-reader`,
-`support`, `billing-admin`. Les groupes sont la façon dont les gens les obtiennent.
+Les rôles sont les noms dans lesquels s'écrivent vos règles - `orders-reader`,
+`support`, `billing-admin`. Les groupes sont le moyen par lequel les personnes
+les obtiennent.
 
-Le partage est délibéré : **le catalogue est global à la gateway, les groupes
-appartiennent à une organisation**. Un vocabulaire pour toute l'installation,
-assemblé différemment pour chaque organisation.
+Ce découpage est voulu : **le catalogue est commun à toute la gateway, les
+groupes appartiennent à une organisation**. Un seul vocabulaire pour toute
+l'installation, assemblé différemment dans chaque organisation.
 
 ## Le catalogue
 
-**Application > Roles.** Un rôle a un nom, unique dans l'installation, une
-description, des étiquettes facultatives, et au plus un parent.
+**Application > Roles.** Un rôle a un nom, unique dans toute l'installation,
+une description, des étiquettes (tags) facultatives et au plus un parent.
 
-Les noms de rôles s'écrivent aussi dans les règles de routes : ils sont donc limités
-aux lettres, aux chiffres, à `-` et `_`. Un rôle dont le nom sort de là est refusé
-quand une route essaie de s'en servir.
+Les noms de rôle s'écrivent aussi dans les règles des routes : ils sont donc
+limités aux lettres, aux chiffres, à `-` et à `_`. Un rôle dont le nom ne
+respecte pas cette contrainte est refusé quand une route tente de l'utiliser.
 
-**Un parent implique ses enfants.** Détenir un rôle parent l'accorde, lui et tout ce
-qui est en dessous, jusqu'en bas :
+**Un parent implique ses enfants.** Détenir un rôle parent, c'est détenir ce
+rôle et tout ce qui se trouve en dessous, jusqu'en bas :
 
 ```
 staff
@@ -33,84 +34,91 @@ staff
   billing
 ```
 
-Qui détient `staff` satisfait une règle qui demande `support-lead`. Qui détient
-`support` satisfait `support-lead` mais pas `billing`. Accordez le haut d'une
-branche pour accorder la branche.
+Une personne qui détient `staff` satisfait une règle exigeant `support-lead`.
+Une personne qui détient `support` satisfait `support-lead`, mais pas
+`billing`. Pour accorder une branche, accordez son sommet.
 
-Un rôle ne peut pas devenir son propre ancêtre : un cycle est refusé. Supprimer un
-rôle remonte ses enfants au premier niveau au lieu de les supprimer avec lui, et le
-retire de tous les groupes qui le portaient. Certains rôles sont marqués rôles
-**système** et ne peuvent pas être supprimés du tout.
+Un rôle ne peut pas devenir son propre ancêtre : un cycle est refusé. Supprimer
+un rôle fait remonter ses enfants au premier niveau, au lieu de les supprimer
+avec lui, et retire ce rôle de tous les groupes qui le portaient. Certains
+rôles sont marqués comme rôles **système** et ne peuvent pas être supprimés du
+tout.
 
-Les étiquettes sont un classement libre - une par microservice, par exemple - et
-elles voyagent avec le rôle là où les expressions peuvent les lire. Elles n'ont
-aucun effet sur les décisions d'accès.
+Les étiquettes sont un classement libre - une par microservice, par exemple -
+et elles accompagnent le rôle partout où des expressions peuvent les lire.
+Elles n'ont aucun effet sur les décisions d'accès.
 
 ![Le catalogue des rôles : une hiérarchie, et ce que chaque rôle ouvre](img/console/roles.webp)
 
 ## Les groupes
 
-**Un groupe appartient à une organisation** et porte un ensemble de rôles du
-catalogue. Son nom est unique dans cette organisation. Un membre de l'organisation
-reçoit ensuite des groupes, et ses rôles sont les rôles de ces groupes.
+**Un groupe appartient à une seule organisation** et réunit un ensemble de
+rôles du catalogue. Son nom est unique au sein de cette organisation. Des
+groupes sont ensuite attribués à chaque membre de l'organisation, et ses rôles
+sont ceux de ces groupes.
 
-Rien d'autre n'accorde un rôle. Il n'y a pas de rôle sur un compte, et pas de rôle
-hors d'une organisation :
+Rien d'autre n'accorde un rôle. Il n'y a pas de rôle porté par un compte, ni de
+rôle en dehors d'une organisation :
 
 > [!WARNING]
-> Une session **sans organisation active ne détient aucun rôle**. Pas les rôles
-> d'une autre organisation, pas un sous-ensemble : aucun. Toute règle qui demande un
-> rôle exige donc aussi une organisation active, même quand la règle n'en parle pas.
+> Une session **sans organisation active ne détient aucun rôle**. Ni les rôles
+> d'une autre organisation, ni un sous-ensemble : aucun. Toute règle qui exige
+> un rôle exige donc aussi une organisation active, même si elle n'en mentionne
+> pas.
 
-![Les groupes d'une organisation, chacun accordant un jeu de rôles à ses membres](img/console/groups.webp)
+![Les groupes d'une organisation, chacun accordant un ensemble de rôles à ses membres](img/console/groups.webp)
 
 ## Un groupe à la fois, ou tous
 
-Chaque organisation choisit comment ses groupes se combinent :
+Chaque organisation choisit la manière dont ses groupes se combinent :
 
 | Mode | Ce qu'il fait |
 |---|---|
-| Cumulatif (le défaut) | tous les groupes attribués comptent à la fois |
-| Exclusif | un seul groupe s'applique, choisi à la connexion |
+| Cumulative (valeur par défaut) | tous les groupes attribués à la personne comptent en même temps |
+| Exclusive | un seul groupe s'applique, choisi à la connexion |
 
-Le mode exclusif existe pour le cas où quelqu'un porte deux casquettes dans la même
-organisation et où les deux ne doivent pas être portées ensemble. Quand il est
-actif et que la personne a plus d'un groupe, elle est envoyée sur `/select-group`,
-et elle peut basculer plus tard depuis le bouton utilisateur. Une session exclusive
-qui n'a pas choisi ne porte **aucun rôle** - la même règle que sans organisation.
+Le mode Exclusive répond au cas d'une personne qui porte deux casquettes dans
+la même organisation, sans pouvoir les porter en même temps. Quand il est
+activé et que la personne a plusieurs groupes, elle est envoyée sur
+`/select-group`, et peut en changer plus tard depuis le bouton utilisateur.
+Une session en mode Exclusive qui n'a pas encore choisi ne porte **aucun
+rôle** - la même règle que sans organisation.
 
-Il n'y a pas de défaut pour toute l'installation : c'est une propriété de
-l'organisation, et une organisation qui ne dit rien est cumulative.
+Il n'y a pas de valeur par défaut à l'échelle de l'installation : c'est une
+propriété de l'organisation, et une organisation qui ne précise rien est en
+mode Cumulative.
 
-## Comment les rôles effectifs sont calculés
+## Comment se calculent les rôles effectifs
 
 À chaque requête, pour le compte, l'organisation active et le groupe actif :
 
-1. prendre les groupes attribués dans **cette** organisation - ou seulement le groupe actif, en mode exclusif ;
+1. prendre les groupes attribués dans **cette** organisation - ou seulement le groupe actif, en mode Exclusive ;
 2. prendre les rôles de ces groupes ;
-3. déplier chaque rôle vers le bas de la hiérarchie, en ajoutant chaque descendant ;
-4. trier, dédoublonner.
+3. développer chaque rôle vers le bas de la hiérarchie, en ajoutant tous ses descendants ;
+4. trier, et éliminer les doublons.
 
-Le résultat est ce contre quoi les règles de routes et d'endpoints sont jugées, et
-ce qui est transmis à l'amont avec l'identité : votre service reçoit la liste
-dépliée et n'a jamais à connaître la hiérarchie.
+C'est à ce résultat que sont confrontées les règles de route et les règles
+d'endpoint, et c'est lui qui est transmis à l'upstream avec l'identité : votre
+service reçoit la liste développée et n'a jamais à connaître la hiérarchie.
 
-Le calcul est mémorisé quelques secondes par compte, organisation et groupe. Un rôle
-accordé ou retiré prend donc effet en quelques secondes, sans déconnecter personne.
+Le calcul est conservé quelques secondes par compte, organisation et groupe. Un
+rôle accordé ou retiré prend donc effet en quelques secondes, sans déconnecter
+personne.
 
-## Laisser une autorité amont décider
+## Laisser décider une autorité externe
 
-Les attributions de groupes se posent à la main, ou se projettent depuis ce qu'une
-autorité externe rapporte : un groupe d'annuaire, une équipe GitHub, un claim d'un
-fournisseur d'identité. Une règle associe un groupe rapporté à un groupe d'une
-organisation, et s'exécute à chaque connexion externe - l'appartenance suit donc
-l'annuaire plutôt qu'un tableur.
+Les groupes peuvent être attribués à la main, ou déduits de ce que rapporte une
+autorité externe : un groupe d'annuaire, une équipe GitHub, un claim d'un
+fournisseur d'identité. Une règle fait correspondre un groupe rapporté à un
+groupe d'une organisation, et s'exécute à chaque connexion externe : les
+appartenances suivent ainsi l'annuaire plutôt qu'un tableur.
 
-Une règle ne gère jamais que ce qu'une règle a posé. Une appartenance ou un groupe
-attribué à la main par un administrateur n'est jamais retiré par une règle, et une
-règle qui matcherait tout est refusée.
+Une règle ne gère jamais que ce qu'une règle a placé. Une appartenance ou un
+groupe attribué à la main par un administrateur n'est jamais retiré par une
+règle, et une règle qui correspondrait à tout est refusée.
 
-> [!NOTE] **Enterprise edition.**
-> Créer et modifier des règles de groupe fait partie de l'édition Enterprise. Les
-> lire, et en supprimer une, ne sont pas bridés - une image communautaire peut donc
-> encore voir et nettoyer ce qu'une image Enterprise a laissé.
+> [!NOTE] **Édition Enterprise.**
+> La création et la modification des règles de groupe font partie de l'édition
+> Enterprise. Les lire, et en supprimer une, reste possible partout : une image
+> Community peut ainsi toujours voir et effacer ce qu'une image Enterprise a
+> laissé derrière elle.

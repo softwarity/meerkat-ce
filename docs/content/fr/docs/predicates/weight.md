@@ -2,25 +2,25 @@
 title: weight
 section: Prédicats
 order: 50
-summary: Répartit le trafic entre les routes d'un groupe (canari) : une route prend poids/total des requêtes.
+summary: Répartit le trafic entre les routes d'un groupe (canari) ; une route prend weight/total des requêtes.
 ---
 
 # weight
 
-Répartit le trafic d'un groupe de routes par parts. C'est le canari : le même
-chemin, deux amonts, l'essentiel du trafic sur la version en production et un peu
-sur la nouvelle.
+Répartit le trafic d'un groupe de routes selon des parts. C'est le déploiement
+canari : le même chemin, deux upstreams, l'essentiel du trafic sur la version en
+production et un peu sur la nouvelle.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
 | `group` | chaîne | oui | Le nom que partagent les routes d'une même répartition. |
-| `weight` | entier | oui | La part de cette route dans le groupe. Doit être strictement positif. |
+| `weight` | entier | oui | La part de cette route dans le groupe. Doit être supérieure à zéro. |
 
-Une route prend `weight` divisé par le **total du groupe** des requêtes. Ce sont
-des parts, pas des pourcentages : `8` et `2` donnent la même répartition que `80`
-et `20`.
+Une route prend une part des requêtes égale à son `weight` divisé par le **total
+du groupe**. Les nombres sont des parts, pas des pourcentages : `8` et `2`
+donnent la même répartition que `80` et `20`.
 
 ## Exemple
 
@@ -68,7 +68,7 @@ versions au cours d'une session. Ajoutez un prédicat
 rester d'un seul côté.
 
 Les parts sont calculées sur les routes réellement chargées : **désactiver** une
-route du groupe donne sa part aux autres au lieu de perdre ce trafic.
+route du groupe redistribue donc sa part aux autres au lieu de perdre ce trafic.
 
-Les autres prédicats s'appliquent toujours : une route ne prend sa part que des
-requêtes que son chemin, son hôte et sa méthode acceptaient déjà.
+Les autres prédicats s'appliquent toujours : une route ne prend sa part que parmi
+les requêtes que son chemin, son hôte et sa méthode ont déjà acceptées.

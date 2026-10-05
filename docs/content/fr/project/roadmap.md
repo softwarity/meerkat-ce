@@ -2,135 +2,139 @@
 title: Feuille de route
 section: Le projet
 order: 10
-summary: Ce qui est construit, ce qui est en cours d'achèvement, et ce qui n'est délibérément pas sur la liste.
+summary: Ce qui est construit, ce qui reste à finir, et ce qui est volontairement absent de la liste.
 ---
 
 # Feuille de route
 
-L'autorité sur l'état, c'est
-[FEATURES.md](https://github.com/softwarity/meerkat-ce/blob/main/FEATURES.md) dans
-le dépôt : une ligne par fonctionnalité, l'état lu dans le code, et une case
-cochée dans le commit qui livre la chose. Cette page est ce tableau lu à voix
-haute.
+Sur l'état du produit, c'est
+[FEATURES.md](https://github.com/softwarity/meerkat-ce/blob/main/FEATURES.md), dans
+le dépôt, qui fait foi : une ligne par fonctionnalité, un état lu dans le code, et
+une case cochée dans le commit qui livre la fonctionnalité. Cette page se contente
+de lire ce tableau à voix haute.
 
 ## Construit et utilisé
 
-Le chemin critique est entier. Une requête arrive, une route la reconnaît, des
-filtres la transforment, une règle d'accès décide, et ce qui s'est passé se voit
-ensuite.
+Le chemin critique est complet. Une requête arrive, une route la reconnaît, des
+filtres la transforment, une règle d'accès tranche, et ce qui s'est passé reste
+visible après coup.
 
-- **Routage** : le catalogue de prédicats et de filtres, édité à chaud, appliqué
-  à la requête suivante. Voir les [prédicats](/docs/predicates/overview) et les
-  [filtres](/docs/filters/overview).
-- **Identité** : comptes locaux, OpenID Connect, LDAP et Active Directory,
-  GitHub, tous testés contre de vrais serveurs. Sessions, jetons d'API, jetons
-  signés vers l'amont.
-- **Accès** : un catalogue de rôles hiérarchique, des groupes par organisation,
-  les organisations elles-mêmes, une règle par route, et une sécurité par
-  endpoint lue dans la description OpenAPI d'un service.
-- **Second facteur** : TOTP avec navigateurs de confiance, et passkeys.
-- **Le coffre** : des secrets scellés au repos et des valeurs en clair, les deux
+- **Le routage** : le catalogue de prédicats et de filtres, modifiable à chaud et
+  appliqué dès la requête suivante. Voir les [prédicats](/docs/predicates/overview)
+  et les [filtres](/docs/filters/overview).
+- **L'identité** : comptes locaux, OpenID Connect, LDAP et Active Directory,
+  GitHub, tous testés face à de vrais serveurs. Sessions, jetons d'API, jetons
+  signés transmis aux upstreams.
+- **L'accès** : un catalogue hiérarchique de rôles, des groupes par organisation,
+  les organisations elles-mêmes, une règle par route, et une sécurité par endpoint
+  lue dans la description OpenAPI d'un service.
+- **Le second facteur** : TOTP avec navigateurs de confiance, et passkeys.
+- **Le coffre** : des secrets scellés au repos et des valeurs en clair, tous
   référencés par leur nom. La même clé maîtresse scelle les clés TLS et les
-  secrets TOTP, et elle tourne par un redémarrage.
-- **TLS** : certificats et émission ACME, sérialisée pour qu'un cluster demande
-  une seule fois.
-- **Audit** : chaque changement d'administration avec son auteur et un diff
-  champ par champ, et la sécurité des comptes - chaque connexion, chaque refus
-  avec sa raison et son adresse, chaque moyen d'entrer changé par son titulaire.
-- **La console** : toute l'administration, sur son propre port, avec le partage
-  de capacités qui décide qui voit quelle moitié.
-- **L'endpoint agent** : MCP sur le plan de contrôle, sous les mêmes règles
+  secrets TOTP, et un redémarrage suffit à la renouveler.
+- **TLS** : les certificats et l'émission ACME, sérialisée pour qu'un cluster ne
+  fasse la demande qu'une fois.
+- **L'audit** : chaque changement d'administration, avec son auteur et le détail
+  champ par champ, ainsi que la sécurité des comptes - chaque connexion, chaque
+  refus avec son motif et son adresse, chaque moyen d'accès modifié par son
+  titulaire.
+- **La console** : toute l'administration, sur son propre port, avec le découpage
+  par capacités qui décide qui en voit quelle moitié.
+- **Le point d'entrée des agents** : MCP sur le plan de contrôle, soumis aux mêmes règles
   qu'un humain.
-- **Le portail de navigation** : une barre unique au travers des applications
-  que la passerelle sert, injectée dans des pages qui n'embarquent aucune
-  bibliothèque pour cela.
-- **Le cluster** : plusieurs passerelles derrière un PostgreSQL, qui se
+- **Le portail de navigation** : une barre commune à toutes les applications que
+  sert la gateway, injectée dans des pages qui n'embarquent aucune bibliothèque
+  pour cela.
+- **Le cluster** : plusieurs gateways derrière un même PostgreSQL, qui se
   coordonnent par la base plutôt qu'entre elles.
-- **Configurations versionnées** : plusieurs coexistent, une seule est active,
-  l'export et l'import ferment la boucle, un point de reprise à chaque
-  changement, et deux configurations enregistrées se comparent.
-- **Sessions ouvertes** : vos appareils connectés, sur votre profil, avec
-  *Sign out everywhere else*. Les administrateurs voient et ferment les
-  sessions depuis la console.
-- **Export OpenTelemetry** (Enterprise) : une adresse de collecteur pour les
-  traces, les métriques, le journal d'audit et les journaux. Voir
+- **Les configurations versionnées** : plusieurs coexistent, une seule est active,
+  l'export et l'import bouclent la boucle, chaque changement crée un point de
+  reprise, et deux configurations enregistrées se comparent.
+- **Les sessions ouvertes** : sur votre profil, la liste de vos appareils
+  connectés, avec *Sign out everywhere else*. Les administrateurs voient les
+  sessions et y mettent fin depuis la console.
+- **L'export OpenTelemetry** (Enterprise) : une seule adresse de collecteur pour
+  les traces, les métriques, le journal d'audit et les journaux. Voir
   [les traces](/docs/operations/tracing).
-- **Appels planifiés** : la passerelle appelle un service selon une cadence,
-  un calendrier cron ou une seule fois, avec reprises et historique des
-  exécutions. Le service les crée par l'API, depuis ses propres écrans ; la
-  console observe et intervient. Voir [les appels planifiés](/docs/operations/scheduler).
-- **Le journal de la passerelle**, en direct dans la console, avec son niveau
-  monté pour une demi-heure depuis là. Voir [les journaux](/docs/operations/logs).
+- **Les appels planifiés** : la gateway appelle un service à intervalle
+  régulier, selon un calendrier cron ou une seule fois, avec des reprises et un
+  historique des exécutions. Le service les crée par l'API, depuis ses propres
+  écrans ; la console les surveille et intervient au besoin. Voir
+  [les appels planifiés](/docs/operations/scheduler).
+- **Le journal de la gateway**, en direct dans la console, d'où son niveau se
+  relève pour une demi-heure. Voir [les journaux](/docs/operations/logs).
 
 ## En cours d'achèvement
 
-Ces sujets marchent et ne sont pas finis. Le tableau du dépôt dit, ligne par
-ligne, ce qui manque à chacun.
+Ces fonctionnalités marchent, mais ne sont pas terminées. Le tableau du dépôt
+indique, ligne par ligne, ce qui manque à chacune.
 
-- **Audit des endpoints** (Enterprise) : un interrupteur par opération envoie
-  ses appels au journal d'audit. Ce qui manque est le choix des champs du body
-  à garder, et l'audit d'un refus fait avant que l'opération soit connue.
-- **Tracing** : le contexte traverse la passerelle et les traces partent vers
-  votre collecteur. Ce qui manque est que la passerelle se déclare dans
-  `tracestate` et `baggage`, et un lien d'une ligne d'audit vers sa trace.
-- **Quotas** : ils se posent par route, par endpoint et par consommateur -
-  utilisateur, jeton, organisation, adresse - et un dépassement répond 429 avec
-  les en-têtes standards. Ce qui manque est l'écran qui montre la consommation,
-  le ralentissement plutôt que le refus, et des compteurs justes en cluster.
-- **Mode développement** : le tunnel marche, la connexion s'arrête sur une page
-  qui nomme ce qui est substitué et par qui, et un bandeau le redit pendant
-  qu'on travaille. Ce qui manque est la portée d'une substitution - elle vaut
-  aujourd'hui pour tout le trafic - puis l'écran de console qui liste les
-  sessions en cours, et l'audit de chaque substitution (une clé déposée est
-  déjà auditée).
-- **Notifications** : le relais SMTP est livré, avec un gabarit unique aux
-  couleurs du thème, et le résumé quotidien des accès qui se ferment part tout
-  seul. Ce qui manque est un gabarit par événement, et traduit.
-- **Identité vers l'amont** : le jeton signé est émis, avec son JWKS publié et
-  la rotation des clés. Ce qui manque est un endpoint d'échange rendant un
-  couple access/refresh, et les modes qui portent un secret vers l'amont :
-  BASIC, FORM, JWT tiers.
-- **Passkeys** : utilisables comme facteur. Récupérer un compte dont l'unique
-  passkey est perdue n'est pas encore écrit.
-- **Codes à usage unique par e-mail** : se connecter avec un code à la place
-  du mot de passe est livré, éteint par défaut, lié au navigateur qui l'a
-  demandé et jamais ouvert sur la console. Ce qui manque est le lien magique,
-  et pouvoir fermer cette porte compte par compte.
+- **L'audit des endpoints** (Enterprise) - un interrupteur par opération envoie
+  ses appels au journal d'audit. Il reste à pouvoir choisir les champs du corps à
+  conserver, et à auditer un refus prononcé avant que l'opération soit connue.
+- **Les traces** - le contexte traverse la gateway et les traces partent vers
+  votre collecteur. Il reste à ce que la gateway se déclare dans `tracestate`
+  et `baggage`, et à relier une ligne d'audit à sa trace.
+- **Les quotas** - ils se définissent par route, par endpoint et par
+  consommateur - utilisateur, jeton, organisation, adresse - et un dépassement
+  reçoit un 429 avec les en-têtes standard. Il manque l'écran qui montre la
+  consommation, la possibilité de ralentir plutôt que de refuser, et des compteurs
+  qui restent justes en cluster.
+- **Le mode développeur** - le tunnel fonctionne, la connexion s'arrête sur une
+  page qui dit ce qui est substitué et par qui, et un bandeau le rappelle pendant
+  que vous travaillez. Il manque la portée d'une substitution - aujourd'hui, elle
+  vaut pour tout le trafic - puis l'écran de la console qui liste les sessions en
+  cours, et l'audit de chaque substitution (le dépôt d'une clé, lui, est déjà
+  audité).
+- **Les notifications** - le relais SMTP est livré, avec un gabarit unique aux
+  couleurs du thème, et le récapitulatif quotidien des accès qui arrivent à
+  échéance part tout seul. Il manque un gabarit par événement, chacun traduit.
+- **L'identité transmise aux upstreams** - le jeton signé est émis, avec son JWKS
+  publié et la rotation des clés. Il manque un endpoint d'échange qui rende un
+  couple jeton d'accès / jeton de rafraîchissement, et les modes qui portent un
+  secret jusqu'à l'upstream : BASIC, FORM, JWT tiers.
+- **Les passkeys** - utilisables comme facteur. La récupération d'un compte dont
+  l'unique passkey est perdue n'est pas encore écrite.
+- **Les codes à usage unique par e-mail** - se connecter avec un code à la place
+  du mot de passe est livré : désactivé par défaut, lié au navigateur qui a fait
+  la demande, et jamais ouvert sur la console. Il manque le lien magique, et le
+  moyen de fermer cette porte compte par compte.
 
 ## Ensuite
 
-- **Un assistant de découverte** : la passerelle sait déjà lire le socket Docker
-  et un namespace Kubernetes. Transformer cela en « scanner, choisir un
-  conteneur, obtenir une route » est l'écran qui manque.
+- **Un assistant de découverte** : la gateway sait déjà lire le socket Docker
+  et un namespace Kubernetes. Il manque l'écran qui en fait "analyser, choisir un
+  conteneur, obtenir une route".
 - **SAML**, pour les entreprises dont le fournisseur d'identité ne parle pas
-  OpenID Connect. Il est enregistrable aujourd'hui et refuse à la fabrique, ce
-  qui est honnête et pas encore utile.
+  OpenID Connect. On peut déjà l'enregistrer, et la fabrique le refuse : c'est
+  honnête, mais pas encore utile.
 - **Se connecter en tant que** : ce qu'un support fait tous les jours, et qui
-  aujourd'hui se fait en demandant son mot de passe à quelqu'un.
-- **Un cache de réponse**, parce que la passerelle est déjà le seul endroit qui
-  voit passer la même requête deux fois.
-- **Servir une application sous un sous-chemin sans la reconstruire** : le
-  préfixe est retiré à l'aller, il reste à réécrire ce que l'application renvoie.
-- **gRPC pour de bon** : sécurité par méthode, et gRPC-Web. Les métriques
+  passe aujourd'hui par demander son mot de passe à quelqu'un.
+- **Un cache de réponses**, puisque la gateway est déjà le seul endroit qui
+  voit passer deux fois la même requête.
+- **Servir une application sous un sous-chemin sans la reconstruire** : le préfixe
+  est retiré à l'aller ; il reste à réécrire ce que l'application renvoie.
+- **gRPC pour de bon** : la sécurité par méthode, et gRPC-Web. Les compteurs
   lisent déjà `grpc-status`.
-- **Le portail par organisation** : icône, titre et arrangement propres à chaque
-  client. Ce serait la première surcharge visuelle par tenant du produit.
-- **HTTP/3**, quand le gain se mesurera plutôt qu'il ne se racontera.
-- **Un coffre externe** : HashiCorp Vault, les secrets de Kubernetes et ceux de
-  Docker, pour les installations qui en ont déjà un et n'en veulent pas un
-  second.
-- **Les anomalies poussées vers GitHub, GitLab ou Jira**, plutôt que lues dans
+- **Un portail par organisation** : une icône, un titre et un agencement propres à
+  chaque client. Ce serait la première personnalisation visuelle par organisation
+  du produit.
+- **HTTP/3**, le jour où le gain se mesurera au lieu de se raconter.
+- **Un coffre externe** : HashiCorp Vault, les secrets Kubernetes et les secrets
+  Docker, pour les installations qui en ont déjà un et n'en veulent pas un second.
+- **Les signalements poussés vers GitHub, GitLab ou Jira**, plutôt que lus dans
   un écran de plus.
 - **Les notifications Web Push**, pour ce qu'un exploitant doit savoir sans
-  avoir l'onglet ouvert.
+  garder un onglet ouvert.
 
 ## Pas sur la liste
 
-Kerberos et SPNEGO sont notés comme Enterprise, et rien n'est commencé. Un
-système de plugins n'est pas prévu : le catalogue de filtres est trié exprès, et
-chaque filtre qui y figure est un filtre que nous savons expliquer et tester.
+Kerberos et SPNEGO sont inscrits comme fonctionnalités Enterprise, et rien n'est
+commencé. Aucun système de plugins n'est prévu : le catalogue de filtres est
+volontairement restreint, et chaque filtre qui y figure est un filtre que nous
+savons expliquer et tester.
 
 > [!TIP]
-> Ce que la suite d'intégration impose vraiment est sur la page
-> [couverture de tests](/project/tests) : c'est le fichier que la suite exécute,
-> pas une description de celui-ci.
+> Ce que la suite d'intégration vérifie réellement se trouve sur la page
+> [couverture de tests](/project/tests) - c'est le fichier que la suite exécute,
+> pas une description de ce fichier.

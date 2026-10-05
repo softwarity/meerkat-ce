@@ -13,11 +13,14 @@ const SRC = join(here, '..', '..', 'e2e', 'scenarios.json');
 const CONTENT = join(here, '..', 'content');
 
 const DOMAINS = {
-  gateway: { en: 'Gateway scope', fr: 'Périmètre gateway' },
-  application: { en: 'Application scope', fr: 'Périmètre application' },
-  tenant: { en: 'Tenant scope', fr: 'Périmètre tenant' },
-  console: { en: 'Console navigation', fr: 'Navigation console' },
-  auth: { en: 'Sign-in and profile flows', fr: 'Flux de connexion et de profil' },
+  gateway: { en: 'Gateway scope', fr: 'Périmètre de la gateway' },
+  application: { en: 'Application scope', fr: "Périmètre de l'application" },
+  tenant: { en: 'Tenant scope', fr: "Périmètre d'une organisation" },
+  console: { en: 'Console navigation', fr: 'Navigation dans la console' },
+  auth: { en: 'Sign-in and profile flows', fr: 'Parcours de connexion et de profil' },
+  infra: { en: 'Infrastructure scope', fr: "Périmètre de l'infrastructure" },
+  app: { en: 'Application screens', fr: "Écrans de l'application" },
+  dataplane: { en: 'Data plane', fr: 'Plan de données' },
 };
 
 const HEAD = {
@@ -37,17 +40,17 @@ const HEAD = {
   },
   fr: {
     title: 'Couverture de tests',
-    summary: "La matrice exacte que joue la suite d'intégration : chaque scénario, joué par chaque profil, autorisé et refusé.",
+    summary: "La matrice exacte que joue la suite d'intégration : chaque scénario, joué avec chaque profil, côté autorisé comme côté refusé.",
     intro:
-      "Cette page rend tel quel le fichier que la suite d'intégration Playwright exécute, " +
+      "Cette page affiche tel quel le fichier qu'exécute la suite d'intégration Playwright, " +
       '`e2e/scenarios.json`. Chaque scénario est joué avec chacun des profils ci-dessous, ' +
-      'et la suite vérifie A LA FOIS que les profils autorisés passent ET que tous les ' +
-      "autres sont refusés - un test d'accès qui ne prouve que la moitié oui ne prouve rien.",
+      'et la suite vérifie À LA FOIS que les profils autorisés passent ET que tous les ' +
+      "autres sont refusés - un test d'accès qui ne prouve que la moitié \"oui\" ne prouve rien.",
     profiles: 'Les profils',
     allowed: 'Autorisés',
     refused: 'Refusés',
     probe: 'Sonde',
-    scenario: 'Scenario',
+    scenario: 'Scénario',
   },
 };
 

@@ -92,7 +92,7 @@ support or a git repository without anyone having to wonder what is inside - and
 day an export may hold a secret, nobody dares share one and the feature dies of its
 own caution.
 
-The counterpart is assumed: a document alone does not start an environment. Its
+The trade-off is deliberate: a document alone does not start an environment. Its
 references have to exist in [the vault](/docs/operations/vault), which is a
 separate file with a separate life.
 
@@ -112,7 +112,7 @@ what makes it affordable and complete at the same time:
 - what is not configuration - creating an account, filling the vault, opening a
  session - leaves no trace here at all.
 
-A point has an hour, an author and the sentence the audit trail wrote at the same
+A point has a time, an author and the sentence the audit trail wrote at the same
 second. Nobody asks for one and nobody names one: that is the whole difference with
 a saved configuration.
 

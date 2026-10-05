@@ -3,27 +3,27 @@
  "targets": {
   "U": {
    "en": "Go unit and package tests (make test / test-ee)",
-   "fr": "Tests unitaires et de paquet Go (make test / test-ee)"
+   "fr": "Tests Go unitaires et de paquet (make test / test-ee)"
   },
   "I": {
    "en": "Integration suite (Playwright) against one gateway process, CE and EE",
-   "fr": "Suite d'intégration (Playwright) contre un processus, CE et EE"
+   "fr": "Suite d'intégration (Playwright) contre un seul processus de la gateway, en CE et en EE"
   },
   "C1": {
    "en": "docker compose, one instance, SQLite - the published docker-compose.yml / .ee.yml",
-   "fr": "docker compose, une instance, SQLite - les docker-compose.yml / .ee.yml publiés"
+   "fr": "docker compose, une instance, SQLite - les fichiers docker-compose.yml / .ee.yml publiés"
   },
   "CC": {
    "en": "docker compose cluster: 3 gateways + PostgreSQL + a load balancer (EE)",
-   "fr": "Cluster docker compose : 3 passerelles + PostgreSQL + un répartiteur (EE)"
+   "fr": "Cluster docker compose : 3 gateways + PostgreSQL + un load balancer (EE)"
   },
   "S1": {
    "en": "Docker Swarm, one replica - the published stack.swarm.yml",
-   "fr": "Docker Swarm, une réplique - le stack.swarm.yml publié"
+   "fr": "Docker Swarm, une réplique - le fichier stack.swarm.yml publié"
   },
   "SC": {
    "en": "Docker Swarm, 3 replicas on PostgreSQL (EE)",
-   "fr": "Docker Swarm, 3 réplicas sur PostgreSQL (EE)"
+   "fr": "Docker Swarm, 3 répliques sur PostgreSQL (EE)"
   },
   "K1": {
    "en": "kind + the Helm chart, values-ce-one-node / values-ee-one-node",
@@ -35,11 +35,11 @@
   },
   "KO": {
    "en": "kind with OpenShift's rules: namespace under Pod Security 'restricted', the pod run as an arbitrary uid from a namespace range with group 0 (what the restricted SCC does), the chart's values unchanged",
-   "fr": "kind avec les règles d'OpenShift : namespace en Pod Security 'restricted', pod lancé sous un uid arbitraire tiré d'une plage avec le groupe 0 (ce que fait la SCC restricted), valeurs du chart inchangées"
+   "fr": "kind soumis aux règles d'OpenShift : namespace en Pod Security 'restricted', pod lancé sous un uid arbitraire tiré d'une plage du namespace, avec le groupe 0 (ce que fait la SCC restricted), valeurs du chart inchangées"
   },
   "OK": {
    "en": "MicroShift built from OKD, one node in a container on the runner: the real restricted-v2 SCC and the real router (e2e/platform/okd/run.sh), every night",
-   "fr": "MicroShift construit depuis OKD, un nœud dans un conteneur sur le runner : la vraie SCC restricted-v2 et le vrai routeur (e2e/platform/okd/run.sh), chaque nuit"
+   "fr": "MicroShift construit à partir d'OKD, un nœud dans un conteneur sur le runner : la vraie SCC restricted-v2 et le vrai routeur (e2e/platform/okd/run.sh), chaque nuit"
   }
  },
  "features": [
@@ -56,7 +56,7 @@
     "EE"
    ],
    "en": "Every sign-in page renders and submits through the image, in light and dark, on a fresh install.",
-   "fr": "Chaque page de connexion s'affiche et se soumet via l'image, en clair et sombre, sur une installation neuve."
+   "fr": "Chaque page de connexion s'affiche et s'envoie à travers l'image, en thème clair et en thème sombre, sur une installation neuve."
   },
   {
    "id": "AUTH-02",
@@ -72,7 +72,7 @@
     "EE"
    ],
    "en": "Password sign-in through the shipped image: right password in, wrong one refused, the session cookie set on each scheme.",
-   "fr": "Connexion par mot de passe via l'image livrée : bon mot de passe accepté, mauvais refusé, cookie de session posé sur chaque schéma."
+   "fr": "Connexion par mot de passe à travers l'image livrée : le bon mot de passe passe, le mauvais est refusé, le cookie de session est posé sous chaque schéma."
   },
   {
    "id": "AUTH-03",
@@ -87,7 +87,7 @@
     "EE"
    ],
    "en": "Search-then-bind against OpenLDAP and Samba AD on the platform network; groups collected; CE refuses the provider.",
-   "fr": "Search-then-bind contre OpenLDAP et Samba AD sur le réseau de la plateforme ; groupes collectés ; la CE refuse le fournisseur."
+   "fr": "Recherche puis bind sur OpenLDAP et Samba AD, sur le réseau de la plateforme ; les groupes sont collectés ; CE refuse le fournisseur."
   },
   {
    "id": "AUTH-04",
@@ -103,7 +103,7 @@
     "EE"
    ],
    "en": "OIDC sign-in against Dex on the platform network, behind the published ports (redirect URI = the outside address).",
-   "fr": "Connexion OIDC contre Dex sur le réseau de la plateforme, derrière les ports publiés (URI de retour = l'adresse extérieure)."
+   "fr": "Connexion OIDC avec Dex sur le réseau de la plateforme, derrière les ports publiés (URI de redirection = l'adresse vue de l'extérieur)."
   },
   {
    "id": "AUTH-05",
@@ -117,7 +117,7 @@
     "EE"
    ],
    "en": "Step ordering (password, code, organisation) on the image; a pending step cannot be skipped by URL.",
-   "fr": "Ordre des étapes (mot de passe, code, organisation) sur l'image ; une étape en attente ne se saute pas par URL."
+   "fr": "Ordre des étapes (mot de passe, code, organisation) sur l'image ; une étape en attente ne peut pas être sautée en modifiant l'URL."
   },
   {
    "id": "AUTH-06",
@@ -132,7 +132,7 @@
     "EE"
    ],
    "en": "The JWT a service receives verifies against /.well-known/jwks.json, from ANY node of a cluster.",
-   "fr": "Le JWT reçu par un service se vérifie contre /.well-known/jwks.json, depuis N'IMPORTE quel nœud du cluster."
+   "fr": "Le JWT que reçoit un service se vérifie avec /.well-known/jwks.json, depuis N'IMPORTE QUEL nœud d'un cluster."
   },
   {
    "id": "AUTH-07",
@@ -147,7 +147,7 @@
     "EE"
    ],
    "en": "Key rotation on one node: the others sign with the new key and still publish the old one until it expires.",
-   "fr": "Rotation de clé sur un nœud : les autres signent avec la nouvelle et publient encore l'ancienne jusqu'à expiration."
+   "fr": "Rotation des clés sur un nœud : les autres signent avec la nouvelle clé et publient encore l'ancienne jusqu'à son expiration."
   },
   {
    "id": "AUTH-08",
@@ -163,7 +163,7 @@
     "EE"
    ],
    "en": "Session cookie: per-install suffix, __Host- over HTTPS, survives a pod restart (state in the store), valid on every node.",
-   "fr": "Cookie de session : suffixe par installation, __Host- en HTTPS, survit à un redémarrage (état en base), valable sur chaque nœud."
+   "fr": "Cookie de session : suffixe propre à l'installation, préfixe __Host- en HTTPS, survie au redémarrage d'un pod (l'état est en base), validité sur tous les nœuds."
   },
   {
    "id": "AUTH-09",
@@ -178,7 +178,7 @@
     "EE"
    ],
    "en": "API tokens: data-plane token reaches a route, admin token reaches the API, neither reaches the other plane.",
-   "fr": "Jetons d'API : un jeton data atteint une route, un jeton admin atteint l'API, aucun n'atteint l'autre plan."
+   "fr": "Jetons d'API : un jeton du plan de données atteint une route, un jeton d'administration atteint l'API, et aucun des deux n'atteint l'autre plan."
   },
   {
    "id": "AUTH-10",
@@ -193,7 +193,7 @@
     "EE"
    ],
    "en": "Policy refusals named; temporary password expires after its window.",
-   "fr": "Refus de politique nommés ; un mot de passe temporaire expire après sa fenêtre."
+   "fr": "Les refus de la politique de mots de passe sont nommés ; un mot de passe temporaire expire à la fin de sa fenêtre."
   },
   {
    "id": "AUTH-11",
@@ -208,7 +208,7 @@
     "EE"
    ],
    "en": "Repeated failures answer 429, and the counter is shared: failing on node A then B still trips it.",
-   "fr": "Les échecs répétés répondent 429, et le compteur est partagé : échouer sur A puis sur B le déclenche quand même."
+   "fr": "Des échecs répétés reçoivent un 429, et le compteur est partagé : échouer sur le nœud A puis sur le nœud B le déclenche quand même."
   },
   {
    "id": "AUTH-12",
@@ -223,7 +223,7 @@
     "EE"
    ],
    "en": "Self sign-up with the mail sink: account pending, verification mail received, account usable.",
-   "fr": "Auto-inscription avec le puits SMTP : compte en attente, mail de vérification reçu, compte utilisable."
+   "fr": "Auto-inscription avec le serveur SMTP de test : compte en attente, e-mail de vérification reçu, compte utilisable."
   },
   {
    "id": "AUTH-13",
@@ -237,7 +237,7 @@
     "EE"
    ],
    "en": "History lists the sign-in with this browser badged.",
-   "fr": "L'historique liste la connexion, ce navigateur signalé."
+   "fr": "L'historique liste la connexion et signale ce navigateur par un badge."
   },
   {
    "id": "AUTH-14",
@@ -252,7 +252,7 @@
     "EE"
    ],
    "en": "Sign-out on node A ends the session on node B too.",
-   "fr": "Une déconnexion sur le nœud A termine la session sur le nœud B aussi."
+   "fr": "Se déconnecter sur le nœud A met aussi fin à la session sur le nœud B."
   },
   {
    "id": "AUTH-15",
@@ -266,7 +266,7 @@
     "EE"
    ],
    "en": "Passkey enrol and sign-in with a virtual authenticator (Chromium CDP), behind HTTPS on the published port.",
-   "fr": "Enrôlement et connexion passkey avec un authentificateur virtuel (CDP Chromium), en HTTPS sur le port publié."
+   "fr": "Enrôlement d'une passkey et connexion avec un authentificateur virtuel (CDP de Chromium), en HTTPS sur le port publié."
   },
   {
    "id": "AUTH-16",
@@ -281,7 +281,7 @@
     "EE"
    ],
    "en": "Code by e-mail: code received in the mail sink, accepted once, expired after its TTL.",
-   "fr": "Code par e-mail : code reçu dans le puits SMTP, accepté une fois, expiré après son TTL."
+   "fr": "Code par e-mail : le code arrive sur le serveur SMTP de test, est accepté une seule fois, et expire à la fin de sa durée de vie."
   },
   {
    "id": "AUTH-17",
@@ -295,7 +295,7 @@
     "EE"
    ],
    "en": "A passwordless account signs in by passkey or code only.",
-   "fr": "Un compte sans mot de passe se connecte par passkey ou code seulement."
+   "fr": "Un compte sans mot de passe ne se connecte que par passkey ou par code."
   },
   {
    "id": "AUTH-18",
@@ -308,8 +308,8 @@
     "CE",
     "EE"
    ],
-   "en": "No two factors of the same kind counted twice.",
-   "fr": "Deux facteurs de même nature ne comptent pas double."
+   "en": "Two factors of the same kind are not counted twice.",
+   "fr": "Deux facteurs de même nature ne comptent pas pour deux."
   },
   {
    "id": "AUTH-19",
@@ -320,7 +320,7 @@
     "EE"
    ],
    "en": "Not built (SAML).",
-   "fr": "Non construit (SAML)."
+   "fr": "Non construite (SAML)."
   },
   {
    "id": "AUTH-20",
@@ -331,7 +331,7 @@
     "EE"
    ],
    "en": "Not built (Kerberos).",
-   "fr": "Non construit (Kerberos)."
+   "fr": "Non construite (Kerberos)."
   },
   {
    "id": "AUTH-21",
@@ -346,7 +346,7 @@
     "EE"
    ],
    "en": "Forgotten password: mail in the sink, link works once, old sessions revoked.",
-   "fr": "Mot de passe oublié : mail dans le puits, lien valable une fois, anciennes sessions révoquées."
+   "fr": "Mot de passe oublié : l'e-mail arrive sur le serveur SMTP de test, le lien ne fonctionne qu'une fois, les anciennes sessions sont révoquées."
   },
   {
    "id": "AUTH-22",
@@ -361,7 +361,7 @@
     "EE"
    ],
    "en": "E-mail verification mail received and honoured.",
-   "fr": "Mail de vérification reçu et pris en compte."
+   "fr": "L'e-mail de vérification d'adresse est reçu et pris en compte."
   },
   {
    "id": "AUTH-23",
@@ -375,7 +375,7 @@
     "EE"
    ],
    "en": "Security alerts sent for the events covered.",
-   "fr": "Alertes de sécurité envoyées pour les événements couverts."
+   "fr": "Les alertes de sécurité sont envoyées pour les événements couverts."
   },
   {
    "id": "AUTH-24",
@@ -389,7 +389,7 @@
     "EE"
    ],
    "en": "Local authority can be disabled while an external one signs in.",
-   "fr": "L'autorité locale se désactive pendant qu'une externe connecte."
+   "fr": "L'autorité locale peut être désactivée pendant qu'une autorité externe assure la connexion."
   },
   {
    "id": "MFA-01",
@@ -404,7 +404,7 @@
     "EE"
    ],
    "en": "TOTP enrol and challenge (code computed by the test), secret sealed in the store (no base32 secret in a DB dump).",
-   "fr": "Enrôlement et défi TOTP (code calculé par le test), secret scellé en base (aucun secret base32 dans un dump)."
+   "fr": "Enrôlement et défi TOTP (code calculé par le test), secret scellé en base (aucun secret base32 dans un dump de la base)."
   },
   {
    "id": "MFA-02",
@@ -419,7 +419,7 @@
     "EE"
    ],
    "en": "Backup code by e-mail through the mail sink.",
-   "fr": "Code de secours par e-mail via le puits SMTP."
+   "fr": "Code de secours envoyé par e-mail, lu sur le serveur SMTP de test."
   },
   {
    "id": "MFA-03",
@@ -433,7 +433,7 @@
     "EE"
    ],
    "en": "Trusted browser skips the challenge for its TTL, then asks again.",
-   "fr": "Un navigateur de confiance saute le défi pendant son TTL, puis le redemande."
+   "fr": "Un navigateur de confiance est dispensé du défi pendant sa durée de validité, puis le défi est redemandé."
   },
   {
    "id": "MFA-04",
@@ -447,7 +447,7 @@
     "EE"
    ],
    "en": "Mandatory MFA forces enrolment at next sign-in.",
-   "fr": "Le MFA obligatoire impose l'enrôlement à la connexion suivante."
+   "fr": "Le second facteur obligatoire impose l'enrôlement à la connexion suivante."
   },
   {
    "id": "MFA-05",
@@ -461,7 +461,7 @@
     "EE"
    ],
    "en": "A sign-in started on node A finishes on node B (flow state in the store).",
-   "fr": "Une connexion commencée sur le nœud A se termine sur le nœud B (état du flux en base)."
+   "fr": "Une connexion commencée sur le nœud A se termine sur le nœud B (l'état du parcours est en base)."
   },
   {
    "id": "RBAC-01",
@@ -476,7 +476,7 @@
     "EE"
    ],
    "en": "A parent role implies its children at a route.",
-   "fr": "Un rôle parent implique ses enfants sur une route."
+   "fr": "Sur une route, un rôle parent implique ses rôles enfants."
   },
   {
    "id": "RBAC-02",
@@ -491,7 +491,7 @@
     "EE"
    ],
    "en": "Group roles reach the JWT sent upstream.",
-   "fr": "Les rôles du groupe arrivent dans le JWT envoyé à l'amont."
+   "fr": "Les rôles d'un groupe arrivent dans le JWT envoyé à l'upstream."
   },
   {
    "id": "RBAC-03",
@@ -505,7 +505,7 @@
     "EE"
    ],
    "en": "Per-organisation groups do not leak across organisations.",
-   "fr": "Les groupes par organisation ne fuient pas d'une organisation à l'autre."
+   "fr": "Les groupes propres à une organisation ne débordent pas sur une autre."
   },
   {
    "id": "RBAC-04",
@@ -519,7 +519,7 @@
     "EE"
    ],
    "en": "The access matrix: every admin endpoint x every profile, allowed and refused (scenarios.json) - played against the IMAGE too.",
-   "fr": "La matrice d'accès : chaque endpoint admin x chaque profil, autorisé et refusé (scenarios.json) - jouée aussi contre l'IMAGE."
+   "fr": "La matrice d'accès : chaque endpoint d'administration x chaque profil, côté autorisé comme côté refusé (scenarios.json) - jouée aussi contre l'IMAGE."
   },
   {
    "id": "RBAC-05",
@@ -534,7 +534,7 @@
     "EE"
    ],
    "en": "Capabilities narrow the console and the API alike.",
-   "fr": "Les capacités restreignent console et API pareillement."
+   "fr": "Les capacités restreignent la console et l'API de la même façon."
   },
   {
    "id": "RBAC-06",
@@ -549,7 +549,7 @@
     "EE"
    ],
    "en": "Route access levels (public, signed in, organisation, role) on the data plane of the image.",
-   "fr": "Niveaux d'accès d'une route (public, connecté, organisation, rôle) sur le data plane de l'image."
+   "fr": "Les niveaux d'accès d'une route (public, connecté, organisation, rôle) sur le plan de données de l'image."
   },
   {
    "id": "RBAC-07",
@@ -564,7 +564,7 @@
     "EE"
    ],
    "en": "Per-endpoint rules from a deposited OpenAPI: closed operation refused, exception allowed.",
-   "fr": "Règles par endpoint depuis un OpenAPI déposé : opération fermée refusée, exception autorisée."
+   "fr": "Règles par endpoint tirées d'un OpenAPI déposé : une opération fermée est refusée, une exception est autorisée."
   },
   {
    "id": "RBAC-09",
@@ -579,7 +579,7 @@
     "EE"
    ],
    "en": "Roles reach the upstream in the configured header shape.",
-   "fr": "Les rôles arrivent à l'amont dans la forme d'en-tête configurée."
+   "fr": "Les rôles arrivent à l'upstream dans le format d'en-tête configuré."
   },
   {
    "id": "RBAC-10",
@@ -593,7 +593,7 @@
     "EE"
    ],
    "en": "Group rules from an LDAP group / OIDC claim assign membership at sign-in; CE refuses.",
-   "fr": "Les règles de groupe depuis un groupe LDAP / claim OIDC posent l'appartenance à la connexion ; la CE refuse."
+   "fr": "Les règles de groupe, à partir d'un groupe LDAP ou d'un claim OIDC, attribuent l'appartenance à la connexion ; CE refuse."
   },
   {
    "id": "RBAC-11",
@@ -605,7 +605,7 @@
     "EE"
    ],
    "en": "Not built (impersonation).",
-   "fr": "Non construit (impersonation)."
+   "fr": "Non construite (connexion en tant que)."
   },
   {
    "id": "MODEL-01",
@@ -620,7 +620,7 @@
     "EE"
    ],
    "en": "Custom account fields validated and forwarded.",
-   "fr": "Champs de compte validés et transmis."
+   "fr": "Les champs de compte personnalisés sont validés et transmis."
   },
   {
    "id": "MODEL-02",
@@ -635,7 +635,7 @@
     "EE"
    ],
    "en": "An account outside its window is refused at sign-in with the date.",
-   "fr": "Un compte hors de sa fenêtre est refusé à la connexion, avec la date."
+   "fr": "Un compte hors de sa fenêtre de validité est refusé à la connexion, avec la date."
   },
   {
    "id": "TENANT-01",
@@ -650,7 +650,7 @@
     "EE"
    ],
    "en": "Organisations: CE has one, EE several (multi mode switch refused on CE).",
-   "fr": "Organisations : une en CE, plusieurs en EE (le passage en multi refusé en CE)."
+   "fr": "Organisations : une seule en CE, plusieurs en EE (le passage en mode multi-organisation est refusé en CE)."
   },
   {
    "id": "TENANT-02",
@@ -664,7 +664,7 @@
     "EE"
    ],
    "en": "Membership join/leave and admin badge in both modes.",
-   "fr": "Adhésion/retrait et badge admin dans les deux modes."
+   "fr": "Entrée et sortie d'un membre, badge d'administrateur, dans les deux modes."
   },
   {
    "id": "TENANT-03",
@@ -690,7 +690,7 @@
     "EE"
    ],
    "en": "Working hours refuse outside the window (clock injected); ignored on CE.",
-   "fr": "Les heures ouvrées refusent hors fenêtre (horloge injectée) ; ignorées en CE."
+   "fr": "Les heures ouvrées refusent l'accès hors de la plage (horloge injectée) ; elles sont ignorées en CE."
   },
   {
    "id": "TENANT-05",
@@ -704,7 +704,7 @@
     "EE"
    ],
    "en": "Session TTL per organisation.",
-   "fr": "TTL de session par organisation."
+   "fr": "Durée de vie de session propre à chaque organisation."
   },
   {
    "id": "TENANT-06",
@@ -717,7 +717,7 @@
     "EE"
    ],
    "en": "Tenant isolation: an organisation's admin cannot read or write another's objects (matrix).",
-   "fr": "Isolation : l'admin d'une organisation ne lit ni n'écrit les objets d'une autre (matrice)."
+   "fr": "Isolation des organisations : l'administrateur d'une organisation ne peut ni lire ni modifier les objets d'une autre (matrice)."
   },
   {
    "id": "TENANT-07",
@@ -731,7 +731,7 @@
     "EE"
    ],
    "en": "Export carries organisations as documented.",
-   "fr": "L'export emporte les organisations comme documenté."
+   "fr": "L'export contient les organisations, comme documenté."
   },
   {
    "id": "TENANT-08",
@@ -744,7 +744,7 @@
     "EE"
    ],
    "en": "Single/multi mode switch, and CE stays single.",
-   "fr": "Bascule mono/multi, et la CE reste mono."
+   "fr": "Bascule entre le mode mono-organisation et le mode multi-organisation ; CE reste en mono-organisation."
   },
   {
    "id": "ROUTE-01",
@@ -760,7 +760,7 @@
     "EE"
    ],
    "en": "A route saved through the API serves at once, on every node of a cluster (change bus), without restart.",
-   "fr": "Une route enregistrée via l'API sert aussitôt, sur chaque nœud d'un cluster (bus de changement), sans redémarrage."
+   "fr": "Une route enregistrée par l'API est servie aussitôt, sur tous les nœuds d'un cluster (bus de changement), sans redémarrage."
   },
   {
    "id": "SVC-01",
@@ -774,7 +774,7 @@
     "EE"
    ],
    "en": "A self-contained route (target in the route) proxies with no other object.",
-   "fr": "Une route autoportante (cible dans la route) proxifie sans autre objet."
+   "fr": "Une route autoportante (la cible est dans la route) relaie le trafic sans aucun autre objet."
   },
   {
    "id": "ROUTE-02",
@@ -789,7 +789,7 @@
     "EE"
    ],
    "en": "Route attributes (strip prefix, host rewrite, headers) as seen by httpbin.",
-   "fr": "Attributs de route (strip prefix, réécriture d'hôte, en-têtes) vus par httpbin."
+   "fr": "Les attributs de route (retrait du préfixe, réécriture de l'hôte, en-têtes) tels que les voit httpbin."
   },
   {
    "id": "SVC-02",
@@ -806,7 +806,7 @@
     "EE"
    ],
    "en": "Discovery lists containers / swarm services / k8s services with the rights the chart and compose files grant; published ports read on each.",
-   "fr": "La découverte liste conteneurs / services swarm / services k8s avec les droits accordés par le chart et les compose ; ports publiés lus sur chacun."
+   "fr": "La découverte liste les conteneurs, les services swarm et les services k8s avec les droits qu'accordent le chart et les fichiers compose ; les ports publiés sont lus sur chacun."
   },
   {
    "id": "ROUTE-03",
@@ -821,7 +821,7 @@
     "EE"
    ],
    "en": "Each of the eleven predicates matches and refuses as documented, against httpbin.",
-   "fr": "Chacun des onze prédicats matche et refuse comme documenté, contre httpbin."
+   "fr": "Chacun des onze prédicats accepte et refuse comme documenté, face à httpbin."
   },
   {
    "id": "SVC-03",
@@ -835,7 +835,7 @@
     "EE"
    ],
    "en": "Simple route wizard result serves.",
-   "fr": "Le résultat de l'assistant de route simple sert."
+   "fr": "La route produite par l'assistant de route simple fonctionne."
   },
   {
    "id": "ROUTE-04",
@@ -850,7 +850,7 @@
     "EE"
    ],
    "en": "Request filters (headers, rewrite, body limits) observed upstream on httpbin.",
-   "fr": "Filtres de requête (en-têtes, réécriture, limites de corps) observés à l'amont sur httpbin."
+   "fr": "Les filtres de requête (en-têtes, réécriture, limites de taille du corps) sont observés côté upstream, sur httpbin."
   },
   {
    "id": "SVC-04",
@@ -865,7 +865,7 @@
     "EE"
    ],
    "en": "Upstream health shown down when the service is scaled to 0, up when back.",
-   "fr": "Santé de l'amont affichée basse quand le service passe à 0, haute à son retour."
+   "fr": "L'état de l'upstream s'affiche hors service quand le service est réduit à 0 instance, en service quand il revient."
   },
   {
    "id": "ROUTE-05",
@@ -880,7 +880,7 @@
     "EE"
    ],
    "en": "Response filters (headers, CORS, cache-control) on proxied and own answers.",
-   "fr": "Filtres de réponse (en-têtes, CORS, cache-control) sur réponses proxifiées et propres."
+   "fr": "Les filtres de réponse (en-têtes, CORS, cache-control) s'appliquent aux réponses relayées comme à celles de la gateway."
   },
   {
    "id": "SVC-05",
@@ -892,7 +892,7 @@
     "EE"
    ],
    "en": "Not built (applications).",
-   "fr": "Non construit (applications)."
+   "fr": "Non construite (applications)."
   },
   {
    "id": "SVC-06",
@@ -906,7 +906,7 @@
     "EE"
    ],
    "en": "Endpoint inventory from a deposited spec.",
-   "fr": "Inventaire d'endpoints depuis une spec déposée."
+   "fr": "Inventaire des endpoints à partir d'une spécification déposée."
   },
   {
    "id": "ROUTE-07",
@@ -921,7 +921,7 @@
     "EE"
    ],
    "en": "Timeouts: a slow upstream (delay endpoint) gets 504 at the configured time, not before.",
-   "fr": "Timeouts : un amont lent (endpoint delay) reçoit 504 au délai configuré, pas avant."
+   "fr": "Timeouts : un upstream lent (endpoint delay) reçoit un 504 au timeout configuré, pas avant."
   },
   {
    "id": "ROUTE-08",
@@ -936,7 +936,7 @@
     "EE"
    ],
    "en": "Rate limit answers 429 past the bound, and the bound is shared across nodes.",
-   "fr": "La limite de débit répond 429 au-delà du seuil, et le seuil est partagé entre nœuds."
+   "fr": "Le rate limit répond 429 une fois le seuil dépassé, et ce seuil est partagé entre les nœuds."
   },
   {
    "id": "ROUTE-09",
@@ -951,7 +951,7 @@
     "EE"
    ],
    "en": "Circuit breaker opens on a failing upstream (status endpoint) and half-opens after the delay.",
-   "fr": "Le disjoncteur s'ouvre sur un amont en échec (endpoint status) et se rouvre à moitié après le délai."
+   "fr": "Le disjoncteur s'ouvre sur un upstream en échec (endpoint status) et passe en demi-ouverture après le délai."
   },
   {
    "id": "ROUTE-10",
@@ -966,7 +966,7 @@
     "EE"
    ],
    "en": "A fresh install answers no route by default (no open proxy).",
-   "fr": "Une installation neuve ne répond à aucune route par défaut (pas de proxy ouvert)."
+   "fr": "Une installation neuve ne sert aucune route par défaut (pas de proxy ouvert)."
   },
   {
    "id": "ROUTE-11",
@@ -980,7 +980,7 @@
     "EE"
    ],
    "en": "Upstream probe marks a route's target reachable or not.",
-   "fr": "La sonde marque la cible d'une route joignable ou non."
+   "fr": "Le health check d'upstream indique si la cible d'une route est joignable ou non."
   },
   {
    "id": "ROUTE-12",
@@ -994,7 +994,7 @@
     "EE"
    ],
    "en": "Route export re-imports to the same routes.",
-   "fr": "L'export des routes se réimporte à l'identique."
+   "fr": "Un export des routes, une fois réimporté, redonne les mêmes routes."
   },
   {
    "id": "ROUTE-13",
@@ -1010,7 +1010,7 @@
     "EE"
    ],
    "en": "WebSocket through the gateway (echo service), through every ingress of each target.",
-   "fr": "WebSocket à travers la passerelle (service echo), par chaque entrée de chaque cible."
+   "fr": "WebSocket à travers la gateway (service d'écho), par chaque point d'entrée de chaque cible."
   },
   {
    "id": "ROUTE-14",
@@ -1025,7 +1025,7 @@
     "EE"
    ],
    "en": "h2 negotiated over the HTTPS door (ALPN); upstream compression passed through.",
-   "fr": "h2 négocié sur la porte HTTPS (ALPN) ; compression de l'amont transmise."
+   "fr": "h2 est négocié sur la porte HTTPS (ALPN) ; la compression de l'upstream est transmise telle quelle."
   },
   {
    "id": "ROUTE-15",
@@ -1039,7 +1039,7 @@
     "EE"
    ],
    "en": "Routing tester names the winning route.",
-   "fr": "Le testeur de routage nomme la route gagnante."
+   "fr": "Le testeur de routage nomme la route retenue."
   },
   {
    "id": "ROUTE-16",
@@ -1053,7 +1053,7 @@
     "EE"
    ],
    "en": "Single target enforced.",
-   "fr": "Cible unique imposée."
+   "fr": "La cible unique est imposée."
   },
   {
    "id": "ROUTE-17",
@@ -1068,7 +1068,7 @@
     "EE"
    ],
    "en": "Template response renders the caller's identity.",
-   "fr": "La réponse par gabarit rend l'identité de l'appelant."
+   "fr": "La réponse par gabarit affiche l'identité de l'appelant."
   },
   {
    "id": "ROUTE-18",
@@ -1082,7 +1082,7 @@
     "EE"
    ],
    "en": "Roles header sent upstream.",
-   "fr": "En-tête des rôles envoyé à l'amont."
+   "fr": "L'en-tête des rôles est envoyé à l'upstream."
   },
   {
    "id": "ROUTE-19",
@@ -1096,7 +1096,7 @@
     "EE"
    ],
    "en": "REMOTE_USER header sent upstream.",
-   "fr": "En-tête REMOTE_USER envoyé à l'amont."
+   "fr": "L'en-tête REMOTE_USER est envoyé à l'upstream."
   },
   {
    "id": "ROUTE-20",
@@ -1112,7 +1112,7 @@
     "EE"
    ],
    "en": "gRPC unary and streaming through the gateway (grpc echo), grpc-status counted; h2c and TLS upstreams.",
-   "fr": "gRPC unaire et en flux à travers la passerelle (grpc echo), grpc-status compté ; amonts h2c et TLS."
+   "fr": "gRPC unaire et en flux à travers la gateway (écho gRPC), grpc-status comptabilisé ; upstreams en h2c et en TLS."
   },
   {
    "id": "ROUTE-21",
@@ -1124,7 +1124,7 @@
     "EE"
    ],
    "en": "Not built (extensions).",
-   "fr": "Non construit (extensions)."
+   "fr": "Non construite (extensions)."
   },
   {
    "id": "UIF-01",
@@ -1138,7 +1138,7 @@
     "EE"
    ],
    "en": "An app published under a prefix loads its assets (mount slash redirect).",
-   "fr": "Une appli publiée sous un préfixe charge ses ressources (redirection du slash)."
+   "fr": "Une application publiée sous un préfixe charge ses ressources (redirection vers le chemin de montage avec la barre oblique finale)."
   },
   {
    "id": "UIF-02",
@@ -1152,7 +1152,7 @@
     "EE"
    ],
    "en": "HTML injection present on UI routes, absent on API routes.",
-   "fr": "Injection HTML présente sur les routes UI, absente sur les routes API."
+   "fr": "L'injection HTML est présente sur les routes d'interface, absente sur les routes d'API."
   },
   {
    "id": "UIF-03",
@@ -1166,7 +1166,7 @@
     "EE"
    ],
    "en": "User button renders and signs out.",
-   "fr": "Le bouton utilisateur s'affiche et déconnecte."
+   "fr": "Le bouton utilisateur s'affiche et permet de se déconnecter."
   },
   {
    "id": "UIF-04",
@@ -1181,7 +1181,7 @@
     "EE"
    ],
    "en": "Live channel delivers an event published on another node.",
-   "fr": "Le canal live livre un événement publié sur un autre nœud."
+   "fr": "Le canal en direct délivre un événement publié sur un autre nœud."
   },
   {
    "id": "UIF-05",
@@ -1195,7 +1195,7 @@
     "EE"
    ],
    "en": "Language picker switches the page locale.",
-   "fr": "Le sélecteur de langue change la locale de la page."
+   "fr": "Le sélecteur de langue change la langue de la page."
   },
   {
    "id": "UIF-06",
@@ -1209,7 +1209,7 @@
     "EE"
    ],
    "en": "Per-route CSS injected.",
-   "fr": "CSS par route injecté."
+   "fr": "Le CSS propre à une route est injecté."
   },
   {
    "id": "UIF-07",
@@ -1223,7 +1223,7 @@
     "EE"
    ],
    "en": "Rewritten OpenAPI spec served under the route prefix.",
-   "fr": "Spec OpenAPI réécrite servie sous le préfixe de la route."
+   "fr": "La spécification OpenAPI réécrite est servie sous le préfixe de la route."
   },
   {
    "id": "PORTAL-01",
@@ -1237,7 +1237,7 @@
     "EE"
    ],
    "en": "Portal bar lists the routes the user may reach.",
-   "fr": "La barre du portail liste les routes accessibles."
+   "fr": "La barre du portail liste les routes auxquelles l'utilisateur a accès."
   },
   {
    "id": "PORTAL-03",
@@ -1265,7 +1265,7 @@
     "EE"
    ],
    "en": "Identity forwarding modes seen by httpbin.",
-   "fr": "Modes de transmission d'identité vus par httpbin."
+   "fr": "Les modes de transmission de l'identité, tels que les voit httpbin."
   },
   {
    "id": "SAUTH-02",
@@ -1277,7 +1277,7 @@
     "EE"
    ],
    "en": "Not built (send-auth credentials in the vault).",
-   "fr": "Non construit (identifiants send-auth au coffre)."
+   "fr": "Non construite (identifiants send-auth dans le coffre)."
   },
   {
    "id": "SAUTH-03",
@@ -1313,7 +1313,7 @@
     "EE"
    ],
    "en": "Not built (OIDC provider).",
-   "fr": "Non construit (fournisseur OIDC)."
+   "fr": "Non construite (fournisseur OIDC)."
   },
   {
    "id": "VAULT-01",
@@ -1328,7 +1328,7 @@
     "EE"
    ],
    "en": "A $name reference resolves at use, the value never travels back.",
-   "fr": "Une référence $nom se résout à l'usage, la valeur ne revient jamais."
+   "fr": "Une référence $nom est résolue au moment de l'usage, et la valeur ne revient jamais vers l'appelant."
   },
   {
    "id": "VAULT-02",
@@ -1344,7 +1344,7 @@
     "EE"
    ],
    "en": "Master key rotation with MEERKAT_VAULT_KEY_PREVIOUS: restart, everything re-sealed, old key removable; rolling across cluster nodes.",
-   "fr": "Rotation de la clé maîtresse avec MEERKAT_VAULT_KEY_PREVIOUS : redémarrage, tout rescellé, ancienne clé retirable ; en rolling sur les nœuds."
+   "fr": "Rotation de la clé maîtresse avec MEERKAT_VAULT_KEY_PREVIOUS : redémarrage, tout est rescellé, l'ancienne clé peut être retirée ; déroulée nœud après nœud sur un cluster."
   },
   {
    "id": "VAULT-03",
@@ -1358,7 +1358,7 @@
     "EE"
    ],
    "en": "Portable vault export/import with its passphrase.",
-   "fr": "Export/import du coffre portable avec sa phrase de passe."
+   "fr": "Export et import du coffre portable, avec sa phrase secrète."
   },
   {
    "id": "VAULT-04",
@@ -1370,7 +1370,7 @@
     "EE"
    ],
    "en": "Not built (external vault).",
-   "fr": "Non construit (coffre externe)."
+   "fr": "Non construite (coffre externe)."
   },
   {
    "id": "VAULT-05",
@@ -1384,7 +1384,7 @@
     "EE"
    ],
    "en": "A literal in a sensitive field is refused or moved to the vault.",
-   "fr": "Un littéral dans un champ sensible est refusé ou rangé au coffre."
+   "fr": "Une valeur littérale saisie dans un champ sensible est refusée, ou déplacée dans le coffre."
   },
   {
    "id": "VAULT-06",
@@ -1398,7 +1398,7 @@
     "EE"
    ],
    "en": "Reminder date feeds the digest.",
-   "fr": "La date de rappel alimente le digest."
+   "fr": "La date de rappel alimente le récapitulatif quotidien."
   },
   {
    "id": "SSL-01",
@@ -1414,7 +1414,7 @@
     "EE"
    ],
    "en": "Self-signed, PEM import, keystore import, CSR + adopt - each serves on the HTTPS door of the image.",
-   "fr": "Auto-signé, import PEM, keystore, CSR + adoption - chacun sert sur la porte HTTPS de l'image."
+   "fr": "Certificat auto-signé, import PEM, import d'un keystore, CSR puis adoption - chacun est servi sur la porte HTTPS de l'image."
   },
   {
    "id": "SSL-02",
@@ -1430,7 +1430,7 @@
     "EE"
    ],
    "en": "HTTPS doors open on placement and are reachable on the PUBLISHED ports of each target; the TLS screen links match.",
-   "fr": "Les portes HTTPS s'ouvrent au placement et sont joignables sur les ports PUBLIÉS de chaque cible ; les liens de l'écran TLS correspondent."
+   "fr": "Les portes HTTPS s'ouvrent dès le placement d'un certificat et sont joignables sur les ports PUBLIÉS de chaque cible ; les liens de l'écran TLS correspondent."
   },
   {
    "id": "SSL-03",
@@ -1444,7 +1444,7 @@
     "EE"
    ],
    "en": "TLS secrets via the vault.",
-   "fr": "Secrets TLS via le coffre."
+   "fr": "Les secrets TLS passent par le coffre."
   },
   {
    "id": "SSL-04",
@@ -1459,7 +1459,7 @@
     "EE"
    ],
    "en": "Expiry digest names a certificate inside its window (clock injected) in the mail sink.",
-   "fr": "Le digest d'expiration cite un certificat dans sa fenêtre (horloge injectée) dans le puits SMTP."
+   "fr": "Le récapitulatif des expirations, reçu sur le serveur SMTP de test, cite un certificat entré dans sa fenêtre d'alerte (horloge injectée)."
   },
   {
    "id": "SSL-05",
@@ -1474,7 +1474,7 @@
     "EE"
    ],
    "en": "ACME against Pebble on the platform network: authority saved, order placed -> issued over TLS-ALPN, renewed; in a cluster issued ONCE (lock); CE refuses.",
-   "fr": "ACME contre Pebble sur le réseau de la plateforme : autorité enregistrée, commande placée -> émise par TLS-ALPN, renouvelée ; en cluster émise UNE fois (verrou) ; la CE refuse."
+   "fr": "ACME avec Pebble sur le réseau de la plateforme : autorité enregistrée, commande placée -> certificat émis par TLS-ALPN, puis renouvelé ; en cluster, émis UNE SEULE fois (verrou) ; CE refuse."
   },
   {
    "id": "SSL-06",
@@ -1489,7 +1489,7 @@
     "EE"
    ],
    "en": "Force HTTPS redirects only names a certificate carries; a service calling by cluster name stays plain; HSTS only on 443.",
-   "fr": "Force HTTPS ne redirige que les noms portés par un certificat ; un service appelant par nom de cluster reste en clair ; HSTS seulement sur 443."
+   "fr": "Force HTTPS ne redirige que les noms couverts par un certificat ; un service qui appelle par son nom de cluster reste en clair ; HSTS uniquement sur le port 443."
   },
   {
    "id": "SSL-07",
@@ -1501,7 +1501,7 @@
     "EE"
    ],
    "en": "Not built (HTTP/3).",
-   "fr": "Non construit (HTTP/3)."
+   "fr": "Non construite (HTTP/3)."
   },
   {
    "id": "SSL-08",
@@ -1516,7 +1516,7 @@
     "EE"
    ],
    "en": "Placement on a plane reloads the door on every node; conflict named; fallback = oldest placed.",
-   "fr": "Le placement recharge la porte sur chaque nœud ; conflit nommé ; repli = plus ancien placé."
+   "fr": "Placer un certificat sur un plan recharge la porte sur tous les nœuds ; un conflit est nommé ; le certificat de repli est le plus anciennement placé."
   },
   {
    "id": "NOTIF-01",
@@ -1531,7 +1531,7 @@
     "EE"
    ],
    "en": "SMTP relay test mail arrives in the sink (STARTTLS and plain).",
-   "fr": "Le mail de test du relais arrive dans le puits (STARTTLS et clair)."
+   "fr": "L'e-mail de test du relais SMTP arrive sur le serveur SMTP de test (avec STARTTLS et en clair)."
   },
   {
    "id": "NOTIF-02",
@@ -1543,7 +1543,7 @@
     "EE"
    ],
    "en": "Not built (Web Push).",
-   "fr": "Non construit (Web Push)."
+   "fr": "Non construite (Web Push)."
   },
   {
    "id": "NOTIF-03",
@@ -1571,7 +1571,7 @@
     "EE"
    ],
    "en": "Daily digest sent ONCE per day across a cluster (advisory lock), at the configured hour.",
-   "fr": "Digest quotidien envoyé UNE fois par jour sur un cluster (verrou consultatif), à l'heure configurée."
+   "fr": "Le récapitulatif quotidien est envoyé UNE SEULE fois par jour sur un cluster (verrou consultatif), à l'heure configurée."
   },
   {
    "id": "SCHED-01",
@@ -1586,7 +1586,7 @@
     "EE"
    ],
    "en": "A scheduled call fires once per tick across all nodes, against httpbin.",
-   "fr": "Un appel planifié part une fois par échéance sur l'ensemble des nœuds, contre httpbin."
+   "fr": "Un appel planifié part une seule fois par échéance pour l'ensemble des nœuds, vers httpbin."
   },
   {
    "id": "SCHED-02",
@@ -1600,7 +1600,7 @@
     "EE"
    ],
    "en": "A one-off task fires once.",
-   "fr": "Une tâche ponctuelle part une fois."
+   "fr": "Une tâche ponctuelle part une seule fois."
   },
   {
    "id": "SCHED-03",
@@ -1614,7 +1614,7 @@
     "EE"
    ],
    "en": "Run history lists runs and replays one.",
-   "fr": "L'historique liste les exécutions et en rejoue une."
+   "fr": "L'historique liste les exécutions et permet d'en rejouer une."
   },
   {
    "id": "SCHED-04",
@@ -1628,7 +1628,7 @@
     "EE"
    ],
    "en": "Retry bounded on a failing upstream.",
-   "fr": "Reprise bornée sur un amont en échec."
+   "fr": "Les reprises sont bornées face à un upstream en échec."
   },
   {
    "id": "SCHED-05",
@@ -1642,7 +1642,7 @@
     "EE"
    ],
    "en": "Service-requested delay honoured.",
-   "fr": "Report demandé par le service respecté."
+   "fr": "Le report demandé par le service est respecté."
   },
   {
    "id": "I18N-01",
@@ -1656,7 +1656,7 @@
     "EE"
    ],
    "en": "Sign-in pages served in each of the 20 languages from Accept-Language, no key left untranslated.",
-   "fr": "Pages de connexion servies dans chacune des 20 langues depuis Accept-Language, aucune clé non traduite."
+   "fr": "Les pages de connexion sont servies dans chacune des 20 langues selon Accept-Language, sans aucune clé restée non traduite."
   },
   {
    "id": "THEME-01",
@@ -1670,7 +1670,7 @@
     "EE"
    ],
    "en": "Global theme applied to the sign-in pages.",
-   "fr": "Thème global appliqué aux pages de connexion."
+   "fr": "Le thème global s'applique aux pages de connexion."
   },
   {
    "id": "I18N-02",
@@ -1684,7 +1684,7 @@
     "EE"
    ],
    "en": "Backend errors localised.",
-   "fr": "Erreurs backend localisées."
+   "fr": "Les erreurs du backend sont traduites."
   },
   {
    "id": "THEME-02",
@@ -1698,7 +1698,7 @@
     "EE"
    ],
    "en": "Branding applied; hiding the mark refused on CE.",
-   "fr": "Marque appliquée ; masquer la marque refusé en CE."
+   "fr": "La marque est appliquée ; masquer la mention Meerkat est refusé en CE."
   },
   {
    "id": "I18N-03",
@@ -1710,7 +1710,7 @@
     "EE"
    ],
    "en": "Decision (console in English), nothing to test.",
-   "fr": "Décision (console en anglais), rien à tester."
+   "fr": "Décision (la console est en anglais) : rien à tester."
   },
   {
    "id": "THEME-03",
@@ -1724,7 +1724,7 @@
     "EE"
    ],
    "en": "Shared palette used by pages and console.",
-   "fr": "Palette partagée utilisée par pages et console."
+   "fr": "La palette partagée est utilisée par les pages et par la console."
   },
   {
    "id": "I18N-04",
@@ -1752,7 +1752,7 @@
     "EE"
    ],
    "en": "M3 editor saves a theme that pages use.",
-   "fr": "L'éditeur M3 enregistre un thème utilisé par les pages."
+   "fr": "L'éditeur M3 enregistre un thème que les pages utilisent."
   },
   {
    "id": "THEME-05",
@@ -1766,7 +1766,7 @@
     "EE"
    ],
    "en": "Light/dark follows the user choice.",
-   "fr": "Clair/sombre suit le choix de l'utilisateur."
+   "fr": "Le mode clair ou sombre suit le choix de l'utilisateur."
   },
   {
    "id": "THEME-08",
@@ -1780,7 +1780,7 @@
     "EE"
    ],
    "en": "A named theme selectable.",
-   "fr": "Un thème nommé se sélectionne."
+   "fr": "Un thème nommé peut être sélectionné."
   },
   {
    "id": "THEME-07",
@@ -1794,7 +1794,7 @@
     "EE"
    ],
    "en": "Template previews render with their data set.",
-   "fr": "Les aperçus de gabarits s'affichent avec leur jeu de données."
+   "fr": "Les aperçus des gabarits s'affichent avec leur jeu de données."
   },
   {
    "id": "I18N-05",
@@ -1808,7 +1808,7 @@
     "EE"
    ],
    "en": "A language override in the store wins over the embedded catalogue.",
-   "fr": "Une surcharge de langue en base l'emporte sur le catalogue embarqué."
+   "fr": "Une traduction surchargée en base l'emporte sur le catalogue embarqué."
   },
   {
    "id": "THEME-06",
@@ -1822,7 +1822,7 @@
     "EE"
    ],
    "en": "Brand background rendered.",
-   "fr": "Fond de marque affiché."
+   "fr": "Le fond de marque s'affiche."
   },
   {
    "id": "CONSOLE-01",
@@ -1838,7 +1838,7 @@
     "EE"
    ],
    "en": "The console loads from the image on the admin port of each target and signs in.",
-   "fr": "La console se charge depuis l'image sur le port admin de chaque cible et se connecte."
+   "fr": "La console se charge depuis l'image, sur le port d'administration de chaque cible, et la connexion aboutit."
   },
   {
    "id": "CONSOLE-02",
@@ -1866,7 +1866,7 @@
     "EE"
    ],
    "en": "Route editor saves every section and the route serves.",
-   "fr": "L'éditeur de route enregistre chaque section et la route sert."
+   "fr": "L'éditeur de route enregistre chaque section, et la route fonctionne."
   },
   {
    "id": "CONSOLE-04",
@@ -1880,7 +1880,7 @@
     "EE"
    ],
    "en": "Endpoint security screen edits rules that apply.",
-   "fr": "L'écran de sécurité des endpoints édite des règles qui s'appliquent."
+   "fr": "L'écran de sécurité des endpoints modifie des règles qui s'appliquent réellement."
   },
   {
    "id": "CONSOLE-05",
@@ -1895,7 +1895,7 @@
     "EE"
    ],
    "en": "Export a file from CE and import it into EE and back; the plan names what CE leaves out.",
-   "fr": "Exporter un fichier depuis la CE, l'importer dans l'EE et retour ; le plan nomme ce que la CE laisse de côté."
+   "fr": "Exporter un fichier depuis CE, l'importer dans EE, puis l'inverse ; le plan nomme ce que CE laisse de côté."
   },
   {
    "id": "CONSOLE-06",
@@ -1923,7 +1923,7 @@
     "EE"
    ],
    "en": "Users screen: create, temporary password, reset.",
-   "fr": "Écran des utilisateurs : création, mot de passe temporaire, reset."
+   "fr": "Écran des utilisateurs : création, mot de passe temporaire, réinitialisation."
   },
   {
    "id": "CONSOLE-08",
@@ -1937,7 +1937,7 @@
     "EE"
    ],
    "en": "Sessions screen scoped per admin perimeter.",
-   "fr": "Écran des sessions limité au périmètre de l'admin."
+   "fr": "L'écran des sessions est limité au périmètre de l'administrateur."
   },
   {
    "id": "CONSOLE-09",
@@ -1951,7 +1951,7 @@
     "EE"
    ],
    "en": "Profile edits saved.",
-   "fr": "Modifications du profil enregistrées."
+   "fr": "Les modifications du profil sont enregistrées."
   },
   {
    "id": "CONSOLE-10",
@@ -1980,7 +1980,7 @@
     "EE"
    ],
    "en": "Console on its own port, never on the data plane (data port answers no /api).",
-   "fr": "Console sur son port, jamais sur le data plane (le port data ne répond aucun /api)."
+   "fr": "La console est sur son propre port, jamais sur le plan de données (le port de données ne répond à aucun /api)."
   },
   {
    "id": "CONSOLE-12",
@@ -1994,7 +1994,7 @@
     "EE"
    ],
    "en": "Routes screen reorders and toggles.",
-   "fr": "L'écran des routes réordonne et bascule."
+   "fr": "L'écran des routes permet de les réordonner et de les activer ou désactiver."
   },
   {
    "id": "CONSOLE-13",
@@ -2022,7 +2022,7 @@
     "EE"
    ],
    "en": "License page lists the EE features, locked on CE.",
-   "fr": "La page licence liste les fonctions EE, verrouillées en CE."
+   "fr": "La page de licence liste les fonctionnalités EE, verrouillées en CE."
   },
   {
    "id": "CONSOLE-15",
@@ -2036,7 +2036,7 @@
     "EE"
    ],
    "en": "Version and release notes match the image's stamped version.",
-   "fr": "Version et notes de version correspondent à la version tamponnée de l'image."
+   "fr": "La version et les notes de version correspondent à la version inscrite dans l'image."
   },
   {
    "id": "LIFE-01",
@@ -2053,7 +2053,7 @@
     "EE"
    ],
    "en": "First start of each image on each target: admin bootstrap from env, readiness green, no route open.",
-   "fr": "Premier démarrage de chaque image sur chaque cible : admin depuis l'env, readiness verte, aucune route ouverte."
+   "fr": "Premier démarrage de chaque image sur chaque cible : administrateur initial créé à partir de l'environnement, readiness au vert, aucune route ouverte."
   },
   {
    "id": "LIFE-02",
@@ -2068,7 +2068,7 @@
     "EE"
    ],
    "en": "Declarative seed from a mounted file (ConfigMap / compose volume) applied once.",
-   "fr": "Seed déclaratif depuis un fichier monté (ConfigMap / volume compose) appliqué une fois."
+   "fr": "Le jeu de données déclaratif, lu dans un fichier monté (ConfigMap / volume compose), est appliqué une seule fois."
   },
   {
    "id": "LIFE-03",
@@ -2082,7 +2082,7 @@
     "EE"
    ],
    "en": "Developer mode switch gates dev features.",
-   "fr": "L'interrupteur mode développeur conditionne les fonctions dev."
+   "fr": "L'interrupteur du mode développeur conditionne les fonctionnalités de développement."
   },
   {
    "id": "LIFE-04",
@@ -2096,7 +2096,7 @@
     "EE"
    ],
    "en": "API docs pages served.",
-   "fr": "Pages de doc d'API servies."
+   "fr": "Les pages de documentation d'API sont servies."
   },
   {
    "id": "LIFE-05",
@@ -2110,7 +2110,7 @@
     "EE"
    ],
    "en": "A route in maintenance answers its unavailable page (503).",
-   "fr": "Une route en maintenance répond sa page d'indisponibilité (503)."
+   "fr": "Une route en maintenance répond par sa page d'indisponibilité (503)."
   },
   {
    "id": "DEV-01",
@@ -2124,7 +2124,7 @@
     "EE"
    ],
    "en": "Dev capability gates dev screens.",
-   "fr": "La capacité dev conditionne les écrans dev."
+   "fr": "La capacité dev conditionne l'accès aux écrans de développement."
   },
   {
    "id": "DEV-02",
@@ -2138,7 +2138,7 @@
     "EE"
    ],
    "en": "Developer key deposited and revoked.",
-   "fr": "Clé développeur déposée et révoquée."
+   "fr": "Une clé de développeur est déposée, puis révoquée."
   },
   {
    "id": "DEV-03",
@@ -2152,7 +2152,7 @@
     "EE"
    ],
    "en": "plug: workstation reaches a cluster service through the gateway tunnel (reuse plug's e2e cells).",
-   "fr": "plug : le poste atteint un service du cluster par le tunnel de la passerelle (réutiliser les cellules e2e de plug)."
+   "fr": "plug : le poste de travail atteint un service du cluster par le tunnel de la gateway (en réutilisant les cellules e2e de plug)."
   },
   {
    "id": "DEV-04",
@@ -2166,7 +2166,7 @@
     "EE"
    ],
    "en": "plug: a cluster service is substituted by a local process and restored on exit.",
-   "fr": "plug : un service du cluster est substitué par un processus local et rétabli à la sortie."
+   "fr": "plug : un service du cluster est remplacé par un processus local, puis rétabli à la sortie."
   },
   {
    "id": "DEV-05",
@@ -2178,7 +2178,7 @@
     "EE"
    ],
    "en": "Not built (substitution scope).",
-   "fr": "Non construit (portée des substitutions)."
+   "fr": "Non construite (portée des substitutions)."
   },
   {
    "id": "DEV-06",
@@ -2205,7 +2205,7 @@
     "EE"
    ],
    "en": "Substitution removed when the developer disconnects.",
-   "fr": "Substitution retirée à la déconnexion du développeur."
+   "fr": "La substitution est retirée quand le développeur se déconnecte."
   },
   {
    "id": "DEV-08",
@@ -2218,7 +2218,7 @@
     "EE"
    ],
    "en": "Two developers on two names.",
-   "fr": "Deux développeurs sur deux noms."
+   "fr": "Deux développeurs sur deux noms différents."
   },
   {
    "id": "DEV-09",
@@ -2232,7 +2232,7 @@
     "EE"
    ],
    "en": "Test tooling endpoints answer.",
-   "fr": "Les endpoints d'outillage de test répondent."
+   "fr": "Les endpoints de l'outillage de test répondent."
   },
   {
    "id": "DEV-10",
@@ -2246,7 +2246,7 @@
     "EE"
    ],
    "en": "UI test mode.",
-   "fr": "Mode test UI."
+   "fr": "Mode de test de l'interface."
   },
   {
    "id": "DEV-11",
@@ -2259,7 +2259,7 @@
     "EE"
    ],
    "en": "Tunnel security frame enforced.",
-   "fr": "Cadre de sécurité du tunnel appliqué."
+   "fr": "Le cadre de sécurité du tunnel est appliqué."
   },
   {
    "id": "DEV-12",
@@ -2273,7 +2273,7 @@
     "EE"
    ],
    "en": "Console in dev mode.",
-   "fr": "Console en mode dev."
+   "fr": "La console en mode développeur."
   },
   {
    "id": "CFG-01",
@@ -2287,7 +2287,7 @@
     "EE"
    ],
    "en": "Saved configurations listed, CE capped at three.",
-   "fr": "Configurations enregistrées listées, CE plafonnée à trois."
+   "fr": "Les configurations enregistrées sont listées ; CE est plafonnée à trois."
   },
   {
    "id": "CFG-02",
@@ -2302,7 +2302,7 @@
     "EE"
    ],
    "en": "Set as current applies on every node.",
-   "fr": "Set as current s'applique sur chaque nœud."
+   "fr": "Set as current s'applique sur tous les nœuds."
   },
   {
    "id": "CFG-03",
@@ -2317,7 +2317,7 @@
     "EE"
    ],
    "en": "A configuration file at first start becomes the active one (mounted file).",
-   "fr": "Un fichier de configuration au premier démarrage devient l'actif (fichier monté)."
+   "fr": "Un fichier de configuration présent au premier démarrage devient la configuration active (fichier monté)."
   },
   {
    "id": "CFG-04",
@@ -2331,7 +2331,7 @@
     "EE"
    ],
    "en": "Compare shows added/removed/changed.",
-   "fr": "La comparaison montre ajouts/suppressions/modifications."
+   "fr": "La comparaison montre ce qui est ajouté, retiré et modifié."
   },
   {
    "id": "CFG-05",
@@ -2345,7 +2345,7 @@
     "EE"
    ],
    "en": "Export round-trips (ZIP with assets).",
-   "fr": "L'export fait l'aller-retour (ZIP avec ressources)."
+   "fr": "L'export se réimporte à l'identique (ZIP avec ses ressources)."
   },
   {
    "id": "CFG-06",
@@ -2359,7 +2359,7 @@
     "EE"
    ],
    "en": "Restore points: restore one, state matches.",
-   "fr": "Points de reprise : en restaurer un, l'état correspond."
+   "fr": "Points de reprise : en restaurer un redonne le même état."
   },
   {
    "id": "CFG-07",
@@ -2373,7 +2373,7 @@
     "EE"
    ],
    "en": "Git locations against a Gitea on the platform: pull replaces, push replaces only the directory, two platforms share a repo; CE refuses.",
-   "fr": "Emplacements git contre un Gitea de la plateforme : pull remplace, push ne remplace que le dossier, deux plateformes partagent un dépôt ; la CE refuse."
+   "fr": "Emplacements git avec un Gitea sur la plateforme : un pull remplace, un push ne remplace que le répertoire, deux plateformes partagent un même dépôt ; CE refuse."
   },
   {
    "id": "PAGE-01",
@@ -2387,7 +2387,7 @@
     "EE"
    ],
    "en": "Vanilla pages render without JS errors.",
-   "fr": "Les pages vanilla s'affichent sans erreur JS."
+   "fr": "Les pages vanilla s'affichent sans erreur JavaScript."
   },
   {
    "id": "PAGE-02",
@@ -2401,7 +2401,7 @@
     "EE"
    ],
    "en": "Layouts selectable on EE, centred only on CE.",
-   "fr": "Layouts sélectionnables en EE, centré seul en CE."
+   "fr": "Les dispositions se choisissent en EE ; seule la disposition centrée existe en CE."
   },
   {
    "id": "PAGE-03",
@@ -2415,7 +2415,7 @@
     "EE"
    ],
    "en": "Overridden translations shown.",
-   "fr": "Traductions surchargées affichées."
+   "fr": "Les traductions surchargées s'affichent."
   },
   {
    "id": "PAGE-04",
@@ -2443,7 +2443,7 @@
     "EE"
    ],
    "en": "Embedded console served.",
-   "fr": "Console embarquée servie."
+   "fr": "La console embarquée est servie."
   },
   {
    "id": "PAGE-06",
@@ -2457,7 +2457,7 @@
     "EE"
    ],
    "en": "Console layout.",
-   "fr": "Layout de la console."
+   "fr": "La disposition de la console."
   },
   {
    "id": "PAGE-07",
@@ -2471,7 +2471,7 @@
     "EE"
    ],
    "en": "Softwarity components render.",
-   "fr": "Les composants softwarity s'affichent."
+   "fr": "Les composants Softwarity s'affichent."
   },
   {
    "id": "QUOTA-01",
@@ -2486,7 +2486,7 @@
     "EE"
    ],
    "en": "Quotas count per caller and are shared across nodes.",
-   "fr": "Les quotas comptent par appelant et sont partagés entre nœuds."
+   "fr": "Les quotas comptent par appelant et sont partagés entre les nœuds."
   },
   {
    "id": "QUOTA-02",
@@ -2500,7 +2500,7 @@
     "EE"
    ],
    "en": "429 carries Retry-After.",
-   "fr": "Le 429 porte Retry-After."
+   "fr": "Le 429 porte l'en-tête Retry-After."
   },
   {
    "id": "QUOTA-03",
@@ -2512,7 +2512,7 @@
     "EE"
    ],
    "en": "Not built (consumption).",
-   "fr": "Non construit (consommation)."
+   "fr": "Non construite (consommation)."
   },
   {
    "id": "QUOTA-04",
@@ -2524,7 +2524,7 @@
     "EE"
    ],
    "en": "Not built (cluster quota counters).",
-   "fr": "Non construit (compteurs de quotas en cluster)."
+   "fr": "Non construite (compteurs de quotas en cluster)."
   },
   {
    "id": "QUOTA-05",
@@ -2538,7 +2538,7 @@
     "EE"
    ],
    "en": "Per-endpoint quota refuses one operation, not its neighbour.",
-   "fr": "Le quota par endpoint refuse une opération, pas sa voisine."
+   "fr": "Un quota par endpoint refuse une opération, pas sa voisine."
   },
   {
    "id": "AUD-01",
@@ -2553,7 +2553,7 @@
     "EE"
    ],
    "en": "Every admin mutation appears in the trail with actor and diff, whichever node took it.",
-   "fr": "Chaque mutation admin apparaît au journal avec acteur et diff, quel que soit le nœud."
+   "fr": "Chaque modification d'administration apparaît dans le journal d'audit avec son auteur et le détail du changement, quel que soit le nœud qui l'a reçue."
   },
   {
    "id": "AUD-02",
@@ -2567,7 +2567,7 @@
     "EE"
    ],
    "en": "Retention purges old events; CSV export (EE) refused on CE.",
-   "fr": "La rétention purge les vieux événements ; l'export CSV (EE) refusé en CE."
+   "fr": "La rétention purge les anciens événements ; l'export CSV (EE) est refusé en CE."
   },
   {
    "id": "AUD-03",
@@ -2580,7 +2580,7 @@
     "EE"
    ],
    "en": "Audit events reach an OpenTelemetry Collector on the platform (file exporter checked).",
-   "fr": "Les événements d'audit atteignent un Collector OpenTelemetry de la plateforme (exporteur fichier vérifié)."
+   "fr": "Les événements d'audit arrivent à un OpenTelemetry Collector sur la plateforme (vérifié par son exporteur fichier)."
   },
   {
    "id": "AUD-04",
@@ -2593,7 +2593,7 @@
     "EE"
    ],
    "en": "Endpoint audit records chosen operations to the collector; CE keeps rules unapplied.",
-   "fr": "L'audit des endpoints enregistre les opérations choisies vers le collecteur ; la CE garde les règles sans les appliquer."
+   "fr": "L'audit des endpoints envoie au collecteur les opérations choisies ; CE conserve les règles sans les appliquer."
   },
   {
    "id": "ISSUE-01",
@@ -2607,7 +2607,7 @@
     "EE"
    ],
    "en": "An issue filed from a page lands in the console.",
-   "fr": "Un signalement depuis une page arrive dans la console."
+   "fr": "Un signalement déposé depuis une page arrive dans la console."
   },
   {
    "id": "ISSUE-02",
@@ -2621,7 +2621,7 @@
     "EE"
    ],
    "en": "Issue screenshots stored.",
-   "fr": "Captures des signalements stockées."
+   "fr": "Les captures d'écran des signalements sont stockées."
   },
   {
    "id": "ISSUE-03",
@@ -2635,7 +2635,7 @@
     "EE"
    ],
    "en": "Issue follow-up in the console.",
-   "fr": "Suivi des signalements en console."
+   "fr": "Le suivi des signalements se fait dans la console."
   },
   {
    "id": "ISSUE-04",
@@ -2649,7 +2649,7 @@
     "EE"
    ],
    "en": "Issue switch hides the button.",
-   "fr": "L'interrupteur masque le bouton."
+   "fr": "L'interrupteur des signalements masque le bouton."
   },
   {
    "id": "ISSUE-05",
@@ -2661,7 +2661,7 @@
     "EE"
    ],
    "en": "Not built (connectors).",
-   "fr": "Non construit (connecteurs)."
+   "fr": "Non construite (connecteurs)."
   },
   {
    "id": "ISSUE-06",
@@ -2673,7 +2673,7 @@
     "EE"
    ],
    "en": "Not built (numbered annotations).",
-   "fr": "Non construit (annotations numérotées)."
+   "fr": "Non construite (annotations numérotées)."
   },
   {
    "id": "MCP-01",
@@ -2688,7 +2688,7 @@
     "EE"
    ],
    "en": "MCP endpoint answers initialize and tools/list through the image with an agent token.",
-   "fr": "Le point MCP répond initialize et tools/list via l'image avec un jeton d'agent."
+   "fr": "L'endpoint MCP répond à initialize et à tools/list à travers l'image, avec un jeton d'agent."
   },
   {
    "id": "MCP-02",
@@ -2702,7 +2702,7 @@
     "EE"
    ],
    "en": "Agent token scope: read-only token refused on writes.",
-   "fr": "Portée du jeton d'agent : un jeton lecture seule refusé en écriture."
+   "fr": "Périmètre du jeton d'agent : un jeton en lecture seule est refusé en écriture."
   },
   {
    "id": "MCP-03",
@@ -2716,7 +2716,7 @@
     "EE"
    ],
    "en": "Agent actions audited under the token's account.",
-   "fr": "Actions de l'agent auditées sous le compte du jeton."
+   "fr": "Les actions d'un agent sont auditées sous le compte du jeton."
   },
   {
    "id": "MCP-04",
@@ -2744,7 +2744,7 @@
     "EE"
    ],
    "en": "Direct write plus restore point.",
-   "fr": "Écriture directe et point de reprise."
+   "fr": "Écriture directe, avec son point de reprise."
   },
   {
    "id": "MCP-07",
@@ -2758,7 +2758,7 @@
     "EE"
    ],
    "en": "OAuth plug-in flow for an MCP client.",
-   "fr": "Flux de branchement OAuth pour un client MCP."
+   "fr": "Parcours de branchement OAuth pour un client MCP."
   },
   {
    "id": "MCP-06",
@@ -2772,7 +2772,7 @@
     "EE"
    ],
    "en": "Export/import tools for the agent.",
-   "fr": "Outils d'export/import pour l'agent."
+   "fr": "Outils d'export et d'import pour l'agent."
   },
   {
    "id": "SEC-01",
@@ -2786,7 +2786,7 @@
     "EE"
    ],
    "en": "Cross-site form posts refused (Origin/SameSite).",
-   "fr": "Envois de formulaire inter-sites refusés (Origin/SameSite)."
+   "fr": "Les envois de formulaire depuis un autre site sont refusés (Origin/SameSite)."
   },
   {
    "id": "SEC-02",
@@ -2815,7 +2815,7 @@
     "EE"
    ],
    "en": "Security headers present on pages and console from the image.",
-   "fr": "En-têtes de sécurité présents sur pages et console depuis l'image."
+   "fr": "Les en-têtes de sécurité sont présents sur les pages et sur la console servies par l'image."
   },
   {
    "id": "SEC-04",
@@ -2830,7 +2830,7 @@
     "EE"
    ],
    "en": "No secret in clear: grep a DB dump and the logs for passwords, TOTP secrets, private keys, tokens.",
-   "fr": "Aucun secret en clair : rechercher dans un dump de base et dans les logs mots de passe, secrets TOTP, clés privées, jetons."
+   "fr": "Aucun secret en clair : recherche des mots de passe, secrets TOTP, clés privées et jetons dans un dump de la base et dans les journaux."
   },
   {
    "id": "SEC-05",
@@ -2859,7 +2859,7 @@
     "EE"
    ],
    "en": "Encryption at rest: sealed columns unreadable without the vault key; a node with another key says so.",
-   "fr": "Chiffrement au repos : colonnes scellées illisibles sans la clé du coffre ; un nœud avec une autre clé le dit."
+   "fr": "Chiffrement au repos : les colonnes scellées sont illisibles sans la clé du coffre ; un nœud qui a une autre clé le dit."
   },
   {
    "id": "SEC-07",
@@ -2874,7 +2874,7 @@
     "EE"
    ],
    "en": "Revoking a session or token takes effect on every node at once.",
-   "fr": "Révoquer une session ou un jeton prend effet sur chaque nœud aussitôt."
+   "fr": "Révoquer une session ou un jeton prend effet aussitôt, sur tous les nœuds."
   },
   {
    "id": "SEC-08",
@@ -2888,7 +2888,7 @@
     "EE"
    ],
    "en": "Security events in the trail.",
-   "fr": "Événements de sécurité au journal."
+   "fr": "Les événements de sécurité figurent dans le journal d'audit."
   },
   {
    "id": "SEC-09",
@@ -2902,7 +2902,7 @@
     "EE"
    ],
    "en": "Sign-in and forgotten password answer the same for known and unknown accounts (timing within bounds).",
-   "fr": "Connexion et mot de passe oublié répondent pareil pour comptes connus et inconnus (temps dans les bornes)."
+   "fr": "La connexion et le mot de passe oublié répondent de la même façon pour un compte connu et pour un compte inconnu (temps de réponse dans les bornes)."
   },
   {
    "id": "SEC-10",
@@ -2916,7 +2916,7 @@
     "EE"
    ],
    "en": "No personal page cached (Cache-Control: no-store).",
-   "fr": "Aucune page personnelle en cache (Cache-Control: no-store)."
+   "fr": "Aucune page personnelle n'est mise en cache (Cache-Control: no-store)."
   },
   {
    "id": "PERF-01",
@@ -2930,7 +2930,7 @@
     "EE"
    ],
    "en": "A slow upstream does not slow the others (concurrent load).",
-   "fr": "Un amont lent ne ralentit pas les autres (charge concurrente)."
+   "fr": "Un upstream lent ne ralentit pas les autres (charge concurrente)."
   },
   {
    "id": "PERF-05",
@@ -2944,7 +2944,7 @@
     "EE"
    ],
    "en": "Benchmarks published per arch (existing CI).",
-   "fr": "Bancs publiés par architecture (CI existante)."
+   "fr": "Les bancs de mesure sont publiés par architecture (CI existante)."
   },
   {
    "id": "PERF-02",
@@ -2974,7 +2974,7 @@
     "EE"
    ],
    "en": "Active/active: two or three gateways on one PostgreSQL behind a load balancer; any node serves any session.",
-   "fr": "Actif/actif : deux ou trois passerelles sur un PostgreSQL derrière un répartiteur ; n'importe quel nœud sert n'importe quelle session."
+   "fr": "Actif/actif : deux ou trois gateways sur un même PostgreSQL, derrière un load balancer ; n'importe quel nœud sert n'importe quelle session."
   },
   {
    "id": "PERF-04",
@@ -2987,7 +2987,7 @@
     "EE"
    ],
    "en": "Shared state: sessions, rate limits, locks, change bus across nodes.",
-   "fr": "État partagé : sessions, limites de débit, verrous, bus de changement entre nœuds."
+   "fr": "État partagé entre les nœuds : sessions, rate limits, verrous, bus de changement."
   },
   {
    "id": "PERF-06",
@@ -3001,7 +3001,7 @@
     "EE"
    ],
    "en": "Validator on a rewritten page.",
-   "fr": "Validateur sur une page réécrite."
+   "fr": "Le validateur sur une page réécrite."
   },
   {
    "id": "OBS-01",
@@ -3016,7 +3016,7 @@
     "EE"
    ],
    "en": "Traffic dashboard sums every node of a cluster.",
-   "fr": "Le tableau de bord somme tous les nœuds d'un cluster."
+   "fr": "Le tableau de bord du trafic additionne tous les nœuds d'un cluster."
   },
   {
    "id": "OBS-02",
@@ -3032,7 +3032,7 @@
     "EE"
    ],
    "en": "Liveness/readiness/startup probes as the chart and compose use them; readiness drops while migrating.",
-   "fr": "Sondes liveness/readiness/startup telles que le chart et compose les utilisent ; readiness tombe pendant une migration."
+   "fr": "Les liveness, readiness et startup probes telles que le chart et compose les utilisent ; la readiness tombe pendant une migration."
   },
   {
    "id": "OBS-03",
@@ -3047,7 +3047,7 @@
     "EE"
    ],
    "en": "Log level change propagated to all nodes and reverted after 30 minutes (clock injected).",
-   "fr": "Changement de niveau de log propagé à tous les nœuds et rétabli après 30 minutes (horloge injectée)."
+   "fr": "Un changement du niveau de journalisation est propagé à tous les nœuds, puis annulé au bout de 30 minutes (horloge injectée)."
   },
   {
    "id": "OBS-04",
@@ -3061,7 +3061,7 @@
     "EE"
    ],
    "en": "traceparent reaches the upstream in both editions; spans exported to the collector in EE only.",
-   "fr": "traceparent atteint l'amont dans les deux éditions ; spans exportés au collecteur en EE seulement."
+   "fr": "traceparent arrive à l'upstream dans les deux éditions ; les spans ne sont exportés vers le collecteur qu'en EE."
   },
   {
    "id": "OBS-05",
@@ -3085,7 +3085,7 @@
     "EE"
    ],
    "en": "Metrics and logs pushed over OTLP to the collector.",
-   "fr": "Métriques et logs poussés en OTLP au collecteur."
+   "fr": "Les métriques et les journaux sont poussés en OTLP vers le collecteur."
   },
   {
    "id": "DEPLOY-01",
@@ -3102,7 +3102,7 @@
     "EE"
    ],
    "en": "One image per edition runs unchanged on compose, swarm and kind; edition reported matches.",
-   "fr": "Une image par édition tourne telle quelle sur compose, swarm et kind ; l'édition annoncée correspond."
+   "fr": "Une image par édition tourne telle quelle sur compose, swarm et kind ; l'édition annoncée est la bonne."
   },
   {
    "id": "DEPLOY-02",
@@ -3117,7 +3117,7 @@
     "EE"
    ],
    "en": "Every documented environment variable has its effect (table-driven from the docs).",
-   "fr": "Chaque variable d'environnement documentée a son effet (piloté par la table de la doc)."
+   "fr": "Chaque variable d'environnement documentée produit son effet (test piloté par le tableau de la documentation)."
   },
   {
    "id": "DEPLOY-03",
@@ -3131,7 +3131,7 @@
     "EE"
    ],
    "en": "Runs with no external dependency (SQLite, no network egress).",
-   "fr": "Tourne sans dépendance externe (SQLite, sans sortie réseau)."
+   "fr": "La gateway tourne sans aucune dépendance externe (SQLite, aucun accès réseau sortant)."
   },
   {
    "id": "DEPLOY-04",
@@ -3143,7 +3143,7 @@
     "EE"
    ],
    "en": "CI itself (this plan's runner).",
-   "fr": "La CI elle-même (le lanceur de ce plan)."
+   "fr": "La CI elle-même (c'est elle qui exécute ce plan)."
   },
   {
    "id": "DEPLOY-05",
@@ -3158,7 +3158,7 @@
     "EE"
    ],
    "en": "Edition truth: the CE image refuses every EE endpoint and locks every EE control; the EE image allows them.",
-   "fr": "Vérité d'édition : l'image CE refuse chaque endpoint EE et verrouille chaque contrôle EE ; l'image EE les permet."
+   "fr": "Vérité de l'édition : l'image CE refuse chaque endpoint EE et verrouille chaque contrôle EE ; l'image EE les autorise."
   },
   {
    "id": "DEPLOY-06",
@@ -3174,7 +3174,7 @@
     "EE"
    ],
    "en": "Upgrade from the previous release on SQLite and PostgreSQL: migrations run, data kept, rollback to the older binary refused cleanly.",
-   "fr": "Montée depuis la release précédente sur SQLite et PostgreSQL : migrations jouées, données gardées, retour à l'ancien binaire refusé proprement."
+   "fr": "Montée de version depuis la version précédente, sur SQLite et sur PostgreSQL : les migrations s'exécutent, les données sont conservées, le retour à l'ancien binaire est refusé proprement."
   },
   {
    "id": "DEPLOY-07",
@@ -3193,7 +3193,7 @@
     "EE"
    ],
    "en": "The published files (docker-compose.yml, .ee.yml, stack.swarm.yml, helm values) deploy as shipped - the platform uses THEM, rewritten only for the image tag (asserted).",
-   "fr": "Les fichiers publiés (docker-compose.yml, .ee.yml, stack.swarm.yml, valeurs helm) se déploient tels quels - la plateforme utilise CEUX-LÀ, réécrits seulement pour le tag d'image (vérifié)."
+   "fr": "Les fichiers publiés (docker-compose.yml, .ee.yml, stack.swarm.yml, valeurs helm) se déploient tels que livrés - ce sont EUX que la plateforme utilise, réécrits uniquement pour le tag de l'image (réécriture vérifiée)."
   },
   {
    "id": "STORE-01",
@@ -3207,7 +3207,7 @@
     "EE"
    ],
    "en": "Standalone on SQLite in a volume; restart keeps everything.",
-   "fr": "Autonome sur SQLite dans un volume ; un redémarrage garde tout."
+   "fr": "Autonome, sur SQLite dans un volume ; un redémarrage conserve tout."
   },
   {
    "id": "STORE-02",
@@ -3222,7 +3222,7 @@
     "EE"
    ],
    "en": "Same suite on PostgreSQL (existing CI job) and through the image.",
-   "fr": "Même suite sur PostgreSQL (job CI existant) et via l'image."
+   "fr": "La même suite sur PostgreSQL (job de CI existant) et à travers l'image."
   },
   {
    "id": "STORE-07",
@@ -3237,7 +3237,7 @@
     "EE"
    ],
    "en": "A database seeded by the previous release opens with this one (fixture DB per release).",
-   "fr": "Une base amorcée par la release précédente s'ouvre avec celle-ci (base de référence par release)."
+   "fr": "Une base alimentée par la version précédente s'ouvre avec celle-ci (une base de référence par version)."
   },
   {
    "id": "STORE-03",
@@ -3251,7 +3251,7 @@
     "EE"
    ],
    "en": "Cluster store: two nodes, one database, no split brain on locks.",
-   "fr": "Store en cluster : deux nœuds, une base, aucun split brain sur les verrous."
+   "fr": "Base en cluster : deux nœuds, une seule base, aucun split-brain sur les verrous."
   },
   {
    "id": "STORE-04",
@@ -3265,7 +3265,7 @@
     "EE"
    ],
    "en": "Nothing stored on local disk besides /data (read-only rootfs works with an emptyDir on /tmp, snapshot download included).",
-   "fr": "Rien sur le disque local hors /data (rootfs en lecture seule avec un emptyDir sur /tmp, téléchargement du snapshot compris)."
+   "fr": "Rien n'est stocké sur le disque local en dehors de /data (le système de fichiers racine en lecture seule fonctionne avec un emptyDir sur /tmp, téléchargement du snapshot compris)."
   },
   {
    "id": "STORE-08",
@@ -3280,7 +3280,7 @@
     "EE"
    ],
    "en": "A stale write answers 409 and the console offers reload.",
-   "fr": "Une écriture périmée répond 409 et la console propose de recharger."
+   "fr": "Une écriture périmée reçoit un 409, et la console propose de recharger."
   },
   {
    "id": "STORE-05",
@@ -3295,7 +3295,7 @@
     "EE"
    ],
    "en": "Backup snapshot downloaded and restored by the documented procedure.",
-   "fr": "Snapshot de sauvegarde téléchargé et restauré par la procédure documentée."
+   "fr": "Le snapshot de sauvegarde est téléchargé puis restauré en suivant la procédure documentée."
   },
   {
    "id": "STORE-06",
@@ -3308,7 +3308,7 @@
     "EE"
    ],
    "en": "Audit trail export (CSV).",
-   "fr": "Export du journal (CSV)."
+   "fr": "Export du journal d'audit (CSV)."
   },
   {
    "id": "QUAL-01",
@@ -3332,7 +3332,7 @@
     "EE"
    ],
    "en": "Docs links and screenshots checked (screenshots.mjs --check).",
-   "fr": "Liens et captures de la doc vérifiés (screenshots.mjs --check)."
+   "fr": "Les liens et les captures d'écran de la documentation sont vérifiés (screenshots.mjs --check)."
   },
   {
    "id": "DEPLOY-08",
@@ -3346,7 +3346,7 @@
     "EE"
    ],
    "en": "cosign verify succeeds on the image under test with the workflow's identity, for the digest and for each architecture; an unsigned or re-pushed image fails.",
-   "fr": "cosign verify réussit sur l'image testée avec l'identité du workflow, pour le digest et pour chaque architecture ; une image non signée ou repoussée échoue."
+   "fr": "cosign verify réussit sur l'image testée avec l'identité du workflow, pour le digest et pour chaque architecture ; une image non signée ou poussée à nouveau échoue."
   },
   {
    "id": "EVAL-01",
@@ -3359,7 +3359,7 @@
     "EVAL"
    ],
    "en": "The evaluation image reports edition eval at startup, serves every Enterprise feature the EE image serves, and never stops the data plane: the same smoke chain passes on day one and with the clock moved a year forward.",
-   "fr": "L'image d'évaluation annonce l'édition eval au démarrage, sert toutes les fonctions Enterprise que sert l'image EE, et n'arrête jamais le plan de données : la même chaîne de fumée passe au premier jour et l'horloge avancée d'un an."
+   "fr": "L'image d'évaluation annonce l'édition eval au démarrage, sert toutes les fonctionnalités Enterprise que sert l'image EE, et n'arrête jamais le plan de données : la même chaîne de tests de fumée passe le premier jour, et encore avec l'horloge avancée d'un an."
   },
   {
    "id": "EVAL-02",
@@ -3373,7 +3373,7 @@
     "EVAL"
    ],
    "en": "Every built-in page carries the evaluation notice, in each locale, and it survives a brand configured to hide the mark; the EE image shows none of it.",
-   "fr": "Chaque page intégrée porte la mention d'évaluation, dans chaque langue, et elle survit à une marque configurée pour masquer la signature ; l'image EE n'en montre rien."
+   "fr": "Chaque page intégrée porte la mention d'évaluation, dans chaque langue, et celle-ci résiste à une marque configurée pour masquer la mention Meerkat ; l'image EE n'en affiche aucune."
   },
   {
    "id": "EVAL-03",
@@ -3386,7 +3386,7 @@
     "EVAL"
    ],
    "en": "The user button injected into a proxied page carries the notice when opened, through gzip and brotli, and a response over the rewrite ceiling still arrives whole.",
-   "fr": "Le bouton utilisateur injecté dans une page relayée porte la mention à l'ouverture, en gzip comme en brotli, et une réponse au-dessus du plafond de réécriture arrive toujours entière."
+   "fr": "Le bouton utilisateur injecté dans une page relayée affiche la mention à l'ouverture, en gzip comme en brotli, et une réponse qui dépasse le plafond de réécriture arrive quand même entière."
   },
   {
    "id": "EVAL-04",
@@ -3399,7 +3399,7 @@
     "EVAL"
    ],
    "en": "The console shows the evaluation watermark on a dense screen in both colour schemes, behind the content, and every row stays clickable.",
-   "fr": "La console affiche le filigrane d'évaluation sur un écran dense dans les deux schémas de couleur, derrière le contenu, et chaque ligne reste cliquable."
+   "fr": "La console affiche le filigrane d'évaluation sur un écran dense, en clair comme en sombre, derrière le contenu, et chaque ligne reste cliquable."
   },
   {
    "id": "EVAL-05",
@@ -3414,7 +3414,7 @@
     "EVAL"
    ],
    "en": "No card, table or row of the console paints an opaque background over the page; the sticky header and the frozen columns are the two stated exceptions, and every banded table hovers the same colour.",
-   "fr": "Aucune carte, table ou ligne de la console ne pose un fond opaque sur la page ; l'en-tête collant et les colonnes gelées sont les deux exceptions assumées, et toute table bandée survole de la même couleur."
+   "fr": "Aucune carte, aucun tableau ni aucune ligne de la console ne peint un fond opaque par-dessus la page ; l'en-tête collant et les colonnes figées sont les deux exceptions déclarées, et tous les tableaux à bandes ont la même couleur au survol."
   }
  ],
  "platform": [
@@ -3432,7 +3432,7 @@
     "EE"
    ],
    "en": "Smoke on every target: image starts, admin signs in, a route proxies to httpbin, the admin API answers, the console loads.",
-   "fr": "Fumée sur chaque cible : l'image démarre, l'admin se connecte, une route proxifie vers httpbin, l'API admin répond, la console se charge.",
+   "fr": "Test de fumée sur chaque cible : l'image démarre, l'administrateur se connecte, une route relaie vers httpbin, l'API d'administration répond, la console se charge.",
    "category": "Deployment"
   },
   {
@@ -3449,7 +3449,7 @@
     "EE"
    ],
    "en": "Upgrade in place from the previous release (found, not pinned): compose pull + up, helm upgrade, stack deploy - data and sessions kept.",
-   "fr": "Montée en place depuis la release précédente (trouvée, pas figée) : compose pull + up, helm upgrade, stack deploy - données et sessions gardées.",
+   "fr": "Montée de version sur place depuis la version précédente (retrouvée, non figée) : compose pull + up, helm upgrade, stack deploy - les données et les sessions sont conservées.",
    "category": "Upgrade"
   },
   {
@@ -3464,7 +3464,7 @@
     "EE"
    ],
    "en": "Downgrade refused: the previous image on a newer database stops with a message naming both versions.",
-   "fr": "Retour refusé : l'image précédente sur une base plus récente s'arrête avec un message nommant les deux versions.",
+   "fr": "Retour en arrière refusé : l'image précédente, lancée sur une base plus récente, s'arrête avec un message qui nomme les deux versions.",
    "category": "Upgrade"
   },
   {
@@ -3478,7 +3478,7 @@
     "EE"
    ],
    "en": "Rolling update of a 3-replica deployment under constant traffic: no request lost beyond the drain window.",
-   "fr": "Mise à jour roulante d'un déploiement à 3 réplicas sous trafic constant : aucune requête perdue au-delà de la fenêtre de drainage.",
+   "fr": "Mise à jour progressive d'un déploiement à 3 répliques sous trafic constant : aucune requête perdue au-delà de la fenêtre de drainage.",
    "category": "Cluster"
   },
   {
@@ -3493,7 +3493,7 @@
     "EE"
    ],
    "en": "Kill a node during traffic: the others keep serving, sessions survive, the lock holder changes.",
-   "fr": "Tuer un nœud pendant le trafic : les autres continuent, les sessions survivent, le détenteur du verrou change.",
+   "fr": "Arrêt brutal d'un nœud sous trafic : les autres continuent de servir, les sessions survivent, le verrou change de détenteur.",
    "category": "Cluster"
   },
   {
@@ -3508,7 +3508,7 @@
     "EE"
    ],
    "en": "PostgreSQL restart: nodes reconnect, readiness drops and comes back, no data lost.",
-   "fr": "Redémarrage de PostgreSQL : les nœuds se reconnectent, readiness tombe et revient, aucune donnée perdue.",
+   "fr": "Redémarrage de PostgreSQL : les nœuds se reconnectent, la readiness tombe puis revient, aucune donnée n'est perdue.",
    "category": "Cluster"
   },
   {
@@ -3522,7 +3522,7 @@
     "EE"
    ],
    "en": "Exactly-once jobs across nodes: scheduled call, daily digest, ACME issuance, retention purge.",
-   "fr": "Tâches exactement une fois entre nœuds : appel planifié, digest quotidien, émission ACME, purge de rétention.",
+   "fr": "Tâches exécutées exactement une fois sur l'ensemble des nœuds : appel planifié, récapitulatif quotidien, émission ACME, purge de rétention.",
    "category": "Cluster"
   },
   {
@@ -3539,7 +3539,7 @@
     "EE"
    ],
    "en": "Published ports read from the runtime (Docker socket, swarm service, k8s Service) and used in the TLS links and redirects.",
-   "fr": "Ports publiés lus depuis le runtime (socket Docker, service swarm, Service k8s) et utilisés dans les liens TLS et les redirections.",
+   "fr": "Les ports publiés sont lus auprès du runtime (socket Docker, service swarm, Service k8s) et utilisés dans les liens TLS et les redirections.",
    "category": "Deployment"
   },
   {
@@ -3554,7 +3554,7 @@
     "EE"
    ],
    "en": "Helm: install, upgrade with --reuse-values (new defaults still applied), uninstall leaves no orphan; chart values matrix (one node CE/EE, cluster EE).",
-   "fr": "Helm : installation, montée avec --reuse-values (nouveaux défauts appliqués), désinstallation sans orphelin ; matrice de valeurs (un nœud CE/EE, cluster EE).",
+   "fr": "Helm : installation, montée de version avec --reuse-values (les nouvelles valeurs par défaut s'appliquent quand même), désinstallation sans objet orphelin ; matrice des fichiers de valeurs du chart (un nœud CE/EE, cluster EE).",
    "category": "Deployment"
   },
   {
@@ -3570,7 +3570,7 @@
     "EE"
    ],
    "en": "Swarm: secrets and configs mounted, replicas converge, update order start-first.",
-   "fr": "Swarm : secrets et configs montés, réplicas convergés, mise à jour start-first.",
+   "fr": "Swarm : secrets et configs montés, convergence des répliques, ordre de mise à jour start-first.",
    "category": "Deployment"
   },
   {
@@ -3585,7 +3585,7 @@
     "EE"
    ],
    "en": "Edition matrix: the same scenario file played against CE and EE, each expecting its own answers (422/lock vs allowed).",
-   "fr": "Matrice d'édition : le même fichier de scénarios joué contre CE et EE, chacun attendant ses réponses (422/verrou vs autorisé).",
+   "fr": "Matrice des éditions : le même fichier de scénarios joué contre CE et EE, chaque édition attendant ses propres réponses (422/cadenas d'un côté, accès autorisé de l'autre).",
    "category": "Edition"
   },
   {
@@ -3600,7 +3600,7 @@
     "EE"
    ],
    "en": "Configuration portability: export from EE, import into CE (EE parts named and left out), export from CE, import into EE.",
-   "fr": "Portabilité de configuration : export depuis l'EE, import dans la CE (parties EE nommées et écartées), export depuis la CE, import dans l'EE.",
+   "fr": "Portabilité de la configuration : export depuis EE puis import dans CE (les parties EE sont nommées et laissées de côté), export depuis CE puis import dans EE.",
    "category": "Edition"
   },
   {
@@ -3615,7 +3615,7 @@
     "EE"
    ],
    "en": "Image hygiene: non-root user, no capability, no privilege escalation, no shell needed, Trivy scan without critical CVE; read-only root filesystem with an emptyDir on /tmp (the snapshot download writes a temporary file).",
-   "fr": "Hygiène de l'image : utilisateur non root, aucune capacité, aucune élévation de privilèges, pas besoin de shell, scan Trivy sans CVE critique ; rootfs en lecture seule avec un emptyDir sur /tmp (le téléchargement du snapshot écrit un fichier temporaire).",
+   "fr": "Hygiène de l'image : utilisateur non root, aucune capability, aucune élévation de privilèges, aucun shell nécessaire, analyse Trivy sans CVE critique ; système de fichiers racine en lecture seule avec un emptyDir sur /tmp (le téléchargement du snapshot écrit un fichier temporaire).",
    "category": "Security"
   },
   {
@@ -3630,7 +3630,7 @@
     "EE"
    ],
    "en": "arm64 image runs the smoke suite (native runner).",
-   "fr": "L'image arm64 joue la suite de fumée (runner natif).",
+   "fr": "L'image arm64 passe la suite de tests de fumée (runner natif).",
    "category": "Deployment"
   },
   {
@@ -3644,7 +3644,7 @@
     "EE"
    ],
    "en": "Soak: 4 hours of mixed traffic on a cluster; memory and goroutines flat, no error budget burnt.",
-   "fr": "Endurance : 4 heures de trafic mixte sur un cluster ; mémoire et goroutines stables, aucun budget d'erreur consommé.",
+   "fr": "Endurance : 4 heures de trafic mixte sur un cluster ; mémoire et goroutines stables, budget d'erreurs intact.",
    "category": "Soak"
   },
   {
@@ -3659,7 +3659,7 @@
     "EE"
    ],
    "en": "Load smoke: N requests/s through the image within a latency budget, published beside the benchmarks.",
-   "fr": "Charge rapide : N requêtes/s via l'image dans un budget de latence, publié à côté des bancs.",
+   "fr": "Test de fumée en charge : N requêtes/s à travers l'image dans un budget de latence donné, publié à côté des bancs de mesure.",
    "category": "Performance"
   },
   {
@@ -3675,7 +3675,7 @@
     "EE"
    ],
    "en": "Behind a reverse proxy (Traefik/ingress-nginx): X-Forwarded-* trusted only from it, client IP right in logs and rate limits.",
-   "fr": "Derrière un reverse proxy (Traefik/ingress-nginx) : X-Forwarded-* acceptés seulement de lui, IP cliente juste dans les logs et limites.",
+   "fr": "Derrière un reverse proxy (Traefik/ingress-nginx) : les X-Forwarded-* ne sont acceptés que de lui, et l'adresse IP du client est correcte dans les journaux et les rate limits.",
    "category": "Deployment"
   },
   {
@@ -3690,7 +3690,7 @@
     "EE"
    ],
    "en": "Graceful shutdown: SIGTERM drains in-flight requests, closes HTTPS doors, exits 0 within the grace period.",
-   "fr": "Arrêt propre : SIGTERM draine les requêtes en cours, ferme les portes HTTPS, sort en 0 dans le délai de grâce.",
+   "fr": "Arrêt propre : sur SIGTERM, la gateway termine les requêtes en cours, ferme les portes HTTPS et sort avec le code 0 dans le délai de grâce.",
    "category": "Lifecycle"
   },
   {
@@ -3704,7 +3704,7 @@
     "EE"
    ],
    "en": "Vault key mismatch between nodes is detected and named, never silently half-working.",
-   "fr": "Une clé de coffre différente entre nœuds est détectée et nommée, jamais à moitié fonctionnelle en silence.",
+   "fr": "Une clé de coffre différente d'un nœud à l'autre est détectée et nommée, jamais tolérée en silence avec un fonctionnement à moitié correct.",
    "category": "Cluster"
   },
   {
@@ -3719,7 +3719,7 @@
     "EE"
    ],
    "en": "Time and timezone: TZ env honoured in digests and schedules.",
-   "fr": "Heure et fuseau : variable TZ respectée dans digests et planifications.",
+   "fr": "Heure et fuseau horaire : la variable d'environnement TZ est respectée dans les récapitulatifs et les planifications.",
    "category": "Lifecycle"
   },
   {
@@ -3735,7 +3735,7 @@
    ],
    "category": "Deployment",
    "en": "OpenShift compatibility on kind: the chart installs under Pod Security 'restricted' with an arbitrary uid and group 0, no runAsUser/fsGroup pinned by the chart; the gateway writes /data, migrates, serves, and the snapshot download works.",
-   "fr": "Compatibilité OpenShift sur kind : le chart s'installe en Pod Security 'restricted' avec un uid arbitraire et le groupe 0, sans runAsUser/fsGroup fixé par le chart ; la passerelle écrit /data, migre, sert, et le téléchargement du snapshot fonctionne."
+   "fr": "Compatibilité OpenShift sur kind : le chart s'installe en Pod Security 'restricted' avec un uid arbitraire et le groupe 0, sans runAsUser ni fsGroup imposé par le chart ; la gateway écrit dans /data, migre, sert le trafic, et le téléchargement du snapshot fonctionne."
   },
   {
    "id": "X-22",
@@ -3750,7 +3750,7 @@
    ],
    "category": "Deployment",
    "en": "Static check of the rendered chart for every values file: no pinned uid, no privileged field, no hostPath, no port below 1024 (kube-linter / a rule script), so a change that would break OpenShift fails on the push, not at a customer's.",
-   "fr": "Contrôle statique du chart rendu pour chaque fichier de valeurs : aucun uid fixé, aucun champ privilégié, aucun hostPath, aucun port sous 1024 (kube-linter / un script de règles), pour qu'un changement qui casserait OpenShift échoue au push, pas chez un client."
+   "fr": "Contrôle statique du chart rendu, pour chaque fichier de valeurs : aucun uid imposé, aucun champ privilégié, aucun hostPath, aucun port inférieur à 1024 (kube-linter / un script de règles) ; un changement qui casserait OpenShift échoue ainsi au push, et non chez un client."
   },
   {
    "id": "X-23",
@@ -3765,7 +3765,7 @@
    ],
    "category": "Deployment",
    "en": "A real OpenShift (MicroShift from OKD): the published chart admitted by the restricted-v2 SCC under a uid the cluster chose, the store writing /data, both planes behind Routes, the mount helper admitted and serving a volume as the workload's uid.",
-   "fr": "Un vrai OpenShift (MicroShift depuis OKD) : le chart publié admis par la SCC restricted-v2 sous un uid choisi par le cluster, le store qui écrit /data, les deux plans derrière des Routes, le helper de montage admis et servant un volume sous l'uid du workload."
+   "fr": "Un vrai OpenShift (MicroShift issu d'OKD) : le chart publié est admis par la SCC restricted-v2 sous un uid choisi par le cluster, la base écrit dans /data, les deux plans sont derrière des Routes, l'assistant de montage est admis et sert un volume sous l'uid de la charge de travail."
   }
  ]
 }

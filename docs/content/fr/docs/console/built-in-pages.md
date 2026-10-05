@@ -2,102 +2,106 @@
 title: Pages intégrées
 section: La console
 order: 174
-summary: L'allure des pages que Meerkat sert lui-même - couleurs, disposition et identité, avec un seul aperçu vivant.
+summary: L'apparence des pages que Meerkat sert lui-même - couleurs, disposition et identité, avec un seul aperçu en direct.
 ---
 
 # Pages intégrées
 
-**Application > Built-in pages.** Les pages que la passerelle sert en son nom propre :
-connexion, inscription, challenge du second facteur, page d'indisponibilité, pages
-d'erreur.
+**Application > Built-in pages.** Les pages que la gateway sert en son nom propre :
+la connexion, l'inscription, la demande du second facteur, la page d'indisponibilité,
+les pages d'erreur.
 
-Un écran, un aperçu, trois onglets à gauche : **Theme**, **Layout**, **Branding**. Ils
-décrivent la même page, donc l'aperçu ne bouge pas, et le sélecteur de thèmes reste
-dessous sur les trois - essayer une couleur en jugeant une disposition est le sens
-normal, pas un cas particulier.
+Un seul écran, un seul aperçu, et trois onglets à gauche : **Theme**, **Layout**,
+**Branding**. Tous trois décrivent la même page : l'aperçu ne bouge donc jamais, et le
+sélecteur de thème reste en dessous dans les trois onglets - essayer une couleur
+pendant qu'on évalue une disposition est la façon normale de procéder.
 
-Les onglets sont de vraies routes : un marque-page sur la galerie des dispositions revient
-sur la galerie des dispositions.
+Les onglets sont de véritables routes : un favori posé sur la galerie des dispositions
+ramène à la galerie des dispositions.
 
-![Built-in pages sur l'onglet Theme : la table des jetons à gauche, les deux aperçus à droite avec le carrousel de thèmes entre eux](img/console/built-in-pages-theme.webp)
+![Built-in pages sur l'onglet Theme : le tableau des jetons de thème à gauche, les deux aperçus à droite avec le carrousel de thèmes entre eux](img/console/built-in-pages-theme.webp)
 
-La page de connexion telle qu'elle est servie, sombre en haut et claire en bas, avec le
-carrousel de thèmes dans l'intervalle. A gauche, une ligne par jeton, une colonne par
-schéma.
+La page de connexion telle qu'elle est servie, en mode sombre en haut et en mode clair
+en bas, avec le carrousel de thèmes entre les deux. À gauche, une ligne par jeton de
+thème et une colonne par mode.
 
-## Le sélecteur de thèmes
+## Le sélecteur de thème
 
-Le carrousel au milieu de l'aperçu est la liste des thèmes. Cliquez une palette pour la
-regarder ; cliquez **la palette posée sur le bloc de navigation** pour rendre ce thème
-**vivant**. Sélectionné et actif sont deux choses différentes, et c'est ce qui permet
-d'essayer un thème sans le servir.
+Le carrousel au milieu de l'aperçu est la liste des thèmes. Cliquez sur une palette
+pour l'examiner ; cliquez sur **la palette affichée sur le bloc de navigation** pour
+mettre ce thème **en service**. Sélectionné et actif sont deux états distincts : c'est
+ce qui permet d'essayer un thème sans le servir.
 
-Les commandes entre les flèches ajoutent un thème (une copie de celui-ci, ou un départ
-depuis un préréglage) et en suppriment un. Le thème actif ne peut pas être supprimé.
+Les commandes situées entre les flèches ajoutent un thème (en dupliquant celui-ci ou en
+partant d'un préréglage) et en suppriment un. Le thème actif ne peut pas être supprimé.
 
 ## Theme
 
-Les deux palettes du thème, **sombre et claire côte à côte**, une ligne par jeton.
-Survoler le nom d'un jeton met en évidence la partie de l'aperçu qu'il peint, ce qui est
-le moyen le plus rapide de découvrir ce qu'un nom veut dire.
+Les deux palettes du thème, **sombre et claire côte à côte**, avec une ligne par jeton.
+Survoler le nom d'un jeton met en évidence la partie de l'aperçu qu'il colore : c'est
+le moyen le plus rapide de comprendre à quoi correspond un nom.
 
-- **Les cases Dark et Light** de l'en-tête décident quels schémas les pages servies
-  proposent. Décochez-en une et les pages cessent de la proposer ; les deux ne peuvent pas
-  être décochées.
-- **Glow** rassemble en un interrupteur les effets décoratifs des pages : le halo derrière
-  la page, les lueurs du logo et des boutons, le dégradé du nom d'application. Décoché
-  donne un design plat, et la couleur que ces effets utilisent devient inutilisée.
-- **Export** et **Import** emportent une palette en fichier, pour la déplacer d'une
-  installation à l'autre.
+- **Les cases Dark et Light** de l'en-tête déterminent quels modes proposent les pages
+  servies. Décochez-en une et les pages cessent de proposer ce mode ; il est impossible
+  de décocher les deux.
+- **Glow** regroupe sous un seul interrupteur les effets décoratifs des pages : le halo
+  d'ambiance derrière la page, les lueurs du logo et des boutons, le dégradé du nom de
+  l'application. Décoché, le rendu est plat, et la couleur qu'utilisent ces effets ne
+  sert plus.
+- **Export** et **Import** transportent une palette sous forme de fichier, pour la
+  déplacer d'une installation à une autre.
 
-Le bouton Save est sur cet onglet : un thème est un objet à lui, et l'enregistrer est ce
-qui change ce qu'un thème vivant sert.
+Le bouton Save se trouve dans cet onglet : un thème est un objet à part entière, et
+c'est son enregistrement qui modifie ce que sert un thème en service.
 
 ## Layout
 
-**Arrangement** est une galerie de maquettes : où se posent la marque, l'image et le
-formulaire. En choisir une met l'aperçu à jour aussitôt.
+**Arrangement** est une galerie de maquettes : l'emplacement de la marque, de l'image
+et du formulaire. En choisir une met aussitôt l'aperçu à jour.
 
 > [!NOTE]
-> Edition Enterprise : **garder** un arrangement autre que le centré. La galerie reste
-> cliquable et l'aperçu suit, parce que voir un arrangement est ce à quoi sert cet écran ;
-> ce que la licence achète, c'est de le garder.
+> Édition Enterprise : **conserver** une disposition autre que la disposition centrée.
+> La galerie reste cliquable et l'aperçu suit, car cet écran sert justement à voir une
+> disposition ; ce que la licence apporte, c'est le droit de la conserver.
 
-- **Logo size** - la boîte dans laquelle le logo est dessiné. Un logotype large posé dans
-  la boîte normale sort au quart de sa hauteur ; *banner* dessine la marque à sa propre
-  taille. Il n'y a rien à dimensionner tant qu'aucun logo n'est posé dans l'onglet
-  Branding.
-- **Which side** - le bord que prend la marque. Seuls les arrangements faits de moitiés
-  ont un côté.
+- **Logo size** - le cadre dans lequel le logo est dessiné. Un logotype tout en largeur
+  placé dans le cadre normal ressort au quart de sa hauteur ; *banner* dessine le logo
+  à sa taille réelle. Il n'y a rien à dimensionner tant qu'aucun logo n'a été défini
+  dans l'onglet Branding.
+- **Which side** - le bord qu'occupe la marque. Seules les dispositions faites de deux
+  moitiés ont un côté.
 
-Une page ouverte dans une iframe laisse tomber la marque et remplit le cadre d'elle-même,
-quel que soit l'arrangement choisi.
+Une page ouverte dans une iframe abandonne d'elle-même la marque et remplit le cadre,
+quelle que soit la disposition choisie.
 
 ## Branding
 
-![Built-in pages sur l'onglet Branding : nom d'application, accroche, zones de dépôt du logo, de l'icône d'onglet et du fond, et la carte de la marque Meerkat](img/console/built-in-pages-branding.webp)
+![Built-in pages sur l'onglet Branding : le nom de l'application, le slogan, les zones de dépôt du logo, de l'icône d'onglet et de l'image de fond, et la carte de la mention Meerkat](img/console/built-in-pages-branding.webp)
 
-Le nom et l'accroche tapés ici apparaissent aussitôt dans l'aperçu. En dessous, la carte
-de la marque Meerkat, avec sa pastille Enterprise.
+Le nom et le slogan saisis ici apparaissent aussitôt dans l'aperçu. En dessous, la
+carte de la mention Meerkat, réservée à l'édition Enterprise.
 
-L'identité de l'application : **nom**, **accroche**, **logo**, **icône d'onglet**
-(favicon), et **image de fond** avec son ajustement (couvrir, contenir, répéter) et son
-assombrissement. Le schéma sombre peut porter sa propre image, ou partager celle du clair.
+L'identité de l'application : le **nom**, le **slogan**, le **logo**, l'**icône
+d'onglet** (favicon) et l'**image de fond**, avec son ajustement (couvrir, contenir,
+mosaïque) et son assombrissement. Le mode sombre peut avoir sa propre image ou partager
+celle du mode clair.
 
-La **marque Meerkat** a sa propre carte, parce que c'est une question de licence et non
-d'identité : les pages servies portent une ligne *powered by softwarity/meerkat* en pied,
-et la retirer est Enterprise.
+La **mention Meerkat** a sa propre carte, parce que c'est une question de licence et
+non d'identité : les pages servies affichent en pied de page une ligne *powered by
+softwarity/meerkat*, et la retirer est réservé à l'édition Enterprise.
 
 > [!NOTE]
-> Edition Enterprise : retirer la marque Meerkat.
+> Édition Enterprise : retirer la mention Meerkat.
 
 ## Pièges
 
-- **Sélectionné n'est pas actif.** Editer une palette change le thème que vous regardez ;
-  le servir, c'est le clic sur la palette du bloc de navigation.
-- **La console ne porte pas ce thème.** Ce sont les pages que le **plan de données** sert
-  à vos utilisateurs. La console a sa propre allure.
-- **La taille du logo ne fait rien sans logo**, et le côté ne fait rien sur un arrangement
-  sans moitiés. Les contrôles sont désactivés plutôt que muets.
-- **Une image de fond voyage dans un export en paquet**, pas dans un export YAML simple.
-  Voir [Configuration](/docs/console/configuration).
+- **Sélectionné ne veut pas dire actif.** Modifier une palette change le thème que vous
+  avez sous les yeux ; pour le servir, il faut cliquer sur la palette du bloc de
+  navigation.
+- **La console ne porte pas ce thème.** Il s'agit des pages que le **plan de données**
+  sert à vos utilisateurs. La console a sa propre apparence.
+- **La taille du logo n'a aucun effet sans logo**, et le côté n'a aucun effet sur une
+  disposition sans moitiés. Dans ces cas, les commandes sont désactivées plutôt que
+  d'agir dans le vide.
+- **Une image de fond voyage dans un export sous forme de paquet**, pas dans un simple
+  export YAML. Voir [Configuration](/docs/console/configuration).

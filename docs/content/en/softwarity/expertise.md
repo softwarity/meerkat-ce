@@ -61,4 +61,4 @@ arrange a project however the last developer felt.
 > [!NOTE]
 > How we engage - support, integration, bespoke work around the products - is
 > being written here. In the meantime, the way to reach us is
-> [on the contact page](/softwarity/team).
+> [on the team page](/softwarity/team).

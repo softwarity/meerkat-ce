@@ -2,74 +2,78 @@
 title: Applications
 section: La console
 order: 176
-summary: Le catalogue des applications que la passerelle offre, et le bouton à trois états qui décide de la façon dont elle les offre.
+summary: Le catalogue des applications que propose la gateway, et le sélecteur à trois états qui décide de la manière dont elle les propose.
 ---
 
 # Applications
 
-**Application > Portal.** La liste des applications que cette passerelle offre,
-dans l'ordre que vous choisissez, et la façon dont elle est offerte. Chaque
-visiteur ne voit que les entrées que son accès autorise.
+**Application > Portal.** La liste des applications que propose cette gateway,
+dans l'ordre de votre choix, et la manière dont elle est présentée. Chaque visiteur
+ne voit que les entrées auxquelles il a accès.
 
-C'est un réglage **global**, comme le thème : un catalogue pour l'installation,
-édité ici.
+C'est un réglage **global**, comme le thème : un seul catalogue pour toute
+l'installation, que vous modifiez ici.
 
-![L'écran Portal : le bouton à trois états, les contrôles d'arrangement, et la vraie barre en mode édition dessous](img/console/portal.webp)
+![L'écran Portal : le sélecteur à trois états, les réglages de disposition et, en dessous, la vraie barre en mode édition](img/console/portal.webp)
 
-## Le bouton à trois états
+## Le sélecteur à trois états
 
-| | Ce qui est dessiné |
+| | Ce qui s'affiche |
 |---|---|
-| **None** | rien. Le bouton utilisateur et les pages intégrées portent le nom de votre marque, sans rien à cliquer |
+| **None** | rien. Le bouton utilisateur et les pages intégrées affichent le nom de votre marque, sans rien de cliquable |
 | **Links** | la liste, dans le sous-menu *Applications* du bouton utilisateur et sur les pages du plan de données |
-| **Portal** | une barre de navigation sur chaque page de chaque application ; les pages intégrées n'offrent plus qu'un lien de retour |
+| **Portal** | une barre de navigation sur chaque page de chaque application ; les pages intégrées proposent alors un seul lien de retour |
 
-**Changer de mode ne coûte pas la liste.** Vous pouvez construire un menu, le
-promouvoir en barre, revenir : les entrées restent.
+**Changer de mode ne fait pas perdre la liste.** Vous pouvez composer un menu, le
+transformer en barre, puis revenir en arrière : les entrées sont conservées.
 
-## Ce qu'on y fait
+## Ce que vous faites sur cet écran
 
-1. **Choisir le mode.** Rien en dessous n'apparaît en *None*.
-2. **Ajouter une application** par UI que la liste doit offrir. En *Links* elles
-   s'empilent dans une liste numérotée, avec deux flèches pour l'ordre. En
-   *Portal* elles se construisent sur le canevas, qui est **la vraie barre en
-   mode édition** : cliquer une entrée l'ouvre dans le tiroir.
-3. **Choisir l'arrangement** (mode *Portal*) : *header mode* ou *rail mode*, le
-   côté que prend le rail, si les entrées d'en-tête montrent l'icône, le libellé
-   ou les deux, et si le nom d'application se pose à côté du logo.
-4. **Vérifier en étroit** (mode *Portal*). Les trois boutons de largeur mettent
-   l'aperçu en tablette et en téléphone, pour voir apparaître les chevrons de
-   débordement et le lanceur en gaufre quand les onglets ne tiennent plus. Seule
-   la pleine largeur est éditable, et la largeur n'est jamais enregistrée.
+1. **Choisissez le mode.** En mode *None*, rien de ce qui suit n'apparaît.
+2. **Ajoutez une application** pour chaque interface que la liste doit proposer. En
+   mode *Links*, elles s'empilent dans une liste numérotée, avec deux flèches pour
+   régler l'ordre. En mode *Portal*, vous les composez sur le canevas, qui est
+   **la vraie barre en mode édition** : un clic sur une entrée l'ouvre dans le
+   tiroir.
+3. **Choisissez la disposition** (mode *Portal*) : *header mode* ou *rail mode*, le
+   côté où se place le rail, ce qu'affichent les entrées de l'en-tête (l'icône, le
+   libellé ou les deux) et la présence du nom de l'application à côté du logo.
+4. **Vérifiez le rendu sur un écran étroit** (mode *Portal*). Les trois boutons de
+   largeur font passer l'aperçu au format tablette ou téléphone : vous voyez ainsi
+   apparaître les chevrons de débordement et le lanceur d'applications lorsque les
+   onglets ne tiennent plus. L'édition n'est possible qu'en pleine largeur, et la
+   largeur choisie n'est jamais enregistrée.
 
 ## Une entrée
 
-- **Application (route)** - la route UI vers laquelle cette entrée mène. Seules
-  les **routes UI activées** sont proposées. L'entrée hérite de l'accès de la
-  route, et c'est ce qui rend la liste différente par visiteur : le payload ne
-  porte aucune règle d'accès.
-- **Label** - vide reprend le nom de la route.
-- **Description** - l'infobulle.
+- **Application (route)** - la route UI à laquelle mène cette entrée. Seules les
+  **routes UI activées** sont proposées. L'entrée hérite de l'accès de la route :
+  c'est ce qui fait que la liste varie d'un visiteur à l'autre, car les données
+  envoyées ne contiennent aucune règle d'accès.
+- **Label** - laissé vide, il reprend le nom de la route.
+- **Description** - le texte de l'infobulle.
 
-En mode *Portal* s'y ajoutent de quoi dessiner une barre :
+En mode *Portal* s'ajoute ce qu'il faut pour dessiner une barre :
 
-- **Icon** - chercher dans le jeu d'icônes embarqué, ou coller un SVG.
-- **Home label** - la ligne *retour ici* d'un sous-menu. Vide reprend le libellé.
+- **Icon** - cherchez dans le jeu d'icônes embarqué, ou collez un SVG.
+- **Home label** - la ligne *retour ici* d'un sous-menu. Laissé vide, il reprend le
+  libellé.
 - **Sous-applications** - l'action rapide du tiroir en ajoute une.
 
-Les actions rapides en haut du tiroir déplacent une entrée vers le haut ou le
-bas, la désactivent sans la supprimer, ou la retirent.
+Les actions rapides, en haut du tiroir, permettent de monter ou de descendre une
+entrée, de la désactiver sans la supprimer, ou de la retirer.
 
 ## Pièges
 
-- **Une nouvelle route UI n'apparaît pas toute seule.** Elle n'est offerte que
-  si elle est dans cette liste : c'est ce qui remplace l'ancien champ *Link* de
+- **Une nouvelle route UI n'apparaît pas toute seule.** Elle n'est proposée que si
+  elle figure dans cette liste : c'est ce qui remplace l'ancien champ *Link* de
   l'éditeur de route.
-- **Pas de route UI, pas de catalogue.** Une entrée a besoin d'une route activée
-  et marquée UI dans [Routes](/docs/console/routes).
+- **Sans route UI, pas de catalogue.** Une entrée a besoin d'une route activée et
+  déclarée UI dans [Routes](/docs/console/routes).
 - **Un visiteur voit moins d'entrées que vous**, et c'est voulu : la liste est
-  filtrée par l'accès de la route de chaque entrée.
-- **La barre ne s'affiche jamais dans une iframe.** Une page incluse dans une
-  autre n'est pas l'endroit d'une navigation.
-- **Passer en *Portal* change toutes les routes UI d'un coup.** Les boutons
-  utilisateur par route perdent leur sous-menu Applications au profit de la barre.
+  filtrée selon l'accès de la route de chaque entrée.
+- **La barre ne s'affiche jamais dans une iframe.** Une page intégrée dans une
+  autre n'a pas à porter de barre de navigation.
+- **Passer en mode *Portal* modifie toutes les routes UI d'un coup.** Les boutons
+  utilisateur de chaque route perdent leur sous-menu Applications, que la barre
+  remplace.

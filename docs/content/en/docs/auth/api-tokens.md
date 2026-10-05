@@ -70,8 +70,9 @@ there - a credential is only minted by its owner. The revocation is a
 
 > [!WARNING]
 > Signing out does **not** revoke your tokens, and neither does changing your
-> password from the profile - only a reset through the e-mailed link does. A token is an independent credential with its own lifetime - revoke
-> it explicitly.
+> password from the profile - only a reset through the e-mailed link does. A
+> token is an independent credential with its own lifetime - revoke it
+> explicitly.
 
 ## Control-plane tokens
 
@@ -81,10 +82,10 @@ with its owner's capabilities, read again on every call, and its perimeter only
 ever takes away - so it never hands out more than its owner holds.
 
 The screen is **Access tokens** (under Infra or Application, the same one): one
-table for both kinds, the details and the actions in the drawer of a row. Tokens that belong to a connected agent
-do not appear there: an agent's connection is managed in the **MCP** section,
-which mints the same kind of token through a consent flow instead of a copied
-secret.
+table for both kinds, the details and the actions in the drawer of a row. Tokens
+that belong to a connected agent do not appear there: an agent's connection is
+managed in the **MCP** section, which mints the same kind of token through a
+consent flow instead of a copied secret.
 
 ### The perimeter, on two axes
 
@@ -123,7 +124,7 @@ the **TCP peer address**, never on a forwarded header.
 
 A token's name, scope, ranges and expiry can all be edited **without
 changing the secret**. *Renew* does the opposite: it rotates the secret and keeps
-everything else, and the old secret dies the moment it is next used.
+everything else, and the old secret stops working at once.
 
 Every mutation made with a token is audited with the token's name beside the
 account - `admin, via claude-desktop`, not `admin` - so a change an agent made is

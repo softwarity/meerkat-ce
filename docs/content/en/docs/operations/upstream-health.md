@@ -92,9 +92,10 @@ now has something to say. Not there yet: a service's own `/health`.
 
 ## In a cluster
 
-The breaker's state, and the target check, are **per node**, and that is the right one to keep. Two gateways
-may genuinely disagree about an upstream - a network path, a DNS answer, a sidecar -
-and a shared verdict would let one node's bad minute close a circuit for everybody.
+The breaker's state and the target check are **per node**, and that is the right choice.
+Two gateways may genuinely disagree about an upstream - a network path, a DNS answer, a
+sidecar - and a shared verdict would let one node's bad minute open a circuit for
+everybody.
 
 The cost is stated: a service coming back is discovered once per node rather than
 once, which is one probe each. And the health screen answers for **the node that was

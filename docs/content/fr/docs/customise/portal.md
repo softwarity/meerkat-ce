@@ -2,123 +2,129 @@
 title: Le catalogue d'applications
 section: Personnalisation
 order: 252
-summary: La liste des applications que la passerelle offre, et les trois façons de l'offrir - rien, un menu, ou une barre de navigation.
+summary: La liste des applications que propose la gateway, et les trois façons de la présenter - rien, un menu ou une barre de navigation.
 ---
 
 # Le catalogue d'applications
 
-Plusieurs routes UI derrière une passerelle, ce sont plusieurs applications : un
-visiteur atterrit sur l'une et n'a aucun moyen d'atteindre la suivante. Le
-catalogue est la liste de celles que vous offrez, dans l'ordre que vous
-choisissez.
+Plusieurs routes d'interface derrière une même gateway, ce sont plusieurs
+applications : le visiteur arrive sur l'une et n'a aucun moyen de rejoindre la
+suivante. Le catalogue est la liste de celles que vous proposez, dans l'ordre
+que vous choisissez.
 
-Il se règle sous **Application > Portal**, il est **global** comme le thème, et
+Il se règle dans **Application > Portal**, il est **global** comme le thème, et
 il est livré vide.
 
-![L'écran Portal en mode Portal : le bouton à trois états, l'arrangement, et la vraie barre en maquette live](img/console/portal.webp)
+![L'écran Portal en mode Portal : le sélecteur à trois états, l'agencement, et la vraie barre en maquette interactive](img/console/portal.webp)
 
 ## Un catalogue, trois rendus
 
-Un bouton à trois états décide de ce qui est dessiné. **La liste, elle, ne bouge
-pas** : passer d'un menu à une barre est une décision de rendu, pas une raison
-de retaper vos applications.
+Un sélecteur à trois états décide de ce qui est affiché. **La liste, elle, ne
+change pas** : passer d'un menu à une barre est une décision d'affichage, pas
+une raison de ressaisir vos applications.
 
-| Mode | Ce que voit le visiteur |
+| Mode | Ce qu'obtient le visiteur |
 |---|---|
-| **None** | Aucune liste. Le bouton utilisateur et les pages que Meerkat sert lui-même portent le nom de votre marque, sans rien à cliquer. C'est la bonne réponse quand il n'y a qu'une application |
-| **Links** | La liste, dans l'ordre choisi, dans le sous-menu **Applications** du bouton utilisateur et sur les pages du plan de données |
-| **Portal** | Une barre de navigation sur chaque page de chaque application. Les pages intégrées n'offrent alors qu'**un** lien, la première entrée que l'appelant peut ouvrir : la barre est la navigation, une page hors des applications a juste besoin d'une porte |
+| **None** | Aucune liste. Le bouton utilisateur et les pages que Meerkat sert lui-même portent le nom de votre marque, sans rien à cliquer. C'est le bon choix quand il n'y a qu'une application |
+| **Links** | La liste, dans l'ordre que vous avez choisi, dans le sous-menu **Applications** du bouton utilisateur et sur les pages du plan de données |
+| **Portal** | Une barre de navigation sur chaque page de chaque application. Les pages intégrées ne proposent alors qu'**un seul** lien, la première entrée que l'appelant a le droit d'ouvrir : la navigation, c'est la barre, et une page extérieure aux applications n'a besoin que d'une porte d'entrée |
 
-## Ce qu'une entrée porte
+## Ce que contient une entrée
 
 | Champ | Ce qu'il fait |
 |---|---|
-| Route | la route UI que cette entrée ouvre. L'entrée hérite de son adresse **et de son accès** |
-| Libellé | le nom sous lequel l'application est offerte. Vide retombe sur le nom de la route |
+| Route | la route d'interface qu'ouvre cette entrée. L'entrée hérite de son adresse **et de ses règles d'accès** |
+| Label | le nom sous lequel l'application est proposée. Laissé vide, c'est le nom de la route qui sert |
 | Description | l'infobulle de l'entrée |
-| Désactivé | éteint pour tout le monde, sans le retirer de la liste |
+| Disabled | désactive l'entrée pour tout le monde, sans la retirer de la liste |
 
-En mode **Portal**, une entrée porte en plus de quoi dessiner une barre : une
-icône, des enfants, et le libellé de la ligne « retour ici » quand elle en a.
+En mode **Portal**, une entrée contient en plus de quoi dessiner une barre :
+une icône, des entrées enfants, et le libellé de la ligne "revenir ici" quand
+elle a des enfants.
 
 | Champ | Ce qu'il fait |
 |---|---|
-| Icône | un glyphe choisi dans la banque de la console, stocké en SVG et dessiné en masque CSS - aucune police d'icônes n'est jamais chargée. Vide retombe sur l'initiale du libellé |
-| Libellé d'accueil | ce que lit la ligne « retour à cette application », quand elle a des enfants |
-| Enfants | des sous-applications montrées sur la surface secondaire |
+| Icon | un pictogramme choisi dans la bibliothèque de la console, stocké en SVG et dessiné comme un masque CSS - aucune police d'icônes n'est jamais chargée. Laissé vide, c'est l'initiale du libellé qui sert |
+| Home label | le texte de la ligne "revenir à cette application", quand l'entrée a des enfants |
+| Children | les sous-applications affichées sur la surface secondaire |
 
 ## Le catalogue dit ce qui existe, la route dit qui le voit
 
-Une entrée hérite de l'**accès de la route à laquelle elle se lie**, donc un
-visiteur ne voit offert que ce que ses droits autorisent. Aucune règle d'accès
-ne se décide ici : ce serait mettre une décision de sécurité dans un réglage
-d'affichage.
+Une entrée hérite des **règles d'accès de la route à laquelle elle est liée** :
+un visiteur ne se voit donc proposer que ce que ses droits autorisent. Aucune
+règle d'accès ne se décide ici : ce serait loger une décision de sécurité dans
+un réglage d'affichage.
 
-La charge utile servie au navigateur ne porte d'ailleurs aucune règle : le
-filtrage se fait avant qu'elle soit écrite, ce qui est pourquoi il n'y a rien à
-lire ni à trafiquer dans la page.
+Les données envoyées au navigateur ne contiennent aucune règle non plus : le
+filtrage a lieu avant leur écriture, et c'est pourquoi la page ne contient rien
+à lire ni à falsifier.
 
-C'est aussi pourquoi le catalogue est global plutôt que par organisation : il
-est déjà personnalisé, par les routes.
+C'est aussi la raison pour laquelle le catalogue est global plutôt que propre à
+chaque organisation : il est déjà personnalisé, par les routes.
 
-> [!NOTE] Une route ne s'inscrit plus toute seule
-> Le nom d'une application se décidait avant sur **chaque route UI**, dans un
-> champ `Link`. Trois endroits pouvaient donc nommer la même application, et
-> comme la liste était déduite des routes, il fallait deviner lesquelles
-> étaient la même chose - une installation fronte couramment un produit avec
-> plusieurs routes, une par organisation ou par version, qui diffèrent par ce
-> qu'elles proxifient et jamais par où l'on va.
+> [!NOTE] Une route ne s'inscrit plus toute seule dans la liste
+> Auparavant, le nom d'une application se décidait sur **chaque route
+> d'interface**, dans un champ `Link`. Trois endroits pouvaient ainsi nommer la
+> même application et, comme la liste était déduite des routes, il fallait bien
+> deviner lesquelles désignaient la même chose - il est courant qu'une
+> installation expose un seul produit par plusieurs routes, une par
+> organisation ou par version, qui diffèrent par ce qu'elles relaient et jamais
+> par l'endroit où elles mènent.
 >
-> Une nouvelle route UI n'apparaît donc plus d'elle-même : vous l'ajoutez ici.
-> C'est le même nombre de décisions qu'avant, prises au même endroit.
+> Une nouvelle route d'interface n'apparaît donc plus d'elle-même : vous
+> l'ajoutez ici. Le nombre de décisions est le même qu'avant, mais elles se
+> prennent en un seul endroit.
 
 ## En-tête ou rail
 
-En mode **Portal** seulement. Un axe, et il se bascule :
+En mode **Portal** uniquement. Un seul axe, qui s'inverse :
 
 | Disposition | Les entrées | Leurs enfants |
 |---|---|---|
 | `header` | un bandeau d'onglets en haut | un rail |
 | `rail` | un rail | un bandeau d'onglets en haut |
 
-Le rail prend le côté que vous choisissez, et ce côté veut toujours dire quelque
-chose puisque l'une des deux surfaces est toujours un rail.
+Le rail se place du côté que vous choisissez, et ce côté a toujours un sens
+puisque l'une des deux surfaces est toujours un rail.
 
-Les entrées se rendent en icône seule, en libellé seul, ou les deux - un seul
-réglage pour toute la barre. Le nom d'application de la marque peut se poser à
-côté du logo ; c'est éteint par défaut, parce que le logo seul est la marque.
+Les entrées s'affichent avec l'icône seule, le libellé seul, ou les deux - un
+seul réglage pour toute la barre. Le nom de l'application défini dans la marque
+peut figurer à côté du logo ; il est désactivé par défaut, car le logo seul
+suffit à faire la marque.
 
 ## Ce que la barre remplace
 
-En mode **Portal**, elle prend la place du bouton utilisateur par route sur
-**toutes** les routes UI. Le bouton ne disparaît pas : il déménage **dans** la
-barre, et il y perd son sous-menu Applications, puisque c'est désormais la barre
-elle-même. La navigation et le menu du compte sont une seule surface, pas deux
-coins.
+En mode **Portal**, elle prend la place du bouton utilisateur propre à chaque
+route, sur **toutes** les routes d'interface. Le bouton ne disparaît pas : il
+s'installe **dans** la barre, où il perd son sous-menu Applications, puisque ce
+rôle revient désormais à la barre elle-même. La navigation et le menu du compte
+occupent une seule surface, et non deux coins de l'écran.
 
-La barre n'est jamais dessinée dans une iframe : une page embarquée ailleurs
-n'est pas l'endroit d'une navigation.
+La barre n'est jamais affichée dans une iframe : une page incorporée ailleurs
+n'est pas un endroit où naviguer.
 
-Techniquement, c'est un simple élément personnalisé à shadow DOM, servi comme le
-bouton utilisateur, portant le thème du plan de données et le clair ou sombre du
-visiteur.
+Techniquement, c'est un simple élément personnalisé doté d'un shadow DOM, servi
+comme le bouton utilisateur, qui prend le thème du plan de données et le mode
+clair ou sombre du visiteur.
 
-## L'éditer
+## Modifier le catalogue
 
-En mode **Links**, la console montre la liste telle qu'elle est : des entrées
-numérotées, deux flèches pour l'ordre. En mode **Portal**, elle montre une
-maquette live de la barre pendant que vous la construisez, pour que la
-disposition se juge là où elle sera lue plutôt que dans une liste de champs.
+En mode **Links**, la console montre la liste pour ce qu'elle est : des entrées
+numérotées et deux flèches pour l'ordre. En mode **Portal**, elle montre une
+maquette interactive de la barre pendant que vous la construisez : la
+disposition se juge ainsi là où elle sera lue, plutôt que dans une liste de
+champs.
 
-## Ce qui n'est pas construit
+## Ce qui n'est pas réalisé
 
-- **Le canal de badge.** Une entrée porte une clé de badge et l'emplacement est
- réservé, mais rien ne pousse encore un compte dessus - c'est prévu sur le canal
- live.
-- **L'atterrissage sur la première application accessible.** Un visiteur qui ne
- peut pas ouvrir l'application sur laquelle il arrive n'est pas redirigé vers
- une qu'il peut ouvrir.
-- **Le glisser-déposer** : réordonner à la souris, ou faire glisser une entrée
- pour changer de niveau. Les flèches font le travail.
-- **L'arrangement par organisation**. Ce serait la première surcharge visuelle
- par tenant du produit, et le thème et la marque sont globaux aujourd'hui.
+- **Le canal des badges.** Une entrée possède une clé de badge et l'emplacement
+ est réservé, mais rien n'y envoie encore de compteur - c'est prévu sur le
+ canal temps réel.
+- **L'arrivée sur la première application accessible.** Un visiteur qui ne peut
+ pas ouvrir l'application sur laquelle il arrive n'est pas redirigé vers une
+ application qu'il peut ouvrir.
+- **Le glisser-déposer** : réordonner à la main, ou faire glisser une entrée
+ pour la changer de niveau. Les flèches font l'affaire.
+- **Un agencement par organisation.** Ce serait la première surcharge visuelle
+ par organisation du produit, alors que le thème et la marque sont aujourd'hui
+ globaux.

@@ -7,7 +7,7 @@ summary: What this installation is, which languages it speaks, and the policies 
 
 # General and Security
 
-Three screens at the top of the **Application** plane. They hold what is true of
+Two screens of the **Application** plane. They hold what is true of
 the whole application, and writing to them takes the `app admin` capability (or
 `root`).
 

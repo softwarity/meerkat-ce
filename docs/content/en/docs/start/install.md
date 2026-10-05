@@ -13,12 +13,13 @@ prerequisite.
 
 ## Docker image
 
-Two images, built from the same commit and carrying the same name: the
-**registry** is what says the edition.
+Three images, built from the same commit and carrying the same name: the
+**registry** and the tag are what say the edition.
 
 | Image | Edition |
 |---|---|
 | `docker.io/softwarity/meerkat:latest` | community, public |
+| `docker.io/softwarity/meerkat:eval` | evaluation, public: everything Enterprise does, with an evaluation notice - not for production |
 | `ghcr.io/softwarity/meerkat:latest` | Enterprise, private registry |
 
 ```yaml
@@ -44,7 +45,7 @@ anything after the image name is a flag.
 
 ## Verify the signature
 
-Both images are signed when they are built, with
+All three images are signed when they are built, with
 [cosign](https://docs.sigstore.dev/) and no key. There is no public key to go
 and fetch: the signature carries the identity of the GitHub Actions workflow
 that produced the image, and that identity is what you check.
@@ -56,8 +57,9 @@ cosign verify \
   docker.io/softwarity/meerkat:latest
 ```
 
-The same command verifies the Enterprise image at `ghcr.io/softwarity/meerkat`
-once you are logged in to that registry. Both are built by workflows living in
+The same command verifies the evaluation image, `docker.io/softwarity/meerkat:eval`,
+and the Enterprise image at `ghcr.io/softwarity/meerkat` once you are logged in
+to that registry. All three are built by workflows living in
 the public mirror, `softwarity/meerkat-ce`, which is the repository the
 identity names - the Enterprise sources are private, the pipeline that builds
 them is not. The command prints the exact identity it accepted, so a policy

@@ -2,147 +2,151 @@
 title: Sessions
 section: Authentification
 order: 114
-summary: Ce qu'est le cookie de session, combien de temps il vit, et ce qui met fin à une session - et ce qui n'y met pas fin.
+summary: Ce qu'est le cookie de session, combien de temps il vit, ce qui met précisément fin à une session - et ce qui n'y met pas fin.
 ---
 
 # Sessions
 
-Une session de navigateur est un **cookie opaque**. Il ne porte ni identité, ni
-claims, ni signature : trente-deux octets aléatoires, dont la gateway ne garde
-qu'une empreinte. Tout ce qui décrit la session - à qui elle appartient, quelle
-organisation est active, quelle étape de connexion reste due - vit côté serveur,
-dans une ligne.
+Une session de navigateur est un **cookie opaque**. Il ne contient ni identité, ni claims,
+ni signature : trente-deux octets aléatoires, dont la gateway ne conserve qu'une
+empreinte. Tout ce qui concerne la session - à qui elle appartient, quelle organisation est
+active, quelle étape de connexion reste à franchir - se trouve côté serveur, dans une ligne
+de la base.
 
-C'est délibéré. Les JWT sont pour le chemin d'API et pour ce qui est transmis à
-l'amont, jamais pour le navigateur : un jeton dans un cookie ne se retire pas,
-une ligne si.
+C'est voulu. Les JWT servent aux appels d'API et à ce qui est transmis à l'upstream, jamais au
+navigateur : on ne peut pas retirer un jeton placé dans un cookie, alors qu'on peut
+supprimer une ligne.
 
 ## Les cookies
 
-Une session par plan, parce que les cookies ne sont pas cantonnés par port : sur
-un hôte qui sert les deux ports, un seul nom ferait partager une même session à
+Il y a une session par plan, parce que la portée d'un cookie ne tient pas compte du port :
+sur un hôte qui sert les deux ports, un nom unique ferait partager la même session à
 l'application et à la console.
 
-| Cookie | Plan | Ce qu'il porte |
+| Cookie | Plan | Ce qu'il contient |
 |---|---|---|
-| `MEERKAT_SESSION` | plan de données | la valeur de session |
-| `MEERKAT_ADMIN_SESSION` | plan de contrôle | la valeur de session de la console |
-| `MEERKAT_UNTIL` | plan de données | quand cette session expire, en horodatage |
+| `MEERKAT_SESSION` | plan de données | la valeur de la session |
+| `MEERKAT_ADMIN_SESSION` | plan de contrôle | la valeur de la session de la console |
+| `MEERKAT_UNTIL` | plan de données | le moment où cette session expire, sous forme d'horodatage |
 | `MEERKAT_ADMIN_UNTIL` | plan de contrôle | la même chose, pour la console |
 
-Chaque nom se termine par l'identifiant de cette installation - `MEERKAT_SESSION_3fa9c1e2` -
-généré à l'installation et jamais exporté avec une configuration. Un cran au-dessus, la même
-raison : deux passerelles qu'un navigateur atteint sous un même nom d'hôte, une Enterprise et
-une communautaire côte à côte sur `localhost`, écraseraient sinon les sessions l'une de
-l'autre. Le cookie de navigateur de confiance est suffixé de la même façon ; ceux de la langue
-et du thème sont le choix de la personne et restent partagés.
+Chaque nom se termine par l'identifiant de l'installation - `MEERKAT_SESSION_3fa9c1e2` -
+généré à l'installation et jamais exporté avec une configuration. C'est la même raison, un
+niveau plus haut : deux gateways qu'un navigateur atteint sous le même nom d'hôte, par
+exemple une édition Enterprise et une édition Community côte à côte sur `localhost`,
+écraseraient sinon mutuellement leurs sessions. Le cookie des navigateurs de confiance
+porte le même suffixe ; les cookies de langue et de mode d'affichage relèvent du choix de
+la personne et restent partagés.
 
 En HTTPS, les noms commencent par `__Host-` (`__Host-MEERKAT_ADMIN_SESSION_...`). Un
-navigateur interdit à une page en clair d'écraser un cookie `Secure` du même nom : un seul nom
-pour les deux schémas rendait la connexion en HTTP impossible après une session en HTTPS - et la
-porte en clair de la console existe pour le jour où un certificat casse. Le préfixe fait aussi
-garantir par le navigateur que le cookie a été posé en HTTPS, par cet hôte, pour tout le site.
+navigateur interdit à une page servie en clair d'écraser un cookie `Secure` du même nom :
+avec un seul nom pour les deux schémas, il devenait impossible de se connecter en HTTP
+après une session en HTTPS - or l'accès en clair à la console existe justement pour le jour
+où un certificat fait défaut. Ce préfixe oblige aussi le navigateur à garantir que le
+cookie a été posé en HTTPS, par cet hôte, pour tout le site.
 
-Les cookies de session sont `HttpOnly`, `SameSite=Lax`, `Path=/`, avec un
-`Max-Age` égal à la durée de vie de la session. `Secure` est posé quand la requête
-est arrivée en HTTPS - soit TLS terminé par la gateway, soit
-`X-Forwarded-Proto: https` envoyé par le proxy devant elle.
+Les cookies de session sont `HttpOnly`, `SameSite=Lax`, `Path=/`, avec un `Max-Age` égal à
+la durée de vie de la session. `Secure` est ajouté quand la requête est arrivée en HTTPS -
+soit que la gateway termine elle-même TLS, soit que le proxy placé devant elle envoie
+`X-Forwarded-Proto: https`.
 
-Les deux cookies `..._UNTIL` ne sont délibérément **pas** `HttpOnly` : une page les
-lit pour s'apercevoir que la session s'est terminée, ou est revenue dans un autre
-onglet, sans interroger un point d'entrée. Ils portent une échéance et rien
+Les deux cookies `..._UNTIL` ne sont volontairement **pas** `HttpOnly` : une page les lit
+pour s'apercevoir que la session a pris fin, ou qu'elle a été rétablie dans un autre
+onglet, sans interroger régulièrement un endpoint. Ils contiennent une échéance et rien
 d'autre.
 
 > [!NOTE]
-> Aucun attribut `Domain` n'est posé : le cookie est lié à l'hôte, et c'est un
-> choix. Un `Domain` enverrait la session à **tous** les sous-domaines, y compris
-> ceux que Meerkat ne sert pas - un site vitrine hébergé ailleurs, un SaaS derrière
-> un CNAME, une préproduction - et un seul compromis recevrait la session de tout
-> le monde. `app.acme.io` et `admin.acme.io` se connectent donc séparément ; des
-> applications sous un même nom d'hôte partagent la session.
+> Aucun attribut `Domain` n'est défini : le cookie est donc limité à l'hôte, et c'est un
+> choix. Un `Domain` enverrait la session à **tous** les sous-domaines, y compris ceux que
+> Meerkat ne sert pas - un site marketing hébergé ailleurs, un SaaS derrière un CNAME, un
+> hôte de préproduction - et il suffirait que l'un d'eux soit compromis pour qu'il reçoive
+> les sessions de tout le monde. On se connecte donc séparément à `app.acme.io` et à
+> `admin.acme.io` ; les applications servies sous un même nom d'hôte partagent la session.
 
-Une session d'un plan n'est jamais acceptée sur l'autre. La réponse à un cookie du
-plan de données sur le port d'administration n'est pas "interdit", c'est "pas de
+Une session d'un plan n'est jamais acceptée sur l'autre. À un cookie du plan de données
+présenté sur le port d'administration, la réponse n'est pas "interdit" mais "pas de
 session".
 
 ## Combien de temps vit une session
 
-La durée est un **temps d'inactivité, pas un temps total** : chaque requête repousse
-l'échéance à *maintenant plus la durée*. Pour que ce soit bon marché, la nouvelle
-échéance n'est écrite en base qu'une fois la session dans sa seconde moitié : une
-session de trente minutes écrit au plus toutes les quinze minutes.
+La durée de vie est un **temps d'inactivité, pas une durée totale** : chaque requête
+repousse l'échéance à *maintenant plus la durée de vie*. Pour que cela reste peu coûteux,
+la nouvelle échéance n'est écrite en base qu'une fois la session entrée dans la seconde
+moitié de sa durée de vie : une session de trente minutes écrit donc au plus toutes les
+quinze minutes.
 
-Une déconnexion, ou une révocation sur un autre noeud, ne peut pas être annulée par
-une requête déjà en vol : le prolongement ne s'applique que si l'échéance dont
-elle a été informée est toujours celle qui est stockée.
+Une déconnexion, ou une révocation sur un autre nœud, ne peut pas être annulée par une
+requête qui était déjà en cours : la prolongation ne s'applique que si l'échéance dont la
+requête avait connaissance est encore celle qui est enregistrée.
 
-La durée elle-même se résout depuis le niveau le plus fin qui dit quelque chose :
+La durée de vie elle-même est prise au niveau le plus précis qui en définit une :
 
-| Niveau | Où il vit | Modifiable |
+| Niveau | Où elle se trouve | Modifiable |
 |---|---|---|
-| Appartenance, une personne dans une organisation | `sessionTTL` sur l'appartenance | API d'administration seulement |
-| Organisation | `sessionTTL` sur l'organisation | API d'administration seulement |
-| Installation | réglage `session_ttl`, défaut `PT30M` | **Application > Security** |
+| L'appartenance, une personne dans une organisation | `sessionTTL` sur l'appartenance | API d'administration uniquement |
+| L'organisation | `sessionTTL` sur l'organisation | API d'administration uniquement |
+| L'installation | réglage `session_ttl`, `PT30M` par défaut | **Application > Security** |
 
-Les valeurs sont des durées ISO-8601 : `PT15M`, `PT1H`, `P1D`. Jours, heures,
-minutes et secondes seulement - semaines, mois et années sont refusés. La console
-propose une liste de quinze minutes à un jour, et conserve une valeur posée
-ailleurs plutôt que de la perdre.
+Les valeurs sont des durées ISO-8601 : `PT15M`, `PT1H`, `P1D`. Seuls les jours, les heures,
+les minutes et les secondes sont admis - les semaines, les mois et les années sont refusés.
+La console propose une liste allant de quinze minutes à un jour, et conserve une valeur
+définie ailleurs au lieu de la perdre.
 
 > [!WARNING]
-> Deux aspérités sur les deux niveaux du bas, à connaître avant de s'en servir. Une
-> durée invalide n'est **pas** contrôlée à l'écriture : elle est acceptée puis
-> retombe silencieusement à trente minutes à la connexion suivante. Et l'écran des
-> membres de la console envoie une durée d'appartenance vide dès que vous cochez une
-> appartenance ou un groupe, ce qui **efface** une durée par membre posée par l'API.
+> Les deux niveaux les plus précis présentent deux défauts qu'il vaut mieux connaître avant
+> de s'en servir. Une durée invalide n'est **pas** contrôlée à l'écriture : elle est
+> acceptée, puis remplacée sans avertissement par trente minutes à la connexion suivante.
+> Et l'écran des membres de la console envoie une durée d'appartenance vide chaque fois que
+> vous cochez une appartenance ou un groupe, ce qui **efface** une durée par membre définie
+> par l'API.
 
-Une session qui doit encore une étape de connexion - un mot de passe à changer, un
-code à saisir - utilise la durée de l'installation, parce que l'organisation n'est
-pas encore connue.
+Une session à laquelle il reste une étape de connexion à franchir - un mot de passe à
+changer, un code à saisir - utilise la durée de vie de l'installation, car l'organisation
+n'est pas encore connue.
 
 ## Ce qui met fin à une session
 
 | Cause | Portée | Immédiat |
 |---|---|---|
-| `POST /logout` | cette session-là | oui, la ligne est supprimée |
-| Expiration par inactivité | cette session | oui, refusée sur l'horloge |
-| Une réinitialisation de mot de passe par le lien envoyé par courriel | **toutes** les sessions de ce compte, sur toutes les passerelles | oui |
-| La suppression du compte | toutes les sessions de ce compte | oui |
-| La **désactivation** du compte | toutes les sessions de ce compte, sur les deux plans | oui |
-| **Sign out** dans *Active sessions* du profil, ou *Sign out everywhere else* | cette session, ou toutes les autres de cette personne | oui |
+| `POST /logout` | cette session uniquement | oui, la ligne est supprimée |
+| L'expiration pour inactivité | cette session | oui, elle est refusée d'après l'heure réelle |
+| Une réinitialisation du mot de passe par le lien reçu par e-mail | **toutes** les sessions du compte, sur toutes les gateways | oui |
+| La suppression du compte | toutes les sessions du compte | oui |
+| La **désactivation** du compte | toutes les sessions du compte, sur les deux plans | oui |
+| **Déconnecter** dans les *Sessions actives* du profil, ou *Déconnecter partout ailleurs* | cette session, ou toutes les autres sessions de la personne | oui |
 | **Sign out** sur l'écran *Sessions* de la console | cette session | oui |
 
-La déconnexion est un `POST` - il n'y a pas de `GET /logout` - et elle supprime la
-ligne plutôt que d'effacer seulement le cookie, puis efface les deux cookies et
-dit aux autres passerelles de l'oublier. Elle termine **cette** session : les
-autres navigateurs de la même personne gardent la leur, et la console et
-l'application sont indépendantes.
+La déconnexion est un `POST` - il n'y a pas de `GET /logout`. Elle supprime la ligne au
+lieu de se contenter d'effacer le cookie, puis efface les deux cookies et demande aux
+autres gateways d'oublier la session. Elle met fin à **cette** session : les autres
+navigateurs de la même personne gardent la leur, et la console et l'application sont
+indépendantes.
 
 ## Ce qui ne met pas fin à une session
 
-Cette liste compte plus que la précédente :
+Cette liste compte davantage que la précédente :
 
-- **Changer un mot de passe non plus.** Ni le changement volontaire dans le profil, ni le changement forcé à la connexion, ni la réinitialisation par un administrateur. Seul le lien de réinitialisation par courriel révoque les sessions - avec les jetons d'API et les navigateurs de confiance du compte -, parce que c'est le flux qui existe pour un compte que quelqu'un d'autre tient peut-être.
-- **"Mot de passe à changer" non plus.** Le drapeau est lu à la connexion *suivante*.
-- **Les changements de rôle, de groupe et d'appartenance non plus.** Ils prennent effet en quelques secondes : l'identité mémorisée est jetée, la session est gardée, ce qui est précisément pourquoi être ajouté à une organisation prend effet sans se déconnecter. Retirer un rôle marche pareil.
-- **Désactiver une organisation non plus.**
-- **Sur le plan de contrôle, la fenêtre de validité d'un compte n'est pas revérifiée** sur une session cookie : elle l'est à la connexion et à chaque appel par jeton, mais une session de console déjà ouverte court jusqu'à son expiration.
+- **Changer de mot de passe n'y met pas fin.** Ni le changement volontaire depuis le profil, ni le changement imposé à la connexion, ni la réinitialisation par un administrateur. Seul le lien de réinitialisation reçu par e-mail révoque les sessions - ainsi que les jetons d'API et les navigateurs de confiance du compte - parce que ce parcours existe précisément pour un compte que quelqu'un d'autre détient peut-être.
+- **L'obligation de changer de mot de passe non plus.** L'indicateur est lu à la connexion *suivante*.
+- **Les changements de rôle, de groupe et d'appartenance non plus.** Ils prennent effet en quelques secondes : l'identité mémorisée est abandonnée et la session conservée. C'est pourquoi un ajout à une organisation peut prendre effet sans déconnexion. Le retrait d'un rôle fonctionne de la même façon.
+- **La désactivation d'une organisation non plus.**
+- **Sur le plan de contrôle, la période de validité d'un compte n'est pas contrôlée de nouveau** pour une session par cookie : elle l'est à la connexion et à chaque appel par jeton, mais une session de console déjà ouverte se poursuit jusqu'à son expiration.
 
 ## Voir les sessions
 
-Une personne lit les siennes dans son profil, **Security, Active sessions** : chaque
-navigateur connecté aux applications, quand et depuis quelle adresse, *This browser*
-signalé ; **Sign out** sur n'importe quel autre, ou **Sign out everywhere else**. La
-session d'un autre compte n'est jamais la sienne à fermer, quel que soit l'identifiant
-qu'un formulaire porte.
+Chacun consulte les siennes dans son profil, **Sécurité, Sessions actives** : chaque
+navigateur connecté aux applications, depuis quand et depuis quelle adresse, avec la
+mention *Ce navigateur* sur celui en cours ; **Déconnecter** sur n'importe quel autre, ou
+**Déconnecter partout ailleurs**. Personne ne peut fermer la session d'un autre compte,
+quel que soit l'identifiant que transporte un formulaire.
 
-Les administrateurs les lisent dans **Sessions**, dans le rail : qui, quel navigateur et
-quelle adresse, quel plan, depuis quand - filtrées par compte, par pages. Chacun lit son
-périmètre. Root lit les deux plans ; un administrateur d'application les sessions des
-applications, toutes organisations, puisque qui fait tourner la console, et d'où, est
-l'affaire de root ; un administrateur d'organisation les sessions ouvertes dans les
-organisations qu'il administre, et ne peut fermer que celles-là. En fermer une écrit
-`session.revoke` au [journal d'audit](/docs/operations/audit).
+Les administrateurs les consultent dans **Sessions**, dans la barre latérale : qui, quel
+navigateur et quelle adresse, quel plan, depuis quand - avec un filtre par compte et une
+pagination. Chacun voit son propre périmètre. Root voit les deux plans. Un administrateur
+des applications voit les sessions des applications, toutes organisations confondues, mais
+pas celles de la console : savoir qui utilise la console, et depuis où, ne regarde que
+root. L'administrateur d'une organisation voit les sessions ouvertes dans les organisations
+qu'il administre, et ne peut mettre fin qu'à celles-là. Mettre fin à une session écrit
+`session.revoke` dans le [journal d'audit](/docs/operations/audit).
 
 ![Sessions : qui est connecté, depuis quel navigateur et quelle adresse, sur quel plan, et depuis quand](img/console/sessions.webp)
-

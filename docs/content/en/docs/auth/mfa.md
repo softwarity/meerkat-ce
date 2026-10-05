@@ -109,7 +109,7 @@ turn it off afterwards - the self-service disable answers `403` and says why.
 > the piece FEATURES.md still lists as missing on this feature.
 
 An authority can **waive** the challenge for people arriving through it -
-*Two-factor: left to the authority* on an OIDC, directory or GitHub authority.
+*Two-factor: Left to the authority* on an OIDC, directory or GitHub authority.
 See [OpenID Connect](/docs/auth/oidc) for what that setting does and does not
 do.
 

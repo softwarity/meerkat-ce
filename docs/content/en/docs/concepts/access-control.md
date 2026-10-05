@@ -20,14 +20,14 @@ grants everything under it without listing any of it.
 
 Roles carry tags, which are for classification rather than for permission.
 Roles marked as system roles cannot be deleted; deleting an ordinary role
-re-parents its children rather than orphaning them.
+moves its children to the top level rather than deleting them.
 
 The catalogue is global on purpose. What differs between organisations is who
 holds what - not what the words mean.
 
 ## Groups
 
-A group belongs to an **organisation** and bundles role IDs from the catalogue.
+A group belongs to an **organisation** and bundles roles from the catalogue.
 People are assigned groups per organisation, which is what lets the same account
 be an administrator in one and a reader in another.
 
@@ -85,8 +85,8 @@ administering the gateway rather than about using an application.
 | Flag | What it opens |
 |---|---|
 | `root` | global administration; implies both below, and is the only flag that can mint control-plane tokens |
-| `infraAdmin` | the routing side: routes, TLS, authorities, the built-in pages |
-| `appAdmin` | the application side: accounts, roles, the global settings |
+| `infraAdmin` | the routing side: routes, TLS, authorities, the mail relay |
+| `appAdmin` | the application side: accounts, roles, the global settings, the built-in pages |
 | `dev` | the developer tooling, where developer mode is on |
 | `tenantCreator` | may create organisations |
 
@@ -139,8 +139,9 @@ plus path, with `{var}` templates and `*` for any method - on the endpoint
 inventory the gateway read from that spec. The first matching override wins.
 
 > [!NOTE]
-> An operation with no override falls back to the **route's** rule. There is no
-> deny-by-default option yet, so a spec that grew an operation nobody wrote a
+> An operation with no override falls back to the **route's** rule, unless
+> **Only listed operations are reachable** is on: then it is refused to
+> everyone. Without that switch, a spec that grew an operation nobody wrote a
 > rule for is covered by the route, not refused.
 
 ## What is not built

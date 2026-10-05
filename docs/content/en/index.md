@@ -10,7 +10,7 @@ layout: wide
 Meerkat is an **app-gateway**: one entry point in front of the internal
 application your teams build, which takes charge of everything that is not
 their core business. Authentication, access rules, organisations, routing,
-quotas, audit. One binary, zero dependency.
+quotas, audit. One image, zero dependency.
 
 - [Get started](/docs/start/quick-start)
 - [See it](/showcase/index)
@@ -21,25 +21,19 @@ quotas, audit. One binary, zero dependency.
 :::
 
 ::: stats
-### 1 binary
+### 1 image
 to deploy
-### {{memory.idle}} to {{memory.peak}} MB
-of memory, from idle to full load
+### 70 MB
+on disk
+### {{memory.idle}} MB
+in memory, at rest
 ### 0
-dependencies required
-### {{features.built}}
-features delivered
-### 20
-languages served
+dependencies
 :::
 
-Memory measured by this project's own CI on an x64 runner: {{memory.idle}} MB at rest, and
-**{{memory.peak}} MB at the peak of the load**. The {{features.built}} features are the ones ticked in
-[the product's inventory](/product/features), whose state is read from the
-code; {{features.partial}} more are delivered in part there and {{features.todo}} are still to come. What it costs a
-request is measured too, next to Kong, APISIX and Traefik on the same machine
-in the same run: [the figures](/product/performance), recomputed on every
-commit.
+What the gateway costs a request is measured next to Kong, APISIX and Traefik
+on the same machine: [the figures](/product/performance) are recomputed on
+every commit.
 
 ::: lead
 Your services receive requests that are already authenticated, carrying a
@@ -123,7 +117,9 @@ that version becomes plain Apache 2.0.
 Enterprise is what you need once the installation grows: several
 organisations, Active Directory, several gateways behind one entry point. Never
 a security primitive - TLS, two-factor, passkeys, the vault and the audit trail
-are free and stay free.
+are free and stay free. Team is Enterprise for a cluster of a known size, and
+the evaluation edition is Enterprise with a notice on it, free, to try all of
+it first.
 
-[Compare the editions](/product/editions) . [Pricing](/product/pricing)
+[Compare the editions](/product/editions) . [Pricing](/pricing/index)
 :::

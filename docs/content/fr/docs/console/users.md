@@ -2,109 +2,113 @@
 title: Utilisateurs et champs de compte
 section: La console
 order: 170
-summary: Les comptes, les capacités qu'ils portent, leur sécurité, et les champs supplémentaires que cette installation enregistre sur une personne.
+summary: Les comptes, les capacités qu'ils détiennent, leur sécurité et les champs supplémentaires que cette installation enregistre sur une personne.
 ---
 
 # Utilisateurs et champs de compte
 
-**Application > Users**, ce sont les comptes : qui existe sur cette passerelle, ce
-qu'il peut faire à travers elle, et comment il entre. **Infra > Model** est l'autre
-moitié : la forme d'un compte, décidée une fois.
+**Application > Users** présente les comptes : qui existe sur cette gateway, ce que
+chacun peut y faire, et comment il s'y connecte. **Infra > Model** en est le
+complément : la structure d'un compte, définie une fois pour toutes.
 
-Les deux sont séparés volontairement. Définir un champ et le remplir sont deux gestes
-de deux métiers : l'un dit *cette installation enregistre un centre de coût*, l'autre
-dit *celui d'Alice est B200*. C'est aussi cette séparation qui rend un champ
-transmissible en confiance, puisque personne ne peut s'attribuer un attribut auquel un
-service croit.
+Les deux écrans sont séparés à dessein. Définir un champ et le renseigner sont deux
+actes, accomplis par deux personnes : l'une déclare *cette installation enregistre un
+centre de coût*, l'autre indique *celui d'Alice est B200*. C'est aussi cette séparation
+qui permet de transmettre un champ personnalisé en toute sécurité, puisque personne ne
+peut s'attribuer lui-même un attribut auquel un service se fie.
+
+![L'écran Users : six comptes, chacun avec ses cinq badges de capacité](img/console/users.webp)
+
+Six comptes. Les badges sont des boutons : ici, `admin` détient tout, un compte est
+app admin, un autre infra admin, et les autres ne détiennent rien.
 
 ## La liste des utilisateurs
 
-![L'écran Users : six comptes, chacun avec ses cinq pastilles de capacité](img/console/users.webp)
-
-Six comptes. Les pastilles sont des boutons : ici `admin` porte tout, un compte est
-app admin et un autre infra admin, les autres ne portent rien.
-
-Une ligne par compte : le point d'activation, l'identifiant, le nom complet et
-l'adresse, et les **pastilles de capacité**. Une pastille est un bouton : la cliquer
-donne ou retire le pouvoir sans ouvrir le tiroir.
+Une ligne par compte : le point d'activation, le nom d'utilisateur, le nom complet et
+l'adresse e-mail, puis les **badges de capacité**. Un badge est un bouton : un clic
+accorde ou retire la capacité sans ouvrir le tiroir.
 
 | Capacité | Ce qu'elle ouvre |
 |---|---|
-| `root` | Toute la passerelle : routes, utilisateurs, organisations, réglages |
-| `infra admin` | Le plan de routage : routes et pages intégrées |
+| `root` | Toute la gateway : routes, utilisateurs, organisations, réglages |
+| `infra admin` | Le plan de routage : les routes et les pages intégrées |
 | `app admin` | L'identité applicative : utilisateurs, rôles, réglages |
 | `dev` | L'outillage développeur sur les applications servies |
-| `tenant creator` | La création d'organisations (mode multi seulement) |
+| `tenant creator` | La création d'organisations (en mode multi-organisation uniquement) |
 
-Les actions de ligne activent et désactivent un compte. Vous ne pouvez ni retirer votre
-propre `root`, ni vous désactiver, ni vous supprimer.
+Les actions de ligne activent et désactivent un compte. Vous ne pouvez pas retirer
+votre propre capacité `root`, ni désactiver ou supprimer votre propre compte.
 
 La recherche porte sur le compte. Le bouton **+** en crée un.
 
 ## Le tiroir d'un compte
 
-Trois pages dans un tiroir, et la première est la seule que l'on **remplit**.
+Trois pages dans un même tiroir, dont la première est la seule que vous
+**remplissez**.
 
 **La page du compte**
 
-- Identifiant, nom complet, courriel.
-- **Access from** et **Access until** - la fenêtre de validité, en **jours et non en
-  instants** : *jusqu'au 31* vaut tout le 31. Hors fenêtre, la connexion est refusée en
-  nommant la date, et une session déjà ouverte est revérifiée plutôt que coupée en plein
-  travail.
-- **Les champs propres à cette installation** - ceux que l'écran Model définit.
+- Le nom d'utilisateur, le nom complet, l'adresse e-mail.
+- **Access from** et **Access until** - la période de validité, exprimée en **jours
+  et non en instants** : *jusqu'au 31* signifie toute la journée du 31. En dehors de
+  cette période, la connexion est refusée et le message cite la date ; une session
+  déjà ouverte est revérifiée, plutôt que coupée en plein travail.
+- **Les champs propres à cette installation** - tous ceux que définit l'écran Model.
 
-**Security** (à une touche, et qui revient)
+**Security** (à un clic, avec un bouton de retour)
 
-- **Two-factor** - exigé, optionnel, ou hérité de la politique applicative ; le libellé
-  dit ce que l'héritage donne aujourd'hui.
-- **Password** - *Reset password* produit un mot de passe à remettre en main propre, et
-  *Force a change at next sign-in* garde celui que la personne connaît déjà et refuse
-  d'aller plus loin avec, ce qui économise un appel téléphonique par personne. Un compte
-  né chez une autorité n'a pas de mot de passe local : le bouton dit alors *Set a
-  password*, et le faire ouvre délibérément une seconde porte.
-- **External authorities** - quelles autorités sont rattachées à ce compte.
+- **Two-factor** - le second facteur est exigé, facultatif, ou hérité de la politique
+  de l'application ; le libellé précise ce que donne l'héritage en ce moment.
+- **Password** - *Reset password* génère un mot de passe à remettre à la personne.
+  *Force a change at next sign-in* conserve le mot de passe qu'elle connaît déjà, mais
+  l'empêche d'aller plus loin sans en changer, ce qui épargne un appel téléphonique
+  par personne. Un compte né auprès d'une autorité n'a pas de mot de passe local, et
+  le bouton s'intitule alors *Set a password* : en définir un ouvre, en connaissance
+  de cause, un second moyen de se connecter.
+- **External authorities** - les autorités liées à ce compte.
 
-**Sign-in history** - chaque connexion, d'où et comment. C'est une porte et non une
-section, parce qu'une liste aussi longue que le compte est vieux repousserait tout le
-reste hors de portée.
+**Sign-in history** - toutes les connexions, avec leur origine et leur méthode. C'est
+une porte d'entrée vers une autre page plutôt qu'une section : une liste aussi longue
+que le compte est ancien repousserait hors de portée tout ce qui se trouve en dessous.
 
 **Danger zone** - la suppression emporte le compte, ses appartenances, ses sessions et
-ses jetons. Le journal d'audit garde une trace anonymisée.
+ses jetons. Le journal d'audit en conserve une trace anonymisée.
 
 ## Infra > Model : les champs que porte un compte
 
-Ce que cette installation sait d'une personne et que le produit ne pouvait pas deviner :
-un matricule, un centre de coût, une référence de contrat.
+Ce que cette installation sait d'une personne et que le produit ne pouvait pas
+deviner : un matricule, un centre de coût, une référence de contrat.
 
-Chaque définition a un **Name** (la clé qu'une route transmet), un **Label** (ce que
-l'écran du compte affiche) et un **Type** : texte, nombre, date, choix ou oui/non. Un
-champ **choix** prend aussi sa liste, séparée par des virgules - et c'est la liste qui
-justifie le type : elle transforme un centre de coût en donnée plutôt qu'en trois
-orthographes de la même chose.
+Chaque définition comporte un **Name** (la clé que transmet une route), un **Label**
+(ce qu'affiche l'écran du compte) et un **Type** : texte, nombre, date, choix ou
+oui/non. Un champ de type **choix** reçoit aussi sa liste de valeurs, séparées par des
+virgules, et c'est cette liste qui fait l'intérêt du type : elle fait d'un centre de
+coût une donnée, au lieu de trois orthographes de la même chose.
 
-Dès lors, un champ voyage comme n'importe quel autre fait sur l'appelant : choisissez-le
-dans la transmission d'identité d'une route pour l'envoyer à un service, ou dans son
-user info pour le poser sur une page.
+Dès lors, un champ circule comme n'importe quelle autre information sur l'appelant :
+sélectionnez-le dans la transmission d'identité d'une route pour l'envoyer à un
+service, ou dans sa section User info pour l'inscrire sur une page.
 
 > [!NOTE]
-> **Aucun champ n'est jamais obligatoire.** Un champ défini aujourd'hui est vide sur tous
-> les comptes qui existent déjà, et l'exiger bloquerait la prochaine personne qui en
-> ouvre un pour changer autre chose.
+> **Aucun champ n'est jamais obligatoire.** Un champ défini aujourd'hui est vide sur
+> tous les comptes qui existent déjà ; l'exiger bloquerait la prochaine personne qui
+> ouvrirait l'un d'eux pour modifier autre chose.
 
-Ajoutez un champ, retirez-en un, puis **Save** : cet écran a un seul bouton pour toute la
-liste.
+Ajoutez un champ, retirez-en un, puis cliquez sur **Save** : cet écran n'a qu'un seul
+bouton pour toute la liste.
 
 ## Pièges
 
-- **Une capacité n'est pas un rôle.** Les capacités administrent *cette console* ; les
-  rôles sont ce que lisent vos applications. Donner `app admin` ne donne rien dans une
-  application proxifiée.
-- **Un compte sans organisation n'atteint rien.** Créez-le ici, puis placez-le dans
-  [Members](/docs/console/organisation).
-- **Une valeur hors de la liste d'un choix est refusée**, par une phrase qui nomme ce qui
-  est permis - comme l'est une route qui transmet un champ que le modèle ne définit pas.
-- **Retirer un champ du modèle l'empêche de voyager.** Il ne dort pas dans la route.
-- **La fenêtre de validité est vérifiée à la connexion et revérifiée ensuite** : personne
-  n'est jeté dehors en plein travail par une horloge, mais rien de nouveau ne s'ouvre non
-  plus.
+- **Une capacité n'est pas un rôle.** Les capacités servent à administrer *cette
+  console* ; les rôles sont ce que lisent vos applications. Accorder `app admin` ne
+  donne aucun droit dans une application exposée par la gateway.
+- **Un compte sans organisation n'a accès à rien.** Créez-le ici, puis rattachez-le à
+  une organisation sur l'écran [Members](/docs/console/organisation).
+- **Une valeur absente de la liste d'un champ de type choix est refusée**, par un
+  message qui nomme les valeurs permises. Il en va de même d'une route qui transmet un
+  champ que le modèle ne définit pas.
+- **Retirer un champ du modèle met fin à sa transmission.** Il ne reste pas en
+  sommeil dans la route.
+- **La période de validité est vérifiée à la connexion, puis revérifiée ensuite** :
+  personne n'est éjecté en plein travail par une horloge, mais plus rien de nouveau ne
+  s'ouvre non plus.

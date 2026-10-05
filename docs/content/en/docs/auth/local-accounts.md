@@ -57,7 +57,7 @@ the password-update page. The same screen carries a *Force a change for
 everyone* button for the day you need it.
 
 **A temporary password runs out.** The password an administrator issues, at
-creation or on a reset, works for *Temporary (hours)*, until its owner
+creation or on a reset, works for *Temporary (hours)*, or until its owner
 sets their own. Past that, signing in with it is refused with a sentence that
 says to ask an administrator for a new one. It travels by mail, chat or phone,
 and one nobody used should not stay a way in. *Force a change* is not affected:
@@ -109,7 +109,7 @@ above, and a picture code to copy.
 Four things must all hold for that page to exist at all:
 
 1. the local authority is **enabled**;
-2. self-registration is allowed for it - either *Allowed* on the authority itself, or *Inherited* with the switch at the top of **Infra > Authentication** on;
+2. self-registration is allowed for it - either *Allowed* on the authority itself, or *Inherited from the application* with the switch at the top of **Infra > Authentication** on;
 3. a mail relay is configured in **Infra > Mail relay**, because the address has to be confirmed;
 4. it is the data plane. The administration port never serves a sign-up form.
 
@@ -126,17 +126,6 @@ link is a one-shot token valid for 24 hours, 48 hours or 7 days - **Confirmation
 links valid for**, beside the self-registration switch. Someone who signs in
 before confirming gets the link sent again rather than an explanation.
 
-## Changing one's address
-
-The address is where a password reset lands, so it is a way into the account.
-When a mail relay is configured, changing it from the profile does **not**
-change it yet: a link goes to the **new** address, and the change is made when
-that link comes back - valid for the same lifetime as a sign-up's. The **old**
-address is told at once, which is the owner's alarm when it was not them. A
-session somebody else got hold of is therefore no longer enough to point the
-account's recovery at their own mailbox. Without a relay nothing could carry a
-confirmation, and the address changes at once, as before.
-
 A username or an address already taken lands on the **same** page as a
 successful sign-up, and nothing is created: the form does not tell a stranger
 who already has an account here. The picture code is on by default and can be
@@ -148,6 +137,17 @@ address: `/register` five tries per fifteen minutes, fixed; `/forgot-password`
 its own counter, **Reset requests** under the rate limits (five by default,
 within the sign-in window, and never off). The two no longer share one: a busy
 sign-up page used to throttle resets, and a flood of resets closed sign-up.
+
+## Changing one's address
+
+The address is where a password reset lands, so it is a way into the account.
+When a mail relay is configured, changing it from the profile does **not**
+change it yet: a link goes to the **new** address, and the change is made when
+that link comes back - valid for the same lifetime as a sign-up's. The **old**
+address is told at once, which is the owner's alarm when it was not them. A
+session somebody else got hold of is therefore no longer enough to point the
+account's recovery at their own mailbox. Without a relay nothing could carry a
+confirmation, and the address changes at once, as before.
 
 ## A forgotten password
 

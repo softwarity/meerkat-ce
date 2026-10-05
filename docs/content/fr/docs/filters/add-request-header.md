@@ -2,22 +2,22 @@
 title: add-request-header
 section: Filtres
 order: 62
-summary: Ajoute une valeur d'en-tête de requête ; ifNotPresent n'ajoute rien si le client en a déjà envoyé une.
+summary: Ajoute une valeur à un en-tête de requête ; avec ifNotPresent, rien n'est ajouté si le client en a déjà envoyé une.
 ---
 
 # add-request-header
 
-Ajoute une valeur d'en-tête à la requête envoyée à l'amont, à côté de celles qui
-sont déjà là. Avec `ifNotPresent` cela devient un défaut : la route ne remplit
-l'en-tête que si l'appelant ne l'a pas fait.
+Ajoute une valeur d'en-tête à la requête envoyée à l'upstream, en plus de celles qui
+s'y trouvent déjà. Avec `ifNotPresent`, le filtre fournit une valeur par défaut :
+la route ne renseigne l'en-tête que si l'appelant ne l'a pas fait.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
-| `name` | chaîne | oui | L'en-tête ajouté. |
+| `name` | chaîne | oui | L'en-tête à ajouter. |
 | `value` | chaîne | oui | La valeur ajoutée. |
-| `ifNotPresent` | booléen | non | N'ajoute rien si l'appelant a déjà envoyé cet en-tête. Défaut : `false`. |
+| `ifNotPresent` | booléen | non | N'ajoute rien si l'appelant a déjà envoyé cet en-tête. Par défaut : `false`. |
 
 ## Exemple
 
@@ -32,10 +32,10 @@ filters:
 
 ## Notes
 
-La valeur est ajoutée à côté des valeurs existantes. Avec `ifNotPresent`, rien
-n'est ajouté quand l'appelant a déjà envoyé cet en-tête.
+La valeur s'ajoute aux valeurs existantes. Avec `ifNotPresent`, rien n'est ajouté
+si l'appelant a déjà envoyé cet en-tête.
 
-Pour remplacer ce que l'appelant a envoyé, utilisez
+Pour remplacer ce que l'appelant a envoyé, utilisez plutôt
 [set-request-header](/docs/filters/set-request-header) : deux valeurs sur un
-en-tête que le service lit comme unique, c'est un bug qui attend le jour où le
-service choisira l'autre.
+en-tête que le service croit unique, c'est un bug en sommeil, qui se réveille le
+jour où le service lit l'autre.

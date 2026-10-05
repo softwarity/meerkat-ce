@@ -2,14 +2,14 @@
 title: preserve-host
 section: Filtres
 order: 72
-summary: Envoie à l'amont l'hôte de l'appelant plutôt que celui de l'amont.
+summary: Envoie à l'upstream le Host de l'appelant, et non celui de l'upstream.
 ---
 
 # preserve-host
 
 Le service construit ses liens à partir du nom sous lequel il a été appelé. Sans
-ce filtre il voit le nom interne, et tous les liens, redirections et domaines de
-cookie qu'il écrit mènent là-bas.
+ce filtre, il voit le nom interne, et tous les liens, redirections et domaines de
+cookie qu'il écrit y mènent.
 
 ## Paramètres
 
@@ -22,23 +22,24 @@ filters:
   - type: preserve-host
 ```
 
-On omet `args` puisqu'il n'y a rien à passer.
+`args` est omis, puisqu'il n'y a rien à passer.
 
 ## Notes
 
-L'en-tête `Host` et la valeur que Go met sur le fil sont posés tous les deux,
-et c'est tout l'intérêt : n'en poser qu'un les met en désaccord, et c'est le bug
-d'hôte virtuel qui coûte un après-midi.
+Le filtre fixe à la fois l'en-tête `Host` et la valeur que Go écrit sur le réseau,
+et c'est tout son intérêt : si l'on n'en fixe qu'un, les deux se contredisent, et
+on obtient ce bug d'hôte virtuel qui fait perdre un après-midi.
 
-**La console l'ajoute d'elle-même** à une nouvelle route dont l'amont est une
-application atteinte directement : un service du cluster, un conteneur, une adresse
-privée. Une telle application est seule derrière son adresse et lit l'hôte reçu - pour
-vérifier l'origine d'un WebSocket (le canal temps réel de Grafana refuse une connexion
-dont l'origine n'est pas l'hôte qu'il a reçu), pour écrire ses liens. Le filtre
-apparaît dans la liste au moment où l'adresse est saisie, et se retire comme un autre.
-Un nom public n'en reçoit pas, et une route existante n'est jamais modifiée.
+**La console l'ajoute d'elle-même** à une nouvelle route dont l'upstream est une
+application jointe directement : un service du cluster, un conteneur, une adresse
+privée. Une telle application est seule derrière son adresse et lit le Host
+qu'elle reçoit - pour vérifier l'origine d'un WebSocket (le canal live de Grafana
+refuse une connexion dont l'origine n'est pas le Host qu'il a reçu), ou pour écrire
+ses liens. Le filtre apparaît dans la liste pendant la saisie de l'adresse, et se
+retire comme n'importe quel autre. Un nom public n'en reçoit pas, et une route
+existante n'est jamais modifiée.
 
 Deux pièges à connaître :
 
-- Un amont qui choisit un site **par son nom** reçoit le nom public au lieu de celui qu'il connaît, et répond son site par défaut. C'est à cela que sert [set-host](/docs/filters/set-host).
-- Conserver l'hôte ne suffit pas pour une application publiée sous un préfixe : il lui faut aussi connaître ce préfixe, que [strip-prefix](/docs/filters/strip-prefix) annonce en `X-Forwarded-Prefix`.
+- Un upstream qui choisit un site **d'après le nom** reçoit le nom public au lieu de celui qu'il connaît, et répond avec son site par défaut. C'est à cela que sert [set-host](/docs/filters/set-host).
+- Conserver le Host ne suffit pas à une application publiée sous un préfixe : elle doit aussi connaître ce préfixe, que [strip-prefix](/docs/filters/strip-prefix) annonce dans `X-Forwarded-Prefix`.

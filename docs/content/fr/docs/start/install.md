@@ -2,23 +2,24 @@
 title: Installation
 section: Démarrer
 order: 4
-summary: Les images Docker, la construction du binaire, et les réglages que la gateway lit au démarrage.
+summary: Les images Docker, la construction du binaire par vos soins, et les réglages que la gateway lit au démarrage.
 ---
 
 # Installation
 
-Meerkat est un binaire Go unique, sans CGO et sans dépendance externe. Son
-stockage embarqué est un fichier dans un répertoire ; une base externe est une
-option, pas un prérequis.
+Meerkat tient en un seul binaire Go, sans CGO ni dépendance externe. Son
+stockage embarqué est un fichier dans un répertoire ; une base de données
+externe est une option, pas un prérequis.
 
 ## Image Docker
 
-Deux images, construites depuis le même commit, portant le même nom : c'est
-le **registre** qui dit l'édition.
+Trois images, construites à partir du même commit et portant le même nom : ce
+sont le **registre** et le tag qui indiquent l'édition.
 
 | Image | Édition |
 |---|---|
-| `docker.io/softwarity/meerkat:latest` | communautaire, publique |
+| `docker.io/softwarity/meerkat:latest` | Community, publique |
+| `docker.io/softwarity/meerkat:eval` | évaluation, publique : tout ce que fait Enterprise, avec une mention d'évaluation - pas pour la production |
 | `ghcr.io/softwarity/meerkat:latest` | Enterprise, registre privé |
 
 ```yaml
@@ -27,7 +28,7 @@ services:
     image: docker.io/softwarity/meerkat:latest
     ports:
       - "8080:8080" # plan de données
-      - "9090:9090" # plan de contrôle - à garder interne
+      - "9090:9090" # plan de contrôle - à garder en interne
     environment:
       MEERKAT_ADMIN_PASSWORD: ${MEERKAT_ADMIN_PASSWORD:?set a password for the first admin}
     volumes:
@@ -38,16 +39,17 @@ volumes:
   meerkat-data:
 ```
 
-L'image pose `MEERKAT_DATA=/data` et déclare ce volume. Elle tourne sous un
-utilisateur non privilégié (uid 65532), et le point d'entrée est le binaire
-lui-même : tout ce qui suit le nom de l'image est donc un drapeau.
+L'image définit `MEERKAT_DATA=/data` et déclare ce volume. Elle s'exécute sous
+un utilisateur non root (uid 65532), et son point d'entrée est le binaire
+lui-même : tout ce qui suit le nom de l'image est donc une option de ligne de
+commande.
 
 ## Vérifier la signature
 
-Les deux images sont signées à la construction, avec
-[cosign](https://docs.sigstore.dev/) et sans clé. Il n'y a aucune clé publique
-à aller chercher : la signature porte l'identité du workflow GitHub Actions qui
-a produit l'image, et c'est cette identité que l'on vérifie.
+Les trois images sont signées au moment de leur construction, avec
+[cosign](https://docs.sigstore.dev/) et sans clé. Il n'y a donc aucune clé
+publique à récupérer : la signature porte l'identité du workflow GitHub Actions
+qui a produit l'image, et c'est cette identité que vous vérifiez.
 
 ```bash
 cosign verify \
@@ -56,22 +58,26 @@ cosign verify \
   docker.io/softwarity/meerkat:latest
 ```
 
-La même commande vérifie l'image Enterprise sur `ghcr.io/softwarity/meerkat`,
-une fois connecté à ce registre. Les deux sont construites par des workflows qui
-vivent dans le miroir public, `softwarity/meerkat-ce`, et c'est donc ce dépôt
-que nomme l'identité : les sources Enterprise sont privées, la chaîne qui les
-construit ne l'est pas. La commande affiche l'identité exacte qu'elle a
-acceptée, de quoi épingler un fichier précis plutôt qu'un répertoire.
+La même commande vérifie l'image d'évaluation,
+`docker.io/softwarity/meerkat:eval`, ainsi que l'image Enterprise sur
+`ghcr.io/softwarity/meerkat` une fois que vous êtes authentifié auprès de ce
+registre. Les trois sont construites par des workflows hébergés dans le miroir
+public, `softwarity/meerkat-ce`, et c'est ce dépôt que nomme l'identité : les
+sources Enterprise sont privées, la chaîne qui les construit ne l'est pas. La
+commande affiche l'identité exacte qu'elle a acceptée ; une politique qui veut
+épingler un fichier précis plutôt qu'un répertoire peut la reprendre de là.
 
-Ce qui est signé, c'est le **digest**, et récursivement : la liste de manifestes
-plus chaque image par architecture qu'elle désigne. Deux conséquences utiles. Un
-client qui a tiré l'image arm64 vérifie ce qu'il exécute vraiment, pas sa
-voisine. Et une release, qui réétiquette sous son numéro de version un digest
-déjà testé sans rien reconstruire, emporte la signature avec elle : rien n'est
-re-signé puisque rien n'est reconstruit.
+Ce qui est signé, c'est le **digest**, et de façon récursive : la liste de
+manifestes et chacune des images par architecture qu'elle référence. Deux
+conséquences à connaître. Un client qui a récupéré l'image arm64 vérifie ce
+qu'il exécute réellement, et non l'image voisine. Et une version publiée, qui
+se contente de poser son numéro de version sur un digest déjà testé, sans rien
+reconstruire, emporte la signature avec elle : rien n'est signé à nouveau,
+puisque rien n'est reconstruit.
 
-Pour refuser une image non signée à l'échelle d'un cluster plutôt que de
-vérifier à la main, les deux mêmes valeurs vont dans une politique Kyverno :
+Pour refuser les images non signées à l'échelle d'un cluster, plutôt que de les
+vérifier une par une à la main, reportez ces deux mêmes valeurs dans une
+politique Kyverno :
 
 ```yaml
 apiVersion: kyverno.io/v1
@@ -97,138 +103,143 @@ spec:
                     subject: "https://github.com/softwarity/meerkat-ce/.github/workflows/*"
 ```
 
-Vérifiez `validationFailureAction` contre votre version de Kyverno : les
-récentes ont déplacé cet interrupteur dans la règle, et une politique qui
-atterrit en mode audit signale au lieu de refuser.
+Vérifiez `validationFailureAction` au regard de votre version de Kyverno : les
+versions récentes ont déplacé ce réglage dans la règle, et une politique qui se
+retrouve en mode audit signale au lieu de refuser.
 
-## Construire le binaire
+## Construire le binaire vous-même
 
-Ce qui est publié, ce sont les images ; le binaire se construit depuis les
+Seules les images sont publiées ; le binaire, lui, se construit à partir des
 sources.
 
 ```bash
 git clone https://github.com/softwarity/meerkat-ce.git
 cd meerkat-ce
-make ui      # construit la console et la prepare pour l'embarquement (Node requis)
+make ui      # construit la console et la prépare pour l'embarquer (Node requis)
 make build   # -> bin/meerkat
 ./bin/meerkat --help
 ```
 
-`make ui` est ce qui met la console **dans** le binaire. Sautez-le et la gateway
-route toujours, mais le plan de contrôle répond une page d'état JSON au lieu
-d'une console.
+C'est `make ui` qui place la console **dans** le binaire. Sans cette étape, la
+gateway route toujours, mais le plan de contrôle renvoie une page d'état en
+JSON à la place de la console.
 
-La version de Go vient de `go.mod`, celle de Node de `.node-version`. Ce dépôt
-est l'arbre communautaire : les sources Enterprise n'y sont pas, donc ce qu'il
-construit est l'édition communautaire. Voir [Éditions](/product/editions).
+La version de Go est celle de `go.mod`, celle de Node est dans `.node-version`.
+Ce dépôt est l'arbre Community : les sources Enterprise n'y figurent pas, et ce
+qu'il construit est donc l'édition Community. Voir
+[Éditions](/product/editions).
 
-## Ce qu'elle lit au démarrage
+## Ce que la gateway lit au démarrage
 
-Chaque drapeau a un équivalent `MEERKAT_*`, et le drapeau gagne. `./bin/meerkat
---help` en donne la liste ; la voici.
+Chaque option de ligne de commande a son équivalent `MEERKAT_*`, et c'est
+l'option qui l'emporte. `./bin/meerkat --help` en affiche la liste ; la voici.
 
 ### Ports
 
-| Drapeau | Variable | Défaut | Quoi |
+| Option | Variable | Valeur par défaut | Rôle |
 |---|---|---|---|
 | `-addr` | `MEERKAT_ADDR` | `:8080` | plan de données, HTTP en clair |
 | `-admin-addr` | `MEERKAT_ADMIN_ADDR` | `:9090` | plan de contrôle, HTTP en clair |
 | `-tls-addr` | `MEERKAT_TLS_ADDR` | `:8443` | HTTPS du plan de données, ouvert quand TLS est activé |
-| `-admin-tls-addr` | `MEERKAT_ADMIN_TLS_ADDR` | `:9443` | HTTPS du plan de contrôle, pareil |
+| `-admin-tls-addr` | `MEERKAT_ADMIN_TLS_ADDR` | `:9443` | HTTPS du plan de contrôle, de même |
 
-Les ports HTTPS s'ouvrent et se ferment à chaud, depuis la console. Un échec y
-est journalisé et n'arrête pas les ports en clair : une faute de frappe dans une
-adresse coûte une porte, pas l'installation.
+Les ports HTTPS s'ouvrent et se ferment pendant que la gateway tourne, depuis
+la console. Un échec à ce niveau est journalisé et n'arrête pas les ports en
+clair : une faute de frappe dans une adresse coûte une porte, pas
+l'installation.
 
 ### Stockage
 
-| Drapeau | Variable | Défaut | Quoi |
+| Option | Variable | Valeur par défaut | Rôle |
 |---|---|---|---|
 | `-data` | `MEERKAT_DATA` | `data` | répertoire du stockage embarqué |
-| `-database-url` | `MEERKAT_DATABASE_URL` | vide | URL PostgreSQL pour plusieurs gateways servant une seule installation |
+| `-database-url` | `MEERKAT_DATABASE_URL` | vide | URL PostgreSQL, pour plusieurs gateways qui partagent une même installation |
 
 > [!WARNING]
-> Le défaut de `-data` est **relatif**. Sous Docker l'image le pose déjà à
-> `/data` ; ailleurs, donnez un chemin absolu, sinon la base atterrit là où le
-> processus a été lancé.
+> La valeur par défaut de `-data` est un chemin **relatif**. Sous Docker,
+> l'image le fixe déjà à `/data` ; partout ailleurs, indiquez un chemin absolu,
+> sans quoi la base se retrouve dans le répertoire d'où le processus a été
+> lancé.
 
 > [!NOTE]
 > Édition Enterprise. Le pilote PostgreSQL n'est compilé que dans l'image
-> Enterprise. Le binaire communautaire n'a aucun pilote enregistré :
-> `MEERKAT_DATABASE_URL` y reçoit une phrase qui nomme ce qui est disponible,
-> plutôt qu'une erreur de pilote.
+> Enterprise. Le binaire Community n'enregistre aucun pilote : si vous y
+> définissez `MEERKAT_DATABASE_URL`, il répond par une phrase qui indique ce
+> qui est disponible, et non par une erreur de pilote.
 
-### Au premier démarrage seulement
+### Au premier démarrage uniquement
 
-| Variable | Quoi |
+| Variable | Rôle |
 |---|---|
-| `MEERKAT_ADMIN_PASSWORD` | le mot de passe du premier administrateur, lu seulement tant qu'aucun compte n'existe |
-| `MEERKAT_CONFIG_FILE` (`-config`) | une configuration YAML ou JSON qui amorce une gateway **vide**. Une gateway configurée ne l'applique pas : quand le fichier diffère de ce qui tourne, il est rangé comme **configuration enregistrée** (nommée d'après le fichier), à comparer et à rendre courante depuis l'écran Configuration |
-| `MEERKAT_VAULT_FILE` (`-vault`) | un fichier de coffre chiffré, ingéré une seule fois |
+| `MEERKAT_ADMIN_PASSWORD` | le mot de passe du premier administrateur, lu uniquement tant qu'il n'existe aucun compte |
+| `MEERKAT_CONFIG_FILE` (`-config`) | une configuration YAML ou JSON qui initialise une gateway **vide**. Une gateway déjà configurée ne l'applique pas : si le fichier diffère de ce qui tourne, il est mis de côté comme **configuration enregistrée** (au nom du fichier), que vous pouvez comparer et rendre courante depuis l'écran Configuration |
+| `MEERKAT_VAULT_FILE` (`-vault`) | un fichier de coffre chiffré, importé une seule fois |
 | `MEERKAT_VAULT_PASSPHRASE`, `MEERKAT_VAULT_PASSPHRASE_FILE` | la phrase secrète de ce fichier |
-| `MEERKAT_TENANCY` (`-tenancy`) | `single` ou `multi`, tranché au premier démarrage ; ensuite la console est maîtresse du mode |
+| `MEERKAT_TENANCY` (`-tenancy`) | `single` ou `multi`, fixé au premier démarrage ; ensuite, c'est la console qui en décide |
 
-Sans fichier de configuration, la gateway démarre vide - aucune route - et le
-compte administrateur est la seule chose qu'elle crée.
+Sans fichier de configuration, la gateway démarre vide - sans aucune route -
+et ne crée rien d'autre que le compte de l'administrateur.
 
-`-tenancy` est fait pour l'amorçage - un premier démarrage, une installation
-livrée avec sa configuration, du GitOps. Une fois le mode choisi, le drapeau est
-ignoré, avec une ligne dans le journal qui le dit plutôt qu'un remplacement
-silencieux. Demander `multi` sur une image communautaire démarre en
-mono-organisation, et le dit aussi.
+`-tenancy` sert à l'amorçage : un premier démarrage, une installation
+préconfigurée, du GitOps. Une fois le mode choisi, l'option est ignorée, et une
+ligne du journal le signale : la valeur n'est jamais remplacée en silence.
+Demander `multi` sur une image Community démarre avec une seule organisation,
+et le journal le dit aussi.
 
-### Interrupteurs d'exploitation
+### Options d'exploitation
 
-| Drapeau | Variable | Quoi |
+| Option | Variable | Rôle |
 |---|---|---|
-| `-production` | `MEERKAT_PRODUCTION` | déclare cette gateway de production : toute la surface développeur reste fermée quoi que disent les réglages stockés |
-| `-plug-addr` | `MEERKAT_PLUG_ADDR` | adresse d'écoute du tunnel développeur, `:22222` par défaut, Enterprise seulement |
-| `-console-url` | `MEERKAT_CONSOLE_URL` | contournement de développement : proxifier la console vers un serveur de dev front |
-| `-version` | - | afficher la version et sortir |
+| `-production` | `MEERKAT_PRODUCTION` | déclare cette gateway comme étant en production : tout ce qui est destiné aux développeurs reste fermé, quoi que disent les réglages stockés |
+| `-plug-addr` | `MEERKAT_PLUG_ADDR` | adresse d'écoute du tunnel développeur, `:22222` par défaut, Enterprise uniquement |
+| `-console-url` | `MEERKAT_CONSOLE_URL` | pour le développement : relaie la console vers un serveur de développement front |
+| `-version` | - | affiche la version et quitte |
 
-`MEERKAT_PRODUCTION` est une décision d'environnement et non un réglage stocké,
-pour une raison : le réglage stocké voyage. Un export de configuration, une
-sauvegarde restaurée ou une base copiée depuis la recette peuvent chacun
-emporter le mode développeur en production, et personne ne s'en aperçoit avant
-qu'il y ait un port de tunnel devant des clients.
+Si `MEERKAT_PRODUCTION` relève de l'environnement et non d'un réglage stocké,
+c'est pour une raison précise : un réglage stocké voyage. Un export de
+configuration, une sauvegarde restaurée ou une base copiée depuis la
+préproduction peuvent chacun amener le mode développeur en production, et
+personne ne s'en aperçoit avant qu'un port de tunnel se retrouve exposé aux
+clients.
 
 ### Journaux et traces
 
-| Drapeau | Variable | Défaut | Quoi |
+| Option | Variable | Valeur par défaut | Rôle |
 |---|---|---|---|
-| `-log-level` | `MEERKAT_LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` ; une faute de frappe retombe sur `info` plutôt que d'empêcher le démarrage |
-| `-log-format` | `MEERKAT_LOG_FORMAT` | vide | `json` ou `text` ; vide choisit JSON sur une gateway de production et texte ailleurs |
-| `-access-log` | `MEERKAT_ACCESS_LOG` | éteint | une ligne par requête franchissant la porte d'entrée, sur la sortie standard - voir [Journaux](/docs/operations/logs) |
+| `-log-level` | `MEERKAT_LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` ; une faute de frappe ramène à `info` au lieu d'empêcher le démarrage |
+| `-log-format` | `MEERKAT_LOG_FORMAT` | vide | `json` ou `text` ; une valeur vide donne du JSON sur une gateway de production et du texte ailleurs |
+| `-access-log` | `MEERKAT_ACCESS_LOG` | désactivé | une ligne par requête qui franchit la porte d'entrée, sur la sortie standard - voir [Journaux](/docs/operations/logs) |
 | `-otlp-endpoint` | `MEERKAT_OTLP_ENDPOINT` | vide | un collecteur vers lequel exporter les traces dès la première seconde, par exemple `http://otel-collector:4318` (Enterprise) |
-| `-otlp-sample` | `MEERKAT_OTLP_SAMPLE` | `0.1` | la part des parcours ouverts par cette gateway qui sont enregistrés, de 0 à 1 |
+| `-otlp-sample` | `MEERKAT_OTLP_SAMPLE` | `0.1` | la proportion enregistrée des parcours ouverts par cette gateway, de 0 à 1 |
 
-Le niveau est fixé au démarrage ; le changer demande un redémarrage.
+Le niveau de journalisation est fixé au démarrage ; le modifier impose un
+redémarrage.
 
-Les deux réglages `otlp` servent à une gateway qui doit tracer avant que
-quiconque ait ouvert la console - une image lancée par une chaîne de
-déploiement, par exemple. Sinon c'est le réglage de la console (**Infra,
-OpenTelemetry**) qu'il faut prendre : il ajoute les métriques, la crédentiale au
-coffre, le choix route par route et le bouton Test. Tant qu'il n'a jamais été allumé,
-l'exportateur du démarrage tourne ; une fois allumé, il prend la main, et
-l'éteindre de nouveau arrête l'export jusqu'au prochain démarrage. Voir
-[Traces](/docs/operations/tracing).
+Les deux réglages `otlp` s'adressent à une gateway qui doit tracer avant
+même que quelqu'un ait ouvert la console - une image lancée par un pipeline,
+par exemple. Dans les autres cas, utilisez le réglage de la console (**Infra,
+OpenTelemetry**) : il ajoute les métriques, l'identifiant d'accès rangé dans le
+coffre, le choix route par route et le bouton Test. Tant que ce réglage n'a
+jamais été activé, c'est l'export configuré au démarrage qui tourne ; dès qu'il
+l'est, il prend le relais, et le désactiver ensuite arrête l'export jusqu'au
+prochain démarrage. Voir [Traces](/docs/operations/tracing).
 
-## Sondes
+## Health checks
 
-Les deux plans répondent aux deux sondes.
+Les deux plans répondent aux deux health checks.
 
 | Chemin | Réponse |
 |---|---|
-| `/healthz` | vivacité - UP inconditionnellement, parce que la vivacité décide s'il faut tuer le processus |
-| `/readyz` | disponibilité - 503 avec le motif quand le stockage ne répond pas, ou quand la table de routage n'est pas encore compilée |
+| `/healthz` | vivacité (liveness) - UP sans condition, car ce health check décide s'il faut tuer le processus |
+| `/readyz` | disponibilité (readiness) - 503 accompagné d'un motif quand le stockage ne répond pas, ou quand la table de routage n'est pas encore compilée |
 
 > [!WARNING]
-> Faites pointer votre répartiteur sur `/readyz`, jamais sur `/healthz`. Une
-> sonde de vivacité qui échouerait parce que la base est injoignable
-> transformerait un hoquet de base de données en redémarrage simultané de tous
-> les noeuds.
+> Faites pointer votre load balancer sur `/readyz`, jamais sur
+> `/healthz`. Une liveness probe qui échouerait dès que la base est
+> injoignable transformerait un simple incident de base de données en
+> redémarrage de tous les nœuds à la fois.
 
 ## Signaux
 
 - `SIGHUP` recharge les routes.
-- `SIGINT` et `SIGTERM` arrêtent la gateway, avec un drainage de dix secondes au plus.
+- `SIGINT` et `SIGTERM` arrêtent la gateway, en laissant jusqu'à dix secondes aux requêtes en cours pour se terminer.

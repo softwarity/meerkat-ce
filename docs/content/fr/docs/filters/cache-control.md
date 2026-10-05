@@ -2,14 +2,14 @@
 title: cache-control
 section: Filtres
 order: 64
-summary: Pose le Cache-Control de la réponse.
+summary: Fixe l'en-tête Cache-Control de la réponse.
 ---
 
 # cache-control
 
-Décide ce qui peut être mis en cache, pour un service qui n'en dit rien. C'est le
-filtre qui garde une page personnelle hors d'un cache partagé, et celui qui
-autorise à garder un catalogue public pendant une heure.
+Décide de ce qui peut être mis en cache, pour un service qui n'en dit rien. C'est
+le filtre qui tient une page personnelle à l'écart d'un cache partagé, et celui
+qui autorise à conserver un catalogue public pendant une heure.
 
 ## Paramètres
 
@@ -28,9 +28,10 @@ filters:
 
 ## Notes
 
-`no-store` pour des données personnelles, `public, max-age=3600` pour du contenu
-partagé.
+`no-store` pour les données personnelles, `public, max-age=3600` pour les contenus
+partagés.
 
-`Expires` et `Pragma` sont retirés au passage : ils pourraient dire le contraire,
-et c'est le plus ancien qui gagne dans certains caches. Dire deux fois la même
-chose, c'est ainsi qu'une page finit en cache alors qu'elle ne devait pas.
+`Expires` et `Pragma` sont supprimés par la même occasion : ils pourraient dire le
+contraire, et certains caches donnent raison à l'en-tête le plus ancien. Dire deux
+fois la même chose, c'est ainsi qu'une page finit dans un cache où elle n'aurait
+jamais dû entrer.

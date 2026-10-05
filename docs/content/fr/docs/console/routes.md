@@ -2,104 +2,109 @@
 title: Routes
 section: La console
 order: 152
-summary: La table de routage dans l'ordre où elle est lue, et le fonctionnement de l'éditeur de route.
+summary: La table de routage, dans l'ordre où elle est lue, et le fonctionnement de l'éditeur de route.
 ---
 
 # Routes
 
-**Infra > Routes.** Toute la table de routage, dans l'ordre où la passerelle la
-lit, et l'éditeur dans lequel chaque route s'ouvre. C'est l'écran sur lequel on
-passe le plus de temps.
+**Infra > Routes.** Toute la table de routage, dans l'ordre où la gateway la
+lit, et l'éditeur dans lequel s'ouvre chaque route. C'est l'écran sur lequel vous
+passerez le plus de temps.
 
-![L'écran Routes : cinq routes dans l'ordre, avec leurs pastilles d'accès, ce qu'elles filtrent et leur amont](img/console/routes-list.webp)
+![L'écran Routes : cinq routes dans l'ordre, avec leurs badges d'accès, ce qu'elles reconnaissent et leur upstream](img/console/routes-list.webp)
 
-Cinq routes dans l'ordre où elles sont lues. *Billing*, *Docs portal* et
+Cinq routes, dans l'ordre où elles sont lues. *Billing*, *Docs portal* et
 *Inventory* portent la marque UI, *Billing* et *Orders API* exigent une session
-(`AUTH`), *Inventory* répond elle-même en maintenance, et *Catch-all* sur
-`path: /**` est en dernier - un attrape-tout ailleurs répondrait pour tout ce
-qui est en dessous.
+(`AUTH`), *Inventory* répond d'elle-même, en maintenance, et *Catch-all*, sur
+`path: /**`, vient en dernier : placée ailleurs, une route attrape-tout
+répondrait à la place de toutes celles qui la suivent.
 
 ## La liste
 
-Une ligne par route : son nom, ce qu'elle décide de l'accès, et une colonne
-**Matching and target** sur deux lignes : ce qu'elle matche, puis où elle
-envoie. L'ordre compte - **la première route qui matche gagne** - donc le
-tableau est ordonné, pas trié.
+Une ligne par route : son nom, ce qu'elle décide en matière d'accès, et une
+colonne **Matching and target** sur deux lignes, avec ce que la route reconnaît,
+puis l'endroit où elle envoie la requête. L'ordre a un sens - **la première route
+qui correspond l'emporte** - et le tableau est donc ordonné, pas trié.
 
-- **La poignée de glissement** déplace une route vers le haut ou le bas et
-  enregistre aussitôt. Elle ne marche que sur la liste entière : avec une recherche
-  ou un filtre actif, elle se tait et dit pourquoi, car faire passer la ligne trois
-  au-dessus de la ligne une d'une vue filtrée la placerait au-dessus de ce qui est
-  réellement premier.
-- **Le coeur** devant le nom dit si la cible de la route est là : vert quand elle
-  répond, brisé et rouge quand elle ne répond pas, avec la raison dans l'infobulle.
-  Pas de coeur tant que rien n'est connu, pour une route qui répond elle-même, ou
-  pour une route désactivée. Une deuxième marque apparaît pour une **route UI**
-  (celle qui sert des pages dans un navigateur).
-- **Les pastilles d'accès** disent ce que Meerkat exige lui-même : `AUTH` connecté,
-  `ORG` dans une organisation, `ORG-2` dans l'une de deux organisations nommées,
-  `DENY` personne, un tiret pour délégué. Une pastille comptant les endpoints
-  apparaît quand la route affine l'accès par opération, et son clic ouvre
+- **La poignée de déplacement** monte ou descend une route, et le changement est
+  enregistré aussitôt. Elle ne fonctionne que sur la liste complète : dès qu'une
+  recherche ou un filtre par type est actif, la poignée se désactive et explique
+  pourquoi. Dans une vue filtrée, faire passer la troisième ligne au-dessus de la
+  première la placerait en réalité au-dessus de la route qui occupe vraiment la
+  première place.
+- **Le cœur** placé devant le nom indique si la cible de la route est joignable :
+  vert quand elle l'est, brisé et rouge quand elle ne l'est pas, avec la raison
+  dans l'infobulle. Il n'y a pas de cœur tant que rien n'est connu, ni pour une
+  route qui répond d'elle-même, ni pour une route désactivée. Une seconde marque
+  signale une **route UI** (une route qui sert des pages dans un navigateur).
+- **Les badges d'accès** indiquent ce que Meerkat exige lui-même : `AUTH` pour un
+  utilisateur connecté, `ORG` pour un membre d'une organisation, `ORG-2` pour un
+  membre de l'une des deux organisations désignées, `DENY` pour personne, un tiret
+  quand l'accès est délégué. Un badge qui compte des endpoints apparaît lorsque la
+  route affine l'accès opération par opération ; un clic dessus ouvre
   [Endpoint security](/docs/console/endpoints).
 - **Les actions de ligne** : ouvrir la route dans le plan de données (routes UI
-  seulement), activer ou désactiver, dupliquer, supprimer.
-- **La recherche** matche le nom de la route, son amont et ses motifs de chemin -
-  c'est-à-dire ce dont on se souvient d'elle. Le sélecteur à côté restreint aux
-  routes UI ou aux routes de service.
+  uniquement), l'activer ou la désactiver, la dupliquer, la supprimer.
+- **La recherche** porte sur le nom de la route, son upstream et ses motifs de
+  chemin, c'est-à-dire ce dont vous vous souvenez en général. Le sélecteur voisin
+  restreint la liste aux routes UI ou aux routes de service.
 
-**Dupliquer** fabrique une copie à l'identité neuve, **désactivée**, posée juste
-après l'originale. C'est la façon prévue d'essayer une variante : un autre amont,
-l'accès d'une autre organisation, comparés côte à côte sans tout retaper.
+**Dupliquer** crée une copie dotée d'une nouvelle identité, **désactivée**, et
+placée juste après l'originale. C'est la manière prévue d'essayer une variante :
+un autre upstream, l'accès d'une autre organisation, à comparer côte à côte sans
+rien ressaisir.
 
-### La cible répond-elle ?
+### La cible est-elle joignable ?
 
-Le cœur le dit pour chaque route qui envoie vers un service.
+Le cœur répond à cette question pour chaque route qui envoie vers un service.
 
 | Cœur | Quand |
 |---|---|
-| vert | le service est trouvé dans le cluster avec au moins un réplica prêt, ou une cible externe accepte une connexion |
-| brisé, rouge | aucun réplica prêt, la cible refuse ou ne se résout pas, ou le disjoncteur est ouvert |
-| aucun | rien de connu encore, une route qui répond elle-même, ou une route désactivée |
+| vert | le service est trouvé dans le cluster avec au moins une réplique prête, ou une cible externe accepte la connexion |
+| brisé, rouge | aucune réplique n'est prête, la cible refuse la connexion ou son nom ne se résout pas, ou le disjoncteur est ouvert |
+| aucun | rien n'est encore connu, la route répond d'elle-même, ou elle est désactivée |
 
-La passerelle vérifie toutes les 30 secondes, en arrière-plan : elle lit le
-nombre de réplicas que Docker ou Swarm déclare, et ouvre une simple connexion
-TCP vers le reste. Aucune requête HTTP n'est envoyée : l'upstream ne voit ni
-appel, ni connexion, ni ligne dans ses journaux. Chaque nœud vérifie depuis là
-où il est. Quand un cœur change, la liste suit sans rechargement.
+La gateway vérifie toutes les 30 secondes, en arrière-plan : elle lit le
+nombre de répliques que déclare Docker ou Swarm, et ouvre une simple connexion
+TCP vers tout le reste (un service Kubernetes, un hôte externe). Aucune requête
+HTTP n'est envoyée : l'upstream ne voit donc ni appel, ni authentification, ni ligne
+dans ses journaux. Chaque nœud vérifie depuis l'endroit où il se trouve. Quand un
+cœur change d'état, la liste se met à jour sans rechargement.
 
-## Trois boutons dans la bannière
+## Trois boutons dans le bandeau
 
-- **Routing test** compose une requête fictive et dit quelle route la prend. A
-  utiliser avant de déplacer quoi que ce soit : il répond à la seule question dont
-  l'ordre est le sujet.
-- **Global** porte ce qui est vrai de toutes les routes à la fois : l'interrupteur
-  **Unavailable** qui les ferme toutes (les pages de connexion continuent, et
-  quiconque administre ou développe ici passe encore), combien de temps une route
-  attend un service avant de répondre 502, et le plafond de ce qu'un filtre de
-  réécriture de corps peut tenir en mémoire. Le bouton lui-même passe à
-  *Unavailable* tant que l'interrupteur est actif, pour que personne n'ait à
-  l'ouvrir pour le savoir.
-- **JWT** porte les clés qui signent le JWT d'identité que vos services vérifient :
-  le JWKS à donner à un backend, la moitié publique de chaque algorithme, la
-  rotation, et quelles routes signent avec quoi.
-  Un service pointé sur le JWKS n'a besoin de rien d'autre : le `kid` du jeton
-  désigne la clé, et la clé porte son algorithme, qui se choisit donc une seule
-  fois, dans Auth forward. Le service le prend sur la clé, jamais dans
+- **Routing test** compose une requête fictive et vous dit quelle route la prend.
+  Servez-vous-en avant de déplacer quoi que ce soit : c'est la réponse à la seule
+  question que pose l'ordre.
+- **Global** rassemble ce qui vaut pour toutes les routes à la fois :
+  l'interrupteur **Unavailable**, qui les ferme toutes (les pages de connexion
+  restent en service, et quiconque administre ou développe ici continue de
+  passer), le temps qu'une route attend un service avant de répondre 502, et le
+  plafond de ce qu'un filtre de réécriture du corps peut garder en mémoire. Tant
+  que l'interrupteur est actif, le bouton lui-même vire à l'ambre et affiche
+  *Unavailable* : personne n'a besoin de l'ouvrir pour le savoir.
+- **JWT** rassemble les clés qui signent le JWT d'identité que vérifient vos
+  services : le JWKS à fournir à un backend, la partie publique de chaque
+  algorithme, la rotation, et quelles routes signent avec quelle clé.
+  Un service qui pointe sur le JWKS n'a besoin de rien d'autre : le `kid` du jeton
+  désigne la clé, et la clé porte son algorithme. L'algorithme se choisit donc une
+  seule fois, dans Auth forward. Le service le lit sur la clé, jamais dans
   l'en-tête du jeton.
 
 ## L'éditeur
 
-Cliquer une ligne ouvre la route dans le tiroir de droite. Le tiroir est dans
-l'URL - `/infra/routes/:id/:section` - donc une section se met en marque-page et un
-rafraîchissement y revient.
+Un clic sur une ligne ouvre la route dans le tiroir de droite. Le tiroir figure
+dans l'URL - `/infra/routes/:id/:section` - si bien qu'une section peut être mise
+en favori et qu'un rechargement y ramène.
 
 ![L'éditeur de route ouvert sur Target, avec la liste des sections à gauche](img/console/route-editor-target.webp)
 
-L'éditeur sur *Orders API* : la liste des sections à gauche avec ses étoiles et
-ses compteurs, et le panneau Target à droite - mode, amont, les deux attentes, le
-disjoncteur et le contrat d'API.
+L'éditeur sur *Orders API* : à gauche, la liste des sections avec ses étoiles et
+ses compteurs ; à droite, le panneau Target, avec le mode, l'upstream, les deux
+timeouts, le disjoncteur et le contrat d'API.
 
-Le nom est dans l'en-tête. La colonne de gauche liste les sections, groupées :
+Le nom se trouve dans l'en-tête. La colonne de gauche liste les sections,
+regroupées ainsi :
 
 | Groupe | Sections |
 |---|---|
@@ -108,107 +113,113 @@ Le nom est dans l'en-tête. La colonne de gauche liste les sections, groupées :
 | Modifiers | Incoming, Outgoing, Auth forward |
 | UI | Locales, Color scheme, User button, User info, Custom |
 
-**Identity** est ce que la route sait de l'appelant. Deux sections le
-dépensent : **Auth forward** l'envoie au service, **User info** le dépose sur la
-page. **OpenTelemetry** décide si la route est tracée (voir
+**Identity** contient ce que la route sait de l'appelant. Deux sections
+l'exploitent : **Auth forward** le transmet au service, **User info** l'affiche
+sur la page. **OpenTelemetry** décide si la route est tracée (voir
 [les traces](/docs/operations/tracing#choisir-les-routes-traces)).
 
 ### Lire les marques
 
-- **Une étoile** marque une section toujours obligatoire : Target et Predicates.
-  C'est un fait sur les routes, donc elle ne disparaît jamais.
-- **Le rouge** marque une section à laquelle il manque quelque chose maintenant. Il
-  s'en va quand le manque est comblé.
-- **Un nombre entre parenthèses** dit combien d'éléments la section porte (trois
-  prédicats, deux gates).
-- **La section Security** porte le niveau qu'elle pose (`AUTH`, `ORG`, `DENY`, ou un
-  point quand rien n'est posé mais que des utilisateurs sont exceptés) : une route
-  ouverte et une route fermée ne se lisent pas pareil dans la liste.
+- **Une étoile** signale une section toujours obligatoire : Target et Predicates.
+  C'est une propriété des routes, et elle ne disparaît donc jamais.
+- **Le rouge** signale une section où il manque quelque chose en ce moment. Il
+  disparaît une fois le manque comblé.
+- **Un nombre entre parenthèses** donne le nombre d'éléments que contient la
+  section (trois prédicats, deux gates).
+- **La section Security** affiche le niveau qu'elle impose (`AUTH`, `ORG`, `DENY`,
+  ou un point quand elle n'impose rien mais que des utilisateurs font exception) :
+  une route ouverte et une route fermée ne se présentent ainsi pas de la même
+  façon dans la liste.
 
 ### Ce qui manque, et Save
 
-Save reste désactivé jusqu'à ce que la route soit valide **et** que quelque chose
-ait changé. A côté, un bouton rouge **N to fix** liste chaque manque : chaque ligne
-nomme la section et y saute. Personne ne fouille quatorze sections à la recherche du
-champ voulu.
+Save ne s'active que lorsque la route est valide **et** que quelque chose a
+changé. À côté, un bouton rouge **N to fix** dresse la liste des manques : chaque
+ligne nomme la section concernée et vous y conduit. Inutile de parcourir quinze
+sections à la recherche du champ à compléter.
 
-Enregistrer garde le tiroir ouvert et applique la route aussitôt. Fermer avec des
-modifications non enregistrées demande d'abord, et tant qu'il y en a, un clic à
-l'extérieur ne ferme pas le tiroir.
+L'enregistrement laisse le tiroir ouvert et applique la route aussitôt. Si vous
+fermez le tiroir avec des modifications non enregistrées, une confirmation vous
+est demandée ; tant qu'il en reste, un clic en dehors du tiroir ne le ferme pas.
 
-### Les sections qui se taisent
+### Les sections qui se désactivent
 
-- Les sections **UI** restent visibles mais désactivées jusqu'à ce que la case UI de
-  leur groupe soit cochée. Une route est toujours un service ; l'UI vient par-dessus.
-![La section Color scheme d'une route UI, avec son mécanisme, son nom de balise et la surcharge du thème stocké](img/console/route-editor-color-scheme.webp)
+- Les sections **UI** restent visibles mais désactivées tant que la case UI de
+  leur groupe n'est pas cochée. Une route est toujours un service ; l'UI vient
+  s'y ajouter.
 
-Une section UI une fois la case cochée : ici Color scheme, qui dit comment
-l'application servie prend un choix clair ou sombre.
+![La section Color scheme d'une route UI, avec son mécanisme, son nom de balise et le remplacement du thème mémorisé](img/console/route-editor-color-scheme.webp)
 
-- **Incoming**, **Identity** et **Auth forward** sont désactivées quand la route répond d'elle-même
-  (redirect, maintenance, respond). Ce n'est pas du rangement : la passerelle jette
-  tous les filtres de requête sur une telle route, donc les éditer écrirait des
-  réglages qu'elle jette.
+Une section UI une fois la case cochée : ici Color scheme, qui indique comment
+l'application servie reçoit le choix d'un thème clair ou sombre.
+
+- **Incoming**, **Identity** et **Auth forward** sont désactivées quand la route
+  répond d'elle-même (redirect, maintenance, respond). Ce n'est pas une question
+  de présentation : sur une telle route, la gateway écarte tous les filtres de
+  requête, et les modifier reviendrait à écrire des réglages qu'elle ignore.
 
 ## La section Target
 
-Le mode décide de tout le reste du panneau.
+Le mode détermine tout le reste du panneau.
 
 | Mode | Ce que fait la route |
 |---|---|
-| **Proxy** | Va chercher chez un service et rend ce qu'il dit |
+| **Proxy** | Interroge un service et renvoie sa réponse |
 | **Redirect** | Envoie le navigateur ailleurs |
 | **Maintenance** | Sert la page d'indisponibilité intégrée |
-| **Respond** | Construit une réponse depuis un gabarit, sans rien appeler |
+| **Respond** | Construit une réponse à partir d'un gabarit, sans rien appeler |
 
-Sur une route proxy, on règle aussi :
+Sur une route en mode proxy, vous réglez aussi :
 
-- **Upstream** - le schéma se choisit, il ne se tape pas : `http` d'abord, parce que
-  dans un cluster TLS s'arrête à la passerelle, `https` pour un tiers, `h2c` pour un
-  service gRPC. Les services découverts par la passerelle sont proposés dans le
-  champ.
-- **When the service is slow or down** - les délais de connexion et de première
-  réponse, qui héritent des valeurs Global sauf réglage ici. Passé l'un des deux,
-  l'appelant reçoit un 502. Ce qui suit la première ligne n'est jamais borné : un
-  téléchargement ou un websocket dure ce qu'il faut.
-- **Stop calling this service when it stops answering** - le disjoncteur : après N
-  échecs d'affilée, les appelants reçoivent tout de suite la page d'indisponibilité,
-  et après le délai le service est rencontré par une seule requête plutôt que par
-  tout ce qui s'est accumulé. Un 500 ne compte pas.
-- **The API contract** - pas de spec, une spec publiée par le service (une URL
-  relative à l'amont), ou une spec déposée ici en fichier. Une spec est ce qui
-  débloque les [écrans d'endpoints](/docs/console/endpoints) et le swagger
-  développeur.
+- **Upstream** - le schéma se choisit, il ne se saisit jamais : `http` en
+  premier, parce qu'à l'intérieur d'un cluster TLS se termine à la gateway,
+  `https` pour un tiers, `h2c` pour un service gRPC. Le champ propose les services
+  que la gateway a découverts.
+- **When the service is slow or down** - les timeouts de connexion et de première
+  réponse, qui reprennent les valeurs de Global tant qu'ils ne sont pas réglés
+  ici. Passé l'un ou l'autre, l'appelant reçoit une réponse 502. Ce qui suit la
+  première ligne n'est jamais borné : un téléchargement ou un websocket dure
+  aussi longtemps que nécessaire.
+- **Stop calling this service when it stops answering** - le disjoncteur : après
+  N échecs consécutifs, les appelants reçoivent immédiatement la page
+  d'indisponibilité ; une fois le délai écoulé, le service reçoit une seule
+  requête d'essai, et non tout ce qui s'était accumulé. Une réponse 500 n'entre
+  pas dans le décompte.
+- **The API contract** - aucune spécification, une spécification publiée par le
+  service (une URL relative à l'upstream), ou une spécification déposée ici sous
+  forme de fichier. C'est elle qui donne accès aux
+  [écrans des endpoints](/docs/console/endpoints) et au swagger développeur.
 
-![La section Predicates : un prédicat de chemin, un prédicat de méthode et un prédicat d'en-tête à deux valeurs acceptées](img/console/route-editor-predicates.webp)
+![La section Predicates : un prédicat de chemin, un prédicat de méthode et un prédicat d'en-tête qui accepte deux valeurs](img/console/route-editor-predicates.webp)
 
-Les briques s'empilent dans le panneau, chacune avec son explication et son bouton
-de retrait. Ici : deux motifs de chemin, quatre méthodes, et un en-tête qui
-accepte une courte liste de valeurs.
+Les briques s'empilent dans un panneau, chacune avec sa propre explication et son
+propre bouton de suppression. Ici : deux motifs de chemin, quatre méthodes, et un
+en-tête qui accepte une courte liste de valeurs.
 
 ## Prédicats, gates, filtres
 
-Les sections qui portent des briques sont le vocabulaire du routage, et elles ont
-leur propre référence :
+Les sections qui contiennent des briques forment le vocabulaire du routage, et
+elles ont leur propre référence :
 
-- **[Prédicats](/docs/predicates/overview)** - les façons dont une route décide qu'une requête est pour elle.
+- **[Prédicats](/docs/predicates/overview)** - les façons dont une route décide qu'une requête lui est destinée.
 - **[Filtres](/docs/filters/overview)** - les façons dont elle la transforme, et les gates qui la refusent.
 
-![La section Incoming : un filtre strip-prefix et deux filtres set-request-header, dont un qui lit une entrée du coffre, chacun avec ses flèches pour le déplacer](img/console/route-editor-filters.webp)
+![La section Incoming : un filtre strip-prefix et deux filtres set-request-header, dont l'un lit une entrée du coffre, chacun avec des flèches pour le réordonner](img/console/route-editor-filters.webp)
 
-Les filtres s'appliquent dans l'ordre où ils sont listés, et les flèches de
-chaque carte le déplacent vers le haut ou le bas.
+Les filtres s'appliquent dans l'ordre de la liste, et les flèches de chaque carte
+la font monter ou descendre.
 
 ## Erreurs fréquentes
 
-- **Réordonner avec une recherche active.** La poignée refuse et le dit ; effacez la
-  recherche d'abord.
-- **Attendre qu'une route neuve soit joignable.** Une duplication naît désactivée,
-  volontairement.
-- **Deux routes qui matchent les mêmes chemins.** Parfaitement légal, et la raison
-  d'être de l'ordre. Utilisez Routing test plutôt que de raisonner dessus.
-- **Editer Incoming, Identity ou Auth forward sur une redirection.** Les sections sont
-  désactivées ; ce que vous cherchez est probablement Outgoing, qui s'applique à
-  tous les modes.
-- **Chercher des règles par endpoint sans spec.** Déclarez d'abord la spec OpenAPI
-  dans la section Target de la route.
+- **Réordonner alors qu'une recherche est active.** La poignée refuse et le dit ;
+  effacez d'abord la recherche.
+- **S'attendre à ce qu'une nouvelle route soit joignable.** Une copie est créée
+  désactivée, et c'est voulu.
+- **Deux routes qui reconnaissent les mêmes chemins.** C'est parfaitement permis,
+  et c'est la raison d'être de l'ordre. Utilisez Routing test plutôt que de
+  raisonner de tête.
+- **Modifier Incoming, Identity ou Auth forward sur une redirection.** Ces
+  sections sont désactivées ; ce que vous cherchez est probablement Outgoing, qui
+  s'applique à tous les modes.
+- **Chercher des règles par endpoint sans spécification.** Déclarez d'abord la
+  spécification OpenAPI dans la section Target de la route.

@@ -33,7 +33,6 @@ plug -p <gateway-host> -s user-mng-service:8080:3000 npm run start
 - **It lives as long as the session**: the substitution vanishes when the process
   stops, and a gateway restart takes both ends with it.
 
-
 Installing it, per system, and opening the tunnel: [Plug](/docs/operations/plug).
 
 ## Taking an access back
@@ -98,5 +97,5 @@ administration API - the one the console, the CLI and the
 The **scope** of a substitution: today it holds for all traffic, and nothing
 yet limits it to the people who asked for it. On the operations side, what is
 missing is the console screen listing the live sessions, and the audit entry
-for every substitution posed. A key deposited is already a line of the
+for every substitution made. A key deposited is already a line of the
 [audit trail](/docs/operations/audit) (`devkey.add`, with its fingerprint).

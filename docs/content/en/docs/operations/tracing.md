@@ -169,8 +169,8 @@ journey. It stays counted in the metrics and written in the access log.
 
 **Include this route in OpenTelemetry** (on by default): the gateway records its
 own spans for what that route answers, and the route has its own series among
-the metrics pushed to the collector. Off, the route produces **nothing at all**
-- no crossing, no call out, no injected bundle, no series of its own - though it
+the metrics pushed to the collector. Off, the route produces **nothing at all** -
+no crossing, no call out, no injected bundle, no series of its own - though it
 still counts in the gateway's totals (`meerkat.gateway.requests`), and the
 context the caller sent travels on untouched, without the gateway naming itself
 as its parent.

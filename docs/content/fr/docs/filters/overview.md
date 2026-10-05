@@ -2,17 +2,17 @@
 title: Filtres
 section: Filtres
 order: 60
-summary: Ce qu'est un filtre, les quatre phases dans lesquelles il peut tourner, et les trente-trois du catalogue.
+summary: Ce qu'est un filtre, les quatre phases où il peut s'exécuter, et les trente-trois filtres du catalogue.
 ---
 
 # Filtres
 
-Un **filtre** est une brique qu'une route pose sur le trafic qu'elle a accepté. Là
-où un [prédicat](/docs/predicates/overview) décide si une requête est pour cette
-route, un filtre décide ce qu'il lui arrive : la refuser, la modifier à l'aller,
-modifier la réponse au retour, ou y répondre lui-même.
+Un **filtre** est une brique qu'une route applique au trafic qu'elle a accepté. Là
+où un [prédicat](/docs/predicates/overview) décide si une requête concerne cette
+route, un filtre décide de ce qu'elle devient : la refuser, la modifier à l'aller,
+modifier la réponse au retour, ou y répondre directement.
 
-Ils s'écrivent tous de la même façon, un `type` et ses `args` :
+Tous s'écrivent de la même façon, un `type` et ses `args` :
 
 ```yaml
 filters:
@@ -29,99 +29,99 @@ filters:
 ```
 
 Un argument inconnu, un argument obligatoire manquant ou une valeur du mauvais
-type est refusé à l'enregistrement de la route, en nommant ce qui est permis.
+type sont refusés à l'enregistrement de la route, et le message indique ce qui est
+autorisé.
 
 ## Les quatre phases
 
-La phase d'un filtre n'est pas un choix : elle vient avec le type, et elle dit
-**quand** la brique tourne.
+La phase d'un filtre ne se choisit pas : elle découle de son type, et elle dit
+**quand** la brique s'exécute.
 
 | Phase | Ce qu'elle fait |
 | --- | --- |
-| **gate** | Accepte ou refuse, avant que quoi que ce soit ne soit transformé. Elle répond elle-même à l'appelant. |
+| **gate** | Accepte ou refuse, avant toute transformation. Elle répond elle-même à l'appelant. |
 | **request** | Modifie la requête sur le chemin du service. |
-| **response** | Modifie la réponse sur le chemin du retour. |
-| **terminal** | La route répond elle-même, et rien n'est proxifié. |
+| **response** | Modifie la réponse sur le chemin du retour vers l'appelant. |
+| **terminal** | La route répond elle-même, et rien n'est transmis à l'upstream. |
 
 Pour une requête, dans l'ordre :
 
-1. les **gates**, dans l'ordre où elles sont écrites. Celle qui refuse répond sur le champ, avec un statut sur lequel l'appelant peut agir, et rien d'autre ne tourne.
-2. les filtres **request**, dans l'ordre où ils sont écrits. Puis l'amont est appelé : le chemin de base de l'amont est ajouté après que les filtres ont eu leur mot à dire, et le transfert d'identité passe en dernier, donc il gagne sur les en-têtes qu'il écrit lui-même.
-3. les filtres **response**, dans l'ordre où ils sont écrits, au retour.
+1. les **gates**, dans l'ordre où elles sont écrites. Celle qui refuse répond sur-le-champ, avec un statut dont l'appelant peut tirer quelque chose, et plus rien ne s'exécute.
+2. les filtres de **requête**, dans l'ordre où ils sont écrits. L'upstream est ensuite appelé : son propre chemin de base est ajouté une fois que les filtres ont fait leur travail, et le transfert d'identité passe en dernier, si bien qu'il a le dernier mot sur les en-têtes qu'il écrit lui-même.
+3. les filtres de **réponse**, dans l'ordre où ils sont écrits, sur le chemin du retour.
 
-Une gate n'est pas un prédicat. Un prédicat qui ne matche pas laisse essayer la
-**route suivante** ; une gate qui refuse arrête la requête là. Trop gros ne veut
-pas dire 'pas pour cette route', ça veut dire non.
+Une gate n'est pas un prédicat. Un prédicat qui ne correspond pas laisse sa chance
+à la **route suivante** ; une gate qui refuse arrête la requête sur place. "Trop
+volumineux" ne veut pas dire "pas pour cette route" : cela veut dire non.
 
 ## Ce que veut dire terminal
 
-Un filtre terminal répond à la place de la route, donc l'amont n'est jamais
-appelé : [redirect](/docs/filters/redirect),
-[respond](/docs/filters/respond) et
-[maintenance](/docs/filters/maintenance) sont les trois.
+Un filtre terminal répond lui-même pour la route, et l'upstream n'est donc jamais
+appelé. Ils sont trois : [redirect](/docs/filters/redirect),
+[respond](/docs/filters/respond) et [maintenance](/docs/filters/maintenance).
 
-- **Un seul par route.** Un deuxième filtre terminal sur la même route est refusé.
-- **Les filtres request sont abandonnés** et la gateway journalise combien : il n'y a plus de requête proxifiée à modifier.
-- **Les filtres response s'appliquent toujours.** Ce qu'un terminal répond est une réponse comme une autre, et un `Cache-Control` ou un en-tête de sécurité dessus est aussi légitime que sur une réponse proxifiée.
-- **Les gates s'appliquent toujours.** Une route qui répond elle-même a autant de raisons de refuser un corps trop gros qu'une route qui proxifie.
+- **Un seul par route.** Un second filtre terminal sur la même route est refusé.
+- **Les filtres de requête sont ignorés**, et la gateway journalise leur nombre : il n'y a plus de requête transmise à modifier.
+- **Les filtres de réponse s'appliquent toujours.** Ce que renvoie un filtre terminal est une réponse comme une autre, et un `Cache-Control` ou un en-tête de sécurité y est aussi légitime que sur une réponse venue de l'upstream.
+- **Les gates s'appliquent toujours.** Une route qui répond elle-même a autant de raisons de refuser un corps trop volumineux qu'une route qui transmet à un upstream.
 
 > [!TIP]
-> N'importe quel argument peut porter une référence au coffre-fort, écrite `$nom`,
-> résolue au chargement de la route - c'est ainsi qu'un secret partagé reste hors
-> de la configuration exportée. Deux arguments sont pris au mot et jamais
-> interprétés : le gabarit de [respond](/docs/filters/respond) et le motif de
-> [version](/docs/predicates/version), parce que tous les deux écrivent un `$`
-> qui leur appartient.
+> Tout argument peut contenir une référence au coffre, écrite `$name` et résolue
+> au chargement de la route - c'est ainsi qu'un secret partagé reste hors de la
+> configuration exportée. Deux arguments sont pris tels quels et ne sont jamais
+> développés : le gabarit de [respond](/docs/filters/respond) et le motif de
+> [version](/docs/predicates/version), parce que tous deux écrivent leurs propres
+> `$`.
 
 ## Les gates
 
-| Type | Ce qu'il fait |
+| Type | Ce que ça fait |
 | --- | --- |
-| [max-request-body](/docs/filters/max-request-body) | Refuse un corps de requête plus gros que cette taille, avec un `413`. |
-| [max-request-headers](/docs/filters/max-request-headers) | Refuse une requête dont les en-têtes pèsent plus que cette taille, avec un `431`. |
+| [max-request-body](/docs/filters/max-request-body) | Refuse, avec un `413`, une requête dont le corps dépasse cette taille. |
+| [max-request-headers](/docs/filters/max-request-headers) | Refuse, avec un `431`, une requête dont les en-têtes pèsent plus que cette taille. |
 
 ## Les filtres de requête
 
-| Type | Ce qu'il fait |
+| Type | Ce que ça fait |
 | --- | --- |
 | [add-query-param](/docs/filters/add-query-param) | Ajoute un paramètre de requête. |
-| [add-request-header](/docs/filters/add-request-header) | Ajoute une valeur d'en-tête de requête, éventuellement seulement si l'appelant n'en a envoyé aucune. |
-| [copy-request-header](/docs/filters/copy-request-header) | Copie un en-tête de requête sous un second nom, en laissant l'original en place. |
-| [prefix-path](/docs/filters/prefix-path) | Préfixe le chemin avant de proxifier. |
-| [preserve-host](/docs/filters/preserve-host) | Envoie à l'amont l'hôte de l'appelant plutôt que celui de l'amont. |
-| [remove-query-param](/docs/filters/remove-query-param) | Retire un paramètre de la requête proxifiée. |
+| [add-request-header](/docs/filters/add-request-header) | Ajoute une valeur à un en-tête de requête, au besoin seulement si l'appelant n'en a envoyé aucune. |
+| [copy-request-header](/docs/filters/copy-request-header) | Copie un en-tête de requête sous un second nom, sans toucher à l'original. |
+| [prefix-path](/docs/filters/prefix-path) | Ajoute un préfixe au début du chemin avant l'envoi à l'upstream. |
+| [preserve-host](/docs/filters/preserve-host) | Envoie à l'upstream le Host de l'appelant, et non celui de l'upstream. |
+| [remove-query-param](/docs/filters/remove-query-param) | Retire un paramètre de la requête envoyée à l'upstream. |
 | [remove-request-cookie](/docs/filters/remove-request-cookie) | Retire un cookie de la requête. |
-| [remove-request-header](/docs/filters/remove-request-header) | Retire un en-tête de requête avant de proxifier. |
-| [rename-request-header](/docs/filters/rename-request-header) | Déplace un en-tête de requête sous un autre nom, valeurs comprises. |
-| [rewrite-path](/docs/filters/rewrite-path) | Réécrit le chemin avec un remplacement par regexp. |
-| [rewrite-query-param](/docs/filters/rewrite-query-param) | Réécrit la valeur d'un paramètre avec un remplacement par regexp. |
-| [set-host](/docs/filters/set-host) | Fixe l'hôte envoyé à l'amont. |
-| [set-path](/docs/filters/set-path) | Remplace tout le chemin envoyé à l'amont. |
-| [set-query-param](/docs/filters/set-query-param) | Fixe un paramètre de requête, en remplaçant ce que l'appelant a envoyé. |
-| [set-request-header](/docs/filters/set-request-header) | Fixe un en-tête de requête, en remplaçant la valeur du client. |
-| [strip-prefix](/docs/filters/strip-prefix) | Retire les premiers segments du chemin avant de proxifier. |
+| [remove-request-header](/docs/filters/remove-request-header) | Retire un en-tête de la requête avant l'envoi à l'upstream. |
+| [rename-request-header](/docs/filters/rename-request-header) | Déplace un en-tête de requête sous un autre nom, avec toutes ses valeurs. |
+| [rewrite-path](/docs/filters/rewrite-path) | Réécrit le chemin par un remplacement à expression régulière. |
+| [rewrite-query-param](/docs/filters/rewrite-query-param) | Réécrit la valeur d'un paramètre de requête par un remplacement à expression régulière. |
+| [set-host](/docs/filters/set-host) | Fixe le Host envoyé à l'upstream. |
+| [set-path](/docs/filters/set-path) | Remplace en entier le chemin envoyé à l'upstream. |
+| [set-query-param](/docs/filters/set-query-param) | Fixe un paramètre de requête, en remplaçant toute valeur envoyée par l'appelant. |
+| [set-request-header](/docs/filters/set-request-header) | Fixe un en-tête de requête, en remplaçant toute valeur envoyée par le client. |
+| [strip-prefix](/docs/filters/strip-prefix) | Retire les premiers segments du chemin avant l'envoi à l'upstream. |
 
 ## Les filtres de réponse
 
-| Type | Ce qu'il fait |
+| Type | Ce que ça fait |
 | --- | --- |
-| [add-response-header](/docs/filters/add-response-header) | Ajoute une valeur d'en-tête de réponse. |
-| [cache-control](/docs/filters/cache-control) | Pose le `Cache-Control` de la réponse. |
-| [cookie-attributes](/docs/filters/cookie-attributes) | Force des attributs sur les cookies que pose un amont. |
-| [dedupe-response-header](/docs/filters/dedupe-response-header) | Supprime les valeurs répétées d'un en-tête de réponse. |
-| [remove-json-fields](/docs/filters/remove-json-fields) | Retire des champs d'une réponse JSON, par nom ou par chemin pointé. |
-| [remove-response-header](/docs/filters/remove-response-header) | Retire un en-tête de réponse avant qu'il n'atteigne le client. |
-| [rename-response-header](/docs/filters/rename-response-header) | Déplace un en-tête de réponse sous un autre nom, valeurs comprises. |
-| [rewrite-location](/docs/filters/rewrite-location) | Ramène le `Location` d'une redirection d'amont dans l'espace public. |
-| [rewrite-response-header](/docs/filters/rewrite-response-header) | Réécrit la valeur d'un en-tête de réponse avec un remplacement par regexp. |
-| [security-headers](/docs/filters/security-headers) | Pose les en-têtes de réponse sur lesquels un navigateur se durcit. |
-| [set-response-header](/docs/filters/set-response-header) | Fixe un en-tête de réponse, en remplaçant la valeur de l'amont. |
-| [set-status](/docs/filters/set-status) | Remplace le code de statut de la réponse de l'amont. |
+| [add-response-header](/docs/filters/add-response-header) | Ajoute une valeur à un en-tête de réponse. |
+| [cache-control](/docs/filters/cache-control) | Fixe l'en-tête `Cache-Control` de la réponse. |
+| [cookie-attributes](/docs/filters/cookie-attributes) | Impose des attributs aux cookies écrits par un upstream. |
+| [dedupe-response-header](/docs/filters/dedupe-response-header) | Supprime les valeurs en double d'un en-tête de réponse. |
+| [remove-json-fields](/docs/filters/remove-json-fields) | Retire des champs d'une réponse JSON, par leur nom ou par un chemin à points. |
+| [remove-response-header](/docs/filters/remove-response-header) | Retire un en-tête de la réponse avant qu'elle n'atteigne le client. |
+| [rename-response-header](/docs/filters/rename-response-header) | Déplace un en-tête de réponse sous un autre nom, avec toutes ses valeurs. |
+| [rewrite-location](/docs/filters/rewrite-location) | Ramène dans l'espace public le `Location` d'une redirection émise par l'upstream. |
+| [rewrite-response-header](/docs/filters/rewrite-response-header) | Réécrit la valeur d'un en-tête de réponse par un remplacement à expression régulière. |
+| [security-headers](/docs/filters/security-headers) | Ajoute les en-têtes de réponse sur lesquels un navigateur s'appuie pour se durcir. |
+| [set-response-header](/docs/filters/set-response-header) | Fixe un en-tête de réponse, en remplaçant toute valeur envoyée par l'upstream. |
+| [set-status](/docs/filters/set-status) | Remplace le code de statut de la réponse de l'upstream. |
 
 ## Les filtres terminaux
 
-| Type | Ce qu'il fait |
+| Type | Ce que ça fait |
 | --- | --- |
-| [maintenance](/docs/filters/maintenance) | Répond `503` avec la page d'indisponibilité de la gateway au lieu de proxifier. |
-| [redirect](/docs/filters/redirect) | Répond une redirection au lieu de proxifier. |
-| [respond](/docs/filters/respond) | Répond depuis un gabarit, avec l'appelant connecté à disposition. |
+| [maintenance](/docs/filters/maintenance) | Répond `503` avec la page d'indisponibilité de la gateway, sans rien transmettre à l'upstream. |
+| [redirect](/docs/filters/redirect) | Répond par une redirection, sans rien transmettre à l'upstream. |
+| [respond](/docs/filters/respond) | Répond à partir d'un gabarit, avec l'appelant connecté à disposition. |

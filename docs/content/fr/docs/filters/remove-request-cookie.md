@@ -7,8 +7,8 @@ summary: Retire un cookie de la requête.
 
 # remove-request-cookie
 
-Retire un cookie sur le chemin du service et conserve les autres - typiquement un
-cookie de session que l'application prendrait pour le sien.
+Retire un cookie sur le chemin du service et conserve les autres - le plus
+souvent, un cookie de session que l'application prendrait pour le sien.
 
 ## Paramètres
 
@@ -27,8 +27,8 @@ filters:
 
 ## Notes
 
-L'en-tête `Cookie` est une seule chaîne qui porte tous les cookies : ce filtre le
-reconstruit au lieu de le supprimer, car supprimer l'en-tête emporterait la
-session de l'application avec lui. C'est aussi pourquoi
+L'en-tête `Cookie` est une seule chaîne qui porte tous les cookies. Ce filtre la
+reconstruit donc au lieu de la supprimer : retirer l'en-tête entier emporterait
+aussi la session de l'application. C'est également pour cela que
 [remove-request-header](/docs/filters/remove-request-header) n'est pas le bon
-outil pour un cookie.
+outil quand il s'agit d'un seul cookie.

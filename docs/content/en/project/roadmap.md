@@ -69,7 +69,7 @@ line, what is missing from each.
 - **Tracing** - the context crosses the gateway and the traces leave for your
   collector. What is missing is the gateway declaring itself in `tracestate`
   and `baggage`, and a link from an audit line to its trace.
-- **Quotas** - they are posed per route, per endpoint and per consumer - user,
+- **Quotas** - they are set per route, per endpoint and per consumer - user,
   token, organisation, address - and going over answers 429 with the standard
   headers. What is missing is the screen that shows consumption, throttling
   rather than refusing, and counters that stay right across a cluster.
@@ -79,8 +79,8 @@ line, what is missing from each.
   then the console screen listing live sessions, and the audit of each
   substitution (a key deposited is already audited).
 - **Notifications** - the SMTP relay is shipped, with one template in the
-  theme's colours, and the daily summary of closing accesses goes out on its
-  own. What is missing is a template per event, and translated.
+  theme's colours, and the daily summary of accesses about to close goes out on
+  its own. What is missing is one template per event, each of them translated.
 - **Identity to upstreams** - the signed token is emitted, with its published
   JWKS and key rotation. What is missing is an exchange endpoint handing back
   an access and refresh pair, and the modes that carry a secret to the
@@ -110,7 +110,7 @@ line, what is missing from each.
 - **gRPC properly**: per-method security, and gRPC-Web. The counters already
   read `grpc-status`.
 - **A per-organisation portal**: each customer's own icon, title and
-  arrangement. It would be the product's first per-tenant visual override.
+  arrangement. It would be the product's first per-organisation visual override.
 - **HTTP/3**, once the gain can be measured rather than described.
 - **An external vault**: HashiCorp Vault, Kubernetes secrets and Docker
   secrets, for installations that already run one and do not want a second.

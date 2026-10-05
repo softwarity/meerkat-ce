@@ -106,16 +106,16 @@ Fighting it on the document does not work. The way to work **with** it is to spe
 
 | Field | What it is |
 |---|---|
-| Override its storage | the switch. Without it the gateway never touches the application's storage |
+| Override the application's stored theme | the switch. Without it the gateway never touches the application's storage |
 | Key | the `localStorage` key the application keeps its choice under: `theme`, `color-mode`, `vuetify:theme`... |
-| Light value | what to write for light. Defaults to `light` |
-| Dark value | what to write for dark. Defaults to `dark` |
-| Auto value | what "follow the system" is called there. **Empty removes the entry** instead |
+| Light | what to write for light. Defaults to `light` |
+| Dark | what to write for dark. Defaults to `dark` |
+| System | what "follow the system" is called there. **Empty removes the entry** instead |
 
 The values are the application's **own vocabulary** - `dark`, `night`, `1` - and the gateway does not
 guess them: guessing would be writing a dialect we do not speak.
 
-An empty auto value is a choice of its own: with nothing stored, the application falls back to its own
+An empty System value is a choice of its own: with nothing stored, the application falls back to its own
 default, which for most of them *is* the system.
 
 The write happens in an inline script placed **before** the application's boot script, so the value is
@@ -126,7 +126,7 @@ already in place when the app first reads it - and the chrome then simply inheri
 > `system`, `light` or `dark` under a key, and in `system` mode it **clears** the document's
 > `color-scheme` on every run. Anything the gateway set was wiped a tick later. Writing the choice
 > into that key instead lets the application apply it the way it already knows how, before its first
-> paint - so here the auto value is `system`, not empty.
+> paint - so here the System value is `system`, not empty.
 
 ## Debugging it
 

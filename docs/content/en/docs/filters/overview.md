@@ -7,7 +7,7 @@ summary: What a filter is, the four phases one can run in, and the thirty-three 
 
 # Filters
 
-A **filter** is a brick a route poses on the traffic it has accepted. Where a
+A **filter** is a brick a route puts on the traffic it has accepted. Where a
 [predicate](/docs/predicates/overview) decides whether a request is for this
 route, a filter decides what happens to it: refuse it, change it on the way in,
 change the answer on the way back, or answer it outright.

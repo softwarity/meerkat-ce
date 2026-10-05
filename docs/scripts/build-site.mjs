@@ -25,6 +25,27 @@
 
 import { mkdir, readFile, readdir, rm, writeFile, stat } from 'node:fs/promises';
 import { loadFacts } from './facts.mjs';
+import { createHighlighter } from 'shiki';
+
+// Code blocks are coloured HERE, at build time: the page arrives with its
+// colours in it, and the browser downloads no highlighter. Two themes of one
+// family, one per colour scheme - each token carries both colours and the
+// stylesheet picks (styles.scss, .shiki).
+const CODE_THEMES = { light: 'catppuccin-latte', dark: 'catppuccin-mocha' };
+const CODE_LANGS = ['yaml', 'bash', 'json', 'http', 'html', 'go', 'javascript', 'typescript', 'css', 'sql', 'ini', 'dockerfile'];
+const highlighter = await createHighlighter({ themes: Object.values(CODE_THEMES), langs: CODE_LANGS });
+const CODE_ALIASES = { sh: 'bash', shell: 'bash', yml: 'yaml', js: 'javascript', ts: 'typescript' };
+
+// A fence with a language the highlighter knows comes out coloured; any other
+// - no language, an output sample, a diagram drawn in text - stays plain.
+function codeBlock(lang, code) {
+  const known = CODE_ALIASES[lang] ?? lang;
+  if (!CODE_LANGS.includes(known)) {
+    const cls = lang ? ` class="language-${lang}"` : '';
+    return `<pre><code${cls}>${escapeHtml(code)}</code></pre>`;
+  }
+  return highlighter.codeToHtml(code, { lang: known, themes: CODE_THEMES, defaultColor: false });
+}
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -120,7 +141,7 @@ const slugify = (s) =>
 //
 // Folded by default, and that is the point - what a reader NEEDS is the
 // sentence above it; the file is there for the one who is about to paste it.
-const BLOCKS = new Set(['hero', 'cards', 'grid', 'gallery', 'steps', 'cta', 'lead', 'split', 'quote', 'figure', 'stats', 'details']);
+const BLOCKS = new Set(['hero', 'cards', 'grid', 'gallery', 'steps', 'cta', 'lead', 'split', 'quote', 'figure', 'stats', 'details', 'widget']);
 
 function renderBlock(name, body, file, lang, arg) {
   if (name === 'cards' || name === 'grid') {
@@ -131,6 +152,14 @@ function renderBlock(name, body, file, lang, arg) {
       return `<article class="mk-card"><h3>${inline(head.trim())}</h3>${inner}</article>`;
     });
     return `<div class="mk-${name}">${cards.join('')}</div>`;
+  }
+  // A place for one of the application's own components, named by the block's
+  // argument: the page component mounts it there (page.component.ts, WIDGETS).
+  // The build only reserves the spot - what the widget shows is not prose.
+  if (name === 'widget') {
+    const widget = (arg || '').trim();
+    if (!/^[a-z-]+$/.test(widget)) throw new Error(`${file}: a widget block names a widget, as in "::: widget install"`);
+    return `<div class="mk-widget" data-widget="${widget}"></div>`;
   }
   if (name === 'figure') {
     const svg = figures[lang]?.[arg];
@@ -233,8 +262,7 @@ function render(md, file, lang) {
       if (i >= lines.length) throw new Error(`${file}: a code fence is never closed`);
       i++;
       closeList(listStack);
-      const cls = lang ? ` class="language-${lang}"` : '';
-      html.push(`<pre><code${cls}>${escapeHtml(body.join('\n'))}</code></pre>`);
+      html.push(codeBlock(lang, body.join('\n')));
       continue;
     }
 

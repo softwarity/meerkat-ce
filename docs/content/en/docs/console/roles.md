@@ -35,7 +35,8 @@ your organisation is a catalogue you assign in one click.
 
 ## The editor
 
-- **Name** - the technical name, the one a rule or a service reads.
+- **Role name** - the technical name, the one a rule or a service reads. It is set
+  when the role is created and cannot be changed afterwards.
 - **Description** - the human sentence the organisation screens put forward. Write
   it: a person granting roles reads this, not the name.
 - **Tags** - free labels, proposed from what the catalogue already uses so a
@@ -49,8 +50,9 @@ is born under that row.
 
 ## Traps
 
-- **Renaming a role renames a contract.** Rules, endpoint overrides and services
-  that read the name follow the name, not the row. Rename deliberately.
+- **A role cannot be renamed.** A role is its name: rules, endpoint overrides and
+  the services that read it out of a token all hold the name. To change it, add the
+  new role, point the rules at it, then delete the old one.
 - **A role grants nothing on its own.** It has to be in a group, and someone has
   to be in that group.
 - **Tags only help if they are spelt alike.** Take the suggestion the field

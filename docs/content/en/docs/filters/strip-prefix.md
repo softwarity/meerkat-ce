@@ -40,11 +40,11 @@ filters:
 `X-Forwarded-Prefix` is how a service that **builds** its own links learns where it
 lives. Without it, an application seeing `/orders` writes `/orders`, the browser
 follows it, and it lands outside the route. Spring reads the header through
-`ForwardedHeaderFilter`, nginx poses it; a service that only ever answers does not
+`ForwardedHeaderFilter`, nginx sets it; a service that only ever answers does not
 need it.
 
 Whatever a caller sent under that name is purged, on every route, even one with no
-`strip-prefix`: a caller posing their own prefix would make the service write its
+`strip-prefix`: a caller sending their own prefix would make the service write its
 links wherever they asked.
 
 **On the way back, the prefix is restored** on the two things a browser follows

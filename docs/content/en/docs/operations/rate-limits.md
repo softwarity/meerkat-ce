@@ -68,7 +68,7 @@ off from is still being fed by their own refusals.
 ## The window slides
 
 A bucket that resets answers "a hundred in the last minute" wrongly at every boundary:
-two hundred requests land in two seconds, one on each side of the reset. That is not an
+two hundred requests land in two seconds, a hundred on each side of the reset. That is not an
 approximation, it is a fault. So the shape is the standard two-window estimate - the
 current window's count plus the previous one's, weighted by how far into the current one
 we are - which costs two integers per key and is off by less than a percent.
@@ -116,8 +116,9 @@ That is a decision rather than an omission: an exact shared counter costs a roun
 the database on every request, which is not a price a gateway can pay on the path of all
 traffic. This is the **protective** half - approximate, free, and enough against abuse.
 
-One counter *is* in the database and is exact: the **brute-force counter** on sign-ins. Five attempts means five for the installation, not five per node, and a restart
-no longer lets a throttled attacker back in.
+One counter *is* in the database and is exact: the **brute-force counter** on sign-ins.
+Five attempts means five for the installation, not five per node, and a restart no longer
+lets a throttled attacker back in.
 
 ## What is missing
 

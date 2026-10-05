@@ -2,97 +2,103 @@
 title: Métriques
 section: Exploitation
 order: 209
-summary: Ce que la passerelle compte, où la console le montre, et comment en garder l'historique en le poussant en OTLP.
+summary: Ce que la gateway compte, où la console l'affiche, et comment en conserver l'historique en le poussant en OTLP.
 ---
 
 # Métriques
 
-La passerelle compte ce qu'elle sert, et la console le dessine : l'écran **Metrics** (`/traffic`)
-montre la dernière heure, sans rien installer - c'est la promesse zéro dépendance, dans les deux
-éditions. Voir [l'écran de trafic](/docs/operations/traffic) et
-[l'écran Metrics](/docs/console/traffic).
+La gateway compte ce qu'elle sert, et la console en trace les courbes : l'écran
+**Metrics** (`/traffic`) affiche la dernière heure, sans rien à installer - c'est la promesse
+du zéro dépendance, dans les deux éditions. Voir [l'écran de trafic](/docs/operations/traffic)
+et [l'écran Metrics](/docs/console/traffic).
 
-Cette fenêtre vit en mémoire et repart de zéro au redémarrage de la passerelle. Pour garder un
-historique, alerter dessus ou le dessiner à côté du reste de votre plateforme, les compteurs sont
-**poussés en OTLP** vers un collecteur OpenTelemetry, qui les écrit dans Prometheus. C'est la seule
-façon dont ils sortent de la passerelle : rien ne vient la scraper.
+Cette fenêtre est conservée en mémoire et repart de zéro quand la gateway redémarre. Pour
+garder un historique, déclencher des alertes ou tracer ces courbes à côté de celles du reste
+de votre plateforme, les compteurs sont **poussés en OTLP** vers un collecteur OpenTelemetry,
+qui les écrit dans Prometheus. C'est leur seule façon de sortir de la gateway : rien ne
+vient les y collecter.
 
 ## Ce qui est compté
 
-Par route, sous les noms qu'elles prennent dans Prometheus une fois traduites par un collecteur :
+Par route, sous les noms que les séries prennent dans Prometheus une fois traduites par un
+collecteur :
 
-| Série | Ce qu'elle porte |
+| Série | Ce qu'elle contient |
 |---|---|
-| `meerkat_requests_total` | les requêtes répondues, par classe de statut, de `1xx` à `5xx` |
-| `meerkat_request_duration_seconds` | un histogramme à douze bornes, avec sa somme et son compte |
-| `meerkat_upstream_failures_total` | les échecs entre la passerelle et le service, par `kind` : `connect`, `timeout`, `refused`, `upstream` |
+| `meerkat_requests_total` | les requêtes servies, par classe de statut, de `1xx` à `5xx` |
+| `meerkat_request_duration_seconds` | un histogramme à douze bornes, avec sa somme et son nombre d'observations |
+| `meerkat_upstream_failures_total` | les échecs entre la gateway et le service, par `kind` : `connect`, `timeout`, `refused`, `upstream` |
 
-Par endpoint, où l'unité est le gabarit et jamais un chemin brut :
+Par endpoint, l'unité étant le gabarit et jamais un chemin brut :
 
-| Série | Ce qu'elle porte |
+| Série | Ce qu'elle contient |
 |---|---|
-| `meerkat_endpoint_requests_total` | les requêtes répondues par cette opération |
-| `meerkat_endpoint_errors_total` | les `4xx` et `5xx` parmi elles |
+| `meerkat_endpoint_requests_total` | les requêtes servies par cette opération |
+| `meerkat_endpoint_errors_total` | parmi elles, les `4xx` et les `5xx` |
 | `meerkat_endpoint_duration_seconds_total` | les secondes passées à y répondre |
 
-Il n'y a pas d'histogramme par endpoint, et c'est délibéré : une spec qui déclare deux cents
-opérations transformerait douze seaux en deux mille quatre cents séries pour une seule route. La
-somme et le compte donnent une moyenne, qui est ce sur quoi une vue par endpoint se lit ; la
-distribution reste au niveau de la route.
+Il n'y a pas d'histogramme par endpoint, et c'est voulu : avec une spécification qui déclare
+deux cents opérations, douze intervalles deviendraient deux mille quatre cents séries pour
+une seule route. La somme et le nombre de requêtes donnent une moyenne, et c'est elle qu'on
+lit dans une vue par endpoint ; la distribution reste au niveau de la route.
 
-Et la passerelle elle-même :
+Et pour la gateway elle-même :
 
-| Série | Ce qu'elle porte |
+| Série | Ce qu'elle contient |
 |---|---|
-| `meerkat_gateway_requests_total` | les requêtes répondues par toute la passerelle, toutes routes comprises, par classe de statut |
-| `meerkat_gateway_request_duration_seconds` | le temps d'une réponse, toutes routes comprises |
-| `meerkat_requests_in_flight` | une jauge - le seul chiffre qui dit *saturé* plutôt que *occupé* |
+| `meerkat_gateway_requests_total` | les requêtes servies par la gateway entière, toutes routes confondues, par classe de statut |
+| `meerkat_gateway_request_duration_seconds` | le temps mis à répondre, toutes routes confondues |
+| `meerkat_requests_in_flight` | une jauge - le seul chiffre qui dit *saturée* plutôt que *occupée* |
 | `meerkat_logins_total` | les tentatives de connexion, par `outcome` |
-| `meerkat_unmatched_total` | les requêtes qui n'ont matché aucune route |
+| `meerkat_unmatched_total` | les requêtes qui ne correspondaient à aucune route |
 
-Une route dont **Include this route in OpenTelemetry** est coupé n'a aucune
-série à elle. Ses requêtes comptent quand même dans les deux totaux
-`meerkat_gateway_`.
+Une route dont l'option **Include this route in OpenTelemetry** est désactivée n'a aucune
+série propre. Ses requêtes comptent tout de même dans les deux totaux `meerkat_gateway_`.
 
-Un appel gRPC répond toujours `200` et met son verdict dans `grpc-status`. Il est
-compté selon ce verdict, traduit comme gRPC traduit ses codes en HTTP :
-`UNAVAILABLE` est un `5xx`, `NOT_FOUND` ou `PERMISSION_DENIED` un `4xx`. L'appelant
-reçoit toujours son `200` et son trailer.
+Un appel gRPC répond toujours `200` et place son verdict dans `grpc-status`. Il est compté
+d'après ce verdict, traduit selon la correspondance que gRPC établit entre ses codes et ceux
+de HTTP : `UNAVAILABLE` est un `5xx`, `NOT_FOUND` ou `PERMISSION_DENIED` un `4xx`. L'appelant,
+lui, reçoit toujours son `200` et son trailer.
 
-Les étiquettes sont bornées par construction : un identifiant et un nom de route, une classe de
-statut, un seau, un gabarit d'opération, et un `source` qui dit si ce gabarit était `declared` ou
-`deduced`. Jamais un utilisateur, jamais une adresse, jamais un chemin brut.
+Les étiquettes sont bornées par construction : l'identifiant et le nom d'une route, une
+classe de statut, un intervalle d'histogramme, un gabarit d'opération, et une étiquette
+`source` qui dit si ce gabarit est `declared` ou `deduced`. Jamais un utilisateur, jamais une
+adresse, jamais un chemin brut.
 
-## Garder un historique : la poussée OTLP
+## Garder un historique : l'envoi en OTLP
 
-Elle s'allume dans **Infra, OpenTelemetry**, onglet **Metrics**. Les compteurs partent vers le
-collecteur des traces, avec la même crédentiale : toutes les 30 secondes, des totaux cumulés depuis
-le démarrage de la passerelle, une ressource par noeud (`service.instance.id`).
+Activez-le dans **Infra, OpenTelemetry**, onglet **Metrics**. Les compteurs partent vers le
+même collecteur que les traces, avec les mêmes identifiants : toutes les 30 secondes, les
+totaux cumulés depuis le démarrage de la gateway, à raison d'une ressource par nœud
+(`service.instance.id`).
 
-Les noms sont ceux d'OpenTelemetry (`meerkat.requests`, `meerkat.request.duration` en secondes...),
-choisis pour qu'un collecteur qui les écrit dans Prometheus retombe sur les séries ci-dessus : une
-somme monotone prend `_total`, une unité en secondes prend `_seconds`. Les fichiers de collecteur que
-donne la console (Infra, OpenTelemetry, *No collector yet?*) envoient déjà les métriques vers
-Prometheus.
+Les noms sont ceux d'OpenTelemetry (`meerkat.requests`, `meerkat.request.duration` en
+secondes...). Ils sont choisis pour qu'un collecteur qui les écrit dans Prometheus aboutisse
+aux séries ci-dessus : une somme monotone reçoit le suffixe `_total`, une unité en secondes
+le suffixe `_seconds`. Les fichiers de collecteur fournis par la console (Infra,
+OpenTelemetry, *No collector yet?*) acheminent déjà les métriques vers Prometheus.
 
-Il faut un collecteur qui reçoit des métriques. Un backend qui ne prend que des traces ne suffit
-pas : mettez un OpenTelemetry Collector devant. Le bouton Test le dit.
+Il faut un collecteur qui accepte les métriques. Un backend qui ne prend que des traces ne
+convient pas : placez un OpenTelemetry Collector devant lui. Le bouton Test vous le signale.
 
-> [!NOTE] Enterprise edition
-> La poussée des compteurs est Enterprise. Les compteurs et l'écran Metrics sont dans les deux
-> éditions ; ce qui se vend, c'est de les externaliser vers la stack que vous faites déjà tourner.
+> [!NOTE] Édition Enterprise
+> L'envoi des compteurs relève de l'édition Enterprise. Les compteurs et l'écran Metrics
+> existent dans les deux éditions ; ce qui est vendu, c'est leur externalisation vers une
+> pile d'outils que vous exploitez déjà.
 
 ## Le tableau de bord Grafana
 
-Parmi les fichiers du collecteur, deux compagnons Grafana. `grafana-dashboard.json` est un tableau
-de bord prêt sur ces séries : trafic par route, taux d'échec, p95, endpoints les plus lents et les
-plus coûteux, services muets, connexions refusées. `grafana-datasources.yaml` déclare les sources
+Les fichiers du collecteur comprennent deux fichiers d'accompagnement pour Grafana.
+`grafana-dashboard.json` est un tableau de bord prêt à l'emploi, construit sur ces séries :
+trafic par route, taux d'échec, p95, endpoints les plus lents et les plus coûteux, services
+silencieux, connexions refusées. `grafana-datasources.yaml` déclare les sources de données
 Prometheus, Tempo et Loki (le tableau de bord lit Prometheus, uid `meerkat-prometheus`).
 
 ## Ce qui manque
 
-- Rien sur une requête en particulier : c'est l'autre moitié, et elle a sa page
- ([les traces](/docs/operations/tracing)). Un compteur détecte et délimite, une trace explique un
- cas.
-- Rien sur QUI a appelé : aucune étiquette n'est jamais un utilisateur, et c'est ce qui borne la
- cardinalité. Cette question-là se répond dans le [journal d'accès](/docs/operations/logs).
+- Rien sur une requête en particulier : c'est l'autre moitié du sujet, et elle a sa propre
+  page ([les traces](/docs/operations/tracing)). Un compteur détecte et délimite ; une trace
+  explique un cas précis.
+- Rien sur QUI a appelé : aucune étiquette n'est jamais un utilisateur, et c'est ce qui borne
+  la cardinalité. La réponse à cette question se trouve dans le
+  [journal d'accès](/docs/operations/logs).

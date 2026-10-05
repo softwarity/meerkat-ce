@@ -28,18 +28,17 @@ Five tokens: three for the console - full access from `10.20.0.0/16` only, read
 only, and scheduled calls only - and two application tokens their owners created
 on their profile. A row opens its drawer.
 
-Creating one asks five things:
+Creating one asks four things:
 
 | Field | What it decides |
 |---|---|
 | **Token name** | What you will recognise in the list and in the audit trail |
 | **Perimeter** | *Scheduled calls only* opens `/api/schedules` and nothing else; *Read only* reads and runs the testers; *Full access* is everything you can do |
-| **Acts on** | The routing plane, the application's identity, or everything you can do |
 | **Used from** | Comma-separated addresses or CIDR ranges. Judged on the connecting address, never on a forwarded header |
-| **Expiry** | Never, 30 days, 90 days, or a year |
+| **Expiry** | Never, 30 days, 90 days, or 1 year |
 
-**A perimeter only takes away**: at most what you are. A gateway-scoped token
-minted by root drives routes and nothing else.
+**A perimeter only takes away**: at most what you are. A read-only token minted
+by root reads everything root sees and changes nothing.
 
 The secret is **shown once**. Copy it then; it cannot be retrieved. Keep it in an
 environment variable rather than in a file, because a configuration file is a

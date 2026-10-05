@@ -51,7 +51,7 @@ an internal network.
 Behind the ingress, several replicas serve the same routes. They never talk to
 each other: what they have in common is in the database, and a route that
 changes reaches the others in a second. Sessions live there too, so there is no
-affinity to ask of the load balancer: a request lands on whichever replica, and
+affinity to ask of the load balancer: a request lands on any replica, and
 a rolling update takes nobody's session with it.
 
 > [!NOTE]
@@ -106,7 +106,7 @@ or by letting an agent do it.
 That is what decides whether the response is dressed or the request leaves with
 a signed token.
 
-### Pose the access rule
+### Set the access rule
 
 A level, roles, named accounts, and if needed a rule per operation taken from
 the service's spec.
@@ -122,5 +122,5 @@ The full Kubernetes shape, with the Deployment, the two Services, the Ingress
 and the probes, is on [Kubernetes cluster](/docs/deploy/kubernetes). The two
 planes and what separates them are on
 [Architecture](/docs/concepts/architecture). What the same assembly costs
-otherwise is on [the Meerkat case](/product/the-case).
+otherwise is on [the case for Meerkat](/product/the-case).
 :::

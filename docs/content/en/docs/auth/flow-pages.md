@@ -112,14 +112,16 @@ For one request, the language is picked in this order:
 2. `Accept-Language`, matched on the language tag;
 3. English when a route speaks it, otherwise the first language offered.
 
-Someone's own choice is written to their account and reposed into the cookie
+Someone's own choice is written to their account and put back into the cookie
 when they sign in, so their language follows them to a new browser. Arabic and
 Hebrew are rendered right to left.
 
 > [!NOTE]
-> The catalogues are compiled into the binary. Adding a language, or changing one
-> sentence of an existing one, is a rebuild - there is no directory to drop a JSON
-> file into. FEATURES.md lists overridable catalogues as still missing.
+> The catalogues are compiled into the binary, but they are not frozen:
+> **Application > Built-in pages > Locale** corrects a sentence of an existing
+> language, or adds a language the binary does not carry, with no rebuild. Only
+> what differs from the built-in catalogue is stored, so the corrections a later
+> version ships still come through.
 
 ## What you cannot change
 

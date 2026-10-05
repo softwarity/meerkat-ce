@@ -11,7 +11,7 @@ Signing in without a password: the person types their address, receives a
 six-digit code, types it back, and the session opens.
 
 **Application > Security**, the *Allow signing in with an e-mailed code*
-switch. It ships off, and it needs a relay (Infra > Mail relay). Off, the link
+switch. It ships off, and it needs a relay (**Infra > Mail relay**). Off, the link
 is not on the sign-in page and the addresses answer 404: a control that appears
 and then refuses is worse than one that is absent.
 

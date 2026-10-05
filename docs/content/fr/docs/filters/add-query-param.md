@@ -7,15 +7,16 @@ summary: Ajoute un paramètre de requête.
 
 # add-query-param
 
-Ajoute une valeur à la chaîne de requête envoyée à l'amont, à côté de ce que
-l'appelant a déjà envoyé sous ce nom. À utiliser quand un service lit un drapeau
-dans la requête et que c'est la route, pas l'appelant, qui doit le décider.
+Ajoute une valeur à la chaîne de requête envoyée à l'upstream, sans toucher à ce que
+l'appelant a déjà envoyé sous ce nom. Servez-vous-en quand un service lit un
+indicateur dans la chaîne de requête et que c'est à la route, et non à l'appelant,
+d'en décider.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
-| `name` | chaîne | oui | Le paramètre ajouté. |
+| `name` | chaîne | oui | Le paramètre à ajouter. |
 | `value` | chaîne | oui | La valeur ajoutée. |
 
 ## Exemple
@@ -30,8 +31,9 @@ filters:
 
 ## Notes
 
-La valeur est ajoutée et ce que l'appelant avait envoyé sous ce nom est conservé.
-Utilisez [set-query-param](/docs/filters/set-query-param) pour la remplacer.
+La valeur s'ajoute à celles que l'appelant a déjà envoyées sous ce nom, qui sont
+conservées. Pour les remplacer, utilisez
+[set-query-param](/docs/filters/set-query-param).
 
-La chaîne de requête est réencodée à la sortie : la valeur n'a pas besoin d'être
-échappée.
+La chaîne de requête est réencodée en sortie : inutile d'échapper vous-même la
+valeur.

@@ -2,71 +2,78 @@
 title: Le coffre
 section: Exploitation
 order: 227
-summary: Secrets chiffrés et valeurs en clair dans un seul espace de noms, les références $nom, et le piège de la clé maîtresse en cluster.
+summary: Des secrets chiffrés et des valeurs en clair dans un même espace de noms, les références $name, et le piège de la clé maîtresse en cluster.
 ---
 
 # Le coffre
 
-Le coffre est le seul endroit que le reste de la configuration désigne au lieu de porter une valeur en
-ligne. Il tient deux genres d'entrée dans **un seul espace de noms** :
+Le coffre est l'unique endroit vers lequel le reste de la configuration renvoie, plutôt
+que de porter une valeur en dur. Il contient deux types d'entrées dans **un même espace
+de noms** :
 
-| Genre | Au repos | À la relecture |
+| Type | Au repos | En lecture |
 |---|---|---|
-| **secret** | chiffré, AES-256-GCM | jamais en clair. L'API dit si un secret est posé, pas ce qu'il vaut |
+| **secret** | chiffré, AES-256-GCM | jamais en clair. L'API indique si un secret est défini, pas ce qu'il contient |
 | **valeur** | texte en clair | lisible - un nom d'hôte, un nom d'en-tête, un nom de compte |
 
-Tenir les deux au même endroit est l'intérêt : un seul écran pour tout ce à quoi la configuration se
-réfère, et une réponse visible à « qu'est-ce qui sert vraiment ». Seul le chiffrement diffère, et la
-syntaxe de référence est la même - donc promouvoir une valeur en secret ne touche jamais les objets qui
-la désignent.
+Tout l'intérêt est de les réunir : un seul écran pour tout ce à quoi la configuration
+fait référence, et une réponse visible à la question "qu'est-ce qui est réellement
+utilisé ?". Seul le chiffrement diffère, et la syntaxe des références est la même : faire
+d'une valeur un secret ne touche donc jamais aux objets qui la désignent.
 
-L'écran est **Vault**, une entrée transverse à lui.
+L'écran s'appelle **Vault**, une entrée transversale à part entière.
 
 ![L'écran du coffre](img/console/vault.webp)
 
-## Les références
+## Références
 
-Une valeur de la configuration désigne une entrée par son nom :
+Dans la configuration, une valeur désigne une entrée par son nom :
 
 ```yaml
 upstream: "http://${checkout-host}:8080"
 password: "$smtp-password"
 ```
 
-- `$nom` et `${nom}` sont la même référence ; les accolades lui permettent de coller à ce qui suit.
-- `$$` est un `$` littéral.
-- Un nom qui ne résout pas est laissé **tel quel** et signalé, donc une faute de frappe se voit
- elle-même. La transformer silencieusement en chaîne vide produirait un amont vide ou un mot de passe
- vide, qui échouent de façons beaucoup plus déroutantes.
+- `$name` et `${name}` sont la même référence ; les accolades permettent de l'accoler à
+ ce qui suit.
+- `$$` donne un `$` littéral.
+- Un nom qui ne correspond à aucune entrée est laissé **tel quel** et signalé : une
+ faute de frappe apparaît ainsi pour ce qu'elle est. La remplacer en silence par une
+ chaîne vide produirait un upstream vide ou un mot de passe vide, dont les échecs sont bien
+ plus déroutants.
 
-Pour un **secret** il y a une règle de plus : seule une valeur qui est *entièrement* une référence compte
-comme une référence. Un amont se construit autour de ses références, donc un fragment y est normal ; un
-mot de passe n'est pas un fragment. `${a}${b}` et `x-$token` sont donc des littéraux - c'est le bon sens
-de sécurité, puisqu'une valeur qu'on ne peut pas certifier comme référence est traitée comme un secret à
-protéger.
+Les **secrets** obéissent à une règle supplémentaire : seule une valeur constituée
+*entièrement* d'une unique référence compte comme une référence. Un upstream se construit
+autour de ses références, un fragment y est donc normal ; un mot de passe, lui, n'est
+pas un fragment. `${a}${b}` et `x-$token` sont par conséquent des littéraux - c'est le
+choix prudent, puisqu'une valeur dont on ne peut pas garantir qu'elle est une référence
+est traitée comme un secret à protéger.
 
-## Les portées
+## Portées
 
-Une entrée appartient à une portée, et **un nom est unique par portée** - donc le même `db-password` peut
-vouloir dire deux choses différentes pour deux organisations.
+Une entrée appartient à une portée, et **un nom est unique au sein d'une portée** - le
+même `db-password` peut donc désigner deux choses différentes pour deux organisations.
 
-| Portée | Qui l'administre | Ce qui résout dedans |
+| Portée | Qui l'administre | Ce qui s'y résout |
 |---|---|---|
-| `infra` | gateway-admin | les routes, les arguments de filtre, les identifiants d'amont |
-| `app` | app-admin | le relais mail, les fournisseurs d'identité |
-| une organisation | ses administrateurs | ses propres entrées |
+| `infra` | gateway-admin | les routes, les arguments des filtres, les identifiants des upstreams |
+| `app` | app-admin | le relais de messagerie, les fournisseurs d'identité |
+| une organisation | les administrateurs de cette organisation | ses propres entrées |
 
-La résolution honore le même découpage, et c'est ce qui empêche l'administrateur d'un plan de changer
-discrètement ce qu'un autre plan résout : une route ne s'étend jamais que contre les entrées `infra`. Une
-organisation résout d'abord les siennes et retombe sur celles de l'application, donc elle peut **utiliser**
-une valeur globale sans pouvoir l'éditer, et l'ombrer en déclarant la sienne sous le même nom.
+La résolution respecte le même cloisonnement, et c'est ce qui empêche l'administrateur
+d'un plan de modifier discrètement ce que résout un autre plan : une route ne se résout
+jamais qu'à partir des entrées `infra`. Une organisation cherche d'abord dans ses
+propres entrées, puis se rabat sur celles de l'application : elle peut donc **utiliser**
+une valeur globale sans pouvoir la modifier, et la masquer en déclarant la sienne sous le
+même nom.
 
 ## Un champ sensible passe toujours par le coffre
 
-Un champ qui porte un secret a quatre états dans la console, et la saisie bloque l'enregistrement jusqu'à
-ce que la valeur soit rangée. Un littéral hérité d'un fichier d'amorçage ou d'un ancien
-enregistrement est déplacé **côté serveur** : le navigateur envoie un nom, pas une valeur - il n'a jamais
-reçu ce littéral et ne pourrait pas le ranger lui-même.
+Dans la console, un champ qui contient un secret a quatre états, et la saisie d'une
+valeur bloque l'enregistrement tant qu'elle n'a pas été rangée dans le coffre. Un
+littéral hérité d'un fichier d'amorçage ou d'un enregistrement plus ancien est déplacé
+**côté serveur** : le navigateur envoie un nom, pas une valeur - il n'a jamais reçu ce
+littéral et ne pourrait pas le ranger lui-même.
 
 Une référence est publique. Un littéral ne l'est jamais.
 
@@ -74,68 +81,75 @@ Une référence est publique. Un littéral ne l'est jamais.
 
 | D'où elle vient | Comment |
 |---|---|
-| `MEERKAT_VAULT_KEY` | trente-deux octets, en soixante-quatre caractères hexadécimaux ou en base64 |
-| sinon | un fichier `vault.key` dans le répertoire de données, mode `0600`, généré au premier démarrage |
+| `MEERKAT_VAULT_KEY` | trente-deux octets, sous la forme de soixante-quatre caractères hexadécimaux ou en base64 |
+| à défaut | un fichier `vault.key` dans le répertoire de données, en mode `0600`, généré au premier démarrage |
 
-Le fichier généré est posé à côté de la base, donc il protège une **base volée ou copiée** - une
-sauvegarde, un export - et non un répertoire de données volé. Fournir la clé par l'environnement la garde
-entièrement hors du disque, et la console dit laquelle des deux fait votre installation.
+Le fichier généré se trouve à côté de la base de données : il protège donc une **base
+volée ou copiée** - une sauvegarde, un export - et non un répertoire de données volé.
+Fournir la clé par l'environnement évite de l'écrire sur le disque, et la console
+indique lequel des deux cas s'applique à votre installation.
 
-La même clé scelle plus que le coffre : les **clés privées des certificats**, la **clé de compte ACME**,
-la **clé d'hôte** du tunnel développeur et le **secret TOTP** de chaque compte passent par elle aussi. Un
-secret TOTP est un mot de passe qui ne change jamais - qui le lit calcule tous les codes que le compte
-acceptera - donc une base copiée n'en contient aucun en clair. Ceux écrits avant sont scellés au
-démarrage suivant.
+Cette même clé ne scelle pas que le coffre : les **clés privées des certificats**, la
+**clé du compte ACME**, la **clé d'hôte** du tunnel développeur et le **secret TOTP** de
+chaque compte passent eux aussi par elle. Un secret TOTP est un mot de passe qui ne
+change jamais - quiconque le lit peut calculer tous les codes que le compte acceptera à
+l'avenir - de sorte qu'une base copiée n'en contient aucun en clair. Ceux qui ont été
+écrits auparavant sont scellés au démarrage suivant.
 
 > [!WARNING]
-> **La clé reste un fichier local même avec une base externe.** C'est délibéré : elle scelle ce qui est
-> dans la base, donc la mettre *en* base reviendrait à sceller la porte avec la clé dans la serrure. La
-> conséquence en cluster est le piège : chaque noeud génère la sienne au premier démarrage, et un noeud ne
-> peut alors pas ouvrir ce qu'un autre a scellé. L'erreur le nomme - *the private key cannot be unsealed -
-> is this the vault key it was written with?* Posez `MEERKAT_VAULT_KEY` à la même valeur sur tous les
-> noeuds, avant le premier démarrage.
+> **La clé reste un fichier local, même avec une base de données externe.** C'est
+> voulu : elle scelle le contenu de la base, et la ranger *dans* la base reviendrait à
+> verrouiller la porte en laissant la clé dans la serrure. En cluster, la conséquence
+> est un piège : chaque nœud génère sa propre clé au premier démarrage, et aucun nœud ne
+> peut alors ouvrir ce qu'un autre a scellé. Le message d'erreur le dit - *the private
+> key cannot be unsealed - is this the vault key it was written with?* Donnez à
+> `MEERKAT_VAULT_KEY` la même valeur sur tous les nœuds, avant le premier démarrage.
 
-### La faire tourner
+### La renouveler
 
 Un redémarrage avec deux clés :
 
-1. Posez la nouvelle clé dans `MEERKAT_VAULT_KEY` et celle qu'elle remplace dans
-   `MEERKAT_VAULT_KEY_PREVIOUS` (avec le fichier généré, son contenu est l'ancienne clé).
-   Le chart Helm a `vault.previousKey` pour cela.
-2. Redémarrez les noeuds. Chacun lit les deux clés, et le premier qui démarre rescelle tout
-   sous la nouvelle. Le journal dit combien de valeurs il a déplacées.
-3. Quand tous les noeuds tournent avec la nouvelle clé, retirez `MEERKAT_VAULT_KEY_PREVIOUS`.
+1. Placez la nouvelle clé dans `MEERKAT_VAULT_KEY` et celle qu'elle remplace dans
+   `MEERKAT_VAULT_KEY_PREVIOUS` (si vous utilisez le fichier généré, l'ancienne clé est
+   son contenu). Le chart Helm prévoit `vault.previousKey` à cet effet.
+2. Redémarrez les nœuds. Chacun lit les deux clés, et le premier à démarrer scelle de
+   nouveau l'ensemble avec la nouvelle. Le journal indique combien de valeurs il a
+   converties.
+3. Quand tous les nœuds fonctionnent avec la nouvelle clé, retirez
+   `MEERKAT_VAULT_KEY_PREVIOUS`.
 
-Rien n'est illisible entre-temps. Un noeud démarré avec la nouvelle clé seule, avant que les
-autres aient bougé, échoue sur la première valeur scellée qu'il lit, avec la même erreur qu'une
-mauvaise clé.
+Rien ne devient illisible dans l'intervalle. Un nœud démarré avec la nouvelle clé
+seule, avant que les autres ne soient passés à la nouvelle, échoue sur la première
+valeur scellée qu'il lit, avec la même erreur que pour une mauvaise clé.
 
-## Le coffre comme fichier
+## Le coffre sous forme de fichier
 
-L'exact inverse d'un export de configuration, sur tous les points. Il porte les valeurs
-elles-mêmes, il est chiffré par une phrase de passe que la passerelle ne stocke jamais, et ce n'est **pas**
-quelque chose à versionner : il existe pour amorcer un environnement ou déménager une passerelle, puis pour
-être supprimé.
+L'exact opposé d'un export de configuration, à tous points de vue. Il contient les
+valeurs elles-mêmes, il est chiffré avec une phrase de passe que la gateway ne
+conserve jamais, et il n'est **pas** fait pour être versionné : il sert à amorcer un
+environnement ou à déménager une gateway, puis il se supprime.
 
-Le fichier écrit sa propre recette en clair - version du format, dérivation de clé, ses paramètres, le sel,
-le nonce - parce qu'il survivra des années au binaire qui l'a produit, et qu'un paramètre changé dans une
-version ultérieure ne doit pas rendre un vieil export illisible. La dérivation est Argon2id et la phrase de
-passe a un plancher de douze caractères ; la console propose d'en générer une, précisément pour que personne
-ne tape le nom du produit suivi de l'année.
+Le fichier décrit en clair sa propre recette - version du format, dérivation de clé et
+ses paramètres, sel, nonce - parce qu'il survivra de plusieurs années au binaire qui l'a
+produit, et qu'un paramètre modifié dans une version ultérieure ne doit pas rendre un
+ancien export illisible. La dérivation est Argon2id, et la phrase de passe compte au
+minimum douze caractères ; la console propose d'en générer une, justement pour que
+personne ne saisisse le nom du produit suivi de l'année.
 
-Une passerelle peut en ingérer un au démarrage : `-vault`, avec la phrase de passe dans
+Une gateway peut en charger un au démarrage : `-vault`, avec la phrase de passe dans
 `MEERKAT_VAULT_PASSPHRASE` ou `MEERKAT_VAULT_PASSPHRASE_FILE`.
 
-## Les dates de rappel
+## Dates de rappel
 
-Une entrée peut porter une **date de rappel** : le jour où son secret expire à sa source - un jeton, un
-certificat.
+Une entrée peut porter une **date de rappel** : le jour où l'on sait que son secret
+expire à la source - un jeton, un certificat.
 
-C'est purement un rappel et ça ne change rien. La passerelle ne peut pas savoir qu'un jeton a été renouvelé
-chez le fournisseur, donc la référence `$nom` continue de résoudre. La date ne fait que nourrir le digest
-quotidien, qui liste ce qui approche et ce qui vient de passer, jamais la valeur.
+Ce n'est qu'un rappel, qui ne change rien. La gateway ne peut pas savoir si un jeton
+a été renouvelé chez le fournisseur : la référence `$name` continue donc d'être
+résolue. La date alimente seulement le récapitulatif quotidien, qui liste ce qui arrive
+à échéance et ce qui vient d'y arriver, jamais la valeur.
 
 ## Ce qui manque
 
-- **Un backend externe** : ni HashiCorp Vault, ni secrets Kubernetes ou Docker comme source
- alternative.
+- **Un backend externe** : pas de HashiCorp Vault, ni de secrets Kubernetes ou Docker
+ comme autre source.

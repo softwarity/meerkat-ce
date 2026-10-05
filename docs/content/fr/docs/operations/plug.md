@@ -1,142 +1,140 @@
 ---
 title: Plug
-section: Operations
+section: Exploitation
 order: 228
-summary: Ouvrir le tunnel développeur, dire aux développeurs où il est, et ce qu'ils lancent sous macOS, Linux et Windows.
+summary: Ouvrir le tunnel développeur, indiquer son adresse aux développeurs, et ce qu'ils exécutent sous macOS, Linux et Windows.
 ---
 
 # Plug
 
-[plug](https://github.com/softwarity/plug) fait tourner le processus local d'un
-développeur comme un membre du cluster. Son service répond sous son vrai nom et
-joint les autres par les leurs : pas de port-forward, pas de changement de code.
-Un service déployé du même nom est mis de côté pendant la session, puis remis.
-À quoi cela sert, et comment tous ceux qui regardent l'application savent qui la
-sert, est sur [Dev mode](/product/dev-mode). Cette page dit comment l'ouvrir et
-comment l'installer ; tout le reste de ce que fait plug - profils, plusieurs
-clusters à la fois, volumes, environnements - est dans
+[plug](https://github.com/softwarity/plug) fait tourner le processus local d'un développeur
+comme s'il était membre du cluster. Son service répond sous son vrai nom et joint les autres
+par le leur : pas de port-forward, pas de modification du code. Si un service du même nom est
+déjà déployé, il est mis de côté le temps de la session, puis rétabli. À quoi cela sert, et
+comment tous ceux qui regardent l'application apprennent qui la sert, est expliqué sur la
+page [Mode développement](/product/dev-mode). Cette page-ci explique comment ouvrir le
+tunnel et comment installer plug ; tout ce que plug fait par ailleurs - les profils,
+plusieurs clusters à la fois, les volumes, les environnements - se trouve dans
 [la documentation de plug](https://softwarity.github.io/plug/).
 
-> [!NOTE] Edition Enterprise
-> Le tunnel est intégré à l'image Enterprise, tout comme le client plug qu'il
-> distribue.
+> [!NOTE] Édition Enterprise
+> Le tunnel est intégré à l'image Enterprise, de même que le client plug qu'il distribue.
 
 ## Deux conditions, deux responsables
 
-Le tunnel ne tourne que si **les deux** sont allumés :
+Le tunnel ne fonctionne que si ces **deux** interrupteurs sont activés :
 
-| interrupteur | où | à qui | ce qu'il décide |
+| interrupteur | où | qui en décide | ce qu'il détermine |
 |---|---|---|---|
-| Developer mode | Application, General | l'administrateur d'application | ce que l'installation offre à ses développeurs : le menu Developer, la doc des API, les connexions simulées |
-| Open the developer tunnel | **Infra, Plug** | l'administrateur d'infrastructure | un port dans le cluster, et les droits du déploiement dessus (socket Docker, rôle Kubernetes) |
+| Developer mode | Application, General | l'administrateur de l'application | ce que cette installation propose à ses développeurs : le menu Developer, la documentation des API, les connexions simulées |
+| Open the developer tunnel | **Infra, Plug** | l'administrateur de l'infrastructure | un port ouvert sur le cluster, et les droits du déploiement sur celui-ci (socket Docker, rôle Kubernetes) |
 
-L'interrupteur du tunnel est **livré éteint**. Une passerelle déclarée production
-(`MEERKAT_PRODUCTION`) garde toute la surface développeur fermée, quoi que
-disent les deux interrupteurs.
+L'interrupteur du tunnel est **désactivé à la livraison**. Une gateway déclarée en
+production (`MEERKAT_PRODUCTION`) garde fermé tout ce qui est destiné aux développeurs, quel
+que soit l'état de ces deux interrupteurs.
 
-Tant que le tunnel est fermé, on ne propose pas au développeur de déposer une
-clé : la page n'existe pas, et le menu utilisateur ne la montre pas. Une clé
-pour une porte absente est une clé dont personne ne peut se servir.
+Tant que le tunnel est fermé, on ne propose pas au développeur de déposer une clé : la page
+n'existe pas, et le menu utilisateur ne l'affiche pas. Une clé pour une porte qui n'existe
+pas est une clé dont personne ne peut se servir.
 
-La page Infra, Plug dit ce que le tunnel **fait**, pas ce qui est coché : en
-écoute sur son port, fermé et par quel interrupteur, ou allumé mais incapable de
-tourner ici et pourquoi - une passerelle qui ne tourne pas dans un conteneur,
-par exemple, ne peut pas créer de nom dans le cluster.
+La page Infra, Plug dit ce que le tunnel **fait**, et non ce qui a été coché : il écoute sur
+son port, il est fermé et par quel interrupteur, ou bien il est activé mais ne peut pas
+fonctionner ici, et pourquoi - une gateway qui ne tourne pas dans un conteneur, par
+exemple, ne peut pas créer de nom dans le cluster.
 
-## L'adresse que les développeurs utilisent
+## L'adresse qu'utilisent les développeurs
 
-La passerelle ne voit pas ce qui se trouve entre elle et un portable : un
-NodePort, un LoadBalancer, un port Docker publié. La page Infra, Plug enregistre
-donc l'hôte et le port **publiés**, et chaque commande de cette page et de la
-page de profil du développeur les porte, prête à copier.
+La gateway ne voit pas ce qui la sépare d'un ordinateur portable : un NodePort, un
+LoadBalancer, un port Docker publié. La page Infra, Plug enregistre donc l'hôte et le port
+**publiés**, et toutes les commandes de cette page, comme celles de la page de profil du
+développeur, les contiennent déjà : il ne reste qu'à les copier.
 
-![L'écran Plug : l'interrupteur du tunnel, l'hôte et le port publiés, et qui a la capacité développeur](img/console/plug.webp)
+![L'écran Plug : l'interrupteur du tunnel, l'hôte et le port publiés, et qui détient la capacité développeur](img/console/plug.webp)
 
-Le tunnel écoute sur **22222** dans le conteneur (`MEERKAT_PLUG_ADDR`).
+Dans le conteneur, le tunnel écoute sur le port **22222** (`MEERKAT_PLUG_ADDR`).
 
-- **Docker Compose** : le publier, `22222:22222`.
-- **Kubernetes** : le chart Helm crée un Service `-plug`, en ClusterIP par
-  défaut. Mettre `plug.service.type` à `NodePort` ou `LoadBalancer` pour des
-  machines hors du cluster, puis enregistrer cette adresse sur la page.
-- **Docker Swarm** : non fourni (voir [Une passerelle](/docs/deploy/one-gateway)).
+- **Docker Compose** : publiez-le, `22222:22222`.
+- **Kubernetes** : le chart Helm crée un Service `-plug`, de type ClusterIP par défaut.
+  Passez `plug.service.type` à `NodePort` ou à `LoadBalancer` pour les machines situées hors
+  du cluster, puis enregistrez cette adresse sur la page.
+- **Docker Swarm** : non fourni (voir [Une gateway](/docs/deploy/one-gateway)).
 
 ## Sur la machine d'un développeur
 
-Sur Infra, Plug, le bouton **On a developer's machine** ouvre ces étapes dans un
-tiroir, pour macOS, Linux ou Windows, avec des commandes qui portent déjà
-l'adresse de cette passerelle. C'est de l'aide, pas de la configuration : rien
-n'y est enregistré.
+Sur la page Infra, Plug, le bouton **On a developer's machine** ouvre ces étapes dans un
+tiroir, pour macOS, Linux ou Windows, avec des commandes qui contiennent déjà
+l'adresse de cette gateway. C'est une aide, pas de la configuration : rien n'y est
+enregistré.
 
-![Le tiroir des étapes pour la machine d'un développeur : installer, nommer le profil, la paire de clés, la déposer, brancher un service](img/console/plug-machine.webp)
+![Le panneau des étapes pour la machine d'un développeur : installer, nommer le profil, générer la paire de clés, la déposer, brancher un service](img/console/plug-machine.webp)
 
-Le développeur doit avoir la **capacité développeur** sur son compte
-(Application, Users). Ensuite, une fois :
+Le compte du développeur doit avoir la **capacité développeur** (Application, Users).
+Ensuite, une seule fois :
 
-**1. Installer plug.** Il s'installe depuis la passerelle elle-même, pas depuis
-un gestionnaire de paquets, et prépare la machine une fois pour que les
-lancements suivants ne demandent aucun privilège.
+**1. Installez plug.** Il s'installe depuis la gateway elle-même, et non depuis un
+gestionnaire de paquets. Il prépare la machine une fois pour toutes, si bien que les
+exécutions suivantes ne demandent plus aucun privilège.
 
-macOS et Linux, depuis un terminal (il peut demander le mot de passe une fois) :
+Sous macOS et Linux, dans un terminal (votre mot de passe peut vous être demandé une fois) :
 
 ```sh
 ssh -p 22222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@<gateway-host> install | sh
 ```
 
-Windows, depuis **Git Bash** (fourni avec Git for Windows ; il demande une fois
-à s'exécuter en Administrateur) :
+Sous Windows, dans **Git Bash** (fourni avec Git for Windows ; l'installation demande une
+fois à s'exécuter en tant qu'administrateur) :
 
 ```bash
 ssh -n -p 22222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@<gateway-host> install-windows | bash -s -- <gateway-host> 22222
 ```
 
-L'installeur crée un profil nommé d'après l'hôte, c'est lui que `-p` désigne
-ci-dessous. Un nom à soi se lit mieux dès qu'un second cluster est installé, et
-la paire de clés suit le profil :
+Le programme d'installation crée un profil qui porte le nom de l'hôte : c'est ce profil que
+désigne `-p` ci-dessous. Un nom de votre choix est plus lisible dès qu'un deuxième cluster
+est installé, et la paire de clés suit le profil :
 
 ```sh
-plug rn <gateway-host> mon-cluster
+plug rn <gateway-host> my-cluster
 ```
 
-`<profil>` ci-dessous est ce nom : `mon-cluster` une fois renommé,
+Ci-dessous, `<profile>` désigne ce nom : `my-cluster` si vous l'avez renommé,
 `<gateway-host>` sinon.
 
-Les commandes de la page Infra, Plug suivent l'adresse et le nom de profil
-saisis sur la page.
+Les commandes de la page Infra, Plug reprennent l'adresse et le nom de profil que vous y
+avez saisis.
 
-**2. Générer la paire de clés.** plug la range sous `~/.plug/keys`, une paire
-par cluster, pour qu'une clé puisse être retirée d'un cluster sans toucher aux
-autres.
-
-```sh
-plug keygen -p <profil>
-plug pubkey -p <profil> | pbcopy                        # macOS
-plug pubkey -p <profil> | xclip -selection clipboard    # Linux
-plug pubkey -p <profil> | clip                          # Windows, Git Bash
-```
-
-**3. Déposer la clé publique** sur son profil, connecté aux applications :
-`/profile/dev/key`, ou depuis n'importe quelle application, menu utilisateur,
-Developer, plug key. La page montre l'empreinte SHA256, à comparer avec ce qu'a
-affiché `plug pubkey`. Elle prend une clé publique, jamais un certificat.
-
-Une clé par poste : plug garde une paire par profil, donc un second poste lance
-`plug keygen` chez lui et dépose une seconde clé à côté de la première. Chacune
-est listée avec son empreinte et le commentaire qu'elle porte, et en retirer une
-ne ferme que ce poste. Une clé appartient à un seul compte : la même clé déposée
-deux fois, ou par quelqu'un d'autre, est refusée.
-
-**4. Brancher un service**, en préfixant la commande qui le lance :
+**2. Générez la paire de clés.** plug la conserve dans `~/.plug/keys`, à raison d'une paire
+par cluster : vous pouvez ainsi retirer une clé d'un cluster sans toucher aux autres.
 
 ```sh
-plug -p <profil> -s my-service:8080:3000 npm run start
+plug keygen -p <profile>
+plug pubkey -p <profile> | pbcopy                        # macOS
+plug pubkey -p <profile> | xclip -selection clipboard    # Linux
+plug pubkey -p <profile> | clip                          # Windows, Git Bash
 ```
 
-Le cluster le joint sous `my-service:8080`, redirigé vers le `3000` local, tant
-que la commande tourne.
+**3. Déposez la clé publique** sur votre profil, en étant connecté aux applications :
+`/profile/dev/key`, ou, depuis n'importe quelle application, le menu utilisateur, Developer,
+plug key. La page affiche l'empreinte SHA256, à comparer avec celle que `plug pubkey` a
+affichée. Elle accepte une clé publique, jamais un certificat.
+
+Une clé par poste de travail : plug conserve une paire par profil. Sur une deuxième machine,
+il faut donc lancer `plug keygen` sur place et déposer une deuxième clé à côté de la
+première. Chaque clé est listée avec son empreinte et le commentaire qu'elle porte, et en
+retirer une ne ferme l'accès qu'à la machine correspondante. Une clé appartient à un seul
+compte : la même clé déposée deux fois, ou par quelqu'un d'autre, est refusée.
+
+**4. Branchez un service**, en préfixant la commande qui le lance :
+
+```sh
+plug -p <profile> -s my-service:8080:3000 npm run start
+```
+
+Le cluster le joint à l'adresse `my-service:8080`, redirigée vers votre port local `3000`,
+aussi longtemps que la commande tourne.
 
 ## Retirer un accès
 
-Retirer la clé du profil, la capacité développeur du compte, ou l'un des deux
-interrupteurs ferme la porte à la connexion suivante : rien n'a été émis qui
-survivrait au retrait. Infra, Plug liste qui détient la capacité, avec
-l'empreinte de sa clé ou le fait qu'il n'en a pas encore.
+Retirer la clé du profil, retirer la capacité développeur du compte ou désactiver l'un des
+deux interrupteurs ferme la porte dès la connexion suivante : rien n'a été émis qui puisse
+survivre à ce retrait. La page Infra, Plug liste ceux qui détiennent la capacité, avec
+l'empreinte de leur clé, ou la mention qu'ils n'en ont pas encore.

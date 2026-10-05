@@ -19,9 +19,9 @@ nothing behind it is a switch that lies.
 
 Here the pool holds four lines: a certificate for `gateway.acme.example` served on
 the console, one for `apps.acme.example` and `docs.acme.example` served on the
-application, a signing request still waiting for its answer, and an order to Let's Encrypt
-(staging) for `status.acme.example`, kept in reserve: placed on a door, it would
-be asked at once.
+application, a signing request still waiting for its answer, and an order to
+Let's Encrypt (staging) for `status.acme.example`, kept in reserve: placed on a
+door, it would be asked at once.
 
 ## A pool, then a placement
 
@@ -34,7 +34,8 @@ typed beside it. One certificate can carry several names, a wildcard
   *Signed on request*), how long it lasts, its key type, and where it is served.
 - **Console** and **Application** - the two doors. **Drag a certificate onto
   one**, or onto both: it is served there at once. Drag it from one door to the
-  other to move it, back onto the pool or click its cross to take it off. The
+  other to move it; drag it back onto the pool, or click its cross, to take it
+  off. The
   **Serve on** entries of a certificate's menu do the same without a mouse.
 
 Each door's title gives its two ports as the world reaches them -
@@ -60,7 +61,7 @@ vouches for it but itself), and **No intermediate** - a chain that works in
 
 ## Adding a certificate
 
-The **Add certificate** menu has five doors. Each puts one certificate in the
+The **Add certificate** menu has five entries. Each puts one certificate in the
 pool, served nowhere until it is placed:
 
 1. **Generate a self-signed one** - the names (separated by spaces or commas:
@@ -107,11 +108,11 @@ those that used a name a certificate placed on the application carries. A servic
 calling the gateway by its cluster name (`http://meerkat:8080`) stays in the clear:
 sent to HTTPS it would meet a certificate for another name, from an authority it
 does not know, and stop working. The console is never forced, and neither is the
-liveness probe. If every
-certificate expires, the redirect **stands itself down** and says so, rather
-than sending callers to a door none of them will open.
+liveness probe. If every certificate expires, the redirect **stands itself
+down** and says so, rather than sending callers to a door none of them will
+open.
 
-The switch is always there, greyed while the applications' HTTPS door is not
+The switch is always there, greyed while the application's HTTPS door is not
 open - no certificate is placed on the application yet - with a line saying so.
 **HSTS duration** sits under it, active once HTTPS is forced: forcing HTTPS also
 sends HSTS, so browsers stop sending even the first request in clear - the one a
@@ -142,7 +143,7 @@ Pick a **provider**: the form shows only what that one uses.
 | Another authority | its directory URL, its root certificate when this gateway does not already trust it (`step ca root` for step-ca), a binding and a contact if it requires them - every value from whoever runs it |
 
 Saving asks the authority's directory whether it answers: a wrong URL or an
-unreachable authority is said at once. No account is opened yet - that waits for
+unreachable authority is reported at once. No account is opened yet - that waits for
 the first certificate asked. The HMAC key is a secret and goes through the
 [vault](/docs/console/vault). An authority still asked for a certificate cannot
 be deleted; the refusal names what asks it.

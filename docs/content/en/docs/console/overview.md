@@ -62,8 +62,9 @@ same scopes on every call.
 | `dev` | The developer tooling on the served applications, not a console screen |
 
 Signing in lands you on the first section you may use: Infra on Routes for an
-infra admin, Application on General for an app admin, Tenants otherwise.
-Capabilities are granted per account on [Users](/docs/console/users).
+infra admin, Application on General for an app admin, Tenants otherwise (License
+when there is a single organisation). Capabilities are granted per account on
+[Users](/docs/console/users).
 
 ## The habits of the screens
 
@@ -125,7 +126,7 @@ Learn these five and the console stops surprising you.
   (the active/active cluster, the deployment files). The list is read from the
   product's own feature contract, so it cannot drift from it. It is the only
   screen that talks about editions: everywhere else a locked control carries its
-  cap and links here.
+  badge and links here.
 
 ![The License screen: the edition, then every Enterprise feature with how far it is built and the screen it lives on](img/console/license.webp)
 
@@ -141,9 +142,8 @@ signs out every console tab at once.
 ![The release notes window: Meerkat 1.0.1, its patch notes, then 1.0.0](img/console/release-notes.webp)
 
 The account menu says which version runs, and which edition: **Meerkat 1.0.1 EE**
-(or **CE**). Click it for the
-release notes, newest first, from that version down to its minor release - the
-same text as the GitHub release. A development build shows the last release it
+(or **CE**). Click it for the release notes, newest first, from that version down
+to its minor release - the same text as the GitHub release. A development build shows the last release it
 carries, with what is coming under **Next release** on top; an empty section
 says *Missing information*.
 

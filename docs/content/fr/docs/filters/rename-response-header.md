@@ -2,19 +2,19 @@
 title: rename-response-header
 section: Filtres
 order: 80
-summary: Déplace un en-tête de réponse sous un autre nom, valeurs comprises.
+summary: Déplace un en-tête de réponse sous un autre nom, avec toutes ses valeurs.
 ---
 
 # rename-response-header
 
-Renomme un en-tête de la réponse, pour un client qui lit un autre nom que celui
-que le service écrit.
+Renomme un en-tête de la réponse, pour un client qui ne lit pas le nom que le
+service écrit.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
-| `from` | chaîne | oui | L'en-tête lu, puis retiré. |
+| `from` | chaîne | oui | L'en-tête lu, puis supprimé. |
 | `to` | chaîne | oui | L'en-tête écrit. |
 
 ## Exemple
@@ -29,7 +29,7 @@ filters:
 
 ## Notes
 
-Toutes les valeurs sont déplacées sous le nouveau nom et l'ancien disparaît. Ce qui
-se trouvait déjà sous `to` est remplacé.
+Toutes les valeurs passent sous le nouveau nom et l'ancien disparaît. Ce qui se
+trouvait déjà sous `to` est remplacé.
 
-Rien ne se passe si `from` est absent.
+Il ne se passe rien si `from` est absent.

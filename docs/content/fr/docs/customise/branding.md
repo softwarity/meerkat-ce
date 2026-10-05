@@ -2,101 +2,108 @@
 title: La marque
 section: Personnalisation
 order: 246
-summary: Nom, logo, favicon et le fond de page - y compris une image différente en clair et en sombre.
+summary: Le nom, le logo, le favicon et le fond de page - avec, si besoin, une image différente en clair et en sombre.
 ---
 
 # La marque
 
-La marque, c'est l'identité de l'application sur les pages que la passerelle sert : le nom qu'un
-visiteur lit au-dessus de la carte de connexion, le symbole dans l'onglet du navigateur, l'image
-derrière tout ça.
+La marque est l'identité de l'application sur les pages que sert la gateway : le nom que
+le visiteur lit au-dessus de la carte de connexion, l'icône dans l'onglet du navigateur,
+l'image en arrière-plan.
 
-Elle est **globale** - une identité par passerelle, quel que soit le thème actif. Les thèmes sont des
-essais de couleur ; l'identité ne se dédouble pas avec eux. Elle s'édite sur l'onglet **Branding** de
-**Application > Built-in pages**.
+Elle est **globale** - une identité par gateway, quel que soit le thème actif. Les thèmes
+sont des essais de couleurs ; l'identité ne se dédouble pas avec eux. Elle se modifie dans
+l'onglet **Branding** de **Application > Built-in pages**.
 
 ![L'onglet de la marque](img/console/built-in-pages-branding.webp)
 
 ## Nom et description
 
-Le nom de l'application et une description d'une ligne. Une installation neuve arrive avec des
-placeholders évidents - `MY APP` et `My application description` - pour qu'il soit clair que les deux
-sont à vous plutôt que quelque chose à contourner.
+Le nom de l'application et une description d'une ligne. Une installation neuve est livrée
+avec des valeurs manifestement provisoires - `MY APP` et `My application description` - pour
+qu'il soit évident que ces deux champs sont à remplir par vous, et non à contourner.
 
 ## Le logo
 
-Une image téléversée, stockée en data URI. Formats acceptés : PNG, JPEG, WebP, SVG et ICO. Au-delà
-d'environ `195 KiB` l'enregistrement est refusé en le disant, plutôt que tronqué en silence.
+Une image que vous envoyez, stockée sous forme de data URI. Formats acceptés : PNG, JPEG,
+WebP, SVG et ICO. Au-delà d'environ `195 KiB`, l'enregistrement est refusé, en nommant le
+champ en cause, plutôt que de tronquer l'image sans rien dire.
 
-Sa **taille** est choisie, pas devinée : normale, grande ou très grande. Un logo n'est pas une forme
-fixe - une sentinelle carrée et un logotype large ne remplissent pas la même boîte, et le logotype posé
-dans la boîte carrée en sort au tiers de sa hauteur. L'autre solution était de la déduire du rapport
-d'aspect de l'image, ce qui décide à votre place sur une page qui est la vôtre. Trois tailles, choisies
-une fois, à côté de l'image.
+Sa **taille** se choisit, elle ne se devine pas : normale, grande ou très grande. Un logo n'a
+pas de forme fixe - une sentinelle carrée et un logotype tout en largeur ne remplissent pas
+le même cadre, et le logotype placé dans le cadre carré n'atteint qu'un tiers de sa hauteur.
+L'autre solution consistait à déduire la taille des proportions de l'image, c'est-à-dire à
+décider à votre place sur une page qui est la vôtre. Trois tailles, donc, choisies une fois
+pour toutes, à côté de l'image.
 
 ## Le favicon
 
-Optionnel, et délibérément : laissé vide, **le logo sert d'icône d'onglet**. Un logo est presque
-toujours utilisable comme icône, et demander une seconde image pour voir sa propre marque dans l'onglet
-est une étape que la plupart des gens sautent - après quoi la page de connexion de leur application
-porte la sentinelle de Meerkat, qui est le seul endroit où elle ne doit pas être.
+Il est facultatif, et c'est voulu : si vous le laissez vide, **le logo sert d'icône
+d'onglet**. Un logo fait presque toujours une icône acceptable, et réclamer une seconde image
+pour voir sa propre marque dans l'onglet est une étape que la plupart des gens sautent - à la
+suite de quoi la page de connexion de leur application affiche la sentinelle de Meerkat, au
+seul endroit où elle n'a rien à faire.
 
-Un favicon est un petit carré : au-delà d'environ `41 KiB` c'est une image entière déposée par erreur,
-et elle voyagerait sur chaque page.
+Un favicon est un petit carré : au-delà d'environ `41 KiB`, il s'agit d'une image complète
+déposée là par erreur, et elle serait transportée avec chaque page.
 
 ## Le fond
 
-L'image derrière les pages intégrées appartient à la **marque** et non à un thème, exprès : une
-photographie de bâtiment ou un visuel produit est l'identité de l'application, et elle doit survivre aux
-essais de couleur qu'un thème est.
+L'image affichée derrière les pages intégrées appartient à la **marque** et non à un thème,
+et c'est délibéré : la photographie d'un bâtiment ou le visuel d'un produit font partie de
+l'identité de l'application, et doivent survivre aux essais de couleurs que sont les thèmes.
 
 | Champ | Ce qu'il fait |
 |---|---|
 | Image | l'image, jusqu'à environ `911 KiB` |
-| Cadrage | `cover` remplit l'écran et recadre, `contain` montre tout, `tile` répète |
-| Voile | la quantité de couleur de surface posée par-dessus l'image, de rien à opaque |
+| Fit | `cover` remplit l'écran quitte à rogner l'image, `contain` la montre en entier, `tile` la répète |
+| Dim | la quantité de couleur de surface superposée à l'image, de rien du tout à l'opacité complète |
 
-**Le voile mérite sa place.** Sans lui, n'importe quelle image avec un coin clair rend la carte de
-connexion illisible dans l'un ou l'autre schéma, et le seul recours serait de retoucher l'image.
+**Le voile (Dim) n'est pas là par hasard.** Sans lui, la moindre image dont un coin est
+lumineux rend la carte de connexion illisible dans l'un des deux modes, et il ne resterait
+plus qu'à retoucher l'image.
 
-Le fond est désigné par une URL et jamais intégré dans la page : c'est le seul actif ici qui peut peser
-un mégaoctet, et un data URI le mettrait dans chaque page du flux au lieu d'une fois dans le cache du
-navigateur.
+Le fond est référencé par une URL et jamais incorporé à la page : c'est le seul élément, ici,
+qui puisse peser un mégaoctet, et une data URI le placerait dans chaque page du parcours au
+lieu de le ranger une seule fois dans le cache du navigateur.
 
 ## Un fond différent en clair et en sombre
 
-Une photographie passe souvent dans un schéma et pas dans l'autre. Le schéma sombre reçoit donc sa
-**propre** image, son propre cadrage et son propre voile.
+Une photographie passe souvent bien dans un mode et mal dans l'autre. Le mode sombre dispose
+donc de sa **propre** image, de son propre cadrage et de son propre voile.
 
-Un interrupteur décide dans quel sens ça marche :
+Un seul interrupteur décide du fonctionnement :
 
-- **une image pour les deux** - l'image claire sert aussi en sombre, et les champs sombres sont ignorés
- (la console les désactive) ;
-- **une image chacun** - deux images, deux cadrages, deux voiles.
+- **une image pour les deux modes** - l'image du mode clair sert aussi en sombre, et les
+ champs du mode sombre sont ignorés (la console les désactive) ;
+- **une image par mode** - deux images, deux cadrages, deux voiles.
 
-Téléverser une image claire et aucune sombre veut dire « utilise-la dans les deux », ce qui est la
-lecture intuitive d'une image unique. Retirer les deux remet le fond sur *éteint*, une seule forme
-plutôt que « éteint avec des réglages encore dedans ».
+Envoyer une image pour le clair et aucune pour le sombre signifie "utilisez-la dans les deux
+modes" : c'est ce que l'on attend naturellement d'une image unique. Retirer les deux images
+remet le fond à l'état *désactivé*, un état unique plutôt qu'un fond "désactivé, mais qui
+garde encore des réglages".
 
-Sous le capot, CSS ne peut pas commuter une `url()` par `light-dark()`, donc l'image suit le schéma de
-deux façons : la préférence système, et une classe que le serveur pose quand un schéma est imposé - qui
-l'emporte sur la préférence, pour que le choix du visiteur tienne même contre celui de son système.
+En coulisses, CSS ne sait pas faire varier une `url()` avec `light-dark()`. L'image suit donc
+le mode de deux manières : par la préférence du système, et par une classe que le serveur
+appose quand un mode est imposé - celle-ci l'emporte sur la préférence, si bien que le choix
+du visiteur tient même contre celui de son système.
 
-## La mention « powered by »
+## La mention "powered by"
 
-Les pages servies portent une ligne discrète `powered by softwarity/meerkat`. La retirer est un
-interrupteur sur cet écran.
+Les pages servies portent une discrète ligne `powered by softwarity/meerkat`. Un interrupteur
+de cet écran permet de la retirer.
 
-> [!NOTE] Enterprise edition
-> Cacher la mention est ce que la fonctionnalité white-label accorde. C'est un **choix** et non un
-> effet de bord de la détention d'une licence : une installation qui ne l'a jamais demandé garde la
-> mention. Sans l'image Enterprise l'interrupteur est refusé à l'enregistrement, en disant pourquoi -
-> un interrupteur qui enregistre et ne fait rien est pire qu'un interrupteur qui dit qu'il ne peut pas.
+> [!NOTE] Édition Enterprise
+> Masquer la mention est précisément ce qu'apporte la fonction de marque blanche. C'est un
+> **choix**, et non un effet secondaire de la possession d'une licence : une installation qui
+> ne l'a jamais demandé garde la mention. Sans l'image Enterprise, l'enregistrement refuse
+> l'interrupteur et dit pourquoi - un interrupteur qui s'enregistre sans rien faire est pire
+> qu'un interrupteur qui annonce qu'il ne peut rien.
 
-Disposer les pages se vend avec la même clé - voir
+Le choix de la disposition des pages est vendu avec la même clé - voir
 [les pages intégrées](/docs/customise/built-in-pages).
 
 ## Ce qui manque
 
-La couleur de fond du logo a été abandonnée plutôt que construite : l'image de fond a remplacé de fait
-le besoin.
+La couleur de fond propre au logo a été abandonnée plutôt que réalisée : l'image de fond en a
+supprimé le besoin.

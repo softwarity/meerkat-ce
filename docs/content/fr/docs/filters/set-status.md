@@ -2,14 +2,14 @@
 title: set-status
 section: Filtres
 order: 92
-summary: Remplace le code de statut de la réponse de l'amont.
+summary: Remplace le code de statut de la réponse de l'upstream.
 ---
 
 # set-status
 
-Remplace le code de statut de la réponse. Son usage honnête est un service qui
-répond le mauvais code pour un cas qu'il a bien traité, et qu'on ne peut pas
-modifier aujourd'hui.
+Remplace le code de statut de la réponse. Son seul usage légitime : un service qui
+renvoie le mauvais code pour un cas qu'il a correctement traité, et qu'on ne peut
+pas modifier aujourd'hui.
 
 ## Paramètres
 
@@ -30,11 +30,11 @@ filters:
 
 ## Notes
 
-Le corps n'est pas touché : un `200` posé sur une page d'erreur cache donc l'erreur
-à tout ce qui ne lit que le code - supervision comprise, et métriques de la route
-avec elle.
+Le corps n'est pas modifié : un `200` plaqué sur une page d'erreur cache donc
+l'erreur à tout ce qui ne lit que le code - la supervision comprise, et les
+métriques de la route avec elle.
 
-Les métriques de la route et son disjoncteur lisent tous les deux le statut qui
-atteint le client, pas celui que le service a envoyé. Un `200` posé sur un `502`
-leur cache donc aussi la panne : le disjoncteur compte une réussite et ne s'ouvre
-jamais.
+Les métriques de la route et son disjoncteur lisent tous deux le statut qui
+parvient au client, et non celui que le service a envoyé. Un `200` plaqué sur un
+`502` leur cache donc aussi la panne : le disjoncteur compte un succès et ne
+s'ouvre jamais.

@@ -42,6 +42,7 @@ This is the list as it shows up in security questionnaires and tenders.
 | **Scheduled work** | closings, reminders, purges, the morning report |
 | **User feedback** | report a problem with a screenshot and context |
 | **Developer tooling** | test against the cluster from your own machine |
+| **API documentation** | one Swagger for every API, called through the gateway, under the identity you choose |
 
 What Meerkat covers of it, line by line and with the state read from the code,
 is on [what it does](/product/features).
@@ -149,7 +150,7 @@ is heaviest:
 | Workstation to cluster | mirrord Team annual, $400 | mirrord Team monthly, $500 | plug: built in |
 | Menu and portal in your applications | no product | no product | included |
 | **Per month** | **$2,252** | **$7,354** | Community: free |
-| **Per year** | **$27,024** | **$88,248** | Enterprise: [per production instance](/product/pricing) |
+| **Per year** | **$27,024** | **$88,248** | Team, Enterprise: [on request](/pricing/index) |
 
 Public list prices in US dollars, excluding tax, excluding machines and
 integration time. Products with no public price for this scenario are left out
@@ -287,6 +288,6 @@ For the team that will live with it, that means:
 
 What is actually built, and what is not, is
 [one table read from the code](/project/roadmap) - the same transparency as the
-figures above. What the two editions carry is on
+figures above. What each edition carries is on
 [editions](/product/editions), and if you would rather see before deciding, the
 [showcase](/showcase/index) has the screens.

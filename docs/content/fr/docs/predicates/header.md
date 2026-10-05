@@ -2,22 +2,23 @@
 title: header
 section: Prédicats
 order: 42
-summary: Matche quand un en-tête est présent, contre une liste de valeurs ou une regexp.
+summary: Accepte la requête quand un en-tête est présent, avec une liste de valeurs ou une expression régulière.
 ---
 
 # header
 
-Matche quand l'en-tête nommé est présent, et éventuellement quand sa valeur est
-dans une liste ou a une certaine forme. Sert à séparer le trafic sur ce que
-l'appelant déclare : un nom de client, un environnement, la forme d'une clé.
+Accepte la requête quand l'en-tête nommé est présent et, si vous le demandez,
+quand sa valeur figure dans une liste ou respecte une forme. Servez-vous-en pour
+répartir le trafic selon ce que l'appelant déclare : un nom de client, un
+environnement, la forme d'une clé d'API.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
-| `name` | chaîne | oui | L'en-tête cherché. |
-| `values` | liste de chaînes | non | La valeur doit être l'une d'elles, par exemple `staging`, `prod`. |
-| `regexp` | chaîne | non | Regexp ancrée sur la valeur entière. Pour une forme, pas pour une liste. |
+| `name` | chaîne | oui | L'en-tête recherché. |
+| `values` | liste de chaînes | non | La valeur de l'en-tête doit être l'une d'elles, par exemple `staging`, `prod`. |
+| `regexp` | chaîne | non | Expression régulière que la valeur entière doit respecter. À réserver à une forme, pas à une liste. |
 
 Donnez `values` ou `regexp`, pas les deux. Sans l'un ni l'autre, la présence de
 l'en-tête suffit.
@@ -39,5 +40,5 @@ predicates:
 
 ## Notes
 
-Les noms d'en-tête ne sont pas sensibles à la casse, les valeurs le sont. Seule
+Les noms d'en-tête sont insensibles à la casse, les valeurs ne le sont pas. Seule
 la **première** valeur d'un en-tête répété est lue.

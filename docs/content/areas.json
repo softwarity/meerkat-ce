@@ -66,6 +66,22 @@
     }
   },
   {
+    "id": "pricing",
+    "icon": "sell",
+    "home": "pricing/index",
+    "prefixes": [
+      "pricing"
+    ],
+    "label": {
+      "en": "Pricing",
+      "fr": "Tarifs"
+    },
+    "short": {
+      "en": "Pricing",
+      "fr": "Tarifs"
+    }
+  },
+  {
     "id": "softwarity",
     "icon": "diversity_3",
     "home": "softwarity/index",

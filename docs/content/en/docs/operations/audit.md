@@ -204,8 +204,9 @@ export.
 ## Filters, retention, and what is missing
 
 The screen filters on the part of the trail (**All**, **Changes**, **Data plane
-sign-ins**, **Console sign-ins**), the target kind of a change, the period, and a free-text box that also searches the reason and the
-address. The API adds the actor and the target id: `GET /api/audit?kind=security`.
+sign-ins**, **Console sign-ins**), the target kind of a change, the period, and a
+free-text box that also searches the reason and the address. The API adds the
+actor and the target id: `GET /api/audit?kind=security`.
 
 **Retention** is a year by default, applied by the periodic sweep, and root
 chooses it at the top of the screen - three months, six, one, two or five years

@@ -45,9 +45,9 @@ is not a time-series database, and an installation that wants a year of curves
 pushes the counters over OTLP to a collector that writes them into the one it
 already runs ([metrics](/docs/operations/metrics)).
 
-[Logs](/docs/operations/logs) are structured. The level is set at startup only.
-An access log - one line per request crossing the front door -
-turns on when asked. It carries the same identifier as
+[Logs](/docs/operations/logs) are structured. The level is set at startup, and
+the console can change it live. An access log - one line per request crossing
+the front door - turns on when asked. It carries the same identifier as
 [traces](/docs/operations/tracing), which is the join between a line of the
 gateway's and a service's own business audit.
 
@@ -72,11 +72,11 @@ carries no account, no certificate and no secret value, so it is not a backup.
 > [!NOTE] Enterprise edition
 > Running several gateways against one PostgreSQL database is the Enterprise
 > image: the driver that opens the connection and waits on notifications lives
-> there. The community image tells you what it can do instead
-> of failing on a driver.
+> there. The community image tells you what it can do instead of failing on a
+> driver.
 
 > [!WARNING]
-> The vault's master key is a **file** beside the data directory, and it stays one
+> The vault's master key is a **file** in the data directory, and it stays one
 > even with an external database. Every node must carry the same key, or one node
 > cannot open what another sealed - certificates included. See
 > [the vault](/docs/operations/vault).

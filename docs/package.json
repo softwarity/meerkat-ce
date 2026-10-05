@@ -28,6 +28,7 @@
     "@angular/build": "^22.1.7",
     "@angular/cli": "^22.1.7",
     "@angular/compiler-cli": "^22.1.5",
+    "shiki": "^4.5.0",
     "typescript": "~6.0.0"
   }
 }

@@ -55,10 +55,10 @@ organisation and nobody names it.
 
 ## Traps
 
-- **Disabling an organisation cuts access for everyone in it** who needs one. It
-  deletes nothing.
+- **Disabling an organisation cuts access for everyone in it**, wherever an
+  organisation is required. It deletes nothing.
 - **Switching the gateway back to a single organisation serves the first one
-  only.** The others are not deleted, and the
-  **License** screen says how many are being held back.
+  only.** The others are not deleted, and the **License** screen says how many
+  are not being served.
 - **A member is not an account.** Create the account on
   [Users](/docs/console/users) first; here you place it.

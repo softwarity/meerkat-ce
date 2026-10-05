@@ -9,7 +9,9 @@
 # For the Enterprise image and the developer tunnel, see docker-compose.ee.yml.
 services:
   meerkat:
-    image: docker.io/softwarity/meerkat:latest
+    # MEERKAT_IMAGE picks another edition or a pinned version without editing
+    # this file: softwarity/meerkat:eval, or the image built for your licence.
+    image: ${MEERKAT_IMAGE:-docker.io/softwarity/meerkat:latest}
     ports:
       - "8080:8080" # application plane
       - "9090:9090" # control plane (admin console) - keep this one internal

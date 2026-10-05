@@ -34,5 +34,5 @@ anything that only reads the code - monitoring included, and the route's own
 metrics with it.
 
 The route's metrics and its circuit breaker both read the status that reaches the
-client, not the one the service sent. A `200` posed over a `502` therefore hides
+client, not the one the service sent. A `200` set over a `502` therefore hides
 the failure from them as well: the breaker counts a success and never opens.

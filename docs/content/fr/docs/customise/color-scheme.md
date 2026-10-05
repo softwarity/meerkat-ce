@@ -2,142 +2,153 @@
 title: Clair et sombre
 section: Personnalisation
 order: 255
-summary: Comment dire à la passerelle ce que votre application sait faire d'un schéma de couleur, et comment travailler avec une application qui garde le sien.
+summary: Comment indiquer à la gateway ce que votre application sait faire d'un mode clair ou sombre, et comment composer avec une application qui garde le sien.
 ---
 
 # Clair et sombre
 
-Un visiteur choisit clair ou sombre une fois, dans le bouton utilisateur, et il s'attend à ce que tout
-suive : les pages de Meerkat **et** l'application derrière. Les pages sont à nous de peindre.
-L'application est à vous, et aucune ne lit un schéma de la même façon - c'est pourquoi le mécanisme se
-déclare **sur la route** au lieu d'être deviné.
+Un visiteur choisit le clair ou le sombre une seule fois, dans le bouton utilisateur, et
+s'attend à ce que tout suive : les pages de Meerkat **et** l'application qui se trouve
+derrière. Les pages, c'est à nous de les peindre. L'application est la vôtre, et il n'y en a
+pas deux qui lisent ce mode de la même façon - c'est pourquoi le mécanisme se déclare **sur
+la route** au lieu d'être deviné.
 
-Cette page est écrite pour la personne qui intègre une application. Pour les pages que Meerkat sert
-lui-même, voir [les pages intégrées](/docs/customise/built-in-pages).
+Cette page s'adresse à la personne qui intègre une application. Pour les pages que Meerkat
+sert lui-même, voir [les pages intégrées](/docs/customise/built-in-pages).
 
-## Où vit le choix
+## Où est conservé le choix
 
-Le choix du visiteur est un cookie, `MEERKAT_SCHEME`, qui porte `light`, `dark` ou `auto`, gardé un an et
-en `SameSite=Lax`. Il est aussi stocké sur son compte, donc il est reposé sur un navigateur qui ne l'a
-jamais vu.
+Le choix du visiteur est un cookie, `MEERKAT_SCHEME`, qui contient `light`, `dark` ou `auto`,
+conservé un an et marqué `SameSite=Lax`. Il est aussi enregistré sur son compte, ce qui
+permet de le rétablir sur un navigateur qui ne l'a jamais vu.
 
-`auto` veut dire « suivre le système », et c'est le défaut : rien n'est imposé jusqu'à ce que quelqu'un
-choisisse.
+`auto` signifie "suivre le système", et c'est la valeur par défaut : rien n'est imposé tant
+que personne n'a choisi.
 
-## Ce que la passerelle fait toujours
+## Ce que la gateway fait toujours
 
-Sur une route UI dont le schéma n'est pas `none`, la passerelle injecte un petit agent. Quand un schéma
-est choisi, il pose sur `<html>` :
+Sur une route d'interface dont le mécanisme n'est pas `none`, la gateway injecte un petit
+agent. Quand un mode est choisi, il place sur `<html>` :
 
-- la propriété CSS `color-scheme`, pour que les contrôles de formulaire, les barres de défilement et le
- fond par défaut suivent ;
-- `data-meerkat-scheme="light"` ou `"dark"`, pour une application qui préfère lire un attribut qu'un
- style calculé.
+- la propriété CSS `color-scheme`, pour que les contrôles de formulaire, les barres de
+ défilement et le fond par défaut suivent ;
+- `data-meerkat-scheme="light"` ou `"dark"`, pour une application qui préfère lire un
+ attribut plutôt qu'un style calculé.
 
-Sur `auto` les deux sont retirés, et le navigateur revient à suivre le système.
+En `auto`, les deux sont retirés et le navigateur recommence à suivre le système.
 
-Cela suffit à une application dont le CSS est écrit sur `prefers-color-scheme` ou sur `light-dark()`.
-Tout ce qui suit est pour les applications qui basculent autrement.
+Cela suffit à une application dont le CSS repose sur `prefers-color-scheme` ou sur
+`light-dark()`. Tout ce qui suit concerne les applications qui basculent autrement.
 
 ## Déclarer le mécanisme
 
-Quatre réponses, et l'une d'elles est « il n'y a rien à basculer ».
+Quatre réponses possibles, dont l'une est "il n'y a rien à basculer".
 
-![Déclarer le schéma de couleur sur une route](img/console/route-editor-color-scheme.webp)
+![Déclarer le mode de couleur sur une route](img/console/route-editor-color-scheme.webp)
 
-| Mécanisme | Ce que la passerelle écrit | Balisage typique |
+| Mécanisme | Ce qu'écrit la gateway | Balisage type |
 |---|---|---|
-| *(aucun choisi)* | la propriété CSS `color-scheme` seule | votre CSS lit `prefers-color-scheme` |
-| `attribute` | **un** attribut, nommé par vous, toujours écrit, à la valeur claire ou à la sombre | `<html data-theme="dark">` |
-| `add-attribute` | les deux valeurs **sont** des noms d'attribut, posés nus et retirés comme des classes | `<body dark-theme>` |
-| `class` | les deux valeurs sont des noms de classe, les deux retirées et la courante ajoutée | `<body class="dark">` |
-| `none` | rien du tout | clair et sombre ne veulent rien dire pour cette UI |
+| *(aucun choisi)* | uniquement la propriété CSS `color-scheme` | votre CSS lit `prefers-color-scheme` |
+| `attribute` | **un seul** attribut, que vous nommez, toujours écrit, avec la valeur du clair ou celle du sombre | `<html data-theme="dark">` |
+| `add-attribute` | les deux valeurs **sont** des noms d'attributs, ajoutés sans valeur et retirés comme des classes | `<body dark-theme>` |
+| `class` | les deux valeurs sont des noms de classes ; les deux sont retirées, puis celle du mode en cours est ajoutée | `<body class="dark">` |
+| `none` | rien du tout | le clair et le sombre n'ont aucun sens pour cette interface |
 
-Deux champs de plus le façonnent :
+Deux autres champs le précisent :
 
-- **la balise**, `html` sauf indication contraire. Une application qui lit son thème sur `<body>` ne l'a
- jamais vu sur `<html>`, et c'est de loin la première raison pour laquelle une bascule a l'air de ne
- rien faire.
-- **la valeur claire et la valeur sombre.** Pour `attribute` ce sont les deux valeurs de l'attribut ;
- pour les deux autres ce sont les noms eux-mêmes.
+- **la balise**, `html` sauf indication contraire. Une application qui lit son thème sur
+ `<body>` ne le verra jamais sur `<html>`, et c'est de loin la raison la plus fréquente pour
+ laquelle une bascule semble ne rien faire.
+- **la valeur du clair et la valeur du sombre.** Pour `attribute`, ce sont les deux valeurs
+ de l'attribut ; pour les deux autres, ce sont les noms eux-mêmes.
 
-D'où le fait qu'une **valeur vide veut dire quelque chose** dans les deux derniers : rien sur la balise
-dans cet état. C'est la forme la plus répandue qui existe - rien en clair, `dark` en sombre :
+C'est ce qui donne un **sens à une valeur vide** dans ces deux derniers mécanismes : rien
+n'est posé sur la balise dans cet état. C'est le cas de figure le plus répandu - rien en
+clair, `dark` en sombre :
 
 | Mécanisme | clair | sombre | Résultat |
 |---|---|---|---|
 | `class` | *(vide)* | `dark` | `<body>` en clair, `<body class="dark">` en sombre |
 | `add-attribute` | *(vide)* | `dark-theme` | `<body>` en clair, `<body dark-theme>` en sombre |
-| `attribute` sur `data-theme` | `light` | `dark` | toujours écrit, l'un ou l'autre |
+| `attribute` sur `data-theme` | `light` | `dark` | toujours écrit, avec l'une ou l'autre valeur |
 
-La balise n'est peut-être pas encore analysée - l'agent tourne depuis le head, exprès, pour que `<html>`
-soit habillé avant le premier rendu. Un `<body>` qui n'existe pas encore est rattrapé une fois le document
-analysé, et jamais écrit sur `<html>` à la place : une classe laissée sur le mauvais élément est un thème
-que rien ne retire.
+Il se peut que la balise n'ait pas encore été analysée - l'agent s'exécute dès l'en-tête du
+document, à dessein, pour que `<html>` soit habillé avant le premier affichage. Un `<body>`
+qui n'existe pas encore est traité dès que le document est analysé, et l'agent n'écrit jamais
+sur `<html>` à sa place : une classe laissée sur le mauvais élément est un thème que plus
+rien ne retire.
 
-## Ce que "none" veut dire, et ce que ce n'est pas
+## Ce que "none" veut dire, et ce qu'il ne veut pas dire
 
-`none` dit que cette UI n'a **aucun schéma de couleur à elle**. Ce n'est pas « elle prend la propriété CSS
-`color-scheme` et rien de plus » - ça, c'est laisser le mécanisme vide. C'est : clair et sombre ne veulent
-rien dire ici.
+`none` déclare que cette interface n'a **aucun mode de couleur qui lui soit propre**. Cela ne
+veut pas dire "elle prend la propriété CSS `color-scheme` et rien de plus" - cela, c'est
+laisser le mécanisme vide. Cela veut dire : le clair et le sombre n'ont aucun sens ici.
 
-La bascule n'est alors pas offerte dans le bouton utilisateur, et l'agent laisse le document tranquille.
+La bascule n'est alors pas proposée dans le bouton utilisateur, et l'agent ne touche pas au
+document.
 
-## Offrir la bascule, et habiller le bouton
+## Proposer la bascule, et habiller le bouton
 
-Deux choses qui voyageaient ensemble et qui sont maintenant séparées :
+Deux choses qui allaient autrefois de pair et sont désormais séparées :
 
-- **offrir la bascule** est de l'habillage. Ça appartient au bouton utilisateur, et une route peut
- l'offrir ou non.
-- **comment l'application consomme un schéma** appartient à la route, et reste vrai quel que soit celui
- qui offre la bascule - y compris une barre de [portail](/docs/customise/portal), où il n'y a pas de
- bouton par route auquel l'accrocher.
+- **proposer la bascule** relève de l'habillage. Cela appartient au bouton utilisateur, et
+ une route peut la proposer ou non.
+- **la façon dont l'application reçoit un mode** appartient à la route, et vaut quel que soit
+ l'élément qui propose la bascule - y compris une barre de [portail](/docs/customise/portal),
+ où il n'y a pas de bouton propre à la route auquel la rattacher.
 
-Quand une route n'offre **pas** la bascule, elle dit à la place ce que le bouton injecté porte lui-même :
-clair, sombre, ou le choix de la personne. Ça existe pour l'application qui n'a qu'un seul aspect et pas
-de bascule, où le bouton suit sinon le système du visiteur et flotte en clair sur une page sombre. Ça
-habille l'habillage seul ; la page n'est jamais touchée.
+Quand une route ne propose **pas** la bascule, elle indique à la place ce que porte le bouton
+injecté lui-même : le clair, le sombre ou le choix du visiteur. Ce réglage existe pour
+l'application qui n'a qu'une seule apparence et pas de bascule : sans lui, le bouton suit le
+système du visiteur et se retrouve en clair sur une page sombre. Il n'habille que l'élément
+injecté ; la page n'est jamais modifiée.
 
 ## Les applications qui gardent leur propre thème
 
-Voici le cas qui mord, et la raison d'être de cette page.
+Voici le cas qui fait mal, et la raison d'être de cette page.
 
-Une application qui mémorise son clair ou sombre dans `localStorage` **le restaure au chargement**,
-par-dessus ce que la passerelle vient d'appliquer. Le choix du visiteur tient jusqu'à ce que le script de
-l'application tourne, puis il revient en arrière. Le même portail a alors l'air juste dans un navigateur
-et faux dans un autre, et ce qui diffère n'est que ce que ce navigateur avait en réserve.
+Une application qui mémorise son propre mode clair ou sombre dans `localStorage` **le
+rétablit au chargement**, par-dessus ce que la gateway vient d'appliquer. Le choix du
+visiteur tient jusqu'à l'exécution du script de l'application, puis l'ancien mode revient
+brutalement. Le même portail paraît alors correct dans un navigateur et faux dans un autre,
+et la seule différence tient à ce que ce navigateur avait en mémoire.
 
-Lutter sur le document ne marche pas. La façon de travailler **avec** est de parler son propre stockage.
+Lutter contre cela au niveau du document ne fonctionne pas. La solution consiste à composer
+**avec** l'application, en écrivant dans son propre stockage.
 
 | Champ | Ce que c'est |
 |---|---|
-| Surcharger son stockage | l'interrupteur. Sans lui la passerelle ne touche jamais au stockage de l'application |
-| Clé | la clé `localStorage` sous laquelle l'application garde son choix : `theme`, `color-mode`, `vuetify:theme`... |
-| Valeur claire | ce qu'il faut écrire pour le clair. `light` par défaut |
-| Valeur sombre | ce qu'il faut écrire pour le sombre. `dark` par défaut |
-| Valeur auto | comment « suivre le système » s'appelle là-bas. **Vide retire l'entrée** à la place |
+| Override the application's stored theme | l'interrupteur. Sans lui, la gateway ne touche jamais au stockage de l'application |
+| Key | la clé `localStorage` sous laquelle l'application range son choix : `theme`, `color-mode`, `vuetify:theme`... |
+| Light | ce qu'il faut écrire pour le clair. Par défaut `light` |
+| Dark | ce qu'il faut écrire pour le sombre. Par défaut `dark` |
+| System | le nom que porte "suivre le système" dans cette application. **Laissé vide, l'entrée est supprimée** |
 
-Les valeurs sont le **vocabulaire propre** de l'application - `dark`, `night`, `1` - et la passerelle ne
-les devine pas : deviner serait écrire un dialecte que nous ne parlons pas.
+Ces valeurs appartiennent au **vocabulaire de l'application** - `dark`, `night`, `1` - et la
+gateway ne cherche pas à les deviner : deviner reviendrait à écrire dans un dialecte que
+nous ne parlons pas.
 
-Une valeur auto vide est un choix à part entière : sans rien en réserve, l'application retombe sur son
-propre défaut, qui pour la plupart d'entre elles *est* le système.
+Une valeur System vide est un choix à part entière : quand rien n'est stocké, l'application
+retombe sur son propre comportement par défaut qui, pour la plupart d'entre elles, *est* de
+suivre le système.
 
-L'écriture se fait dans un script en ligne placé **avant** le script de démarrage de l'application, pour
-que la valeur soit déjà en place quand l'application la lit pour la première fois - et l'habillage hérite
-alors simplement du document.
+L'écriture est faite par un script en ligne placé **avant** le script de démarrage de
+l'application : la valeur est donc déjà en place quand l'application la lit pour la première
+fois - et l'habillage injecté n'a plus qu'à hériter du document.
 
 > [!TIP]
-> `ng-m3-theme` de l'écosystème Softwarity est le cas qui a enseigné ça : son service garde `system`,
-> `light` ou `dark` sous une clé, et en mode `system` il **efface** la propriété `color-scheme` du document
-> à chaque passage. Tout ce que la passerelle posait était balayé un tick plus tard. Écrire le choix dans
-> cette clé laisse au contraire l'application l'appliquer comme elle sait déjà le faire, avant son premier
-> rendu - donc ici la valeur auto est `system`, et non vide.
+> `ng-m3-theme`, de l'écosystème Softwarity, est le cas qui nous l'a appris : son service
+> conserve `system`, `light` ou `dark` sous une clé et, en mode `system`, il **efface** la
+> propriété `color-scheme` du document à chaque exécution. Tout ce que posait la gateway
+> disparaissait l'instant d'après. Écrire le choix dans cette clé laisse au contraire
+> l'application l'appliquer comme elle sait déjà le faire, avant son premier affichage - ici,
+> la valeur System est donc `system`, et non vide.
 
-## Le déboguer
+## Déboguer
 
-Ce que la route a déclaré voyage sur la balise de script de l'agent, donc un coup d'oeil au HTML servi dit
-ce que la passerelle croit avoir reçu :
+Ce que la route a déclaré est transporté par la balise de script de l'agent lui-même : un
+coup d'œil au HTML servi suffit pour savoir ce que la gateway pense avoir reçu comme
+consigne :
 
 ```html
 <script defer src="/meerkat/page.js"
@@ -152,5 +163,5 @@ ce que la passerelle croit avoir reçu :
  data-scheme-storage-auto="system"></script>
 ```
 
-Si un champ que vous avez rempli est absent là, la route ne l'a pas enregistré. S'il est présent et que
-rien ne se passe, c'est la balise qui est en général la réponse.
+Si un champ que vous avez rempli n'y figure pas, la route ne l'a pas enregistré. S'il y
+figure et que rien ne se passe, la cause est le plus souvent la balise.

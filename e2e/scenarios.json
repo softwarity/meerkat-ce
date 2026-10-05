@@ -5,31 +5,31 @@
       "id": "root",
       "username": "admin",
       "en": "Root: full control of the gateway",
-      "fr": "Root : contrôle complet du gateway"
+      "fr": "Root : contrôle total de la gateway"
     },
     {
       "id": "infra-admin",
       "username": "gwadmin",
       "en": "Gateway admin: routes and built-in pages only",
-      "fr": "Admin gateway : routes et pages intégrées uniquement"
+      "fr": "Admin infra : les routes et les pages intégrées uniquement"
     },
     {
       "id": "app-admin",
       "username": "appadmin",
       "en": "Application admin: users, roles and identity settings only",
-      "fr": "Admin appli : utilisateurs, rôles et réglages d'identité uniquement"
+      "fr": "Admin applicatif : les utilisateurs, les rôles et les réglages d'identité uniquement"
     },
     {
       "id": "tenant-admin",
       "username": "tadmin",
       "en": "Tenant admin: ADMIN member of the acme tenant",
-      "fr": "Admin tenant : membre ADMIN du tenant acme"
+      "fr": "Admin d'organisation : membre ADMIN de l'organisation acme"
     },
     {
       "id": "user",
       "username": "alice",
       "en": "Plain user: USER member of the acme tenant, no capability",
-      "fr": "Utilisateur simple : membre USER du tenant acme, aucune capacité"
+      "fr": "Simple utilisateur : membre USER de l'organisation acme, sans aucune capacité"
     }
   ],
   "scenarios": [
@@ -51,7 +51,7 @@
       },
       "description": {
         "en": "The routing plane belongs to the gateway scope: only root and infra-admin may read the route table; every other profile gets 403.",
-        "fr": "Le plan de routage appartient au périmètre gateway : seuls root et l'admin gateway lisent la table des routes ; tout autre profil reçoit 403."
+        "fr": "Le plan de routage relève du périmètre de la gateway : seuls root et l'admin infra peuvent lire la table des routes ; tous les autres profils reçoivent un 403."
       }
     },
     {
@@ -72,11 +72,11 @@
       ],
       "title": {
         "en": "Deposit an OpenAPI spec on a route",
-        "fr": "Déposer une spec OpenAPI sur une route"
+        "fr": "Déposer une spécification OpenAPI sur une route"
       },
       "description": {
         "en": "A route may hold its contract as a deposited file rather than an upstream url, and the gateway then serves it on the route's own prefix. Depositing belongs to the routing plane: root and infra-admin only, every other profile gets 403. The probe names a route that does not exist, so an allowed caller gets 404 - which proves the barrier without depending on a fixture route.",
-        "fr": "Une route peut porter son contrat sous forme de fichier déposé plutôt que d'URL amont, et la gateway le sert alors sur le préfixe de la route. Le dépôt appartient au plan de routage : root et l'admin gateway seulement, tout autre profil reçoit 403. La sonde nomme une route inexistante, donc un appelant autorisé reçoit 404, ce qui prouve la barrière sans dépendre d'une route de fixture."
+        "fr": "Une route peut porter son contrat sous la forme d'un fichier déposé plutôt que d'une URL upstream ; la gateway le sert alors sous le préfixe de la route. Le dépôt relève du plan de routage : root et l'admin infra uniquement, tous les autres profils reçoivent un 403. La sonde désigne une route qui n'existe pas, si bien qu'un appelant autorisé reçoit un 404 - ce qui prouve la barrière sans dépendre d'une route créée pour le test."
       }
     },
     {
@@ -97,11 +97,11 @@
       ],
       "title": {
         "en": "Choose which operations of a route are audited",
-        "fr": "Choisir les opérations auditées d'une route"
+        "fr": "Choisir les opérations d'une route qui sont auditées"
       },
       "description": {
         "en": "An audited operation's calls become audit events sent to the OpenTelemetry collector, with the caller, the status, the trace id and the fields the operation names. Choosing them belongs to the routing plane: root and infra-admin only, every other profile gets 403. The probe names a route that does not exist, so an allowed caller gets 404.",
-        "fr": "Les appels d'une opération auditée deviennent des événements d'audit envoyés au collecteur OpenTelemetry, avec l'appelant, le statut, le trace id et les champs que l'opération nomme. Les choisir appartient au plan de routage : root et l'admin gateway seulement, tout autre profil reçoit 403. La sonde nomme une route inexistante, donc un appelant autorisé reçoit 404."
+        "fr": "Les appels d'une opération auditée deviennent des événements d'audit envoyés au collecteur OpenTelemetry, avec l'appelant, le statut, l'identifiant de trace et les champs que l'opération désigne. Ce choix relève du plan de routage : root et l'admin infra uniquement, tous les autres profils reçoivent un 403. La sonde désigne une route qui n'existe pas, si bien qu'un appelant autorisé reçoit un 404."
       }
     },
     {
@@ -121,11 +121,11 @@
       ],
       "title": {
         "en": "Remove a route's deposited spec",
-        "fr": "Retirer la spec déposée d'une route"
+        "fr": "Retirer la spécification déposée sur une route"
       },
       "description": {
         "en": "Removing drops the file AND the declaration that names it, in one move: a route left pointing at a file that is gone is the dangling reference this feature exists to avoid. Same plane and same holders as the deposit.",
-        "fr": "Le retrait supprime le fichier ET la déclaration qui le nomme, d'un seul geste : une route qui pointe vers un fichier absent est justement la référence pendante que cette fonction évite. Même plan et mêmes porteurs que le dépôt."
+        "fr": "Le retrait supprime d'un seul geste le fichier ET la déclaration qui le nomme : une route qui pointerait encore vers un fichier disparu est précisément la référence orpheline que cette fonctionnalité doit éviter. Même plan et mêmes titulaires que pour le dépôt."
       }
     },
     {
@@ -150,11 +150,11 @@
       ],
       "title": {
         "en": "Preview a version predicate",
-        "fr": "Aperçu d'un prédicat de version"
+        "fr": "Prévisualiser un prédicat de version"
       },
       "description": {
         "en": "The editor asks the ENGINE what a version pattern extracts while it is being typed, rather than guessing in the browser: Go uses RE2, which refuses lookarounds JavaScript allows, so a preview computed there would promise a match the gateway turns down at save. It reads and writes nothing, but it belongs to the routing plane and follows the route table's scope.",
-        "fr": "L'éditeur demande au MOTEUR ce qu'un motif de version extrait pendant la frappe, plutôt que de deviner dans le navigateur : Go utilise RE2, qui refuse des lookarounds que JavaScript accepte, donc un aperçu calculé là promettrait une correspondance que la gateway refuse à l'enregistrement. Il ne lit ni n'écrit rien, mais il appartient au plan de routage et suit le périmètre de la table des routes."
+        "fr": "Pendant la saisie, l'éditeur demande au MOTEUR ce qu'extrait un motif de version, au lieu de le deviner dans le navigateur : Go utilise RE2, qui refuse des lookarounds que JavaScript accepte, et un aperçu calculé côté navigateur promettrait donc une correspondance que la gateway rejetterait à l'enregistrement. L'appel ne lit et n'écrit rien, mais il relève du plan de routage et suit le périmètre de la table des routes."
       }
     },
     {
@@ -170,12 +170,12 @@
         "infra-admin"
       ],
       "title": {
-        "en": "Read the brick catalog",
-        "fr": "Lire le catalogue de briques"
+        "en": "Read the brick catalogue",
+        "fr": "Lire le catalogue des briques"
       },
       "description": {
-        "en": "The predicates/modifiers catalog drives the route editor: gateway scope.",
-        "fr": "Le catalogue des prédicats/modificateurs alimente l'éditeur de routes : périmètre gateway."
+        "en": "The catalogue of predicates and filters drives the route editor: gateway scope.",
+        "fr": "Le catalogue des prédicats et des filtres alimente l'éditeur de route : périmètre de la gateway."
       }
     },
     {
@@ -195,8 +195,8 @@
         "fr": "Gérer les thèmes des pages intégrées"
       },
       "description": {
-        "en": "The flow pages (login, profile) carry the PRODUCT's face — name, logo, colours — so their themes and branding are application scope. The gateway merely serves them.",
-        "fr": "Les pages de flux (login, profil) portent le visage du PRODUIT — nom, logo, couleurs — donc leurs thèmes et le branding sont du périmètre application. Le gateway ne fait que les servir."
+        "en": "The flow pages (login, profile) carry the PRODUCT's face - name, logo, colours - so their themes and branding are application scope. The gateway merely serves them.",
+        "fr": "Les pages des parcours (connexion, profil) portent le visage du PRODUIT - son nom, son logo, ses couleurs - et leurs thèmes comme leur marque relèvent donc du périmètre de l'application. La gateway ne fait que les servir."
       }
     },
     {
@@ -217,7 +217,7 @@
       },
       "description": {
         "en": "The wordings of the sign-in page are the PRODUCT speaking, so they sit in application scope beside its theme and its brand. The same right covers correcting a shipped catalogue and adding a language the binary does not carry.",
-        "fr": "Les libellés de la page de connexion sont le PRODUIT qui parle : ils sont donc du périmètre application, à côté de son thème et de sa marque. Le même droit couvre la correction d'un catalogue livré et l'ajout d'une langue que le binaire ne porte pas."
+        "fr": "Les libellés de la page de connexion, c'est le PRODUIT qui parle : ils relèvent donc du périmètre de l'application, à côté de son thème et de sa marque. Le même droit permet de corriger un catalogue livré et d'ajouter une langue que le binaire n'embarque pas."
       }
     },
     {
@@ -238,7 +238,7 @@
       },
       "description": {
         "en": "The user base is the application's identity: app-admin scope. A gateway admin has no business reading it.",
-        "fr": "La base d'utilisateurs est l'identité de l'application : périmètre admin appli. Un admin gateway n'a pas à la lire."
+        "fr": "La base des utilisateurs, c'est l'identité de l'application : périmètre de l'admin applicatif. Un admin infra n'a aucune raison de la lire."
       }
     },
     {
@@ -259,7 +259,7 @@
       },
       "description": {
         "en": "The global hierarchical role catalogue (RBAC-01) is application scope.",
-        "fr": "Le catalogue global hiérarchique de rôles (RBAC-01) est du périmètre applicatif."
+        "fr": "Le catalogue global et hiérarchique des rôles (RBAC-01) relève du périmètre de l'application."
       }
     },
     {
@@ -280,7 +280,7 @@
       },
       "description": {
         "en": "A directory or an identity provider is a third-party service reached by URL, with credentials: infra plane. An app admin configures who may do what, not what the gateway connects to.",
-        "fr": "Un annuaire ou un fournisseur d'identité est un service tiers atteint par URL, avec des identifiants : plan infra. Un admin appli règle qui peut quoi, pas ce à quoi la gateway se connecte."
+        "fr": "Un annuaire ou un fournisseur d'identité est un service tiers, joint par une URL et avec des identifiants : plan infra. Un admin applicatif décide qui peut faire quoi, pas ce à quoi la gateway se connecte."
       }
     },
     {
@@ -303,11 +303,11 @@
       ],
       "title": {
         "en": "Probe where a request lands",
-        "fr": "Tester où atterrit une requête"
+        "fr": "Tester où aboutit une requête"
       },
       "description": {
         "en": "Runs a request through the live matcher and reports every route's verdict, in order. Routing is the infra plane's: an app admin cannot inspect it.",
-        "fr": "Passe une requête dans le moteur de correspondance actif et rapporte le verdict de chaque route, dans l'ordre. Le routage relève du plan infra : un admin appli ne peut pas l'inspecter."
+        "fr": "Fait passer une requête dans le moteur de correspondance en service et rapporte le verdict de chaque route, dans l'ordre. Le routage appartient au plan infra : un admin applicatif ne peut pas l'inspecter."
       }
     },
     {
@@ -337,7 +337,7 @@
       },
       "description": {
         "en": "Seals the entries the caller administers under a passphrase, and only those: an app admin's export holds no infrastructure entry, a tenant admin's holds only their organisation's. This is the half a configuration export never carries, which is what lets a configuration be public. A profile administering no vault at all is refused; 422 means the caller's scopes hold nothing yet.",
-        "fr": "Scelle les entrées que l'appelant administre, et elles seules : l'export d'un admin appli ne contient aucune entrée d'infrastructure, celui d'un admin de tenant seulement celles de son organisation. C'est la moitié qu'un export de configuration ne porte jamais, ce qui est précisément ce qui permet à une configuration d'être publique. Un profil qui n'administre aucun coffre est refusé ; 422 signifie que ses périmètres ne contiennent encore rien."
+        "fr": "Scelle sous une phrase secrète les entrées que l'appelant administre, et seulement celles-là : l'export d'un admin applicatif ne contient aucune entrée d'infrastructure, celui d'un admin d'organisation uniquement celles de son organisation. C'est la moitié qu'un export de configuration n'emporte jamais, et c'est ce qui permet à une configuration d'être publique. Un profil qui n'administre aucun coffre est refusé ; un 422 signifie que les périmètres de l'appelant ne contiennent encore rien."
       }
     },
     {
@@ -356,8 +356,8 @@
         "fr": "Exporter toute la configuration"
       },
       "description": {
-        "en": "Downloads routes, roles, authorities, mail relay, themes and settings as one YAML file. Root only: a configuration crosses both planes at once, so administering one of them is not enough. Secrets never travel — a declared secret field leaves as its $name reference or not at all, which is what makes the file safe to put in a ticket or a git repository.",
-        "fr": "Télécharge routes, rôles, autorités, relais mail, thèmes et paramètres dans un seul fichier YAML. Root uniquement : une configuration traverse les deux plans à la fois, en administrer un seul ne suffit donc pas. Les secrets ne voyagent jamais : un champ secret déclaré part sous forme de référence $nom ou pas du tout, ce qui rend le fichier partageable dans un ticket ou un dépôt git."
+        "en": "Downloads routes, roles, authorities, mail relay, themes and settings as one YAML file. Root only: a configuration crosses both planes at once, so administering one of them is not enough. Secrets never travel - a declared secret field leaves as its $name reference or not at all, which is what makes the file safe to put in a ticket or a git repository.",
+        "fr": "Télécharge les routes, les rôles, les autorités, le relais de messagerie, les thèmes et les réglages dans un seul fichier YAML. Réservé à root : une configuration couvre les deux plans à la fois, et n'en administrer qu'un ne suffit donc pas. Les secrets ne voyagent jamais - un champ déclaré secret part sous la forme de sa référence $nom, ou ne part pas du tout, et c'est ce qui permet de joindre le fichier à un ticket ou de le ranger dans un dépôt git sans risque."
       }
     },
     {
@@ -373,11 +373,11 @@
       ],
       "title": {
         "en": "What an export will not contain",
-        "fr": "Ce que l'export ne contiendra pas"
+        "fr": "Ce qu'un export ne contiendra pas"
       },
       "description": {
         "en": "Lists the secret fields holding a literal rather than a vault reference: they stay behind, so the console can say so next to the download button, while the admin can still act on it. Lists as well every $name the configuration expects, which is what the target gateway will have to hold in its own vault.",
-        "fr": "Liste les champs secrets qui portent une valeur en clair plutôt qu'une référence au coffre : ils ne partiront pas, la console peut donc le dire à côté du bouton de téléchargement, au moment où l'admin peut encore agir. Liste aussi tous les $nom attendus par la configuration, c'est-à-dire ce que le coffre de la gateway cible devra contenir."
+        "fr": "Liste les champs secrets qui contiennent une valeur littérale au lieu d'une référence au coffre : ils ne partiront pas, et la console peut ainsi le dire à côté du bouton de téléchargement, tant que l'administrateur peut encore y remédier. Liste aussi tous les $nom que la configuration attend, c'est-à-dire ce que la gateway de destination devra avoir dans son propre coffre."
       }
     },
     {
@@ -401,11 +401,11 @@
       ],
       "title": {
         "en": "Preview what importing a file would do",
-        "fr": "Prévisualiser ce qu'un import ferait"
+        "fr": "Prévisualiser l'effet de l'import d'un fichier"
       },
       "description": {
         "en": "Reports what an imported file would add, change or remove, and which vault entries it expects that the vault does not hold, without writing anything. That preview is the one moment an admin still knows what a given secret was, which is why the missing ones are asked for right there.",
-        "fr": "Rapporte ce qu'un fichier importé ajouterait, modifierait ou supprimerait, et quelles entrées de coffre il attend sans que le coffre les possède, sans rien écrire. Cette prévisualisation est le seul moment où l'admin sait encore à quoi correspond un secret donné : c'est donc là qu'on demande ceux qui manquent."
+        "fr": "Indique, sans rien écrire, ce qu'un fichier importé ajouterait, modifierait ou supprimerait, et quelles entrées de coffre il attend alors que le coffre ne les contient pas. Cet aperçu est le seul moment où un administrateur sait encore à quoi correspondait tel secret : c'est pourquoi les entrées manquantes sont demandées à cet endroit précis."
       }
     },
     {
@@ -425,7 +425,7 @@
       },
       "description": {
         "en": "Several configurations coexist and one is active (CFG-02). Root only, like export and import and for the same reason: a configuration crosses both planes at once, so whoever handles one administers both. Reading stays open on the community image - what the Enterprise one adds is KEEPING several - so an installation coming down from it still sees what it saved.",
-        "fr": "Plusieurs configurations coexistent, une seule est active (CFG-02). Root uniquement, comme l'export et l'import et pour la même raison : une configuration traverse les deux plans à la fois, donc qui en manipule une administre les deux. La lecture reste ouverte sur l'image communautaire - c'est d'en GARDER plusieurs que l'édition Enterprise ajoute - donc une installation qui en redescend voit toujours ce qu'elle a enregistré."
+        "fr": "Plusieurs configurations coexistent et une seule est active (CFG-02). Réservé à root, comme l'export et l'import et pour la même raison : une configuration couvre les deux plans à la fois, et celui qui en manipule une administre donc les deux. La lecture reste ouverte sur l'image Community - ce qu'ajoute l'image Enterprise, c'est d'en CONSERVER plusieurs - si bien qu'une installation qui redescend d'Enterprise voit toujours ce qu'elle avait enregistré."
       }
     },
     {
@@ -446,7 +446,7 @@
       },
       "description": {
         "en": "The named git locations a configuration travels through (CFG-07): a repository, a branch and a directory each, so the same repository can hold one directory per customer platform. Root only, like every configuration - a location names a repository and a vault reference for its token, which is the installation's own business.",
-        "fr": "Les emplacements git nommés par lesquels une configuration voyage (CFG-07) : un dépôt, une branche et un répertoire chacun, de sorte qu'un même dépôt tient un répertoire par plateforme cliente. Root seulement, comme toute configuration : un emplacement nomme un dépôt et une référence de coffre pour son jeton, ce qui est l'affaire de l'installation elle-même."
+        "fr": "Les emplacements git nommés par lesquels transite une configuration (CFG-07) : chacun désigne un dépôt, une branche et un répertoire, si bien qu'un même dépôt peut contenir un répertoire par plateforme cliente. Réservé à root, comme tout ce qui touche aux configurations - un emplacement désigne un dépôt et une référence de coffre pour son jeton, et cela ne regarde que l'installation."
       }
     },
     {
@@ -466,11 +466,11 @@
       ],
       "title": {
         "en": "Check a git location without writing to it",
-        "fr": "Vérifier un emplacement git sans rien y écrire"
+        "fr": "Vérifier un emplacement git sans y écrire"
       },
       "description": {
         "en": "Proves the repository answers, the credential is accepted and the branch exists, and writes nothing - so a wrong token is found on the screen that sets it rather than during the first push of a real change. A refused credential comes back with what that forge actually wants, because every forge reports a missing permission and a wrong basic-auth username as the same sentence. The probe names a location that does not exist, so a 404 proves the barrier without a fixture.",
-        "fr": "Prouve que le dépôt répond, que l'identifiant est accepté et que la branche existe, sans rien écrire : un mauvais jeton se découvre sur l'écran qui le pose, pas au premier push d'un vrai changement. Un identifiant refusé revient avec ce que cette forge demande réellement, parce que toutes rapportent une permission manquante et un mauvais nom d'utilisateur HTTP de la même façon. La sonde nomme un emplacement inexistant : le 404 prouve la barrière sans fixture."
+        "fr": "Prouve que le dépôt répond, que l'identifiant est accepté et que la branche existe, sans rien écrire - un mauvais jeton se découvre ainsi sur l'écran où on le saisit, et non lors du premier push d'un vrai changement. Un identifiant refusé revient accompagné de ce que cette forge attend réellement, car toutes les forges signalent une permission manquante et un mauvais nom d'utilisateur basic-auth par la même phrase. La sonde désigne un emplacement qui n'existe pas : un 404 prouve donc la barrière sans donnée de test."
       }
     },
     {
@@ -490,11 +490,11 @@
       ],
       "title": {
         "en": "Pull a configuration from git, applying nothing",
-        "fr": "Tirer une configuration depuis git sans rien appliquer"
+        "fr": "Tirer une configuration depuis git, sans rien appliquer"
       },
       "description": {
         "en": "Reads a configuration out of its git location and SHELVES it: the document lands as a saved copy and the gateway goes on serving what it serves. The answer carries the plan - what activating it would add, change and remove - because the loop is pull, read, activate, read again. Whoever can write to the branch must not be able to reconfigure the gateway, which is why nothing here applies.",
-        "fr": "Lit une configuration dans son emplacement git et la RANGE : le document arrive comme copie enregistrée et la passerelle continue de servir ce qu'elle servait. La réponse porte le plan - ce qu'activer ajouterait, modifierait et retirerait - parce que la boucle est tirer, lire, activer, relire. Qui peut écrire sur la branche ne doit pas pouvoir reconfigurer la passerelle : c'est pourquoi rien ici n'applique."
+        "fr": "Lit une configuration dans son emplacement git et la MET DE CÔTÉ : le document arrive comme une copie enregistrée, et la gateway continue de servir ce qu'elle servait. La réponse contient le plan - ce que l'activation ajouterait, modifierait et retirerait - car la boucle est : tirer, lire, activer, relire. Quiconque peut écrire sur la branche ne doit pas pouvoir reconfigurer la gateway ; c'est pourquoi rien n'est appliqué ici."
       }
     },
     {
@@ -517,8 +517,8 @@
         "fr": "Pousser une configuration enregistrée vers git"
       },
       "description": {
-        "en": "Commits the SAVED copy to its git location, attributed to the operator who clicked - which is what links the audit trail to the repository's history. A branch that has moved since this configuration was last read from it is a refusal with a cure (pull it into a copy and compare), never a force push.",
-        "fr": "Committe la copie ENREGISTRÉE dans son emplacement git, attribuée à l'opérateur qui a cliqué : c'est ce qui relie la piste d'audit à l'historique du dépôt. Une branche qui a bougé depuis la dernière lecture est un refus accompagné du remède (tirer dans une copie et comparer), jamais un push forcé."
+        "en": "Commits the SAVED copy to its git location, attributed to the operator who clicked - which is what links the audit trail to the repository's history. A push replaces the location's directory, whatever is there, and never rewrites history: what it replaced stays in the repository's log. The one refusal left is somebody else pushing at the very same moment, and the cure is to push again.",
+        "fr": "Committe la copie ENREGISTRÉE dans son emplacement git, au nom de l'opérateur qui a cliqué - c'est ce qui relie le journal d'audit à l'historique du dépôt. Un push remplace le répertoire de l'emplacement, quel que soit son contenu, et ne réécrit jamais l'historique : ce qu'il a remplacé reste dans le journal du dépôt. Le seul refus restant est celui d'un autre push qui arrive au même moment, et le remède consiste à pousser de nouveau."
       }
     },
     {
@@ -542,11 +542,11 @@
       ],
       "title": {
         "en": "Send a mail relay test message",
-        "fr": "Envoyer un e-mail de test du relais"
+        "fr": "Envoyer un message de test par le relais de messagerie"
       },
       "description": {
-        "en": "The mail relay is infrastructure (a third party host with credentials): only infra admins may fire the test (422 while it is not configured).",
-        "fr": "Le relais mail est de l'infrastructure (un hôte tiers avec identifiants) : seuls les admins infra déclenchent le test (422 tant qu'il n'est pas configuré)."
+        "en": "The mail relay is infrastructure (a third-party host with credentials): only infra admins may fire the test (422 while it is not configured).",
+        "fr": "Le relais de messagerie relève de l'infrastructure (un hôte tiers, avec des identifiants) : seuls les admins infra peuvent déclencher le test (422 tant que le relais n'est pas configuré)."
       }
     },
     {
@@ -563,11 +563,11 @@
       ],
       "title": {
         "en": "List every account's application tokens",
-        "fr": "Lister les jetons d'application de chaque compte"
+        "fr": "Lister les jetons d'application de tous les comptes"
       },
       "description": {
         "en": "The tokens each person created on their profile to call the applications' APIs (AUTH-09), with their owner: what an application administrator needs to find the one a departed colleague's script still carries, or the one that leaked.",
-        "fr": "Les jetons que chacun a créés sur son profil pour appeler les API des applications (AUTH-09), avec leur propriétaire : ce qu'il faut à un administrateur d'application pour retrouver celui qu'un script d'un collègue parti porte encore, ou celui qui a fuité."
+        "fr": "Les jetons que chacun a créés sur son profil pour appeler les API des applications (AUTH-09), avec leur propriétaire : ce qu'il faut à un administrateur d'application pour retrouver le jeton qu'utilise encore le script d'un collègue parti, ou celui qui a fuité."
       }
     },
     {
@@ -591,7 +591,7 @@
       },
       "description": {
         "en": "Ends it at its next call, and writes token.revoke to the owner's line of the trail. An administrator ends a token here, never mints one: a credential is only created by its owner.",
-        "fr": "Le termine à son prochain appel, et écrit token.revoke au journal, sur la ligne du propriétaire. Un administrateur termine un jeton ici, n'en crée jamais : une crédentiale n'est créée que par son propriétaire."
+        "fr": "Le jeton cesse de fonctionner à son prochain appel, et token.revoke est écrit dans le journal d'audit, sur la ligne de son propriétaire. Ici, un administrateur met fin à un jeton, il n'en crée jamais : seul son propriétaire peut créer un jeton."
       }
     },
     {
@@ -613,7 +613,7 @@
       },
       "description": {
         "en": "Who is signed in where, right now (CONSOLE-08), with filters and pages. Root reads both planes; an application administrator the applications' sessions only, since who runs the console is root's business.",
-        "fr": "Qui est connecté où, en ce moment (CONSOLE-08), avec filtres et pages. Root lit les deux plans ; un administrateur d'application les sessions des applications seulement, puisque qui fait tourner la console est l'affaire de root."
+        "fr": "Qui est connecté, et où, en ce moment même (CONSOLE-08), avec des filtres et une pagination. Root lit les deux plans ; un administrateur d'application ne lit que les sessions des applications, car savoir qui utilise la console ne regarde que root."
       }
     },
     {
@@ -638,7 +638,7 @@
       },
       "description": {
         "en": "Signs one session out on every gateway (SEC-07), and writes session.revoke to the trail. A console session is root's alone: under an application administrator's eyes it reads as absent.",
-        "fr": "Déconnecte une session sur toutes les passerelles (SEC-07), et écrit session.revoke au journal. Une session de console est l'affaire de root seul : sous les yeux d'un administrateur d'application, elle se lit comme absente."
+        "fr": "Déconnecte une session sur toutes les gateways (SEC-07) et écrit session.revoke dans le journal d'audit. Une session de la console ne regarde que root : pour un administrateur d'application, elle apparaît comme inexistante."
       }
     },
     {
@@ -657,11 +657,11 @@
       ],
       "title": {
         "en": "Read the audit trail",
-        "fr": "Lire la piste d'audit"
+        "fr": "Lire le journal d'audit"
       },
       "description": {
         "en": "The audit trail is a transverse section scoped by capability (RBAC-05): root sees all, infra-admin the routing plane (routes, themes), app-admin the identity (users, roles, settings), a tenant admin only their tenants' events. Anyone who administers nothing is refused.",
-        "fr": "La piste d'audit est une section transverse cadrée par capacité (RBAC-05) : root voit tout, l'admin gateway le plan de routage (routes, thèmes), l'admin appli l'identité (utilisateurs, rôles, réglages), un admin de tenant seulement les événements de ses tenants. Quiconque n'administre rien est refusé."
+        "fr": "Le journal d'audit est une section transverse, délimitée par les capacités (RBAC-05) : root voit tout, l'admin infra le plan de routage (routes, thèmes), l'admin applicatif l'identité (utilisateurs, rôles, réglages), et un admin d'organisation seulement les événements de ses organisations. Qui n'administre rien est refusé."
       }
     },
     {
@@ -685,7 +685,7 @@
       },
       "description": {
         "en": "The trail as a CSV file (STORE-06): the filters of the screen and the perimeter of the caller, never more than the screen shows. Enterprise, and audited - the file carries addresses and names, and who took it out is a question somebody will ask.",
-        "fr": "Le journal en fichier CSV (STORE-06) : les filtres de l'écran et le périmètre de l'appelant, jamais plus que ce que l'écran montre. Enterprise, et audité - le fichier porte des adresses et des noms, et qui l'a sorti est une question que quelqu'un posera."
+        "fr": "Le journal sous forme de fichier CSV (STORE-06) : avec les filtres de l'écran et le périmètre de l'appelant, jamais plus que ce que montre l'écran. Réservé à l'édition Enterprise, et audité - le fichier contient des adresses et des noms, et quelqu'un demandera un jour qui l'a sorti."
       }
     },
     {
@@ -701,11 +701,11 @@
       ],
       "title": {
         "en": "How long the audit trail keeps an event",
-        "fr": "Combien de temps le journal d'audit garde un événement"
+        "fr": "Combien de temps le journal d'audit conserve un événement"
       },
       "description": {
         "en": "The retention of the trail (AUD-02), from three months to five years. Root's alone: whoever may shorten the trail may erase their own traces with it.",
-        "fr": "La rétention du journal (AUD-02), de trois mois à cinq ans. Réservée à root : qui peut raccourcir le journal peut y effacer ses propres traces."
+        "fr": "La durée de rétention du journal (AUD-02), de trois mois à cinq ans. Réservée à root : qui peut raccourcir le journal peut du même coup effacer ses propres traces."
       }
     },
     {
@@ -724,11 +724,11 @@
       ],
       "title": {
         "en": "Read the issue reports",
-        "fr": "Lire les signalements d'anomalies"
+        "fr": "Lire les signalements"
       },
       "description": {
         "en": "The embedded issue tracker (ISSUE-03) is a transverse section: root and infra/app admins see every report, a tenant admin only those filed under their tenants. Anyone who administers nothing is refused.",
-        "fr": "Le suivi d'anomalies embarqué (ISSUE-03) est une section transverse : root et les admins infra/appli voient tous les signalements, un admin de tenant seulement ceux déposés sous ses tenants. Quiconque n'administre rien est refusé."
+        "fr": "Le suivi des signalements embarqué (ISSUE-03) est une section transverse : root et les admins infra et applicatifs voient tous les signalements, un admin d'organisation seulement ceux qui ont été déposés dans ses organisations. Qui n'administre rien est refusé."
       }
     },
     {
@@ -745,11 +745,11 @@
       ],
       "title": {
         "en": "Read the maintenance switch",
-        "fr": "Lire le commutateur de maintenance"
+        "fr": "Lire l'interrupteur de maintenance"
       },
       "description": {
         "en": "The switch that closes an installation to its visitors (LIFE-05) answers 503 for every route at once, without a single route being edited. Why it is closed is picked from a translated list rather than typed, because that page is read in twenty languages. Closing every application is an operator's act: only root and infra admins read or flip it, and whoever administers or develops can still go through to check the fix before reopening.",
-        "fr": "Le commutateur qui ferme une installation a ses visiteurs (LIFE-05) repond 503 pour toutes les routes d'un coup, sans qu'une seule route soit modifiee. La raison se choisit dans une liste traduite plutot que de se saisir, parce que cette page se lit en vingt langues. Fermer toutes les applications est un acte d'exploitant : seuls root et les admins infra le lisent ou le basculent, et quiconque administre ou developpe peut passer pour verifier le correctif avant de rouvrir."
+        "fr": "L'interrupteur qui ferme une installation à ses visiteurs (LIFE-05) fait répondre 503 à toutes les routes d'un coup, sans qu'aucune ne soit modifiée. Le motif de la fermeture se choisit dans une liste traduite au lieu d'être saisi, parce que cette page se lit en vingt langues. Fermer toutes les applications est un geste d'exploitant : seuls root et les admins infra lisent ou actionnent l'interrupteur, et quiconque administre ou développe peut encore passer pour vérifier le correctif avant la réouverture."
       }
     },
     {
@@ -766,11 +766,11 @@
       ],
       "title": {
         "en": "List what the runtime can route to",
-        "fr": "Lister ce vers quoi la gateway peut router"
+        "fr": "Lister ce vers quoi le runtime permet de router"
       },
       "description": {
         "en": "What the runtime says exists beside this gateway (SVC-02), asked when a route is created: an upstream typed by hand is where the typos live, and none of them show up until traffic does. Always available in both editions and with no switch - what gates it is what the deployment grants, a mounted socket or a service account. An installation with no runtime to ask answers WHY rather than failing.",
-        "fr": "Ce que l'execution declare exister a cote de la gateway (SVC-02), demande au moment ou une route est creee : un amont tape a la main est la ou vivent les fautes de frappe, et aucune ne se voit avant le trafic. Toujours disponible dans les deux editions et sans interrupteur - ce qui l'ouvre est ce que le deploiement accorde, un socket monte ou un compte de service. Une installation sans execution a interroger repond POURQUOI plutot que d'echouer."
+        "fr": "Ce que le runtime déclare exister à côté de cette gateway (SVC-02), demandé au moment où l'on crée une route : un upstream saisi à la main est l'endroit où se glissent les fautes de frappe, et aucune ne se voit avant que le trafic arrive. Toujours disponible, dans les deux éditions et sans interrupteur - ce qui en décide, c'est ce qu'accorde le déploiement, un socket monté ou un compte de service. Une installation qui n'a aucun runtime à interroger répond POURQUOI au lieu d'échouer."
       }
     },
     {
@@ -793,11 +793,11 @@
       ],
       "title": {
         "en": "Subscribe to what a screen shows",
-        "fr": "S abonner a ce qu un ecran montre"
+        "fr": "S'abonner à ce qu'affiche un écran"
       },
       "description": {
         "en": "One websocket for the whole console, with a source per screen: the traffic curves, the scheduled calls, and the journal of administrative writes every screen watches to learn that what it is showing moved. It answers every ADMINISTRATOR - the routing plane's, the application's, an organisation's - and WHAT each may watch is decided at the upgrade, from the audit trail's own partition, then handed to the socket as a registry holding those sources and nothing else. A source cannot check it: the library shares one read between the subscribers of a topic. It is mounted BEHIND the same funnel as every API call, so a subscription passes the same checks: session, pending login, token perimeter, narrowing to the token's domain. A plain GET is not an upgrade, so an allowed caller is refused by the protocol rather than by the perimeter, which is the point of the probe.",
-        "fr": "Un seul websocket pour toute la console, avec une source par ecran : les courbes de trafic, les appels planifies, et le journal des ecritures d administration que chaque ecran surveille pour apprendre que ce qu il montre a bouge. Il repond a tout ADMINISTRATEUR - celui du plan de routage, celui de l application, celui d une organisation - et CE que chacun peut surveiller est decide a la montee en version, a partir du cloisonnement du journal d audit, puis remis au socket sous la forme d un registre qui ne tient que ces sources. Une source ne peut pas le verifier : la bibliotheque partage une lecture entre les abonnes d un sujet. Il est monte DERRIERE le meme entonnoir que chaque appel d API, donc un abonnement passe les memes controles : session, connexion en attente, perimetre du jeton, reduction au domaine du jeton. Un GET simple n est pas une montee en version, donc un appelant autorise est refuse par le protocole et non par le perimetre, ce qui est justement ce que la sonde verifie."
+        "fr": "Un seul WebSocket pour toute la console, avec une source par écran : les courbes de trafic, les appels planifiés, et le journal des écritures d'administration, que chaque écran surveille pour savoir que ce qu'il affiche a changé. Il répond à tout ADMINISTRATEUR - celui du plan de routage, celui de l'application, celui d'une organisation - et CE QUE chacun peut surveiller est décidé au moment de l'upgrade WebSocket, à partir du cloisonnement du journal d'audit lui-même, puis remis au socket sous la forme d'un registre qui contient ces sources et rien d'autre. Une source ne peut pas faire ce contrôle : la bibliothèque partage une même lecture entre tous les abonnés d'un sujet. Il est monté DERRIÈRE le même entonnoir que tous les appels d'API, et un abonnement passe donc les mêmes contrôles : session, connexion en attente, périmètre du jeton, restriction au domaine du jeton. Un simple GET n'est pas un upgrade : un appelant autorisé est donc refusé par le protocole et non par le périmètre, et c'est tout l'intérêt de la sonde."
       }
     },
     {
@@ -817,11 +817,11 @@
       ],
       "title": {
         "en": "Read what the running release brought",
-        "fr": "Lire ce que la version en service a apporté"
+        "fr": "Lire ce qu'apporte la version en service"
       },
       "description": {
         "en": "The version under the account button, and the notes of the minor or major release it belongs to: 1.0.0 for 1.0.1, never a patch's. Any signed-in account reads it.",
-        "fr": "La version sous le bouton du compte, et les notes de la version mineure ou majeure dont elle fait partie : 1.0.0 pour 1.0.1, jamais celles d'un correctif. Tout compte connecté la lit."
+        "fr": "La version affichée sous le bouton du compte, et les notes de la version mineure ou majeure à laquelle elle appartient : celles de la 1.0.0 pour une 1.0.1, jamais celles d'un correctif. Tout compte connecté peut les lire."
       }
     },
     {
@@ -838,11 +838,11 @@
       ],
       "title": {
         "en": "Read what passed through",
-        "fr": "Lire ce qui est passe"
+        "fr": "Lire ce qui est passé par la gateway"
       },
       "description": {
         "en": "Traffic per route over the last hour: requests by status class, latency, upstream failures (OBS-01). It tells a route that is failing from one nobody is calling - the two look identical in a configuration. Summed over every node of a cluster, and each interval says how many it covers, so a partial curve never passes for a total. In memory: a restart starts a new hour, and an installation wanting a year pushes the counters over OTLP (Enterprise) to a collector that writes them into the time-series database it already runs. With ?endpoints=1 it also answers WHICH endpoint of a route the time went to, over the period ?since asks for - the same one the caller is drawing, so a route's endpoints add up to the route rather than to a longer story nobody asked about. The unit is the template, never a raw path - one series per order is chosen by whoever sends the requests, which makes it a denial of service and not an imprecision. A name is either DECLARED (a deposited spec, the per-endpoint rules, or what the control plane resolved from the upstream) or DEDUCED from the shape of the paths seen, with identifier-looking segments folded to {id} and a per-route budget past which everything shares one bucket. Deduced lines are marked, because a shape can be read wrong.",
-        "fr": "Le trafic par route sur la derniere heure : requetes par classe de statut, latence, echecs d amont (OBS-01). Il distingue une route qui echoue d une route que personne n appelle - les deux se ressemblent dans une configuration. Somme sur tous les noeuds d un cluster, et chaque intervalle dit combien il en couvre, pour qu une courbe partielle ne passe jamais pour un total. En memoire : un redemarrage commence une nouvelle heure, et qui veut un an pousse les compteurs en OTLP (Enterprise) vers un collecteur qui les ecrit dans la base de series temporelles qu il a deja. Avec ?endpoints=1 il repond aussi QUEL endpoint d une route a pris le temps, sur la periode que ?since demande - celle que l appelant dessine, pour que les endpoints d une route s additionnent a la route et non a une histoire plus longue que personne n a demandee. L unite est le gabarit, jamais un chemin brut - une serie par commande, c est celui qui envoie les requetes qui la choisit, donc un deni de service et pas une imprecision. Un nom est soit DECLARE (spec deposee, regles par endpoint, ou ce que le plan de controle a resolu depuis l amont), soit DEDUIT de la forme des chemins vus, les segments qui ressemblent a un identifiant plies en {id}, avec un plafond par route au-dela duquel tout partage un seul seau. Les lignes deduites sont marquees, parce qu une forme peut se lire de travers."
+        "fr": "Le trafic par route sur la dernière heure : requêtes par classe de statut, latence, échecs de l'upstream (OBS-01). Il permet de distinguer une route en échec d'une route que personne n'appelle - dans une configuration, les deux se ressemblent trait pour trait. Les chiffres sont additionnés sur tous les nœuds d'un cluster, et chaque intervalle indique combien de nœuds il couvre, pour qu'une courbe partielle ne passe jamais pour un total. Tout est en mémoire : un redémarrage ouvre une nouvelle heure, et une installation qui veut un an d'historique pousse les compteurs en OTLP (Enterprise) vers un collecteur, qui les écrit dans la base de séries temporelles qu'elle exploite déjà. Avec ?endpoints=1, la réponse dit aussi À QUEL endpoint d'une route le temps a été consacré, sur la période demandée par ?since - celle-là même que l'appelant est en train de tracer, pour que la somme des endpoints d'une route donne la route, et non une histoire plus longue que personne n'a demandée. L'unité est le gabarit de chemin, jamais le chemin brut - avec une série par commande, c'est celui qui envoie les requêtes qui choisirait leur nombre, ce qui en ferait un déni de service et non une simple imprécision. Un nom est soit DÉCLARÉ (une spécification déposée, les règles par endpoint, ou ce que le plan de contrôle a résolu auprès de l'upstream), soit DÉDUIT de la forme des chemins observés, les segments qui ressemblent à un identifiant étant ramenés à {id}, avec un budget par route au-delà duquel tout partage une seule ligne. Les lignes déduites sont signalées, car une forme peut être mal interprétée."
       }
     },
     {
@@ -859,11 +859,11 @@
       ],
       "title": {
         "en": "Read which routes are answering",
-        "fr": "Lire quelles routes repondent"
+        "fr": "Lire quelles routes répondent"
       },
       "description": {
         "en": "The console has always shown what is CONFIGURED and never what WORKS (SVC-04). This reports what the circuit breaker already watches on every answer, per node - so it needs no prober of its own, and it sits on the routing plane's perimeter like the routes it describes.",
-        "fr": "La console a toujours montre ce qui est CONFIGURE et jamais ce qui MARCHE (SVC-04). Ceci rapporte ce que le disjoncteur observe deja sur chaque reponse, noeud par noeud - donc sans sonde propre, et dans le perimetre du plan de routage comme les routes qu'il decrit."
+        "fr": "La console a toujours montré ce qui est CONFIGURÉ, jamais ce qui FONCTIONNE (SVC-04). Cet appel rapporte ce que le disjoncteur observe déjà sur chaque réponse, nœud par nœud - il n'a donc besoin d'aucun health check propre, et il relève du périmètre du plan de routage, comme les routes qu'il décrit."
       }
     },
     {
@@ -884,7 +884,7 @@
       },
       "description": {
         "en": "The last lines this node wrote about itself (OBS-03), structured whatever the output format, for the console's Logs screen. Per node: in a cluster the answer names the node, and the whole cluster's log is the collector's business. The access log is not in it.",
-        "fr": "Les dernieres lignes que ce noeud a ecrites sur lui-meme (OBS-03), structurees quel que soit le format de sortie, pour l'ecran Logs de la console. Par noeud : en cluster la reponse nomme le noeud, et le journal du cluster entier est l'affaire du collecteur. Le journal d'acces n'y est pas."
+        "fr": "Les dernières lignes que ce nœud a écrites sur lui-même (OBS-03), structurées quel que soit le format de sortie, pour l'écran Logs de la console. Par nœud : en cluster, la réponse nomme le nœud, et le journal de tout le cluster est l'affaire du collecteur. Le journal d'accès n'en fait pas partie."
       }
     },
     {
@@ -907,11 +907,11 @@
       ],
       "title": {
         "en": "Turn the log level up or down",
-        "fr": "Monter ou baisser le niveau de log"
+        "fr": "Relever ou abaisser le niveau de journalisation"
       },
       "description": {
         "en": "Live, on every node, and not stored: a restart comes back at the manifest's level. A level more talkative than the startup one goes back on its own after thirty minutes, because a gateway left at debug fills a disk. The probe sends a level that does not exist, refused after the guard, so the run never changes what the gateway writes.",
-        "fr": "A chaud, sur tous les noeuds, et sans stockage : un redemarrage revient au niveau du manifeste. Un niveau plus bavard que celui du demarrage revient de lui-meme apres trente minutes, parce qu'une gateway laissee en debug remplit un disque. La sonde envoie un niveau qui n'existe pas, refuse apres la garde, pour que le passage ne change jamais ce que la gateway ecrit."
+        "fr": "À chaud, sur tous les nœuds, et sans rien stocker : un redémarrage revient au niveau du manifeste. Un niveau plus bavard que celui du démarrage redescend de lui-même au bout de trente minutes, parce qu'une gateway laissée en debug remplit un disque. La sonde envoie un niveau qui n'existe pas, refusé une fois la garde franchie : le test ne change donc jamais ce qu'écrit la gateway."
       }
     },
     {
@@ -928,11 +928,11 @@
       ],
       "title": {
         "en": "Read the gateway's own limits",
-        "fr": "Lire les limites propres a la gateway"
+        "fr": "Lire les limites propres à la gateway"
       },
       "description": {
         "en": "How much memory the proxy may spend on a body it rewrites (PERF-02) is a property of the INSTALLATION, not of the application it serves - so it lives in the Routes page's Global drawer, with the other things that are true of every route at once, and an application administrator cannot move it.",
-        "fr": "La memoire que le proxy peut depenser pour reecrire un corps (PERF-02) est une propriete de l'INSTALLATION, pas de l'application servie : elle vit donc dans le tiroir Global de la page Routes, avec ce qui est vrai de toutes les routes a la fois, et un administrateur d'application ne peut pas la deplacer."
+        "fr": "La quantité de mémoire que le proxy peut consacrer à un corps qu'il réécrit (PERF-02) est une propriété de l'INSTALLATION, pas de l'application qu'elle sert - elle se règle donc dans le tiroir Global de la page Routes, avec tout ce qui vaut pour toutes les routes à la fois, et un administrateur d'application ne peut pas y toucher."
       }
     },
     {
@@ -949,11 +949,11 @@
       ],
       "title": {
         "en": "Read the issue tracker switch",
-        "fr": "Lire l'interrupteur du suivi d'anomalies"
+        "fr": "Lire l'interrupteur des signalements"
       },
       "description": {
         "en": "Turning user-filed issue reports on is an infrastructure decision (ISSUE-04): the switch sits on the Issues screen, ships OFF, and only infra admins read or flip it.",
-        "fr": "Activer les signalements d'anomalies est une décision d'infrastructure (ISSUE-04) : l'interrupteur est posé sur l'écran Anomalies, livré ÉTEINT, et seuls les admins infra le lisent ou le basculent."
+        "fr": "Activer les signalements déposés par les utilisateurs est une décision d'infrastructure (ISSUE-04) : l'interrupteur se trouve sur l'écran Issues, il est livré DÉSACTIVÉ, et seuls les admins infra le lisent ou l'actionnent."
       }
     },
     {
@@ -970,11 +970,11 @@
       ],
       "title": {
         "en": "List a tenant's members",
-        "fr": "Lister les membres d'un tenant"
+        "fr": "Lister les membres d'une organisation"
       },
       "description": {
         "en": "Tenant administration is ownership or the ADMIN membership on THAT tenant: neither capability admins nor plain members reach another tenant's member list.",
-        "fr": "L'administration d'un tenant est la propriété ou la membership ADMIN sur CE tenant : ni les admins par capacité ni les membres simples n'atteignent la liste des membres."
+        "fr": "Administrer une organisation suppose d'en être le propriétaire ou un membre ADMIN de CETTE organisation : ni les administrateurs par capacité ni les simples membres n'accèdent à la liste des membres d'une autre organisation."
       }
     },
     {
@@ -991,11 +991,11 @@
       ],
       "title": {
         "en": "Read a member's sign-in history",
-        "fr": "Lire l'historique de connexions d'un membre"
+        "fr": "Lire l'historique des connexions d'un membre"
       },
       "description": {
         "en": "The sign-in history of a member is visible to root and to that tenant's owner or ADMIN, nobody else.",
-        "fr": "L'historique de connexions d'un membre est visible par root et par le propriétaire ou l'ADMIN de son tenant, personne d'autre."
+        "fr": "L'historique des connexions d'un membre est visible de root et du propriétaire ou d'un ADMIN de cette organisation, et de personne d'autre."
       }
     },
     {
@@ -1018,11 +1018,11 @@
       ],
       "title": {
         "en": "Transfer tenant ownership",
-        "fr": "Transférer la propriété d'un tenant"
+        "fr": "Transférer la propriété d'une organisation"
       },
       "description": {
         "en": "Ownership is a tenant field (TENANT-02): only root or the current owner may transfer it. A tenant ADMIN reaches the endpoint but is refused (403); root reaches the handler and 422s on the probe's unknown user, without changing anything.",
-        "fr": "La propriété est un champ du tenant (TENANT-02) : seuls root ou le propriétaire actuel peuvent la transférer. Un ADMIN de tenant atteint l'endpoint mais est refusé (403) ; root atteint le handler et renvoie 422 sur l'utilisateur inconnu de la sonde, sans rien changer."
+        "fr": "La propriété est un champ de l'organisation (TENANT-02) : seuls root et le propriétaire actuel peuvent la transférer. Un ADMIN de l'organisation atteint l'endpoint mais se voit refusé (403) ; root atteint le handler, qui répond 422 parce que l'utilisateur de la sonde est inconnu, sans rien modifier."
       }
     },
     {
@@ -1040,11 +1040,11 @@
       ],
       "title": {
         "en": "List control-plane access tokens",
-        "fr": "Lister les tokens d'accès control-plane"
+        "fr": "Lister les jetons d'accès au plan de contrôle"
       },
       "description": {
         "en": "Control-plane tokens grant headless access to the admin port: this is what connects an agent (MCP-01). Anybody who administers a domain (root, infra-admin, app-admin) mints and lists their OWN: a token acts with its owner's capabilities, read again on every call, so it never hands out more than the person holds. The tokens authenticate on the admin plane only, never the data plane, and each carries a perimeter (readonly or full).",
-        "fr": "Les tokens control-plane donnent un accès sans navigateur au port d'administration : c'est ce qui branche un agent (MCP-01). Quiconque administre un domaine (root, infra-admin, app-admin) crée et liste les SIENS : un token agit avec les capacités de son titulaire, relues à chaque appel, donc il ne donne jamais plus que ce que la personne détient. Ils authentifient sur le plan admin uniquement, jamais le plan data, et chacun porte un périmètre (readonly ou full)."
+        "fr": "Les jetons du plan de contrôle donnent un accès sans navigateur au port d'administration : c'est par eux que se connecte un agent (MCP-01). Quiconque administre un domaine (root, infra-admin, app-admin) crée et liste LES SIENS : un jeton agit avec les capacités de son propriétaire, relues à chaque appel, et ne donne donc jamais plus que ce que détient la personne. Ces jetons n'authentifient que sur le plan d'administration, jamais sur le plan de données, et chacun porte un périmètre (readonly ou full)."
       }
     },
     {
@@ -1061,11 +1061,11 @@
       ],
       "title": {
         "en": "The agent endpoint's switch",
-        "fr": "L'interrupteur de l'endpoint agent"
+        "fr": "L'interrupteur de l'endpoint des agents"
       },
       "description": {
-        "en": "The MCP endpoint ships OFF (MCP-01) and only root may open it: a control-plane token is required either way, but the door's existence is a decision somebody takes, not something inherited from an upgrade.",
-        "fr": "L'endpoint MCP est livré ÉTEINT (MCP-01) et seul root peut l'ouvrir : un token control-plane reste nécessaire de toute façon, mais l'existence de la porte est une décision que quelqu'un prend, pas un héritage de mise à jour."
+        "en": "The MCP endpoint ships OFF (MCP-01) and only root or an infra admin may open it: a control-plane token is required either way, but the door's existence is a decision somebody takes, not something inherited from an upgrade.",
+        "fr": "L'endpoint MCP est livré DÉSACTIVÉ (MCP-01), et seuls root et un admin infra peuvent l'ouvrir : un jeton du plan de contrôle reste nécessaire dans tous les cas, mais l'existence de cette porte est une décision que quelqu'un prend, pas un héritage d'une montée de version."
       }
     },
     {
@@ -1088,11 +1088,11 @@
       ],
       "title": {
         "en": "Choose between one organisation and several",
-        "fr": "Choisir entre une organisation et plusieurs"
+        "fr": "Choisir entre une seule organisation et plusieurs"
       },
       "description": {
         "en": "The shape of the identity - who belongs where - so it is the app-admin's decision, not root's alone. The probe sends a mode that does not exist, refused after the guard, so the run never switches the installation it is testing.",
-        "fr": "La forme de l'identité - qui appartient à quoi -, donc la décision de l'app-admin et pas seulement de root. La sonde envoie un mode qui n'existe pas, refusé après la garde, pour que le passage ne bascule jamais l'installation qu'il teste."
+        "fr": "C'est la forme de l'identité - qui appartient à quoi - et la décision revient donc à l'admin applicatif, pas seulement à root. La sonde envoie un mode qui n'existe pas, refusé une fois la garde franchie : le test ne bascule donc jamais l'installation qu'il teste."
       }
     },
     {
@@ -1114,11 +1114,11 @@
       ],
       "title": {
         "en": "Change what a token may do",
-        "fr": "Changer ce qu un jeton a le droit de faire"
+        "fr": "Modifier ce qu'un jeton a le droit de faire"
       },
       "description": {
         "en": "A token is editable for everything that is NOT in the token. The secret is a hash in a column and encodes no perimeter, no domain, no address, no expiry and no name, so none of them has to be reissued to be changed - and whoever holds the key keeps holding the same key. Which is what makes NARROWING cheap, and that is the reason this exists: a read-only token in a service's deployment manifest should become a schedules one without minting a second and editing another team's repository, because that friction is why the safer move does not get made. Widening is possible too, and the audit records the before and after of every field. Open to whoever may mint one - root, infra-admin, app-admin - on their own tokens only: another person's answers not found.",
-        "fr": "Un jeton est editable pour tout ce qui n est PAS dans le jeton. Le secret est un hache dans une colonne et n encode ni perimetre, ni domaine, ni adresse, ni expiration, ni nom : rien de tout cela n a besoin d etre reemis pour changer, et celui qui detient la cle detient toujours la meme cle. C est ce qui rend le RETRECISSEMENT bon marche, et c est la raison d etre de cet endpoint : un jeton read-only dans le manifeste de deploiement d un service doit pouvoir devenir un jeton schedules sans en frapper un second et modifier le depot d une autre equipe, parce que cette friction est justement pourquoi le geste le plus sur ne se fait pas. L elargissement est possible aussi, et le journal d audit enregistre l avant et l apres de chaque champ. Ouvert a qui peut en frapper un - root, infra-admin, app-admin - sur ses propres jetons seulement : celui d un autre repond introuvable."
+        "fr": "Dans un jeton, tout ce qui n'est PAS dans le jeton lui-même est modifiable. Le secret est un condensat rangé dans une colonne ; il n'encode ni périmètre, ni domaine, ni adresse, ni expiration, ni nom, et rien de tout cela n'exige donc une réémission pour être changé - celui qui détient la clé continue de détenir la même clé. C'est ce qui rend la RESTRICTION peu coûteuse, et c'est la raison d'être de cet endpoint : un jeton en lecture seule, écrit dans le manifeste de déploiement d'un service, doit pouvoir devenir un jeton schedules sans qu'il faille en créer un second et modifier le dépôt d'une autre équipe, car c'est à cause de cette friction que le choix le plus sûr n'est pas fait. L'élargissement est possible aussi, et le journal d'audit enregistre l'avant et l'après de chaque champ. Ouvert à quiconque peut créer un jeton - root, infra-admin, app-admin - et uniquement sur ses propres jetons : celui d'un autre répond introuvable."
       }
     },
     {
@@ -1140,11 +1140,11 @@
       ],
       "title": {
         "en": "Give a token a new secret",
-        "fr": "Donner un nouveau secret a un jeton"
+        "fr": "Donner un nouveau secret à un jeton"
       },
       "description": {
         "en": "A rotation, and what it KEEPS is why it is not simply minting a second one: the name, the perimeter, the domain, the addresses and the expiry all stay, so the audit keeps one history for one credential and the only thing to change anywhere is the value in one configuration file. The old secret stops working the moment this answers - which is what a rotation is, and why the console asks first. The new value travels exactly once, in this response, like a freshly minted one. Whoever may mint one, on their own tokens only.",
-        "fr": "Une rotation, et ce qu elle GARDE est ce qui la distingue d un second jeton frappe : le nom, le perimetre, le domaine, les adresses et l expiration restent, donc le journal d audit garde une seule histoire pour une seule cle et la seule chose a changer ou que ce soit est la valeur dans un fichier de configuration. L ancien secret cesse de fonctionner des que cette reponse part - c est ce qu est une rotation, et c est pourquoi la console demande d abord. La nouvelle valeur voyage exactement une fois, dans cette reponse, comme celle d un jeton neuf. Qui peut en frapper un, sur ses propres jetons seulement."
+        "fr": "C'est une rotation, et ce qu'elle CONSERVE explique pourquoi elle ne revient pas à créer un second jeton : le nom, le périmètre, le domaine, les adresses et l'expiration restent tous en place, si bien que le journal d'audit garde un seul historique pour un seul jeton, et que la seule chose à changer, où que ce soit, est la valeur dans un fichier de configuration. L'ancien secret cesse de fonctionner à l'instant où cet appel répond - c'est le principe d'une rotation, et c'est pourquoi la console demande d'abord confirmation. La nouvelle valeur ne voyage qu'une seule fois, dans cette réponse, comme celle d'un jeton tout juste créé. Ouvert à quiconque peut créer un jeton, uniquement sur ses propres jetons."
       }
     },
     {
@@ -1161,11 +1161,11 @@
       ],
       "title": {
         "en": "The developer tunnel (plug)",
-        "fr": "Le tunnel developpeur (plug)"
+        "fr": "Le tunnel développeur (plug)"
       },
       "description": {
         "en": "Whether the developer tunnel is open (DEV-11), the address developers type to reach it, what it is doing on this node, and who holds the developer capability with or without a deposited key - by fingerprint, never the key. Infrastructure, beside developer mode rather than under it: developer mode is a configuration of what the installation offers its developers, this opens a port into the cluster and uses the deployment's rights over it. The tunnel runs only when both say so, ships OFF, and the page where a developer deposits a key exists only while it is open.",
-        "fr": "Si le tunnel developpeur est ouvert (DEV-11), l adresse que les developpeurs tapent pour le joindre, ce qu il fait sur ce noeud, et qui detient la capacite developpeur avec ou sans cle deposee - par empreinte, jamais la cle. De l infrastructure, a cote du mode developpeur et non dessous : le mode developpeur est une configuration de ce que l installation offre a ses developpeurs, ceci ouvre un port dans le cluster et exerce les droits du deploiement dessus. Le tunnel ne tourne que si les deux le disent, il est livre ETEINT, et la page ou un developpeur depose sa cle n existe que tant qu il est ouvert."
+        "fr": "Indique si le tunnel développeur est ouvert (DEV-11), l'adresse que saisissent les développeurs pour le joindre, ce qu'il fait sur ce nœud, et qui détient la capacité développeur, avec ou sans clé déposée - désignée par son empreinte, jamais la clé elle-même. C'est de l'infrastructure, à côté du mode développeur et non en dessous : le mode développeur configure ce que l'installation offre à ses développeurs, alors que le tunnel ouvre un port dans le cluster et y exerce les droits du déploiement. Le tunnel ne tourne que si les deux le permettent, il est livré DÉSACTIVÉ, et la page où un développeur dépose une clé n'existe que tant qu'il est ouvert."
       }
     },
     {
@@ -1182,11 +1182,11 @@
       ],
       "title": {
         "en": "Where this gateway's traces go",
-        "fr": "Ou partent les traces de cette gateway"
+        "fr": "Où partent les traces de cette gateway"
       },
       "description": {
         "en": "The collector this gateway exports its spans to (OBS-04), and whether this image can export at all. Whoever edits routes - this is infrastructure, like TLS or the mail relay - and Enterprise to turn on: the trace context TRAVELS in both editions, and an identifier is put on every request whether or not anybody is tracing, because that identifier is what joins a line of the access log to a service's own business audit. What is sold is putting Meerkat on the trace: its inbound span, the span of the upstream call, and the gap between the two, which is the gateway's own time and the one number nobody else in the cluster can produce. What comes back is RAW: a header value of $otlp-token is the reference as written, never the secret behind it - the exporter resolves it at the moment of the call, so the credential is not in this answer, not in the audit trail and not on the screen.",
-        "fr": "Le collecteur vers lequel cette gateway exporte ses spans (OBS-04), et si cette image sait exporter tout court. Root uniquement, et Enterprise pour l allumer : le contexte de trace TRAVERSE dans les deux editions, et un identifiant est pose sur chaque requete que quelqu un trace ou non, parce que cet identifiant est ce qui joint une ligne du journal d acces a l audit metier d un service. Ce qui se vend, c est de mettre Meerkat sur la trace : son span d entree, celui de l appel amont, et l ecart entre les deux qui est le temps propre de la passerelle - le seul chiffre que personne d autre dans le cluster ne peut produire. Ce qui revient est BRUT : une valeur d en-tete a $otlp-token est la reference telle qu ecrite, jamais le secret derriere - l exportateur la resout au moment de l appel, donc la credentiale n est ni dans cette reponse, ni dans le journal d audit, ni a l ecran."
+        "fr": "Le collecteur vers lequel cette gateway exporte ses spans (OBS-04), et le fait que cette image sache exporter ou non. Ouvert à quiconque modifie les routes - c'est de l'infrastructure, comme TLS ou le relais de messagerie - et réservé à l'édition Enterprise pour l'activation : le contexte de trace CIRCULE dans les deux éditions, et un identifiant est posé sur chaque requête, que quelqu'un trace ou non, parce que c'est cet identifiant qui relie une ligne du journal d'accès à l'audit métier d'un service. Ce qui se vend, c'est de faire figurer Meerkat sur la trace : son span d'entrée, le span de l'appel à l'upstream, et l'écart entre les deux, qui est le temps propre à la gateway et le seul chiffre que personne d'autre dans le cluster ne peut produire. La réponse est BRUTE : une valeur d'en-tête égale à $otlp-token est la référence telle qu'elle a été écrite, jamais le secret qu'elle désigne - l'exporteur la résout au moment de l'appel, et le secret n'est donc ni dans cette réponse, ni dans le journal d'audit, ni à l'écran."
       }
     },
     {
@@ -1211,11 +1211,11 @@
       ],
       "title": {
         "en": "Ask the collector whether it answers",
-        "fr": "Demander au collecteur s'il repond"
+        "fr": "Demander au collecteur s'il répond"
       },
       "description": {
         "en": "Posts an EMPTY OTLP batch to the address on screen, before anybody saves it: the whole path is exercised - name resolution, network, TLS, the credential, the collector's own answer - and no span is recorded anywhere. Gateway scope, like the setting it tests, because it makes this gateway call an address somebody hands it; the answer carries the status and the time it took, never the body.",
-        "fr": "Envoie un lot OTLP VIDE a l'adresse affichee, avant meme de l'enregistrer : tout le chemin est exerce - resolution du nom, reseau, TLS, la credentiale, la reponse du collecteur - et aucun span n'est enregistre nulle part. Perimetre passerelle, comme le reglage qu'il teste, puisqu'il fait appeler par la gateway une adresse qu'on lui donne ; la reponse porte le statut et le temps, jamais le corps."
+        "fr": "Envoie un lot OTLP VIDE à l'adresse affichée à l'écran, avant même qu'elle soit enregistrée : tout le chemin est éprouvé - résolution du nom, réseau, TLS, identifiants, réponse du collecteur lui-même - et aucun span n'est enregistré où que ce soit. Périmètre de la gateway, comme le réglage qu'il teste, puisqu'il fait appeler par cette gateway une adresse que quelqu'un lui fournit ; la réponse contient le statut et le temps écoulé, jamais le corps."
       }
     },
     {
@@ -1237,11 +1237,11 @@
       ],
       "title": {
         "en": "Approving an agent is a root decision",
-        "fr": "Approuver un agent est une décision root"
+        "fr": "Approuver un agent est une décision de root"
       },
       "description": {
         "en": "The consent page (MCP-07) hands an agent the approver's own powers over the whole gateway, so only root reaches it; everyone else is refused before seeing it. Root reaches the handler and 400s on the probe's unknown client, without registering anything.",
-        "fr": "La page de consentement (MCP-07) donne à un agent les pouvoirs de celui qui approuve sur toute la gateway : seul root l'atteint, tout autre profil est refusé avant de la voir. Root atteint le handler et renvoie 400 sur le client inconnu de la sonde, sans rien enregistrer."
+        "fr": "La page de consentement (MCP-07) remet à un agent les pouvoirs de celui qui approuve, sur toute la gateway : seul root y accède, et tous les autres sont refusés avant de la voir. Root atteint le handler, qui répond 400 parce que le client de la sonde est inconnu, sans rien enregistrer."
       }
     },
     {
@@ -1266,11 +1266,11 @@
       ],
       "title": {
         "en": "Drive the gateway from an agent",
-        "fr": "Piloter le gateway depuis un agent"
+        "fr": "Piloter la gateway depuis un agent"
       },
       "description": {
         "en": "One endpoint, the Model Context Protocol over Streamable HTTP. It sits behind the same door as the API, and the tools it offers are the caller's own: a signed-in session reaches it, the tools then answer with that person's powers. Off by default, hence the 404 on a fresh installation.",
-        "fr": "Un seul endpoint, le Model Context Protocol en Streamable HTTP. Il est derrière la même porte que l'API, et les outils offerts sont ceux de l'appelant : une session connectée l'atteint, les outils répondent ensuite avec les pouvoirs de cette personne. Éteint par défaut, d'où le 404 sur une installation neuve."
+        "fr": "Un seul endpoint, le Model Context Protocol en Streamable HTTP. Il se trouve derrière la même porte que l'API, et les outils qu'il propose sont ceux de l'appelant : une session connectée l'atteint, puis les outils répondent avec les pouvoirs de cette personne. Désactivé par défaut, d'où le 404 sur une installation neuve."
       }
     },
     {
@@ -1290,11 +1290,11 @@
       ],
       "title": {
         "en": "The console documents the control plane",
-        "fr": "La console documente le control plane"
+        "fr": "La console documente le plan de contrôle"
       },
       "description": {
-        "en": "Every signed-in console user may open the swagger-ui page: it lists Meerkat's own admin API, and nothing else — the routes' specs live on the data plane, for developers. Anonymous callers get 401.",
-        "fr": "Tout utilisateur connecté à la console peut ouvrir la page swagger-ui : elle liste l'API admin de Meerkat, et rien d'autre — les specs des routes vivent sur le plan data, pour les développeurs. Un appel anonyme reçoit 401."
+        "en": "Every signed-in console user may open the swagger-ui page: it lists Meerkat's own admin API, and nothing else - the routes' specs live on the data plane, for developers. Anonymous callers get 401.",
+        "fr": "Tout utilisateur connecté à la console peut ouvrir la page swagger-ui : elle liste l'API d'administration de Meerkat, et rien d'autre - les spécifications des routes se trouvent sur le plan de données, à l'intention des développeurs. Un appelant anonyme reçoit un 401."
       }
     },
     {
@@ -1310,11 +1310,11 @@
       ],
       "title": {
         "en": "The Infra rail entry shows only for its admins",
-        "fr": "L'entrée Infra du rail n'apparaît que pour ses admins"
+        "fr": "L'entrée Infra du rail n'apparaît que pour ses administrateurs"
       },
       "description": {
         "en": "The console rail hides the Gateway scope from profiles that cannot use it (and the API refuses them anyway).",
-        "fr": "Le rail de la console cache le périmètre Gateway aux profils qui ne peuvent pas l'utiliser (et l'API les refuse de toute façon)."
+        "fr": "Le rail de la console masque le périmètre de la gateway aux profils qui ne peuvent pas s'en servir (et l'API les refuse de toute façon)."
       }
     },
     {
@@ -1330,11 +1330,11 @@
       ],
       "title": {
         "en": "The Application rail entry shows only for its admins",
-        "fr": "L'entrée Application du rail n'apparaît que pour ses admins"
+        "fr": "L'entrée Application du rail n'apparaît que pour ses administrateurs"
       },
       "description": {
         "en": "Users, roles and identity settings are gated behind the app-admin capability in the console navigation.",
-        "fr": "Utilisateurs, rôles et réglages d'identité sont derrière la capacité admin appli dans la navigation console."
+        "fr": "Dans la navigation de la console, les utilisateurs, les rôles et les réglages d'identité sont réservés à la capacité app-admin."
       }
     },
     {
@@ -1351,11 +1351,11 @@
       ],
       "title": {
         "en": "The Tenants rail entry shows for tenant admins",
-        "fr": "L'entrée Tenants du rail apparaît pour les admins de tenant"
+        "fr": "L'entrée Tenants du rail apparaît pour les administrateurs d'organisation"
       },
       "description": {
         "en": "A tenant owner or ADMIN (or a tenant creator) sees the Tenants scope; plain members and capability admins without a tenant do not.",
-        "fr": "Un propriétaire ou ADMIN de tenant (ou un créateur de tenants) voit le périmètre Tenants ; les membres simples et les admins par capacité sans tenant, non."
+        "fr": "Le propriétaire ou un ADMIN d'une organisation (ou un créateur d'organisations) voit le périmètre Tenants ; les simples membres et les administrateurs par capacité sans organisation ne le voient pas."
       }
     },
     {
@@ -1373,11 +1373,11 @@
       ],
       "title": {
         "en": "The Issues rail entry shows for administrators",
-        "fr": "L'entrée Anomalies du rail apparaît pour les administrateurs"
+        "fr": "L'entrée Issues du rail apparaît pour les administrateurs"
       },
       "description": {
         "en": "The issue reports section (ISSUE-03) follows the audit rule: anyone administering a domain may open it, the API scopes the content.",
-        "fr": "La section des signalements (ISSUE-03) suit la règle de l'audit : quiconque administre un domaine peut l'ouvrir, l'API cadre le contenu."
+        "fr": "La section des signalements (ISSUE-03) suit la même règle que l'audit : quiconque administre un domaine peut l'ouvrir, et l'API délimite le contenu."
       }
     },
     {
@@ -1394,11 +1394,11 @@
       ],
       "title": {
         "en": "Each profile lands on its own first screen",
-        "fr": "Chaque profil atterrit sur son premier écran"
+        "fr": "Chaque profil arrive sur son propre premier écran"
       },
       "description": {
         "en": "Opening the console root: infra admins land on /infra/routes, app admins on /application/general, everyone else on their tenant.",
-        "fr": "À l'ouverture de la console : les admins infra atterrissent sur /infra/routes, les admins appli sur /application/general, les autres sur leur tenant."
+        "fr": "À l'ouverture de la racine de la console : les admins infra arrivent sur /infra/routes, les admins applicatifs sur /application/general, et tous les autres sur leur organisation."
       }
     },
     {
@@ -1409,11 +1409,11 @@
       "allowed": [],
       "title": {
         "en": "A wrong password is refused without a session",
-        "fr": "Un mauvais mot de passe est refusé sans session"
+        "fr": "Un mauvais mot de passe est refusé, sans session"
       },
       "description": {
         "en": "The login page answers 401 with the same message whether the user or the password is wrong (no account enumeration) and no session cookie is issued.",
-        "fr": "La page de login répond 401 avec le même message que l'utilisateur ou le mot de passe soit faux (pas d'énumération de comptes) et aucun cookie de session n'est émis."
+        "fr": "La page de connexion répond 401 avec le même message, que l'erreur porte sur l'utilisateur ou sur le mot de passe (pas d'énumération des comptes), et aucun cookie de session n'est émis."
       }
     },
     {
@@ -1426,11 +1426,11 @@
       ],
       "title": {
         "en": "A user sees their own sign-in history",
-        "fr": "Un utilisateur voit son historique de connexions"
+        "fr": "Un utilisateur voit son propre historique de connexions"
       },
       "description": {
         "en": "After signing in, /profile/security links to /profile/history where the fresh sign-in shows with its method.",
-        "fr": "Une fois connecté, /profile/security mène à /profile/history où la connexion fraîche apparaît avec sa méthode."
+        "fr": "Une fois la connexion faite, /profile/security renvoie vers /profile/history, où la connexion toute récente apparaît avec sa méthode."
       }
     },
     {
@@ -1443,11 +1443,11 @@
       ],
       "title": {
         "en": "The profile flow links back to the applications",
-        "fr": "Le flux profil ramène vers les applications"
+        "fr": "Le parcours du profil ramène aux applications"
       },
       "description": {
-        "en": "The profile hub (and the user button's Applications submenu) lists the UI routes the session may open — public, authenticated, and granted role-gated ones only.",
-        "fr": "Le hub profil (et le sous-menu Applications du user-button) liste les routes UI que la session peut ouvrir — publiques, authentifiées, et à rôle requis seulement s'il est détenu."
+        "en": "The profile hub (and the user button's Applications submenu) lists the UI routes the session may open - public, authenticated, and granted role-gated ones only.",
+        "fr": "La page d'accueil du profil (et le sous-menu Applications du bouton utilisateur) liste les routes d'interface que la session peut ouvrir - les routes publiques, les routes authentifiées, et parmi les routes soumises à un rôle, uniquement celles dont le rôle est accordé."
       }
     },
     {
@@ -1458,11 +1458,11 @@
       "allowed": [],
       "title": {
         "en": "The developer page refuses non-dev users",
-        "fr": "La page développeur refuse les non-développeurs"
+        "fr": "La page développeur refuse les utilisateurs qui ne sont pas développeurs"
       },
       "description": {
         "en": "/profile/dev answers 403 for a user without the dev capability.",
-        "fr": "/profile/dev répond 403 pour un utilisateur sans la capacité dev."
+        "fr": "/profile/dev répond 403 à un utilisateur qui n'a pas la capacité dev."
       }
     },
     {
@@ -1473,11 +1473,11 @@
       "allowed": [],
       "title": {
         "en": "An app admin can never mint or promote a root",
-        "fr": "Un admin appli ne peut jamais créer ni promouvoir un root"
+        "fr": "Un admin applicatif ne peut jamais créer un root ni en promouvoir un"
       },
       "description": {
         "en": "Creating a root user or setting the root flag on an existing user requires root itself: the API answers 403 to an app-admin.",
-        "fr": "Créer un utilisateur root ou poser le drapeau root sur un utilisateur existant exige root : l'API répond 403 à un admin appli."
+        "fr": "Créer un utilisateur root ou poser l'indicateur root sur un utilisateur existant exige d'être soi-même root : l'API répond 403 à un admin applicatif."
       }
     },
     {
@@ -1492,7 +1492,7 @@
       },
       "description": {
         "en": "With the home-grown captcha on (the default), the register page carries a distorted-digits image; a wrong copy is refused, creates no account, and each challenge is single-use.",
-        "fr": "Avec le captcha maison activé (le défaut), la page d'inscription porte une image de chiffres déformés ; une copie fausse est refusée, ne crée aucun compte, et chaque défi est à usage unique."
+        "fr": "Quand le captcha maison est activé (c'est le cas par défaut), la page d'inscription affiche une image de chiffres déformés ; une saisie erronée est refusée et ne crée aucun compte, et chaque défi ne sert qu'une fois."
       }
     },
     {
@@ -1503,11 +1503,11 @@
       "allowed": [],
       "title": {
         "en": "Self-registration end to end",
-        "fr": "Auto-inscription de bout en bout"
+        "fr": "L'auto-inscription de bout en bout"
       },
       "description": {
         "en": "With the policy on and SMTP configured: the visitor registers, cannot sign in before confirming, opens the mailed one-shot link, the admins are notified, and the first sign-in lands on the waiting room until access is granted.",
-        "fr": "Politique activée et SMTP configuré : le visiteur s'inscrit, ne peut pas se connecter avant de confirmer, ouvre le lien à usage unique reçu par mail, les admins sont notifiés, et la première connexion atterrit sur la salle d'attente jusqu'à l'attribution d'accès."
+        "fr": "Avec la politique activée et SMTP configuré : le visiteur s'inscrit, ne peut pas se connecter avant d'avoir confirmé, ouvre le lien à usage unique reçu par e-mail, les administrateurs sont prévenus, et la première connexion aboutit à la salle d'attente jusqu'à ce qu'un accès soit accordé."
       }
     },
     {
@@ -1520,11 +1520,11 @@
       ],
       "title": {
         "en": "Personal API tokens authenticate API calls",
-        "fr": "Les jetons API personnels authentifient les appels API"
+        "fr": "Les jetons d'API personnels authentifient les appels d'API"
       },
       "description": {
-        "en": "A user mints a token on Profile → Security → API tokens (shown once); it captures their current tenant+group context and authenticates 'Authorization: Bearer mk_…' calls to the data-plane API routes with no browser session. Disabling or revoking it — or disabling the account — stops it at the next request; the admin port never accepts it.",
-        "fr": "Un utilisateur crée un jeton dans Profil → Sécurité → Jetons API (affiché une fois) ; il capture son contexte tenant+groupe courant et authentifie les appels « Authorization: Bearer mk_… » vers les routes API du data plane sans session navigateur. Le désactiver ou le révoquer — ou désactiver le compte — l'arrête à la requête suivante ; le port admin ne l'accepte jamais."
+        "en": "A user mints a token on Profile > Security > API tokens (shown once); it captures their current tenant+group context and authenticates 'Authorization: Bearer mk_...' calls to the data-plane API routes with no browser session. Disabling or revoking it - or disabling the account - stops it at the next request; the admin port never accepts it.",
+        "fr": "Un utilisateur crée un jeton dans Profil > Sécurité > Jetons d'API (affiché une seule fois) ; le jeton capture son contexte du moment, organisation + groupe, et authentifie les appels 'Authorization: Bearer mk_...' vers les routes d'API du plan de données, sans session de navigateur. Le désactiver ou le révoquer - ou désactiver le compte - l'arrête dès la requête suivante ; le port d'administration ne l'accepte jamais."
       }
     },
     {
@@ -1539,7 +1539,7 @@
       },
       "description": {
         "en": "Failed sign-ins are counted per address and account within a configurable window (Security page): past the budget the endpoint answers 429 without even checking, and a success forgives the counter. Wrong two-factor codes are throttled per account the same way.",
-        "fr": "Les échecs de connexion sont comptés par adresse et par compte dans une fenêtre configurable (page Security) : au-delà du budget l'endpoint répond 429 sans même vérifier, et un succès remet le compteur à zéro. Les mauvais codes de double authentification sont freinés par compte de la même façon."
+        "fr": "Les échecs de connexion sont comptés par adresse et par compte, dans une fenêtre configurable (page Security) : une fois le budget dépassé, l'endpoint répond 429 sans même vérifier, et un succès remet le compteur à zéro. Les codes de second facteur erronés sont freinés de la même façon, par compte."
       }
     },
     {
@@ -1550,11 +1550,11 @@
       "allowed": [],
       "title": {
         "en": "Forgot password resets through a mailed one-shot link",
-        "fr": "Le mot de passe oublié se réinitialise par lien mail à usage unique"
+        "fr": "Le mot de passe oublié se réinitialise par un lien à usage unique reçu par e-mail"
       },
       "description": {
         "en": "The sign-in page links the flow (when SMTP is configured): a neutral outcome whatever the address, a 1-hour one-shot link that survives mail-scanner prefetches (GET peeks, POST consumes), and a successful reset revokes every open session and notifies the owner.",
-        "fr": "La page de connexion propose le flux (quand SMTP est configuré) : réponse neutre quelle que soit l'adresse, lien à usage unique valable 1 h qui survit aux préchargements des scanners de mail (le GET regarde, le POST consomme), et une réinitialisation réussie révoque toutes les sessions ouvertes et notifie le propriétaire."
+        "fr": "La page de connexion propose ce parcours (quand SMTP est configuré) : un résultat neutre quelle que soit l'adresse, un lien à usage unique valable 1 heure, qui résiste au préchargement par les analyseurs de messagerie (le GET consulte, le POST consomme), et une réinitialisation réussie qui révoque toutes les sessions ouvertes et prévient le propriétaire."
       }
     },
     {
@@ -1567,11 +1567,11 @@
       ],
       "title": {
         "en": "A mailed code signs in, and only in the browser that asked",
-        "fr": "Un code par e-mail connecte, et seulement dans le navigateur qui l'a demandé"
+        "fr": "Un code reçu par e-mail connecte, et seulement dans le navigateur qui l'a demandé"
       },
       "description": {
         "en": "Sign-in by one-time code (AUTH-16), switched on for the run: the sign-in page offers it, the code arrives through the SMTP sink, it opens the session - and the same code pasted into a second browser is refused, which is what the request-id cookie is for.",
-        "fr": "Connexion par code à usage unique (AUTH-16), activée pour l'exécution : la page de connexion l'offre, le code arrive par le collecteur SMTP, il ouvre la session - et le même code collé dans un second navigateur est refusé, ce qui est la raison d'être du cookie d'identifiant de requête."
+        "fr": "Connexion par code à usage unique (AUTH-16), activée pour la durée du test : la page de connexion la propose, le code arrive par le serveur SMTP de test, il ouvre la session - et le même code, collé dans un second navigateur, est refusé : c'est à cela que sert le cookie d'identifiant de requête."
       }
     },
     {
@@ -1584,11 +1584,11 @@
       ],
       "title": {
         "en": "A service schedules a call to itself, and the gateway makes it",
-        "fr": "Un service planifie un appel vers lui-même, et la passerelle le fait"
+        "fr": "Un service planifie un appel vers lui-même, et la gateway l'effectue"
       },
       "description": {
         "en": "Scheduled calls (SCHED-01): root mints a schedules-perimeter token, a backend creates a schedule on the control plane - saying which ROLES its call must carry, in the singular or the plural - finds it again by its own metadata, and the gateway calls the named route through its front door as \"meerkat\" holding them; the run closes with what answered. No account behind the call, and the token opens nothing else on that port. The history (SCHED-03) keeps every turn that ended, and a turn is asked for again by name - a new run carrying today's payload, which says in the history which one it replays.",
-        "fr": "Appels planifiés (SCHED-01) : root frappe un jeton de périmètre schedules, un backend crée une tâche sur le plan de contrôle - en disant quels RÔLES son appel doit porter, au singulier ou au pluriel - la retrouve par ses propres métadonnées, et la passerelle appelle la route nommée par sa porte d'entrée sous le nom \"meerkat\" muni de ces rôles ; l'exécution se clôt avec ce qui a répondu. Aucun compte derrière l'appel, et le jeton n'ouvre rien d'autre sur ce port. L'historique (SCHED-03) garde chaque tour terminé, et un tour se redemande par son nom - une nouvelle exécution qui porte le payload d'aujourd'hui et dit dans l'historique lequel elle rejoue."
+        "fr": "Appels planifiés (SCHED-01) : root crée un jeton au périmètre schedules, un backend crée une planification sur le plan de contrôle - en indiquant quels RÔLES son appel doit porter, au singulier ou au pluriel -, la retrouve grâce à ses propres métadonnées, puis la gateway appelle la route désignée par sa porte d'entrée, en tant que \"meerkat\" muni de ces rôles ; l'exécution se clôt avec ce qui a répondu. Il n'y a aucun compte derrière l'appel, et le jeton n'ouvre rien d'autre sur ce port. L'historique (SCHED-03) conserve chaque exécution terminée, et une exécution se redemande par son nom - une nouvelle exécution, qui porte le contenu du jour et indique dans l'historique laquelle elle rejoue."
       }
     },
     {
@@ -1601,11 +1601,11 @@
       ],
       "title": {
         "en": "Exclusive group mode asks which group at sign-in",
-        "fr": "Le mode groupe exclusif demande quel groupe à la connexion"
+        "fr": "Le mode de groupe exclusif demande à la connexion quel groupe choisir"
       },
       "description": {
         "en": "With a tenant forced to SINGLE, a member holding several groups lands on /select-group after signing in (and again after each tenant switch); only the chosen group's roles apply to the session.",
-        "fr": "Avec un tenant forcé en SINGLE, un membre de plusieurs groupes atterrit sur /select-group après connexion (et à chaque changement de tenant) ; seuls les rôles du groupe choisi s'appliquent à la session."
+        "fr": "Quand une organisation est forcée en SINGLE, un membre qui a plusieurs groupes arrive sur /select-group après s'être connecté (et de nouveau à chaque changement d'organisation) ; seuls les rôles du groupe choisi s'appliquent à la session."
       }
     },
     {
@@ -1620,7 +1620,7 @@
       },
       "description": {
         "en": "When the global passkey policy is off, the login page hides the passkey button and the WebAuthn endpoints answer 403.",
-        "fr": "Quand la politique globale passkey est coupée, la page de login cache le bouton passkey et les endpoints WebAuthn répondent 403."
+        "fr": "Quand la politique globale des passkeys est désactivée, la page de connexion masque le bouton passkey et les endpoints WebAuthn répondent 403."
       }
     },
     {
@@ -1631,11 +1631,11 @@
       "allowed": [],
       "title": {
         "en": "An account awaiting access passes \"signed in\" and stops at \"in an organisation\"",
-        "fr": "Un compte en attente d'accès passe « connecté » et s'arrête à « dans une organisation »"
+        "fr": "Un compte en attente d'accès passe le niveau \"connecté\" et s'arrête au niveau \"dans une organisation\""
       },
       "description": {
-        "en": "The belonging axis (RBAC-06) over a real gateway: a confirmed account that belongs to no organisation still passes a route gated on authentication — that level says who it is and nothing more — but a route asking for an organisation sends it to /account-pending rather than answering a bare 403.",
-        "fr": "L'axe d'appartenance (RBAC-06) sur une vraie gateway : un compte confirmé qui n'appartient à aucune organisation passe encore une route protégée par l'authentification — ce niveau dit qui c'est, rien de plus — mais une route qui exige une organisation le renvoie vers /account-pending au lieu de répondre un 403 sec."
+        "en": "The belonging axis (RBAC-06) over a real gateway: a confirmed account that belongs to no organisation still passes a route gated on authentication - that level says who it is and nothing more - but a route asking for an organisation sends it to /account-pending rather than answering a bare 403.",
+        "fr": "L'axe de l'appartenance (RBAC-06) sur une vraie gateway : un compte confirmé qui n'appartient à aucune organisation passe tout de même une route protégée par l'authentification - ce niveau dit qui il est, et rien de plus - mais une route qui exige une organisation le renvoie vers /account-pending au lieu de répondre par un simple 403."
       }
     },
     {
@@ -1649,11 +1649,11 @@
       ],
       "title": {
         "en": "Single-organisation mode is switched live, and gives the others back",
-        "fr": "Le mode mono-organisation se bascule a chaud, et rend les autres"
+        "fr": "Le mode mono-organisation se bascule à chaud, et restitue les autres organisations"
       },
       "description": {
         "en": "The shape of an installation is a setting read per request, not a value frozen at boot: switching it takes effect at once. Going down to one organisation holds the others back without deleting anything - the console is served knowing it, on the first paint - and switching up gives them and their people's access straight back.",
-        "fr": "La forme d'une installation est un reglage lu par requete, pas une valeur figee au demarrage : la bascule prend effet immediatement. Redescendre a une organisation met les autres de cote sans rien supprimer - la console est servie en le sachant, des la premiere peinture - et rebasculer les rend, elles et l'acces des personnes concernees."
+        "fr": "La forme d'une installation est un réglage lu à chaque requête, pas une valeur figée au démarrage : la bascule prend effet immédiatement. Redescendre à une seule organisation met les autres en retrait sans rien supprimer - la console est servie en le sachant, dès le premier affichage - et remonter les restitue aussitôt, elles et les accès de leurs membres."
       }
     },
     {
@@ -1674,7 +1674,7 @@
       },
       "description": {
         "en": "What the gateway presents at a handshake is infrastructure, like the upstream of a route: only infra admins may read the certificates. Key material never appears in the payload, whoever asks.",
-        "fr": "Ce que la gateway présente à la poignée de main est de l'infrastructure, comme l'amont d'une route : seuls les admins infra lisent les certificats. Le matériel de clé n'apparaît dans la charge utile, pour personne."
+        "fr": "Ce que la gateway présente lors d'une négociation TLS relève de l'infrastructure, comme l'upstream d'une route : seuls les admins infra peuvent lire les certificats. Les clés n'apparaissent jamais dans la réponse, quel que soit le demandeur."
       }
     },
     {
@@ -1705,7 +1705,7 @@
       },
       "description": {
         "en": "HTTPS in one click, for a laboratory or a first integration: the gateway is its own authority, and the certificate says so.",
-        "fr": "HTTPS en un clic, pour un labo ou une première intégration : la gateway est sa propre autorité, et le certificat le dit."
+        "fr": "HTTPS en un clic, pour un laboratoire ou une première intégration : la gateway est sa propre autorité, et le certificat le dit."
       }
     },
     {
@@ -1730,11 +1730,11 @@
       ],
       "title": {
         "en": "Create a certificate signing request",
-        "fr": "Créer une demande de signature"
+        "fr": "Créer une demande de signature de certificat"
       },
       "description": {
         "en": "The offline door: the request leaves for whoever runs the authority, the private key stays. Nothing here needs a route to the internet.",
-        "fr": "La porte hors ligne : la demande part vers qui tient l'autorité, la clé privée reste. Rien ici n'a besoin d'un accès internet."
+        "fr": "La porte hors ligne : la demande part chez celui qui exploite l'autorité, la clé privée reste sur place. Rien ici n'exige un accès à Internet."
       }
     },
     {
@@ -1764,7 +1764,7 @@
       },
       "description": {
         "en": "An order sits in the certificate pool like the others and is placed the same way; the authority is asked on the first visit to a name once the order serves a door. Refused while no authority is set up, and for a wildcard or an address.",
-        "fr": "Une commande vit dans la réserve de certificats comme les autres et se place de la même façon ; l'autorité est sollicitée à la première visite d'un nom une fois la commande sur une porte. Refusé tant qu'aucune autorité n'est configurée, et pour un joker ou une adresse."
+        "fr": "Une commande se range dans la réserve de certificats comme les autres et se place de la même façon ; l'autorité est sollicitée à la première visite d'un nom, une fois la commande placée sur une porte. Refusé tant qu'aucune autorité n'est configurée, et pour un nom générique ou une adresse."
       }
     },
     {
@@ -1785,7 +1785,7 @@
       },
       "description": {
         "en": "The accounts certificates are asked of, and the providers the drawer offers. A literal account key never travels back.",
-        "fr": "Les comptes auprès desquels les certificats sont demandés, et les fournisseurs proposés. Une clé de compte en clair ne revient jamais."
+        "fr": "Les comptes auprès desquels les certificats sont demandés, et les fournisseurs que propose le tiroir. Une clé de compte littérale ne revient jamais vers l'appelant."
       }
     },
     {
@@ -1812,7 +1812,7 @@
       },
       "description": {
         "en": "Refused at save time rather than at renewal time: terms not accepted, a binding missing, a directory that does not answer - each named.",
-        "fr": "Refusé à l'enregistrement plutôt qu'au renouvellement : conditions non acceptées, liaison de compte manquante, répertoire qui ne répond pas - chacun nommé."
+        "fr": "Le refus tombe à l'enregistrement plutôt qu'au renouvellement : conditions non acceptées, liaison de compte manquante, annuaire qui ne répond pas - chaque cause est nommée."
       }
     },
     {
@@ -1841,7 +1841,7 @@
       },
       "description": {
         "en": "Another directory is another account: it gets a fresh corner of the cache. On the community image the edition refuses first (422).",
-        "fr": "Un autre répertoire est un autre compte : il reçoit un coin neuf du cache. Sur l'image communautaire, l'édition refuse d'abord (422)."
+        "fr": "Un autre annuaire, c'est un autre compte : il reçoit un recoin neuf du cache. Sur l'image Community, c'est l'édition qui refuse en premier (422)."
       }
     },
     {
@@ -1865,7 +1865,7 @@
       },
       "description": {
         "en": "Refused while certificates are still asked of it, and the refusal names them.",
-        "fr": "Refusé tant que des certificats lui sont demandés, et le refus les nomme."
+        "fr": "Refusé tant que des certificats lui sont encore demandés, et le refus les nomme."
       }
     },
     {
@@ -1886,11 +1886,11 @@
       ],
       "title": {
         "en": "Ask an authority again",
-        "fr": "Redemander à une autorité"
+        "fr": "Solliciter de nouveau une autorité"
       },
       "description": {
         "en": "Once whatever the authority refused for is fixed - a DNS record, a closed port - the order is asked again. On the community image the edition refuses first (422).",
-        "fr": "Une fois corrigé ce que l'autorité a refusé - un enregistrement DNS, un port fermé - la commande est redemandée. Sur l'image communautaire, l'édition refuse d'abord (422)."
+        "fr": "Une fois corrigée la cause du refus de l'autorité - un enregistrement DNS, un port fermé -, la commande lui est soumise de nouveau. Sur l'image Community, c'est l'édition qui refuse en premier (422)."
       }
     },
     {
@@ -1917,7 +1917,7 @@
       },
       "description": {
         "en": "A certificate is made or imported once, then served on the console, the applications, or both. Another certificate already answering for one of its names on that door is named in the refusal, and replaced only when asked.",
-        "fr": "Un certificat est fabriqué ou importé une fois, puis servi sur la console, les applications, ou les deux. Un autre certificat qui répond déjà pour l'un de ses noms sur cette porte est nommé dans le refus, et remplacé seulement sur demande."
+        "fr": "Un certificat est créé ou importé une seule fois, puis servi sur la console, sur les applications, ou sur les deux. Si un autre certificat répond déjà pour l'un de ses noms sur cette porte, le refus le nomme, et il n'est remplacé que sur demande."
       }
     },
     {
@@ -1938,7 +1938,7 @@
       },
       "description": {
         "en": "Which HTTPS doors are open, and whether an ACME authority issues on its own. The external-account HMAC key follows the vault rule: a literal never travels back.",
-        "fr": "Quelles portes HTTPS sont ouvertes, et si une autorité ACME émet toute seule. La clé HMAC de compte externe suit la règle du coffre : un littéral ne revient jamais."
+        "fr": "Quelles portes HTTPS sont ouvertes, et si une autorité ACME émet de sa propre initiative. La clé HMAC du compte externe suit la règle du coffre : une valeur littérale ne revient jamais vers l'appelant."
       }
     },
     {
@@ -1961,7 +1961,7 @@
       },
       "description": {
         "en": "What changes going from one saved configuration to another, object by object, without looking at what runs (CFG-04): the question asked of a customer's configuration and the template it was made from, before touching either. Root only, like every configuration.",
-        "fr": "Ce qui change en passant d'une configuration enregistrée à une autre, objet par objet, sans regarder ce qui tourne (CFG-04) : la question qu'on pose à la configuration d'un client et au modèle dont elle est partie, avant de toucher à l'une ou l'autre. Root seulement, comme toute configuration."
+        "fr": "Ce qui change quand on passe d'une configuration enregistrée à une autre, objet par objet, sans regarder ce qui est en service (CFG-04) : c'est la question que l'on pose à la configuration d'un client et au modèle dont elle est issue, avant de toucher à l'une ou à l'autre. Réservé à root, comme tout ce qui touche aux configurations."
       }
     }
   ]

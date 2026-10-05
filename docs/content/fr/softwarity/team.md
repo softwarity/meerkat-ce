@@ -8,29 +8,29 @@ summary: Qui construit tout cela, et comment nous joindre.
 # L'équipe
 
 > [!NOTE]
-> Cette page est un emplacement réservé. Les personnes, leurs rôles et leurs
-> visages viennent ici : le contenu est en cours d'écriture et remplacera ce
-> bloc.
+> Cette page est provisoire. Les personnes, leurs rôles et leurs visages
+> figureront ici : le contenu est en cours de rédaction et remplacera ce bloc.
 
 ## Nous joindre
 
-Le chemin le plus rapide, aujourd'hui, c'est le dépôt : une issue sur
-[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) est lue, et
+Aujourd'hui, le moyen le plus rapide est le dépôt : un ticket ouvert sur
+[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) est lu, et
 une discussion y reste là où la réponse servira à quelqu'un d'autre.
 
 ::: grid
 ### Commercial
 
-Pour l'édition Enterprise, un contrat de support ou une intégration : le canal
-de contact est en cours de mise en place et son adresse sera ici.
+Pour les éditions Team et Enterprise, un contrat de support ou une
+intégration : le contact commercial est en cours de mise en place, et son
+adresse figurera ici.
 
 ### Sécurité
 
-Une vulnérabilité ne se signale pas dans une issue publique. L'adresse de
-divulgation et sa politique viennent ici.
+Une vulnérabilité ne doit pas être signalée dans un ticket public. L'adresse
+de signalement et la politique de divulgation figureront ici.
 
 ### Recrutement
 
-Ce que nous cherchons, et comment nous travaillons au quotidien, sera décrit sur
-cette page.
+Ce que nous recherchons, et notre façon de travailler au quotidien, seront
+décrits sur cette page.
 :::

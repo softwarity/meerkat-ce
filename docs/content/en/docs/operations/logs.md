@@ -53,7 +53,7 @@ few seconds. [Metrics](/docs/console/traffic) and the traces answer it.
 
 ## The access log
 
-Ships off: at four hundred requests a second, that is thirty-five million lines
+Off by default: at four hundred requests a second, that is thirty-five million lines
 a day.
 
 ```
@@ -113,7 +113,7 @@ writes on its standard output.
 > a day fill a disk.
 >
 > ```
-> docker --log-opt max-size=50m --log-opt max-file=5
+> docker run --log-opt max-size=50m --log-opt max-file=5
 > ```
 >
 > Kubernetes does it on its own: 10 Mi, 5 files.

@@ -11,7 +11,7 @@ Several gateways serving one installation, in front of the same applications. Th
 
 What you deploy is four objects and one dependency: a Deployment of three replicas, two ClusterIP Services (one per plane), an Ingress in front of the public one, and one external PostgreSQL. No StatefulSet, no headless Service, no PersistentVolumeClaim, no sidecar, no Redis.
 
-The Helm chart in deploy/helm installs the single-gateway shape: one replica, one volume, Recreate. A cluster changes three things - no volume, a database URL, several replicas - so it is written out in full below rather than hidden behind values.
+The Helm chart in deploy/helm installs the single-gateway shape by default: one replica, one volume, Recreate. A cluster changes three things - no volume, a database URL, several replicas - which `values-ee-cluster.yaml` sets; they are also written out in full below rather than hidden behind values.
 
 ## Why a Deployment, and not a StatefulSet
 
@@ -229,7 +229,7 @@ How an operator reaches the console then, in order of preference: kubectl port-f
 
 ## The Ingress
 
-Two things a default Ingress gets wrong for this gateway. It proxies WebSockets, and it holds a live channel open on /meerkat/events - both are long-lived responses, so a controller that buffers the body or closes the connection at its default sixty seconds breaks pages that were working, intermittently and only for some users.
+Two things a default Ingress gets wrong for this gateway. The gateway proxies WebSockets, and it holds a live channel open on /meerkat/events - both are long-lived responses, so a controller that buffers the body or closes the connection at its default sixty seconds breaks pages that were working, intermittently and only for some users.
 
 And the scheme. Meerkat can terminate TLS itself (-tls-addr, -admin-tls-addr, with ACME issuance serialised by an advisory lock so N nodes ask for one certificate rather than N, the material and the challenge being rows every node can answer from). In Kubernetes you usually terminate at the Ingress instead, and both work. But whatever terminates in front must send X-Forwarded-Proto: the gateway reads the scheme from it as much as from the connection, and without it three things go wrong at once - session cookies lose their Secure attribute, the console announces http:// URLs, and the redirect to HTTPS loops for ever. nginx and Traefik both set it by default; anything hand-rolled in front has to be checked.
 
@@ -300,7 +300,7 @@ in which no node is ready.
 
 ## Optional: let the route editor see the namespace
 
-The gateway can list the Services of its OWN namespace and offer them when somebody creates a route, so an upstream becomes a pick rather than a typed URL. There is no switch for it: what opens it is what the deployment grants. The ServiceAccount needs list on services in its own namespace and nothing else - no secret, no pod, no other namespace - and without the right the console says which one it lacks while free typing stays exactly as it was. The developer tunnel asks for more than this, and what it grants is set out on [Docker and Helm](/docs/deploy/one-gateway).
+The gateway can list the Services of its OWN namespace and offer them when somebody creates a route, so an upstream becomes a pick rather than a typed URL. There is no switch for it: what opens it is what the deployment grants. The ServiceAccount needs list on services in its own namespace and nothing else - no secret, no pod, no other namespace - and without the right the console says which one it lacks while free typing stays exactly as it was. The developer tunnel asks for more than this, and what it grants is set out on [One gateway](/docs/deploy/one-gateway).
 
 ::: details The Role and its binding
 ```yaml
@@ -399,4 +399,4 @@ spec:
 - The database has a failover path, and the restore has been tried.
 - Kill one pod during a load test and watch the figures: this is the cheapest rehearsal you will get.
 
-One gateway on one volume is a simpler shape, and it has its own page: [Docker and Helm](/docs/deploy/one-gateway).
+One gateway on one volume is a simpler shape, and it has its own page: [One gateway](/docs/deploy/one-gateway).

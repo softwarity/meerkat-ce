@@ -69,11 +69,11 @@ lands directly on the organisation.
 ## The rule about stacking factors
 
 The authority that recognises the account has the last word on whether Meerkat
-asks for its own second factor. An authority set to *Two-factor: left to the
+asks for its own second factor. An authority set to *Two-factor: Left to the
 authority* means "this provider already challenged them" and Meerkat does not ask
 again.
 
-Two precisions that matter:
+Two points that matter:
 
 - It is a **declaration, not a proof**. Meerkat does not read the `acr` or `amr` claims a provider may send, so nothing verifies that the provider really asked. Set that value only where you know it did.
 - The other two values behave the same as each other: *Always required* on an authority does **not** force a second factor on. What decides is the account's own setting, then the installation's. See [Two-factor](/docs/auth/mfa).

@@ -202,6 +202,31 @@ a {
     white-space: nowrap;
   }
 
+  /* The shell commands a widget writes at run time, in the same palette. */
+  .mk-sh-cmd {
+    color: light-dark(#1e66f5, #89b4fa);
+    font-style: italic;
+  }
+  .mk-sh-flag {
+    color: light-dark(#fe640b, #fab387);
+  }
+  .mk-sh-str {
+    color: light-dark(#40a02b, #a6e3a1);
+  }
+  .mk-sh-var {
+    color: light-dark(#8839ef, #cba6f7);
+  }
+  .mk-sh-op {
+    color: light-dark(#179299, #94e2d5);
+  }
+
+  /* Coloured at build time (build-site.mjs): each token carries its colour in
+     both schemes, and the page's own scheme picks one. */
+  .shiki span {
+    color: light-dark(var(--shiki-light), var(--shiki-dark));
+    font-style: light-dark(var(--shiki-light-font-style, normal), var(--shiki-dark-font-style, normal));
+  }
+
   pre {
     background: var(--surface-2);
     border: 1px solid var(--line);
@@ -370,7 +395,21 @@ a {
   margin: 8px 0 26px;
 }
 
+/* Four cards read as two rows of two. Left to auto-fit they come out three and
+   one: an orphan under a row of narrow columns. */
+.mk-cards:has(> .mk-card:nth-child(4):last-child) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 760px) {
+  .mk-cards:has(> .mk-card:nth-child(4):last-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .mk-card {
+  /* A grid item is as wide as its longest line unless told otherwise: a
+     command in a card would push the card out of its column. */
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -388,6 +427,13 @@ a {
   img {
     margin: 0 0 12px;
     box-shadow: none;
+  }
+
+  /* A command in a card wraps rather than scrolls: a card is a column, and a
+     scrollbar inside one hides the end of the line that matters. */
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -587,6 +633,12 @@ a {
   .dg .edge-mk { stroke: var(--accent); stroke-width: 1.8; fill: none; }
   .dg .ah { fill: var(--ink-2); }
   .dg .ah-mk { fill: var(--accent); }
+  .dg .dot { fill: var(--accent); opacity: 0; }
+  .dg .dot-no { fill: var(--sand); }
+  .dg .t-no { fill: var(--sand); font-weight: 600; }
+  .dg .t-ask { font-size: 13px; font-weight: 600; fill: var(--accent-ink); }
+  .dg .lit { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent); stroke-width: 1.8; }
+  .dg .lit-no { fill: var(--sand-soft); stroke: var(--sand); stroke-width: 1.8; }
   .dg .divider { stroke: var(--rule-strong); stroke-width: 1; stroke-dasharray: 2 5; }
   .dg .grid { stroke: var(--rule); stroke-width: 1; }
   .dg .axis { stroke: var(--rule-strong); stroke-width: 1; }
@@ -694,5 +746,13 @@ a {
 
   .mk-stats {
     break-inside: avoid;
+  }
+}
+
+/* The requests that travel across a figure stay still for a reader who asked
+   for less motion: the drawing says the same thing without them. */
+@media (prefers-reduced-motion: reduce) {
+  .mk-figure .flow {
+    display: none;
   }
 }

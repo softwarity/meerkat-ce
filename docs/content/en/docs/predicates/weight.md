@@ -18,9 +18,9 @@ little on the new one.
 | `group` | string | yes | The name the routes of one split share. |
 | `weight` | integer | yes | This route's share of the group. Must be greater than zero. |
 
-A route takes `weight` divided by the **total of the group** of the requests. The
-numbers are shares, not percentages: `8` and `2` is the same split as `80` and
-`20`.
+A route takes a share of the requests: its `weight` divided by the **total of the
+group**. The numbers are shares, not percentages: `8` and `2` is the same split as
+`80` and `20`.
 
 ## Example
 

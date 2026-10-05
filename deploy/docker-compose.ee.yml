@@ -20,7 +20,9 @@
 # which resource it lacks, and the gateway serves as usual.
 services:
   meerkat:
-    image: ghcr.io/softwarity/meerkat:latest
+    # MEERKAT_IMAGE picks another edition or a pinned version without editing
+    # this file: softwarity/meerkat:eval, or the image built for your licence.
+    image: ${MEERKAT_IMAGE:-ghcr.io/softwarity/meerkat:latest}
     ports:
       - "8080:8080" # application plane
       - "9090:9090" # control plane (admin console) - keep this one internal

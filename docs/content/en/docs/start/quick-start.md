@@ -13,13 +13,11 @@ through it.
 
 ## Start the gateway
 
-```bash
-docker run -d --name meerkat \
-  -p 8080:8080 -p 9090:9090 \
-  -e MEERKAT_ADMIN_PASSWORD='choose-one-now' \
-  -v meerkat-data:/data \
-  docker.io/softwarity/meerkat:latest
-```
+Pick the edition you run and where you run it: the commands and the files below
+follow.
+
+::: widget install
+:::
 
 The two published ports are two different jobs:
 
@@ -53,32 +51,32 @@ docker logs meerkat | grep 'admin account created'
 
 ## Sign in to the console
 
-Open **http://localhost:9090**. Sign in as `admin`. If the password was
+Open **http://localhost:9090** and sign in as `admin`. If the password was
 generated, the console asks you for a new one before letting you anywhere else.
 
-The console has two planes of its own in the left navigation - **Infra** for
-the installation (routes, TLS, authentication authorities, configuration) and
-**Application** for what your users meet (accounts, roles, built-in pages,
-portal).
+## Send a first request through
 
-## See traffic go through
+A fresh gateway is **empty**: it has no route, so every address on port 8080
+answers 404. Give it one, pointing at a public test service:
 
-A fresh gateway starts **empty**: no route, so every path of the data plane
-answers 404 until you say what it serves. The sign-in pages are there already
-(`http://localhost:8080/login`): they belong to the gateway, not to a route.
+1. In the console, open **Infra > Routes** and click **New route**. Name it
+   `demo`.
+2. In **Target**, keep **Proxy** and type the upstream: `https://httpbin.org`.
+3. In **Predicates**, add a **path** predicate with the pattern `/demo/**`.
+4. In **Incoming**, add a **strip-prefix** filter with `1` part: the test
+   service knows `/get`, not `/demo/get`.
+5. Click **Save**. The route serves at once, with nothing to restart.
 
-Add one in the console, **Infra, Routes**, or through the API - pointing at a
-public test service is enough to watch a call go through:
+Then open **[http://localhost:8080/demo/get](http://localhost:8080/demo/get)**
+in your browser.
 
-```bash
-curl -i http://localhost:8080/demo/get
-```
-
-with a route matching `/demo/**`, stripping one segment, towards
-`https://httpbin.org`. [Your first route](/docs/start/first-route) walks
-through it.
+What you see is httpbin's answer: the request as the service received it, with
+the headers the gateway added on the way. The call went in through the gateway
+and out to the service. Open **Metrics** in the console to see it counted, on
+the `demo` route.
 
 ## Next
 
-Point a route at one of your own services: [Your first
-route](/docs/start/first-route).
+That route is open to anyone and points at somebody else's service. [Your first
+route](/docs/start/first-route) puts one of your own behind the gateway, says
+who may reach it, and checks it before your users do.

@@ -7,7 +7,7 @@ summary: Adds the response headers a browser hardens on.
 
 # security-headers
 
-Poses the headers a browser hardens on, for an application that sets none. One
+Sets the headers a browser hardens on, for an application that sets none. One
 brick instead of four `set-response-header`, and with the two decisions that are
 easy to get wrong already taken.
 

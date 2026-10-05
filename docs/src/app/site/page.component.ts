@@ -1,4 +1,18 @@
-import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  ApplicationRef,
+  Component,
+  ComponentRef,
+  DestroyRef,
+  ElementRef,
+  EnvironmentInjector,
+  Type,
+  computed,
+  createComponent,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -8,6 +22,13 @@ import { filter, map, startWith } from 'rxjs';
 import { Lang, WORDS } from './i18n';
 import { Nav, NavArea, NavSection, Page, Shot, SiteService } from './site.service';
 import { BenchmarkComponent } from './widgets/benchmark.component';
+import { InstallComponent } from './widgets/install.component';
+
+// The components a Markdown page can place inside its own text, with a
+// `::: widget name` block. Each takes the page's language as `lang`.
+const WIDGETS: Record<string, Type<unknown>> = {
+  install: InstallComponent,
+};
 
 // One page: what the build made of a Markdown file, plus the two navigations
 // that belong to the page rather than to the site - the other pages of its
@@ -26,6 +47,10 @@ export class PageComponent {
   private readonly router = inject(Router);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
+  private readonly app = inject(ApplicationRef);
+  private readonly injector = inject(EnvironmentInjector);
+  // The widgets mounted in the page being read; they go when the page does.
+  private mounted: ComponentRef<unknown>[] = [];
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -89,6 +114,7 @@ export class PageComponent {
   });
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this.unmountWidgets());
     effect(() => {
       // BOTH read here, synchronously, or the effect does not depend on them.
       // A signal read inside the `then` below runs after the effect has
@@ -128,6 +154,7 @@ export class PageComponent {
           setTimeout(() => {
             this.wireLinks();
             this.wireShots();
+            this.mountWidgets();
             // A deep link may name a heading (?at=the-heading): the path is
             // the page, so the anchor could not ride in the fragment.
             const at = new URL(location.href).searchParams.get('at');
@@ -213,6 +240,32 @@ export class PageComponent {
       node.addEventListener('click', () => this.site.openShot(index));
     }
     this.site.setShots(found);
+  }
+
+  // The spots the build reserved (`::: widget name`) receive their component.
+  // Mounted by hand because the page's text arrives as HTML, where Angular
+  // instantiates nothing: the component is created on the element itself and
+  // attached to the application so it is checked like any other.
+  private mountWidgets(): void {
+    this.unmountWidgets();
+    const root = this.body()?.nativeElement;
+    if (!root) return;
+    for (const host of Array.from(root.querySelectorAll<HTMLElement>('[data-widget]'))) {
+      const type = WIDGETS[host.dataset['widget'] ?? ''];
+      if (!type) continue;
+      const ref = createComponent(type, { environmentInjector: this.injector, hostElement: host });
+      ref.setInput('lang', this.lang());
+      this.app.attachView(ref.hostView);
+      this.mounted.push(ref);
+    }
+  }
+
+  private unmountWidgets(): void {
+    for (const ref of this.mounted) {
+      this.app.detachView(ref.hostView);
+      ref.destroy();
+    }
+    this.mounted = [];
   }
 
   // A link in the Markdown names a page. Turn each into a real href - so it

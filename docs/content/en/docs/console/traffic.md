@@ -18,8 +18,8 @@ is a map of the installation.
 ![The Metrics screen: five figures over the last minute, the traffic and latency curves, and the ranking of routes](img/console/traffic.webp)
 
 Requests per second, the refused-or-failed share, the mean answer, the p95 and
-what is in flight; under them the two curves, and the ranking with its three tabs - the
-failing one carrying its count.
+what is in flight; under them the two curves, and the ranking with its three
+tabs - the failing one carrying its count.
 
 ## What is on the page
 
@@ -28,18 +28,18 @@ failing one carrying its count.
   mean hides: ninety fast answers and ten of three seconds average out to
   something nobody waited for - and how many requests are in flight.
 - **Traffic** and **How long an answer takes**: two curves, the second drawing
-  the mean and the p95 side by side, fed by the gateway
-  pushing an interval every five seconds. Nothing is polled.
-- **Routes**, ranked on one of three axes - **slowest**, **failing**, **costliest**
-  - over the window the samples cover. The failing tab carries its count, so an eye
-  is caught without switching to find out whether there is anything to switch for.
+  the mean and the p95 side by side, fed by the gateway pushing an interval every
+  five seconds. Nothing is polled.
+- **Routes**, ranked on one of three axes - **Slowest**, **Failing**,
+  **Costliest** - over the window the samples cover. The Failing tab carries its
+  count, so it catches the eye without anyone switching tabs to find out whether
+  there is anything to switch for.
 
 ![The ranking of routes, scrolled: five routes with their requests, failures, mean answer and time spent](img/console/metrics.webp)
 
 Further down the same screen: the five routes over the minutes the samples
 cover. *Inventory (maintenance)* answers every request in under a millisecond
-and counts them all as refused -
-which is exactly what a maintenance route does.
+and counts them all as refused - which is exactly what a maintenance route does.
 
 A route **opens on its endpoints**, in the same table and over the same period, so
 the lines add up. The unit is the template (`/orders/{id}`), never the raw path: a
@@ -65,10 +65,9 @@ The counters leave the gateway one way: pushed over OTLP to a collector, from
 Prometheus. See [metrics](/docs/operations/metrics).
 
 > [!NOTE]
-> Enterprise edition: getting the counters out. The counters
-> and this screen are in both editions - curves with nothing to install is what
-> the community image promises; what is sold is externalising them into a stack
-> you already run.
+> Enterprise edition: getting the counters out. The counters and this screen are
+> in both editions - curves with nothing to install is what the community image
+> promises; what is sold is externalising them into a stack you already run.
 
 ## Traps
 

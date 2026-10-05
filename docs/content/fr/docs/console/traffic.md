@@ -2,81 +2,86 @@
 title: Metrics
 section: La console
 order: 182
-summary: Ce que la passerelle a réellement servi - cinq chiffres, deux courbes, et un classement des routes jusqu'à leurs endpoints.
+summary: Ce que la gateway a réellement servi - cinq chiffres, deux courbes et un classement des routes, détaillé jusqu'à leurs endpoints.
 ---
 
 # Metrics
 
-L'entrée **Metrics** du rail, c'est ce que la passerelle a vraiment servi. Tous les autres
-écrans montrent ce qui est **configuré**, et dans une configuration une route qui échoue et
-une route que personne n'appelle se ressemblent.
+L'entrée **Metrics** du rail montre ce que la gateway a réellement servi. Tous les
+autres écrans montrent ce qui est **configuré** ; or, dans une configuration, rien ne
+distingue une route en échec d'une route que personne n'appelle.
 
-Elle vit sur `/traffic` : hors `/api`, les chemins de ce port appartiennent au produit. Root
-et infra admins seulement : les chiffres nomment chaque route et chaque service, ce qui est
-une carte de l'installation.
+L'écran se trouve à l'adresse `/traffic` : en dehors de `/api`, les chemins de ce port
+appartiennent au produit. Il est réservé au compte root et aux administrateurs infra :
+ces chiffres nomment chaque route et chaque service, et dessinent ainsi une carte de
+l'installation.
 
 ![L'écran Metrics : cinq chiffres sur la dernière minute, les courbes de trafic et de latence, et le classement des routes](img/console/traffic.webp)
 
-Requêtes par seconde, part de refusé ou échoué, réponse moyenne, p95 et vol en cours ; en
-dessous les deux courbes, et le classement avec ses trois onglets - celui des échecs
-portant son compteur.
+Les requêtes par seconde, la part des requêtes refusées ou en échec, le temps de réponse
+moyen, le p95 et les requêtes en cours ; en dessous, les deux courbes, puis le
+classement et ses trois onglets, celui des échecs affichant son compteur.
 
-## Ce qu'il y a sur la page
+## Ce que contient la page
 
-- **Over the last minute** : requêtes par seconde, part refusée ou échouée, réponse
-  moyenne, le **p95** - le temps sous lequel sont passées 95 % des réponses, que la moyenne
-  cache : quatre-vingt-dix réponses rapides et dix de trois secondes donnent une moyenne que
-  personne n'a attendue - et combien de requêtes sont en vol.
-- **Traffic** et **How long an answer takes** : deux courbes, la seconde traçant la moyenne et
-  le p95 côte à côte, alimentées par la passerelle
-  qui pousse un intervalle toutes les cinq secondes. Rien n'est interrogé en boucle.
-- **Routes**, classées sur l'un de trois axes - **slowest**, **failing**, **costliest** -
-  sur la fenêtre que couvrent les échantillons. L'onglet des échecs porte son compte, pour
-  qu'un oeil soit attiré sans avoir à basculer pour savoir s'il y a de quoi basculer.
+- **Over the last minute** : les requêtes par seconde, la part des requêtes refusées ou
+  en échec, le temps de réponse moyen, le **p95** et le nombre de requêtes en cours. Le
+  p95 est le temps en dessous duquel 95 % des réponses sont arrivées, ce que masque la
+  moyenne : quatre-vingt-dix réponses rapides et dix réponses de trois secondes donnent
+  une moyenne que personne n'a réellement attendue.
+- **Traffic** et **How long an answer takes** : deux courbes, la seconde traçant côte à
+  côte la moyenne et le p95. La gateway les alimente en poussant un intervalle toutes
+  les cinq secondes. L'écran n'interroge rien périodiquement.
+- **Routes**, classées selon l'un des trois axes - **Slowest**, **Failing**,
+  **Costliest** - sur la fenêtre que couvrent les échantillons. L'onglet Failing affiche
+  son compteur : il attire l'œil sans que vous ayez à changer d'onglet pour savoir s'il
+  y a quelque chose à y voir.
 
-![Le classement des routes, plus bas : cinq routes avec leurs requêtes, leurs échecs, leur réponse moyenne et le temps passé](img/console/metrics.webp)
+![Le classement des routes, plus bas dans la page : cinq routes avec leurs requêtes, leurs échecs, leur temps de réponse moyen et le temps consommé](img/console/metrics.webp)
 
-Plus bas sur le même écran : les cinq routes sur les minutes que couvrent les échantillons.
-*Inventory (maintenance)* répond à chaque requête en moins d'une milliseconde et les compte
-toutes comme refusées - ce que fait
-exactement une route en maintenance.
+Plus bas sur le même écran : les cinq routes, sur les minutes que couvrent les
+échantillons. *Inventory (maintenance)* répond à chaque requête en moins d'une
+milliseconde et les compte toutes comme refusées, ce qui est exactement le rôle d'une
+route en maintenance.
 
-Une route **s'ouvre sur ses endpoints**, dans le même tableau et sur la même période, donc
-les lignes s'additionnent. L'unité est le gabarit (`/orders/{id}`), jamais le chemin brut :
-un chemin brut serait une série par commande.
+Une route **se déplie sur ses endpoints**, dans le même tableau et sur la même période :
+les lignes s'additionnent donc. L'unité est le gabarit (`/orders/{id}`), jamais le chemin
+brut, qui donnerait une série par commande.
 
 Une ligne d'endpoint marquée **deduced** a été déduite de la forme des chemins que cette
-passerelle a vus, pas d'une spec - les segments qui ressemblaient à des identifiants ont été
-repliés. Cela peut se tromper, puisqu'une année ressemble à un id. Déclarez une spec OpenAPI
-sur la [route](/docs/console/routes) pour des noms exacts.
+gateway a vus passer, et non d'une spécification : les segments qui ressemblaient à
+des identifiants ont été regroupés. La déduction peut être fausse, car une année
+ressemble à un identifiant. Pour obtenir des noms exacts, déclarez une spécification
+OpenAPI sur la [route](/docs/console/routes).
 
-Les courbes sont dessinées même vides : *rien de mesuré* et *pas connecté* sont deux
-réponses que le lecteur doit pouvoir distinguer.
-
-> [!NOTE]
-> La fenêtre est tenue en mémoire et repart au redémarrage de la passerelle. En cluster, les
-> échantillons sont sommés sur tous les noeuds, et un endpoint est compté sur celui qui a
-> répondu - l'écran le dit là où cela compte.
-
-## Garder un historique
-
-Les compteurs sortent de la passerelle d'une seule façon : poussés en OTLP vers un collecteur,
-depuis **Infra, OpenTelemetry**, onglet **Metrics**, et écrits par le collecteur dans Prometheus.
-Voir [les métriques](/docs/operations/metrics).
+Les courbes sont tracées même lorsqu'elles sont vides : *rien n'a encore été mesuré* et
+*l'écran n'est pas connecté* sont deux réponses que vous devez pouvoir distinguer.
 
 > [!NOTE]
-> Edition Enterprise : sortir les compteurs. Les compteurs et cet écran sont
-> dans les deux éditions - des courbes sans rien installer est ce que promet l'image
-> communautaire ; ce qui se vend, c'est de les externaliser dans une stack que vous exploitez
-> déjà.
+> La fenêtre est conservée en mémoire et repart de zéro au redémarrage de la gateway.
+> Dans un cluster, les échantillons sont additionnés sur tous les nœuds, et un endpoint
+> est compté sur le nœud qui a répondu - l'écran le précise là où c'est utile.
+
+## Conserver un historique
+
+Les compteurs ne quittent la gateway que d'une seule manière : ils sont poussés en
+OTLP vers un collecteur, depuis **Infra, OpenTelemetry**, onglet **Metrics**, et c'est
+le collecteur qui les écrit dans Prometheus. Voir
+[les métriques](/docs/operations/metrics).
+
+> [!NOTE]
+> Édition Enterprise : l'export des compteurs. Les compteurs et cet écran existent dans
+> les deux éditions - des courbes sans rien installer, c'est la promesse de l'image
+> Community ; ce qui est vendu, c'est leur envoi vers une pile d'outils que vous
+> exploitez déjà.
 
 ## Pièges
 
-- **Les compteurs sont par noeud.** Chaque noeud pousse les siens, sous son propre
-  `service.instance.id`, et un tableau de bord les additionne.
-- **Un redémarrage remet les courbes à zéro.** L'historique est dans Prometheus, quand les
-  compteurs y sont poussés.
-- **Une route que personne n'a appelée n'a rien à dire**, ni ses endpoints. Ce n'est pas une
-  panne.
-- **Les gabarits déduits peuvent se tromper.** Traitez-les comme une indication tant qu'aucune
-  spec n'est déclarée.
+- **Les compteurs sont propres à chaque nœud.** Chaque nœud pousse les siens, sous son
+  propre `service.instance.id`, et c'est un tableau de bord qui les additionne.
+- **Un redémarrage remet les courbes à zéro.** L'historique se trouve dans Prometheus,
+  à condition que les compteurs y soient poussés.
+- **Une route que personne n'a appelée n'a rien à afficher**, et ses endpoints non
+  plus. Ce n'est pas une panne.
+- **Les gabarits déduits peuvent être faux.** Considérez-les comme une indication tant
+  qu'aucune spécification n'est déclarée.

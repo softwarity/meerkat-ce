@@ -2,19 +2,19 @@
 title: set-request-header
 section: Filtres
 order: 90
-summary: Fixe un en-tête de requête (en remplaçant la valeur du client).
+summary: Fixe un en-tête de requête, en remplaçant toute valeur envoyée par le client.
 ---
 
 # set-request-header
 
-Décide un en-tête au niveau de la route. C'est le filtre de ce qu'un service doit
+Fixe un en-tête au niveau de la route. C'est le filtre de ce qu'un service doit
 apprendre et qu'un appelant ne doit pas pouvoir prétendre.
 
 ## Paramètres
 
 | Nom | Type | Obligatoire | Ce que ça fait |
 | --- | --- | --- | --- |
-| `name` | chaîne | oui | L'en-tête posé. |
+| `name` | chaîne | oui | L'en-tête fixé. |
 | `value` | chaîne | oui | La valeur écrite. |
 
 ## Exemple
@@ -29,12 +29,13 @@ filters:
 
 ## Notes
 
-Toutes les valeurs envoyées par l'appelant sous ce nom sont remplacées.
+Toutes les valeurs que l'appelant a envoyées sous ce nom sont remplacées.
 
-La valeur est **fixe** : rien n'est pris dans le chemin, la requête ou l'appelant.
-Pour l'utilisateur connecté, passez par le transfert d'identité de la route plutôt
-que par ce filtre - il tourne après les filtres et récrit les en-têtes qu'il écrit
-lui-même, donc un `set-request-header` sur un de ces noms n'a aucun effet.
+La valeur est **fixe** : rien n'est repris du chemin, de la chaîne de requête ni
+de l'appelant. Pour l'utilisateur connecté, passez par le transfert d'identité de
+la route plutôt que par ce filtre : il s'exécute après les filtres et écrase les
+en-têtes qu'il écrit lui-même, si bien qu'un `set-request-header` sur l'un de ces
+noms reste sans effet.
 
-Une référence au coffre-fort (`$nom`) est résolue ici : c'est ainsi qu'une clé
-d'API partagée atteint un service sans être écrite dans la configuration exportée.
+Une référence au coffre (`$name`) est résolue ici : c'est ainsi qu'une clé d'API
+partagée parvient à un service sans être écrite dans la configuration exportée.

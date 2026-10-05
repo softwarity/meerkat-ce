@@ -33,7 +33,7 @@ deferred, so they run in document order, and the button's element must not upgra
 has defined what it reads. Two separate insertions would each land right after `<body>` and put the
 second one first.
 
-Everything the gateway adds goes at the top of the **body**, never inside the head. A custom element
+The agent and the button go at the top of the **body**, never inside the head. A custom element
 inside `<head>` closes it where it stands, and everything after it - charset, title,
 and `<base href>` - lands in the body, where a base is ignored. An application served
 under a prefix would then resolve every URL from the root.

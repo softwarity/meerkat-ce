@@ -21,8 +21,9 @@ sits last - a catch-all anywhere else would answer for everything under it.
 ## The list
 
 One row per route: its name, what it decides about access, and one **Matching
-and target** column on two lines: what it matches, then where it sends. Order is significant - **the first route that matches wins** -
-so the table is ordered, not sorted.
+and target** column on two lines: what it matches, then where it sends. Order is
+significant - **the first route that matches wins** - so the table is ordered,
+not sorted.
 
 - **The drag handle** moves a route up or down and saves at once. It only works
   on the whole list: with a search or a kind filter active the handle goes quiet
@@ -60,7 +61,7 @@ The heart answers it for every route that sends to a service.
 
 The gateway checks every 30 seconds, in the background: it reads the replica
 count Docker or Swarm declares, and opens a bare TCP connection to anything
-else. No HTTP request is sent, so the upstream sees no call, no sign-in and no
+else (a Kubernetes service, an external host). No HTTP request is sent, so the upstream sees no call, no sign-in and no
 line in its logs. Each node checks from where it stands. When a heart changes,
 the list follows without a reload.
 
@@ -125,7 +126,7 @@ The name sits in the header. The left column lists the sections, grouped:
 
 Save stays disabled until the route is valid **and** something has changed.
 Beside it, a red **N to fix** button lists every gap: each line names the
-section and jumps to it. There is no hunting through fourteen sections for the
+section and jumps to it. There is no hunting through fifteen sections for the
 field that is wanted.
 
 Saving keeps the drawer open and applies the route at once. Closing with unsaved
@@ -136,15 +137,16 @@ close the drawer.
 
 - The **UI** sections stay visible but disabled until the UI checkbox on their
   group is ticked. A route is always a service; UI comes on top.
+
 ![The Color scheme section of a UI route, with its mechanism, tag name and stored-theme override](img/console/route-editor-color-scheme.webp)
 
 A UI section once the box is ticked: here Color scheme, which says how the served
 application takes a light or dark choice.
 
-- **Incoming**, **Identity** and **Auth forward** are disabled when the route answers by itself
-  (redirect, maintenance, respond). This is not tidiness: the gateway drops
-  every request filter on such a route, so editing them would write settings it
-  throws away.
+- **Incoming**, **Identity** and **Auth forward** are disabled when the route
+  answers by itself (redirect, maintenance, respond). This is not tidiness: the
+  gateway drops every request filter on such a route, so editing them would
+  write settings it throws away.
 
 ## The Target section
 
@@ -163,8 +165,8 @@ On a proxy route you also set:
   a cluster TLS ends at the gateway, `https` for a third party, `h2c` for a gRPC
   service. Services the gateway discovered are offered in the field.
 - **When the service is slow or down** - connect and first-answer timeouts,
-  which inherit the Global values unless set here. Past either the caller gets a
-  502. What follows the first line is never bounded, so a download or a
+  which inherit the Global values unless set here. Past either the caller gets
+  a 502. What follows the first line is never bounded, so a download or a
   websocket runs as long as it needs.
 - **Stop calling this service when it stops answering** - the circuit breaker:
   after N failures in a row, callers get the unavailable page at once, and after
@@ -201,7 +203,7 @@ up or down.
   purpose.
 - **Two routes matching the same paths.** Perfectly legal, and the reason order
   exists. Use the Routing test rather than reasoning about it.
-- **Editing Incoming, Identity or Auth forward on a redirect.** The sections are disabled;
-  what you want is probably Outgoing, which applies to every mode.
+- **Editing Incoming, Identity or Auth forward on a redirect.** The sections are
+  disabled; what you want is probably Outgoing, which applies to every mode.
 - **Looking for endpoint rules with no spec.** Declare the OpenAPI spec on the
   route's Target section first.

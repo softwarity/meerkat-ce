@@ -166,7 +166,7 @@ ACME role - any of them answers here.
 | Field | What it is for |
 |---|---|
 | Provider | a known one fixes the directory and says what else it needs; *Another authority* carries its own URL |
-| Root CA | the authority signing the ACME **server's own** HTTPS certificate, in PEM - a private ACME server usually is behind a private certificate |
+| Root CA | the authority signing the ACME **server's own** HTTPS certificate, in PEM - a private ACME server is usually behind a private certificate |
 | EAB key id and HMAC key | External Account Binding: which account this gateway registers under. ZeroSSL and Google require it, Let's Encrypt ignores it |
 | Contact e-mail | some authorities require one; expiry is watched by the daily digest |
 | Terms accepted | a legal act, so it is never assumed |
