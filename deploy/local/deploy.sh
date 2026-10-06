@@ -38,9 +38,9 @@ rev=$(git rev-parse --short HEAD)
 
 for edition in "${editions[@]}"; do
   case "$edition" in
-    ee)   release=meerkat;      tags="ee";      flavour=ee; ports=(8080 8443 19090 19443); says="Enterprise edition" ;;
-    ce)   release=meerkat-ce;   tags="";        flavour=ce; ports=(8081 8444 19091 19444); says="Community edition" ;;
-    eval) release=meerkat-eval; tags="ee eval"; flavour=ee; ports=(8083 8446 19093 19446); says="Enterprise edition" ;;
+    ee)   release=meerkat;      tags="ee";      flavour=ee; ports=(8080 8443 19090 19443); plug=22222; says="Enterprise edition" ;;
+    ce)   release=meerkat-ce;   tags="";        flavour=ce; ports=(8081 8444 19091 19444); plug="";    says="Community edition" ;;
+    eval) release=meerkat-eval; tags="ee eval"; flavour=ee; ports=(8083 8446 19093 19446); plug=22223; says="Enterprise edition" ;;
     *) echo "unknown edition '$edition': ee, ce or eval" >&2; exit 2 ;;
   esac
   tag="$edition-$stamp"
@@ -71,7 +71,8 @@ for edition in "${editions[@]}"; do
       --set-json 'image.pullSecrets=[]' \
       --set admin.password="$(cat "$secret")" --set vault.key="$(openssl rand -base64 32)" \
       --set persistence.enabled=true --set persistence.size=1Gi --set rbac.read=true \
-      --set plug.enabled=$([ "$edition" = ce ] && echo false || echo true) \
+      --set plug.enabled=$([ -n "$plug" ] && echo true || echo false) \
+      $([ -n "$plug" ] && echo "--set plug.port=$plug --set plug.service.type=LoadBalancer") \
       --set service.type=LoadBalancer --set service.adminType=LoadBalancer \
       --set service.appPort="${ports[0]}" --set service.appTlsPort="${ports[1]}" \
       --set service.adminPort="${ports[2]}" --set service.adminTlsPort="${ports[3]}" >/dev/null
@@ -94,5 +95,5 @@ for edition in "${editions[@]}"; do
     sleep 2
   done
   $said || { echo "   $release does not say '$says'" >&2; exit 1; }
-  echo "   $release runs meerkat:$tag ($says), app :${ports[0]}/:${ports[1]}, console :${ports[2]}/:${ports[3]} on a first install"
+  echo "   $release runs meerkat:$tag ($says), app :${ports[0]}/:${ports[1]}, console :${ports[2]}/:${ports[3]}$([ -n "$plug" ] && echo ", plug :$plug") on a first install"
 done
