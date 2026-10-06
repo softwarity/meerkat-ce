@@ -2,13 +2,12 @@ name: CI
 
 on:
   push:
-    # Not the nightly tunnel job: iterating on it means pushing to main, because
-    # a workflow_dispatch only exists from the default branch - and a two-line
-    # change to a shell script it runs cannot break the product. A commit that
-    # touches anything else still runs everything; paths-ignore only skips when
-    # EVERY changed file matches.
+    # Not the scripts of the developer tunnel job: that job is the Enterprise
+    # pipeline's (ci-ee.yml, "The developer tunnel, in a cluster"), and a change
+    # to a shell script it runs cannot break the community product. A commit
+    # that touches anything else still runs everything; paths-ignore only skips
+    # when EVERY changed file matches.
     paths-ignore:
-      - '.github/workflows/plug-hosted.yml'
       - '.github/plug-hosted/**'
     # Every branch except Dependabot's. Its branches arrive WITH a pull
     # request, so `push` and `pull_request` both fire and the whole pipeline
