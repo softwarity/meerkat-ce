@@ -74,9 +74,16 @@ case "$where" in
 esac
 
 # And read back, because a redirect is a promise and this is the evidence: the
-# profile page prints the FINGERPRINT of what it holds.
-if ! curl -s --max-time 15 -b "$djar" "$data/profile/dev/key" | grep -qF "$fingerprint"; then
+# profile page prints the FINGERPRINT of what it holds. Unescaped first: the
+# page is html/template's, which writes a + as &#43;, and a fingerprint is
+# base64 - so half the keys drawn here held one, and their check failed on a
+# key the page was showing.
+curl -s --max-time 15 -b "$djar" "$data/profile/dev/key" > /tmp/devkey.html
+python3 -c 'import html,sys;print(html.unescape(open("/tmp/devkey.html").read()))' > /tmp/devkey.txt
+if ! grep -qF "$fingerprint" /tmp/devkey.txt; then
   echo "the profile page does not show $fingerprint - the key was not stored"
+  echo "--- the fingerprints it shows ---"
+  grep -oE 'SHA256:[A-Za-z0-9+/=]+' /tmp/devkey.txt || echo "(none)"
   exit 1
 fi
 echo "the gateway holds $fingerprint"
