@@ -9,8 +9,14 @@ import (
 // A migration waits for the pause; a backup of the same kind does not.
 func TestAMigrationWaitsForThePause(t *testing.T) {
 	f := setup(t)
-	if code, _ := f.call(t, "GET", "/api/backup?format=postgres", "", f.rootC); code != http.StatusConflict {
-		t.Fatalf("a dump to the other kind, unpaused, answered %d", code)
+	// The other kind is whichever this suite does not run on: the same test
+	// runs on the embedded database and on PostgreSQL.
+	other := "postgres"
+	if f.api.st.Dialect() == "postgres" {
+		other = "sqlite"
+	}
+	if code, _ := f.call(t, "GET", "/api/backup?format="+other, "", f.rootC); code != http.StatusConflict {
+		t.Fatalf("a copy to the other kind (%s), unpaused, answered %d", other, code)
 	}
 	if code, _ := f.call(t, "GET", "/api/backup", "", f.rootC); code != http.StatusOK {
 		t.Fatalf("a hot backup answered %d", code)
