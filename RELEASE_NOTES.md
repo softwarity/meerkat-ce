@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.2.1
+
 - **Who is signed in, live, on Users and Members.** A person icon heads each row,
   coloured while the account has a session open, with its sessions in the tooltip -
   browser, address, since when. On an organisation's Members screen it means signed
