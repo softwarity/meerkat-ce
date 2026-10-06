@@ -61,6 +61,10 @@ type API struct {
 	// single-binary installation - see reload.go.
 	Bus cluster.Bus
 
+	// PauseMoved wakes the consoles when the gateway is paused or resumed, on
+	// this node (pause.go). Nil in tests.
+	PauseMoved func()
+
 	// Scheduler is this node's own scheduler (SCHED-01), rung when a schedule
 	// is written here: the other nodes hear it on the bus, and this one
 	// sleeps until the next thing owed, so it has to be told. Wired by main;
@@ -185,6 +189,7 @@ func (a *API) Register(mux Mux) {
 	a.registerConfigRemotes(mux)
 	a.registerConfigPoints(mux)
 	a.registerBackup(mux)
+	a.registerPause(mux)
 	a.registerCertificates(mux)
 	a.registerAuthorities(mux)
 	a.registerSchedules(mux)

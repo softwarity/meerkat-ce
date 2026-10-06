@@ -303,7 +303,7 @@ jobs:
       # The browser is 130 MB downloaded on every single run, and it changes
       # only when Playwright does - which the lock file says exactly.
       - name: Cache the browser
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}

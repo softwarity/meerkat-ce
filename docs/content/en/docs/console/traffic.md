@@ -7,11 +7,11 @@ summary: What the gateway has actually served - five figures, two curves, and a 
 
 # Metrics
 
-The **Metrics** entry in the rail is what the gateway has really served. Every
+**Data plane, Metrics** is what the gateway has really served. Every
 other screen shows what is **configured**, and in a configuration a route that is
 failing and a route nobody calls look identical.
 
-It is at `/traffic`: outside `/api`, the paths of this port belong to the product.
+It is at `/data-plane/metrics`.
 Root and infra admins only: the figures name every route and every service, which
 is a map of the installation.
 

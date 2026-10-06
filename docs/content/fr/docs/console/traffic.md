@@ -7,12 +7,11 @@ summary: Ce que la gateway a réellement servi - cinq chiffres, deux courbes et 
 
 # Metrics
 
-L'entrée **Metrics** du rail montre ce que la gateway a réellement servi. Tous les
+**Data plane, Metrics** montre ce que la gateway a réellement servi. Tous les
 autres écrans montrent ce qui est **configuré** ; or, dans une configuration, rien ne
 distingue une route en échec d'une route que personne n'appelle.
 
-L'écran se trouve à l'adresse `/traffic` : en dehors de `/api`, les chemins de ce port
-appartiennent au produit. Il est réservé au compte root et aux administrateurs infra :
+L'écran se trouve à l'adresse `/data-plane/metrics`. Il est réservé au compte root et aux administrateurs infra :
 ces chiffres nomment chaque route et chaque service, et dessinent ainsi une carte de
 l'installation.
 

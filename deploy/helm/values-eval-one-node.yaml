@@ -1,0 +1,49 @@
+# Meerkat, evaluation edition, one gateway, with the developer tunnel open.
+#
+#   helm repo add meerkat https://www.softwarity.io/deploy
+#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-eval-one-node.yaml \
+#     --set admin.password='choose-one'
+#
+# The Enterprise image with nothing taken out, public, and with an evaluation
+# notice on its pages and in its console: everything Enterprise does, to try
+# before talking to anyone - not licensed for production. The shape is
+# values-ee-one-node.yaml's; only the image differs.
+image:
+  repository: docker.io/softwarity/meerkat
+  # The evaluation build: `eval` follows the latest release, `X.Y.Z-eval`
+  # pins one - pin it for anything that has to stay put.
+  tag: eval
+  # Public, on Docker Hub: no pull secret.
+  pullSecrets: []
+
+replicaCount: 1
+
+admin:
+  password: ""
+
+# The vault's master key. Optional on a single gateway - left alone it keeps
+# one in its data directory, which is enough while there is one pod and one
+# volume. Set it the day you go clustered, and keep it: losing it loses every
+# secret in the vault.
+vault:
+  key: ""
+
+persistence:
+  enabled: true
+  size: 2Gi
+  storageClass: ""
+
+# The developer tunnel. It opens only where developer mode is on AND the
+# gateway can reach the orchestrator - the chart's RBAC is that grant. Each
+# developer deposits their own public key in their profile, so a connection
+# says who rather than proving somebody has the client.
+plug:
+  enabled: true
+  port: 22222
+  service:
+    # ClusterIP keeps it inside; NodePort or LoadBalancer is how developers
+    # reach it from their machines. Your network, your call.
+    type: ClusterIP
+    nodePort: ""
+
+production: false

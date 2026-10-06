@@ -1,4 +1,5 @@
 import { Component, computed, inject, LOCALE_ID, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -56,13 +57,28 @@ export class AuditPageComponent {
   // security half split by plane - the sign-ins to the applications and the
   // sign-ins to this console are read by different people for different
   // reasons, so they are two views rather than one.
-  protected readonly view = signal<'' | 'admin' | 'account' | 'console'>('');
+  //
+  // Which trail, from the route: under Data plane the sign-ins to the
+  // applications and nothing else; under Meerkat everything else - the changes
+  // and the sign-ins to this console. The applications' sign-ins are read by
+  // the people who run the applications, and they would drown the rest.
+  protected readonly trail = (inject(ActivatedRoute).snapshot.data['trail'] as 'data' | 'system') ?? 'system';
+  // Under Data plane, two views: the sign-ins, and the calls of the audited
+  // operations (AUD-04).
+  protected readonly view = signal<'' | 'admin' | 'account' | 'console' | 'endpoint'>(
+    this.trail === 'data' ? 'account' : '',
+  );
 
   protected readonly me = inject(MeService);
+  protected readonly anonymous = $localize`:@@Anonymous:anonymous`;
   // How long the trail keeps an event (AUD-02) - root's alone, so only root
   // is shown the choice.
   protected readonly retention = signal(0);
   protected readonly retentionChoices = signal<number[]>([]);
+  // The audited calls' own lifetime, and what a full queue had to drop.
+  protected readonly callRetention = signal(0);
+  protected readonly callChoices = signal<number[]>([]);
+  protected readonly callsDropped = signal(0);
   protected readonly loading = signal(true);
   protected readonly events = signal<AuditEvent[]>([]);
   protected readonly target = signal('');
@@ -73,7 +89,8 @@ export class AuditPageComponent {
     const q = this.search().trim().toLowerCase();
     if (!q) return this.events();
     return this.events().filter((e) =>
-      [e.action, e.actorName, e.actorId, e.actorToken, e.target, e.targetName, e.detail, e.ip]
+      [e.action, e.actorName, e.actorId, e.actorToken, e.target, e.targetName, e.detail, e.ip,
+        e.data?.path, e.data?.route, ...Object.values(e.data?.fields ?? {})]
         .some((v) => (v ?? '').toLowerCase().includes(q)),
     );
   });
@@ -85,6 +102,9 @@ export class AuditPageComponent {
         next: (s) => {
           this.retention.set(s.retentionDays);
           this.retentionChoices.set(s.choices);
+          this.callRetention.set(s.endpointRetentionDays);
+          this.callChoices.set(s.endpointChoices);
+          this.callsDropped.set(s.endpointDropped);
         },
       });
     }
@@ -97,12 +117,7 @@ export class AuditPageComponent {
 
   protected reload(quiet = false): void {
     if (!quiet) this.loading.set(true);
-    const days = this.period();
-    const since = days > 0 ? Math.floor(Date.now() / 1000) - days * 86400 : undefined;
-    const view = this.view();
-    const kind: AuditKind | undefined = view === '' ? undefined : view === 'admin' ? 'admin' : 'security';
-    const target = view === 'account' || view === 'console' ? view : view === 'admin' ? this.target() || undefined : undefined;
-    this.api.listAudit({ kind, target, since, limit: 500 }).subscribe({
+    this.api.listAudit({ ...this.query(), limit: 500 }).subscribe({
       next: (events) => {
         this.events.set(events);
         this.loading.set(false);
@@ -117,15 +132,23 @@ export class AuditPageComponent {
   protected setRetention(days: number): void {
     const before = this.retention();
     this.retention.set(days);
-    this.api.setAuditRetention(days).subscribe({ error: () => this.retention.set(before) });
+    this.api.setAuditRetention({ retentionDays: days }).subscribe({ error: () => this.retention.set(before) });
+  }
+
+  protected setCallRetention(days: number): void {
+    const before = this.callRetention();
+    this.callRetention.set(days);
+    this.api.setAuditRetention({ endpointRetentionDays: days }).subscribe({ error: () => this.callRetention.set(before) });
   }
 
   protected retentionLabel(days: number): string {
+    if (days < 30) return $localize`:@@N_days:${days}:n: days`;
     if (days % 365 === 0) {
       const years = days / 365;
       return years === 1 ? $localize`:@@One_year:1 year` : $localize`:@@N_years:${years}:n: years`;
     }
-    return $localize`:@@N_months:${Math.round(days / 30)}:n: months`;
+    const months = Math.round(days / 30);
+    return months === 1 ? $localize`:@@One_month:1 month` : $localize`:@@N_months:${months}:n: months`;
   }
 
   // The file: the filters on screen, the perimeter of the caller.
@@ -140,20 +163,24 @@ export class AuditPageComponent {
     const days = this.period();
     const since = days > 0 ? Math.floor(Date.now() / 1000) - days * 86400 : undefined;
     const view = this.view();
-    const kind: AuditKind | undefined = view === '' ? undefined : view === 'admin' ? 'admin' : 'security';
-    const target = view === 'account' || view === 'console' ? view : view === 'admin' ? this.target() || undefined : undefined;
-    return { kind, target, since };
+    const kind: AuditKind | undefined =
+      view === '' || view === 'endpoint' ? undefined : view === 'admin' ? 'admin' : 'security';
+    const target =
+      view === 'account' || view === 'console' || view === 'endpoint'
+        ? view
+        : view === 'admin'
+          ? this.target() || undefined
+          : undefined;
+    // Meerkat's "All" is every kind but the data plane's: its sign-ins and
+    // its audited calls.
+    const notTarget = view === '' ? 'account,endpoint' : undefined;
+    return { kind, target, notTarget, since };
   }
 
-  protected setView(view: '' | 'admin' | 'account' | 'console'): void {
+  protected setView(view: '' | 'admin' | 'account' | 'console' | 'endpoint'): void {
     this.view.set(view);
     this.target.set('');
     this.reload();
-  }
-
-  // What a security line's kind means to the person reading it.
-  protected plane(e: AuditEvent): string {
-    return e.target === 'console' ? $localize`:@@Audit_plane_console:console` : $localize`:@@Audit_plane_data:data plane`;
   }
 
   // An event of the security half: an account's own sign-in or a way into it,
@@ -162,9 +189,25 @@ export class AuditPageComponent {
     return e.target === 'account' || e.target === 'console';
   }
 
-  // A door that stayed shut: a refused sign-in, or the lock-out after them.
+  // A door that stayed shut: a refused sign-in, the lock-out after them, or
+  // an audited call that was not served.
   protected refused(e: AuditEvent): boolean {
-    return e.action === 'signin.refused' || e.action === 'signin.locked';
+    return e.action === 'signin.refused' || e.action === 'signin.locked' || (e.data?.status ?? 0) >= 400;
+  }
+
+  // The fields an audited call carries, in a stable order.
+  protected fieldsOf(e: AuditEvent): [string, string][] {
+    return Object.entries(e.data?.fields ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  }
+
+  // The body as it was sent, laid out to be read.
+  protected bodyOf(e: AuditEvent): string {
+    const b = e.data?.body ?? '';
+    try {
+      return JSON.stringify(JSON.parse(b), null, 2);
+    } catch {
+      return b;
+    }
   }
 
   protected relWhen(at: number): string {

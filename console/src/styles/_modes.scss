@@ -6,11 +6,8 @@
 // the mode says so, `ee` when it is the Enterprise image. Everything below
 // reads those two.
 //
-// Simpler than the role mechanism, and worth saying why: roles HIDE by default
-// and reveal what is granted, which forces a `display` to be restated per
-// Material family (revert would give back `inline`). Here the default is
-// visible, so nothing is ever revealed - only hidden or locked - and the
-// display is left alone.
+// Like the roles, it only ever HIDES (or locks): nothing is revealed, so an
+// element's own display is left alone.
 
 // ── What has no meaning in this mode ─────────────────────────────────────────
 //
@@ -18,12 +15,9 @@
 // features: an organisation's Danger zone is not something a community user is
 // being denied, it is a notion that does not exist in their world, and showing
 // it greyed out would be noise plus a promise nobody made.
-// `html` is not decoration: the role mechanism sets `display: ... !important` on
-// the very same elements (a rail entry carries both `any-role` and this), and
-// at equal specificity the later rule wins - the role rules live in
-// styles.scss, emitted after every @use. One more element in the selector puts
-// this above them, which is what "not in this mode" has to be: a concept that
-// does not exist cannot be revealed by a role.
+// A rail entry may carry both `any-role` and this. Both rules only hide, so
+// either one is enough to take it away: a concept that does not exist in this
+// mode cannot be brought back by a role.
 html body:not(.multi-tenant) [multi-tenant-only] {
   display: none !important;
 }

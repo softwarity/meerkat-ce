@@ -1,0 +1,61 @@
+@use '../../../styles/table';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px 0;
+}
+.banner h1 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+  flex: none;
+}
+.banner .search {
+  flex: 0 1 360px;
+}
+.hint {
+  margin: 0;
+  padding: 4px 24px 8px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+  max-width: 90ch;
+}
+// The page column: banner fixed, table area takes the rest and scrolls INSIDE
+// its frame, like every other list of the console.
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  padding: 0 24px;
+}
+.table-wrap {
+  @include table.frame;
+}
+.empty {
+  padding: 48px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+.sub,
+.when {
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.mono {
+  font-family: var(--mk-mono, monospace);
+}
+// Transparent above the ground the page carries: the paginator sits under the
+// frame, not on a band of its own colour.
+mat-paginator {
+  background: transparent;
+}
+
+@include table.banded-rows;

@@ -2,9 +2,50 @@
 
 ## NEXT RELEASE
 
+- **Who is signed in, live, on Users and Members.** A person icon heads each row,
+  coloured while the account has a session open, with its sessions in the tooltip -
+  browser, address, since when. On an organisation's Members screen it means signed
+  in to that organisation. The green dot is gone from Users: it read as "online",
+  and a greyed row already says disabled.
 - **The Compose and Swarm files take their image from `MEERKAT_IMAGE`.** The same
   published file runs the community image, the evaluation one or the image built for
   a licence, without being edited; unset, nothing changes.
+- **The API reference, the release notes and the licence moved under Meerkat**, at
+  the foot of its sections. The release notes are a full page now, titled with the
+  running version and edition, and the user menu keeps your profile and sign out.
+- **Certificate requests and endpoint traffic arrive live.** The TLS screen no longer
+  asks every few seconds while an ACME request is out, and Metrics reads the
+  per-endpoint ranking when traffic comes in rather than on a timer.
+- **Two rail entries instead of seven.** **Data plane** gathers what the applications
+  are doing - their sign-ins, their sessions, the scheduled calls, the traffic, the
+  issue reports - and **Meerkat** the gateway itself - the changes and the console's
+  sign-ins, its log, who holds the console. Each opens on sections, like Infra, and
+  lists only those you may open. The old addresses redirect.
+- **The Sessions screen** shows one plane at a time, updates live, and draws its rows
+  like every other list.
+- **A menu entry granted by a role** keeps its layout: the role mechanism now only
+  hides what no role grants, and no longer guesses an element's display to show it.
+- **The audited operations are kept in Meerkat.** A call of an operation ticked in
+  Endpoint audit used to leave for the collector and nowhere else, so without the
+  export it was audited nowhere. It is now kept in the trail and shown under Data
+  plane, Audit, Operations - who, the status, the path, the fields, the masked
+  body - and still sent to the collector when the export is on. Written off the
+  request, in batches, on a lifetime of its own: a month by default, set by root.
+- **Move the database, in both directions.** Meerkat, Configuration, Snapshot now
+  copies the whole database to the other kind as well: from the embedded one to
+  PostgreSQL to scale, or back. Into a file - a `.db`, or a `.sql` dump for `psql` -
+  or straight into an empty PostgreSQL server, every table counted on both sides.
+  A **Pause** switch puts the applications on the maintenance page and stops every
+  write first, and the screen prints what to change in the Helm chart or Compose
+  file, the vault key included. `meerkat db dump` and `meerkat db copy` do the same
+  from a script.
+- **Configuration moved under Meerkat**: it is the whole installation, not the
+  routing plane's. The old addresses redirect.
+- **The Helm chart keeps the embedded database's volume** when a release is
+  pointed at PostgreSQL. It used to stop rendering the claim on that upgrade, and
+  Helm deleted it - the volume with it under a Delete reclaim policy - which took
+  away the way back from a migration. Delete it yourself once the new database
+  has proven itself; before upgrading an existing release, download a snapshot.
 
 ---
 

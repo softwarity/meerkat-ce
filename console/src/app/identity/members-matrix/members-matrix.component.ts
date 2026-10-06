@@ -21,6 +21,7 @@ import {
 import { LoginHistoryDialogComponent } from '../login-history-dialog.component';
 import { PasswordDialogComponent } from '../password-dialog.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
+import { PresenceComponent, PresenceService } from '../../shared/presence';
 
 interface UserRow {
   id: string;
@@ -41,7 +42,9 @@ interface UserRow {
 // mat-table pattern as the groups matrix.
 @Component({
   selector: 'app-members-matrix',
+  providers: [PresenceService],
   imports: [
+    PresenceComponent,
     MatButtonModule,
     MatCheckboxModule,
     MatIconModule,

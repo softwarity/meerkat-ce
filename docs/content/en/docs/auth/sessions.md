@@ -132,14 +132,15 @@ browser signed in to the applications, when and from which address, *This
 browser* marked; **Sign out** on any other one, or **Sign out everywhere else**.
 Another account's session is never theirs to close, whatever id a form carries.
 
-Administrators read them on **Sessions**, in the rail: who, which browser and
-address, which plane, since when - filtered by account, paged. Each reads their
-own perimeter. Root reads both planes. An application administrator reads the
+Administrators read them on **Data plane, Sessions** for the applications and
+**Meerkat, Sessions** for the console: who, which browser and address, since
+when - filtered by account, paged, updated live. Each reads their own perimeter.
+Root reads both planes. An application administrator reads the
 applications' sessions, across every organisation, but not the console's: who
 runs the console, and from where, is root's business. An organisation's
 administrator reads the sessions open in the organisations they administer, and
 can end only those. Ending one writes `session.revoke` to the
 [audit trail](/docs/operations/audit).
 
-![Sessions: who is signed in, from which browser and address, on which plane, and since when](img/console/sessions.webp)
+![Sessions: who is signed in, from which browser and address, and since when](img/console/sessions.webp)
 

@@ -267,3 +267,11 @@ func renderMaintenance(m store.Maintenance) []byte {
 	}
 	return routing.MaintenancePage()
 }
+
+// ServePaused is what the data plane answers while the gateway is paused for a
+// database move (store/pause.go): the maintenance page, on everything - the
+// gateway's own pages included, since signing in writes a session and nothing
+// is written now - and with no door, since there is nothing behind it to check.
+func (rt *Router) ServePaused(w http.ResponseWriter, req *http.Request) {
+	rt.serveMaintenance(w, req, maintenanceAnswer{Reason: store.ReasonMaintenance, Fallback: routing.MaintenancePage()})
+}

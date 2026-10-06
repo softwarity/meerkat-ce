@@ -1359,11 +1359,11 @@
       }
     },
     {
-      "id": "ui-rail-issues",
+      "id": "ui-rail-data-plane",
       "domain": "console",
       "kind": "ui",
       "check": {
-        "railItem": "Issues"
+        "railItem": "Data plane"
       },
       "allowed": [
         "root",
@@ -1372,12 +1372,35 @@
         "tenant-admin"
       ],
       "title": {
-        "en": "The Issues rail entry shows for administrators",
-        "fr": "L'entrée Issues du rail apparaît pour les administrateurs"
+        "en": "The Data plane rail entry shows for administrators",
+        "fr": "L'entrée Data plane du rail apparaît pour les administrateurs"
       },
       "description": {
-        "en": "The issue reports section (ISSUE-03) follows the audit rule: anyone administering a domain may open it, the API scopes the content.",
-        "fr": "La section des signalements (ISSUE-03) suit la même règle que l'audit : quiconque administre un domaine peut l'ouvrir, et l'API délimite le contenu."
+        "en": "What the applications are doing - their sign-ins, sessions, scheduled calls, traffic and issue reports - in one entry with a section each. It shows for anyone who may open one of those sections; each section is guarded on its own and the API scopes the content.",
+        "fr": "Ce que font les applications - leurs connexions, sessions, appels planifiés, trafic et signalements - sous une seule entrée, une section chacun. Elle apparaît pour quiconque peut ouvrir l'une de ces sections ; chaque section a sa propre garde et l'API délimite le contenu."
+      }
+    },
+    {
+      "id": "ui-rail-meerkat",
+      "domain": "console",
+      "kind": "ui",
+      "check": {
+        "railItem": "Meerkat"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin",
+        "user"
+      ],
+      "title": {
+        "en": "The Meerkat rail entry shows for everybody holding the console",
+        "fr": "L'entrée Meerkat du rail apparaît pour quiconque tient la console"
+      },
+      "description": {
+        "en": "The gateway itself - its audit trail without the applications' sign-ins, its own log, the console's sessions, the API reference, the release notes and the licence. Everybody reads the last two, so the entry shows for every profile; each other section shows only for who may open it.",
+        "fr": "La gateway elle-même - son audit sans les connexions aux applications, son propre journal, les sessions de la console, la référence de l'API, les notes de version et la licence. Tout le monde lit les deux dernières, donc l'entrée apparaît pour chaque profil ; chaque autre section n'apparaît que pour qui peut l'ouvrir."
       }
     },
     {

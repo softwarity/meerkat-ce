@@ -1,3 +1,4 @@
+import { filter } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { LiveTopic, LivewireClient } from '@softwarity/livewire';
@@ -123,6 +124,15 @@ export class TrafficService {
   // it.
   window = (offset: number, limit: number) => this.topic.window({}, offset, limit);
   resync = () => this.topic.resync();
+  // The samples that carry requests, as they land: what the screen hangs the
+  // things it reads by HTTP on, instead of a timer of its own. The gateway
+  // pushes a sample every interval, empty or not, so an empty one is dropped
+  // here - otherwise a quiet gateway would be read on the sampler's clock,
+  // which is polling under another name.
+  served = () =>
+    this.topic.open({}).pipe(
+      filter((f) => f.type === 'patch' && f.upserted.some((s) => s.routes.some((r) => r.byClass.some((n) => n > 0)))),
+    );
 
   private readonly http = inject(HttpClient);
 

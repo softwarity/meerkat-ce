@@ -8,7 +8,7 @@ summary: Ce que la gateway compte, où la console l'affiche, et comment en conse
 # Métriques
 
 La gateway compte ce qu'elle sert, et la console en trace les courbes : l'écran
-**Metrics** (`/traffic`) affiche la dernière heure, sans rien à installer - c'est la promesse
+**Metrics** (`/data-plane/metrics`) affiche la dernière heure, sans rien à installer - c'est la promesse
 du zéro dépendance, dans les deux éditions. Voir [l'écran de trafic](/docs/operations/traffic)
 et [l'écran Metrics](/docs/console/traffic).
 

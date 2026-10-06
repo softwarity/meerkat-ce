@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LiveWindowDataSource } from '@softwarity/livewire';
+import { throttleTime } from 'rxjs';
 import type { EChartsCoreOption } from 'echarts/core';
 import { ChartComponent } from './chart.component';
 import {
@@ -54,18 +55,19 @@ export class MetricsPageComponent {
 
   constructor() {
     this.source.reset((offset, limit) => this.traffic.window(offset, limit));
-    // Every fifteen seconds, whether or not a route is open.
+    // The endpoint ranking is read again when TRAFFIC arrives - a sample the
+    // live channel pushes with requests in it - at most once in fifteen
+    // seconds. Not on a timer: a gateway serving nothing has nothing new to
+    // rank, and the channel already says when it serves something.
     //
-    // It used to refresh only while one WAS open, which was a deadlock the
-    // moment endpoints started being deduced: a deduced template appears with
-    // the traffic, so a route that went quiet at page load never grew a
-    // chevron, and without a chevron there was nothing to open to trigger the
-    // refresh that would have grown it. Fifteen seconds of one line per
-    // endpoint is a few kilobytes; the rate is what keeps it off the socket,
-    // not the condition.
+    // Whether or not a route is open, for the reason the timer had: a deduced
+    // endpoint appears with the traffic, so a route that went quiet at page
+    // load would otherwise never grow the chevron that opens it.
     this.loadEndpoints();
-    const timer = setInterval(() => this.loadEndpoints(), 15_000);
-    this.destroyRef.onDestroy(() => clearInterval(timer));
+    this.traffic
+      .served()
+      .pipe(throttleTime(15_000, undefined, { leading: true, trailing: true }), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.loadEndpoints());
   }
 
   // Asked for over the period the table is DRAWING, so a route's endpoints add

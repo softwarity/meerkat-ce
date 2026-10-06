@@ -34,7 +34,7 @@
             <ng-container matColumnDef="identity">
               <mat-header-cell *matHeaderCellDef i18n="@@User">User</mat-header-cell>
               <mat-cell *matCellDef="let u" [class.off]="!u.enabled">
-                <span class="dot" [title]="u.enabled ? 'enabled' : 'disabled'"></span>
+                <app-presence [userId]="u.id" />
                 <span class="id">
                   <span class="mono">{{ u.username }}</span>
                   <span class="muted">{{ u.fullname }}{{ u.fullname && u.email ? ' - ' : '' }}{{ u.email }}</span>

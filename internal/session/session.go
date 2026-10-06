@@ -298,7 +298,11 @@ func (m *Manager) slide(w http.ResponseWriter, r *http.Request) {
 	}
 	until := now.Add(ttl).Unix()
 	if err := m.st.ExtendSession(r.Context(), sess.TokenHash, sess.ExpiresAt, until); err != nil {
-		slog.Error("session extension failed", "err", err)
+		// Paused (store/pause.go): the session keeps its deadline, which is
+		// still hours away, and says nothing about it.
+		if !errors.Is(err, store.ErrPaused) {
+			slog.Error("session extension failed", "err", err)
+		}
 		return
 	}
 	sess.ExpiresAt = until

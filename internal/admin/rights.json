@@ -95,8 +95,28 @@
     "guard": "rootOnly"
   },
   {
+    "method": "POST",
+    "path": "/api/backup/check",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/backup/copy",
+    "guard": "rootOnly"
+  },
+  {
     "method": "GET",
     "path": "/api/backup/info",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/backup/pause",
+    "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/backup/pause",
     "guard": "rootOnly"
   },
   {

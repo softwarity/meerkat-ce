@@ -57,6 +57,9 @@ helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-
   --set admin.password='choose-one'
 ```
 
+Pour l'essayer d'abord, l'image d'évaluation installe la même architecture sans
+secret d'accès : `-f https://www.softwarity.io/deploy/values-eval-one-node.yaml`.
+
 ## Trois gateways, Enterprise
 
 Ce qui fait de trois pods UNE seule gateway, c'est la base de données qu'ils
@@ -78,6 +81,9 @@ kubectl create secret generic meerkat-state \
 helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-cluster.yaml \
   --set admin.password='choose-one'
 ```
+
+Le même cluster sur l'image d'évaluation, pour l'essayer avant de l'acheter :
+`-f https://www.softwarity.io/deploy/values-eval-cluster.yaml`, avec le même Secret.
 
 Sur Swarm, la même architecture se déploie avec la stack ci-dessous. Swarm
 interpole les trois valeurs au moment du déploiement, à partir du shell qui
@@ -108,6 +114,8 @@ site : ce que vous téléchargez est ce que déploie la version publiée.
 | [values-ce-one-node.yaml](/deploy/values-ce-one-node.yaml) | Une gateway Community sur son volume |
 | [values-ee-one-node.yaml](/deploy/values-ee-one-node.yaml) | Une gateway Enterprise, tunnel développeur ouvert |
 | [values-ee-cluster.yaml](/deploy/values-ee-cluster.yaml) | Trois gateways Enterprise sur un PostgreSQL partagé |
+| [values-eval-one-node.yaml](/deploy/values-eval-one-node.yaml) | Une gateway sur l'image d'évaluation, tunnel développeur ouvert |
+| [values-eval-cluster.yaml](/deploy/values-eval-cluster.yaml) | Trois gateways sur l'image d'évaluation, sur un PostgreSQL partagé |
 | [docker-compose.yml](/deploy/docker-compose.yml) | Une gateway Community, en une commande |
 | [docker-compose.ee.yml](/deploy/docker-compose.ee.yml) | Une gateway Enterprise avec le tunnel |
 | [stack.swarm.yml](/deploy/stack.swarm.yml) | Trois gateways sur Docker Swarm |
@@ -122,6 +130,9 @@ pour les deux éditions, et l'édition, c'est l'image :
   registre, qui contient l'accès qui vous a été remis, est nommé dans
   `image.pullSecrets`. Les fichiers `values-ee-*` définissent les deux ; c'est
   toute la différence au moment de l'installation.
+- **Évaluation** : `docker.io/softwarity/meerkat:eval`, publique - tout ce que fait
+  Enterprise, avec une mention d'évaluation, pas pour la production. Les fichiers
+  `values-eval-*` la définissent, sans secret d'accès.
 
 Chaque fichier est commenté ligne par ligne : ce que fait une variable, et ce
 qu'il en coûte de l'oublier. Le détail de chaque variable se trouve sur la page

@@ -15,7 +15,9 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
+import { LiveTopic, LivewireClient } from '@softwarity/livewire';
 import { DateTime } from 'luxon';
 import { firstValueFrom, Observable } from 'rxjs';
 import {
@@ -116,26 +118,23 @@ export class TlsPageComponent {
   constructor() {
     this.load();
     this.loadAuthorities();
-    inject(DestroyRef).onDestroy(() => clearTimeout(this.poll));
+    // An authority answered - a certificate issued, a request refused - and
+    // the pool is read again. Heard on the live channel, not asked for every
+    // few seconds while a request is out.
+    new LiveTopic(inject(LivewireClient), 'certificates')
+      .open(null)
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe(() => this.loadCertificates());
     // Somebody else's write (CONSOLE-13), and only the CERTIFICATES: the rest
     // of this screen is a form, and re-applying the settings under somebody
     // typing in it would throw their work away for news they did not ask for.
     inject(LiveChangesService).on('certificate', () => this.loadCertificates());
   }
 
-  // While an authority is being asked, the pool looks again every few
-  // seconds: the answer comes in the background, and a screen that waited
-  // for somebody to reload would show "Asking" long after it was settled.
-  private poll?: ReturnType<typeof setTimeout>;
-
   private loadCertificates(): void {
     this.api.listCertificates().subscribe({
       next: (list) => {
         this.certificates.set(list);
-        clearTimeout(this.poll);
-        if (list.some((c) => c.status === 'requesting')) {
-          this.poll = setTimeout(() => this.loadCertificates(), 3000);
-        }
       },
       error: () => this.certificates.set([]),
     });

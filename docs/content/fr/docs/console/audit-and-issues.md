@@ -31,21 +31,24 @@ le détail des différences champ par champ. Quand un agent ou un script a agi, 
 jeton figure à côté de celui du compte : *admin, via claude-desktop* au lieu de
 *admin*. C'est précisément pour faire cette différence que le jeton est nommé.
 
-Une ligne de sécurité se lit de la même façon, avec son plan (**data plane** pour les
-comptes des applications, **console** pour cette console), le motif ou la méthode à
-côté, et l'adresse en dessous. Une connexion refusée s'affiche dans la couleur
+Une ligne de sécurité se lit de la même façon, avec le motif ou la méthode, et
+l'adresse en dessous. Son plan est celui de l'écran : les connexions aux applications
+sous Data plane, celles de la console sous Meerkat. Une connexion refusée s'affiche dans la couleur
 d'erreur : quand on parcourt le journal à la recherche d'une attaque, ce sont les
 lignes à repérer sans avoir à lire. La liste complète des actions et des motifs se
 trouve dans [le journal d'audit](/docs/operations/audit).
 
-Le sélecteur choisit la partie du journal à afficher : **All**, **Changes**, **Data
-plane sign-ins** (les comptes des applications) ou **Console sign-ins**. Sous
-**Changes**, un type de **cible** affine encore. Viennent ensuite la **période**
+Le journal se lit à deux endroits. **Data plane, Audit** affiche ce qui s'est passé dans
+les applications : leurs connexions (**Sign-ins**), et les **Operations** - les appels aux
+opérations qu'une route audite (Enterprise), avec le statut, le chemin, les champs que
+l'opération retient et le corps quand elle le garde. **Meerkat, Audit** affiche le reste, avec un
+sélecteur : **All**, **Changes** ou **Console sign-ins**. Sous **Changes**, un type
+de **cible** affine encore. Viennent ensuite la **période**
 (24 heures, 7 jours, 30 jours, tout l'historique) et un champ de recherche libre qui
 filtre ce qui est déjà chargé, motifs et adresses compris.
 
 En haut, **Export CSV** (Enterprise) télécharge ce que retiennent les filtres, et -
-pour root uniquement - **Keep events for** fixe la durée pendant laquelle le journal
+pour root uniquement, sur celui de Meerkat - **Keep events for** fixe la durée pendant laquelle le journal
 conserve un événement. Voir [le journal d'audit](/docs/operations/audit).
 
 - Les secrets sont masqués : le journal consigne qu'un champ a changé, pas sa nouvelle

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/softwarity/meerkat/internal/tracing"
 )
@@ -28,9 +29,14 @@ import (
 type database struct {
 	*sql.DB
 	dialect string
+	// paused refuses every write while the gateway is paused (pause.go).
+	paused atomic.Bool
 }
 
 func (d *database) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if d.paused.Load() {
+		return nil, ErrPaused
+	}
 	ctx, end := d.step(ctx, query)
 	res, err := d.DB.ExecContext(ctx, rebind(d.dialect, query), args...)
 	end(err)
@@ -103,6 +109,9 @@ func querySummary(stmt string) string {
 }
 
 func (d *database) Exec(query string, args ...any) (sql.Result, error) {
+	if d.paused.Load() {
+		return nil, ErrPaused
+	}
 	return d.DB.Exec(rebind(d.dialect, query), args...)
 }
 
@@ -127,20 +136,29 @@ func (d *database) queryRowOn(ctx context.Context, c *sql.Conn, query string, ar
 }
 
 func (d *database) BeginTx(ctx context.Context, opts *sql.TxOptions) (*transaction, error) {
+	if d.paused.Load() {
+		return nil, ErrPaused
+	}
 	t, err := d.DB.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return &transaction{Tx: t, dialect: d.dialect}, nil
+	return &transaction{Tx: t, dialect: d.dialect, paused: &d.paused}, nil
 }
 
 // transaction is the same translation, inside a transaction.
 type transaction struct {
 	*sql.Tx
 	dialect string
+	// paused is the database's: a transaction begun just before the pause is
+	// refused at its next write, and its rollback leaves nothing behind.
+	paused *atomic.Bool
 }
 
 func (t *transaction) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if t.paused != nil && t.paused.Load() {
+		return nil, ErrPaused
+	}
 	return t.Tx.ExecContext(ctx, rebind(t.dialect, query), args...)
 }
 

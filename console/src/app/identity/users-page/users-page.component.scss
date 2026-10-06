@@ -77,20 +77,6 @@ mat-row:last-of-type {
 .off {
   opacity: 0.45;
 }
-.dot {
-  display: inline-block;
-  flex: 0 0 7px;
-  width: 7px;
-  height: 7px;
-  margin-right: 12px;
-  border-radius: 50%;
-  background: var(--mat-sys-secondary);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--mat-sys-secondary) 60%, transparent);
-}
-.off .dot {
-  background: var(--mat-sys-outline);
-  box-shadow: none;
-}
 mat-drawer {
   width: min(560px, 96vw);
   border-left: 1px solid var(--mat-sys-outline-variant);

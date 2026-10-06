@@ -330,7 +330,7 @@ func (a *API) tools() []mcp.Tool {
 				"password changed by its owner: kind 'security' keeps those, kind 'admin' leaves them out.",
 			Schema: object(map[string]any{
 				"limit":  map[string]any{"type": "integer", "description": "How many events, 1 to 200 (default 50)."},
-				"target": str("Optional: only this kind of object - route, user, role, settings, tenant, token, issue, account (an application account's security), console (a console sign-in)."),
+				"target": str("Optional: only this kind of object - route, user, role, settings, tenant, token, issue, account (an application account's security), console (a console sign-in), endpoint (a call of an audited operation)."),
 				"kind":   str("Optional: 'admin' for the changes, 'security' for the sign-ins and the ways into an account. Both when absent."),
 			}),
 			Call: a.toolReadAudit,

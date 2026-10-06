@@ -7,7 +7,7 @@ summary: Moving a gateway's setup around: named configurations, restore points, 
 
 # Configuration
 
-**Infra > Configuration**, root only. Three tabs, because three different
+**Meerkat > Configuration**, root only. Three tabs, because three different
 questions were sharing one page.
 
 What travels in a configuration: **routes, roles, authorities, mail relay, themes
@@ -228,6 +228,10 @@ has proven itself.
 > the encryption at rest - exactly as storing a vault file beside its passphrase
 > would. Keep the key in a secret manager, or supply it through
 > `MEERKAT_VAULT_KEY`; the tab says which of the two this gateway does.
+
+The same tab **moves** the database, between the embedded one and PostgreSQL,
+into a file or straight into a server, with the **Pause** switch that makes the
+copy whole: see [moving the database](/docs/operations/backup-restore#moving-the-database-embedded-and-postgresql).
 
 ## Traps
 

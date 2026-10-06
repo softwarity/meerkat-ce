@@ -40,7 +40,7 @@ for edition in "${editions[@]}"; do
   case "$edition" in
     ee)   release=meerkat;      tags="ee";      flavour=ee; ports=(8080 8443 19090 19443); says="Enterprise edition" ;;
     ce)   release=meerkat-ce;   tags="";        flavour=ce; ports=(8081 8444 19091 19444); says="Community edition" ;;
-    eval) release=meerkat-eval; tags="ee eval"; flavour=ee; ports=(8082 8445 19092 19445); says="Enterprise edition" ;;
+    eval) release=meerkat-eval; tags="ee eval"; flavour=ee; ports=(8083 8446 19093 19446); says="Enterprise edition" ;;
     *) echo "unknown edition '$edition': ee, ce or eval" >&2; exit 2 ;;
   esac
   tag="$edition-$stamp"

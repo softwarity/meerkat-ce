@@ -229,9 +229,13 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"DELETE /api/routes/{id}": true, "PUT /api/routes/{id}/security": true, "PUT /api/routes/{id}/audit": true,
 		"PUT /api/routes/{id}/spec": true, "DELETE /api/routes/{id}/spec": true,
 		"PUT /api/settings": true, "PUT /api/settings/agent": true, "PUT /api/settings/issues": true,
-		"PUT /api/settings/telemetry":  true,
-		"PUT /api/settings/plug":       true,
-		"PUT /api/settings/audit":      true,
+		"PUT /api/settings/telemetry": true,
+		"PUT /api/settings/plug":      true,
+		"PUT /api/settings/audit":     true,
+		// Nothing is stored, but every write on every node stops: a write.
+		"PUT /api/backup/pause": true,
+		// Writes a whole other database: never this one, but a write.
+		"POST /api/backup/copy":        true,
 		"DELETE /api/sessions/{id}":    true,
 		"DELETE /api/data-tokens/{id}": true,
 		"PUT /api/settings/proxy":      true,

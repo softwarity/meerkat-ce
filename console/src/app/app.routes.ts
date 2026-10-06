@@ -4,6 +4,9 @@ import {
   apiDocsAccess,
   appOnly,
   auditAccess,
+  dataAuditAccess,
+  dataPlaneLanding,
+  systemLanding,
   logsAccess,
   sessionsAccess,
   schedulerAccess,
@@ -213,51 +216,12 @@ export const routes: Routes = [
         canActivate: [infraOnly],
         loadComponent: () => import('./gateway/mcp-page.component').then((m) => m.McpPageComponent),
       },
-      {
-        // The configuration screen (CFG-02/03/05). Root only: a document
-        // crosses both planes at once. Three tabs, and they are child ROUTES so
-        // a bookmark on one comes back to it.
-        path: 'configuration',
-        canActivate: [rootOnly],
-        loadComponent: () =>
-          import('./gateway/configuration/configuration-page.component').then(
-            (m) => m.ConfigurationPageComponent,
-          ),
-        children: [
-          { path: '', pathMatch: 'full', redirectTo: 'management' },
-          // The Import/export tab is gone: its export report, its plan and its
-          // vault entries live in the dialogs of Management now. The path stays
-          // as a redirect - the bookmarks people already have must land
-          // somewhere that makes sense, not on a 404.
-          { path: 'import-export', redirectTo: 'management' },
-          {
-            path: 'snapshot',
-            loadComponent: () =>
-              import('./gateway/configuration/snapshot-tab.component').then(
-                (m) => m.ConfigurationSnapshotComponent,
-              ),
-          },
-          {
-            // The tape, and one point open in its drawer: same shape as
-            // management, same reason.
-            matcher: historyMatcher,
-            loadComponent: () =>
-              import('./gateway/configuration/history-tab.component').then(
-                (m) => m.ConfigurationHistoryComponent,
-              ),
-          },
-          {
-            // management and management/:id share ONE component instance (the
-            // same trick as routes and roles): opening the drawer changes a
-            // param, it does not re-create the screen nor re-fetch the list.
-            matcher: managementMatcher,
-            loadComponent: () =>
-              import('./gateway/configuration/management-tab.component').then(
-                (m) => m.ConfigurationManagementComponent,
-              ),
-          },
-        ],
-      },
+      // The configuration moved under Meerkat: a document crosses both planes,
+      // so it was never the routing plane's. Its addresses follow it, tab and
+      // open item included.
+      { path: 'configuration', redirectTo: '/system/configuration' },
+      { path: 'configuration/:tab', redirectTo: '/system/configuration/:tab' },
+      { path: 'configuration/:tab/:id', redirectTo: '/system/configuration/:tab/:id' },
     ],
   },
 
@@ -358,7 +322,7 @@ export const routes: Routes = [
           import('./portal/portal-page.component').then((m) => m.PortalPageComponent),
       },
       // Moved to the rail: sessions are not configuration (see /sessions).
-      { path: 'sessions', redirectTo: '/sessions' },
+      { path: 'sessions', redirectTo: '/data-plane/sessions' },
       {
         path: 'security',
         canActivate: [appOnly],
@@ -420,68 +384,176 @@ export const routes: Routes = [
       },
     ],
   },
-  {
-    // The only screen that talks about editions. Everywhere else an Enterprise
-    // control carries its cap and links here - repeating the pitch on ten
-    // screens would turn the console into an advert.
-    path: 'license',
-    loadComponent: () =>
-      import('./settings/license-page.component').then((m) => m.LicensePageComponent),
-  },
+  { path: 'license', redirectTo: '/system/license' },
+
   {
     path: 'vault',
     canActivate: [vaultAccess],
     loadComponent: () => import('./gateway/vault-page.component').then((m) => m.VaultPageComponent),
   },
+  // ── the data plane ─────────────────────────────────────────────────────────
+  // What the applications this gateway serves are doing: their sign-ins, their
+  // sessions, the calls made to them on a schedule, their traffic and what
+  // their users reported. Sections, like Infra, each guarded on its own - the
+  // entry shows for anyone who may open one of them, and the bare /data-plane
+  // forwards to the first one they may.
   {
-    // Named traffic, not metrics: outside /api, the control plane's paths are
-    // the product's (the agent endpoint's rule), and a console route taking
-    // one would be unreachable by reload, bookmark or a pasted link.
-    path: 'traffic',
-    canActivate: [metricsAccess],
-    loadComponent: () =>
-      import('./metrics/metrics-page.component').then((m) => m.MetricsPageComponent),
+    path: 'data-plane',
+    component: SectionShellComponent,
+    data: { plane: 'data-plane' },
+    children: [
+      { path: '', pathMatch: 'full', canActivate: [dataPlaneLanding], children: [] },
+      {
+        path: 'audit',
+        canActivate: [dataAuditAccess],
+        data: { trail: 'data' },
+        loadComponent: () => import('./settings/audit-page.component').then((m) => m.AuditPageComponent),
+      },
+      {
+        // Read within the caller's perimeter - root every application session,
+        // an application administrator the same, an organisation's
+        // administrator theirs.
+        path: 'sessions',
+        canActivate: [sessionsAccess],
+        data: { sessions: 'data' },
+        loadComponent: () =>
+          import('./identity/sessions-page/sessions-page.component').then((m) => m.SessionsPageComponent),
+      },
+      {
+        // The scheduled calls (SCHED-01): what the thing this gateway serves
+        // is doing, not what the gateway holds.
+        path: 'scheduler',
+        canActivate: [schedulerAccess],
+        loadComponent: () =>
+          import('./scheduler/scheduler-page.component').then((m) => m.SchedulerPageComponent),
+      },
+      {
+        // Not at /metrics: a child path, so nothing the control plane serves
+        // at its root can shadow it on a reload.
+        path: 'metrics',
+        canActivate: [metricsAccess],
+        loadComponent: () =>
+          import('./metrics/metrics-page.component').then((m) => m.MetricsPageComponent),
+      },
+      {
+        matcher: issuesMatcher,
+        canActivate: [issuesAccess],
+        loadComponent: () => import('./issues/issues-page.component').then((m) => m.IssuesPageComponent),
+      },
+    ],
   },
-  // The scheduled calls (SCHED-01): transverse like the traffic and the audit,
-  // and on the APPLICATION side of that group - it says what the thing this
-  // gateway serves is doing, not what the gateway holds.
+
+  // ── Meerkat itself ─────────────────────────────────────────────────────────
+  // What was done to the gateway and what it says about itself: the changes
+  // and the console's sign-ins, its own log, who holds the console. At
+  // /system, because /meerkat/ is the gateway's own prefix (its scripts, its
+  // events) and a reload there would never reach the console.
   {
-    path: 'scheduler',
-    canActivate: [schedulerAccess],
-    loadComponent: () =>
-      import('./scheduler/scheduler-page.component').then((m) => m.SchedulerPageComponent),
+    path: 'system',
+    component: SectionShellComponent,
+    data: { plane: 'system' },
+    children: [
+      { path: '', pathMatch: 'full', canActivate: [systemLanding], children: [] },
+      {
+        path: 'audit',
+        canActivate: [auditAccess],
+        data: { trail: 'system' },
+        loadComponent: () => import('./settings/audit-page.component').then((m) => m.AuditPageComponent),
+      },
+      {
+        // The gateway's own log (OBS-03), live.
+        path: 'logs',
+        canActivate: [logsAccess],
+        loadComponent: () => import('./logs/logs-page.component').then((m) => m.LogsPageComponent),
+      },
+      {
+        // Who holds the console: root's alone.
+        path: 'sessions',
+        canActivate: [rootOnly],
+        data: { sessions: 'admin' },
+        loadComponent: () =>
+          import('./identity/sessions-page/sessions-page.component').then((m) => m.SessionsPageComponent),
+      },
+      {
+        // The configuration screen (CFG-02/03/05). Root only: a document
+        // crosses both planes at once, which is why it is Meerkat's and not
+        // Infra's. Three tabs, and they are child ROUTES so
+        // a bookmark on one comes back to it.
+        path: 'configuration',
+        canActivate: [rootOnly],
+        loadComponent: () =>
+          import('./gateway/configuration/configuration-page.component').then(
+            (m) => m.ConfigurationPageComponent,
+          ),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'management' },
+          // The Import/export tab is gone: its export report, its plan and its
+          // vault entries live in the dialogs of Management now. The path stays
+          // as a redirect - the bookmarks people already have must land
+          // somewhere that makes sense, not on a 404.
+          { path: 'import-export', redirectTo: 'management' },
+          {
+            path: 'snapshot',
+            loadComponent: () =>
+              import('./gateway/configuration/snapshot-tab.component').then(
+                (m) => m.ConfigurationSnapshotComponent,
+              ),
+          },
+          {
+            // The tape, and one point open in its drawer: same shape as
+            // management, same reason.
+            matcher: historyMatcher,
+            loadComponent: () =>
+              import('./gateway/configuration/history-tab.component').then(
+                (m) => m.ConfigurationHistoryComponent,
+              ),
+          },
+          {
+            // management and management/:id share ONE component instance (the
+            // same trick as routes and roles): opening the drawer changes a
+            // param, it does not re-create the screen nor re-fetch the list.
+            matcher: managementMatcher,
+            loadComponent: () =>
+              import('./gateway/configuration/management-tab.component').then(
+                (m) => m.ConfigurationManagementComponent,
+              ),
+          },
+        ],
+      },
+      {
+        // The swagger-ui screen: an iframe over the gateway-served /apidocs/
+        // page. The control plane's reference, for whoever scripts it.
+        path: 'api',
+        canActivate: [apiDocsAccess],
+        loadComponent: () => import('./gateway/api-docs-page.component').then((m) => m.ApiDocsPageComponent),
+      },
+      {
+        // What this version brought (CONSOLE-15). Anyone holding the console.
+        path: 'release-notes',
+        loadComponent: () =>
+          import('./shared/release-notes.component').then((m) => m.ReleaseNotesPageComponent),
+      },
+      {
+        // The edition's own screen (CONSOLE-14). No guard: it is the one page
+        // anyone holding the console may open, which makes it the landing of
+        // whoever administers nothing.
+        path: 'license',
+        loadComponent: () =>
+          import('./settings/license-page.component').then((m) => m.LicensePageComponent),
+      },
+    ],
   },
-  {
-    // Who is signed in where: not configuration, so a rail entry of its own,
-    // read within the caller's perimeter - root every session, an application
-    // administrator the applications', an organisation's administrator theirs.
-    path: 'sessions',
-    canActivate: [sessionsAccess],
-    loadComponent: () =>
-      import('./identity/sessions-page/sessions-page.component').then((m) => m.SessionsPageComponent),
-  },
-  {
-    path: 'audit',
-    canActivate: [auditAccess],
-    loadComponent: () => import('./settings/audit-page.component').then((m) => m.AuditPageComponent),
-  },
-  {
-    // The gateway's own log (OBS-03), live. Not configuration, so not under
-    // Infra: a transverse screen beside the audit trail.
-    path: 'logs',
-    canActivate: [logsAccess],
-    loadComponent: () => import('./logs/logs-page.component').then((m) => m.LogsPageComponent),
-  },
-  {
-    matcher: issuesMatcher,
-    canActivate: [issuesAccess],
-    loadComponent: () => import('./issues/issues-page.component').then((m) => m.IssuesPageComponent),
-  },
-  {
-    // The swagger-ui screen: an iframe over the gateway-served /apidocs/ page.
-    path: 'api',
-    canActivate: [apiDocsAccess],
-    loadComponent: () => import('./gateway/api-docs-page.component').then((m) => m.ApiDocsPageComponent),
-  },
+
+  // Where these screens used to live, for the bookmarks and the links already
+  // pasted somewhere.
+  { path: 'traffic', redirectTo: '/data-plane/metrics' },
+  { path: 'scheduler', redirectTo: '/data-plane/scheduler' },
+  { path: 'sessions', redirectTo: '/data-plane/sessions' },
+  { path: 'issues', redirectTo: '/data-plane/issues' },
+  { path: 'issues/:id', redirectTo: '/data-plane/issues/:id' },
+  { path: 'audit', redirectTo: '/system/audit' },
+  { path: 'logs', redirectTo: '/system/logs' },
+  { path: 'api', redirectTo: '/system/api' },
+
   { path: '**', redirectTo: '' },
 ];

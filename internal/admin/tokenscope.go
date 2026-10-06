@@ -47,6 +47,9 @@ var readsNothing = map[string]bool{
 	// Proving a git location answers and its credential is accepted (CFG-07):
 	// it reaches a repository and stores not one byte.
 	"POST /api/config-remotes/{id}/check": true,
+	// Asking a PostgreSQL server what it is before a copy: it reads, and
+	// creates not even a schema.
+	"POST /api/backup/check": true,
 	// The agent endpoint carries both kinds and sorts them per tool: an
 	// annotated read-only tool answers, a mutating one is refused by name.
 	"/mcp": true,

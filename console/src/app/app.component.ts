@@ -12,17 +12,17 @@ import {
   RailnavContainerComponent,
   RailnavContentComponent,
   RailnavItemComponent,
-  RailnavSeparatorComponent,
   RailnavSpacerComponent,
 } from '@softwarity/rail-nav';
 import { catchError, filter, firstValueFrom, map, of } from 'rxjs';
 import { ApiService, Tenant } from './api.service';
-import { TenantDialogComponent, TenantDialogResult } from './identity/tenant-dialog.component';
+import type { TenantDialogResult } from './identity/tenant-dialog.component';
 import { LiveChangesService } from './shared/live-changes.service';
 import { TenantsService } from './shared/tenants.service';
 import { MeService } from './me.service';
 import { SessionWatchService } from './session';
 import { UserMenuComponent } from './shared/user-menu.component';
+import { PauseService } from './shared/pause.service';
 
 // Console scopes (CONSOLE-01): Infra (routing, relay, tokens), Application (the
 // product - identity, RBAC, built-in pages), Tenants (drill into one org), plus
@@ -42,7 +42,6 @@ import { UserMenuComponent } from './shared/user-menu.component';
     RailnavContainerComponent,
     RailnavContentComponent,
     RailnavItemComponent,
-    RailnavSeparatorComponent,
     RailnavSpacerComponent,
     LiveIndicatorComponent,
     UserMenuComponent,
@@ -61,6 +60,7 @@ export class AppComponent {
   // about, and a drawer that keeps a deleted organisation offers a link to
   // something that is gone.
   private readonly tenantsService = inject(TenantsService);
+  protected readonly pause = inject(PauseService);
   protected readonly tenants = this.tenantsService.tenants;
 
   private loadTenants(): void {
@@ -68,9 +68,13 @@ export class AppComponent {
   }
 
   protected async createTenant(): Promise<void> {
+    // Loaded when asked for: a dialog is not part of what every page needs,
+    // and importing it here would ship its form, its select and its fields in
+    // the bundle every screen waits for.
+    const { TenantDialogComponent } = await import('./identity/tenant-dialog.component');
     const res = await firstValueFrom(
       this.dialog
-        .open<TenantDialogComponent, void, TenantDialogResult | undefined>(TenantDialogComponent, {
+        .open<InstanceType<typeof TenantDialogComponent>, void, TenantDialogResult | undefined>(TenantDialogComponent, {
           width: '480px',
           restoreFocus: true,
         })
@@ -114,20 +118,15 @@ export class AppComponent {
   // Audit is a transverse section of its own (not under Application): it scopes
   // itself server-side to the caller's domains (gateway/app/tenant).
   protected readonly inVault = computed(() => this.url().startsWith('/vault'));
-  protected readonly inMetrics = computed(() => this.url().startsWith('/traffic'));
-  protected readonly inAudit = computed(() => this.url().startsWith('/audit'));
-  protected readonly inLogs = computed(() => this.url().startsWith('/logs'));
-  protected readonly inScheduler = computed(() => this.url().startsWith('/scheduler'));
-  protected readonly inSessions = computed(() => this.url().startsWith('/sessions'));
-  protected readonly inIssues = computed(() => this.url().startsWith('/issues'));
-  protected readonly inApiDocs = computed(() => this.url().startsWith('/api'));
+  protected readonly inDataPlane = computed(() => this.url().startsWith('/data-plane'));
+  protected readonly inSystem = computed(() => this.url().startsWith('/system'));
 
   constructor() {
     const icons = inject(MatIconRegistry);
     icons.setDefaultFontSetClass('material-symbols-outlined');
-    // Brand SVG logos from public/, usable as <mat-icon svgIcon="jwt|openapi|swagger-ui">.
+    // Brand SVG logos from public/, usable as <mat-icon svgIcon="jwt|openapi|swagger-ui|meerkat">.
     const sanitizer = inject(DomSanitizer);
-    for (const name of ['jwt', 'openapi', 'swagger-ui']) {
+    for (const name of ['jwt', 'openapi', 'swagger-ui', 'meerkat']) {
       icons.addSvgIcon(name, sanitizer.bypassSecurityTrustResourceUrl(`${name}.svg`));
     }
     // Role-based UI visibility (styles/_roles.scss): MeService loads /api/me and

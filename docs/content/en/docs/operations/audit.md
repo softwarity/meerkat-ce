@@ -142,7 +142,8 @@ nobody's fault in particular.
 
 - *Send the audit logs*: the data plane - the accounts' sign-ins, refusals,
   password and second-factor changes, and the calls of the operations audited
-  in **Endpoint audit**, which send nothing while it is off;
+  in **Endpoint audit**, which are kept in Meerkat either way and sent to the
+  collector only while it is on;
 - *Send Meerkat's console audit too*: the changes made in the console and the
   sign-ins to it.
 
@@ -161,8 +162,22 @@ does not answer. What a full queue has to drop is counted, and the tab says so.
 
 **Infra, Endpoint audit** (Enterprise) lists the operations of each route's
 OpenAPI contract, with a switch per operation. An audited call becomes an audit
-event, sent to the collector with the rest of the trail when the OpenTelemetry
-**Audit** tab is on. Nothing is stored here: the volume is the data plane's.
+event: kept in the trail, where **Data plane, Audit, Operations** shows it, and
+sent to the collector with the rest of the trail when the OpenTelemetry
+**Audit** tab is on.
+
+An event names the caller as the gateway authenticated them (account,
+organisation, group, roles), the operation, the path as requested, the status,
+the address and the trace id, then the fields the operation takes from the call
+and, when asked, the JSON body with its secrets masked.
+
+They are written off the request, in batches: a call never waits on the trail,
+and a queue that cannot keep up drops events rather than slow the traffic -
+the screen says how many since the gateway started. Their volume follows the
+traffic, so they have their own lifetime, a month by default, which root sets
+on the same screen (**Keep operations for**): seven days to a year, apart from
+the year the changes are kept. An application administrator reads every call;
+an organisation's administrator, the calls made in their organisation.
 
 On the community image the screen is locked, and so is the route editor's
 upload: an event nothing would ever send is a trail that looks kept and is not.
@@ -203,10 +218,12 @@ export.
 
 ## Filters, retention, and what is missing
 
-The screen filters on the part of the trail (**All**, **Changes**, **Data plane
-sign-ins**, **Console sign-ins**), the target kind of a change, the period, and a
-free-text box that also searches the reason and the address. The API adds the
-actor and the target id: `GET /api/audit?kind=security`.
+The applications' sign-ins have a screen of their own, **Data plane, Audit**.
+**Meerkat, Audit** filters the rest on the part of the trail (**All**,
+**Changes**, **Console sign-ins**). Both filter on the period and a free-text box
+that also searches the reason and the address, and Meerkat's on the target kind
+of a change. The API adds the actor and the target id, and `notTarget` to leave
+one kind out: `GET /api/audit?kind=security`, `GET /api/audit?notTarget=account`.
 
 **Retention** is a year by default, applied by the periodic sweep, and root
 chooses it at the top of the screen - three months, six, one, two or five years

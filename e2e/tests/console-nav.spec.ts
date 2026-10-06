@@ -56,3 +56,30 @@ test.describe('ui-landing', () => {
     });
   }
 });
+
+// Meerkat's own sections: everybody holding the console reads the release
+// notes and the licence, the API reference shows for the profiles its route
+// guard lets in (apiDocsAccess), and for nobody else - a link that bounces
+// whoever follows it is worse than no link.
+const API_REFERENCE = ['root', 'infra-admin', 'app-admin'];
+
+test.describe('ui-system-sections', () => {
+  for (const profile of profiles) {
+    const api = API_REFERENCE.includes(profile.id);
+    test(`Meerkat ${api ? 'lists' : 'hides'} the API reference, and lists the licence, for ${profile.id}`, async ({ browser }) => {
+      const context = await browser.newContext({ storageState: authFile(profile.id) });
+      const page = await context.newPage();
+      await page.goto(ADMIN_URL + '/system/license');
+      const nav = page.locator('nav.left');
+      await expect(nav.getByRole('link', { name: 'License' })).toBeVisible();
+      await expect(nav.getByRole('link', { name: 'Release notes' })).toBeVisible();
+      const item = nav.getByRole('link', { name: 'API reference' });
+      if (api) {
+        await expect(item).toBeVisible();
+      } else {
+        await expect(item).toBeHidden();
+      }
+      await context.close();
+    });
+  }
+});

@@ -30,3 +30,53 @@ func TestAnUnknownAuditKindIsRefused(t *testing.T) {
 		t.Fatal("an unknown kind was accepted")
 	}
 }
+
+// NotTarget is the console's own trail: everything but the applications'
+// sign-ins, which the Data plane shows apart.
+func TestNotTargetLeavesOneKindOut(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	for _, target := range []string{"route", AuditTargetAccount, AuditTargetConsole} {
+		if err := st.AddAuditEvent(ctx, AuditEvent{Target: target, Action: "x"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := st.ListAuditEvents(ctx, AuditFilter{NotTarget: AuditTargetAccount})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d events, want route and console", len(got))
+	}
+	for _, e := range got {
+		if e.Target == AuditTargetAccount {
+			t.Fatal("an account event came through NotTarget=account")
+		}
+	}
+}
+
+// The calls of audited operations have their own lifetime: the trail's purge
+// leaves them, theirs leaves the rest.
+func TestEndpointCallsHaveTheirOwnRetention(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	if err := st.AddAuditEvent(ctx, AuditEvent{Target: "route", Action: "route.update", At: 100}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.insertCalls(ctx, []AuditEvent{{ID: NewEventID(), At: 100, Target: AuditTargetEndpoint, Action: "endpoint.call",
+		Data: &EndpointCall{Route: "r", Status: 200}}}); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := st.PurgeAuditEventsBefore(ctx, 200); n != 1 {
+		t.Fatalf("the trail's purge removed %d, want the change alone", n)
+	}
+	if n, _ := st.PurgeEndpointCallsBefore(ctx, 200); n != 1 {
+		t.Fatalf("the calls' purge removed %d, want the call", n)
+	}
+	if d := st.EndpointCallRetentionDays(ctx); d != DefaultEndpointCallRetention {
+		t.Fatalf("default retention %d", d)
+	}
+	if err := st.SetEndpointCallRetentionDays(ctx, 12); err == nil {
+		t.Fatal("a retention that is not offered was accepted")
+	}
+}

@@ -63,3 +63,19 @@ func TestTheAuditExportsAsCSV(t *testing.T) {
 		t.Fatalf("the export is not in the trail: %+v", events)
 	}
 }
+
+// The audited calls have their own lifetime, set on its own: writing one
+// retention leaves the other as it was.
+func TestTheCallsRetentionIsSetOnItsOwn(t *testing.T) {
+	f := setup(t)
+	if code, out := f.call(t, "PUT", "/api/settings/audit", `{"endpointRetentionDays":90}`, f.rootC); code != http.StatusOK ||
+		!strings.Contains(out, `"endpointRetentionDays":90`) || !strings.Contains(out, `"retentionDays":365`) {
+		t.Fatalf("set the calls' retention: %d %s", code, out)
+	}
+	if code, _ := f.call(t, "PUT", "/api/settings/audit", `{"endpointRetentionDays":12}`, f.rootC); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a lifetime that is not offered answered %d", code)
+	}
+	if code, _ := f.call(t, "PUT", "/api/settings/audit", `{}`, f.rootC); code != http.StatusUnprocessableEntity {
+		t.Fatalf("an empty body answered %d", code)
+	}
+}

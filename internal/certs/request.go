@@ -40,6 +40,16 @@ type IssueStatus struct {
 type issueBook struct {
 	mu sync.Mutex
 	by map[string]IssueStatus
+	// moved is told that a status changed: asked, issued, refused, forgotten.
+	// The TLS screen hears it on the live channel instead of asking every few
+	// seconds (Supervisor.OnIssueMoved).
+	moved func()
+}
+
+func (b *issueBook) tell() {
+	if b.moved != nil {
+		b.moved()
+	}
 }
 
 func issueKey(authority, name string) string { return authority + "|" + strings.ToLower(name) }
@@ -55,18 +65,21 @@ func (b *issueBook) get(key string) (IssueStatus, bool) {
 // one request in flight per name, and a failure stays until somebody retries.
 func (b *issueBook) claim(key string) bool {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if b.by == nil {
 		b.by = map[string]IssueStatus{}
 	}
 	if _, seen := b.by[key]; seen {
+		b.mu.Unlock()
 		return false
 	}
 	b.by[key] = IssueStatus{State: IssueRequesting, At: time.Now().Unix()}
+	b.mu.Unlock()
+	b.tell()
 	return true
 }
 
 func (b *issueBook) set(key string, st IssueStatus, ok bool) {
+	defer b.tell()
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if ok {
@@ -77,6 +90,7 @@ func (b *issueBook) set(key string, st IssueStatus, ok bool) {
 }
 
 func (b *issueBook) forget(key string) {
+	defer b.tell()
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.by, key)
@@ -87,6 +101,10 @@ func (b *issueBook) forget(key string) {
 func (s *Supervisor) Issue(authority, name string) (IssueStatus, bool) {
 	return s.issues.get(issueKey(authority, name))
 }
+
+// OnIssueMoved names what to call when an issuance status changes. Set once,
+// at wiring time, before the first request.
+func (s *Supervisor) OnIssueMoved(f func()) { s.issues.moved = f }
 
 // Retry forgets a failure and asks again.
 func (s *Supervisor) Retry(ctx context.Context, authority string, names []string) {

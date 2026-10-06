@@ -12,8 +12,8 @@ réellement été **servi**, et c'est la moitié qui compte quand vous êtes d'a
 dans une configuration, rien ne distingue une route en panne d'une route que personne
 n'appelle.
 
-Il se trouve à l'adresse `/traffic` du plan de contrôle, sous l'entrée **Metrics** du
-rail, et il exige le compte root ou la capacité gateway-admin.
+Il se trouve à l'adresse `/data-plane/metrics` du plan de contrôle, sous **Data plane,
+Metrics**, et il exige le compte root ou la capacité gateway-admin.
 
 ![L'écran de trafic](img/console/traffic.webp)
 

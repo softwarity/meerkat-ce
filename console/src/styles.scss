@@ -75,71 +75,33 @@ html {
 // ── Role-based visibility (UIF-06) ───────────────────────────────────────────
 // Config lives in styles/_roles.scss. Elements carry `any-role="root dev"`
 // (space = OR); they show only when <body> has a matching role class. The
-// superuser role reveals every gated element (admin sees all).
+// superuser role lets every gated element through (admin sees all).
 //
 // Pure CSS on purpose: no directive and no runtime, so the same mechanism works
 // on content Angular never rendered (the injections of UIF-06) and cannot go
 // out of step with a second implementation.
-$mat-inline-flex: '[matButton], [matIconButton], [matFab], [matMiniFab],'
-  + 'mat-chip, mat-chip-row, mat-chip-option, mat-basic-chip, mat-form-field';
-$mat-inline-block: 'mat-icon, mat-radio-button, mat-checkbox, mat-slide-toggle';
-// App-level flex containers carrying any-role belong here too: .drawer-item and
-// .section-link are plain <a>s whose display:flex would otherwise be reverted to
-// inline on reveal (revert goes to the UA default, breaking align-items:center).
-$mat-flex: 'mat-toolbar, mat-toolbar-row, mat-list-item, mat-button-toggle-group,'
-  + '.drawer-item, .section-link';
-$mat-block: 'mat-card, mat-card-header, mat-card-content, mat-card-actions,'
-  + 'mat-list, mat-nav-list, mat-action-list, mat-selection-list, mat-divider,'
-  + 'mat-expansion-panel, mat-tab-group, mat-paginator, mat-tree, mat-table,'
-  + 'mat-row, mat-header-row, mat-option, mat-optgroup';
-
-// Reveal the gated elements a scope is entitled to. $on is the attribute test:
-// empty matches every gated element (the superuser), "~='dev'" only those that
-// name that role. One mixin for both, because the four Material families were
-// previously written out twice and nothing would have caught them drifting.
 //
-// Material components do not restore a useful display with `revert`: it goes
-// back to the UA value, so a matButton would come back as `inline`. Hence the
-// display restated per family, which is the price of the mechanism and the one
-// part of it that can rot silently when a component is added or renamed.
-@mixin reveal($scope, $on: '') {
-  #{$scope} [any-role#{$on}],
-  #{$scope} [anyrole#{$on}] {
-    display: revert !important;
+// HIDE only, never reveal: an element is hidden when no role on <body> lets it
+// through, and otherwise left exactly as its own styles draw it. It used to be
+// the other way round - hidden by default, then revealed with a `display`
+// restated per Material family, `revert` for the rest - and `revert` is the
+// browser's default, not the element's: an <a mat-menu-item> came back
+// `inline` instead of Material's `flex`. Every new component was one more
+// family to remember, and forgetting one broke it silently.
+//
+// "No role lets it through" is a conjunction, one :not() per known role, which
+// the cascade expresses directly: the list of roles is already closed
+// (_roles.scss), so nothing has to enumerate combinations.
+@function gate($attr) {
+  $not: ':not(body.#{roles.$superuser-role} *)';
+  @each $role in roles.$known-roles {
+    $not: $not + ':not(body.#{$role} [#{$attr}~="#{$role}"])';
   }
-  #{$scope} :is(#{$mat-inline-flex})[any-role#{$on}],
-  #{$scope} :is(#{$mat-inline-flex})[anyrole#{$on}] {
-    display: inline-flex !important;
-  }
-  #{$scope} :is(#{$mat-inline-block})[any-role#{$on}],
-  #{$scope} :is(#{$mat-inline-block})[anyrole#{$on}] {
-    display: inline-block !important;
-  }
-  #{$scope} :is(#{$mat-flex})[any-role#{$on}],
-  #{$scope} :is(#{$mat-flex})[anyrole#{$on}] {
-    display: flex !important;
-  }
-  #{$scope} :is(#{$mat-block})[any-role#{$on}],
-  #{$scope} :is(#{$mat-block})[anyrole#{$on}] {
-    display: block !important;
-  }
+  @return '[#{$attr}]#{$not}';
 }
-
-// Hidden by default, revealed by what the body carries. This way round is not
-// a stylistic choice: `any-role` is an OR over a set that varies per element,
-// and the cascade can express "at least one rule reveals" but not "no rule
-// matches" without enumerating every combination of roles.
-[any-role],
-[anyrole] {
+#{gate('any-role')},
+#{gate('anyrole')} {
   display: none !important;
-}
-
-// Superuser: reveal every gated element, whatever its any-role value.
-@include reveal('body.#{roles.$superuser-role}');
-
-// Each known role reveals only the elements that name it.
-@each $role in roles.$known-roles {
-  @include reveal('body.#{$role}', "~='#{$role}'");
 }
 
 // A control floating OVER the preview: the template picker at its top edge,

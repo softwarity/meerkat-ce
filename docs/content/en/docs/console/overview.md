@@ -25,17 +25,12 @@ The left rail holds the two planes and the transverse screens.
 
 | Rail entry | URL | What it answers |
 |---|---|---|
-| **Infra** | `/infra/...` | How requests travel: routes, endpoints, authorities, TLS, the relay, the configuration |
+| **Infra** | `/infra/...` | How requests travel: routes, endpoints, authorities, TLS, the relay |
 | **Application** | `/application/...` | The product your users see: identity, roles, pages, portal, policies |
 | **Tenants** | `/tenants/:id/...` | One organisation at a time (several-organisations mode only) |
-| **API** | `/api` | The control plane's own REST reference, tried with your session |
 | **Vault** | `/vault` | Every named value and secret the configuration points at |
-| **Metrics** | `/traffic` | What the gateway has actually served |
-| **Scheduler** | `/scheduler` | The calls the gateway makes to your services on a schedule |
-| **Sessions** | `/sessions` | Who is signed in, within your perimeter |
-| **Audit** | `/audit` | Who changed what |
-| **Logs** | `/logs` | What the gateway says about itself, live |
-| **Issues** | `/issues` | What your users reported |
+| **Data plane** | `/data-plane/...` | What the applications are doing: their sign-ins (Audit), who is signed in to them (Sessions), the calls made to them on a schedule (Scheduler), what the gateway served (Metrics), what your users reported (Issues) |
+| **Meerkat** | `/system/...` | The gateway itself: who changed what and who signed in to the console (Audit), what it says about itself, live (Logs), who holds the console (Sessions), the whole installation as a document or a database (Configuration) - and, at the foot, the control plane's REST reference (API reference), what this version brought (Release notes) and the edition (License) |
 
 The split is not cosmetic. **Infra** is about the installation: an upstream, a
 certificate, an SMTP server, a directory. **Application** is about the product
@@ -44,8 +39,9 @@ sign-in page looks like. The same person often does both, and holds both
 capabilities, but the questions are asked in two places.
 
 > [!NOTE]
-> Metrics lives at `/traffic`, not `/metrics`: outside `/api`, the paths of the
-> control plane belong to the product, so the console keeps clear of them.
+> Meerkat lives at `/system`, not `/meerkat`: outside `/api`, the paths of the
+> control plane belong to the product (`/meerkat/...` serves the gateway's own
+> scripts), so the console keeps clear of them.
 
 ## What you see depends on who you are
 
@@ -100,7 +96,6 @@ Learn these five and the console stops surprising you.
 - **[Plug](/docs/operations/plug)** - the developer tunnel.
 - **[Access tokens, MCP and API](/docs/console/access-and-agents)** - driving Meerkat without a browser.
 - **Model** - the fields an account carries, documented with [Users](/docs/console/users).
-- **[Configuration](/docs/console/configuration)** - configurations, restore points, snapshots. At the foot of the menu, apart from the daily screens.
 
 ### Application
 
@@ -121,7 +116,8 @@ Learn these five and the console stops surprising you.
 - **[Scheduler](/docs/operations/scheduler)** - the scheduled calls and their runs.
 - **[Audit and Issues](/docs/console/audit-and-issues)** - the trail of changes, and the reports.
 - **[Logs](/docs/operations/logs#in-the-console)** - the gateway's own lines, live, and its level. One node at a time.
-- **License** - which edition answered, and every Enterprise feature: what it
+- **[Configuration](/docs/console/configuration)** (under Meerkat, root only) - configurations, restore points, snapshots and migration: the whole installation, which crosses both planes.
+- **License** (under Meerkat, and open to everybody) - which edition answered, and every Enterprise feature: what it
   does, how far it is built, and the screen it lives on, or that it has none
   (the active/active cluster, the deployment files). The list is read from the
   product's own feature contract, so it cannot drift from it. It is the only
@@ -137,15 +133,17 @@ gateway's own profile pages, the same ones your users get: photo, password,
 second factor, passkeys, personal API tokens. Sign out is underneath, and it
 signs out every console tab at once.
 
-### Version and release notes
+## Version and release notes
 
-![The release notes window: Meerkat 1.0.1, its patch notes, then 1.0.0](img/console/release-notes.webp)
+![The release notes: Meerkat 1.0.1, its patch notes, then 1.0.0](img/console/release-notes.webp)
 
-The account menu says which version runs, and which edition: **Meerkat 1.0.1 EE**
-(or **CE**). Click it for the release notes, newest first, from that version down
-to its minor release - the same text as the GitHub release. A development build shows the last release it
+**Meerkat, Release notes** says which version runs, and which edition, in its
+title: **Meerkat 1.0.1 EE** (or **CE**). Underneath, the release notes, newest
+first, from that version down to its minor release - the same text as the
+GitHub release. A development build shows the last release it
 carries, with what is coming under **Next release** on top; an empty section
 says *Missing information*.
 
 Right under it, **License** opens the edition's screen: every Enterprise
-feature, how far it is built, and where it lives.
+feature, how far it is built, and where it lives. Both are open to everybody
+holding the console.

@@ -71,7 +71,7 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
   'CONSOLE-14': {
     label: $localize`:@@EE_CONSOLE_14:This list`,
     what: $localize`:@@EE_CONSOLE_14_what:What the Enterprise edition carries, read from the product's own contract.`,
-    where: '/license',
+    where: '/system/license',
     whereLabel: $localize`:@@License:License`,
   },
   'DEV-03': {
@@ -107,7 +107,7 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
   'CFG-07': {
     label: $localize`:@@EE_CFG_07:Configurations in git`,
     what: $localize`:@@EE_CFG_07_what:Keep configurations in a git repository, exported under your own name.`,
-    where: '/infra/configuration',
+    where: '/system/configuration',
     whereLabel: $localize`:@@Configuration:Configuration`,
   },
   'PAGE-02': {
@@ -161,7 +161,7 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
   'STORE-06': {
     label: $localize`:@@EE_STORE_06:Audit export`,
     what: $localize`:@@EE_STORE_06_what:Export the filtered trail as a file, for an auditor or a SIEM.`,
-    where: '/audit',
+    where: '/system/audit',
     whereLabel: $localize`:@@Audit:Audit`,
   },
 };

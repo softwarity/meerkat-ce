@@ -146,3 +146,67 @@ func TestTheCommunityImageAppliesNoEndpointAudit(t *testing.T) {
 		t.Fatalf("a route carrying audit rules was left out: %s", rt.Problems()["r1"])
 	}
 }
+
+// The call is kept in the trail whether or not the collector export is on: an
+// operation ticked in Endpoint audit is audited, not merely forwarded.
+func TestAnAuditedCallIsKeptWithoutTheCollector(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("endpoint audit is Enterprise (AUD-04)")
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(upstream.Close)
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	route := pathRoute("r-keep", "orders", 1, "/o/**", upstream.URL)
+	route.API = &store.RouteAPI{Audit: []store.EndpointAudit{{
+		Method: "POST", Path: "/o/orders/{id}", Body: true,
+		Fields: []store.AuditField{{Name: "order", From: store.AuditFromPath, Key: "id"}},
+	}}}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("POST", "http://localhost/o/orders/9", bytes.NewBufferString(`{"secret":"s3","n":1}`))
+	req.Header.Set("Content-Type", "application/json")
+	rt.ServeHTTP(httptest.NewRecorder(), req)
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		evs, err := st.ListAuditEvents(ctx, store.AuditFilter{Target: store.AuditTargetEndpoint})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(evs) == 1 {
+			c := evs[0].Data
+			if c == nil || c.Status != http.StatusAccepted || c.Fields["order"] != "9" || c.Operation != "/o/orders/{id}" {
+				t.Fatalf("the call was kept as %+v", c)
+			}
+			if strings.Contains(c.Body, "s3") || !strings.Contains(c.Body, `"secret":"***"`) {
+				t.Fatalf("the body was kept as %s", c.Body)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d calls kept, want 1", len(evs))
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	// Neither half of the filter keeps it: it is not a change, nor a sign-in.
+	for _, kind := range []string{store.AuditKindAdmin, store.AuditKindSecurity} {
+		evs, _ := st.ListAuditEvents(ctx, store.AuditFilter{Kind: kind})
+		for _, e := range evs {
+			if e.Target == store.AuditTargetEndpoint {
+				t.Fatalf("a call came through kind=%s", kind)
+			}
+		}
+	}
+}

@@ -32,6 +32,8 @@ const plain = [
   ['helm/values-ce-one-node.yaml', 'values-ce-one-node.yaml'],
   ['helm/values-ee-one-node.yaml', 'values-ee-one-node.yaml'],
   ['helm/values-ee-cluster.yaml', 'values-ee-cluster.yaml'],
+  ['helm/values-eval-one-node.yaml', 'values-eval-one-node.yaml'],
+  ['helm/values-eval-cluster.yaml', 'values-eval-cluster.yaml'],
 ];
 for (const [from, to] of plain) {
   await copyFile(join(deploy, from), join(out, to));

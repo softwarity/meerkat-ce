@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -16,15 +17,16 @@ import (
 )
 
 // Endpoint audit (AUD-04): an audited operation's calls become audit events,
-// sent to the collector like the rest of the trail (AUD-03).
+// kept in the trail and sent to the collector like the rest of it (AUD-03).
 //
 // OUTSIDE the endpoint guard, and that is the point: auditing observes and
 // never decides. Wrapped around the guard, it sees the answer the caller got -
 // a refusal included, which is an event worth having - and nothing it does can
 // open or close a door.
 //
-// FREE when the audit is not sent: one atomic read, and the request goes on
-// untouched. The body is read only for an operation that asks for it.
+// Free for a call no operation audits: a path match, and the request goes on
+// untouched. The body is read only for an operation that asks for it, and the
+// event is handed to a writer, never written in the request.
 
 type auditedOp struct {
 	method string
@@ -60,10 +62,6 @@ func (rt *Router) endpointAuditor(routeName string, audits []store.EndpointAudit
 	}
 	strip := stripPrefixCount(filters)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !tracing.ShippingData() {
-			next.ServeHTTP(w, req)
-			return
-		}
 		specPath := routing.StripSegments(req.URL.Path, strip)
 		var op *auditedOp
 		for i := range ops {
@@ -97,7 +95,13 @@ func (rt *Router) endpointAuditor(routeName string, audits []store.EndpointAudit
 		if status == 0 {
 			status = http.StatusOK
 		}
-		tracing.ShipAudit(rt.auditRecordOf(req, routeName, op, specPath, status, body, bodyTooBig))
+		now := time.Now()
+		ev := rt.auditCallOf(req, routeName, op, specPath, status, body, bodyTooBig)
+		ev.ID, ev.At = store.NewEventID(), now.Unix()
+		rt.st.RecordEndpointCall(ev)
+		if tracing.ShippingData() {
+			tracing.ShipAudit(auditRecordOf(ev, now))
+		}
 	}), nil
 }
 
@@ -106,35 +110,28 @@ func isJSON(contentType string) bool {
 	return err == nil && (mt == "application/json" || strings.HasSuffix(mt, "+json"))
 }
 
-// auditRecordOf builds the event: the caller as the gateway authenticated
-// them, the operation, what was asked for, the answer, and what the operation
-// said to take from the call.
-func (rt *Router) auditRecordOf(req *http.Request, routeName string, op *auditedOp, specPath string, status int, body []byte, bodyTooBig bool) tracing.AuditRecord {
+// auditCallOf builds the event: the caller as the gateway authenticated them,
+// the operation, what was asked for, the answer, and what the operation said
+// to take from the call.
+func (rt *Router) auditCallOf(req *http.Request, routeName string, op *auditedOp, specPath string, status int, body []byte, bodyTooBig bool) store.AuditEvent {
 	what := strings.TrimSpace(op.spec.Description)
 	if what == "" {
 		what = req.Method + " " + op.tmpl
 	}
-	attrs := []tracing.Attr{
-		tracing.String("audit.action", "endpoint.call"),
-		tracing.String("audit.target", "endpoint"),
-		tracing.String("audit.description", what),
-		tracing.String("meerkat.route", routeName),
-		tracing.String("http.request.method", req.Method),
-		tracing.String("http.route", op.tmpl),
-		tracing.String("url.path", req.URL.Path),
-		tracing.Int64("http.response.status_code", int64(status)),
-		tracing.String("client.address", callerIP(req)),
+	call := &store.EndpointCall{
+		Route: routeName, Method: req.Method, Operation: op.tmpl, Path: req.URL.Path,
+		Status: status, TraceID: tracing.ID(req.Context()),
+	}
+	ev := store.AuditEvent{
+		Action: "endpoint.call", Target: store.AuditTargetEndpoint,
+		TargetID: routeName, TargetName: what, IP: callerIP(req), Data: call,
 	}
 	// The caller, always - the switch on the spans (OBS-04) is about traces;
 	// an audit event without its actor is not one.
 	if d, ok := rt.sessionIdentity(req); ok {
-		attrs = append(attrs,
-			tracing.String("user.id", d.UserID), tracing.String("user.name", d.Username),
-			tracing.String("meerkat.tenant.id", d.TenantID), tracing.String("meerkat.tenant.name", d.Tenant),
-			tracing.String("meerkat.group", d.Group))
-		if len(d.Roles) > 0 {
-			attrs = append(attrs, tracing.Strings("meerkat.roles", d.Roles))
-		}
+		ev.ActorID, ev.ActorName = d.UserID, d.Username
+		ev.TenantID, ev.TenantName = d.TenantID, d.Tenant
+		call.Group, call.Roles = d.Group, d.Roles
 	}
 	var parsed any
 	if body != nil {
@@ -153,19 +150,66 @@ func (rt *Router) auditRecordOf(req *http.Request, routeName string, op *audited
 		case store.AuditFromBody:
 			v = pointer(parsed, f.Key)
 		}
-		attrs = append(attrs, tracing.String("audit.field."+f.Name, v))
+		if call.Fields == nil {
+			call.Fields = map[string]string{}
+		}
+		call.Fields[f.Name] = v
 	}
 	if op.spec.Body {
 		switch {
 		case bodyTooBig:
-			attrs = append(attrs, tracing.String("audit.body.omitted", "larger than "+strconv.Itoa(store.AuditBodyMax)+" bytes"))
+			call.BodyOmitted = "larger than " + strconv.Itoa(store.AuditBodyMax) + " bytes"
 		case parsed != nil:
 			if b, err := json.Marshal(masked(parsed, op.mask)); err == nil {
-				attrs = append(attrs, tracing.String("audit.body", string(b)))
+				call.Body = string(b)
 			}
 		}
 	}
-	return tracing.AuditRecord{Time: time.Now(), TraceID: tracing.ID(req.Context()), Body: what, Attrs: attrs}
+	return ev
+}
+
+// auditRecordOf is the event as it leaves for the collector, under the names
+// a collector already knows (OpenTelemetry's http.*, user.*, client.address).
+// At the instant, not the row's second: two calls in one second are two lines
+// to a collector that keeps one per timestamp.
+func auditRecordOf(ev store.AuditEvent, at time.Time) tracing.AuditRecord {
+	c := ev.Data
+	attrs := []tracing.Attr{
+		tracing.String("audit.id", ev.ID),
+		tracing.String("audit.action", ev.Action),
+		tracing.String("audit.target", ev.Target),
+		tracing.String("audit.description", ev.TargetName),
+		tracing.String("meerkat.route", c.Route),
+		tracing.String("http.request.method", c.Method),
+		tracing.String("http.route", c.Operation),
+		tracing.String("url.path", c.Path),
+		tracing.Int64("http.response.status_code", int64(c.Status)),
+		tracing.String("client.address", ev.IP),
+	}
+	if ev.ActorID != "" {
+		attrs = append(attrs,
+			tracing.String("user.id", ev.ActorID), tracing.String("user.name", ev.ActorName),
+			tracing.String("meerkat.tenant.id", ev.TenantID), tracing.String("meerkat.tenant.name", ev.TenantName),
+			tracing.String("meerkat.group", c.Group))
+		if len(c.Roles) > 0 {
+			attrs = append(attrs, tracing.Strings("meerkat.roles", c.Roles))
+		}
+	}
+	names := make([]string, 0, len(c.Fields))
+	for n := range c.Fields {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		attrs = append(attrs, tracing.String("audit.field."+n, c.Fields[n]))
+	}
+	switch {
+	case c.BodyOmitted != "":
+		attrs = append(attrs, tracing.String("audit.body.omitted", c.BodyOmitted))
+	case c.Body != "":
+		attrs = append(attrs, tracing.String("audit.body", c.Body))
+	}
+	return tracing.AuditRecord{Time: at, TraceID: c.TraceID, Body: ev.TargetName, Attrs: attrs}
 }
 
 // pointer resolves a JSON pointer (RFC 6901) in v, as text.

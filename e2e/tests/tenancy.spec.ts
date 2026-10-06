@@ -4,7 +4,8 @@ import { authFile, ENTERPRISE } from '../lib/fixtures';
 
 // The two shapes of an installation, switched live on a running gateway.
 //
-// This runs LAST and puts the mode back, because everything else in the suite
+// This runs LAST - its own project, after the others (playwright.config.ts) -
+// and puts the mode back, because everything else in the suite
 // is written against the multi-organisation console. What it proves is the
 // thing a restart used to be needed for: the mode is read per request, so
 // switching it takes effect at once - and going back down is allowed and

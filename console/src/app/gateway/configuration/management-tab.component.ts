@@ -586,7 +586,7 @@ export class ConfigurationManagementComponent {
   });
 
   // The drawer is URL-driven (F5-proof), like every other detail view in this
-  // console: /infra/configuration/management/<id>, or .../current.
+  // console: /system/configuration/management/<id>, or .../current.
   private readonly openId = toSignal(
     this.route.paramMap.pipe(map((p) => p.get('id'))),
     { initialValue: null },
@@ -729,11 +729,11 @@ export class ConfigurationManagementComponent {
   // is open and the effect above loads it. One path for a click and for a
   // pasted link.
   protected open(row: Row): void {
-    void this.router.navigate(['/infra/configuration/management', row.id]);
+    void this.router.navigate(['/system/configuration/management', row.id]);
   }
 
   protected close(): void {
-    void this.router.navigate(['/infra/configuration/management']);
+    void this.router.navigate(['/system/configuration/management']);
   }
 
   // Saving from the drawer. On a saved configuration it replaces a copy and

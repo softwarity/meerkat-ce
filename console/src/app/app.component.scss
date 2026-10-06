@@ -64,3 +64,25 @@ rail-nav-content {
   --lw-live: var(--mat-sys-primary);
   --lw-down: var(--mat-sys-error);
 }
+
+/* The pause (Configuration > Snapshot): floating at the foot of the screens,
+   clear of every title, in the error colours, until somebody resumes or the gateway restarts elsewhere. */
+rail-nav-content {
+  position: relative;
+}
+.paused {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 14px;
+  border-radius: 999px;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+  box-shadow: var(--mat-sys-level2);
+  font-size: 0.85rem;
+}

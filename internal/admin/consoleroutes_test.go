@@ -43,13 +43,14 @@ func TestNoConsoleRouteTakesAProductPath(t *testing.T) {
 	// wrong, and reported as a bug.
 	//
 	// Recognised by indentation, since that is what tells the two apart in the
-	// source, and guarded by a count: the day the formatter moves these lines,
+	// source - a route on several lines, or a redirect on one - and guarded by
+	// a count: the day the formatter moves these lines,
 	// this fails loudly rather than quietly checking nothing.
 	source, err := os.ReadFile(filepath.Join("..", "..", "console", "src", "app", "app.routes.ts"))
 	if err != nil {
 		t.Skipf("console sources not here: %v", err) // the CE mirror builds Go alone
 	}
-	declared := regexp.MustCompile(`(?m)^    path: '([^']*)'`).FindAllStringSubmatch(string(source), -1)
+	declared := regexp.MustCompile(`(?m)^(?:    path: |  \{ path: )'([^']*)'`).FindAllStringSubmatch(string(source), -1)
 	if len(declared) < 8 {
 		t.Fatalf("found %d top-level routes in app.routes.ts, which cannot be right: "+
 			"the pattern stopped matching, and this test now checks nothing", len(declared))

@@ -34,14 +34,15 @@ var staysHome = map[string]string{
 	"SettingSMTP":          "carries a mail credential, and the host is the one THIS environment sends through",
 
 	// Decisions about this machine, this cluster, this moment.
-	"SettingMaintenance":       "whether this gateway is down right now: a state, and importing it would take an installation offline",
-	"SettingTenancy":           "single or multi is decided when an installation is born, and changing it under existing data is not an import",
-	"SettingTenancyChosen":     "records that the question above was answered here",
-	"SettingScheduleRetention": "how long a finished delayed action is kept before the sweep: housekeeping for THIS installation's own rows, like the trail's retention, and a number an imported configuration has no business shortening",
-	"SettingAuditRetention":    "how long THIS installation keeps its trail: a compliance decision of this place, root's alone, and not something a configuration imported by someone else should be able to shorten",
-	"SettingPlug":              "the tunnel's switch and the address developers type: a port into THIS cluster, published by THIS platform - a reproduced installation decides its own",
-	"SettingAgentEnabled":      "whether the agent endpoint is open on THIS gateway, which is a decision about this deployment's exposure",
-	"SettingEmailSignin":       "depends on SMTP being configured here, and SMTP does not travel",
+	"SettingMaintenance":           "whether this gateway is down right now: a state, and importing it would take an installation offline",
+	"SettingTenancy":               "single or multi is decided when an installation is born, and changing it under existing data is not an import",
+	"SettingTenancyChosen":         "records that the question above was answered here",
+	"SettingScheduleRetention":     "how long a finished delayed action is kept before the sweep: housekeeping for THIS installation's own rows, like the trail's retention, and a number an imported configuration has no business shortening",
+	"SettingAuditRetention":        "how long THIS installation keeps its trail: a compliance decision of this place, root's alone, and not something a configuration imported by someone else should be able to shorten",
+	"SettingEndpointCallRetention": "how long THIS installation keeps the audited calls of its data plane: the same compliance decision as the trail's own retention, for the part of it whose volume follows the traffic",
+	"SettingPlug":                  "the tunnel's switch and the address developers type: a port into THIS cluster, published by THIS platform - a reproduced installation decides its own",
+	"SettingAgentEnabled":          "whether the agent endpoint is open on THIS gateway, which is a decision about this deployment's exposure",
+	"SettingEmailSignin":           "depends on SMTP being configured here, and SMTP does not travel",
 
 	// Markers: something already happened, and it happened HERE.
 	"SettingConfigSeed":         "records that this installation was seeded",

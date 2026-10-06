@@ -14,7 +14,7 @@ Three screens, one subject: working on this gateway from outside the console.
   application tokens: an app admin sees everyone's and can revoke them.
 - **Infra > MCP** (infra admins) connects an assistant, and produces no key at
   all.
-- **API** (rail) is the reference for the calls both of them make.
+- **Meerkat, API reference** is the reference for the calls both of them make.
 
 ## Access tokens
 
@@ -85,7 +85,7 @@ other change.
 
 ## API
 
-The **API** entry in the rail shows the control plane's own REST reference - the
+**Meerkat, API reference** shows the control plane's own REST reference - the
 swagger-ui page the gateway serves - and the calls are tried **with your real
 session**: being in the console is the authorisation. It is the same surface a
 token drives.

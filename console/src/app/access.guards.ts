@@ -15,7 +15,7 @@ function landing(me: MeService): string {
   // /tenants does not exist in single-organisation mode, and License is the
   // one screen no guard can bounce anyone off: it is the honest destination
   // for someone who administers nothing here.
-  return me.multiTenant() ? '/tenants' : '/license';
+  return me.multiTenant() ? '/tenants' : '/system/license';
 }
 
 // bounce is how a guard refuses: it redirects, UNLESS that would send someone
@@ -135,6 +135,40 @@ export const auditAccess: CanActivateFn = async (_route, state) => {
   await me.ensureLoaded();
   const ok = me.isRoot() || me.isInfraAdmin() || me.isAppAdmin() || me.isTenantAdmin();
   return ok ? true : bounce(router, state, landing(me));
+};
+
+// dataAuditAccess gates the applications' sign-ins (Data plane > Audit): the
+// people who run the applications - root, an application administrator, an
+// organisation's administrator for their own. The routing plane's
+// administrator is not among them: the API shows them no account event.
+export const dataAuditAccess: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  const ok = me.isRoot() || me.isAppAdmin() || me.isTenantAdmin();
+  return ok ? true : bounce(router, state, landing(me));
+};
+
+// dataPlaneLanding: "/data-plane" is not a page - it forwards to the first of
+// its sections the caller may open, in the order the left nav lists them.
+export const dataPlaneLanding: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  if (me.isRoot() || me.isAppAdmin() || me.isTenantAdmin()) return bounce(router, state, '/data-plane/audit');
+  if (me.isInfraAdmin()) return bounce(router, state, '/data-plane/metrics');
+  return bounce(router, state, landing(me));
+};
+
+// systemLanding: "/system" forwards to its audit for whoever administers
+// something, and to the licence for whoever does not - the one section of
+// Meerkat everybody may open.
+export const systemLanding: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  const admin = me.isRoot() || me.isInfraAdmin() || me.isAppAdmin() || me.isTenantAdmin();
+  return bounce(router, state, admin ? '/system/audit' : '/system/license');
 };
 
 // schedulerAccess gates the transverse Scheduler section. A schedule belongs

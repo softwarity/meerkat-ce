@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { httpResource } from '@angular/common/http';
-import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
+import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
+import { MeService } from '../me.service';
 
 export interface ReleaseNotes {
   version: string;
@@ -9,15 +9,45 @@ export interface ReleaseNotes {
   parts?: { title: string; markdown: string }[];
 }
 
-// The running version and what it brought (CONSOLE-15), opened from the
-// account menu. A development build is shown as the last release it carries,
-// and the window opens on what is in development. The gateway picks the
-// sections: the minor or major release, then its patches that say something.
+// The running version and what it brought (CONSOLE-15): a section of Meerkat,
+// a page rather than a window - notes are read, scrolled and come back to, and
+// a dialog over a screen one was not looking at is no place for that. A
+// development build is shown as the last release it carries, and the page
+// opens on what is in development. The gateway picks the sections: the minor
+// or major release, then its patches that say something.
 @Component({
-  selector: 'app-release-notes-dialog',
-  imports: [MatButtonModule, MatDialogModule],
+  selector: 'app-release-notes-page',
+  imports: [LoadingIndicatorComponent],
   styles: [
     `
+      :host {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+      }
+      .banner {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 24px;
+        flex: none;
+      }
+      .banner h1 {
+        font-size: 1.15rem;
+        font-weight: 500;
+        margin: 0;
+        flex: 1;
+      }
+      .content {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 24px 24px;
+      }
+      .notes-column {
+        max-width: 860px;
+      }
       .missing {
         margin: 8px 0;
         color: var(--mat-sys-on-surface-variant);
@@ -26,7 +56,7 @@ export interface ReleaseNotes {
       .notes {
         line-height: 1.5;
       }
-      h3.part {
+      h2.part {
         margin: 24px 0 4px;
         padding-bottom: 4px;
         border-bottom: 1px solid var(--mat-sys-outline-variant);
@@ -34,10 +64,9 @@ export interface ReleaseNotes {
         font-size: 1.05rem;
         font-weight: 600;
       }
-      h3.part:first-child {
+      h2.part:first-child {
         margin-top: 0;
       }
-
       .notes :is(h4, h5) {
         margin: 20px 0 6px;
         font-size: 1rem;
@@ -60,34 +89,46 @@ export interface ReleaseNotes {
     `,
   ],
   template: `
-    <h2 mat-dialog-title>
-      <ng-container i18n="@@Release_notes_title">Meerkat {{ data.version }}</ng-container>
-    </h2>
-    <mat-dialog-content>
-      @for (p of parts(); track p.title) {
-        <h3 class="part">
-          @if (p.title === 'NEXT RELEASE') {
-            <ng-container i18n="@@Next_release">Next release</ng-container>
-          } @else {
-            {{ p.title }}
-          }
-        </h3>
-        @if (p.html) {
-          <div class="notes" [innerHTML]="p.html"></div>
+    <div class="banner">
+      <h1>
+        @if (notes.value(); as n) {
+          <ng-container i18n="@@Meerkat_VERSION_EDITION">Meerkat {{ n.version }} {{ enterprise() ? 'EE' : 'CE' }}</ng-container>
         } @else {
-          <p class="missing" i18n="@@Release_notes_missing">Missing information.</p>
+          <ng-container i18n="@@Release_notes">Release notes</ng-container>
         }
-      }
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button matButton mat-dialog-close i18n="@@Close">Close</button>
-    </mat-dialog-actions>
+      </h1>
+    </div>
+    @if (notes.isLoading()) {
+      <loading-indicator withContainer />
+    } @else {
+      <div class="content">
+        <div class="notes-column">
+          @for (p of parts(); track p.title) {
+            <h2 class="part">
+              @if (p.title === 'NEXT RELEASE') {
+                <ng-container i18n="@@Next_release">Next release</ng-container>
+              } @else {
+                {{ p.title }}
+              }
+            </h2>
+            @if (p.html) {
+              <div class="notes" [innerHTML]="p.html"></div>
+            } @else {
+              <p class="missing" i18n="@@Release_notes_missing">Missing information.</p>
+            }
+          } @empty {
+            <p class="missing" i18n="@@Release_notes_missing">Missing information.</p>
+          }
+        </div>
+      </div>
+    }
   `,
 })
-export class ReleaseNotesDialogComponent {
-  protected readonly data = inject<ReleaseNotes>(MAT_DIALOG_DATA);
+export class ReleaseNotesPageComponent {
+  protected readonly notes = httpResource<ReleaseNotes>(() => '/api/release-notes');
+  protected readonly enterprise = inject(MeService).enterprise;
   protected readonly parts = computed(() =>
-    (this.data.parts ?? []).map((p) => ({ title: p.title, html: renderNotes(p.markdown) })),
+    (this.notes.value()?.parts ?? []).map((p) => ({ title: p.title, html: renderNotes(p.markdown) })),
   );
 }
 
@@ -118,7 +159,7 @@ export function renderNotes(md: string): string {
     if (heading) {
       flushPara();
       flushList();
-      // One level under the sections the dialog titles (h3).
+      // Under the sections the page titles (h2): ### is h4, #### is h5.
       const level = heading[1].length + 1;
       out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
     } else if (/^- /.test(line)) {

@@ -9,6 +9,7 @@
       <ng-container matColumnDef="user" sticky>
         <mat-header-cell *matHeaderCellDef i18n="@@User">User</mat-header-cell>
         <mat-cell *matCellDef="let u">
+          <app-presence [userId]="u.id" [tenantId]="tenantId()" />
           <div class="user-cell">
             <span class="name mono">{{ u.username }}</span>
             @if (u.fullname) {

@@ -1,0 +1,51 @@
+# Meerkat, evaluation edition, three gateways serving ONE installation.
+#
+#   kubectl create secret generic meerkat-state \
+#     --from-literal=database-url='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require' \
+#     --from-literal=vault-key="$(openssl rand -hex 32)"
+#   helm repo add meerkat https://www.softwarity.io/deploy
+#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-eval-cluster.yaml \
+#     --set admin.password='choose-one'
+#
+# The cluster shape of values-ee-cluster.yaml - a shared PostgreSQL, three
+# replicas, no volume - on the public evaluation image: the way to try the
+# cluster before buying it. Not licensed for production.
+image:
+  repository: docker.io/softwarity/meerkat
+  # The evaluation build: `eval` follows the latest release, `X.Y.Z-eval`
+  # pins one - pin it for anything that has to stay put.
+  tag: eval
+  # Public, on Docker Hub: no pull secret.
+  pullSecrets: []
+
+# Three is the usual answer: it survives a node and a rolling update at once.
+replicaCount: 3
+
+# The Secret created above, holding BOTH keys. Give it here rather than
+# putting a URL and a master key in a file that goes into git.
+database:
+  existingSecret: meerkat-state
+  existingSecretKey: database-url
+
+vault:
+  existingSecret: meerkat-state
+  existingSecretKey: vault-key
+
+admin:
+  password: ""
+
+# Ignored when clustered, and said out loud rather than left to surprise: the
+# state is rows, the pod's directory holds nothing worth keeping, and a
+# ReadWriteOnce volume could not follow a pod between machines anyway.
+persistence:
+  enabled: false
+
+service:
+  type: ClusterIP
+  appPort: 8080
+  adminPort: 9090
+
+# A cluster is a production gateway. This closes the developer surface for
+# good, whatever the database says - and unlike the stored switch, it does not
+# travel in a backup or a configuration export.
+production: true

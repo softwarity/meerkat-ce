@@ -527,7 +527,7 @@ moins une fois. Si vous avez besoin du reste, il vous faut un broker.
 
 ## Ce que voit l'exploitant
 
-**Scheduler**, dans le rail, liste tout ce qui est planifié, avec un filtre par
+**Data plane, Scheduler** liste tout ce qui est planifié, avec un filtre par
 organisation et par service, et se met à jour en direct : une exécution qui
 démarre, progresse et se termine apparaît sans rien rafraîchir. Trois actions s'y
 trouvent, celles dont on a besoin à deux heures du matin : mettre en pause, avancer

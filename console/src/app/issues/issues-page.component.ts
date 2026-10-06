@@ -153,11 +153,11 @@ export class IssuesPageComponent {
   }
 
   protected open(i: Issue): void {
-    void this.router.navigate(['/issues', i.id]);
+    void this.router.navigate(['/data-plane/issues', i.id]);
   }
 
   protected onClose(): void {
-    if (this.openedId()) void this.router.navigate(['/issues']);
+    if (this.openedId()) void this.router.navigate(['/data-plane/issues']);
   }
 
   protected setStatus(status: IssueStatus): void {

@@ -104,7 +104,9 @@ spec:
         - name: meerkat
           # The external database is an Enterprise capability: the community
           # image links no PostgreSQL driver at all. Pin a release rather than
-          # riding "latest" on something that answers your front door.
+          # riding "latest" on something that answers your front door. To try
+          # the cluster first: docker.io/softwarity/meerkat:eval, public, the
+          # Enterprise image with an evaluation notice - not for production.
           image: ghcr.io/softwarity/meerkat:latest
           ports:
             - name: app

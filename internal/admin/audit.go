@@ -305,13 +305,14 @@ func isSensitiveKey(k string) bool {
 // actor, target, targetId, since, until (unix seconds), limit.
 func (a *API) listAudit(w http.ResponseWriter, r *http.Request, actor store.User) {
 	f := store.AuditFilter{
-		ActorID:  strings.TrimSpace(r.URL.Query().Get("actor")),
-		Target:   strings.TrimSpace(r.URL.Query().Get("target")),
-		TargetID: strings.TrimSpace(r.URL.Query().Get("targetId")),
-		Kind:     strings.TrimSpace(r.URL.Query().Get("kind")),
-		Since:    atoi64(r.URL.Query().Get("since")),
-		Until:    atoi64(r.URL.Query().Get("until")),
-		Limit:    int(atoi64(r.URL.Query().Get("limit"))),
+		ActorID:   strings.TrimSpace(r.URL.Query().Get("actor")),
+		Target:    strings.TrimSpace(r.URL.Query().Get("target")),
+		NotTarget: strings.TrimSpace(r.URL.Query().Get("notTarget")),
+		TargetID:  strings.TrimSpace(r.URL.Query().Get("targetId")),
+		Kind:      strings.TrimSpace(r.URL.Query().Get("kind")),
+		Since:     atoi64(r.URL.Query().Get("since")),
+		Until:     atoi64(r.URL.Query().Get("until")),
+		Limit:     int(atoi64(r.URL.Query().Get("limit"))),
 	}
 	// Scope by capability (RBAC-05): root sees all; otherwise the union of the
 	// domains the caller administers. infra-admin -> routing plane targets,
@@ -442,31 +443,66 @@ func add(set map[string]bool, kinds []string) {
 	}
 }
 
-// auditSettings is the trail's own setting, and what may be chosen.
+// auditSettings is the trail's own settings, and what may be chosen. The
+// audited calls of the data plane (AUD-04) have their own lifetime, and the
+// count of those a full queue had to drop since the gateway started.
 type auditSettings struct {
-	RetentionDays int   `json:"retentionDays"`
-	Choices       []int `json:"choices"`
+	RetentionDays         int   `json:"retentionDays"`
+	Choices               []int `json:"choices"`
+	EndpointRetentionDays int   `json:"endpointRetentionDays"`
+	EndpointChoices       []int `json:"endpointChoices"`
+	EndpointDropped       int64 `json:"endpointDropped"`
 }
 
 func (a *API) getAuditSettings(w http.ResponseWriter, r *http.Request, _ store.User) {
 	writeJSON(w, http.StatusOK, auditSettings{
 		RetentionDays: a.st.AuditRetentionDays(r.Context()), Choices: store.AuditRetentionChoices,
+		EndpointRetentionDays: a.st.EndpointCallRetentionDays(r.Context()), EndpointChoices: store.EndpointCallRetentionChoices,
+		EndpointDropped: a.st.EndpointCallsDropped(),
 	})
 }
 
+// auditSettingsPut is what may be written: either retention, or both. A zero
+// leaves that one as it is, so the screen that shows one choice sends one.
+//
+// The read-only fields are accepted and ignored: a script that sends back what
+// it read must not be refused for it.
+type auditSettingsPut struct {
+	RetentionDays         int   `json:"retentionDays"`
+	EndpointRetentionDays int   `json:"endpointRetentionDays"`
+	Choices               []int `json:"choices"`
+	EndpointChoices       []int `json:"endpointChoices"`
+	EndpointDropped       int64 `json:"endpointDropped"`
+}
+
 func (a *API) putAuditSettings(w http.ResponseWriter, r *http.Request, actor store.User) {
-	var p auditSettings
+	var p auditSettingsPut
 	if err := decodeStrict(r, &p); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed audit settings: "+err.Error())
 		return
 	}
-	before := a.st.AuditRetentionDays(r.Context())
-	if err := a.st.SetAuditRetentionDays(r.Context(), p.RetentionDays); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+	if p.RetentionDays == 0 && p.EndpointRetentionDays == 0 {
+		writeErr(w, http.StatusUnprocessableEntity, "audit settings: expected retentionDays, endpointRetentionDays, or both")
 		return
 	}
-	a.auditUpdate(r.Context(), actor, "audit.retention", "settings", "", "", "",
-		map[string]int{"retentionDays": before}, map[string]int{"retentionDays": p.RetentionDays})
+	if p.RetentionDays != 0 {
+		before := a.st.AuditRetentionDays(r.Context())
+		if err := a.st.SetAuditRetentionDays(r.Context(), p.RetentionDays); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		a.auditUpdate(r.Context(), actor, "audit.retention", "settings", "", "", "",
+			map[string]int{"retentionDays": before}, map[string]int{"retentionDays": p.RetentionDays})
+	}
+	if p.EndpointRetentionDays != 0 {
+		before := a.st.EndpointCallRetentionDays(r.Context())
+		if err := a.st.SetEndpointCallRetentionDays(r.Context(), p.EndpointRetentionDays); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		a.auditUpdate(r.Context(), actor, "audit.retention", "settings", "", "", "",
+			map[string]int{"endpointRetentionDays": before}, map[string]int{"endpointRetentionDays": p.EndpointRetentionDays})
+	}
 	a.getAuditSettings(w, r, actor)
 }
 
@@ -493,12 +529,13 @@ func (a *API) exportAudit(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	f := store.AuditFilter{
-		Kind:   strings.TrimSpace(r.URL.Query().Get("kind")),
-		Target: strings.TrimSpace(r.URL.Query().Get("target")),
-		Since:  atoi64(r.URL.Query().Get("since")),
-		Until:  atoi64(r.URL.Query().Get("until")),
-		Limit:  exportLimit + 1,
-		Scope:  scope,
+		Kind:      strings.TrimSpace(r.URL.Query().Get("kind")),
+		Target:    strings.TrimSpace(r.URL.Query().Get("target")),
+		NotTarget: strings.TrimSpace(r.URL.Query().Get("notTarget")),
+		Since:     atoi64(r.URL.Query().Get("since")),
+		Until:     atoi64(r.URL.Query().Get("until")),
+		Limit:     exportLimit + 1,
+		Scope:     scope,
 	}
 	events, err := a.st.ListAuditEvents(r.Context(), f)
 	if err != nil {
@@ -516,7 +553,7 @@ func (a *API) exportAudit(w http.ResponseWriter, r *http.Request, actor store.Us
 	w.Header().Set("Content-Disposition", `attachment; filename="meerkat-audit.csv"`)
 	cw := csv.NewWriter(w)
 	_ = cw.Write([]string{"at", "action", "actor", "token", "target", "targetId", "targetName",
-		"organisation", "ip", "detail", "changes"})
+		"organisation", "ip", "detail", "changes", "call"})
 	for _, e := range events {
 		changes := ""
 		if len(e.Changes) > 0 {
@@ -532,13 +569,21 @@ func (a *API) exportAudit(w http.ResponseWriter, r *http.Request, actor store.Us
 		if org == "" {
 			org = e.TenantID
 		}
+		// An audited call (AUD-04) travels as JSON in its own column, like the
+		// diff of a change.
+		call := ""
+		if e.Data != nil {
+			if b, err := json.Marshal(e.Data); err == nil {
+				call = string(b)
+			}
+		}
 		_ = cw.Write([]string{
 			time.Unix(e.At, 0).UTC().Format(time.RFC3339), e.Action, actorName, e.ActorToken,
-			e.Target, e.TargetID, e.TargetName, org, e.IP, e.Detail, changes,
+			e.Target, e.TargetID, e.TargetName, org, e.IP, e.Detail, changes, call,
 		})
 	}
 	if truncated {
-		_ = cw.Write([]string{"", "truncated", "", "", "", "", "", "", "", fmt.Sprintf("only the %d most recent events: narrow the period", exportLimit), ""})
+		_ = cw.Write([]string{"", "truncated", "", "", "", "", "", "", "", fmt.Sprintf("only the %d most recent events: narrow the period", exportLimit), "", ""})
 	}
 	cw.Flush()
 }

@@ -33,15 +33,6 @@
       <mat-icon>domain</mat-icon>
     </rail-nav-item>
     <rail-nav-item
-      i18n-label="@@API"
-      label="API"
-      routerLink="/api"
-      [active]="inApiDocs()"
-      any-role="root infra-admin app-admin"
-    >
-      <mat-icon>api</mat-icon>
-    </rail-nav-item>
-    <rail-nav-item
       i18n-label="@@Vault"
       label="Vault"
       routerLink="/vault"
@@ -50,64 +41,21 @@
     >
       <mat-icon>key</mat-icon>
     </rail-nav-item>
+    <!-- Two entries for what is not configuration, each with its sections:
+         what the applications are doing, and the gateway itself. Data plane
+         shows to whoever may open one of its sections; Meerkat to everybody,
+         since its licence and release notes are anyone's to read. -->
     <rail-nav-item
-      i18n-label="@@Audit"
-      label="Audit"
-      routerLink="/audit"
-      [active]="inAudit()"
+      i18n-label="@@Data_plane"
+      label="Data plane"
+      routerLink="/data-plane"
+      [active]="inDataPlane()"
       any-role="root infra-admin app-admin tenant-admin"
     >
-      <mat-icon>history_edu</mat-icon>
+      <mat-icon>apps</mat-icon>
     </rail-nav-item>
-    <rail-nav-item
-      i18n-label="@@Logs"
-      label="Logs"
-      routerLink="/logs"
-      [active]="inLogs()"
-      any-role="root infra-admin"
-    >
-      <mat-icon>receipt_long</mat-icon>
-    </rail-nav-item>
-    <rail-nav-separator />
-    <!-- Below the line: what is about the APPLICATION rather than about
-         Meerkat. The vault and the audit above say what this gateway holds and
-         what was done to it; these three say what the thing it serves is
-         doing. -->
-    <rail-nav-item
-      i18n-label="@@Sessions"
-      label="Sessions"
-      routerLink="/sessions"
-      [active]="inSessions()"
-      any-role="root app-admin tenant-admin"
-    >
-      <mat-icon>devices</mat-icon>
-    </rail-nav-item>
-    <rail-nav-item
-      i18n-label="@@Scheduler"
-      label="Scheduler"
-      routerLink="/scheduler"
-      [active]="inScheduler()"
-      any-role="root app-admin"
-    >
-      <mat-icon>schedule</mat-icon>
-    </rail-nav-item>
-    <rail-nav-item
-      i18n-label="@@Metrics"
-      label="Metrics"
-      routerLink="/traffic"
-      [active]="inMetrics()"
-      any-role="root infra-admin"
-    >
-      <mat-icon>monitoring</mat-icon>
-    </rail-nav-item>
-    <rail-nav-item
-      i18n-label="@@Issues"
-      label="Issues"
-      routerLink="/issues"
-      [active]="inIssues()"
-      any-role="root infra-admin app-admin tenant-admin"
-    >
-      <mat-icon>bug_report</mat-icon>
+    <rail-nav-item label="Meerkat" routerLink="/system" [active]="inSystem()">
+      <mat-icon svgIcon="meerkat" />
     </rail-nav-item>
     <rail-nav-spacer />
     <!-- Whether the socket this tab watches everything on is up (CONSOLE-13).
@@ -125,6 +73,15 @@
     <app-user-menu />
   </rail-nav>
   <rail-nav-content>
+    @if (pause.paused()) {
+      <!-- Over the screens, not above them: a pause is a moment, and it must
+           not move every page down while it lasts. -->
+      <div class="paused" role="status">
+        <mat-icon>pause_circle</mat-icon>
+        <span i18n="@@Gateway_paused">Paused: the applications answer the maintenance page and nothing is written.</span>
+        <button matButton any-role="root" (click)="pause.set(false)" i18n="@@Resume">Resume</button>
+      </div>
+    }
     <router-outlet />
   </rail-nav-content>
 </rail-nav-container>

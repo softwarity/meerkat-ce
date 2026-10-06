@@ -63,15 +63,6 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // The developer tunnel: a port into the cluster, opened for the people
       // who plug their machine in.
       { path: 'plug', label: $localize`:@@Plug:Plug`, icon: 'power' },
-      // The whole installation as one file: not a daily screen, so it sits at
-      // the bottom, apart from the rest.
-      {
-        path: 'configuration',
-        label: $localize`:@@Configuration:Configuration`,
-        icon: 'import_export',
-        roles: 'root',
-        bottom: true,
-      },
     ],
   },
   application: {
@@ -107,6 +98,58 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       { path: 'access-tokens', label: $localize`:@@Access_tokens:Access tokens`, icon: 'key' },
     ],
   },
+  // What the applications are doing. Each section carries the roles of its
+  // guard, so the nav lists what the reader may open and nothing more.
+  'data-plane': {
+    title: $localize`:@@Data_plane:Data plane`,
+    links: [
+      { path: 'audit', label: $localize`:@@Audit:Audit`, icon: 'history_edu', roles: 'root app-admin tenant-admin' },
+      { path: 'sessions', label: $localize`:@@Sessions:Sessions`, icon: 'devices', roles: 'root app-admin tenant-admin' },
+      { path: 'scheduler', label: $localize`:@@Scheduler:Scheduler`, icon: 'schedule', roles: 'root app-admin' },
+      { path: 'metrics', label: $localize`:@@Metrics:Metrics`, icon: 'monitoring', roles: 'root infra-admin' },
+      {
+        path: 'issues',
+        label: $localize`:@@Issues:Issues`,
+        icon: 'bug_report',
+        roles: 'root infra-admin app-admin tenant-admin',
+      },
+    ],
+  },
+  // The gateway itself: what was done to it, what it says, who holds it, and
+  // what it is.
+  system: {
+    title: 'Meerkat',
+    links: [
+      {
+        path: 'audit',
+        label: $localize`:@@Audit:Audit`,
+        icon: 'history_edu',
+        roles: 'root infra-admin app-admin tenant-admin',
+      },
+      { path: 'logs', label: $localize`:@@Logs:Logs`, icon: 'receipt_long', roles: 'root infra-admin' },
+      { path: 'sessions', label: $localize`:@@Sessions:Sessions`, icon: 'devices', roles: 'root' },
+      // The whole installation: as a document (management, history) and as a
+      // database (snapshot, migration). Root's.
+      {
+        path: 'configuration',
+        label: $localize`:@@Configuration:Configuration`,
+        icon: 'import_export',
+        roles: 'root',
+      },
+      // About the product rather than its activity, apart at the foot: the
+      // reference for whoever scripts the control plane, what this version
+      // brought, and the edition - the last two for anyone holding the console.
+      {
+        path: 'api',
+        label: $localize`:@@API_reference:API reference`,
+        icon: 'api',
+        roles: 'root infra-admin app-admin',
+        bottom: true,
+      },
+      { path: 'release-notes', label: $localize`:@@Release_notes:Release notes`, icon: 'new_releases' },
+      { path: 'license', label: $localize`:@@License:License`, icon: 'workspace_premium' },
+    ],
+  },
 };
 
 // The console shell: a plane's sections live in a LEFT NAV inside the page, the
@@ -116,7 +159,7 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
 // between sections. Which plane it serves comes from the route's `plane` data -
 // the router already knows, so there is no URL to parse.
 //
-// The transverse screens (vault, audit) sit outside: they belong to no plane.
+// The vault sits outside: it belongs to no plane.
 // So does a tenant, which brings its own nav.
 @Component({
   selector: 'app-section-shell',

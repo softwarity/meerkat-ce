@@ -143,8 +143,8 @@ capacités, sans que ce soit la faute de qui que ce soit en particulier.
 
 - *Send the audit logs* : le plan de données - les connexions des comptes, les refus, les
   changements de mot de passe et de second facteur, ainsi que les appels aux opérations
-  auditées dans **Endpoint audit**, qui n'envoient rien tant que cet interrupteur est
-  désactivé ;
+  auditées dans **Endpoint audit**, conservés dans Meerkat dans tous les cas et envoyés
+  au collecteur seulement quand cet interrupteur est activé ;
 - *Send Meerkat's console audit too* : les modifications faites dans la console et les
   connexions à celle-ci.
 
@@ -163,9 +163,22 @@ abandonner est compté, et l'onglet l'indique.
 ## Auditer les opérations d'une route
 
 **Infra, Endpoint audit** (Enterprise) liste les opérations du contrat OpenAPI de chaque
-route, avec un interrupteur par opération. Un appel audité devient un événement d'audit,
-envoyé au collecteur avec le reste du journal quand l'onglet **Audit** d'OpenTelemetry est
-activé. Rien n'est stocké ici : le volume est celui du plan de données.
+route, avec un interrupteur par opération. Un appel audité devient un événement d'audit :
+conservé dans le journal, où **Data plane, Audit, Operations** l'affiche, et envoyé au
+collecteur avec le reste du journal quand l'onglet **Audit** d'OpenTelemetry est activé.
+
+Un événement nomme l'appelant tel que la gateway l'a authentifié (compte, organisation,
+groupe, rôles), l'opération, le chemin tel qu'il a été demandé, le statut, l'adresse et
+l'identifiant de trace, puis les champs que l'opération tire de l'appel et, si elle le
+demande, le corps JSON avec ses secrets masqués.
+
+Ils sont écrits hors de la requête, par lots : un appel n'attend jamais le journal, et une
+file qui ne suit plus abandonne des événements plutôt que de ralentir le trafic - l'écran
+indique combien depuis le démarrage de la gateway. Leur volume suit le trafic : ils ont donc
+leur propre durée de conservation, un mois par défaut, que root règle sur le même écran
+(**Keep operations for**) : de sept jours à un an, indépendamment de l'année pendant
+laquelle on garde les modifications. Un administrateur des applications lit tous les appels ;
+l'administrateur d'une organisation, ceux faits dans son organisation.
 
 Sur l'image Community, l'écran est verrouillé, tout comme le téléversement dans l'éditeur de
 route : un événement que rien n'enverrait jamais, c'est un journal qui semble tenu et qui ne
@@ -205,10 +218,13 @@ règles voyagent aussi avec l'export de la [configuration](/docs/console/configu
 
 ## Filtres, rétention, et ce qui manque
 
-L'écran filtre sur le volet du journal (**All**, **Changes**, **Data plane sign-ins**,
-**Console sign-ins**), sur le type de cible d'une modification, sur la période, et propose
-une zone de texte libre qui cherche aussi dans le motif et dans l'adresse. L'API y ajoute
-l'acteur et l'identifiant de la cible : `GET /api/audit?kind=security`.
+Les connexions aux applications ont leur propre écran, **Data plane, Audit**.
+**Meerkat, Audit** filtre le reste sur le volet du journal (**All**, **Changes**,
+**Console sign-ins**). Les deux filtrent sur la période et proposent une zone de texte
+libre qui cherche aussi dans le motif et dans l'adresse, et celui de Meerkat filtre en
+plus sur le type de cible d'une modification. L'API y ajoute l'acteur, l'identifiant de
+la cible, et `notTarget` pour écarter un type : `GET /api/audit?kind=security`,
+`GET /api/audit?notTarget=account`.
 
 La **rétention** est d'un an par défaut, appliquée par le nettoyage périodique. Root la
 choisit en haut de l'écran - trois mois, six mois, un an, deux ans ou cinq ans (**Keep events

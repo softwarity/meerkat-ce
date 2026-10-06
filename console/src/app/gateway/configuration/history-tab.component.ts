@@ -352,11 +352,11 @@ export class ConfigurationHistoryComponent {
   }
 
   protected open(p: RestorePoint): void {
-    void this.router.navigate(['/infra/configuration/history', p.id]);
+    void this.router.navigate(['/system/configuration/history', p.id]);
   }
 
   protected close(): void {
-    void this.router.navigate(['/infra/configuration/history']);
+    void this.router.navigate(['/system/configuration/history']);
   }
 
   // Going back is a change like any other: it shows its plan first, and it

@@ -8,7 +8,7 @@ summary: What a snapshot holds, why there is no restore button, and why a config
 # Backup and restore
 
 Three different things get confused here, so they live on three tabs of the
-**Infra > Configuration** screen and they answer three different questions.
+**Meerkat > Configuration** screen and they answer three different questions.
 
 | What | What it holds | What it is for |
 |---|---|---|
@@ -71,6 +71,72 @@ The old file is kept: a restore one regrets must have a way back.
 > exactly as storing a vault file beside its passphrase would. Keep the key in a
 > secret manager, or supply it through the environment - the console says which of
 > the two your installation does.
+
+## Moving the database: embedded and PostgreSQL
+
+The same tab moves the database. A copy of the **same kind** as the one the
+gateway runs on is a backup; of the **other kind**, it moves the gateway:
+
+| From | To | What you get |
+|---|---|---|
+| embedded | embedded | `meerkat.db`, the snapshot above |
+| embedded | PostgreSQL | `meerkat.sql`, a dump in `pg_dump`'s plain format, or a copy straight into a server |
+| PostgreSQL | PostgreSQL | `meerkat.sql`, or a copy into another server |
+| PostgreSQL | embedded | `meerkat.db`, built from the database |
+
+PostgreSQL is the Enterprise image's: the target is locked on the community one.
+
+**Pause first** - the screen insists: a copy to the other kind, file or server,
+waits for it, and so does the API. A backup of the same kind does not: it is
+made to be taken hot. The **Pause** switch, at the top of the tab, puts every
+application on the maintenance page and stops every write, on every node. A copy
+taken while the gateway writes would lose what is written before the switch -
+sessions, the audit trail, the audited calls. The pause is never stored: a
+restart ends it, and the gateway that starts on the new database works at once.
+While it lasts, the console stays open for reading, and refuses changes.
+
+**Into a server**, the tab takes the target one field at a time - host, port,
+database, user, password, SSL mode - for an empty database. In Kubernetes it
+offers the PostgreSQL services it finds beside the gateway, the operator's
+primary first (CrunchyData's `-primary`, CloudNativePG's `-rw`); a pooler such
+as pgbouncer and a replica are listed and refused, since the cluster needs
+`LISTEN/NOTIFY` and advisory locks, which a transaction pooler breaks and a
+replica cannot take. **Test** asks the server before anything moves, and writes
+nothing there: its version, the SSL mode that connects (tried encrypted first,
+and kept for the copy), whether the database is empty, and whether the user may
+create tables - which PostgreSQL 15 and later no longer grant on `public` by
+default. A target that fails one of these is not offered the copy. It copies
+every table in one transaction, counting each on both sides before it
+commits. A target that already holds accounts or routes is refused: a copy
+never lands over a gateway. The URL is used for the copy and kept nowhere; the
+trail records its host, in the new database, which starts its history by saying
+where it came from.
+
+**Into a file**, the dump loads with `psql -v ON_ERROR_STOP=1 -f meerkat.sql`
+into an empty database. It is one transaction: a dump cut short is refused whole.
+
+**The switch is the deployment's.** The gateway cannot change its own
+`MEERKAT_DATABASE_URL`, so once the copy is done the tab prints what to change,
+filled with the target it was given: a Secret with the
+database URL and the vault key, then `helm upgrade` with
+`database.existingSecret`, `vault.existingSecret` and the number of replicas - or
+the same two variables for Compose and Swarm.
+
+> [!WARNING]
+> The vault key never travels in the copy. Without the same key, every secret of
+> the vault is unreadable on the new database: carry it into the Secret, as the
+> procedure says.
+
+The same moves, for a script or a Kubernetes Job run before an upgrade:
+
+```bash
+meerkat db dump -format postgres -out meerkat.sql    # a dump, for psql
+meerkat db dump -format sqlite -out meerkat.db       # a database file
+meerkat db copy -to postgres://meerkat:PASSWORD@host:5432/meerkat
+```
+
+They read the source from `-data` and `-database-url`, like the gateway. Stop the
+gateway, or pause it from the console, first.
 
 ## The configuration export
 

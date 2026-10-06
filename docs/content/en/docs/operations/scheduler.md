@@ -507,7 +507,7 @@ thing, you need a broker.
 
 ## What the operator sees
 
-**Scheduler**, in the rail, lists everything scheduled, filtered by
+**Data plane, Scheduler** lists everything scheduled, filtered by
 organisation and service, updated live: a run starting, advancing and finishing
 appears without refreshing anything. Three actions live there, and they are the
 ones wanted at two in the morning: pause, bring the next turn forward, remove.

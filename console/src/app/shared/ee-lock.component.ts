@@ -25,7 +25,7 @@ import { RouterLink } from '@angular/router';
         >EE</span
       >
     } @else {
-      <a class="lock" routerLink="/license" [matTooltip]="why()" (click)="$event.stopPropagation()">
+      <a class="lock" routerLink="/system/license" [matTooltip]="why()" (click)="$event.stopPropagation()">
         <mat-icon>workspace_premium</mat-icon>
         <span i18n="@@Enterprise">Enterprise</span>
       </a>

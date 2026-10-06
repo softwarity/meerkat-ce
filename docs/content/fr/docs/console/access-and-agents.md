@@ -16,7 +16,7 @@ console.
   les comptes et peut les révoquer.
 - **Infra > MCP** (administrateurs infra) connecte un assistant, sans produire la
   moindre clé.
-- **API** (dans le rail) est la référence des appels que font l'un et l'autre.
+- **Meerkat, API reference** est la référence des appels que font l'un et l'autre.
 
 ## Access tokens
 
@@ -92,7 +92,7 @@ autre modification.
 
 ## API
 
-L'entrée **API** du rail affiche la référence REST du plan de contrôle - la page
+**Meerkat, API reference** affiche la référence REST du plan de contrôle - la page
 swagger-ui que sert la gateway - et les appels s'y essaient **avec votre véritable
 session** : être dans la console vaut autorisation. C'est la même surface que celle
 que pilote un jeton.

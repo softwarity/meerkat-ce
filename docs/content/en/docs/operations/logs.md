@@ -33,7 +33,7 @@ A typo in the level falls back to `info` rather than stopping a start.
 
 ![The Logs screen: the level at the top right, the level filters and the search, then the lines, one of them open](img/console/logs.webp)
 
-**Logs**, in the rail under Audit (root and infra admin), shows the last 5,000
+**Meerkat, Logs** (root and infra admin) shows the last 5,000
 lines live. The gateway keeps them structured, so the screen lays them out
 whatever the output format: time, level, message, attributes. Click a line to
 open it. Filter by level, search the text, and export what is shown as `.jsonl`.

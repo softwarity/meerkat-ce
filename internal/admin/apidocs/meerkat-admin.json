@@ -390,6 +390,7 @@
         "parameters": [
           { "name": "kind", "in": "query", "schema": { "type": "string", "enum": ["admin", "security"] }, "description": "`admin` keeps the changes, `security` the sign-ins and the ways into an account. Both when absent" },
           { "name": "target", "in": "query", "schema": { "type": "string" }, "description": "Only this target kind (route, user, tenant, ..., account, console)" },
+          { "name": "notTarget", "in": "query", "schema": { "type": "string" }, "description": "Every target kind but these, comma-separated: `account,endpoint` leaves out the applications' sign-ins and their audited calls, which is the console's own trail" },
           { "name": "targetId", "in": "query", "schema": { "type": "string" }, "description": "Only this instance" },
           { "name": "actor", "in": "query", "schema": { "type": "string" }, "description": "Only this actor's id" },
           { "name": "since", "in": "query", "schema": { "type": "integer" }, "description": "Unix seconds lower bound" },
@@ -730,7 +731,24 @@
           "tenantId": { "type": "string" },
           "changes": { "type": "array", "items": { "$ref": "#/components/schemas/FieldChange" } },
           "detail": { "type": "string" },
-          "ip": { "type": "string", "description": "The address the gateway resolved, on a security event" }
+          "ip": { "type": "string", "description": "The address the gateway resolved, on a security event or an audited call" },
+          "data": {
+            "type": "object",
+            "description": "On an audited call of the data plane (target `endpoint`, action `endpoint.call`): what was asked and answered, and what the operation names",
+            "properties": {
+              "route": { "type": "string" },
+              "method": { "type": "string" },
+              "operation": { "type": "string", "description": "The path template of the audited operation" },
+              "path": { "type": "string", "description": "The path as requested" },
+              "status": { "type": "integer" },
+              "traceId": { "type": "string" },
+              "group": { "type": "string" },
+              "roles": { "type": "array", "items": { "type": "string" } },
+              "fields": { "type": "object", "additionalProperties": { "type": "string" } },
+              "body": { "type": "string", "description": "The JSON request body, masked fields replaced" },
+              "bodyOmitted": { "type": "string" }
+            }
+          }
         }
       },
       "Issue": {

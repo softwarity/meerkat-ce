@@ -11,8 +11,8 @@ The console has always shown what is **configured**. This screen shows what was
 actually **served**, which is the half somebody needs when they are on call: a
 route that is failing and a route nobody calls look identical in a configuration.
 
-It lives at `/traffic` on the control plane, under the **Metrics** entry of the
-rail, and it needs root or the gateway-admin capability.
+It lives at `/data-plane/metrics` on the control plane, under **Data plane,
+Metrics**, and it needs root or the gateway-admin capability.
 
 ![The traffic screen](img/console/traffic.webp)
 

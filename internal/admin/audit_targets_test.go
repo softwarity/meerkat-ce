@@ -62,6 +62,15 @@ func TestEveryAuditedKindIsClassed(t *testing.T) {
 			written[kind] = true
 		}
 	}
+	// The audited calls (AUD-04) are written by the gateway, around the
+	// operations a route audits.
+	calls, err := os.ReadFile(filepath.Join("..", "gateway", "endpointaudit.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(calls), "store.AuditTargetEndpoint") {
+		written[store.AuditTargetEndpoint] = true
+	}
 	for _, kind := range store.AuditTargetKinds() {
 		if !written[kind] {
 			t.Errorf("store.AuditTargets classes the kind %q and nothing writes it: "+

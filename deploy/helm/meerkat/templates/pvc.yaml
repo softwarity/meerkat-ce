@@ -4,6 +4,14 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ include "meerkat.fullname" . }}-data
   labels: {{- include "meerkat.labels" . | nindent 4 }}
+  # Kept when it stops being rendered. It stops the moment the release is
+  # pointed at a shared database (meerkat.clustered), and without this Helm
+  # deletes the claim on that very upgrade - and the volume with it, under a
+  # Delete reclaim policy. That file is the embedded database the copy was
+  # taken from: the way back if the move goes wrong, and the operator's to
+  # delete once the new database has proven itself, not Helm's.
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   accessModes: ["ReadWriteOnce"]
   resources:

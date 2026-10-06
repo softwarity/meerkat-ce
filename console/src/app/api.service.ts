@@ -479,6 +479,41 @@ export interface BackupInfo {
   // directory: the safer setup, and one to know before copying a snapshot.
   keyFromEnv: boolean;
   size?: number;
+  // What this gateway runs on: a copy of the same kind is a backup, of the
+  // other kind a migration.
+  dialect: DatabaseKind;
+}
+
+export type DatabaseKind = 'sqlite' | 'postgres';
+
+// A PostgreSQL server to copy into, one field each: assembled into a URL by
+// the gateway, where a password holding an @ is escaped properly.
+export interface DatabaseTarget {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+  sslmode: string;
+}
+
+// A PostgreSQL server, as it answered a test.
+export interface DatabaseProbe {
+  version: string;
+  // The SSL mode that connected.
+  sslmode: string;
+  ssl: boolean;
+  empty: boolean;
+  schema: number;
+  canCreate: boolean;
+}
+
+// A database copied into a PostgreSQL server: where, and every table counted
+// on both sides.
+export interface DatabaseCopy {
+  target: string;
+  tables: { table: string; source: number; target: number }[];
+  rows: number;
 }
 
 // One object an import would touch.
@@ -1079,6 +1114,34 @@ export interface AuditEvent {
   // The address the gateway resolved, on the security half (a sign-in, a
   // refusal, a factor added). Absent on a change.
   ip?: string;
+  // On an audited call of the data plane (target 'endpoint', AUD-04).
+  data?: EndpointCall;
+}
+
+// One audited call: the operation, what was asked and answered, and what the
+// operation names.
+export interface EndpointCall {
+  route: string;
+  method: string;
+  operation: string;
+  path: string;
+  status: number;
+  traceId?: string;
+  group?: string;
+  roles?: string[];
+  fields?: Record<string, string>;
+  // The JSON request body, masked fields replaced.
+  body?: string;
+  bodyOmitted?: string;
+}
+
+export interface AuditSettings {
+  retentionDays: number;
+  choices: number[];
+  endpointRetentionDays: number;
+  endpointChoices: number[];
+  // Calls a full queue had to drop since the gateway started.
+  endpointDropped: number;
 }
 
 // The two halves of the trail: what was changed, and who got in and how.
@@ -1107,6 +1170,8 @@ export interface AuditQuery {
   kind?: AuditKind;
   actor?: string;
   target?: string;
+  // Every target kind but this one: 'account' is the console's own trail.
+  notTarget?: string;
   targetId?: string;
   since?: number;
   until?: number;
@@ -2353,8 +2418,19 @@ export class ApiService {
 
   // A coherent copy of the whole database, taken while the gateway runs. Blob,
   // not text: this is a binary file and reading it as a string would corrupt it.
-  snapshot(): Observable<Blob> {
-    return this.http.get('/api/backup', { responseType: 'blob' });
+  snapshot(format?: DatabaseKind): Observable<Blob> {
+    return this.http.get('/api/backup', { responseType: 'blob', params: format ? { format } : {} });
+  }
+
+  // The whole database into a PostgreSQL server, the gateway paused (the move
+  // to a cluster). The URL is used for the copy and kept nowhere.
+  // What a target server says before anything is copied. Reads only.
+  checkDatabase(target: DatabaseTarget): Observable<DatabaseProbe> {
+    return this.http.post<DatabaseProbe>('/api/backup/check', target);
+  }
+
+  copyDatabase(target: DatabaseTarget): Observable<DatabaseCopy> {
+    return this.http.post<DatabaseCopy>('/api/backup/copy', target);
   }
 
   // ── vault ──────────────────────────────────────────────────────────────────
@@ -2733,16 +2809,25 @@ export class ApiService {
 
   // The audit trail, scoped server-side to the caller (root/app-admin see all,
   // a tenant admin only their tenants'). Filters ride as query params.
-  // How long the trail keeps an event (AUD-02), root only.
-  auditSettings(): Observable<{ retentionDays: number; choices: number[] }> {
-    return this.http.get<{ retentionDays: number; choices: number[] }>('/api/settings/audit');
+  // How long the trail keeps an event (AUD-02), and an audited call (AUD-04),
+  // root only.
+  auditSettings(): Observable<AuditSettings> {
+    return this.http.get<AuditSettings>('/api/settings/audit');
   }
 
-  setAuditRetention(days: number): Observable<{ retentionDays: number; choices: number[] }> {
-    return this.http.put<{ retentionDays: number; choices: number[] }>('/api/settings/audit', {
-      retentionDays: days,
-      choices: [],
-    });
+  // The pause (store/pause.go): every write stops on every node, for a
+  // database move. Read by anyone holding the console, set by root.
+  getPause(): Observable<{ paused: boolean }> {
+    return this.http.get<{ paused: boolean }>('/api/backup/pause');
+  }
+
+  setPause(paused: boolean): Observable<{ paused: boolean }> {
+    return this.http.put<{ paused: boolean }>('/api/backup/pause', { paused });
+  }
+
+  // One retention or the other: the one left out stays as it is.
+  setAuditRetention(p: { retentionDays?: number; endpointRetentionDays?: number }): Observable<AuditSettings> {
+    return this.http.put<AuditSettings>('/api/settings/audit', p);
   }
 
   // How long a finished delayed action is kept before the sweep (SCHED-02),

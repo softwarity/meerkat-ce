@@ -140,13 +140,14 @@ mention *Ce navigateur* sur celui en cours ; **Déconnecter** sur n'importe quel
 **Déconnecter partout ailleurs**. Personne ne peut fermer la session d'un autre compte,
 quel que soit l'identifiant que transporte un formulaire.
 
-Les administrateurs les consultent dans **Sessions**, dans la barre latérale : qui, quel
-navigateur et quelle adresse, quel plan, depuis quand - avec un filtre par compte et une
-pagination. Chacun voit son propre périmètre. Root voit les deux plans. Un administrateur
+Les administrateurs les consultent dans **Data plane, Sessions** pour les applications et
+**Meerkat, Sessions** pour la console : qui, quel navigateur et quelle adresse, depuis
+quand - avec un filtre par compte, une pagination, et une mise à jour en direct. Chacun
+voit son propre périmètre. Root voit les deux plans. Un administrateur
 des applications voit les sessions des applications, toutes organisations confondues, mais
 pas celles de la console : savoir qui utilise la console, et depuis où, ne regarde que
 root. L'administrateur d'une organisation voit les sessions ouvertes dans les organisations
 qu'il administre, et ne peut mettre fin qu'à celles-là. Mettre fin à une session écrit
 `session.revoke` dans le [journal d'audit](/docs/operations/audit).
 
-![Sessions : qui est connecté, depuis quel navigateur et quelle adresse, sur quel plan, et depuis quand](img/console/sessions.webp)
+![Sessions : qui est connecté, depuis quel navigateur et quelle adresse, et depuis quand](img/console/sessions.webp)

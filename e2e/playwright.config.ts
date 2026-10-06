@@ -25,6 +25,17 @@ export default defineConfig({
       use: { browserName: 'chromium' },
       dependencies: ['setup'],
       testMatch: /tests\/.*\.spec\.ts/,
+      testIgnore: /tests\/tenancy\.spec\.ts/,
+    },
+    // The tenancy switch flips the WHOLE installation to single mode for a
+    // moment. Run beside the rest, it made a landing test read the wrong mode
+    // (tenant-admin sent to /license): it has to run after everything else,
+    // which a file's position does not guarantee and a project dependency does.
+    {
+      name: 'tenancy',
+      use: { browserName: 'chromium' },
+      dependencies: ['chromium'],
+      testMatch: /tests\/tenancy\.spec\.ts/,
     },
   ],
   webServer: [

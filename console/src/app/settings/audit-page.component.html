@@ -1,6 +1,18 @@
 <div class="banner">
   <h1 i18n="@@Audit">Audit</h1>
-  @if (me.isRoot() && retentionChoices().length) {
+  @if (trail === 'data' && view() === 'endpoint' && me.isRoot() && callChoices().length) {
+    <!-- The audited calls' own lifetime (AUD-04): the one kind of the trail
+         whose volume follows the traffic. Root's, like the trail's. -->
+    <mat-form-field class="wide" subscriptSizing="dynamic">
+      <mat-label i18n="@@Keep_operations_for">Keep operations for</mat-label>
+      <mat-select [value]="callRetention()" (selectionChange)="setCallRetention($event.value)">
+        @for (d of callChoices(); track d) {
+          <mat-option [value]="d">{{ retentionLabel(d) }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  }
+  @if (trail === 'system' && me.isRoot() && retentionChoices().length) {
     <!-- Root's alone (AUD-02): whoever may shorten the trail may erase their
          own traces with it. -->
     <mat-form-field class="short" subscriptSizing="dynamic">
@@ -24,23 +36,58 @@
 </div>
 
 <div class="toolbar">
-  <p class="hint" i18n="@@Audit_hint_security">
-    Every admin change with its before and after, and every sign-in, refusal and credential change.
-  </p>
+  @if (trail === 'data' && view() === 'endpoint') {
+    <p class="hint" i18n="@@Audit_hint_operations">
+      Every call of the operations ticked in Endpoint audit: who, what was asked, what was answered.
+    </p>
+    @if (callsDropped() > 0) {
+      <p class="hint dropped" i18n="@@Audit_calls_dropped">
+        {{ callsDropped() }} calls came faster than they could be written since this gateway started, and are missing here.
+      </p>
+    }
+  } @else if (trail === 'data') {
+    <p class="hint" i18n="@@Audit_hint_data_plane">
+      Every sign-in to the applications, every refusal, and every change to a way into an account.
+    </p>
+  } @else {
+    <p class="hint" i18n="@@Audit_hint_system">
+      Every admin change with its before and after, and every sign-in to this console.
+    </p>
+  }
 
   <div class="filters">
-    <mat-button-toggle-group
-      [value]="view()"
-      (change)="setView($event.value)"
-      hideSingleSelectionIndicator
-      i18n-aria-label="@@Audit_view"
-      aria-label="Which part of the trail"
-    >
-      <mat-button-toggle value="" i18n="@@All">All</mat-button-toggle>
-      <mat-button-toggle value="admin" i18n="@@Audit_changes">Changes</mat-button-toggle>
-      <mat-button-toggle value="account" i18n="@@Audit_data_plane_signins">Data plane sign-ins</mat-button-toggle>
-      <mat-button-toggle value="console" i18n="@@Audit_console_signins">Console sign-ins</mat-button-toggle>
-    </mat-button-toggle-group>
+    @if (trail === 'data') {
+      <mat-button-toggle-group
+        [value]="view()"
+        (change)="setView($event.value)"
+        hideSingleSelectionIndicator
+        i18n-aria-label="@@Audit_view"
+        aria-label="Which part of the trail"
+      >
+        <mat-button-toggle value="account" i18n="@@Audit_signins">Sign-ins</mat-button-toggle>
+        <mat-button-toggle value="endpoint" ee-feature="AUD-04">
+          <ng-container i18n="@@Audit_operations">Operations</ng-container>
+          <app-ee-lock
+            feature="AUD-04"
+            i18n-why="@@Audit_operations_why"
+            why="The calls of the operations a route audits, kept in this trail."
+          />
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+    }
+    @if (trail === 'system') {
+      <mat-button-toggle-group
+        [value]="view()"
+        (change)="setView($event.value)"
+        hideSingleSelectionIndicator
+        i18n-aria-label="@@Audit_view"
+        aria-label="Which part of the trail"
+      >
+        <mat-button-toggle value="" i18n="@@All">All</mat-button-toggle>
+        <mat-button-toggle value="admin" i18n="@@Audit_changes">Changes</mat-button-toggle>
+        <mat-button-toggle value="console" i18n="@@Audit_console_signins">Console sign-ins</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
 
     @if (view() === 'admin') {
       <mat-form-field class="short" subscriptSizing="dynamic">
@@ -80,11 +127,21 @@
         <div class="event" [class.security]="security(e)" [class.refused]="refused(e)">
           <div class="meta">
             <div class="when" [title]="fullWhen(e.at)">{{ relWhen(e.at) }}</div>
-            <div class="action">{{ e.action }}</div>
+            @if (e.data; as c) {
+              <div class="action">{{ c.method }} {{ c.operation }}</div>
+            } @else {
+              <div class="action">{{ e.action }}</div>
+            }
             <div class="who">
               <!-- A refused name that matches no account has no actor: what was
                    TYPED is the only name there is, and "by ?" would hide it. -->
-              <ng-container i18n="@@by">by</ng-container> {{ e.actorName || e.actorId || e.targetName || '?' }}
+              @if (e.data) {
+                <!-- A call nobody signed: the operation is public, and its
+                     description is not a person. -->
+                <ng-container i18n="@@by">by</ng-container> {{ e.actorName || e.actorId || anonymous }}
+              } @else {
+                <ng-container i18n="@@by">by</ng-container> {{ e.actorName || e.actorId || e.targetName || '?' }}
+              }
               @if (e.actorToken) {
                 <!-- An agent or a script acted with this person's token. Naming
                      it is the difference between "root did this" and "the agent
@@ -97,9 +154,39 @@
             </div>
           </div>
           <div>
-            @if (security(e)) {
+            @if (e.data; as c) {
+              <!-- An audited call (AUD-04): what it means, what was asked and
+                   answered, then what the operation said to keep. -->
               <div class="target">
-                <span class="kind">{{ plane(e) }}</span>
+                <span class="status">{{ c.status }}</span> {{ e.targetName }}
+              </div>
+              <div class="ip">{{ c.path }} <span class="kind">{{ c.route }}</span></div>
+              @if (e.tenantName || e.tenantId) {
+                <div class="org"><mat-icon>domain</mat-icon>{{ e.tenantName || e.tenantId }}</div>
+              }
+              @if (e.ip) {
+                <div class="ip">{{ e.ip }}</div>
+              }
+              @if (fieldsOf(e).length) {
+                <div class="changes">
+                  @for (f of fieldsOf(e); track f[0]) {
+                    <div class="change">
+                      <span class="field">{{ f[0] }}</span>
+                      <span class="to">{{ f[1] || '-' }}</span>
+                    </div>
+                  }
+                </div>
+              }
+              @if (c.body) {
+                <details class="body">
+                  <summary i18n="@@Request_body">Request body</summary>
+                  <pre>{{ bodyOf(e) }}</pre>
+                </details>
+              } @else if (c.bodyOmitted) {
+                <div class="detail"><ng-container i18n="@@Body_not_kept">Body not kept:</ng-container> {{ c.bodyOmitted }}</div>
+              }
+            } @else if (security(e)) {
+              <div class="target">
                 @if (e.detail) {
                   <span class="reason">{{ e.detail }}</span>
                 }
@@ -115,7 +202,7 @@
                 <span class="kind">{{ e.target }}</span> {{ e.targetName || e.targetId }}
               </div>
             }
-            @if (!security(e) && (e.tenantName || e.tenantId)) {
+            @if (!e.data && !security(e) && (e.tenantName || e.tenantId)) {
               <div class="org"><mat-icon>domain</mat-icon>{{ e.tenantName || e.tenantId }}</div>
             }
             @if (e.changes?.length) {
@@ -129,7 +216,7 @@
                   </div>
                 }
               </div>
-            } @else if (e.detail && !security(e)) {
+            } @else if (e.detail && !security(e) && !e.data) {
               <div class="detail">{{ e.detail }}</div>
             }
           </div>

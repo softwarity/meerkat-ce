@@ -177,8 +177,8 @@ func (a *API) putRouteAudit(w http.ResponseWriter, r *http.Request, actor store.
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	// Enterprise (AUD-04): the events go to the collector, which only that
-	// edition exports to. Emptying the list stays allowed - a configuration
+	// Enterprise (AUD-04): the calls are kept in the trail and sent to the
+	// collector, both Enterprise. Emptying the list stays allowed - a configuration
 	// brought over from the other image must be able to drop its rules.
 	if len(body.Endpoints) > 0 {
 		if err := edition.Require("auditing a route's operations"); err != nil {

@@ -8,7 +8,7 @@ summary: What the gateway counts, where the console shows it, and how to keep a 
 # Metrics
 
 The gateway counts what it serves, and the console draws it: the **Metrics**
-screen (`/traffic`) shows the last hour, with nothing to install - that is the
+screen (`/data-plane/metrics`) shows the last hour, with nothing to install - that is the
 zero-dependency promise, in both editions. See
 [the traffic screen](/docs/operations/traffic) and
 [the Metrics screen](/docs/console/traffic).

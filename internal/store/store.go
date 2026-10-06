@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver
@@ -28,6 +29,9 @@ import (
 // Store wraps the embedded database.
 type Store struct {
 	db *database
+	// calls writes the audited calls of the data plane in the background, in
+	// batches (endpointcalls.go). Started on the first call.
+	calls callWriter
 	// locks holds the per-process half of the cluster locks (locks.go): one
 	// mutex per name, kept for the life of the store.
 	locks sync.Map
@@ -37,6 +41,22 @@ type Store struct {
 	// dataDir is kept so a snapshot can be written next to the database and
 	// the console can name the real paths in its restore procedure (STORE-05).
 	dataDir string
+	// sessionsMoved is told that somebody signed in, out, finished a sign-in
+	// step or changed organisation (OnSessionsMoved). Nil until wired.
+	sessionsMoved atomic.Pointer[func()]
+}
+
+// OnSessionsMoved names what to call when the set of open sessions changes:
+// one created, one deleted, a pending step completed, an organisation chosen.
+// The console's presence indicator listens through it (CONSOLE-07). Called
+// after the write, outside any transaction; a slow listener slows the sign-in,
+// so it must only signal.
+func (s *Store) OnSessionsMoved(f func()) { s.sessionsMoved.Store(&f) }
+
+func (s *Store) sessionsChanged() {
+	if f := s.sessionsMoved.Load(); f != nil {
+		(*f)()
+	}
 }
 
 // Open opens (creating if needed) the embedded database inside dataDir and
@@ -85,8 +105,11 @@ func openEmbedded(dataDir string) (*Store, error) {
 	return s, nil
 }
 
-// Close releases the underlying database.
-func (s *Store) Close() error { return s.db.Close() }
+// Close writes what the call writer still holds, then closes the database.
+func (s *Store) Close() error {
+	s.calls.stop()
+	return s.db.Close()
+}
 
 // schemaVersion is bumped on every schema change; migrate upgrades any older
 // database it opens (DEPLOY-06: upgrades without intervention).
@@ -710,9 +733,14 @@ CREATE TABLE IF NOT EXISTS audit_events (
   detail      TEXT NOT NULL DEFAULT '',
   -- The address the gateway resolved, on an account's security events
   -- (v66, AUD-01): a sign-in, a refusal, a factor added. Empty on a change.
-  ip          TEXT NOT NULL DEFAULT ''
+  ip          TEXT NOT NULL DEFAULT '',
+  -- What an audited call of the data plane carries (v74, AUD-04): the route,
+  -- the operation, the status, the fields the operation names, its body. JSON,
+  -- empty on every other event.
+  data        TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS audit_events_at ON audit_events(at);
+CREATE INDEX IF NOT EXISTS audit_events_target ON audit_events(target, at);
 CREATE INDEX IF NOT EXISTS audit_events_tenant ON audit_events(tenant_id, at);
 CREATE INDEX IF NOT EXISTS audit_events_actor ON audit_events(actor_id, at);
 
@@ -1049,7 +1077,7 @@ CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);`
 // installation is stamped 69, and checkNotNewer refuses to open a database
 // stamped higher than the build knows - so restarting the count at 1 would stop
 // every existing installation from starting.
-const schemaVersion = 73
+const schemaVersion = 74
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -2669,6 +2697,7 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	if err != nil {
 		return fmt.Errorf("store: create session: %w", err)
 	}
+	s.sessionsChanged()
 	return nil
 }
 
@@ -2708,6 +2737,7 @@ func (s *Store) SetSessionPending(ctx context.Context, tokenHash, pending string
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("store: set session pending: %w", sql.ErrNoRows)
 	}
+	s.sessionsChanged()
 	return nil
 }
 
@@ -2724,6 +2754,7 @@ func (s *Store) SetSessionTenant(ctx context.Context, tokenHash, tenantID string
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("store: set session tenant: %w", sql.ErrNoRows)
 	}
+	s.sessionsChanged()
 	return nil
 }
 
@@ -2749,6 +2780,9 @@ func (s *Store) DeleteSessionsForUser(ctx context.Context, userID string) (int64
 		return 0, fmt.Errorf("store: delete sessions for %q: %w", userID, err)
 	}
 	n, _ := res.RowsAffected()
+	if n > 0 {
+		s.sessionsChanged()
+	}
 	return n, nil
 }
 
@@ -2885,6 +2919,7 @@ func (s *Store) DeleteSession(ctx context.Context, tokenHash string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash); err != nil {
 		return fmt.Errorf("store: delete session: %w", err)
 	}
+	s.sessionsChanged()
 	return nil
 }
 
@@ -2896,6 +2931,9 @@ func (s *Store) PurgeExpiredSessions(ctx context.Context, now int64) (int64, err
 		return 0, fmt.Errorf("store: purge sessions: %w", err)
 	}
 	n, _ := res.RowsAffected()
+	if n > 0 {
+		s.sessionsChanged()
+	}
 	return n, nil
 }
 

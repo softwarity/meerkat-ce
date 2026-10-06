@@ -44,6 +44,9 @@
 .short {
   width: 170px;
 }
+.wide {
+  width: 210px;
+}
 /* The trail spans the full width of the pane and adapts to it. */
 .events {
   display: grid;
@@ -209,4 +212,36 @@
     width: 14px;
     height: 14px;
   }
+}
+
+// An audited call (AUD-04): the status leads, in the error colour when the
+// call was not served (the row's .refused does the rest).
+.status {
+  font-family: monospace;
+  font-weight: 600;
+}
+.event.refused .status {
+  color: var(--mat-sys-error);
+}
+// The body, folded: a page of calls is read by their first lines.
+.body {
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+.body summary {
+  cursor: pointer;
+  color: var(--mat-sys-on-surface-variant);
+}
+.body pre {
+  margin: 4px 0 0;
+  padding: 8px;
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--mk-mono, monospace);
+  font-size: 0.8rem;
+  background: var(--mat-sys-surface-container);
+  border-radius: 4px;
+}
+.hint.dropped {
+  color: var(--mat-sys-error);
 }

@@ -57,6 +57,11 @@ func main() {
 		devtunnel.RunVerb()
 		return
 	}
+	// The database moves (db.go): a dump, a file, a copy into a server. Not a
+	// gateway either - no ports - and it exits when the copy is done.
+	if len(os.Args) > 1 && os.Args[1] == "db" {
+		os.Exit(runDB(os.Args[2:]))
+	}
 
 	showVersion := flag.Bool("version", false, "print version and exit")
 	addr := flag.String("addr", envOr("MEERKAT_ADDR", ":8080"), "application (data plane) listen address")
@@ -521,10 +526,40 @@ func run(o options) error {
 	// a flip is pushed to the routes screen. Stops with ctx.
 	routeHealth := live.NewRouteHealth()
 	logs := live.NewLogs()
+	// Who is signed in (CONSOLE-07): every session written or removed moves the
+	// counter, and the Users and Members screens re-read GET /api/sessions. A
+	// move on this node is told to the others over the bus, so a console held
+	// by another gateway hears of a sign-in it did not serve.
+	presence := live.NewPresence()
+	st.OnSessionsMoved(func() {
+		presence.Moved()
+		bus.Signal(context.Background(), store.TopicPresence, "")
+	})
+	bus.OnSignal(store.TopicPresence, func(string) { presence.Moved() })
+	// An ACME request answered (SSL-05): the TLS screen re-reads the pool
+	// instead of asking every few seconds while one is out. Told by the TLS
+	// supervisor, wired where it is built.
+	issues := live.NewCounter(live.CertificatesTopic)
+	bus.OnSignal(store.TopicIssue, func(string) { issues.Moved() })
+
+	// The pause (store/pause.go): every node stops writing at once, and every
+	// console hears it. Told by the API on the node that took it, relayed here
+	// to the others.
+	paused := live.NewCounter(live.PauseTopic)
+	adminAPI.PauseMoved = paused.Moved
+	bus.OnSignal(store.TopicPause, func(arg string) {
+		st.Pause(arg == "on")
+		paused.Moved()
+	})
 	go router.WatchTargets(ctx, gateway.DefaultTargetCheck(routeHealth.Flipped))
 	liveServer := live.New(func(p live.Perimeter) live.Sources {
 		sources := live.Sources{
 			live.ChangesTopic: changes.For(p.Named, p.Quiet),
+			// A counter, no person: what it answers is read through
+			// GET /api/sessions, which scopes it.
+			live.PresenceTopic:     presence,
+			live.CertificatesTopic: issues,
+			live.PauseTopic:        paused,
 		}
 		if p.Traffic {
 			sources[live.TrafficTopic] = traffic
@@ -579,6 +614,11 @@ func run(o options) error {
 	go func() {
 		for range time.Tick(time.Minute) {
 			ctx := context.Background()
+			// Paused for a database move: the upkeep deletes, and nothing is
+			// written now. It catches up on the minute after the pause.
+			if st.Paused() {
+				continue
+			}
 			ran, err := st.TryLock(ctx, "upkeep", func(ctx context.Context) error {
 				purge(ctx, sessions, st)
 				return nil
@@ -596,7 +636,8 @@ func run(o options) error {
 	// inactivity rather than time since sign-in. Outermost on purpose - the
 	// healthz handler and the flow pages are requests like the others, and a
 	// deadline that only moved on SOME paths would end sessions at random.
-	dataPlane := sessions.Sliding(afterWrites(mux, "/", identityChanged))
+	everything := func(*http.Request) bool { return true }
+	dataPlane := whilePaused(st, everything, router.ServePaused, sessions.Sliding(afterWrites(mux, "/", identityChanged)))
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           dataPlane,
@@ -633,7 +674,7 @@ func run(o options) error {
 	go sched.Run(schedCtx)
 	adminSrv := &http.Server{
 		Addr:              adminAddr,
-		Handler:           adminSessions.Sliding(afterWrites(adminMux, "", identityChanged)),
+		Handler:           whilePaused(st, refusesWhilePaused, refusePaused, adminSessions.Sliding(afterWrites(adminMux, "", identityChanged))),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -672,6 +713,10 @@ func run(o options) error {
 	// shared cache (PERF-03). A no-op on the embedded database.
 	tlsSup.SerialiseIssuance(st.WithLock)
 	adminAPI.TLS = tlsSup
+	tlsSup.OnIssueMoved(func() {
+		issues.Moved()
+		bus.Signal(context.Background(), store.TopicIssue, "")
+	})
 	bus.Register(store.TopicCertificates, tlsSup.Reload)
 	// Where the spans and the pushed counters go (OBS-04, OBS-06), from the
 	// STORED setting: an operator who switched it on in the console must find
@@ -811,6 +856,46 @@ func afterWrites(mux *http.ServeMux, proxied string, changed func()) http.Handle
 		}
 		changed()
 	})
+}
+
+// whilePaused answers a request with refuse while the gateway is paused for a
+// database move (store/pause.go). The probes go through: a paused node is
+// alive and ready, and an orchestrator that restarted it would end the pause on
+// the very database it is leaving.
+//
+// refuses says which requests it turns away: on the data plane, all of them.
+func whilePaused(st *store.Store, refuses func(*http.Request) bool, refuse http.HandlerFunc, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if st.Paused() && r.URL.Path != "/healthz" && r.URL.Path != "/readyz" && refuses(r) {
+			refuse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// refusesWhilePaused says what the control plane turns away during a pause:
+// every write but the ones the move is made of - resuming, and copying the
+// database out. Reading goes on: the console stays open on what it shows, and
+// root keeps the screen that ends the pause.
+func refusesWhilePaused(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	}
+	switch r.URL.Path {
+	case "/api/backup/pause", "/api/backup/copy":
+		return false
+	}
+	return true
+}
+
+// refusePaused is the control plane's answer to a write during a pause.
+func refusePaused(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", "60")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": store.ErrPaused.Error()})
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {
@@ -964,6 +1049,14 @@ func purge(ctx context.Context, sessions *session.Manager, st *store.Store) {
 		slog.Error("audit purge failed", "err", err)
 	} else if n > 0 {
 		slog.Debug("purged old audit events", "count", n)
+	}
+	// The audited calls of the data plane (AUD-04), on their own, shorter
+	// lifetime: the one kind of the trail whose volume follows the traffic.
+	calls := time.Duration(st.EndpointCallRetentionDays(ctx)) * 24 * time.Hour
+	if n, err := st.PurgeEndpointCallsBefore(ctx, time.Now().Add(-calls).Unix()); err != nil {
+		slog.Error("audited call purge failed", "err", err)
+	} else if n > 0 {
+		slog.Debug("purged old audited calls", "count", n)
 	}
 	// The delayed actions that have been and gone (SCHED-02). Kept a while so
 	// an operator can see that they went out, swept when nobody is looking at

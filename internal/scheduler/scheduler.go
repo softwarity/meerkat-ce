@@ -57,6 +57,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -277,7 +278,10 @@ func (s *Scheduler) Run(ctx context.Context) {
 	s.started.Store(true)
 	defer close(s.loopDone)
 	for {
-		if err := s.Pass(ctx); err != nil && ctx.Err() == nil {
+		// Paused for a database move (store/pause.go): nothing is taken, since
+		// a call made now could not record that it was made. What is owed is
+		// still owed, on whichever database the gateway resumes.
+		if err := s.Pass(ctx); err != nil && ctx.Err() == nil && !errors.Is(err, store.ErrPaused) {
 			slog.Warn("scheduler pass", "err", err)
 		}
 		timer := time.NewTimer(s.sleep(ctx))

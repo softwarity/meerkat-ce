@@ -30,21 +30,25 @@ diff underneath. Where an agent or a script acted, the token's name appears besi
 the account's: *admin, via claude-desktop* rather than *admin*. That difference is
 the whole point of naming it.
 
-A security line reads the same way, with its plane (**data plane** for the
-applications' accounts, **console** for this console) and the reason or the
-method beside it, and the address under it. A
+A security line reads the same way, with the reason or the method, and the
+address under it. Its plane is the screen's: the applications' sign-ins under
+Data plane, the console's under Meerkat. A
 refused sign-in wears the error colour: scrolling for an attack, those are the
 lines to find without reading. The full list of actions and reasons is in
 [the audit trail](/docs/operations/audit).
 
-The toggle picks the part of the trail: **All**, **Changes**, **Data plane
-sign-ins** (the applications' accounts) or **Console sign-ins**. Under
-**Changes**, a **target** kind narrows further. Then the **period** (24 hours,
+The trail is read in two places. **Data plane, Audit** shows what happened in
+the applications: their **Sign-ins**, and the **Operations** - the calls of the
+operations a route audits (Enterprise), with the status, the path, the fields
+the operation takes and the body when it keeps one. **Meerkat, Audit** shows the rest, with a toggle:
+**All**, **Changes** or **Console sign-ins**. Under **Changes**, a **target** kind
+narrows further. Then the **period** (24 hours,
 7 days, 30 days, all time), and a free-text box that narrows what is already
 loaded, reasons and addresses included.
 
 At the top, **Export CSV** (Enterprise) downloads what the filters select, and -
-for root alone - **Keep events for** sets how long the trail keeps an event. See
+for root alone, on Meerkat's - **Keep events for** sets how long the trail keeps
+an event. See
 [the audit trail](/docs/operations/audit).
 
 - Secrets are redacted: the trail records that a field changed, not to what.

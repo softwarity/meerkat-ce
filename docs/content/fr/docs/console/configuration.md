@@ -7,7 +7,7 @@ summary: Transporter la configuration d'une gateway - configurations nommées, p
 
 # Configuration
 
-**Infra > Configuration**, réservé à root. Trois onglets, parce que trois questions
+**Meerkat > Configuration**, réservé à root. Trois onglets, parce que trois questions
 différentes se partageaient une seule page.
 
 Ce qu'une configuration emporte : **les routes, les rôles, les autorités, le relais de
@@ -247,6 +247,11 @@ conserver l'ancien fichier jusqu'à ce que le nouveau ait fait ses preuves.
 > coffre à côté de sa phrase secrète. Conservez la clé dans un gestionnaire de secrets,
 > ou fournissez-la par `MEERKAT_VAULT_KEY` ; l'onglet indique laquelle des deux
 > solutions utilise cette gateway.
+
+
+Le même onglet **déplace** la base, entre la base embarquée et PostgreSQL, vers un
+fichier ou directement vers un serveur, avec l'interrupteur **Pause** qui rend la
+copie complète : voir [déplacer la base](/docs/operations/backup-restore#dplacer-la-base--embarque-et-postgresql).
 
 ## Pièges
 

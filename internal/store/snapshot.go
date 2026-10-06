@@ -77,7 +77,10 @@ func (s *Store) Snapshot(ctx context.Context, dest string) (int64, error) {
 		return 0, fmt.Errorf(
 			"store: a hot snapshot is for the embedded database; this gateway runs on an external one - back it up with its own tools (pg_dump, or point-in-time recovery) and keep the vault master key separately")
 	}
-	if _, err := s.db.ExecContext(ctx, `VACUUM INTO ?`, dest); err != nil {
+	// Straight on the connection, past the pause: VACUUM INTO reads this
+	// database and writes another file, and a snapshot is exactly what a
+	// paused gateway is paused for.
+	if _, err := s.db.DB.ExecContext(ctx, `VACUUM INTO ?`, dest); err != nil {
 		return 0, fmt.Errorf("store: snapshot to %s: %w", dest, err)
 	}
 	info, err := os.Stat(dest)

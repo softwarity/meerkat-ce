@@ -26,17 +26,12 @@ Le rail de gauche regroupe les deux plans et les écrans transverses.
 
 | Entrée du rail | URL | Ce qu'elle vous apprend |
 |---|---|---|
-| **Infra** | `/infra/...` | Le trajet des requêtes : routes, endpoints, autorités, TLS, relais de messagerie, configuration |
+| **Infra** | `/infra/...` | Le trajet des requêtes : routes, endpoints, autorités, TLS, relais de messagerie |
 | **Application** | `/application/...` | Le produit que voient vos utilisateurs : identité, rôles, pages, portail, politiques |
 | **Tenants** | `/tenants/:id/...` | Une organisation à la fois (en mode multi-organisation uniquement) |
-| **API** | `/api` | La référence REST du plan de contrôle, que vous essayez avec votre propre session |
 | **Vault** | `/vault` | Toutes les valeurs et tous les secrets nommés auxquels la configuration fait référence |
-| **Metrics** | `/traffic` | Ce que la gateway a réellement servi |
-| **Scheduler** | `/scheduler` | Les appels planifiés que la gateway adresse à vos services |
-| **Sessions** | `/sessions` | Qui est connecté, dans votre périmètre |
-| **Audit** | `/audit` | Qui a modifié quoi |
-| **Logs** | `/logs` | Ce que la gateway dit d'elle-même, en direct |
-| **Issues** | `/issues` | Ce que vos utilisateurs ont signalé |
+| **Data plane** | `/data-plane/...` | Ce que font les applications : leurs connexions (Audit), qui y est connecté (Sessions), les appels planifiés qui leur sont adressés (Scheduler), ce que la gateway a servi (Metrics), ce que vos utilisateurs ont signalé (Issues) |
+| **Meerkat** | `/system/...` | La gateway elle-même : qui a modifié quoi et qui s'est connecté à la console (Audit), ce qu'elle dit d'elle-même en direct (Logs), qui tient la console (Sessions), l'installation entière comme document ou comme base (Configuration) - et, en bas, la référence REST du plan de contrôle (API reference), ce qu'apporte cette version (Release notes) et l'édition (License) |
 
 Ce découpage n'a rien de cosmétique. **Infra** concerne l'installation : un upstream,
 un certificat, un serveur SMTP, un annuaire. **Application** concerne le produit
@@ -46,9 +41,9 @@ qui s'occupe des deux, et elle détient alors les deux capacités, mais les
 questions se posent à deux endroits distincts.
 
 > [!NOTE]
-> Metrics se trouve à l'adresse `/traffic`, et non `/metrics` : en dehors de
-> `/api`, les chemins du plan de contrôle appartiennent au produit, et la console
-> évite donc de les occuper.
+> Meerkat se trouve à l'adresse `/system`, et non `/meerkat` : en dehors de
+> `/api`, les chemins du plan de contrôle appartiennent au produit (`/meerkat/...`
+> sert les scripts de la gateway), et la console évite donc de les occuper.
 
 ## Ce que vous voyez dépend de qui vous êtes
 
@@ -106,7 +101,6 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
 - **[Plug](/docs/operations/plug)** - le tunnel développeur.
 - **[Access tokens, MCP et API](/docs/console/access-and-agents)** - piloter Meerkat sans navigateur.
 - **Model** - les champs que porte un compte, documentés avec [Users](/docs/console/users).
-- **[Configuration](/docs/console/configuration)** - les configurations, les points de reprise, les snapshots. Tout en bas du menu, à l'écart des écrans de tous les jours.
 
 ### Application
 
@@ -127,7 +121,8 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
 - **[Scheduler](/docs/operations/scheduler)** - les appels planifiés et leurs exécutions.
 - **[Audit et Issues](/docs/console/audit-and-issues)** - l'historique des modifications, et les signalements.
 - **[Logs](/docs/operations/logs#dans-la-console)** - les lignes de journal de la gateway, en direct, et son niveau de journalisation. Un seul nœud à la fois.
-- **License** - l'édition qui a répondu, et chaque fonctionnalité Enterprise : ce
+- **[Configuration](/docs/console/configuration)** (sous Meerkat, root uniquement) - les configurations, les points de reprise, les snapshots et la migration : l'installation entière, qui couvre les deux plans.
+- **License** (sous Meerkat, ouverte à tous) - l'édition qui a répondu, et chaque fonctionnalité Enterprise : ce
   qu'elle fait, son degré d'avancement et l'écran où elle se trouve, ou le fait
   qu'elle n'en a pas (le cluster actif/actif, les fichiers de déploiement). La
   liste est lue dans le contrat de fonctionnalités du produit lui-même : elle ne
@@ -144,16 +139,17 @@ avec la photo, le mot de passe, le second facteur, les passkeys et les jetons
 d'API personnels. La déconnexion est juste en dessous ; elle déconnecte d'un coup
 tous les onglets de la console.
 
-### Version et notes de version
+## Version et notes de version
 
-![La fenêtre des notes de version : Meerkat 1.0.1, les notes de ce correctif, puis la 1.0.0](img/console/release-notes.webp)
+![Les notes de version : Meerkat 1.0.1, les notes de ce correctif, puis la 1.0.0](img/console/release-notes.webp)
 
-Le menu du compte indique la version en service et son édition : **Meerkat 1.0.1 EE**
-(ou **CE**). Cliquez dessus pour lire les notes de version, de la plus récente à
-la plus ancienne, depuis cette version jusqu'à sa version mineure : c'est le même
+**Meerkat, Release notes** indique dans son titre la version en service et son
+édition : **Meerkat 1.0.1 EE** (ou **CE**). En dessous, les notes de version, de la
+plus récente à la plus ancienne, depuis cette version jusqu'à sa version mineure : c'est le même
 texte que celui de la version publiée sur GitHub. Un build de développement
 affiche la dernière version publiée qu'il contient, précédée de ce qui arrive sous
 **Next release** ; une section vide indique *Missing information*.
 
 Juste en dessous, **License** ouvre l'écran de l'édition : chaque fonctionnalité
-Enterprise, son degré d'avancement et l'endroit où elle se trouve.
+Enterprise, son degré d'avancement et l'endroit où elle se trouve. Ces deux écrans
+sont ouverts à quiconque tient la console.

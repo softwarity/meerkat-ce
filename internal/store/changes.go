@@ -106,6 +106,19 @@ const (
 	// late until its next reason to read, never wrong - a late screen writing
 	// over somebody is refused by the row's revision.
 	TopicChanged = "changed"
+	// TopicPresence says that the sessions moved on another node - somebody
+	// signed in, out, chose an organisation, or the upkeep removed expired
+	// ones - so the consoles that node does not hold re-read who is signed in
+	// (CONSOLE-07). No argument: what a screen does next is call
+	// GET /api/sessions, and a lost one leaves it late until the next move.
+	TopicPresence = "presence"
+	// TopicIssue says that an ACME request moved on another node - asked,
+	// issued, refused (SSL-05) - so the TLS screens that node does not hold
+	// read the pool again. No argument.
+	TopicIssue = "issue"
+	// TopicPause pauses or resumes every node (store/pause.go): "on" or "off".
+	// A signal, never a row - a pause outlives no restart, by design.
+	TopicPause = "pause"
 	// TopicMetrics carries a node's own request counters to the others, so the
 	// console's curves are the CLUSTER's and not whichever node the load
 	// balancer happened to hand the screen (OBS-01). The argument is one

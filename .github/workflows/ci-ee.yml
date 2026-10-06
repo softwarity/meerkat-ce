@@ -95,7 +95,7 @@ jobs:
       releasable: ${{ steps.resolve.outputs.releasable }}
     steps:
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.EE_APP_ID }}
           private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
@@ -139,7 +139,7 @@ jobs:
     environment: enterprise
     steps:
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.EE_APP_ID }}
           private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
@@ -179,7 +179,7 @@ jobs:
     environment: enterprise
     steps:
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.EE_APP_ID }}
           private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
@@ -252,7 +252,7 @@ jobs:
       MEERKAT_TEST_DATABASE_URL: postgres://meerkat:meerkat@localhost:5432/meerkat?sslmode=disable
     steps:
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.EE_APP_ID }}
           private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
@@ -323,7 +323,7 @@ jobs:
             expect: 1
     steps:
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.EE_APP_ID }}
           private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
@@ -380,7 +380,7 @@ jobs:
     environment: enterprise
     steps:
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.EE_APP_ID }}
           private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
@@ -417,7 +417,7 @@ jobs:
       # only when Playwright does - which the lock file says exactly. It is a
       # browser: nothing of the tree is in it.
       - name: Cache the browser
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
@@ -477,7 +477,7 @@ jobs:
       eval-digest: ${{ steps.build-eval.outputs.digest }}
     steps:
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.EE_APP_ID }}
           private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
@@ -675,7 +675,7 @@ jobs:
       # environment alone, behind the reviewer: the one that the test jobs
       # hold (environment: enterprise) can only read.
       - id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

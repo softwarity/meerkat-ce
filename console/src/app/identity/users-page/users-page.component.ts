@@ -17,6 +17,7 @@ import { MeService } from "../../me.service";
 import { DialogsService } from "../../shared/dialogs.service";
 import { FormFieldComponent } from "../../shared/form-field.component";
 import { LiveChangesService } from "../../shared/live-changes.service";
+import { PresenceComponent, PresenceService } from "../../shared/presence";
 import { UserCreateComponent } from "../user-create.component";
 import {
   UserEditorComponent,
@@ -35,7 +36,9 @@ function mfaText(required: boolean): string {
 // opens the user's options in a right drawer (the same pattern as routes).
 @Component({
   selector: "app-users-page",
+  providers: [PresenceService],
   imports: [
+    PresenceComponent,
     MatButtonModule,
     MatFormFieldModule,
     MatIconModule,

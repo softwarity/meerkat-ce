@@ -116,6 +116,27 @@ type AuditEvent struct {
 	// of an account's own security (a sign-in, a refusal, a new factor). A
 	// refused sign-in with no address is a line nobody can act on.
 	IP string `json:"ip,omitempty"`
+	// Data is what an audited call carries (AUD-04): see EndpointCall.
+	Data *EndpointCall `json:"data,omitempty"`
+}
+
+// EndpointCall is one audited call of the data plane, as the trail keeps it:
+// what the operation is, what was asked, what was answered, and what the
+// operation said to take from the call.
+type EndpointCall struct {
+	Route     string            `json:"route"`
+	Method    string            `json:"method"`
+	Operation string            `json:"operation"` // the path template
+	Path      string            `json:"path"`      // as requested
+	Status    int               `json:"status"`
+	TraceID   string            `json:"traceId,omitempty"`
+	Group     string            `json:"group,omitempty"`
+	Roles     []string          `json:"roles,omitempty"`
+	Fields    map[string]string `json:"fields,omitempty"`
+	// Body is the request body with its masked fields replaced, as JSON text.
+	Body string `json:"body,omitempty"`
+	// BodyOmitted says why a body that was asked for is not there.
+	BodyOmitted string `json:"bodyOmitted,omitempty"`
 }
 
 // FieldChange is one field's before/after inside an AuditEvent. From/To are the
@@ -222,12 +243,19 @@ var auditTargets = map[string]AuditTarget{
 	"audit":            {},
 	AuditTargetAccount: {Domains: []string{AuditDomainApp}},
 	AuditTargetConsole: {},
+	// A call of an audited operation (AUD-04): the application's business,
+	// whole to its administrators, and to an organisation's administrator for
+	// the calls made in their organisation (the caller's tenant_id).
+	AuditTargetEndpoint: {Domains: []string{AuditDomainApp}},
 }
 
 // The two kinds of the security trail, apart from the administrative one.
 const (
 	AuditTargetAccount = "account"
 	AuditTargetConsole = "console"
+	// AuditTargetEndpoint is a call of an audited operation (AUD-04): neither
+	// a change nor a sign-in, so neither half of the filter keeps it.
+	AuditTargetEndpoint = "endpoint"
 )
 
 // AuditSecurityTargets are the kinds a "security" filter keeps and an
@@ -289,9 +317,12 @@ func auditTargetsWhere(domain string, globalOnly bool) []string {
 // AuditFilter narrows ListAuditEvents. All fields are optional; the zero value
 // lists the most recent events across everything.
 type AuditFilter struct {
-	ActorID  string // exact actor
-	Target   string // exact target kind
-	TargetID string // exact target instance
+	ActorID string // exact actor
+	Target  string // exact target kind
+	// NotTarget leaves one kind out: the console's own trail is every kind but
+	// the application accounts' sign-ins, which the data plane shows apart.
+	NotTarget string
+	TargetID  string // exact target instance
 	// Scope, when non-nil, restricts visibility (see AuditScope). Nil means no
 	// restriction (root, or an internal caller).
 	Scope *AuditScope
@@ -398,6 +429,15 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 		where = append(where, "e.target = ?")
 		args = append(args, f.Target)
 	}
+	if f.NotTarget != "" {
+		kinds := strings.Split(f.NotTarget, ",")
+		ph := make([]string, len(kinds))
+		for i, k := range kinds {
+			ph[i] = "?"
+			args = append(args, strings.TrimSpace(k))
+		}
+		where = append(where, "e.target NOT IN ("+strings.Join(ph, ", ")+")")
+	}
 	if f.TargetID != "" {
 		where = append(where, "e.target_id = ?")
 		args = append(args, f.TargetID)
@@ -406,11 +446,14 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 	case "":
 	case AuditKindAdmin, AuditKindSecurity:
 		not := ""
+		kinds := AuditSecurityTargets
 		if f.Kind == AuditKindAdmin {
+			// A change is what is neither a sign-in nor a call.
 			not = "NOT "
+			kinds = append(slices.Clone(AuditSecurityTargets), AuditTargetEndpoint)
 		}
-		ph := make([]string, len(AuditSecurityTargets))
-		for i, tgt := range AuditSecurityTargets {
+		ph := make([]string, len(kinds))
+		for i, tgt := range kinds {
 			ph[i] = "?"
 			args = append(args, tgt)
 		}
@@ -454,7 +497,7 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 		limit = 200
 	}
 	q := `SELECT e.id, e.at, e.actor_id, COALESCE(u.username, ''), e.actor_token, e.action, e.target,
-	             e.target_id, e.target_name, e.tenant_id, COALESCE(t.name, ''), e.changes, e.detail, e.ip
+	             e.target_id, e.target_name, e.tenant_id, COALESCE(t.name, ''), e.changes, e.detail, e.ip, e.data
 	      FROM audit_events e
 	      LEFT JOIN users u ON u.id = e.actor_id
 	      LEFT JOIN tenants t ON t.id = e.tenant_id`
@@ -476,10 +519,16 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 	var events []AuditEvent
 	for rows.Next() {
 		var ev AuditEvent
-		var changes string
+		var changes, data string
 		if err := rows.Scan(&ev.ID, &ev.At, &ev.ActorID, &ev.ActorName, &ev.ActorToken, &ev.Action, &ev.Target,
-			&ev.TargetID, &ev.TargetName, &ev.TenantID, &ev.TenantName, &changes, &ev.Detail, &ev.IP); err != nil {
+			&ev.TargetID, &ev.TargetName, &ev.TenantID, &ev.TenantName, &changes, &ev.Detail, &ev.IP, &data); err != nil {
 			return nil, fmt.Errorf("store: scan audit event: %w", err)
+		}
+		if data != "" {
+			ev.Data = &EndpointCall{}
+			if err := json.Unmarshal([]byte(data), ev.Data); err != nil {
+				return nil, fmt.Errorf("store: audit %q: bad data: %w", ev.ID, err)
+			}
 		}
 		if changes != "" && changes != "[]" {
 			if err := json.Unmarshal([]byte(changes), &ev.Changes); err != nil {
@@ -496,8 +545,11 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 
 // PurgeAuditEventsBefore drops events older than cutoff (retention upkeep) and
 // reports how many were removed.
+//
+// The calls of audited operations are not among them: they have their own,
+// shorter lifetime (PurgeEndpointCallsBefore).
 func (s *Store) PurgeAuditEventsBefore(ctx context.Context, cutoff int64) (int64, error) {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM audit_events WHERE at < ?`, cutoff)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM audit_events WHERE at < ? AND target <> ?`, cutoff, AuditTargetEndpoint)
 	if err != nil {
 		return 0, fmt.Errorf("store: purge audit events: %w", err)
 	}

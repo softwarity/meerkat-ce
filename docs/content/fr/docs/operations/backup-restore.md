@@ -8,7 +8,7 @@ summary: Ce que contient un snapshot, pourquoi il n'y a pas de bouton de restaur
 # Sauvegarde et restauration
 
 On confond ici trois choses différentes. Elles occupent donc trois onglets de l'écran
-**Infra > Configuration**, et répondent à trois questions différentes.
+**Meerkat > Configuration**, et répondent à trois questions différentes.
 
 | Quoi | Ce qu'il contient | À quoi il sert |
 |---|---|---|
@@ -73,6 +73,73 @@ regrette.
 > exactement comme si vous rangiez un fichier de coffre à côté de sa phrase de passe.
 > Conservez la clé dans un gestionnaire de secrets, ou fournissez-la par l'environnement -
 > la console indique lequel des deux cas est celui de votre installation.
+
+## Déplacer la base : embarquée et PostgreSQL
+
+Le même onglet déplace la base. Une copie du **même type** que celle sur laquelle
+tourne la gateway est une sauvegarde ; du **type opposé**, elle déplace la gateway :
+
+| De | Vers | Ce que vous obtenez |
+|---|---|---|
+| embarquée | embarquée | `meerkat.db`, le snapshot ci-dessus |
+| embarquée | PostgreSQL | `meerkat.sql`, un dump au format texte de `pg_dump`, ou une copie directe vers un serveur |
+| PostgreSQL | PostgreSQL | `meerkat.sql`, ou une copie vers un autre serveur |
+| PostgreSQL | embarquée | `meerkat.db`, construit depuis la base |
+
+PostgreSQL relève de l'image Enterprise : la cible est verrouillée sur l'image Community.
+
+**Mettez d'abord en pause** - l'écran l'exige : une copie vers l'autre type, fichier
+ou serveur, attend la pause, et l'API aussi. Une sauvegarde du même type ne l'attend
+pas : elle est faite pour être prise à chaud. L'interrupteur **Pause**, en haut de l'onglet, fait
+répondre la page de maintenance à toutes les applications et arrête toute écriture,
+sur tous les nœuds. Une copie prise pendant que la gateway écrit perdrait ce qui
+s'écrit avant la bascule : sessions, journal d'audit, appels audités. La pause n'est
+jamais enregistrée : un redémarrage y met fin, et la gateway qui démarre sur la
+nouvelle base fonctionne immédiatement. Pendant la pause, la console reste ouverte
+en lecture et refuse les modifications.
+
+**Vers un serveur**, l'onglet prend la cible champ par champ - hôte, port, base,
+utilisateur, mot de passe, mode SSL - pour une base vide. Dans Kubernetes, il propose
+les services PostgreSQL qu'il trouve à côté de la gateway, le primaire de l'opérateur
+en tête (`-primary` chez CrunchyData, `-rw` chez CloudNativePG) ; un pooler comme
+pgbouncer et un réplica sont listés mais refusés, car le cluster a besoin de
+`LISTEN/NOTIFY` et des verrous consultatifs, qu'un pooler en mode transaction casse et
+qu'un réplica ne peut pas prendre. **Test** interroge le serveur avant que rien ne
+bouge, sans rien y écrire : sa version, le mode SSL qui se connecte (chiffré essayé
+d'abord, puis retenu pour la copie), si la base est vide, et si l'utilisateur peut y
+créer des tables - ce que PostgreSQL 15 et suivants n'accordent plus par défaut sur
+`public`. Une cible qui échoue à l'un de ces points ne se voit pas proposer la copie.
+Il copie toutes les tables dans une seule transaction, en comptant chacune des deux côtés
+avant de valider. Une cible qui contient déjà des comptes ou des routes est refusée :
+une copie n'écrase jamais une gateway. L'adresse sert à la copie et n'est conservée
+nulle part ; le journal en garde l'hôte, dans la nouvelle base, qui commence son
+histoire en disant d'où elle vient.
+
+**Vers un fichier**, le dump se charge avec `psql -v ON_ERROR_STOP=1 -f meerkat.sql`
+dans une base vide. C'est une seule transaction : un dump tronqué est refusé en entier.
+
+**La bascule appartient au déploiement.** La gateway ne peut pas changer sa propre
+`MEERKAT_DATABASE_URL` : une fois la copie faite, l'onglet affiche ce qu'il faut
+modifier, rempli avec la cible donnée : un Secret avec
+l'adresse de la base et la clé du coffre, puis `helm upgrade` avec
+`database.existingSecret`, `vault.existingSecret` et le nombre de réplicas - ou les
+deux mêmes variables pour Compose et Swarm.
+
+> [!WARNING]
+> La clé du coffre ne voyage jamais avec la copie. Sans la même clé, tous les secrets
+> du coffre sont illisibles sur la nouvelle base : reportez-la dans le Secret, comme
+> l'indique la procédure.
+
+Les mêmes opérations, pour un script ou un Job Kubernetes lancé avant une mise à jour :
+
+```bash
+meerkat db dump -format postgres -out meerkat.sql    # un dump, pour psql
+meerkat db dump -format sqlite -out meerkat.db       # un fichier de base
+meerkat db copy -to postgres://meerkat:PASSWORD@host:5432/meerkat
+```
+
+Elles lisent la source dans `-data` et `-database-url`, comme la gateway. Arrêtez la
+gateway, ou mettez-la en pause depuis la console, avant de les lancer.
 
 ## L'export de configuration
 

@@ -85,6 +85,24 @@ services:
 > tunnel écrit une ligne indiquant la ressource qui lui manque, et la
 > gateway sert comme d'habitude.
 
+### L'image d'évaluation
+
+Pour essayer Enterprise avant de parler à qui que ce soit, l'**image d'évaluation**
+est l'image Enterprise sans rien en moins, publique sur Docker Hub, avec une
+mention d'évaluation sur ses pages et dans sa console - sans licence pour la
+production. Même fichier, une ligne changée, aucun registre où se connecter :
+
+```yaml
+    image: docker.io/softwarity/meerkat:eval   # ou X.Y.Z-eval, pour épingler une version
+```
+
+Le fichier publié [docker-compose.ee.yml](/deploy/docker-compose.ee.yml) prend son
+image dans `MEERKAT_IMAGE` : il lance l'évaluation sans être modifié.
+
+```bash
+MEERKAT_IMAGE=docker.io/softwarity/meerkat:eval docker compose -f docker-compose.ee.yml up -d
+```
+
 ## Kubernetes, avec Helm
 
 Une gateway sur son propre volume : c'est l'architecture décrite ci-dessous.
@@ -104,6 +122,11 @@ helm install meerkat meerkat/meerkat \
 # Enterprise, tunnel ouvert (`plug.enabled` vaut déjà true) :
 helm install meerkat meerkat/meerkat \
   --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
+  --set admin.password='your-first-password'
+
+# Évaluation : tout ce que fait Enterprise, publique, pas pour la production.
+helm install meerkat meerkat/meerkat \
+  -f https://www.softwarity.io/deploy/values-eval-one-node.yaml \
   --set admin.password='your-first-password'
 
 # Enterprise en production : la surface développeur est fermée, et le chart

@@ -33,7 +33,7 @@ Une faute de frappe dans le niveau ramène à `info` au lieu d'empêcher le dém
 
 ![L'écran Logs : le niveau en haut à droite, les filtres par niveau et la recherche, puis les lignes, dont une ouverte](img/console/logs.webp)
 
-**Logs**, dans le rail sous Audit (root et infra admin), affiche en direct les 5 000
+**Meerkat, Logs** (root et infra admin) affiche en direct les 5 000
 dernières lignes. La gateway les conserve sous forme structurée : l'écran les présente
 donc de la même façon quel que soit le format de sortie - heure, niveau, message, attributs.
 Cliquez sur une ligne pour l'ouvrir. Vous pouvez filtrer par niveau, chercher dans le texte,
