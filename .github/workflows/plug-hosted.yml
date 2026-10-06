@@ -32,17 +32,36 @@ jobs:
     # port before any task answers it, so a curl with no deadline hangs rather
     # than failing, and a loop around it never advances.
     timeout-minutes: 25
+    # In the mirror, on the PRIVATE tree, as ci-ee.yml does: the Enterprise
+    # image needs ee/, which the mirror's own tree has not got. Built from the
+    # mirror's checkout it could not compile, and every Tuesday run failed at
+    # its first step - since the moment the workflows moved over there.
+    if: github.repository == 'softwarity/meerkat-ce'
+    environment: enterprise
     steps:
+      - id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.EE_APP_ID }}
+          private-key: ${{ secrets.EE_APP_PRIVATE_KEY }}
+          owner: softwarity
+          repositories: meerkat
       - uses: actions/checkout@v7
+        with:
+          repository: softwarity/meerkat
+          ref: main
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
 
       # Both images, because half of what is checked here is the difference
       # between them: one carries plug's payload, the other has nothing to hand
       # out and nothing to run.
       - name: Build the two images
         run: |
-          docker build -q -f docker/Dockerfile --build-arg GO_TAGS=ee --build-arg EDITION=ee \
+          # Not quiet: a build that fails has to say why in the log.
+          docker build -f docker/Dockerfile --build-arg GO_TAGS=ee --build-arg EDITION=ee \
             -t meerkat:ee .
-          docker build -q -f docker/Dockerfile -t meerkat:ce .
+          docker build -f docker/Dockerfile -t meerkat:ce .
 
       # The payload is a COPY from plug's image at build time, which is the one
       # thing a Go test cannot see. And the version the gateway announces has
