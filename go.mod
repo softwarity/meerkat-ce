@@ -11,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pb33f/libopenapi v0.38.7
 	github.com/softwarity/livewire/go v0.4.0
-	github.com/softwarity/plug/agent v0.0.0-20261004140403-abcd36be3840
+	github.com/softwarity/plug/agent v0.0.0-20261006093821-8429e0194670
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.57.0
 	modernc.org/sqlite v1.58.0

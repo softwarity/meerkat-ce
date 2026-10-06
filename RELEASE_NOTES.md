@@ -46,6 +46,11 @@
   Helm deleted it - the volume with it under a Delete reclaim policy - which took
   away the way back from a migration. Delete it yourself once the new database
   has proven itself; before upgrading an existing release, download a snapshot.
+- **plug 2.21.9 for the developer tunnel.** On macOS, a plug launcher up to 2.21.0
+  wrote the profiles of `~/.plug` as root, and `plug rm`, `plug rn`, `plug config` or
+  redefining a profile then failed with "owned by root". A root profile is now
+  managed like any other and handed back to its user, and `~/.plug` is created as
+  the user's.
 
 ---
 
