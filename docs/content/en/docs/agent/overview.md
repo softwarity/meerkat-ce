@@ -44,6 +44,7 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `describe_gateway` | Which edition, which version, how much of everything. Call it first. |
 | `list_routes`, `get_route` | The routes, then one of them in full. |
 | `test_routing` | Which route a given request would reach, and why. |
+| `list_operations`, `call_route` | What a route's service offers, then a real call to it through the gateway. |
 | `save_route`, `delete_route` | Write a route and apply it at once. |
 | `list_route_bricks` | The catalogue of predicates and filters, with their parameters. |
 | `list_users`, `list_tenants` | The accounts and the organisations. |
@@ -58,6 +59,33 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `list_themes` | The colour palettes, and which is active. |
 | `export_configuration` | The whole configuration, as a readable document. |
 | `save_configuration`, `list_configurations` | Named snapshots to come back to. |
+
+## Calling the services behind the routes
+
+`list_operations` reads a route's OpenAPI spec: every operation with the
+**public path** to call - the route's prefix added when the route strips it -
+and, for one operation, its parameters, body and responses with the schemas
+they reference.
+
+`call_route` sends a real request through the route and returns the status,
+the headers and the body (cut at 64 KiB). It is handed to the application plane
+in process, so everything a client meets applies: the route's access rule, the
+per-endpoint security, the filters, the quotas, and the identity the route
+forwards to the service.
+
+- **As whom.** By default the caller is `agent`, holding **every role** of the
+  catalogue - in the identity the service receives too - so an administrator's
+  agent is not stopped by rights it would have to manage. Pass `as` and `roles`
+  to call as somebody shaped otherwise, and `tenant` for a route reserved to
+  organisations.
+- **Why a refusal.** A `403` says why in its body: the gateway names the role
+  or the organisation missing, and a service's own reason comes back as the
+  service wrote it.
+- **For real.** A `POST`, `PUT` or `DELETE` changes the service's data. The call
+  is offered to a full-access token, never to a read-only one, and every call
+  is written to the audit trail with the token that made it. The service
+  receives the marker headers of a simulated call, so its own log tells a test
+  from real traffic.
 
 ## Pictures are described, never sent
 

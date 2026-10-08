@@ -397,6 +397,29 @@ func newK8sAPI() (*k8sAPI, error) {
 		base: fmt.Sprintf("https://%s/api/v1/namespaces/%s", net.JoinHostPort(host, port), n)}, nil
 }
 
+// in is the same API, aimed at another namespace.
+func (a *k8sAPI) in(ns string) *k8sAPI {
+	b := *a
+	b.ns = ns
+	b.base = a.base[:strings.LastIndex(a.base, "/")+1] + ns
+	return &b
+}
+
+// watchedNamespaces is this gateway's own namespace first, then the others
+// MEERKAT_WATCH_NAMESPACES names - the ones the chart granted it a read in
+// (rbac.watchNamespaces), for routes whose upstream lives there.
+func watchedNamespaces(own string) []string {
+	out := []string{own}
+	seen := map[string]bool{own: true}
+	for _, n := range strings.Split(os.Getenv("MEERKAT_WATCH_NAMESPACES"), ",") {
+		if n = strings.TrimSpace(n); n != "" && !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 // k8sState is the namespace as the watches last left it.
 type k8sState struct {
 	mu       sync.Mutex
@@ -410,7 +433,6 @@ func (w *Watcher) watchKubernetes(ctx context.Context) {
 		w.set(Result{Unavailable: "this gateway runs in Kubernetes but cannot talk to it: " + err.Error()})
 		return
 	}
-	st := &k8sState{services: map[string]k8sService{}, pods: map[string]k8sPod{}}
 	kick := make(chan struct{}, 1)
 	poke := func() {
 		select {
@@ -418,18 +440,39 @@ func (w *Watcher) watchKubernetes(ctx context.Context) {
 		default:
 		}
 	}
-	// Without the right to read pods, the services are still worth listing:
-	// the picker offers them, and their targets are dialled as before. Said
-	// once, in a sentence naming the grant.
-	podsDenied := make(chan string, 1)
-	go watchK8s(ctx, api, "services", st, poke, nil)
-	go watchK8s(ctx, api, "pods", st, poke, podsDenied)
+	// One state per namespace, each with its two watches. Without the right
+	// to read pods, the services are still worth listing: the picker offers
+	// them, and their targets are dialled as before. Said once per namespace,
+	// in a sentence naming the grant.
+	type watched struct {
+		api     *k8sAPI
+		st      *k8sState
+		counted bool
+	}
+	spaces := watchedNamespaces(api.ns)
+	all := make([]*watched, 0, len(spaces))
+	podsDenied := make(chan string, len(spaces)*2)
+	for _, ns := range spaces {
+		w := &watched{api: api.in(ns), st: &k8sState{services: map[string]k8sService{}, pods: map[string]k8sPod{}}, counted: true}
+		all = append(all, w)
+		svcDenied := podsDenied
+		if ns == api.ns {
+			svcDenied = nil // its own services: Discover says why when it cannot list them
+		}
+		go watchK8s(ctx, w.api, "services", w.st, poke, svcDenied)
+		go watchK8s(ctx, w.api, "pods", w.st, poke, podsDenied)
+	}
 	denied := ""
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case why := <-podsDenied:
+			for _, sp := range all {
+				if strings.Contains(why, "namespace "+sp.api.ns+" ") {
+					sp.counted = false
+				}
+			}
 			denied = why
 			poke()
 			continue
@@ -446,7 +489,13 @@ func (w *Watcher) watchKubernetes(ctx context.Context) {
 		case <-kick:
 		default:
 		}
-		w.set(st.result(api.ns, denied == ""))
+		r := Result{Source: "kubernetes", Reach: []string{api.ns}}
+		for _, sp := range all {
+			part := sp.st.result(sp.api.ns, sp.counted, sp.api.ns == api.ns)
+			r.Services = append(r.Services, part.Services...)
+		}
+		sortByName(r.Services)
+		w.set(r)
 		if denied != "" {
 			slog.Warn("the routes screen shows no replicas: " + denied)
 			denied = ""
@@ -464,8 +513,8 @@ func watchK8s(ctx context.Context, api *k8sAPI, kind string, st *k8sState, poke 
 		rv, err := api.list(ctx, kind, st)
 		if err != nil {
 			if denied != nil && strings.Contains(err.Error(), "403") {
-				denied <- "its service account may not list and watch pods in namespace " + api.ns +
-					" (the Helm chart grants it with rbac.watch, on by default)"
+				denied <- "its service account may not list and watch " + kind + " in namespace " + api.ns +
+					" (the Helm chart grants it with rbac.watch for its own namespace, rbac.watchNamespaces for another)"
 				return
 			}
 			slog.Debug("kubernetes list failed, retrying", "kind", kind, "err", err)
@@ -631,16 +680,23 @@ func (st *k8sState) apply(kind, typ string, raw json.RawMessage) {
 // selector - its endpoints written by hand, or an ExternalName - has no pods
 // to count, and is dialled like any host. Neither is anything when the pods
 // could not be read (counted false).
-func (st *k8sState) result(ns string, counted bool) Result {
+func (st *k8sState) result(ns string, counted, own bool) Result {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	out := make([]Service, 0, len(st.services))
 	for _, s := range st.services {
+		// A service of the gateway's own namespace resolves under its bare
+		// name too; one of another namespace only under its qualified name,
+		// which is also its identity, so two namespaces' "api" stay apart.
 		svc := Service{
 			Name:      s.Metadata.Name,
 			Names:     []string{s.Metadata.Name, s.Metadata.Name + "." + ns + ".svc"},
 			Networks:  []string{ns},
 			Reachable: true,
+		}
+		if !own {
+			svc.Name = s.Metadata.Name + "." + ns + ".svc"
+			svc.Names = []string{svc.Name}
 		}
 		for _, p := range s.Spec.Ports {
 			svc.Ports = append(svc.Ports, Port{Target: p.Port, Published: p.NodePort})

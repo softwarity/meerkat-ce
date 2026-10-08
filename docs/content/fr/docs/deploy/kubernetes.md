@@ -429,6 +429,12 @@ Sans les pods, l'éditeur propose toujours les Services et les cibles sont véri
 connexion ; sans rien, la console indique le droit qui lui manque, la saisie libre restant
 exactement ce qu'elle était.
 
+Une route dont l'upstream vit dans un AUTRE namespace (`grafana.monitoring.svc`) se lit de
+la même façon dès que ce namespace figure dans `rbac.watchNamespaces` : le chart crée un Role
+dans chaque namespace nommé, jamais un ClusterRole, donc la gateway lit les namespaces que
+quelqu'un a choisis, pas le cluster entier. Un namespace absent de la liste est vérifié par
+une connexion.
+
 Lire les pods, c'est lire les variables d'environnement que déclarent leurs manifestes. Là
 où un manifeste porte un secret en clair, mettez `rbac.watch: false`, ou mieux, rangez ce
 secret dans un Secret.

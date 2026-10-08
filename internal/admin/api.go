@@ -71,6 +71,12 @@ type API struct {
 	// nil is fine.
 	Scheduler interface{ Wake() }
 
+	// DataPlane is the application plane's whole handler, which an agent's
+	// call_route hands its request to in process (MCP-08): the same filters,
+	// rules and identity forwarding as any client's request. Wired by main;
+	// nil and the tool says the plane is not reachable from here.
+	DataPlane http.Handler
+
 	st     *store.Store
 	sm     *session.Manager
 	router *gateway.Router

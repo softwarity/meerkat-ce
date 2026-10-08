@@ -57,12 +57,17 @@ for edition in "${editions[@]}"; do
     fi
   done
 
+  # The other namespaces the routes point at, read like this one
+  # (rbac.watchNamespaces): WATCH_NAMESPACES="monitoring,data" in env.local.
+  watch=()
+  [ -n "${WATCH_NAMESPACES:-}" ] && watch=(--set "rbac.watchNamespaces={$WATCH_NAMESPACES}")
+
   existed=false
   if helm status "$release" -n "$NAMESPACE" >/dev/null 2>&1; then
     existed=true
     # The chart's new defaults, then what this release was given.
     helm upgrade "$release" deploy/helm/meerkat -n "$NAMESPACE" --reset-then-reuse-values \
-      --set image.repository=meerkat --set image.tag="$tag" >/dev/null
+      --set image.repository=meerkat --set image.tag="$tag" "${watch[@]}" >/dev/null
   else
     secret="deploy/local/$release.password.local"
     [ -f "$secret" ] || (umask 077; echo "Local-$(openssl rand -hex 9)-A1" > "$secret")
@@ -70,7 +75,7 @@ for edition in "${editions[@]}"; do
       --set image.repository=meerkat --set image.tag="$tag" --set image.pullPolicy=IfNotPresent \
       --set-json 'image.pullSecrets=[]' \
       --set admin.password="$(cat "$secret")" --set vault.key="$(openssl rand -base64 32)" \
-      --set persistence.enabled=true --set persistence.size=1Gi --set rbac.read=true \
+      --set persistence.enabled=true --set persistence.size=1Gi --set rbac.read=true "${watch[@]}" \
       --set plug.enabled=$([ -n "$plug" ] && echo true || echo false) \
       $([ -n "$plug" ] && echo "--set plug.port=$plug --set plug.service.type=LoadBalancer") \
       --set service.type=LoadBalancer --set service.adminType=LoadBalancer \

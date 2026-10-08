@@ -2790,6 +2790,21 @@
    "fr": "Outils d'export et d'import pour l'agent."
   },
   {
+   "id": "MCP-08",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An agent lists a route's operations and calls one through the gateway: 200 with every role, 403 naming the missing role without it, the service's own refusal passed through, every call audited.",
+   "fr": "Un agent liste les opérations d'une route et en appelle une à travers la gateway : 200 avec tous les rôles, 403 nommant le rôle manquant sans lui, le refus propre au service transmis tel quel, chaque appel audité."
+  },
+  {
    "id": "SEC-01",
    "priority": "P1",
    "feasibility": "easy",

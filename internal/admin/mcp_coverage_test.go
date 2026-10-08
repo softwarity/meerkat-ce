@@ -23,7 +23,7 @@ import (
 
 // agentCovers maps a control-plane section to the tools that speak for it.
 var agentCovers = map[string][]string{
-	"routes":   {"list_routes", "get_route", "test_routing", "save_route", "delete_route"},
+	"routes":   {"list_routes", "get_route", "test_routing", "save_route", "delete_route", "list_operations", "call_route"},
 	"catalog":  {"list_route_bricks"},
 	"services": {"list_services"},
 	"metrics":  {"read_traffic"},
@@ -312,6 +312,7 @@ that list, not by the verb: half the testers in this API are POSTs.`,
 func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 	want := []string{
 		"activate_configuration",
+		"call_route",
 		"delete_group",
 		"delete_role",
 		"delete_route",
@@ -326,6 +327,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"list_groups",
 		"list_languages",
 		"list_members",
+		"list_operations",
 		"list_role_references",
 		"list_roles",
 		"list_route_bricks",

@@ -123,7 +123,7 @@ connexion : le trafic réel l'emporte.
 
 | Runtime | Droit |
 |---|---|
-| Kubernetes | `list` et `watch` sur les `pods` et les `services` du namespace de la gateway. Le chart l'accorde avec `rbac.watch`, actif par défaut - voir [Kubernetes](/docs/deploy/kubernetes) |
+| Kubernetes | `list` et `watch` sur les `pods` et les `services` du namespace de la gateway. Le chart l'accorde avec `rbac.watch`, actif par défaut, et dans un autre namespace avec `rbac.watchNamespaces` - voir [Kubernetes](/docs/deploy/kubernetes) |
 | Docker | l'API Docker, en lecture seule : le proxy de socket du fichier compose, ou le socket monté pour le tunnel |
 | Swarm | le proxy de socket sur chaque nœud (`mode: global`), que la stack déploie - voir [Quelle architecture déployer](/docs/deploy/shapes) |
 

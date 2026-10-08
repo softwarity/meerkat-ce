@@ -30,8 +30,10 @@ mat-row.clickable {
    the names stay aligned. */
 .heart-slot {
   display: inline-flex;
-  width: 16px;
-  margin-right: 8px;
+  flex-direction: column;
+  align-items: center;
+  width: 28px;
+  margin-right: 6px;
   flex: none;
 }
 .heart {
@@ -49,15 +51,39 @@ mat-row.clickable {
 .heart.down {
   color: var(--mat-sys-error);
 }
-/* "2/3": how many of the replicas the runtime counts are ready. */
+/* "2/3", under the heart: how many of the replicas the runtime counts are
+   ready. */
 .replicas {
-  margin-left: 6px;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.2;
   color: var(--mat-sys-on-surface-variant);
 }
-/* The image the replicas run, after the upstream. */
+/* The name and its marks, then the image the replicas run under it. */
+.name-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.name-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.meta-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
 .image {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.2;
   color: var(--mat-sys-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .name {
   font-weight: 500;
@@ -94,6 +120,7 @@ mat-row.clickable {
 .name-cell {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
 }
 // The name column: narrow and fixed - the name, its marks and the handle - so
@@ -156,13 +183,19 @@ mat-row.clickable {
 @include table.banded-rows;
 
 // The UI mark sits with the name, quiet enough not to compete with it.
-.ui-mark {
-  font-size: 15px;
-  width: 15px;
-  height: 15px;
-  margin-left: 6px;
-  color: var(--mat-sys-on-surface-variant);
+/* The route's marks (UI, traced), at the right of the second line: always
+   drawn, so they line up row after row, and barely there when off. */
+.mark {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
   flex: none;
+  color: var(--mat-sys-on-surface-variant);
+  opacity: 0.18;
+}
+.mark.on {
+  opacity: 1;
 }
 
 /* A route the gateway refused to load. Error colour, because nothing about this

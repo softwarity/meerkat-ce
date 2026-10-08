@@ -91,7 +91,7 @@ func TestAServiceCountsThePodsItSelects(t *testing.T) {
 			"o": leaving, "m": done,
 		},
 	}
-	r := st.result("shop", true)
+	r := st.result("shop", true, true)
 	by := map[string]Service{}
 	for _, s := range r.Services {
 		by[s.Name] = s
@@ -113,13 +113,13 @@ func TestAServiceCountsThePodsItSelects(t *testing.T) {
 	}{"main", "orders:1.4.0", "orders@sha256:aaaabbbbccccdddd"})
 	st2 := &k8sState{services: map[string]k8sService{"orders": service("orders", map[string]string{"app": "orders"})},
 		pods: map[string]k8sPod{"d": starting, "e": pulled}}
-	if imgs := st2.result("shop", true).Services[0].Images; len(imgs) != 1 || imgs[0].Count != 2 || imgs[0].Ready != 1 || imgs[0].Digest != "aaaabbbbcccc" {
+	if imgs := st2.result("shop", true, true).Services[0].Images; len(imgs) != 1 || imgs[0].Count != 2 || imgs[0].Ready != 1 || imgs[0].Digest != "aaaabbbbcccc" {
 		t.Errorf("a starting replica read as another image: %+v", imgs)
 	}
 	if by["external"].Counted || len(by["external"].Images) != 0 {
 		t.Errorf("a service without a selector was counted: %+v", by["external"])
 	}
-	if r := st.result("shop", false); r.Services[1].Counted {
+	if r := st.result("shop", false, true); r.Services[1].Counted {
 		t.Error("pods that could not be read were counted")
 	}
 }
@@ -180,13 +180,13 @@ func TestTheNamespaceIsFollowedByItsEvents(t *testing.T) {
 		t.Helper()
 		deadline := time.After(3 * time.Second)
 		for {
-			if s := st.result("shop", true).Services; len(s) == 1 && ok(s[0]) {
+			if s := st.result("shop", true, true).Services; len(s) == 1 && ok(s[0]) {
 				return
 			}
 			select {
 			case <-poked:
 			case <-deadline:
-				t.Fatalf("%s never came: %+v", what, st.result("shop", true).Services)
+				t.Fatalf("%s never came: %+v", what, st.result("shop", true, true).Services)
 			}
 		}
 	}
@@ -294,4 +294,23 @@ func TestASwarmIsFollowedByItsEvents(t *testing.T) {
 	d.events <- `{"Type":"container","Action":"exec_start: sh"}`
 	d.events <- `{"Type":"container","Action":"start"}`
 	read("the third replica", func(s Service) bool { return s.Ready == 3 })
+}
+
+// Another namespace is read the same way, under its qualified names only:
+// the bare name resolves in the gateway's own namespace, not in that one.
+func TestAnotherNamespaceIsNamedInFull(t *testing.T) {
+	t.Setenv("MEERKAT_WATCH_NAMESPACES", " monitoring, shop ,,monitoring")
+	if got := watchedNamespaces("shop"); len(got) != 2 || got[0] != "shop" || got[1] != "monitoring" {
+		t.Fatalf("watched namespaces: %v", got)
+	}
+	api := &k8sAPI{base: "https://10.0.0.1:443/api/v1/namespaces/shop", ns: "shop"}
+	if other := api.in("monitoring"); other.base != "https://10.0.0.1:443/api/v1/namespaces/monitoring" || other.ns != "monitoring" {
+		t.Errorf("aimed at %s (%s)", other.base, other.ns)
+	}
+	st := &k8sState{services: map[string]k8sService{"grafana": service("grafana", map[string]string{"app": "grafana"})},
+		pods: map[string]k8sPod{"g": pod("g", "grafana", "grafana/grafana:12.1.0", true)}}
+	s := st.result("monitoring", true, false).Services[0]
+	if s.Name != "grafana.monitoring.svc" || len(s.Names) != 1 || s.Ready != 1 || s.Images[0].Tag != "12.1.0" {
+		t.Errorf("a service of another namespace: %+v", s)
+	}
 }

@@ -59,6 +59,13 @@ spec:
               containerPort: {{ .Values.plug.port }}
             {{- end }}
           env:
+            {{- $watched := ((.Values.rbac | default dict).watchNamespaces | default list) }}
+            {{- if and $watched (ne ((.Values.rbac | default dict).watch) false) }}
+            # The other namespaces the runtime watcher follows, beside its own:
+            # the ones the chart granted it (rbac.watchNamespaces).
+            - name: MEERKAT_WATCH_NAMESPACES
+              value: {{ join "," $watched | quote }}
+            {{- end }}
             {{- if include "meerkat.clustered" . }}
             # The shared state. This line is what makes several pods ONE
             # gateway instead of several.

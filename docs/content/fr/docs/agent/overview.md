@@ -45,6 +45,7 @@ assistant plutôt qu'en cliquant.
 | `describe_gateway` | Quelle édition, quelle version, combien d'éléments de chaque sorte. À appeler en premier. |
 | `list_routes`, `get_route` | Les routes, puis l'une d'elles en entier. |
 | `test_routing` | Quelle route atteindrait une requête donnée, et pourquoi. |
+| `list_operations`, `call_route` | Ce que propose le service d'une route, puis un vrai appel à travers la gateway. |
 | `save_route`, `delete_route` | Écrire une route et l'appliquer immédiatement. |
 | `list_route_bricks` | Le catalogue des prédicats et des filtres, avec leurs paramètres. |
 | `list_users`, `list_tenants` | Les comptes et les organisations. |
@@ -59,6 +60,33 @@ assistant plutôt qu'en cliquant.
 | `list_themes` | Les palettes de couleurs, et celle qui est active. |
 | `export_configuration` | Toute la configuration, sous la forme d'un document lisible. |
 | `save_configuration`, `list_configurations` | Des snapshots nommés, auxquels revenir. |
+
+## Appeler les services derrière les routes
+
+`list_operations` lit la spec OpenAPI d'une route : chaque opération avec le
+**chemin public** à appeler - le préfixe de la route ajouté quand la route le
+retire - et, pour une opération, ses paramètres, son corps et ses réponses, avec
+les schémas qu'ils référencent.
+
+`call_route` envoie une vraie requête à travers la route et renvoie le statut,
+les en-têtes et le corps (coupé à 64 Kio). Elle est remise en interne au plan
+applicatif : tout ce que rencontre un client s'applique - la règle d'accès de la
+route, la sécurité par endpoint, les filtres, les quotas, et l'identité que la
+route transmet au service.
+
+- **En tant que qui.** Par défaut l'appelant est `agent`, et porte **tous les
+  rôles** du catalogue - dans l'identité que reçoit le service aussi - pour que
+  l'agent d'un administrateur ne bute pas sur des droits qu'il faudrait gérer.
+  `as` et `roles` font appeler en tant que quelqu'un d'autre, et `tenant` sert
+  pour une route réservée à des organisations.
+- **Pourquoi un refus.** Un `403` dit pourquoi dans son corps : la gateway nomme
+  le rôle ou l'organisation qui manque, et la raison propre d'un service revient
+  telle que le service l'a écrite.
+- **Pour de vrai.** Un `POST`, un `PUT` ou un `DELETE` modifie les données du
+  service. L'appel est proposé à un jeton complet, jamais à un jeton en lecture
+  seule, et chaque appel est écrit au journal d'audit avec le jeton qui l'a fait.
+  Le service reçoit les en-têtes qui marquent un appel simulé : son propre
+  journal distingue un test du trafic réel.
 
 ## Les images sont décrites, jamais transmises
 

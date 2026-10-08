@@ -2248,6 +2248,11 @@ func (rt *Router) switchWouldHelp(ctx context.Context, a store.Access, userID st
 }
 
 // needsTenant reports whether the rule asks for an organisation at all.
+// rolesOnly is a rule that names roles and no organisation of its own.
+func rolesOnly(a store.Access) bool {
+	return len(a.Roles) > 0 && a.Level != store.AccessTenant && a.Level != store.AccessTenants
+}
+
 func needsTenant(a store.Access) bool {
 	return a.Level == store.AccessTenant || a.Level == store.AccessTenants || len(a.Roles) > 0
 }
@@ -2274,9 +2279,20 @@ func refusalReason(a store.Access, c store.Caller) string {
 	switch {
 	case a.Level == store.AccessDeny:
 		return "forbidden: this endpoint is closed"
+	// A rule on roles alone fails without an organisation because roles are
+	// held IN one: the role is named as well, so the caller learns what the
+	// endpoint asks and not only what their session lacks.
 	case needsTenant(a) && c.TenantID == "" && len(c.Memberships) == 0:
+		if rolesOnly(a) {
+			return "forbidden: this endpoint requires one of the roles " + strings.Join(a.Roles, ", ") +
+				", held in an organisation - and your account belongs to no organisation yet"
+		}
 		return "forbidden: your account belongs to no organisation yet"
 	case needsTenant(a) && c.TenantID == "":
+		if rolesOnly(a) {
+			return "forbidden: this endpoint requires one of the roles " + strings.Join(a.Roles, ", ") +
+				" in the active organisation - and no organisation is active on this session, choose one first"
+		}
 		return "forbidden: no organisation is active on this session - choose one first"
 	case a.Level == store.AccessTenants && !slices.Contains(a.Tenants, c.TenantID):
 		return "forbidden: this endpoint is reserved to another organisation"

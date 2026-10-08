@@ -259,28 +259,35 @@ func specReadStatus(err error) int {
 // service, or read from what was deposited. One projection either way - which
 // source it was is the console's business, not this screen's.
 func (a *API) readSpec(ctx context.Context, route store.Route) (*openapi.Spec, error) {
+	spec, _, err := a.readSpecRaw(ctx, route)
+	return spec, err
+}
+
+// readSpecRaw is readSpec with the document itself, for a reader that needs
+// more than the projection - an operation's parameters and body (MCP-08).
+func (a *API) readSpecRaw(ctx context.Context, route store.Route) (*openapi.Spec, []byte, error) {
 	decl := route.Spec()
 	if decl.Empty() {
-		return nil, errNoSpec
+		return nil, nil, errNoSpec
 	}
 	if decl.Type == store.SpecFile {
 		raw, ok, err := a.st.RouteSpecContent(ctx, route.ID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !ok {
-			return nil, errNoFile
+			return nil, nil, errNoFile
 		}
-		return openapi.Parse(raw)
+		spec, err := openapi.Parse(raw)
+		return spec, raw, err
 	}
 	specURL, err := resolveSpecURL(route)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	spec, _, err := openapi.Fetch(ctx, specClient, specURL)
-	return spec, err
+	return openapi.Fetch(ctx, specClient, specURL)
 }
 
 // specDeposit is what the console gets back after depositing a file: what the

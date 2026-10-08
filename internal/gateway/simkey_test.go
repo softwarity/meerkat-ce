@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/store/dbtest"
@@ -62,5 +63,29 @@ func TestARouterWithNoStoredKeyStillSigns(t *testing.T) {
 	token, _ := rt.MintSimulationToken("bob", nil, time.Minute)
 	if _, ok := rt.verifySimulationToken(token); !ok {
 		t.Fatal("a router that has not reloaded could not read its own token")
+	}
+}
+
+// A client sends the route's prefix, whether the route strips it or the
+// service is mounted under it with a spec that leaves it out.
+func TestThePublicPathCarriesTheRoutesPrefix(t *testing.T) {
+	route := func(strip bool) store.Route {
+		r := store.Route{Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/orders/**"}}}}}
+		if strip {
+			r.Filters = []routing.Spec{{Type: "strip-prefix", Args: map[string]any{"parts": 1}}}
+		}
+		return r
+	}
+	for _, c := range []struct {
+		strip      bool
+		spec, want string
+	}{
+		{true, "/v1/items", "/orders/v1/items"},
+		{false, "/v1/items", "/orders/v1/items"},
+		{false, "/orders/v1/items", "/orders/v1/items"},
+	} {
+		if got := PublicPath(route(c.strip), c.spec); got != c.want {
+			t.Errorf("strip=%v %s: %s, want %s", c.strip, c.spec, got, c.want)
+		}
 	}
 }

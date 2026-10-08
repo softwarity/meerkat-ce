@@ -246,6 +246,21 @@ const portalNavJS = `(function () {
     return best;
   }
 
+  // The module the page belongs to: the one whose own address OR one of whose
+  // sub-modules' addresses is the longest match. A sub-module is an
+  // application of its own, and its address need not sit under its parent's:
+  // matching parents alone fell back to the first module on such a page, and
+  // the bar showed the first module's sub-modules.
+  function owningParent(parents, path) {
+    var best = null, len = -1;
+    for (var i = 0; i < parents.length; i++) {
+      var own = [parents[i]].concat(parents[i].children || []);
+      var hit = longestMatch(own, path);
+      if (hit && hit.href.length > len) { best = parents[i]; len = hit.href.length; }
+    }
+    return best;
+  }
+
   class MeerkatPortalNav extends HTMLElement {
     constructor() {
       super();
@@ -320,7 +335,7 @@ const portalNavJS = `(function () {
       // current one is matched from the URL.
       this._current = this._preview
         ? (this._byId(d.selected) || d.parents[0] || null)
-        : (longestMatch(d.parents, location.pathname) || d.parents[0]);
+        : (owningParent(d.parents, location.pathname) || d.parents[0]);
       this._render();
     }
 

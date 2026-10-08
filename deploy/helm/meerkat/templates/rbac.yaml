@@ -145,4 +145,38 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "meerkat.fullname" . }}
+{{- if ne ((.Values.rbac | default dict).watch) false }}
+{{- range ((.Values.rbac | default dict).watchNamespaces | default list) }}
+---
+# The same read in a namespace the routes point at (rbac.watchNamespaces):
+# a route to grafana.monitoring.svc then shows Grafana's replicas and image.
+# One Role per namespace named, never a ClusterRole - the gateway reads the
+# namespaces somebody chose, not the whole cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "meerkat.fullname" $ }}-read
+  namespace: {{ . }}
+  labels: {{- include "meerkat.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["services", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "meerkat.fullname" $ }}-read
+  namespace: {{ . }}
+  labels: {{- include "meerkat.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "meerkat.fullname" $ }}-read
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}
 {{- end }}

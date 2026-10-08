@@ -159,7 +159,18 @@ export class RoutesTableComponent {
     }
   }
 
-  // "2/3" beside the name, for a service the runtime counts.
+  protected readonly uiTip = $localize`:@@Serves_pages_in_a_browser:UI: serves pages in a browser`;
+  protected readonly notUiTip = $localize`:@@Not_a_UI_route:Not a UI route: serves an API`;
+  protected readonly tracedTip = $localize`:@@Route_is_traced:Traced: pushed to OpenTelemetry`;
+  protected readonly notTracedTip = $localize`:@@Route_not_traced:Not traced`;
+
+  // Whether the route produces traces: the export is on and the route is not
+  // left out.
+  protected traced(r: Route): boolean {
+    return this.tracingOn() && r.telemetry !== false;
+  }
+
+  // "2/3" under the heart, for a service the runtime counts.
   protected replicas(r: Route): string {
     const rep = this.health()[r.id]?.replicas;
     return r.enabled && rep ? `${rep.ready}/${rep.wanted}` : '';

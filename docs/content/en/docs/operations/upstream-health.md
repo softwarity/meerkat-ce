@@ -116,7 +116,7 @@ traffic wins.
 
 | Runtime | Grant |
 |---|---|
-| Kubernetes | `list` and `watch` on `pods` and `services` in the gateway's namespace. The chart grants it with `rbac.watch`, on by default - see [Kubernetes](/docs/deploy/kubernetes) |
+| Kubernetes | `list` and `watch` on `pods` and `services` in the gateway's namespace. The chart grants it with `rbac.watch`, on by default, and in another namespace with `rbac.watchNamespaces` - see [Kubernetes](/docs/deploy/kubernetes) |
 | Docker | the Docker API, read-only: the socket proxy of the compose file, or the socket mounted for the tunnel |
 | Swarm | the socket proxy on every node (`mode: global`), which the stack deploys - see [Which shape to deploy](/docs/deploy/shapes) |
 

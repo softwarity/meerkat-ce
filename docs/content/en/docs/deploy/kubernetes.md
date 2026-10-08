@@ -306,6 +306,8 @@ The gateway reads its OWN namespace for two things. The route editor offers its 
 
 There is no switch for either: what opens them is what the deployment grants. The chart grants both (`rbac.read` and `rbac.watch`, on by default). By hand, the ServiceAccount needs `list` and `watch` on services and pods in its own namespace and nothing else - no secret, no other namespace. Without the pods, the editor still offers the Services and the targets are checked by a connection; without anything, the console says which right it lacks while free typing stays exactly as it was.
 
+A route whose upstream lives in ANOTHER namespace (`grafana.monitoring.svc`) is read the same way once that namespace is listed in `rbac.watchNamespaces`: the chart creates a Role in each one named, never a ClusterRole, so the gateway reads the namespaces somebody chose and not the whole cluster. A namespace not listed is checked by a connection.
+
 Reading the pods reads the environment variables their manifests declare. Where a manifest carries a secret in clear, set `rbac.watch: false`, or better, move the secret into a Secret.
 
 The developer tunnel asks for more than this, and what it grants is set out on [One gateway](/docs/deploy/one-gateway).

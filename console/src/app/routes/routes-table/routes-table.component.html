@@ -20,22 +20,17 @@
                red - or a host that accepts a connection, and down too when the
                circuit is open. The slot stays empty while nothing is known,
                for a route that answers by itself, and for a disabled one, so
-               the names stay aligned. -->
+               the names stay aligned. The replicas ready sit under the heart
+               they colour, and the image they run under the name. -->
           <span class="heart-slot">
             @if (heart(r); as h) {
               <mat-icon class="heart" [class]="h.state" [matTooltip]="h.tip" matTooltipClass="tooltip-lines">{{ h.state === 'down' ? 'heart_broken' : 'favorite' }}</mat-icon>
             }
+            @if (replicas(r); as n) {<span class="replicas mono">{{ n }}</span>}
           </span>
+          <span class="name-stack">
+          <span class="name-line">
           <span class="name">{{ r.name }}</span>
-          @if (replicas(r); as n) {<span class="replicas mono">{{ n }}</span>}
-          <!-- A route is always a service; UI comes on top (ROUTE-02), and it
-               changes what the route can do - injections, the user button, path
-               locales. Worth seeing without opening it. -->
-          @if (r.isUi) {<mat-icon class="ui-mark" i18n-matTooltip="@@Serves_pages_in_a_browser" matTooltip="UI: serves pages in a browser">web</mat-icon>}
-          <!-- This route produces traces: the export is on and the route is not
-               left out. One mark whether the journey starts at the gateway or in
-               the page - which of the two is in the route's own section. -->
-          @if (tracingOn() && r.telemetry !== false) {<mat-icon class="ui-mark" i18n-matTooltip="@@Route_is_traced" matTooltip="Traced: pushed to OpenTelemetry">timeline</mat-icon>}
           <!-- The gateway is NOT serving this one: it did not compile, so it was
                left out rather than taking the whole table down with it. Said
                here, where the operator looks for the route, because a route that
@@ -43,6 +38,25 @@
           @if (r.problem) {
             <mat-icon class="broken" [matTooltip]="r.problem">error</mat-icon>
           }
+          </span>
+          <!-- The second line: the image the replicas run, then the marks at
+               the right edge, out of the name's way. The marks are ALWAYS
+               drawn, faint when off, so the columns of marks line up and an
+               absent mark reads as "off" rather than as "not shown". -->
+          <span class="meta-line">
+            <span class="image mono">{{ images(r) }}</span>
+            <!-- A route is always a service; UI comes on top (ROUTE-02), and it
+                 changes what the route can do - injections, the user button,
+                 path locales. -->
+            <mat-icon class="mark" [class.on]="r.isUi"
+              [matTooltip]="r.isUi ? uiTip : notUiTip">web</mat-icon>
+            <!-- This route produces traces: the export is on and the route is
+                 not left out. One mark whether the journey starts at the
+                 gateway or in the page. -->
+            <mat-icon class="mark" [class.on]="traced(r)"
+              [matTooltip]="traced(r) ? tracedTip : notTracedTip">timeline</mat-icon>
+          </span>
+          </span>
         </span>
       </mat-cell>
     </ng-container>
@@ -73,7 +87,7 @@
             {{ summary(r) }}
             @if (filterNames(r); as f) {<span class="filters"> - {{ f }}</span>}
           </span>
-          <span class="target mono">{{ target(r) }}@if (images(r); as v) {<span class="image"> - {{ v }}</span>}</span>
+          <span class="target mono">{{ target(r) }}</span>
         </span>
         <span rowActions="tonal">
           @if (r.isUi && openUrl(r)) {

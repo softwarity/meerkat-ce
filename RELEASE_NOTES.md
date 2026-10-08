@@ -37,6 +37,16 @@
   (`rbac.watch`, on by default); the Compose file and the Swarm stack now run a
   read-only proxy of the Docker socket, which also brings the route editor's
   service list to Swarm.
+- **An administrator's agent can test the services behind the routes.** Two new
+  MCP tools: `list_operations` reads what a route's service offers from its
+  OpenAPI spec, and `call_route` makes a real call through the gateway - as an
+  identity holding every role by default, or as somebody chosen to see a rule
+  refuse - and returns what came back. A refusal says why: the gateway now names
+  the role an endpoint asks for even when the caller has no organisation, where it
+  used to name only the missing organisation.
+- **The portal bar shows the right sub-modules on a sub-module's page.** A
+  sub-module whose address is not under its parent's - `/plug` under a module at
+  `/docs`, say - showed the first module's sub-modules instead of its own.
 
 ---
 

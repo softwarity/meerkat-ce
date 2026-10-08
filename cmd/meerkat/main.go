@@ -647,6 +647,7 @@ func run(o options) error {
 	// deadline that only moved on SOME paths would end sessions at random.
 	everything := func(*http.Request) bool { return true }
 	dataPlane := whilePaused(st, everything, router.ServePaused, sessions.Sliding(afterWrites(mux, "/", identityChanged)))
+	adminAPI.DataPlane = dataPlane
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           dataPlane,

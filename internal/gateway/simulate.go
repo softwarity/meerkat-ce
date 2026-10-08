@@ -107,6 +107,46 @@ func isSpecRead(ctx context.Context) bool {
 	return ok
 }
 
+// WithAgentCaller poses the identity an administrator's agent calls a route
+// as (MCP-08), in the context of a request the control plane hands straight
+// to the data plane - so, like a scheduled call, nothing of it travels on a
+// wire and nothing of it can be forged from outside. by is the account behind
+// the agent's token and token its name: both reach the gateway's log and the
+// marker headers the service receives, so its own log can tell a test from
+// real traffic. The roles are expanded through the catalogue, as a session's.
+func (rt *Router) WithAgentCaller(ctx context.Context, user string, roles []string, tenantID, by, token string) context.Context {
+	d := identityData{UserID: "simulated", Username: user, Fullname: "Agent call", TenantID: tenantID,
+		Roles: rt.expandSimRoles(ctx, roles)}
+	if tenantID != "" {
+		if t, err := rt.st.GetTenant(ctx, tenantID); err == nil {
+			d.Tenant = t.Name
+		}
+	}
+	via := "mcp"
+	if token != "" {
+		via = "mcp:" + token
+	}
+	ctx = withSimulatedIdentity(ctx, d)
+	return withSimMeta(ctx, simMeta{By: by, Via: via})
+}
+
+// PublicPath is where a client reaches a spec path through the route: under
+// the route's prefix, unless the spec's path already carries it. Both shapes
+// are common: a route that strips its prefix before the service sees the path,
+// and a service mounted under the same prefix itself whose spec leaves it out
+// of its paths - either way a client sends the prefix.
+func PublicPath(route store.Route, specPath string) string {
+	prefix := strings.TrimRight(routeMatchPrefix(route), "/")
+	if prefix == "" || specPath == prefix || strings.HasPrefix(specPath, prefix+"/") {
+		return specPath
+	}
+	return prefix + specPath
+}
+
+// RouteHost is the host a request must carry to reach the route: its first
+// literal host predicate, or "" when it matches any host.
+func RouteHost(route store.Route) string { return routeLiteralHost(route) }
+
 // simulatedIdentity returns the identity posed by validated simulate headers.
 func simulatedIdentity(ctx context.Context) (identityData, bool) {
 	d, ok := ctx.Value(simKey{}).(identityData)

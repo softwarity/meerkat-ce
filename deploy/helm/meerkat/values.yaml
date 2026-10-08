@@ -160,6 +160,11 @@ securityContext:
 # they run, from the API server's events. It reads the environment variables
 # the pods' manifests declare, so set it false where those carry secrets in
 # clear; the targets are then checked by a connection, as before.
+#
+# watchNamespaces names OTHER namespaces to read the same way, for routes whose
+# upstream lives there (grafana.monitoring.svc): one Role per namespace, never a
+# ClusterRole. A route to a namespace not listed is checked by a connection.
 rbac:
   read: true
   watch: true
+  watchNamespaces: []
