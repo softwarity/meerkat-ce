@@ -71,15 +71,23 @@ type PortalConfig struct {
 	Entries []PortalEntry `json:"entries,omitempty"`
 }
 
-// PortalEntry is one application in the catalogue: a route, the name it is
-// offered under, and - when a bar is drawn - an icon and the children shown in
-// the secondary surface. When it has children, the bar offers a "home" back to
-// the entry itself.
+// PortalEntry is one entry of the catalogue, and it is one of two things.
+//
+//   - A MODULE: an application - RouteID names its UI route, whose address and
+//     access it inherits; a label and an icon may override what the route
+//     offers. A module holds no sub-modules.
+//   - A CONTAINER: no route, a label, an icon and a description of its own, and
+//     modules inside it - its sub-modules. Clicking it opens the first
+//     sub-module the visitor may open, and a container none of whose
+//     sub-modules the visitor may open is not offered at all.
+//
+// Two kinds and not a parent that is also an application: a parent that was a
+// route AND held children needed a second name for its own row ("home"), and
+// a container needs none - it has no page of its own.
 type PortalEntry struct {
-	// RouteID binds the entry to an existing UI route; the entry inherits the
-	// route's address and access from it, and a label/icon may override what
-	// the route offers.
-	RouteID string `json:"routeId"`
+	// RouteID binds a MODULE to its UI route. Empty makes the entry a
+	// container.
+	RouteID string `json:"routeId,omitempty"`
 	// Icon is the chosen glyph as an SVG string (viewBox + path only, picked
 	// from the console's icon bank), NOT a font ligature name: the bar renders
 	// it as a CSS mask, so no icon font is ever loaded. Empty falls back to the
@@ -89,9 +97,6 @@ type PortalEntry struct {
 	// the route's name - the LAST remaining fallback, and there is no third:
 	// the route no longer carries a menu label of its own.
 	Label string `json:"label,omitempty"`
-	// HomeLabel is what the "back to this module" entry reads when the parent
-	// has children (its own row in the secondary surface). Empty uses Label.
-	HomeLabel string `json:"homeLabel,omitempty"`
 	// Description is the entry's tooltip.
 	Description string `json:"description,omitempty"`
 	// Badge is the channel key a future notifier writes a count onto (the
@@ -100,11 +105,16 @@ type PortalEntry struct {
 	Badge string `json:"badge,omitempty"`
 	// Disabled turns the module off for everyone without removing it: kept in
 	// the config but never served. Zero value (false) means enabled.
-	Disabled bool             `json:"disabled,omitempty"`
+	Disabled bool `json:"disabled,omitempty"`
+	// Children are a container's modules, its sub-modules. Empty on a module.
 	Children []PortalSubEntry `json:"children,omitempty"`
 }
 
-// PortalSubEntry is a sub-module of a parent, shown in the secondary surface.
+// IsContainer says the entry is a container rather than a module.
+func (e PortalEntry) IsContainer() bool { return e.RouteID == "" }
+
+// PortalSubEntry is a module inside a container, shown in the secondary
+// surface.
 type PortalSubEntry struct {
 	RouteID string `json:"routeId"`
 	// Icon is an SVG string, same as the parent's (see PortalEntry.Icon).
@@ -241,21 +251,33 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
 	entries := cfg.Entries[:0]
 	for i := range cfg.Entries {
 		p := cfg.Entries[i]
-		if err := checkRoute("entry", p.RouteID); err != nil {
-			return err
+		p.RouteID = strings.TrimSpace(p.RouteID)
+		p.Label = strings.TrimSpace(p.Label)
+		if p.IsContainer() {
+			// A container has no route to name it, so it needs a label of its
+			// own: an untitled heading is one nobody can find again.
+			if p.Label == "" {
+				return fmt.Errorf("portal container #%d: a container needs a label", i+1)
+			}
+		} else {
+			if err := checkRoute("entry", p.RouteID); err != nil {
+				return err
+			}
+			if len(p.Children) > 0 {
+				return fmt.Errorf("portal entry %q: a module holds no sub-modules - "+
+					"add a container and move the modules into it", p.RouteID)
+			}
+			if seenEntries[p.RouteID] {
+				// A route listed twice is one choice offered twice: the second
+				// is dropped, the first wins (the order the admin set).
+				continue
+			}
+			seenEntries[p.RouteID] = true
 		}
-		if seenEntries[p.RouteID] {
-			// A route listed twice is one choice offered twice: the second
-			// is dropped, the first wins (the order the admin set).
-			continue
-		}
-		seenEntries[p.RouteID] = true
 		// The icon is stored as an SVG: a bare name is resolved to its
 		// catalogue SVG, a pasted SVG is sanitized to viewBox + path, anything
 		// else is dropped (icons.Resolve).
 		p.Icon = icons.Resolve(p.Icon)
-		p.Label = strings.TrimSpace(p.Label)
-		p.HomeLabel = strings.TrimSpace(p.HomeLabel)
 		p.Description = strings.TrimSpace(p.Description)
 		p.Badge = strings.TrimSpace(p.Badge)
 

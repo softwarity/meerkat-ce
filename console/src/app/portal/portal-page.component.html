@@ -141,7 +141,10 @@
             <mat-icon>smartphone</mat-icon>
           </mat-button-toggle>
         </mat-button-toggle-group>
-        <button matButton="filled" (click)="addParent()">
+        <button matButton (click)="addContainer()">
+          <mat-icon>folder</mat-icon><span i18n="@@Portal_add_container">Add a container</span>
+        </button>
+        <button matButton="filled" (click)="addModule()">
           <mat-icon>add</mat-icon><span i18n="@@Portal_add_module">Add a module</span>
         </button>
       </div>
@@ -161,7 +164,10 @@
       <div class="canvas-head">
         <span class="text-muted" i18n="@@Portal_links_hint">Offered in this order</span>
         <span class="grow"></span>
-        <button matButton="filled" (click)="addParent()">
+        <button matButton (click)="addContainer()">
+          <mat-icon>folder</mat-icon><span i18n="@@Portal_add_container">Add a container</span>
+        </button>
+        <button matButton="filled" (click)="addModule()">
           <mat-icon>add</mat-icon><span i18n="@@Portal_add_app">Add an application</span>
         </button>
       </div>
@@ -175,8 +181,13 @@
             <div class="link-row" [class.off]="e.disabled">
               <span class="pos">{{ i + 1 }}</span>
               <span class="grow">
-                <b>{{ e.label || routeNameOf(e.routeId) }}</b>
-                <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
+                @if (isContainer(e)) {
+                  <mat-icon class="kind">folder</mat-icon><b>{{ e.label }}</b>
+                  <span class="text-muted path">{{ (e.children ?? []).length }} <span i18n="@@Portal_modules_count">modules, listed in its place</span></span>
+                } @else {
+                  <b>{{ e.label || routeNameOf(e.routeId) }}</b>
+                  <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
+                }
               </span>
               <button matIconButton [disabled]="i === 0" (click)="moveEntry(i, -1)"
                 matTooltip="Move up" i18n-matTooltip="@@Move_up"><mat-icon>arrow_upward</mat-icon></button>

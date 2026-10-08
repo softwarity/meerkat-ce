@@ -44,20 +44,25 @@ bar, come back: the entries stay.
 
 ## An entry
 
-- **Application (route)** - the UI route this entry leads to. Only **enabled UI
-  routes** are offered. The entry inherits the route's access, and that is what
-  makes the list differ per visitor: the payload carries no access rule.
-- **Label** - empty takes the route's name.
+**Add a module** for an application, **Add a container** to group modules.
+
+- **Application (route)** - a module's UI route. Only **enabled UI routes** are
+  offered. The module inherits the route's access, and that is what makes the
+  list differ per visitor: the payload carries no access rule. A container has
+  no route.
+- **Label** - required on a container; on a module, empty takes the route's
+  name.
 - **Description** - the tooltip.
+- **Icon** (*Portal* mode) - search the embedded icon set, or paste an SVG.
 
-In *Portal* mode, what it takes to draw a bar is added:
-
-- **Icon** - search the embedded icon set, or paste an SVG.
-- **Home label** - the *back here* row of a submenu. Empty takes the label.
-- **Sub-applications** - the drawer's quick action adds one.
+A container opens its first sub-module the visitor may open, and is not shown to
+a visitor who may open none of them.
 
 The quick actions at the top of the drawer move an entry up or down, disable it
-without removing it, or take it out.
+without removing it, or take it out. For a module, *Move under* puts it **in a
+container** or back at the **top level**: its list is the top level first, then
+the containers. On a container, **+** adds a module
+inside it.
 
 ## Pitfalls
 

@@ -245,8 +245,8 @@ func portalSampleEntries() []portalEntry {
 	return []portalEntry{
 		{Label: "Orders", Icon: icon("shopping_cart"), Href: "/orders", Description: "Everything being shipped"},
 		{
-			Label: "Billing", Icon: icon("receipt_long"), Href: "/billing",
-			HomeLabel: "Overview", Description: "Invoices and plans",
+			Label: "Billing", Icon: icon("receipt_long"), Href: "/billing/invoices",
+			Description: "Invoices and plans",
 			Children: []portalEntry{
 				{Label: "Invoices", Icon: icon("description"), Href: "/billing/invoices"},
 				{Label: "Plans", Icon: icon("sell"), Href: "/billing/plans"},

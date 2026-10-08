@@ -1866,13 +1866,13 @@ export interface PortalConfig {
 // A top-level module: a full application (a route), which may gather children
 // shown in the secondary surface. label/icon override what the route offers.
 // `icon` is an SVG string (from the icon bank), not a font name.
+// A top-level entry: a MODULE (routeId set, no children) or a CONTAINER (no
+// routeId, a label, and its modules in children). A container opens its first
+// module the visitor may open, and is not offered when they may open none.
 export interface PortalEntry {
-  routeId: string;
+  routeId?: string;
   icon?: string;
   label?: string;
-  // The label of this module's own "home" row when it has children; empty
-  // uses `label`.
-  homeLabel?: string;
   description?: string;
   // Reserved: the channel a future notifier writes a count onto (PORTAL-01).
   badge?: string;

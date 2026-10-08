@@ -46,22 +46,24 @@ transformer en barre, puis revenir en arrière : les entrées sont conservées.
 
 ## Une entrée
 
-- **Application (route)** - la route UI à laquelle mène cette entrée. Seules les
-  **routes UI activées** sont proposées. L'entrée hérite de l'accès de la route :
-  c'est ce qui fait que la liste varie d'un visiteur à l'autre, car les données
-  envoyées ne contiennent aucune règle d'accès.
-- **Label** - laissé vide, il reprend le nom de la route.
+**Add a module** ajoute une application, **Add a container** un groupe de modules.
+
+- **Application (route)** - la route UI d'un module. Seules les **routes UI
+  activées** sont proposées. Le module hérite de l'accès de la route : c'est ce
+  qui fait que la liste varie d'un visiteur à l'autre, car les données envoyées
+  ne contiennent aucune règle d'accès. Un conteneur n'a pas de route.
+- **Label** - obligatoire pour un conteneur ; pour un module, laissé vide, il
+  reprend le nom de la route.
 - **Description** - le texte de l'infobulle.
+- **Icon** (mode *Portal*) - cherchez dans le jeu d'icônes embarqué, ou collez un SVG.
 
-En mode *Portal* s'ajoute ce qu'il faut pour dessiner une barre :
-
-- **Icon** - cherchez dans le jeu d'icônes embarqué, ou collez un SVG.
-- **Home label** - la ligne *retour ici* d'un sous-menu. Laissé vide, il reprend le
-  libellé.
-- **Sous-applications** - l'action rapide du tiroir en ajoute une.
+Un conteneur ouvre son premier sous-module que le visiteur a le droit d'ouvrir,
+et il n'est pas affiché pour un visiteur qui ne peut en ouvrir aucun.
 
 Les actions rapides, en haut du tiroir, permettent de monter ou de descendre une
-entrée, de la désactiver sans la supprimer, ou de la retirer.
+entrée, de la désactiver sans la supprimer, ou de la retirer. Pour un module, *Move under*
+le met **dans un conteneur** ou le ramène **au premier niveau** : sa liste propose
+d'abord le premier niveau, puis les conteneurs. Sur un conteneur, **+** ajoute un module à l'intérieur.
 
 ## Pièges
 

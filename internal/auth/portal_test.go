@@ -27,12 +27,15 @@ func TestPortalJSONFiltersByRouteAccess(t *testing.T) {
 			t.Fatalf("SaveRoute %s: %v", rt.ID, err)
 		}
 	}
-	// shop with a reachable child (intranet) and an unreachable one (reports);
-	// ops is a parent the caller cannot open and that has no reachable child.
+	// shop, a module; a container with a reachable module (intranet) and an
+	// unreachable one (reports); another container whose only module the
+	// caller cannot open; ops, a module the caller cannot open.
 	portal := store.PortalConfig{
 		Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
 		Entries: []store.PortalEntry{
-			{RouteID: "shop", Children: []store.PortalSubEntry{{RouteID: "intranet"}, {RouteID: "reports"}}},
+			{RouteID: "shop"},
+			{Label: "Work", Children: []store.PortalSubEntry{{RouteID: "reports"}, {RouteID: "intranet"}}},
+			{Label: "Back office", Children: []store.PortalSubEntry{{RouteID: "reports"}}},
 			{RouteID: "ops"},
 		},
 	}
@@ -61,16 +64,19 @@ func TestPortalJSONFiltersByRouteAccess(t *testing.T) {
 	if !payload.Enabled {
 		t.Fatal("portal should be enabled")
 	}
-	// One parent (shop). ops is dropped: unreachable and childless for this caller.
-	if len(payload.Parents) != 1 {
-		t.Fatalf("expected 1 reachable parent (shop), got %d:\n%s", len(payload.Parents), raw)
+	// shop, and the Work container. ops is dropped (the caller may not open
+	// it), and so is Back office: none of its modules is open to the caller.
+	if len(payload.Parents) != 2 {
+		t.Fatalf("expected shop and Work, got %d:\n%s", len(payload.Parents), raw)
 	}
-	if payload.Parents[0].Href != "/shop" {
-		t.Errorf("the reachable parent should be /shop, got %q", payload.Parents[0].Href)
+	if payload.Parents[0].Href != "/shop" || len(payload.Parents[0].Children) != 0 {
+		t.Errorf("shop is a module: %+v", payload.Parents[0])
 	}
-	// Under shop, only intranet is reachable; reports (role-gated) is dropped.
-	if len(payload.Parents[0].Children) != 1 || payload.Parents[0].Children[0].Href != "/intranet" {
-		t.Errorf("only the reachable child should remain (/intranet), got %+v", payload.Parents[0].Children)
+	// In Work only intranet remains, and the container leads to it - the first
+	// module the caller may open, not the first one listed.
+	work := payload.Parents[1]
+	if len(work.Children) != 1 || work.Children[0].Href != "/intranet" || work.Href != "/intranet" {
+		t.Errorf("Work should hold /intranet and lead to it, got %+v", work)
 	}
 	// The security boundary: no access rule leaks to the browser.
 	if strings.Contains(raw, "operations") || strings.Contains(raw, "\"roles\"") || strings.Contains(raw, "access") {

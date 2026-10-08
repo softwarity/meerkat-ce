@@ -104,20 +104,16 @@ type portalBrand struct {
 	Logo    string `json:"logo,omitempty"`
 }
 
-// portalEntry is one module as the bar shows it - a parent or a child. It
-// carries NO access rule: what a caller may not open is not in the list at
-// all (the same security boundary as portal-svc's NavPillar). An empty Href
-// marks a parent that groups children the caller can reach but is not itself
-// navigable.
+// portalEntry is one entry as the bar shows it - a module, a container or a
+// container's module. It carries NO access rule: what a caller may not open is
+// not in the list at all (the same security boundary as portal-svc's
+// NavPillar). A container's Href is its first module the caller may open.
 type portalEntry struct {
 	Label string `json:"label"`
 	// Icon is an SVG string (viewBox + path), rendered as a CSS mask by the
 	// bar - no icon font. Empty falls back to the label's initial.
-	Icon string `json:"icon,omitempty"`
-	Href string `json:"href,omitempty"`
-	// HomeLabel is the label of the parent's own "home" row in the secondary
-	// surface when it has children; empty means use Label. Parents only.
-	HomeLabel   string        `json:"homeLabel,omitempty"`
+	Icon        string        `json:"icon,omitempty"`
+	Href        string        `json:"href,omitempty"`
 	Description string        `json:"description,omitempty"`
 	Badge       string        `json:"badge,omitempty"`
 	Children    []portalEntry `json:"children,omitempty"`
@@ -252,24 +248,29 @@ func (h *Handler) portalNav(ctx context.Context, caller store.Caller) (store.Por
 		if p.Disabled { // turned off for everyone, kept in config but not served
 			continue
 		}
-		pe, pVisible, pNavigable := entry(p.RouteID, p.Icon, p.Label, p.Description, p.Badge)
-		pe.HomeLabel = p.HomeLabel
-		if pVisible || pNavigable { // a resolvable, reachable route existed
-			for _, c := range p.Children {
-				if c.Disabled {
-					continue
-				}
-				if ce, _, cNav := entry(c.RouteID, c.Icon, c.Label, c.Description, c.Badge); cNav {
-					pe.Children = append(pe.Children, ce)
-				}
+		if !p.IsContainer() {
+			if pe, _, navigable := entry(p.RouteID, p.Icon, p.Label, p.Description, p.Badge); navigable {
+				out = append(out, pe)
+			}
+			continue
+		}
+		// A container offers the modules the caller may open, and leads to the
+		// first of them. With none, it is a heading that leads nowhere, and it
+		// is not offered at all.
+		ce := portalEntry{Label: p.Label, Icon: p.Icon, Description: p.Description, Badge: p.Badge}
+		for _, c := range p.Children {
+			if c.Disabled {
+				continue
+			}
+			if child, _, navigable := entry(c.RouteID, c.Icon, c.Label, c.Description, c.Badge); navigable {
+				ce.Children = append(ce.Children, child)
 			}
 		}
-		// Keep a parent that is itself reachable, or that gathers at least one
-		// reachable child. A parent neither reachable nor with reachable
-		// children is a heading that leads nowhere: dropped.
-		if pNavigable || len(pe.Children) > 0 {
-			out = append(out, pe)
+		if len(ce.Children) == 0 {
+			continue
 		}
+		ce.Href = ce.Children[0].Href
+		out = append(out, ce)
 	}
 	return cfg, out
 }

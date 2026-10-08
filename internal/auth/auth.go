@@ -3572,12 +3572,27 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 	for _, rt := range routes {
 		byID[rt.ID] = rt
 	}
-	var links []publicLink
+	// The modules in catalogue order: a module for itself, a container for
+	// each of its own - a flat list has no heading to hang them under.
+	type module struct{ routeID, label string }
+	var modules []module
 	for _, e := range cfg.Entries {
 		if e.Disabled {
 			continue
 		}
-		rt, ok := byID[e.RouteID]
+		if !e.IsContainer() {
+			modules = append(modules, module{e.RouteID, e.Label})
+			continue
+		}
+		for _, c := range e.Children {
+			if !c.Disabled {
+				modules = append(modules, module{c.RouteID, c.Label})
+			}
+		}
+	}
+	var links []publicLink
+	for _, m := range modules {
+		rt, ok := byID[m.routeID]
 		// A route deleted after it entered the catalogue leaves a dangling id.
 		// Skipped at read time rather than refused at write time: a deletion
 		// elsewhere must not make this screen fail.
@@ -3588,7 +3603,7 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 		if href == "" {
 			continue
 		}
-		links = append(links, publicLink{Name: portalLabel(e.Label, rt), Href: href})
+		links = append(links, publicLink{Name: portalLabel(m.label, rt), Href: href})
 		if cfg.Mode == store.PortalModePortal {
 			break
 		}

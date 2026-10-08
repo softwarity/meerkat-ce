@@ -12,42 +12,44 @@ import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { ApiService, BankIcon, Route } from '../api.service';
 import { SvgIconComponent } from './svg-icon.component';
 
-// One module as it is edited (PORTAL-01): which UI route it opens, and how it
-// shows in the bar. `icon` is an SVG string; label and homeLabel override the
-// route's name (homeLabel only for a parent, on its own "home" row).
+// One entry as it is edited (PORTAL-01): a module - which UI route it opens -
+// or a container, which has no route and holds modules; and how it shows in
+// the bar. `icon` is an SVG string; a module's label overrides its route's
+// name, a container's label is its only name.
 export interface ModuleDraft {
   routeId: string;
   icon: string;
   label: string;
-  homeLabel: string;
   description: string;
   disabled: boolean;
 }
+
+// What is edited: a top-level module, a container, or a module inside one.
+export type EntryKind = 'module' | 'container' | 'sub';
 
 export interface ModuleFormData {
   title: string;
   module: ModuleDraft;
   routes: Route[];
-  isParent: boolean;
-  // Whether a BAR is being drawn. An icon, a home label and sub-modules are
-  // things a bar has; a flat menu has a name and an order, so offering the
-  // rest there would be offering settings nothing reads.
+  kind: EntryKind;
+  // Whether a BAR is being drawn. An icon is a thing a bar has; a flat menu
+  // has a name and an order, so offering it there would be offering a setting
+  // nothing reads.
   bar: boolean;
   // Set when editing an EXISTING module (not a new one): enables the quick
   // actions (reorder, disable, add sub-module, delete). null while adding.
   existing: boolean;
   canUp: boolean;
   canDown: boolean;
-  // Where the module can be moved to (an existing one, in a bar): the OTHER
-  // top-level modules, by their index and the name they show. `under` is the
-  // module it sits under now, null at the top level; `above` is the module an
-  // indent puts it under (the one right above it), null when it cannot be
-  // indented; `hasChildren` keeps a module with sub-modules where it is - the
-  // catalogue has two levels.
+  // Whether the entry's surface runs across (a row of tabs) rather than down
+  // (a rail, or the links list): the move arrows point that way.
+  horizontal: boolean;
+  // Where a module can be moved to: the containers, by their index and label
+  // (not the one it is in). `under` is the container it is in now, null at the
+  // top level. A container itself stays at the top level: the catalogue has
+  // two levels.
   parents: { index: number; name: string }[];
   under: number | null;
-  above: number | null;
-  hasChildren: boolean;
 }
 
 // The module editor, shown in a DRAWER on the portal page (not a modal): the
@@ -88,7 +90,6 @@ export class ModuleEditorComponent implements OnInit {
   protected readonly routeId = signal('');
   protected readonly icon = signal('');
   protected readonly label = signal('');
-  protected readonly homeLabel = signal('');
   protected readonly description = signal('');
   protected readonly disabled = signal(false);
 
@@ -98,7 +99,6 @@ export class ModuleEditorComponent implements OnInit {
 
   private readonly q$ = new Subject<string>();
 
-  protected readonly hasChildrenHint = $localize`:@@Portal_move_has_children:It has sub-modules: move or remove them first.`;
   protected readonly noRoutes = $localize`:@@Portal_no_ui_routes:No UI route yet: a module opens one.`;
 
   ngOnInit(): void {
@@ -107,7 +107,6 @@ export class ModuleEditorComponent implements OnInit {
     this.routeId.set(m.routeId);
     this.icon.set(m.icon);
     this.label.set(m.label);
-    this.homeLabel.set(m.homeLabel);
     this.description.set(m.description);
     this.disabled.set(m.disabled);
 
@@ -138,31 +137,32 @@ export class ModuleEditorComponent implements OnInit {
     this.icon.set(svg);
   }
 
+  // A module needs its route, a container its label: neither has anything
+  // else to be found by.
+  protected canSave(): boolean {
+    return this.data().kind === 'container' ? !!this.label().trim() : !!this.routeId();
+  }
+
   protected save(): void {
-    if (!this.routeId()) return;
+    if (!this.canSave()) return;
     this.saved.emit({
-      routeId: this.routeId(),
+      routeId: this.data().kind === 'container' ? '' : this.routeId(),
       icon: this.icon().trim(),
       label: this.label().trim(),
-      homeLabel: this.homeLabel().trim(),
       description: this.description().trim(),
       disabled: this.disabled(),
     });
   }
 
-  protected readonly detachTip = $localize`:@@Portal_detach:Detach (top level)`;
-  protected readonly alreadyTop = $localize`:@@Portal_already_top:Already at the top level`;
-  private readonly indentUnder = $localize`:@@Portal_indent:Move under the module above`;
-  private readonly indentNone = $localize`:@@Portal_indent_none:No module above to go under`;
-  private readonly indentSub = $localize`:@@Portal_indent_sub:Already a sub-module`;
+  protected readonly moveUp = $localize`:@@Move_up:Move up`;
+  protected readonly moveDown = $localize`:@@Move_down:Move down`;
+  protected readonly moveLeft = $localize`:@@Move_left:Move left`;
+  protected readonly moveRight = $localize`:@@Move_right:Move right`;
+  protected readonly noContainer = $localize`:@@Portal_no_container:No container yet: add one first`;
+  protected readonly labelHint = $localize`:@@Portal_module_label_hint:Empty uses the route's name.`;
+  protected readonly containerLabelHint = $localize`:@@Portal_container_label_hint:Required: a container has no route to name it.`;
 
-  // Why an indent is possible or not, in the order the reasons matter.
-  protected indentTip(): string {
-    const d = this.data();
-    if (d.under !== null) return this.indentSub;
-    if (d.hasChildren) return this.hasChildrenHint;
-    return d.above === null ? this.indentNone : this.indentUnder;
-  }
+
 
   protected toggleDisabled(v: boolean): void {
     this.disabled.set(v);

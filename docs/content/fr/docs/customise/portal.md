@@ -29,24 +29,32 @@ une raison de ressaisir vos applications.
 | **Links** | La liste, dans l'ordre que vous avez choisi, dans le sous-menu **Applications** du bouton utilisateur et sur les pages du plan de données |
 | **Portal** | Une barre de navigation sur chaque page de chaque application. Les pages intégrées ne proposent alors qu'**un seul** lien, la première entrée que l'appelant a le droit d'ouvrir : la navigation, c'est la barre, et une page extérieure aux applications n'a besoin que d'une porte d'entrée |
 
-## Ce que contient une entrée
+## Modules et conteneurs
+
+Une entrée est l'une de deux choses :
+
+- un **module** - une application : il ouvre une route d'interface, et hérite de
+  son adresse **et de ses règles d'accès** ;
+- un **conteneur** - pas de route : un libellé, une icône et une description à
+  lui, et des modules à l'intérieur, ses sous-modules. Un clic dessus ouvre le
+  **premier sous-module que le visiteur a le droit d'ouvrir**, et un conteneur
+  dont le visiteur ne peut ouvrir aucun sous-module n'est pas proposé du tout.
+  Un conteneur contient des modules, jamais un autre conteneur.
 
 | Champ | Ce qu'il fait |
 |---|---|
-| Route | la route d'interface qu'ouvre cette entrée. L'entrée hérite de son adresse **et de ses règles d'accès** |
-| Label | le nom sous lequel l'application est proposée. Laissé vide, c'est le nom de la route qui sert |
+| Route | la route d'interface d'un module. Un conteneur n'en a pas |
+| Label | le nom sous lequel l'entrée est proposée. Obligatoire pour un conteneur ; pour un module, laissé vide, c'est le nom de la route qui sert |
 | Description | l'infobulle de l'entrée |
 | Disabled | désactive l'entrée pour tout le monde, sans la retirer de la liste |
 
-En mode **Portal**, une entrée contient en plus de quoi dessiner une barre :
-une icône, des entrées enfants, et le libellé de la ligne "revenir ici" quand
-elle a des enfants.
+En mode **Portal**, une entrée porte en plus une icône :
 
 | Champ | Ce qu'il fait |
 |---|---|
 | Icon | un pictogramme choisi dans la bibliothèque de la console, stocké en SVG et dessiné comme un masque CSS - aucune police d'icônes n'est jamais chargée. Laissé vide, c'est l'initiale du libellé qui sert |
-| Home label | le texte de la ligne "revenir à cette application", quand l'entrée a des enfants |
-| Children | les sous-applications affichées sur la surface secondaire |
+
+En mode **Links**, les modules d'un conteneur sont listés à sa place, dans l'ordre.
 
 ## Le catalogue dit ce qui existe, la route dit qui le voit
 

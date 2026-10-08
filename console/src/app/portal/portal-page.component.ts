@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, PortalEntry, PortalSubEntry, PortalConfig, Route, Settings } from '../api.service';
-import { ModuleEditorComponent, ModuleDraft, ModuleFormData } from './module-editor.component';
+import { EntryKind, ModuleEditorComponent, ModuleDraft, ModuleFormData } from './module-editor.component';
 import { LiveChangesService } from '../shared/live-changes.service';
 
 // The navigation portal (PORTAL-01): build the header-or-rail bar the proxied
@@ -150,7 +150,6 @@ export class PortalPageComponent {
       parents: this.entries().map((p, i) => ({
         id: String(i),
         label: this.label(p),
-        homeLabel: this.homeLabel(p),
         icon: p.icon ?? '',
         description: p.description ?? '',
         badge: p.badge ?? '',
@@ -258,11 +257,11 @@ export class PortalPageComponent {
   }
 
   protected label(m: PortalEntry | PortalSubEntry): string {
-    return (m.label || '').trim() || this.routeName(m.routeId);
+    return (m.label || '').trim() || this.routeName(m.routeId ?? '');
   }
 
-  protected homeLabel(m: PortalEntry): string {
-    return (m.homeLabel || '').trim() || this.label(m);
+  protected isContainer(e: PortalEntry): boolean {
+    return !e.routeId;
   }
 
   // ── layout controls ─────────────────────────────────────────────────────
@@ -310,8 +309,8 @@ export class PortalPageComponent {
 
   // The route's own name, which is what an entry falls back to when nobody
   // gave it a label - the LAST fallback, and the only one left.
-  protected routeNameOf(id: string): string {
-    return this.uiRoutes().find((r) => r.id === id)?.name ?? id;
+  protected routeNameOf(id: string | undefined): string {
+    return this.uiRoutes().find((r) => r.id === id)?.name ?? id ?? '';
   }
 
   // Reorder from the flat list. The bar reorders from its drawer; both write
@@ -327,21 +326,32 @@ export class PortalPageComponent {
     this.persist();
   }
 
-  protected addParent(): void {
-    this.open(this.data.title.add, true, undefined, null, (m) => {
-      this.entries.update((ps) => [...ps, { ...m, children: [] }]);
+  protected addModule(): void {
+    this.open(this.data.title.add, 'module', undefined, null, (m) => {
+      this.entries.update((ps) => [...ps, entryFromDraft(m)]);
       this.selected.set(String(this.entries().length - 1)); // keep the new one selected
     });
   }
 
+  // A container is a label, an icon and the modules put in it: no route.
+  protected addContainer(): void {
+    this.open(this.data.title.addContainer, 'container', undefined, null, (m) => {
+      this.entries.update((ps) => [...ps, { ...entryFromDraft(m), routeId: '', children: [] }]);
+      this.selected.set(String(this.entries().length - 1));
+    });
+  }
+
   protected editParent(i: number): void {
-    this.open(this.data.title.edit, true, this.entries()[i], { pi: i, ci: null }, (m) =>
-      this.entries.update((ps) => ps.map((x, j) => (j === i ? { ...x, ...m } : x))),
+    const e = this.entries()[i];
+    const container = this.isContainer(e);
+    this.open(container ? this.data.title.editContainer : this.data.title.edit, container ? 'container' : 'module', e,
+      { pi: i, ci: null }, (m) =>
+        this.entries.update((ps) => ps.map((x, j) => (j === i ? { ...x, ...entryFromDraft(m), routeId: container ? '' : m.routeId } : x))),
     );
   }
 
   private addChild(pi: number): void {
-    this.open(this.data.title.addSub, false, undefined, null, (m) => {
+    this.open(this.data.title.addSub, 'sub', undefined, null, (m) => {
       this.mutateChildren(pi, (cs) => [...cs, childFromDraft(m)]);
       const ci = (this.entries()[pi].children ?? []).length - 1;
       this.selected.set(`${pi}/${ci}`); // keep the new sub-module selected
@@ -350,7 +360,7 @@ export class PortalPageComponent {
 
   private editChild(pi: number, ci: number): void {
     const c = (this.entries()[pi].children ?? [])[ci];
-    this.open(this.data.title.editSub, false, c, { pi, ci }, (m) =>
+    this.open(this.data.title.editSub, 'sub', c, { pi, ci }, (m) =>
       this.mutateChildren(pi, (cs) => cs.map((x, j) => (j === ci ? { ...x, ...childFromDraft(m) } : x))),
     );
   }
@@ -379,19 +389,18 @@ export class PortalPageComponent {
     }
   }
 
-  // Moves the open module under another one, or detaches a sub-module to the
-  // top level, keeping everything it carries; then reopens it where it now is.
+  // Moves the open module into a container, or takes a sub-module out of its
+  // container to the top level, keeping everything it carries; then reopens it
+  // where it now is. A container never moves into another.
   protected onRelocate(target: number | null): void {
     const p = this.editingPath;
     if (!p) return;
     const ps = this.entries();
+    if (target !== null && !this.isContainer(ps[target])) return;
     if (p.ci === null) {
-      // A top-level module going under another one: not with children of its
-      // own (the editor does not offer it), and without its home label, which
-      // only a parent has.
-      if (target === null || (ps[p.pi].children ?? []).length > 0) return;
-      const { children: _children, homeLabel: _home, ...rest } = ps[p.pi];
-      const moved: PortalSubEntry = { ...rest };
+      if (target === null || this.isContainer(ps[p.pi])) return;
+      const { children: _children, ...rest } = ps[p.pi];
+      const moved: PortalSubEntry = { ...rest, routeId: rest.routeId ?? '' };
       const without = ps.filter((_, j) => j !== p.pi);
       const ti = target > p.pi ? target - 1 : target;
       this.entries.set(without.map((x, j) => (j === ti ? { ...x, children: [...(x.children ?? []), moved] } : x)));
@@ -403,8 +412,8 @@ export class PortalPageComponent {
     const ci = p.ci;
     const lifted = ps.map((x, j) => (j === p.pi ? { ...x, children: (x.children ?? []).filter((_, k) => k !== ci) } : x));
     if (target === null) {
-      // Detached: a module of its own, right after the one it was under.
-      lifted.splice(p.pi + 1, 0, { ...child, children: [] });
+      // Taken out: a module of its own, right after its container.
+      lifted.splice(p.pi + 1, 0, { ...child });
       this.entries.set(lifted);
       this.persist();
       this.editParent(p.pi + 1);
@@ -445,7 +454,7 @@ export class PortalPageComponent {
   // remembering where its result goes and highlighting it in the preview.
   private open(
     title: string,
-    isParent: boolean,
+    kind: EntryKind,
     m: PortalEntry | PortalSubEntry | undefined,
     path: { pi: number; ci: number | null } | null,
     apply: (m: ModuleDraft) => void,
@@ -462,30 +471,30 @@ export class PortalPageComponent {
       canUp = idx > 0;
       canDown = idx < siblings - 1;
     }
-    // The other top-level modules, where this one could go.
-    const parents = this.entries()
-      .map((p, index) => ({ index, name: p.label || this.routeNameOf(p.routeId) }))
-      .filter((p) => !path || p.index !== path.pi);
+    // The containers a module could go into: every one but the one it is in.
+    const es = this.entries();
+    const parents = es
+      .map((p, index) => ({ index, name: p.label ?? '', container: this.isContainer(p) }))
+      .filter((p) => p.container && (!path || p.index !== path.pi))
+      .map(({ index, name }) => ({ index, name }));
     this.editing.set({
       title,
-      isParent,
+      kind,
       bar: this.isBar(),
       existing: path !== null,
       canUp,
       canDown,
+      // In a bar, the top level runs across in header mode and the modules of
+      // a container down its rail; rail mode is the reverse. A links list runs
+      // down.
+      horizontal: this.isBar() && (kind === 'sub') === (this.layout() === 'rail'),
       parents,
       under: path && path.ci !== null ? path.pi : null,
-      above:
-        path && path.ci === null && path.pi > 0 && !(this.entries()[path.pi].children ?? []).length
-          ? path.pi - 1
-          : null,
-      hasChildren: !!path && path.ci === null && (this.entries()[path.pi].children ?? []).length > 0,
       routes: this.uiRoutes(),
       module: {
         routeId: m?.routeId ?? '',
         icon: m?.icon ?? '',
         label: m?.label ?? '',
-        homeLabel: (m as PortalEntry | undefined)?.homeLabel ?? '',
         description: m?.description ?? '',
         disabled: !!m?.disabled,
       } satisfies ModuleDraft,
@@ -512,9 +521,23 @@ export class PortalPageComponent {
     title: {
       add: $localize`:@@Portal_add_module:Add a module`,
       edit: $localize`:@@Portal_edit_module:Edit module`,
+      addContainer: $localize`:@@Portal_add_container:Add a container`,
+      editContainer: $localize`:@@Portal_edit_container:Edit container`,
       addSub: $localize`:@@Portal_add_submodule:Add a sub-module`,
       editSub: $localize`:@@Portal_edit_submodule:Edit sub-module`,
     },
+  };
+}
+
+// A top-level module from the editor's draft. No children: a module holds
+// none, only a container does.
+function entryFromDraft(m: ModuleDraft): PortalEntry {
+  return {
+    routeId: m.routeId,
+    icon: m.icon,
+    label: m.label,
+    description: m.description,
+    disabled: m.disabled,
   };
 }
 
@@ -522,10 +545,9 @@ function clone(p: PortalEntry): PortalEntry {
   return { ...p, children: (p.children ?? []).map((c) => ({ ...c })) };
 }
 
-// The editor's draft is shared by parents and children, so it carries the
-// parent-only `homeLabel`. A child must NOT ship it: the settings API rejects
-// unknown fields, and one stray key would 400 the whole save (silently dropping
-// the sub-module). Keep only the fields a PortalSubEntry owns.
+// A sub-module from the editor's draft: only the fields a PortalSubEntry owns,
+// since the settings API rejects unknown fields and one stray key would 400
+// the whole save.
 function childFromDraft(m: ModuleDraft): PortalSubEntry {
   return {
     routeId: m.routeId,

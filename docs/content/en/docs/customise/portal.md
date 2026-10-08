@@ -28,23 +28,32 @@ applications.
 | **Links** | The list, in the order you chose, in the user button's **Applications** submenu and on the data-plane pages |
 | **Portal** | A navigation bar on every page of every application. The built-in pages then offer **one** link, the first entry the caller may open: the bar is the navigation, and a page outside the applications only needs a door |
 
-## What an entry carries
+## Modules and containers
+
+An entry is one of two things:
+
+- a **module** - an application: it opens a UI route, and inherits that route's
+  address **and its access**;
+- a **container** - no route: a label, an icon and a description of its own, and
+  modules inside it, its sub-modules. Clicking it opens the **first sub-module
+  the visitor may open**, and a container none of whose sub-modules the visitor
+  may open is not offered at all. A container holds modules, never another
+  container.
 
 | Field | What it does |
 |---|---|
-| Route | the UI route this entry opens. The entry inherits its address **and its access** |
-| Label | the name the application is offered under. Empty falls back to the route's name |
+| Route | a module's UI route. A container has none |
+| Label | the name the entry is offered under. Required on a container; on a module, empty falls back to the route's name |
 | Description | the entry's tooltip |
 | Disabled | off for everyone, without removing it from the list |
 
-In **Portal** mode an entry also carries what it takes to draw a bar: an icon,
-children, and the label of the "back here" row when it has any.
+In **Portal** mode an entry also carries an icon:
 
 | Field | What it does |
 |---|---|
 | Icon | a glyph picked from the console's bank, stored as SVG and drawn as a CSS mask - no icon font is ever loaded. Empty falls back to the label's initial |
-| Home label | what the "back to this application" row reads, when it has children |
-| Children | sub-applications shown on the secondary surface |
+
+In **Links** mode, a container's modules are listed in its place, in order.
 
 ## The catalogue says what exists, the route says who sees it
 

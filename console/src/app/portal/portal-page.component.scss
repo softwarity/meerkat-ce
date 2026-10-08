@@ -397,6 +397,16 @@
   border-bottom: none;
 }
 
+/* A container in the list: a folder before its label. */
+.link-row .kind {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  vertical-align: text-bottom;
+  margin-right: 4px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .link-row.off {
   opacity: 0.55;
 }

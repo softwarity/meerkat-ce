@@ -37,8 +37,8 @@ func (a *API) lookWriteTools() []mcp.Tool {
 				"header or rail, which side, what an entry shows, and the modules it lists. " +
 				"It takes the shape get_settings returns under \"portal\", so read it, change it, and send it " +
 				"back whole: what you leave out is removed. " +
-				"Every module binds to an ENABLED UI route by its id - list_routes gives them - and a module " +
-				"may carry children, shown in the bar's second surface. " +
+				"An entry is a MODULE, bound to an ENABLED UI route by its id - list_routes gives them - or a " +
+				"CONTAINER: no route, a label, and modules inside it, shown in the bar's second surface. " +
 				"An icon is named, not drawn: pass a Material Symbols name like \"storefront\" and the gateway " +
 				"stores the drawing. It takes effect at once, on every UI route.",
 			Schema: portalSchema(),
@@ -60,27 +60,41 @@ func (a *API) lookWriteTools() []mcp.Tool {
 }
 
 func portalSchema() map[string]any {
-	module := map[string]any{
+	sub := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
 			"routeId":     str("The id of an enabled UI route, from list_routes. Required."),
 			"label":       str("What the bar shows. Empty uses the route's own name."),
 			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
 			"description": str("The entry's tooltip."),
-			"homeLabel":   str("Parents only: what the 'back to this module' row reads when it has children."),
 			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
-			"children":    map[string]any{"type": "array", "description": "Sub-modules, same shape without children.", "items": map[string]any{"type": "object"}},
 		},
 		"required": []any{"routeId"},
 	}
+	entry := map[string]any{
+		"type": "object",
+		"description": "A MODULE (routeId set, no children) or a CONTAINER (no routeId, a label, and its modules " +
+			"in children). A container opens its first module the visitor may open, and is not shown when " +
+			"the visitor may open none of them.",
+		"properties": map[string]any{
+			"routeId":     str("A module's route: the id of an enabled UI route, from list_routes. Leave out for a container."),
+			"label":       str("What the bar shows. Required on a container; on a module, empty uses the route's own name."),
+			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
+			"description": str("The entry's tooltip."),
+			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
+			"children":    map[string]any{"type": "array", "description": "A container's modules, in order. Never on a module.", "items": sub},
+		},
+	}
 	return object(map[string]any{
-		"enabled": map[string]any{"type": "boolean", "description": "Off leaves every route its own user button, as before."},
-		"layout":  str("Which surface carries the top-level modules: \"header\" (tabs) or \"rail\"."),
+		"mode":    str("What the catalogue is drawn as: \"none\", \"links\" (a menu) or \"portal\" (the bar)."),
+		"layout":  str("Which surface carries the top-level entries: \"header\" (tabs) or \"rail\"."),
 		"side":    str("Which edge the rail takes: \"left\" or \"right\"."),
 		"display": str("What an entry shows: \"both\", \"icon\" or \"label\". The rail always shows both."),
 		"showAppName": map[string]any{"type": "boolean",
 			"description": "Write the branding name beside the logo in the bar."},
-		"parents": map[string]any{"type": "array", "description": "The top-level modules, in display order.", "items": module},
+		"hideLogo":   map[string]any{"type": "boolean", "description": "Take the branding's logo out of the bar."},
+		"logoRadius": map[string]any{"type": "integer", "description": "Round the logo, 0 (as drawn) to 50 (a circle)."},
+		"entries":    map[string]any{"type": "array", "description": "The top-level entries, in display order.", "items": entry},
 	})
 }
 

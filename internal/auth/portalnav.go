@@ -39,7 +39,6 @@ const portalNavJS = `(function () {
     apps: 'M240-160q-33 0-56.5-23.5T160-240q0-33 23.5-56.5T240-320q33 0 56.5 23.5T320-240q0 33-23.5 56.5T240-160Zm240 0q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm240 0q-33 0-56.5-23.5T640-240q0-33 23.5-56.5T720-320q33 0 56.5 23.5T800-240q0 33-23.5 56.5T720-160ZM240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400ZM240-640q-33 0-56.5-23.5T160-720q0-33 23.5-56.5T240-800q33 0 56.5 23.5T320-720q0 33-23.5 56.5T240-640Zm240 0q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Zm240 0q-33 0-56.5-23.5T640-720q0-33 23.5-56.5T720-800q33 0 56.5 23.5T800-720q0 33-23.5 56.5T720-640Z',
     menu: 'M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z',
     menuOpen: 'M120-240v-80h520v80H120Zm664-40L584-480l200-200 56 56-144 144 144 144-56 56ZM120-440v-80h400v80H120Zm0-200v-80h520v80H120Z',
-    home: 'M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Z',
     account: 'M234-276q51-39 114-61.5T480-360q69 0 132 22.5T726-276q35-41 54.5-93T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 59 19.5 111t54.5 93Zm246-164q-59 0-99.5-40.5T340-580q0-59 40.5-99.5T480-720q59 0 99.5 40.5T620-580q0 59-40.5 99.5T480-440Zm0 360q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z',
     left: 'M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z',
     right: 'M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z',
@@ -52,7 +51,6 @@ const portalNavJS = `(function () {
   function chromeC(path, cls) {
     return '<svg class="' + cls + '" viewBox="0 -960 960 960" aria-hidden="true" focusable="false"><path d="' + path + '"/></svg>';
   }
-  var HOME_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="' + P.home + '"/></svg>';
 
   var STYLE =
     ':host{all:initial;color-scheme:inherit;' +
@@ -592,8 +590,7 @@ const portalNavJS = `(function () {
     }
 
     // Build a rail. entries render as items; primary rails also carry a logo,
-    // the launcher and the user button. homeFor, when set, prepends a "home"
-    // row pointing back at that parent.
+    // the launcher and the user button.
     _buildRail(entries, opts) {
       var self = this, d = this._data;
       var rail = document.createElement('nav');
@@ -614,7 +611,6 @@ const portalNavJS = `(function () {
 
       var items = document.createElement('div'); items.className = 'ritems';
       this._ritemsEl = items;
-      if (opts.homeFor) items.appendChild(this._railItem(this._homeEntry(opts.homeFor), opts.homeCurrent));
       for (var i = 0; i < entries.length; i++) items.appendChild(this._railItem(entries[i], entries[i] === opts.currentEntry));
       rail.appendChild(items);
 
@@ -648,25 +644,14 @@ const portalNavJS = `(function () {
       this._render();
     }
 
-    // The "back to this module" row for a parent that has children: its own
-    // label (or homeLabel) and a home glyph, so it reads as the way back.
-    _homeEntry(parent) {
-      return {
-        id: parent.id, // selecting the home row selects its parent
-        label: parent.homeLabel || parent.label,
-        href: parent.href,
-        description: parent.description,
-        icon: HOME_SVG,
-      };
-    }
-
     // ---- children strip (rail mode) -------------------------------------
-    _buildStrip(parent, children, currentChild) {
+    // A container's modules, and nothing before them: a container has no page
+    // of its own to go back to.
+    _buildStrip(children, currentChild) {
       var d = this._data;
       var strip = document.createElement('nav'); strip.className = 'strip';
       strip.style[d.side === 'right' ? 'right' : 'left'] = RAIL_W + 'px';
       strip.style[d.side === 'right' ? 'left' : 'right'] = '0';
-      strip.appendChild(this._tab(this._homeEntry(parent), !currentChild && !!parent.href));
       for (var i = 0; i < children.length; i++) strip.appendChild(this._tab(children[i], children[i] === currentChild));
       return strip;
     }
@@ -703,7 +688,7 @@ const portalNavJS = `(function () {
         });
         wrap.appendChild(rail);
         var hasStrip = children.length > 0;
-        if (hasStrip) wrap.appendChild(this._buildStrip(this._current, children, currentChild));
+        if (hasStrip) wrap.appendChild(this._buildStrip(children, currentChild));
         this._offset('rail', d.side, hasStrip);
       } else {
         // parents in the header, children in the rail
@@ -711,8 +696,7 @@ const portalNavJS = `(function () {
         var hasRail = children.length > 0;
         if (hasRail) {
           var crail = this._buildRail(children, {
-            logo: false, footer: false, homeFor: this._current,
-            homeCurrent: !currentChild && !!this._current.href, currentEntry: currentChild
+            logo: false, footer: false, currentEntry: currentChild
           });
           crail.style.top = HEADER_H + 'px';
           wrap.appendChild(crail);

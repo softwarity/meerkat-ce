@@ -47,6 +47,12 @@
 - **The portal bar shows the right sub-modules on a sub-module's page.** A
   sub-module whose address is not under its parent's - `/plug` under a module at
   `/docs`, say - showed the first module's sub-modules instead of its own.
+- **Portal containers.** A portal entry is now a module - an application - or a
+  container: a label, an icon and the modules grouped in it, with no route of its
+  own. Clicking a container opens the first of its modules the visitor may open,
+  and a visitor who may open none of them does not see it. There is no "home
+  label" any more. An entry that was an application holding sub-modules is to be
+  redefined as a container.
 
 ---
 

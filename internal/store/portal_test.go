@@ -103,7 +103,8 @@ func TestSanitizePortalConfigDedups(t *testing.T) {
 	cfg := PortalConfig{
 		Layout: PortalHeader,
 		Entries: []PortalEntry{
-			{RouteID: "a", Children: []PortalSubEntry{{RouteID: "b"}, {RouteID: "b"}}},
+			{Label: "Tools", Children: []PortalSubEntry{{RouteID: "b"}, {RouteID: "b"}}},
+			{RouteID: "a"},
 			{RouteID: "a"}, // duplicate entry
 			{RouteID: "c"},
 		},
@@ -111,11 +112,29 @@ func TestSanitizePortalConfigDedups(t *testing.T) {
 	if err := SanitizePortalConfig(&cfg, portalRoutes()); err != nil {
 		t.Fatalf("valid config should pass, got %v", err)
 	}
-	if len(cfg.Entries) != 2 {
+	if len(cfg.Entries) != 3 {
 		t.Fatalf("duplicate entry should be dropped, got %d entries", len(cfg.Entries))
 	}
 	if got := len(cfg.Entries[0].Children); got != 1 {
 		t.Errorf("duplicate child should be dropped, got %d children", got)
+	}
+}
+
+// Two kinds of entry: a module is a route and holds nothing, a container holds
+// modules and needs a label of its own.
+func TestAnEntryIsAModuleOrAContainer(t *testing.T) {
+	for name, e := range map[string]PortalEntry{
+		"a module holding sub-modules": {RouteID: "a", Children: []PortalSubEntry{{RouteID: "b"}}},
+		"a container without a label":  {Children: []PortalSubEntry{{RouteID: "b"}}},
+	} {
+		cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{e}}
+		if err := SanitizePortalConfig(&cfg, portalRoutes()); err == nil {
+			t.Errorf("%s was accepted", name)
+		}
+	}
+	cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{{Label: " Tools ", Children: []PortalSubEntry{{RouteID: "b"}}}}}
+	if err := SanitizePortalConfig(&cfg, portalRoutes()); err != nil || !cfg.Entries[0].IsContainer() || cfg.Entries[0].Label != "Tools" {
+		t.Errorf("a container: %v %+v", err, cfg.Entries)
 	}
 }
 
