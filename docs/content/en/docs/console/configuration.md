@@ -209,6 +209,8 @@ is intentional and named (*the Acme setup*), the other automatic and timestamped
 
 ## Snapshot
 
+![The Snapshot tab: the pause, the database this gateway runs on, the download and the steps to restore](img/console/database.webp)
+
 A coherent copy of the **whole database**, taken while the gateway runs: routes
 and vault, but also users, organisations, sessions and the audit trail. This is
 what a backup restores; a configuration export is what a second gateway

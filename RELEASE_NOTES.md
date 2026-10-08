@@ -14,27 +14,28 @@
   password: the names a group rule is written against.
 - **A group rule opens in a right drawer**, like every other editor, at its own
   address: a refresh or a pasted link comes back to it.
-- **plug 2.21.10 for the developer tunnel.** A plug installed from the gateway no
-  longer looks for agent updates, announces them or asks whether to apply one: its
-  version, and the agents it reaches, are the gateway's to decide.
-- **A portal module changes level without being recreated.** Every move sits in
-  one row at the top of its editor: up and down, indent under the module above,
-  detach to the top level, and "Move under" any other module, with its label,
-  icon and state. A module that has sub-modules stays at its level.
+- **A portal module changes place without being recreated.** Its editor moves it
+  along its surface - arrows that point the way the bar runs there, across or down -
+  and "Move under" puts it in a container or back at the top level, with its label,
+  icon and state.
 - **plug 2.22.0, installed under the application's name.** The install command on
   the plug page and on a developer's key page creates the profile named after the
   application - shown in the command, so a second gateway with the same branding
   is renamed right there - and the key commands use that same name: a developer
   with several gateways tells them apart by name rather than by host. The install
   now hands the terminal back as soon as it is done, and ends by saying where the
-  key goes: the developer's profile on this gateway.
+  key goes: the developer's profile on this gateway. A plug installed from the
+  gateway no longer looks for agent updates, announces them or asks: its version is
+  the gateway's to decide.
 - **The routes screen shows each service's replicas, live.** A route's heart is
   green when every replica of its service is ready, orange when only some are, and
-  red when none is, with the count beside the name (`2/3`) and the image they run
-  after the upstream - two images during a rollout. It follows the runtime's own
+  red when none is, with the count under the heart (`2/3`) and the image they run
+  under the route's name - two images during a rollout; the UI and traced marks sit
+  at the end of that second line, faint when off. It follows the runtime's own
   events (Kubernetes, Docker, every node of a Swarm), so a replica that dies shows
   at once, and nothing is asked on a timer. The Helm chart grants the read it needs
-  (`rbac.watch`, on by default); the Compose file and the Swarm stack now run a
+  (`rbac.watch`, on by default), and in the other namespaces the routes point at when
+  they are listed (`rbac.watchNamespaces`); the Compose file and the Swarm stack now run a
   read-only proxy of the Docker socket, which also brings the route editor's
   service list to Swarm.
 - **An administrator's agent can test the services behind the routes.** Two new

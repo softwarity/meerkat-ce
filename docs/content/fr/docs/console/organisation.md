@@ -72,6 +72,8 @@ restent séparés : Users traite du compte, cet écran de son affectation.
 
 ## Group rules
 
+![Une règle de groupe ouverte dans son tiroir : l'autorité, le groupe amont, et le groupe de l'organisation qu'elle accorde](img/console/group-rules.webp)
+
 Ce que déclare une **autorité**, converti ici en appartenance et en groupes. Une
 organisation ou une équipe GitHub, un groupe LDAP, une revendication (claim) émise par
 un fournisseur d'identité : une règle énonce *toute personne venant de cette autorité*,

@@ -16,7 +16,7 @@ in an organisation and grants roles. Switch every authority off and nobody signs
 in to the data plane, which is what a gateway serving only public routes may
 want.
 
-![The Authentication screen: the self-registration switch and one row for the local accounts](img/console/auth-providers.webp)
+![The Authentication screen: the self-registration switch and a row per authority - the local accounts, a directory and GitHub](img/console/auth-providers.webp)
 
 A fresh installation: self-registration off, and a single authority - the
 passwords held here - which is switched on.
@@ -50,6 +50,8 @@ but it owns two questions, and opening it asks them:
 > of it here.
 
 ## Adding an authority
+
+![A directory open in its editor: the kind, the server, the search base, the service account read from the vault](img/console/auth-provider-editor.webp)
 
 The kind is chosen first, and cannot be changed afterwards.
 
@@ -100,6 +102,8 @@ application:
   provider that already challenges).
 
 ## Before you leave the editor
+
+![The foot of the editor: the policies, and the Test section that asks the directory about someone and lists who came in through it](img/console/auth-provider-test.webp)
 
 **Test the connection** actually reaches the server and says what came back.
 Do it before telling anyone the authority is ready. Deletion is in the danger

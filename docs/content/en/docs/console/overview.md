@@ -135,7 +135,7 @@ signs out every console tab at once.
 
 ## Version and release notes
 
-![The release notes: Meerkat 1.0.1, its patch notes, then 1.0.0](img/console/release-notes.webp)
+![The release notes, open on what the next release brings](img/console/release-notes.webp)
 
 **Meerkat, Release notes** says which version runs, and which edition, in its
 title: **Meerkat 1.0.1 EE** (or **CE**). Underneath, the release notes, newest

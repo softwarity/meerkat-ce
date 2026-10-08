@@ -18,6 +18,8 @@ administrateurs : c'est l'API qui délimite le périmètre de chaque appel.
 
 ## Les sections
 
+![La section General d'une organisation : son nom, si elle est active, sa description et ses heures ouvrées](img/console/tenants.webp)
+
 Chaque section est une route à part entière : vous pouvez donc créer un lien direct
 vers l'une d'elles.
 

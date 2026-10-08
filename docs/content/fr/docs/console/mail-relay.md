@@ -19,6 +19,8 @@ récapitulatif quotidien.
 
 ## Le relais
 
+![L'écran Mail relay : le serveur, sa sécurité, l'adresse d'expédition, l'authentification par mot de passe, l'envoi de test et le digest quotidien](img/console/mail-relay.webp)
+
 - **Host**, **Port**, **Security** - `STARTTLS`, `TLS` ou aucune.
 - **Sender address** - elle se règle ici parce qu'un fournisseur n'accepte que le
   compte qu'il a authentifié. Vide, le champ signifie *le compte*, à condition que le

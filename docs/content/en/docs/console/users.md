@@ -73,6 +73,8 @@ its tokens. The audit trail keeps an anonymised trace.
 
 ## Infra > Model: the fields an account carries
 
+![The Model screen, where the fields an account carries are declared](img/console/model.webp)
+
 What this installation knows about a person that the product could not have
 guessed: an employee number, a cost centre, a contract reference.
 

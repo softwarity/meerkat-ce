@@ -23,7 +23,7 @@ theme's tokens, so they follow your palette without a rebuild.
 | `/profile` and its sub-pages | the account's own pages: password, second factor, passkeys, authorities, history, tokens |
 | the unavailable page | a route whose service is down, or the global switch |
 
-## One screen, three tabs, one preview
+## One screen, four tabs, one preview
 
 Colours, arrangement and identity were three jobs, each with its own options on one side and the
 **same** preview on the other, each showing a page the other two also decide. They are one
@@ -31,6 +31,9 @@ subject - what the visitor sees - so they are one entry with three tabs, and the
 the left only.
 The preview never moves, and the theme carousel stays under it on all three: trying a colour while
 judging an arrangement is the normal way round, not a special case.
+
+A fourth tab, **Locale**, holds the pages' words: every text of every page, language by
+language, each one changeable where it is shown - see [Languages](#languages).
 
 The tabs are real URLs, so a bookmark on the layout gallery comes back to the layout gallery.
 
@@ -80,6 +83,8 @@ it is put back on a browser that has never seen them - exactly like their langua
 [light and dark](/docs/customise/color-scheme) for what a proxied application does with it.
 
 ## Languages
+
+![The Locale tab: the texts of the sign-in page in English, each one editable, beside the preview](img/console/built-in-pages-locale.webp)
 
 Twenty catalogues are embedded in the binary, one JSON file per language: Arabic, German, English,
 Spanish, French, Hebrew, Hindi, Indonesian, Italian, Japanese, Korean, Dutch, Polish, Portuguese,

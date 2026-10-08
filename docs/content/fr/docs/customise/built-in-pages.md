@@ -23,7 +23,7 @@ elles lisent les jetons du thème : elles suivent donc votre palette sans recomp
 | `/profile` et ses sous-pages | les pages du compte lui-même : mot de passe, second facteur, passkeys, autorités, historique, jetons |
 | la page d'indisponibilité | une route dont le service est arrêté, ou l'interrupteur global |
 
-## Un écran, trois onglets, un aperçu
+## Un écran, quatre onglets, un aperçu
 
 Les couleurs, la disposition et l'identité formaient trois tâches distinctes, avec pour
 chacune ses options d'un côté et le **même** aperçu de l'autre, chacune montrant une page
@@ -32,6 +32,9 @@ et donc d'une seule entrée à trois onglets, les onglets n'occupant que la part
 L'aperçu ne bouge jamais, et le carrousel des thèmes reste dessous dans les trois onglets :
 essayer une couleur tout en jugeant une disposition est la façon normale de travailler, pas
 un cas particulier.
+
+Un quatrième onglet, **Locale**, porte les mots des pages : chaque texte de chaque page,
+langue par langue, chacun modifiable là où il s'affiche - voir [Les langues](#les-langues).
 
 Les onglets sont de vraies URL : un marque-page posé sur la galerie des dispositions ramène
 à la galerie des dispositions.
@@ -86,6 +89,8 @@ Il est donc rétabli sur un navigateur qui ne l'a jamais vu - exactement comme s
 derrière la gateway.
 
 ## Les langues
+
+![L'onglet Locale : les textes de la page de connexion en anglais, chacun modifiable, à côté de l'aperçu](img/console/built-in-pages-locale.webp)
 
 Vingt catalogues sont embarqués dans le binaire, à raison d'un fichier JSON par langue :
 arabe, allemand, anglais, espagnol, français, hébreu, hindi, indonésien, italien, japonais,

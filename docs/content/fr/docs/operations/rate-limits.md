@@ -111,7 +111,7 @@ la cardinalité, un niveau plus bas.
 
 L'écran se trouve dans **Infra > Endpoint rate limits**.
 
-![Endpoint rate limits : trois opérations dotées de leurs propres bornes, par utilisateur ou pour l'opération entière](img/console/endpoint-limits.webp)
+![Endpoint rate limits : trois opérations dotées de leurs propres bornes, par utilisateur ou par adresse](img/console/endpoint-limits.webp)
 
 ## En cluster : lisez le chiffre deux fois
 

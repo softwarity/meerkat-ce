@@ -141,7 +141,7 @@ tous les onglets de la console.
 
 ## Version et notes de version
 
-![Les notes de version : Meerkat 1.0.1, les notes de ce correctif, puis la 1.0.0](img/console/release-notes.webp)
+![Les notes de version, ouvertes sur ce qu'apporte la prochaine version](img/console/release-notes.webp)
 
 **Meerkat, Release notes** indique dans son titre la version en service et son
 édition : **Meerkat 1.0.1 EE** (ou **CE**). En dessous, les notes de version, de la

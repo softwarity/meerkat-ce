@@ -22,7 +22,7 @@ An admin token opens the console's own API without a browser. It acts **with you
 own powers**, narrowed by its perimeter, and it authenticates on the admin port as
 `Authorization: Bearer mk_...`.
 
-![The Access tokens screen: three console tokens and two application tokens, with their owner, plane, perimeter and last use](img/console/access-tokens.webp)
+![The Access tokens screen: three console tokens, with their owner, plane, perimeter and last use](img/console/access-tokens.webp)
 
 Five tokens: three for the console - full access from `10.20.0.0/16` only, read
 only, and scheduled calls only - and two application tokens their owners created
@@ -84,6 +84,8 @@ beside the account's - *admin, via claude-desktop*, not *admin* - and a
 other change.
 
 ## API
+
+![API reference: the control plane's REST reference, its calls tried with the console session](img/console/api-reference.webp)
 
 **Meerkat, API reference** shows the control plane's own REST reference - the
 swagger-ui page the gateway serves - and the calls are tried **with your real

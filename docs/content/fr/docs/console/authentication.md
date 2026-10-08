@@ -18,7 +18,7 @@ attribué de rôles. Désactivez toutes les autorités et plus personne ne se co
 plan de données - ce qui peut convenir à une gateway qui ne sert que des routes
 publiques.
 
-![L'écran Authentication : l'interrupteur de l'auto-inscription et une ligne pour les comptes locaux](img/console/auth-providers.webp)
+![L'écran Authentication : l'interrupteur de l'auto-inscription et une ligne par autorité - les comptes locaux, un annuaire et GitHub](img/console/auth-providers.webp)
 
 Une installation toute neuve : l'auto-inscription est désactivée, et il n'y a qu'une
 autorité - les mots de passe détenus ici -, qui est activée.
@@ -54,6 +54,8 @@ l'ouvre :
 > ne risquez donc pas de vous en interdire l'accès depuis cet écran.
 
 ## Ajouter une autorité
+
+![Un annuaire ouvert dans son éditeur : le type, le serveur, la base de recherche, le compte de service lu dans le coffre](img/console/auth-provider-editor.webp)
 
 Le type se choisit en premier, et ne peut plus être modifié ensuite.
 
@@ -105,6 +107,8 @@ fois la possibilité de s'en remettre à l'application :
   qui demande déjà un second facteur).
 
 ## Avant de quitter l'éditeur
+
+![Le pied de l'éditeur : les politiques, et la section Test qui interroge l'annuaire sur quelqu'un et liste qui est entré par lui](img/console/auth-provider-test.webp)
 
 **Test the connection** contacte réellement le serveur et affiche sa réponse.
 Lancez ce test avant d'annoncer à qui que ce soit que l'autorité est prête. La

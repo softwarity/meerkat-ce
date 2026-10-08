@@ -56,6 +56,8 @@ c'est son enregistrement qui modifie ce que sert un thème en service.
 
 ## Layout
 
+![L'onglet Layout : cinq dispositions, la taille du logo et le côté, avec les aperçus à côté](img/console/built-in-pages-layout.webp)
+
 **Arrangement** est une galerie de maquettes : l'emplacement de la marque, de l'image
 et du formulaire. En choisir une met aussitôt l'aperçu à jour.
 

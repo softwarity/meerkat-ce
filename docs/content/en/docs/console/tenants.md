@@ -18,6 +18,8 @@ API scopes every call.
 
 ## The sections
 
+![An organisation's General section: its name, whether it is enabled, its description and its working hours](img/console/tenants.webp)
+
 Each is a route of its own, so deep links work.
 
 | Section | What it holds |

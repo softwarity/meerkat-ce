@@ -60,6 +60,8 @@ conserve un événement. Voir [le journal d'audit](/docs/operations/audit).
 
 ## Issues
 
+![L'écran Issues : l'interrupteur qui ajoute « Report an issue » au bouton utilisateur, et les signalements avec leur statut](img/console/issues.webp)
+
 Les signalements que vos utilisateurs déposent depuis le bouton utilisateur injecté :
 une description, une capture d'écran et le contexte relevé par le navigateur.
 

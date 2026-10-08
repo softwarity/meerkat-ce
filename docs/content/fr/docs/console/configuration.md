@@ -226,6 +226,8 @@ second automatique et horodaté (*l'état à 14 h 32*).
 
 ## Snapshot
 
+![L'onglet Snapshot : la pause, la base sur laquelle tourne la gateway, le téléchargement et les étapes de restauration](img/console/database.webp)
+
 Une copie cohérente de **toute la base de données**, prise pendant que la gateway
 tourne : les routes et le coffre, mais aussi les utilisateurs, les organisations, les
 sessions et le journal d'audit. C'est ce que restaure une sauvegarde ; un export de

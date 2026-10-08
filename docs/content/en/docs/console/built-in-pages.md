@@ -54,6 +54,8 @@ changes what a live theme serves.
 
 ## Layout
 
+![The Layout tab: five arrangements, the logo size and the side, with the previews beside them](img/console/built-in-pages-layout.webp)
+
 **Arrangement** is a gallery of mock-ups - where the brand, the picture and the
 form sit. Picking one updates the preview at once.
 

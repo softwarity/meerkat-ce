@@ -24,7 +24,7 @@ Un jeton d'administration donne accès à l'API de la console sans navigateur. I
 **avec vos propres pouvoirs**, réduits par son périmètre, et s'authentifie sur le port
 d'administration avec `Authorization: Bearer mk_...`.
 
-![L'écran Access tokens : trois jetons de console et deux jetons d'application, avec leur propriétaire, leur plan, leur périmètre et leur dernière utilisation](img/console/access-tokens.webp)
+![L'écran Access tokens : trois jetons de console, avec leur propriétaire, leur plan, leur périmètre et leur dernière utilisation](img/console/access-tokens.webp)
 
 Cinq jetons : trois pour la console - un accès complet depuis `10.20.0.0/16`
 uniquement, un en lecture seule et un réservé aux appels planifiés - et deux jetons
@@ -91,6 +91,8 @@ un [point de reprise](/docs/console/configuration) est créé à sa suite, comme
 autre modification.
 
 ## API
+
+![API reference : la référence REST du plan de contrôle, ses appels essayés avec la session de la console](img/console/api-reference.webp)
 
 **Meerkat, API reference** affiche la référence REST du plan de contrôle - la page
 swagger-ui que sert la gateway - et les appels s'y essaient **avec votre véritable

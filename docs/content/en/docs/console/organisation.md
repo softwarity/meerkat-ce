@@ -68,6 +68,8 @@ apart: Users is the account, this is the assignment.
 
 ## Group rules
 
+![A group rule open in its drawer: the authority, the upstream group, and the group of the organisation it grants](img/console/group-rules.webp)
+
 What an **authority** says, turned into membership and groups here. A GitHub
 organisation or team, an LDAP group, a claim from an identity provider: a rule
 says *anyone from this authority*, or *anyone whose group is X*, and grants the

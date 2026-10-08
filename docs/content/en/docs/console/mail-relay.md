@@ -18,6 +18,8 @@ code by e-mail, and the daily digest.
 
 ## The relay
 
+![The Mail relay screen: the server, its security, the sender address, password authentication, the test send and the daily digest](img/console/mail-relay.webp)
+
 - **Host**, **Port**, **Security** - `STARTTLS`, `TLS` or none.
 - **Sender address** - it lives here because a provider only accepts the account
   it authenticated. Empty means *the account*, as long as the account is itself

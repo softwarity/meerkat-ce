@@ -76,6 +76,8 @@ ses jetons. Le journal d'audit en conserve une trace anonymisée.
 
 ## Infra > Model : les champs que porte un compte
 
+![L'écran Model, où se déclarent les champs que porte un compte](img/console/model.webp)
+
 Ce que cette installation sait d'une personne et que le produit ne pouvait pas
 deviner : un matricule, un centre de coût, une référence de contrat.
 

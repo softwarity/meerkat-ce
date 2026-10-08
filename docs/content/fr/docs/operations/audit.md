@@ -185,7 +185,7 @@ route : un événement que rien n'enverrait jamais, c'est un journal qui semble 
 l'est pas. Les règles qu'une configuration apporte depuis l'image Enterprise sont conservées
 avec la route sans être appliquées, et vous pouvez toujours les supprimer.
 
-![Endpoint audit avec l'opération de remboursement ouverte : deux champs tirés de l'appel, et le corps JSON transmis](img/console/endpoint-audit.webp)
+![Endpoint audit : les opérations de la spec d'une route, et celles qui laissent un événement d'audit](img/console/endpoint-audit.webp)
 
 | Toujours transmis | |
 |---|---|

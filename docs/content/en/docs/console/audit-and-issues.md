@@ -59,6 +59,8 @@ an event. See
 
 ## Issues
 
+![The Issues screen: the switch that offers "Report an issue" in the user button, and the reports with their status](img/console/issues.webp)
+
 The reports your users file from the injected user button: a description, a
 screenshot, and the context the browser captured.
 
