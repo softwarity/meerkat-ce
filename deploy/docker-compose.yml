@@ -19,11 +19,45 @@ services:
       # Read once, on the FIRST start, to create the admin account. Leave it
       # set afterwards or remove it; it is never used again.
       MEERKAT_ADMIN_PASSWORD: ${MEERKAT_ADMIN_PASSWORD:?set a password for the first admin}
+      # The runtime, through the read-only proxy below: the route editor
+      # offers the containers it finds, and the routes screen shows whether
+      # each target runs and on which image, as Docker's events say.
+      DOCKER_HOST: tcp://docker-proxy:2375
+    networks: [default, runtime]
     volumes:
       # Everything the gateway knows: routes, accounts, the sealed vault, the
       # certificates. Back this up and you have backed up the gateway.
       - meerkat-data:/data
     restart: unless-stopped
+
+  # The Docker socket, behind a filter that refuses every write: the gateway
+  # reads the runtime, it never acts on it. Mounting the socket itself into
+  # the gateway would hand whoever controls the gateway the whole host.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    environment:
+      # What it lets through: reads only (POST stays 0, the default), and only
+      # what the gateway reads - the services and their tasks, the containers,
+      # the networks, the images for their declared ports, the nodes, and the
+      # event stream that says when any of them changes.
+      SERVICES: 1
+      TASKS: 1
+      CONTAINERS: 1
+      NETWORKS: 1
+      IMAGES: 1
+      NODES: 1
+      EVENTS: 1
+      INFO: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Its own network, which only the gateway joins: none of the applications
+    # it routes to can reach it.
+    networks: [runtime]
+    restart: unless-stopped
+
+networks:
+  runtime:
+    internal: true
 
 volumes:
   meerkat-data:

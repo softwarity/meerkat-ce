@@ -90,6 +90,16 @@
     "guard": "infraAdmin"
   },
   {
+    "method": "POST",
+    "path": "/api/auth-providers/{id}/lookup",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth-providers/{id}/people",
+    "guard": "infraAdmin"
+  },
+  {
     "method": "GET",
     "path": "/api/backup",
     "guard": "rootOnly"

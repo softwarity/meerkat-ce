@@ -1064,7 +1064,15 @@ CREATE TABLE IF NOT EXISTS schedule_runs (
   detail      TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_schedule_runs_of ON schedule_runs (schedule_id, ended_at);
-CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);`
+CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);
+-- The SAML assertions already spent (v75, AUTH-19): an assertion is a bearer
+-- credential for its few minutes of validity, so the one this gateway has
+-- accepted is refused a second time - on every node, hence a table and not a
+-- map. Kept until it would have expired anyway, then swept with the upkeep.
+CREATE TABLE IF NOT EXISTS saml_assertions (
+  id      TEXT PRIMARY KEY,
+  expires BIGINT NOT NULL
+);`
 
 // schemaVersion is a VERSION, not a count of migrations.
 //
@@ -1077,7 +1085,7 @@ CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);`
 // installation is stamped 69, and checkNotNewer refuses to open a database
 // stamped higher than the build knows - so restarting the count at 1 would stop
 // every existing installation from starting.
-const schemaVersion = 74
+const schemaVersion = 75
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

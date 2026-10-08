@@ -868,6 +868,21 @@
    "fr": "L'état de l'upstream s'affiche hors service quand le service est réduit à 0 instance, en service quand il revient."
   },
   {
+   "id": "SVC-07",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Scaling a service from 3 to 2 replicas turns its route orange (2/3) and back to green, without reloading the screen; the image it runs shows beside the upstream.",
+   "fr": "Passer un service de 3 à 2 répliques met sa route en orange (2/3) puis de nouveau en vert, sans recharger l'écran ; l'image qu'il exécute s'affiche à côté de l'upstream."
+  },
+  {
    "id": "ROUTE-05",
    "priority": "P2",
    "feasibility": "easy",

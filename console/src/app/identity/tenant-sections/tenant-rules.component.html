@@ -1,3 +1,5 @@
+<mat-drawer-container>
+  <mat-drawer-content>
 <p class="intro text-muted" i18n="@@Group_rules_intro">
   Whoever signs in with this upstream group becomes a member here, with this group.
 </p>
@@ -50,27 +52,29 @@
             @if (r.providerName && r.external) {
               <span class="pill" [matTooltip]="r.providerName">{{ r.providerName }}</span>
             }
-          </mat-cell>
-        </ng-container>
-
-        <ng-container matColumnDef="actions">
-          <mat-header-cell *matHeaderCellDef></mat-header-cell>
-          <mat-cell *matCellDef="let r">
-            <button
-              matIconButton
-              (click)="$event.stopPropagation(); remove(r)"
-              i18n-matTooltip="@@Delete"
-              matTooltip="Delete"
-              i18n-aria-label="@@Delete"
-              aria-label="Delete"
-            >
-              <mat-icon>delete</mat-icon>
-            </button>
+            <!-- The row action lives in the LAST existing column. -->
+            <span rowActions="tonal">
+              <button
+                matIconButton
+                (click)="$event.stopPropagation(); remove(r)"
+                i18n-matTooltip="@@Delete"
+                matTooltip="Delete"
+                i18n-aria-label="@@Delete"
+                aria-label="Delete"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </span>
           </mat-cell>
         </ng-container>
 
         <mat-header-row *matHeaderRowDef="columns; sticky: true"></mat-header-row>
-        <mat-row *matRowDef="let r; columns: columns" class="clickable" (click)="edit(r)"></mat-row>
+        <mat-row
+          *matRowDef="let r; columns: columns"
+          class="clickable"
+          [class.selected]="editingRule()?.id === r.id"
+          (click)="open(r)"
+        ></mat-row>
       </mat-table>
     </div>
   }
@@ -78,7 +82,7 @@
   <button
     matFab
     class="fab-new"
-    (click)="edit()"
+    (click)="openNew()"
     i18n-matTooltip="@@New_rule"
     matTooltip="New rule"
     i18n-aria-label="@@New_rule"
@@ -87,3 +91,20 @@
     <mat-icon>add</mat-icon>
   </button>
 }
+  </mat-drawer-content>
+
+  <mat-drawer class="editor-drawer" position="end" mode="over" [opened]="editing() !== null" (closedStart)="closeEditor()">
+    @if (editing() !== null) {
+      <app-rule-editor
+        [rule]="editingRule()"
+        [tenantName]="scope.tenant()?.name ?? ''"
+        [groups]="groups()"
+        [authorities]="enabledAuthorities()"
+        [reported]="reported()"
+        (saved)="save($event)"
+        (deleted)="remove($event)"
+        (closed)="closeEditor()"
+      />
+    }
+  </mat-drawer>
+</mat-drawer-container>

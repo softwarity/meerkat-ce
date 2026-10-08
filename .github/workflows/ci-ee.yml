@@ -311,8 +311,8 @@ jobs:
         include:
           - directory: OpenLDAP
             service: openldap
-            tests: 'TestLDAPDirectorySignIn|TestLDAPRefusesBadCredentials|TestLDAPNestedGroupsCanBeTurnedOff'
-            expect: 3
+            tests: 'TestLDAPDirectorySignIn|TestLDAPRefusesBadCredentials|TestLDAPNestedGroupsCanBeTurnedOff|TestLDAPLookupWithoutPassword'
+            expect: 4
           - directory: Active Directory
             service: samba
             tests: 'TestLDAPActiveDirectorySignIn'
@@ -320,6 +320,10 @@ jobs:
           - directory: OIDC (Dex)
             service: dex
             tests: 'TestOIDCAgainstDex'
+            expect: 1
+          - directory: SAML (SimpleSAMLphp)
+            service: simplesamlphp
+            tests: 'TestSAMLAgainstSimpleSAMLphp'
             expect: 1
     steps:
       - id: token
@@ -339,9 +343,22 @@ jobs:
         with:
           go-version: stable
           cache: false
+      # The identity provider's signing certificate is made, not shipped: the
+      # image's own expired in 2020, and a private key has no place in git.
+      - name: Make the identity provider's certificate
+        if: matrix.service == 'simplesamlphp'
+        run: sh test/ldap/simplesamlphp/cert.sh
       - name: Start ${{ matrix.directory }}
         working-directory: test/ldap
         run: docker compose up -d ${{ matrix.service }}
+      - name: Wait for the identity provider
+        if: matrix.service == 'simplesamlphp'
+        run: |
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:18090/simplesaml/saml2/idp/metadata.php && exit 0
+            sleep 2
+          done
+          docker logs meerkat-simplesamlphp | tail -30; exit 1
       # The domain controller provisions itself before it answers, and it is
       # the only one that needs seeding afterwards.
       - name: Wait for the domain controller
@@ -359,7 +376,7 @@ jobs:
         env:
           EXPECT: ${{ matrix.expect }}
         run: |
-          go test -tags ee ./ee/directories/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
+          go test -tags ee ./ee/directories/ ./ee/saml/ ./internal/idp/ -run '${{ matrix.tests }}' -count=1 -v 2>&1 | tee out.txt
           ran=$(grep -c -- '--- PASS' out.txt)
           echo "$ran of $EXPECT expected tests ran against ${{ matrix.directory }}"
           [ "$ran" -eq "$EXPECT" ] || { echo "the server was not reached"; exit 1; }

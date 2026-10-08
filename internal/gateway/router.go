@@ -123,6 +123,9 @@ type Router struct {
 	// targets is whether each route's upstream is there at all, as the last
 	// round of the target check found it (targets.go). Per node too.
 	targets *targetStates
+	// reloaded is poked after each reload, so a new route's target is found
+	// out at once rather than at the next event (targets.go). One slot.
+	reloaded chan struct{}
 
 	// opsSlots holds, per route id, WHICH operations its requests are
 	// attributed to (endpoints.go). Kept OUTSIDE the compiled routes on
@@ -192,7 +195,8 @@ func New(st *store.Store, sm *session.Manager) *Router {
 		panic(err) // the OS entropy source is gone; nothing sensible remains
 	}
 	return &Router{st: st, sm: sm, lottery: rand.Float64, simTokenKey: key,
-		breakers: newBreakers(), targets: newTargetStates(), metrics: metrics.NewRegistry()}
+		breakers: newBreakers(), targets: newTargetStates(), reloaded: make(chan struct{}, 1),
+		metrics: metrics.NewRegistry()}
 }
 
 // Reload compiles the enabled routes from the store and swaps them in
@@ -384,6 +388,10 @@ func (rt *Router) Reload(ctx context.Context) error {
 	}
 	rt.mu.Unlock()
 	rt.loaded.Store(true)
+	select {
+	case rt.reloaded <- struct{}{}:
+	default:
+	}
 	slog.Info("routes reloaded", "count", len(compiled), "left out", len(problems))
 	return nil
 }

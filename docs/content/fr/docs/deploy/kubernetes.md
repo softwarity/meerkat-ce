@@ -412,16 +412,29 @@ Faites donc pointer `MEERKAT_DATABASE_URL` vers un nom qui suit le primaire
 plutôt que vers un hôte, et mesurez la fenêtre de bascule de votre base : c'est
 pendant cette fenêtre qu'aucun nœud n'est prêt.
 
-## Optionnel : laisser l'éditeur de routes voir le namespace
+## Optionnel : laisser la gateway voir le namespace
 
-La gateway peut lister les Services de SON PROPRE namespace et les proposer au moment où
-quelqu'un crée une route : un upstream se choisit alors dans une liste au lieu d'être une URL
-à saisir. Il n'y a pas d'interrupteur pour cela : ce qui ouvre la fonction, ce sont les
-droits qu'accorde le déploiement. Le ServiceAccount a besoin de list sur services dans son
-propre namespace et de rien d'autre - aucun secret, aucun pod, aucun autre namespace - et,
-sans ce droit, la console indique lequel lui manque, la saisie libre restant exactement ce
-qu'elle était. Le tunnel développeur en demande davantage, et les droits qu'il reçoit sont
-détaillés sur la page [Une gateway](/docs/deploy/one-gateway).
+La gateway lit SON PROPRE namespace pour deux choses. L'éditeur de routes propose ses
+Services : un upstream se choisit alors dans une liste au lieu d'être une URL à saisir. Et
+la liste des routes montre, pour chaque service, combien de ses répliques sont prêtes et
+quelle image elles exécutent - vert quand toutes le sont, orange quand une partie l'est,
+rouge quand aucune ne l'est - tenu à jour par les événements de l'API server plutôt que par
+une interrogation à intervalle régulier (voir [Santé des upstreams](/docs/operations/upstream-health)).
+
+Il n'y a d'interrupteur ni pour l'un ni pour l'autre : ce qui les ouvre, ce sont les droits
+qu'accorde le déploiement. Le chart accorde les deux (`rbac.read` et `rbac.watch`, actifs
+par défaut). À la main, le ServiceAccount a besoin de `list` et `watch` sur les services et
+les pods de son propre namespace, et de rien d'autre - aucun secret, aucun autre namespace.
+Sans les pods, l'éditeur propose toujours les Services et les cibles sont vérifiées par une
+connexion ; sans rien, la console indique le droit qui lui manque, la saisie libre restant
+exactement ce qu'elle était.
+
+Lire les pods, c'est lire les variables d'environnement que déclarent leurs manifestes. Là
+où un manifeste porte un secret en clair, mettez `rbac.watch: false`, ou mieux, rangez ce
+secret dans un Secret.
+
+Le tunnel développeur en demande davantage, et les droits qu'il reçoit sont détaillés sur
+la page [Une gateway](/docs/deploy/one-gateway).
 
 ::: details Le Role et son binding
 ```yaml
@@ -435,11 +448,12 @@ kind: Role
 metadata:
   name: meerkat-services
 rules:
-  # Lister les Services de CE namespace, et rien d'autre : aucun secret,
-  # aucun pod, aucun autre namespace.
+  # Lire les Services et les pods de CE namespace, et rien d'autre : aucun
+  # secret, aucun autre namespace. watch est ce qui tient l'écran des routes
+  # à jour sans interroger à intervalle régulier.
   - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["list"]
+    resources: ["services", "pods"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

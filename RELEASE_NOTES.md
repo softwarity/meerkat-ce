@@ -2,6 +2,42 @@
 
 ## NEXT RELEASE
 
+- **SAML 2.0 sign-in** (Enterprise). A SAML identity provider - ADFS, Entra ID,
+  Okta, Shibboleth - is an authority like an OIDC one: a button on the sign-in
+  page, its signed answer verified against the certificate in its metadata, and
+  refused for another audience, outside its validity window, unsolicited, or
+  posted a second time. The screen hands over the entity ID, the reply URL and
+  the gateway's own metadata for the provider's admin to import.
+- **What an authority says, before writing a rule.** An authority's editor shows
+  who came in through it, with the groups each reported at their last sign-in -
+  GitHub, OIDC and SAML included - and asks a directory about anyone, without a
+  password: the names a group rule is written against.
+- **A group rule opens in a right drawer**, like every other editor, at its own
+  address: a refresh or a pasted link comes back to it.
+- **plug 2.21.10 for the developer tunnel.** A plug installed from the gateway no
+  longer looks for agent updates, announces them or asks whether to apply one: its
+  version, and the agents it reaches, are the gateway's to decide.
+- **A portal module changes level without being recreated.** Every move sits in
+  one row at the top of its editor: up and down, indent under the module above,
+  detach to the top level, and "Move under" any other module, with its label,
+  icon and state. A module that has sub-modules stays at its level.
+- **plug 2.22.0, installed under the application's name.** The install command on
+  the plug page and on a developer's key page creates the profile named after the
+  application - shown in the command, so a second gateway with the same branding
+  is renamed right there - and the key commands use that same name: a developer
+  with several gateways tells them apart by name rather than by host. The install
+  now hands the terminal back as soon as it is done, and ends by saying where the
+  key goes: the developer's profile on this gateway.
+- **The routes screen shows each service's replicas, live.** A route's heart is
+  green when every replica of its service is ready, orange when only some are, and
+  red when none is, with the count beside the name (`2/3`) and the image they run
+  after the upstream - two images during a rollout. It follows the runtime's own
+  events (Kubernetes, Docker, every node of a Swarm), so a replica that dies shows
+  at once, and nothing is asked on a timer. The Helm chart grants the read it needs
+  (`rbac.watch`, on by default); the Compose file and the Swarm stack now run a
+  read-only proxy of the Docker socket, which also brings the route editor's
+  service list to Swarm.
+
 ---
 
 ## 1.2.1

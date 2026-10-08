@@ -4,6 +4,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -37,6 +38,16 @@ export interface ModuleFormData {
   existing: boolean;
   canUp: boolean;
   canDown: boolean;
+  // Where the module can be moved to (an existing one, in a bar): the OTHER
+  // top-level modules, by their index and the name they show. `under` is the
+  // module it sits under now, null at the top level; `above` is the module an
+  // indent puts it under (the one right above it), null when it cannot be
+  // indented; `hasChildren` keeps a module with sub-modules where it is - the
+  // catalogue has two levels.
+  parents: { index: number; name: string }[];
+  under: number | null;
+  above: number | null;
+  hasChildren: boolean;
 }
 
 // The module editor, shown in a DRAWER on the portal page (not a modal): the
@@ -51,6 +62,7 @@ export interface ModuleFormData {
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
+    MatMenuModule,
     MatSelectModule,
     MatSlideToggleModule,
     MatTooltipModule,
@@ -67,6 +79,8 @@ export class ModuleEditorComponent implements OnInit {
   readonly moved = output<-1 | 1>();
   readonly toggledDisabled = output<boolean>();
   readonly addedSub = output<void>();
+  // Moved under another module (its index), or detached to the top level.
+  readonly relocated = output<number | null>();
   readonly removed = output<void>();
 
   private readonly api = inject(ApiService);
@@ -84,6 +98,7 @@ export class ModuleEditorComponent implements OnInit {
 
   private readonly q$ = new Subject<string>();
 
+  protected readonly hasChildrenHint = $localize`:@@Portal_move_has_children:It has sub-modules: move or remove them first.`;
   protected readonly noRoutes = $localize`:@@Portal_no_ui_routes:No UI route yet: a module opens one.`;
 
   ngOnInit(): void {
@@ -133,6 +148,20 @@ export class ModuleEditorComponent implements OnInit {
       description: this.description().trim(),
       disabled: this.disabled(),
     });
+  }
+
+  protected readonly detachTip = $localize`:@@Portal_detach:Detach (top level)`;
+  protected readonly alreadyTop = $localize`:@@Portal_already_top:Already at the top level`;
+  private readonly indentUnder = $localize`:@@Portal_indent:Move under the module above`;
+  private readonly indentNone = $localize`:@@Portal_indent_none:No module above to go under`;
+  private readonly indentSub = $localize`:@@Portal_indent_sub:Already a sub-module`;
+
+  // Why an indent is possible or not, in the order the reasons matter.
+  protected indentTip(): string {
+    const d = this.data();
+    if (d.under !== null) return this.indentSub;
+    if (d.hasChildren) return this.hasChildrenHint;
+    return d.above === null ? this.indentNone : this.indentUnder;
   }
 
   protected toggleDisabled(v: boolean): void {

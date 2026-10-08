@@ -9,7 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { EeLockComponent } from '../../shared/ee-lock.component';
-import { ApiService, AuthProvider, SecretLocation } from '../../api.service';
+import { ApiService, AuthProvider, DirectoryPerson, LinkedPerson, SecretLocation } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { SecretFieldComponent } from '../../shared/secret-field.component';
@@ -23,7 +23,7 @@ const SECRET_FIELDS: Record<string, string[]> = {
   oidc: ['clientSecret'],
   github: ['clientSecret'],
   ldap: ['bindPassword'],
-  saml: [],
+  saml: ['spKey'],
 };
 
 // The button name a kind writes itself. A VENDOR has one right answer and
@@ -254,8 +254,17 @@ export class AuthProviderEditorComponent {
           { label: $localize`:@@Authorization_callback_URL:Authorization callback URL`, value: callback },
         ];
       case 'oidc':
-      case 'saml':
         return [{ label: $localize`:@@Redirect_URI:Redirect URI`, value: callback }];
+      case 'saml': {
+        // The identity provider's admin needs three things, and most of them
+        // import the third one rather than typing the first two.
+        const metadata = callback.replace(/\/callback$/, '/metadata');
+        return [
+          { label: $localize`:@@Saml_entity_id:Entity ID (audience)`, value: this.cfg('entityId').trim() || metadata },
+          { label: $localize`:@@Saml_acs:Assertion consumer service (reply URL)`, value: callback },
+          { label: $localize`:@@Saml_sp_metadata:This gateway's metadata`, value: metadata },
+        ];
+      }
       default:
         return [];
     }
@@ -322,6 +331,43 @@ export class AuthProviderEditorComponent {
 
   // Tries the configuration without signing anyone in: the fastest way to
   // learn that the issuer does not resolve or the service account cannot bind.
+  // The test section: who came in through this authority and with which
+  // groups, read when an existing authority is opened; and, for a directory,
+  // what it says about anyone, asked on demand.
+  protected readonly people = signal<LinkedPerson[]>([]);
+  protected readonly lookupName = signal('');
+  protected readonly looking = signal(false);
+  protected readonly lookedUp = signal<DirectoryPerson | null>(null);
+  private readonly loadPeople = effect(() => {
+    const p = this.provider();
+    this.people.set([]);
+    this.lookedUp.set(null);
+    if (!p) return;
+    this.api.authProviderPeople(p.id).subscribe({ next: (list) => this.people.set(list), error: () => {} });
+  });
+
+  protected lookup(): void {
+    const p = this.provider();
+    const name = this.lookupName().trim();
+    if (!p || !name) return;
+    this.looking.set(true);
+    this.lookedUp.set(null);
+    this.api.lookupAuthProvider(p.id, name).subscribe({
+      next: (who) => {
+        this.looking.set(false);
+        this.lookedUp.set(who);
+      },
+      error: (err: unknown) => {
+        this.looking.set(false);
+        this.fail(err, 6000);
+      },
+    });
+  }
+
+  protected seen(at?: number): string {
+    return at ? new Date(at * 1000).toLocaleString() : '';
+  }
+
   protected check(): void {
     const p = this.provider();
     if (!p) return;

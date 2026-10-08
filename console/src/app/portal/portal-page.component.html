@@ -6,7 +6,7 @@
       @if (editing(); as ed) {
         <app-module-editor [data]="ed" (saved)="onSaved($event)" (closed)="onClosed()"
           (moved)="onMove($event)" (toggledDisabled)="onToggleDisabled($event)"
-          (addedSub)="onAddSub()" (removed)="onDelete()" />
+          (addedSub)="onAddSub()" (removed)="onDelete()" (relocated)="onRelocate($event)" />
       }
     </mat-drawer>
     <mat-drawer-content>

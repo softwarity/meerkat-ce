@@ -1,0 +1,99 @@
+# A directory to sign in against on the local cluster: OpenLDAP, seeded with
+# the test bench's people and groups (test/ldap/openldap/init.ldif), and
+# phpLDAPadmin to look at it and change it.
+#
+#   deploy/local/openldap.sh        creates the secret and the seed, applies this
+#
+# Inside the cluster:  ldap://openldap.<namespace>.svc:389
+#                      base dc=example,dc=com, admin cn=admin,dc=example,dc=com
+# phpLDAPadmin:        http://phpldapadmin.<namespace>.svc:8091, inside the
+#                      cluster only. It is reached THROUGH Meerkat, by a route
+#                      to that address: publishing an application is the
+#                      gateway's job, so nothing here opens a port outside.
+#                      Log in as the admin DN.
+#
+# No volume, on purpose: a restart puts the seed back, which is what a test
+# directory is for. Every person's password is "password", except dan's.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openldap
+  labels: { app: openldap }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: openldap }
+  template:
+    metadata:
+      labels: { app: openldap }
+    spec:
+      containers:
+        - name: openldap
+          image: osixia/openldap:1.5.0
+          args: ["--copy-service"]
+          env:
+            - { name: LDAP_ORGANISATION, value: "Example Inc." }
+            - { name: LDAP_DOMAIN, value: "example.com" }
+            - { name: LDAP_TLS, value: "false" }
+            - name: LDAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: openldap-admin, key: password }
+          ports:
+            - { name: ldap, containerPort: 389 }
+          volumeMounts:
+            # The file alone (subPath): a ConfigMap mounted as a directory also
+            # holds Kubernetes' own ..data links, which the image would load
+            # too - the same entries twice, and the start fails on "already
+            # exists" (68).
+            - name: seed
+              mountPath: /container/service/slapd/assets/config/bootstrap/ldif/custom/init.ldif
+              subPath: init.ldif
+          readinessProbe:
+            tcpSocket: { port: ldap }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: seed
+          configMap: { name: openldap-seed }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openldap
+  labels: { app: openldap }
+spec:
+  selector: { app: openldap }
+  ports:
+    - { name: ldap, port: 389, targetPort: ldap }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phpldapadmin
+  labels: { app: phpldapadmin }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: phpldapadmin }
+  template:
+    metadata:
+      labels: { app: phpldapadmin }
+    spec:
+      containers:
+        - name: phpldapadmin
+          image: osixia/phpldapadmin:0.9.0
+          env:
+            - { name: PHPLDAPADMIN_LDAP_HOSTS, value: "openldap" }
+            - { name: PHPLDAPADMIN_HTTPS, value: "false" }
+          ports:
+            - { name: http, containerPort: 80 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phpldapadmin
+  labels: { app: phpldapadmin }
+spec:
+  selector: { app: phpldapadmin }
+  ports:
+    - { name: http, port: 8091, targetPort: http }

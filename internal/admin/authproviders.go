@@ -30,6 +30,8 @@ func (a *API) registerAuthProviders(mux Mux) {
 	mux.Handle("PUT /api/auth-providers/{id}", a.infraAdmin(a.putAuthProvider))
 	mux.Handle("DELETE /api/auth-providers/{id}", a.infraAdmin(a.deleteAuthProvider))
 	mux.Handle("POST /api/auth-providers/{id}/check", a.infraAdmin(a.checkAuthProvider))
+	mux.Handle("GET /api/auth-providers/{id}/people", a.infraAdmin(a.authProviderPeople))
+	mux.Handle("POST /api/auth-providers/{id}/lookup", a.infraAdmin(a.lookupAuthProvider))
 }
 
 // providerView is the transport, and it obeys the rule the whole configuration
@@ -289,6 +291,82 @@ func (a *API) checkAuthProvider(w http.ResponseWriter, r *http.Request, _ store.
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": p.Kind, "name": p.Name})
+}
+
+// authProviderPeople lists who came in through an authority, with the groups
+// each reported at their last sign-in - for any kind, since every one of them
+// records what it said. It is what a group rule is written against: one
+// cannot map a group nobody has seen.
+func (a *API) authProviderPeople(w http.ResponseWriter, r *http.Request, _ store.User) {
+	id := r.PathValue("id")
+	if _, err := a.st.GetAuthProvider(r.Context(), id); err != nil {
+		writeErr(w, http.StatusNotFound, "unknown provider "+id)
+		return
+	}
+	people, err := a.st.IdentitiesOfProvider(r.Context(), id, 50)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	if people == nil {
+		people = []store.LinkedPerson{}
+	}
+	writeJSON(w, http.StatusOK, people)
+}
+
+type lookupRequest struct {
+	Username string `json:"username"`
+}
+
+type lookupAnswer struct {
+	Subject  string   `json:"subject"`
+	Username string   `json:"username"`
+	Email    string   `json:"email,omitempty"`
+	Fullname string   `json:"fullname,omitempty"`
+	Groups   []string `json:"groups"`
+}
+
+// lookupAuthProvider asks an authority what it says about one person, without
+// their password: only a directory can answer, searched with its service
+// account. Who has never signed in can be looked up too - which is the point
+// of trying a group rule before anyone relies on it.
+func (a *API) lookupAuthProvider(w http.ResponseWriter, r *http.Request, _ store.User) {
+	var body lookupRequest
+	if err := decodeStrict(r, &body); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed lookup: "+err.Error())
+		return
+	}
+	id := r.PathValue("id")
+	p, missing, err := a.st.ResolvedAuthProvider(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "unknown provider "+id)
+		return
+	}
+	if len(missing) > 0 {
+		writeErr(w, http.StatusUnprocessableEntity, "unknown vault entries: "+strings.Join(missing, ", "))
+		return
+	}
+	driver, err := idp.New(p)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	lookup, ok := driver.(idp.Lookup)
+	if !ok {
+		writeErr(w, http.StatusUnprocessableEntity, p.Name+" cannot be asked about someone who is not signing in: "+
+			"only a directory can, and the groups of the others are the ones their people reported at their last sign-in")
+		return
+	}
+	who, err := lookup.Lookup(r.Context(), strings.TrimSpace(body.Username))
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if who.Groups == nil {
+		who.Groups = []string{}
+	}
+	writeJSON(w, http.StatusOK, lookupAnswer{Subject: who.Subject, Username: who.Username, Email: who.Email,
+		Fullname: who.Fullname, Groups: who.Groups})
 }
 
 // callbackURL is the address to register on the authority's side. The admin

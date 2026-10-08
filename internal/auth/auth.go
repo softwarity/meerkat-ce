@@ -1629,17 +1629,17 @@ const profileDevKeyBody = `    <style>
          THIS gateway's published address in them - the one Infra, Plug
          records, since the gateway cannot see what a NodePort or a
          LoadBalancer publishes. plug is not installed from a package
-         manager: it comes FROM the gateway it plugs you into, and the
-         installer names the profile after the host, which is why keygen and
-         pubkey take it. */}}
+         manager: it comes FROM the gateway it plugs you into. The install
+         command names the profile after the application (plug 2.22 and
+         later), and keygen and pubkey pass that same name. */}}
     <div class="dk-steps">
       <p class="dk-hint">No plug yet? It installs from this gateway, not from a package manager. macOS and Linux:</p>
-      <pre data-copy>ssh -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install | sh</pre>
+      <pre data-copy>ssh -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install {{.PlugProfile}} | sh</pre>
       <p class="dk-hint">Windows, from Git Bash:</p>
-      <pre data-copy>ssh -n -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install-windows | bash -s -- {{.PlugHost}} {{.PlugPort}}</pre>
+      <pre data-copy>ssh -n -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install-windows | bash -s -- {{.PlugHost}} {{.PlugPort}} {{.PlugProfile}}</pre>
       <p class="dk-hint">Then the key pair, once per machine - and paste what the second line prints above:</p>
-      <pre data-copy>plug keygen -p {{.PlugHost}}
-plug pubkey -p {{.PlugHost}}</pre>
+      <pre data-copy>plug keygen -p {{.PlugProfile}}
+plug pubkey -p {{.PlugProfile}}</pre>
     </div>
     <p class="back"><a href="/profile/dev">{{.T.backToDeveloper}}</a></p>
 `
@@ -2143,6 +2143,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /login/{provider}", h.startExternal)
 	mux.HandleFunc("GET /login/{provider}/callback", h.finishExternal)
+	// SAML posts its answer here (AUTH-19), cross-site, so without our cookie:
+	// relayed once from our own page, it comes back with it.
+	mux.HandleFunc("POST /login/{provider}/callback", h.relayExternal)
+	mux.HandleFunc("GET /login/{provider}/metadata", h.serviceMetadata)
 
 	mux.HandleFunc("GET /update-password", h.showUpdatePassword)
 	mux.HandleFunc("POST /update-password", h.doUpdatePassword)
@@ -2772,6 +2776,9 @@ type profileDevData struct {
 	// setting the console prints its commands with.
 	PlugHost string
 	PlugPort int
+	// PlugProfile is the profile the install command creates and keygen and
+	// pubkey name: the application's name, cut down (store.PlugProfile).
+	PlugProfile string
 }
 
 // passkeyView is one profile row: name it, date it, revoke it.
@@ -3287,6 +3294,7 @@ const plugClosed = "the developer tunnel (plug) is not open on this gateway: an 
 func (h *Handler) renderProfileDevKey(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
 	data := profileDevData{flowChrome: h.flowData(r, ""), Error: errMsg, PlugOpen: true}
 	data.PlugHost, data.PlugPort = h.st.Plug(r.Context()).Address()
+	data.PlugProfile = h.st.PlugProfile(r.Context())
 	data.Title = "plug keys - Meerkat"
 	data.Keys = h.devKeyRows(r, sess.UserID)
 	writeFlow(w, profileDevKeyPage, data, status)

@@ -272,8 +272,8 @@ func check(doc *Document) error {
 		}
 		if !store.ValidProviderKind(p.Kind) {
 			return fmt.Errorf("config: authority %q is of kind %q, which this Meerkat cannot drive "+
-				"(allowed: %s, %s, %s)", p.Name, p.Kind,
-				store.ProviderOIDC, store.ProviderLDAP, store.ProviderGitHub)
+				"(allowed: %s, %s, %s, %s)", p.Name, p.Kind,
+				store.ProviderOIDC, store.ProviderLDAP, store.ProviderSAML, store.ProviderGitHub)
 		}
 	}
 	for _, t := range doc.Themes {

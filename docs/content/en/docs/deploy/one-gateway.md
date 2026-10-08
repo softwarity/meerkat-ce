@@ -31,13 +31,37 @@ services:
     environment:
       # Read ONCE, on the first start, to create the admin account.
       MEERKAT_ADMIN_PASSWORD: your-first-password
+      # The runtime, through the read-only proxy below.
+      DOCKER_HOST: tcp://docker-proxy:2375
+    networks: [default, runtime]
     volumes:
       - meerkat-data:/data
     restart: unless-stopped
 
+  # The Docker socket behind a filter that refuses every write.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    environment:
+      { SERVICES: 1, TASKS: 1, CONTAINERS: 1, NETWORKS: 1, IMAGES: 1, NODES: 1, EVENTS: 1, INFO: 1 }
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [runtime]
+    restart: unless-stopped
+
+networks:
+  runtime:
+    internal: true
+
 volumes:
   meerkat-data:
 ```
+
+The proxy is what lets the gateway read the runtime without being able to act on
+it: the route editor offers the containers it finds, and the Routes list shows
+whether each target runs and on which image, as Docker's events say (see
+[Upstream health](/docs/operations/upstream-health)). Mounting the socket in the
+gateway itself would hand whoever controls the gateway the whole host. Leave the
+proxy out and the gateway runs as before, without either.
 
 ## Opening the developer tunnel
 

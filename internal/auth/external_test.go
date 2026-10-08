@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -267,5 +268,29 @@ func TestLoginPageOffersTheAuthorities(t *testing.T) {
 	}
 	if strings.Contains(body, "Retired SSO") {
 		t.Fatal("a disabled authority must not be offered")
+	}
+}
+
+// An answer posted back from another site is handed straight back to the
+// browser in a form that posts itself here again - same-site this time, so
+// the attempt's cookie travels (AUTH-19). Its values go into that form
+// escaped: they are the authority's, and nothing of theirs is markup.
+func TestAPostedAnswerIsRelayedOnce(t *testing.T) {
+	h, _ := externalFixture(t)
+	form := url.Values{"SAMLResponse": {`PHNhbWw+"><script>x</script>`}, "RelayState": {"st4te"}}
+	r := httptest.NewRequest("POST", "/login/corp/callback", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	h.relayExternal(w, r)
+	body := w.Body.String()
+	if w.Code != http.StatusOK || !strings.Contains(body, `action="/login/corp/callback"`) ||
+		!strings.Contains(body, `name="meerkat_relayed" value="1"`) || !strings.Contains(body, `value="st4te"`) {
+		t.Fatalf("the relay page reads:\n%s", body)
+	}
+	if strings.Contains(body, "<script>x</script>") {
+		t.Fatalf("a posted value reached the page unescaped:\n%s", body)
+	}
+	if w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("the relay page, which holds an assertion, may be cached")
 	}
 }

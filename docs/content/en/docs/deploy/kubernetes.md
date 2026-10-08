@@ -300,9 +300,15 @@ So point `MEERKAT_DATABASE_URL` at a name that follows the primary rather than
 at a host, and measure your database's failover window: that window is the one
 in which no node is ready.
 
-## Optional: let the route editor see the namespace
+## Optional: let the gateway see the namespace
 
-The gateway can list the Services of its OWN namespace and offer them when somebody creates a route, so an upstream becomes a pick rather than a typed URL. There is no switch for it: what opens it is what the deployment grants. The ServiceAccount needs list on services in its own namespace and nothing else - no secret, no pod, no other namespace - and without the right the console says which one it lacks while free typing stays exactly as it was. The developer tunnel asks for more than this, and what it grants is set out on [One gateway](/docs/deploy/one-gateway).
+The gateway reads its OWN namespace for two things. The route editor offers its Services, so an upstream becomes a pick rather than a typed URL. And the Routes list shows, for each service, how many of its replicas are ready and which image they run - green when all are, orange when some are, red when none is - kept current by the API server's events rather than by asking on a timer (see [Upstream health](/docs/operations/upstream-health)).
+
+There is no switch for either: what opens them is what the deployment grants. The chart grants both (`rbac.read` and `rbac.watch`, on by default). By hand, the ServiceAccount needs `list` and `watch` on services and pods in its own namespace and nothing else - no secret, no other namespace. Without the pods, the editor still offers the Services and the targets are checked by a connection; without anything, the console says which right it lacks while free typing stays exactly as it was.
+
+Reading the pods reads the environment variables their manifests declare. Where a manifest carries a secret in clear, set `rbac.watch: false`, or better, move the secret into a Secret.
+
+The developer tunnel asks for more than this, and what it grants is set out on [One gateway](/docs/deploy/one-gateway).
 
 ::: details The Role and its binding
 ```yaml
@@ -316,11 +322,12 @@ kind: Role
 metadata:
   name: meerkat-services
 rules:
-  # List the Services of THIS namespace, and nothing else: no secret, no pod,
-  # no other namespace.
+  # Read the Services and pods of THIS namespace, and nothing else: no
+  # secret, no other namespace. watch is what keeps the routes screen current
+  # without asking on a timer.
   - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["list"]
+    resources: ["services", "pods"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

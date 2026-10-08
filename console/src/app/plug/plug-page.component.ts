@@ -61,14 +61,13 @@ export class PlugPageComponent {
   protected readonly host = signal('localhost');
   protected readonly port = signal<number | null>(22222);
   protected readonly os = signal<Os>(this.guessOs());
-  // What the developer calls this cluster on their machine. The installer
-  // names the profile after the host; "localhost" or an IP says nothing once
-  // a second cluster is installed, so the page offers a rename - optional,
-  // local to the commands, never saved.
-  protected readonly profile = signal('profile1');
-  protected readonly profileName = computed(() => this.profile().trim() || this.addr().host);
-  protected readonly renameCmd = computed(
-    () => `plug rn ${this.addr().host} ${this.profileName()}\n`,
+  // What the developer calls this gateway on their machine: the install
+  // command creates the profile under this name, and every other command
+  // passes it. It starts as the application's name, as the gateway cuts it
+  // down; changing it here only changes the commands, nothing is saved.
+  protected readonly profile = signal('');
+  protected readonly profileName = computed(
+    () => this.profile().trim() || this.state()?.profile || 'meerkat',
   );
 
   protected readonly enabled = computed(() => !!this.state()?.enabled);
@@ -94,12 +93,12 @@ export class PlugPageComponent {
     const { host, port } = this.addr();
     const opts = `-p ${port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null`;
     return this.os() === 'windows'
-      ? `ssh -n ${opts} get@${host} install-windows | bash -s -- ${host} ${port}\n`
-      : `ssh ${opts} get@${host} install | sh\n`;
+      ? `ssh -n ${opts} get@${host} install-windows | bash -s -- ${host} ${port} ${this.profileName()}\n`
+      : `ssh ${opts} get@${host} install ${this.profileName()} | sh\n`;
   });
 
-  // The installer names the profile after the host, which is why keygen and
-  // pubkey take it: with a second cluster installed, the bare verb would ask.
+  // keygen and pubkey name the profile: with a second gateway installed, the
+  // bare verb would ask which one.
   protected readonly keyCmd = computed(() => {
     const host = this.profileName();
     const copy = { macos: ' | pbcopy', linux: ' | xclip -selection clipboard', windows: ' | clip' }[
@@ -136,6 +135,7 @@ export class PlugPageComponent {
     this.state.set(s);
     this.host.set(s.host || 'localhost');
     this.port.set(s.port || s.defaultPort);
+    this.profile.set(s.profile);
   }
 
   protected setPort(raw: string) {

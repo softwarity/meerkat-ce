@@ -100,3 +100,41 @@ footer {
   padding: 12px 20px;
   border-top: 1px solid var(--mat-sys-outline-variant);
 }
+
+/* The test section: what the authority says, groups as chips. */
+.test h4 {
+  margin: 12px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--mat-sys-on-surface-variant);
+}
+.lookup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lookup mat-form-field {
+  flex: 1;
+}
+.person {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  font-size: 0.85rem;
+}
+.person .subject {
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.chip {
+  font-size: 0.72rem;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container-highest);
+}

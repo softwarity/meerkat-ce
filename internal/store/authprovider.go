@@ -393,3 +393,47 @@ func (s *Store) UnlinkIdentity(ctx context.Context, providerID, externalID strin
 	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
+
+// LinkedPerson is one account linked to an authority, as the authority last
+// described it: what the console's test shows - "who came in through here,
+// and with which groups".
+type LinkedPerson struct {
+	Identity
+	Username string `json:"username"`
+	Fullname string `json:"fullname,omitempty"`
+}
+
+// IdentitiesOfProvider lists the accounts linked to one authority, the most
+// recently seen first, with the groups each reported at their last sign-in.
+// limit bounds the list; an authority with thousands of people is shown its
+// latest, which is what someone checking a mapping is looking at.
+func (s *Store) IdentitiesOfProvider(ctx context.Context, providerID string, limit int) ([]LinkedPerson, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT i.provider_id, i.external_id, i.user_id, i.groups, i.created_at, i.last_seen_at,
+		        COALESCE(u.username, ''), COALESCE(u.fullname, '')
+		 FROM user_identities i LEFT JOIN users u ON u.id = i.user_id
+		 WHERE i.provider_id = ? ORDER BY i.last_seen_at DESC, i.created_at DESC LIMIT ?`, providerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("store: identities of authority %q: %w", providerID, err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []LinkedPerson
+	for rows.Next() {
+		var p LinkedPerson
+		var groups string
+		if err := rows.Scan(&p.ProviderID, &p.ExternalID, &p.UserID, &groups,
+			&p.CreatedAt, &p.LastSeenAt, &p.Username, &p.Fullname); err != nil {
+			return nil, fmt.Errorf("store: scan identity: %w", err)
+		}
+		if groups != "" {
+			if err := json.Unmarshal([]byte(groups), &p.Groups); err != nil {
+				return nil, fmt.Errorf("store: identity %s/%s groups: %w", p.ProviderID, p.ExternalID, err)
+			}
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}

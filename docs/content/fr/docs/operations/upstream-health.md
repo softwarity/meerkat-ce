@@ -78,24 +78,57 @@ installation ne doit connaître ce comportement que si quelqu'un l'a choisi.
 
 ## Ce que montre la console
 
-Dans la liste Routes, chaque route porte un **cœur** : vert quand sa cible répond, brisé
-et rouge quand elle ne répond pas, avec la raison dans l'infobulle.
+Dans la liste Routes, chaque route porte un **cœur**, avec la raison dans son infobulle :
 
-La gateway vérifie en arrière-plan la cible de chaque route activée, toutes les 30
-secondes, jamais sur le chemin des requêtes :
+| Cœur | Signifie |
+|---|---|
+| Vert | toutes les répliques du service sont prêtes, ou un hôte externe accepte une connexion |
+| Orange | une partie des répliques est prête, pas toutes : le service répond, avec moins que ce qu'on lui a donné |
+| Rouge, brisé | aucune n'est prête, aucune n'est demandée (mis à zéro), l'hôte refuse, ou le circuit est ouvert |
 
-- un service connu de la découverte (Docker, Swarm) est disponible dès qu'une réplique
-  au moins est prête, et indisponible à zéro ;
-- tout le reste - un hôte externe, un service Kubernetes - fait l'objet d'une simple
-  connexion TCP, avec un timeout de 2 secondes. Une connexion et rien d'autre : aucune
-  requête HTTP, donc rien n'apparaît dans les journaux du service ni ne compte dans ses
-  limites. Derrière un `HTTP_PROXY`, c'est le proxy qui est contacté ;
-- un circuit ouvert équivaut à une cible indisponible, quoi qu'ait dit la connexion :
-  le trafic réel l'emporte.
+Pour un service que le runtime exécute, la ligne indique aussi **combien de répliques
+sont prêtes** (`2/3`, à côté du nom) et **quelle image elles exécutent** (après
+l'upstream : le tag, ou le début de l'empreinte quand le tag est `latest`). Deux images
+sur un même service, c'est un déploiement en cours, ou arrêté à mi-chemin ; l'infobulle
+liste chaque image avec son empreinte et le nombre de répliques qui l'exécutent.
 
-Tout changement est poussé aussitôt vers l'écran ouvert, sans rechargement. Une route
-que personne n'appelle a désormais quelque chose à dire. Ce qui manque encore : le
-`/health` propre à chaque service.
+### Sans minuteur
+
+La gateway n'interroge pas le runtime à intervalle régulier : elle l'**écoute**.
+
+- **Kubernetes** : elle liste une fois les Services et les pods de son propre namespace,
+  puis les surveille. Un pod qui démarre, devient prêt, plante ou est remplacé arrive
+  comme un événement de l'API server, et l'écran change avec lui. Les répliques d'un
+  Service sont les pods que choisit son sélecteur. Un Service sans sélecteur n'a pas de
+  pods à compter, et il est vérifié comme un hôte externe.
+- **Docker et Swarm** : un inventaire, puis le flux d'événements de Docker. Dans un Swarm,
+  les événements d'un conteneur ne viennent que du nœud qui l'exécute : la gateway écoute
+  donc chaque nœud, à travers le proxy de socket en lecture seule que la stack déploie
+  sur chacun d'eux.
+- Un flux qui coupe est rouvert, en commençant par un nouvel inventaire : rien de ce qui
+  s'est passé entre-temps n'est perdu.
+
+Ce qu'aucun événement ne peut dire, c'est qu'un **hôte externe** a disparu. Ceux-là sont
+vérifiés par une simple connexion TCP toutes les 30 secondes, avec un timeout de
+2 secondes : une connexion et rien d'autre, aucune requête HTTP, donc rien n'apparaît
+dans les journaux du service ni ne compte dans ses limites. Derrière un `HTTP_PROXY`,
+c'est le proxy qui est contacté. Une gateway sans cible externe ne fait tourner aucun
+minuteur. Un service externe n'affiche jamais de répliques ni d'images : ce n'est pas
+l'affaire de la gateway.
+
+Un circuit ouvert équivaut à une cible indisponible, quoi qu'aient dit le runtime ou la
+connexion : le trafic réel l'emporte.
+
+### Ce qu'il faut
+
+| Runtime | Droit |
+|---|---|
+| Kubernetes | `list` et `watch` sur les `pods` et les `services` du namespace de la gateway. Le chart l'accorde avec `rbac.watch`, actif par défaut - voir [Kubernetes](/docs/deploy/kubernetes) |
+| Docker | l'API Docker, en lecture seule : le proxy de socket du fichier compose, ou le socket monté pour le tunnel |
+| Swarm | le proxy de socket sur chaque nœud (`mode: global`), que la stack déploie - voir [Quelle architecture déployer](/docs/deploy/shapes) |
+
+Sans ce droit, les cibles sont vérifiées par une connexion, et la gateway indique une fois
+le droit qui lui manque.
 
 ## En cluster
 

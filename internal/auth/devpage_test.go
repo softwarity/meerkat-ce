@@ -92,12 +92,13 @@ func TestDeveloperHub(t *testing.T) {
 		t.Fatalf("key page: code=%d", key.Code)
 	}
 	// The commands carry the address developers use, as Infra, Plug records
-	// it - copied, not translated.
+	// it - copied, not translated - and the profile named after the
+	// application (the default branding's "MY APP").
 	for _, want := range []string{
-		"-p 30222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@dev.example.com install | sh",
-		"install-windows | bash -s -- dev.example.com 30222",
-		"plug keygen -p dev.example.com",
-		"plug pubkey -p dev.example.com",
+		"-p 30222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@dev.example.com install my-app | sh",
+		"install-windows | bash -s -- dev.example.com 30222 my-app",
+		"plug keygen -p my-app",
+		"plug pubkey -p my-app",
 	} {
 		if !strings.Contains(keyBody, want) {
 			t.Errorf("the key page does not carry %q", want)

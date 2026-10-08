@@ -52,6 +52,18 @@ function issuesMatcher(segments: UrlSegment[]): UrlMatchResult | null {
   return { consumed: segments, posParams };
 }
 
+// rules and rules/:rule (rules/new included), for an organisation's group
+// rules; group-rules and group-rules/:rule for Application's. The rule opens
+// in the screen's right drawer.
+function rulesMatcher(name: string) {
+  return (segments: UrlSegment[]): UrlMatchResult | null => {
+    if (segments.length === 0 || segments[0].path !== name || segments.length > 2) return null;
+    const posParams: Record<string, UrlSegment> = {};
+    if (segments.length === 2) posParams['rule'] = segments[1];
+    return { consumed: segments, posParams };
+  };
+}
+
 // auth-providers, auth-providers/new and auth-providers/:id.
 function authProvidersMatcher(segments: UrlSegment[]): UrlMatchResult | null {
   if (segments.length === 0 || segments[0].path !== 'auth-providers' || segments.length > 2) return null;
@@ -255,7 +267,7 @@ export const routes: Routes = [
           import('./identity/app-scoped/app-members.component').then((m) => m.AppMembersComponent),
       },
       {
-        path: 'group-rules',
+        matcher: rulesMatcher('group-rules'),
         canActivate: [appOnly, singleTenantOnly],
         loadComponent: () =>
           import('./identity/app-scoped/app-rules.component').then((m) => m.AppRulesComponent),
@@ -373,7 +385,7 @@ export const routes: Routes = [
           import('./identity/tenant-sections/tenant-members.component').then((m) => m.TenantMembersComponent),
       },
       {
-        path: 'rules',
+        matcher: rulesMatcher('rules'),
         loadComponent: () =>
           import('./identity/tenant-sections/tenant-rules.component').then((m) => m.TenantRulesComponent),
       },

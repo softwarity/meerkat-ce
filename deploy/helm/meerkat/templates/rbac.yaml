@@ -109,6 +109,13 @@ subjects:
 # the Services that select it, to say which port the world reaches each of its
 # doors on - an HTTPS link written with the container's 9443 reaches nothing
 # when the Service publishes it as 19443.
+#
+# With rbac.watch (on by default), the pods too, listed and WATCHED: the routes
+# screen shows each service's ready replicas and the image they run, kept
+# current by the API server's events rather than by asking on a timer. It is a
+# read of every pod of the namespace, so of the environment variables their
+# manifests declare: a value written in clear in a manifest is readable here.
+# rbac.watch: false keeps the services only, and the targets are then dialled.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -117,10 +124,14 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["services"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods"]
+{{- if ne ((.Values.rbac | default dict).watch) false }}
+    verbs: ["get", "list", "watch"]
+{{- else }}
     verbs: ["get"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

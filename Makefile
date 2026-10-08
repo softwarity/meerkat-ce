@@ -103,6 +103,7 @@ clean:
 # test itself. The idp tests skip when these are down, so `make test` never
 # depends on Docker.
 ldap-up:
+	sh test/ldap/simplesamlphp/cert.sh
 	cd test/ldap && docker compose up -d
 	@echo "waiting for the domain controller to provision (about a minute on a cold start)..."
 	@cd test/ldap && for i in $$(seq 1 60); do \
@@ -110,7 +111,7 @@ ldap-up:
 		sleep 5; \
 	done
 	docker exec meerkat-samba-ad sh /seed.sh
-	@echo "dex http://localhost:5556/dex - openldap ldap://localhost:3389 - active directory ldaps://localhost:3636"
+	@echo "dex http://localhost:5556/dex - simplesamlphp http://localhost:18090/simplesaml - openldap ldap://localhost:3389 - active directory ldaps://localhost:3636"
 
 # The last metre: register the seeded directory as an authority on a RUNNING
 # gateway, so trying an LDAP sign-in is a click instead of five fields typed

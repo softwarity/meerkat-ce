@@ -53,6 +53,28 @@ services:
       timeout: 5s
       retries: 3
 
+  # A real SAML 2.0 identity provider: SimpleSAMLphp, one container, its
+  # users in its config. It posts only to the consumer service it is told
+  # about, the one ee/saml's integration test plays. Its signing certificate
+  # is made by simplesamlphp/cert.sh before it starts (make ldap-up, the CI).
+  simplesamlphp:
+    image: kenchan0130/simplesamlphp:latest
+    container_name: meerkat-simplesamlphp
+    ports:
+      - "18090:8080"
+    environment:
+      SIMPLESAMLPHP_SP_ENTITY_ID: http://localhost:18999/login/ssp/metadata
+      SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE: http://localhost:18999/login/ssp/callback
+    volumes:
+      - ./simplesamlphp/cert:/var/www/simplesamlphp/cert:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/simplesaml/saml2/idp/metadata.php"]
+      start_period: 30s
+      start_interval: 2s
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
   # A real Active Directory domain controller (Samba 4 in AD DC mode). It
   # provisions on first start, which takes about a minute; the seed script
   # then adds the same people and the same nested groups as the OpenLDAP

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -452,4 +453,79 @@ func randToken32() string {
 		panic("auth: no entropy for the sign-in state: " + err.Error())
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// ── answers posted back (SAML) ───────────────────────────────────────────────
+
+// relayFlag marks a post this gateway relayed to itself.
+const relayFlag = "meerkat_relayed"
+
+// relayExternal receives an answer an authority POSTs back (SAML, AUTH-19).
+//
+// That post comes from another site, and the browser leaves our SameSite=Lax
+// cookie off a cross-site POST - the cookie that says which attempt this is.
+// Lowering it to SameSite=None would weaken it for every flow and demand
+// HTTPS; instead the answer is handed back to the browser in a form that posts
+// itself to this same address, from our own page. That second post is
+// same-site, the cookie goes with it, and the attempt is finished as any
+// other. Nothing about the attempt is kept server-side in between.
+func (h *Handler) relayExternal(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		h.render(w, r, "", h.tr(r, "errSignInExpired"), http.StatusBadRequest)
+		return
+	}
+	if r.PostFormValue(relayFlag) == "1" {
+		h.finishExternal(w, r)
+		return
+	}
+	fields := map[string]string{relayFlag: "1"}
+	for _, k := range []string{"SAMLResponse", "RelayState"} {
+		fields[k] = r.PostFormValue(k)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	if err := relayPage.Execute(w, struct {
+		Action string
+		Fields map[string]string
+	}{Action: r.URL.Path, Fields: fields}); err != nil {
+		slog.Error("relay page", "err", err)
+	}
+}
+
+// relayPage posts itself at once; the button is there for a browser that runs
+// no script, so the sign-in still ends with one click.
+var relayPage = template.Must(template.New("relay").Parse(`<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Signing in</title></head>
+<body>
+<form method="post" action="{{.Action}}">
+{{range $k, $v := .Fields}}<input type="hidden" name="{{$k}}" value="{{$v}}">
+{{end}}<noscript><button type="submit">Continue</button></noscript>
+</form>
+<script>document.forms[0].submit()</script>
+</body></html>`))
+
+// serviceMetadata publishes this gateway's own metadata for an authority that
+// expects it (SAML): what that authority's admin imports, at the address the
+// gateway names as its entity ID by default.
+func (h *Handler) serviceMetadata(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("provider")
+	driver, _, err := h.driverFor(r.Context(), id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	md, ok := driver.(idp.ServiceMetadata)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	doc, err := md.Metadata(h.callbackURL(r, id))
+	if err != nil {
+		slog.Error("service metadata", "provider", id, "err", err)
+		http.Error(w, "this authority's metadata could not be built: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/samlmetadata+xml")
+	_, _ = w.Write(doc)
 }

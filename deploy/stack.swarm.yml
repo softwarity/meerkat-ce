@@ -51,8 +51,14 @@ services:
       # A cluster is a production gateway: the whole developer surface stays
       # closed here, whatever the database says.
       MEERKAT_PRODUCTION: "1"
+      # The runtime, through the read-only proxy below, on every node: the
+      # route editor offers the services it finds, and the routes screen shows
+      # each target's ready replicas and the image they run, as Swarm's events
+      # say - no timer.
+      DOCKER_HOST: tcp://docker-proxy:2375
     networks:
       - meerkat
+      - runtime
     deploy:
       replicas: 3
       placement:
@@ -78,6 +84,37 @@ services:
       retries: 3
       start_period: 15s
 
+  # The Docker socket of EVERY node, behind a filter that refuses every write.
+  # Every node, because a container's events are emitted by the node it runs
+  # on only: the gateway listens to each proxy task (tasks.docker-proxy) and
+  # sees a replica die wherever it ran. The managers' proxies are also the
+  # ones that can list the Swarm services; the gateway asks each in turn.
+  # Mounting the socket in the gateway instead would tie it to the managers
+  # and hand whoever controls it the whole host.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    environment:
+      # What it lets through: reads only (POST stays 0, the default), and only
+      # what the gateway reads - the services and their tasks, the containers,
+      # the networks, the images for their declared ports, the nodes, and the
+      # event stream that says when any of them changes.
+      SERVICES: 1
+      TASKS: 1
+      CONTAINERS: 1
+      NETWORKS: 1
+      IMAGES: 1
+      NODES: 1
+      EVENTS: 1
+      INFO: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - runtime
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+
 # The developer tunnel is not here on purpose. It plugs one machine into the
 # cluster by taking a service name, which means acting on the orchestrator:
 # that is a grant (the Docker socket) and it belongs on the node that holds
@@ -88,3 +125,8 @@ networks:
   meerkat:
     driver: overlay
     attachable: true
+  # The proxies' network, which only the gateway joins: none of the
+  # applications it routes to can reach the Docker API.
+  runtime:
+    driver: overlay
+    internal: true

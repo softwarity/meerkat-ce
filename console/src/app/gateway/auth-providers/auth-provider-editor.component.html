@@ -20,7 +20,7 @@
     <mat-button-toggle value="oidc">OpenID Connect</mat-button-toggle>
     <mat-button-toggle value="ldap" ee-feature="directories" i18n="@@Kind_directory">Directory</mat-button-toggle>
     <mat-button-toggle value="github">GitHub</mat-button-toggle>
-    <mat-button-toggle value="saml" disabled>SAML</mat-button-toggle>
+    <mat-button-toggle value="saml" ee-feature="AUTH-19">SAML</mat-button-toggle>
   </mat-button-toggle-group>
   <p class="hint text-muted">
     @if (kind() === 'oidc') {
@@ -43,7 +43,15 @@
         gets in.
       </ng-container>
     } @else {
-      <ng-container i18n="@@Kind_saml_hint">Not available yet.</ng-container>
+      <app-ee-lock
+        feature="AUTH-19"
+        i18n-why="@@Saml_ee_why"
+        why="Federate with a SAML identity provider: ADFS, Entra ID, Okta, Shibboleth."
+      />
+      <ng-container i18n="@@Kind_saml_hint">
+        A SAML 2.0 identity provider the browser is sent to; its signed answer is verified against
+        the certificate in its metadata.
+      </ng-container>
     }
   </p>
 
@@ -174,6 +182,78 @@
 
   }
 
+  @if (kind() === 'saml') {
+    <app-form-field i18n-label="@@Saml_metadata_url" label="Identity provider metadata URL" i18n-hint="@@Saml_metadata_url_hint" hint="Read again every hour, so a new signing certificate is picked up" allowVault="values" vaultScope="infra">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('metadataUrl')" (input)="setCfg('metadataUrl', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="https://login.acme.io/federationmetadata/2007-06/federationmetadata.xml"></textarea>
+    </app-form-field>
+
+    <app-form-field i18n-label="@@Saml_metadata_xml" label="Or its metadata, pasted" i18n-hint="@@Saml_metadata_xml_hint" hint="For an identity provider that publishes no URL">
+      <textarea matInput rows="3" class="mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('metadataXml')" (input)="setCfg('metadataXml', $any($event.target).value)"
+        placeholder="<EntityDescriptor ...>"></textarea>
+    </app-form-field>
+
+    <mat-form-field>
+      <mat-label i18n="@@Saml_nameid_format">NameID format</mat-label>
+      <mat-select [value]="cfg('nameIdFormat')" (selectionChange)="setCfg('nameIdFormat', $event.value)">
+        <mat-option value="" i18n="@@Saml_nameid_any">The identity provider's choice</mat-option>
+        <mat-option value="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">persistent</mat-option>
+        <mat-option value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">emailAddress</mat-option>
+        <mat-option value="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">unspecified</mat-option>
+      </mat-select>
+      <mat-hint i18n="@@Saml_nameid_format_hint">How the identity provider names the person; a transient one changes at every sign-in</mat-hint>
+    </mat-form-field>
+
+    <p class="hint text-muted" i18n="@@Saml_attributes_hint">
+      Attributes: leave empty to try the usual names (ADFS and Entra claim URIs, Okta and Shibboleth
+      short names).
+    </p>
+    <app-form-field i18n-label="@@Saml_email_attribute" label="E-mail attribute">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('emailAttribute')" (input)="setCfg('emailAttribute', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="email"></textarea>
+    </app-form-field>
+    <app-form-field i18n-label="@@Saml_name_attribute" label="Name attribute">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('nameAttribute')" (input)="setCfg('nameAttribute', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="displayName"></textarea>
+    </app-form-field>
+    <app-form-field i18n-label="@@Saml_groups_attribute" label="Groups attribute" i18n-hint="@@Saml_groups_attribute_hint" hint="A tenant's group rule maps these to roles">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('groupsAttribute')" (input)="setCfg('groupsAttribute', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="groups"></textarea>
+    </app-form-field>
+    <app-form-field i18n-label="@@Saml_subject_attribute" label="Subject attribute" i18n-hint="@@Saml_subject_attribute_hint" hint="Only when the NameID is transient: a stable attribute to link the account by">
+      <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('subjectAttribute')" (input)="setCfg('subjectAttribute', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="objectGUID"></textarea>
+    </app-form-field>
+
+    <app-form-field i18n-label="@@Allowed_domains" label="Allowed e-mail domains" i18n-hint="@@Allowed_domains_hint" hint="Comma separated, empty accepts every address the authority knows">
+      <textarea matInput rows="1" class="oneline" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('allowedDomains')" (input)="setCfgList('allowedDomains', $any($event.target).value)"
+        (keydown.enter)="$event.preventDefault()" placeholder="acme.io"></textarea>
+    </app-form-field>
+
+    <mat-slide-toggle [checked]="cfgBool('signRequests')" (change)="setCfgBool('signRequests', $event.checked)">
+      <ng-container i18n="@@Saml_sign_requests">Sign the requests</ng-container>
+    </mat-slide-toggle>
+    <p class="hint text-muted" i18n="@@Saml_keys_hint">
+      This gateway's own certificate and key: needed to sign the requests, or to read encrypted
+      assertions. Most identity providers need neither.
+    </p>
+    <app-form-field i18n-label="@@Saml_sp_cert" label="This gateway's certificate (PEM)">
+      <textarea matInput rows="3" class="mono" spellcheck="false" autocapitalize="off" autocorrect="off"
+        [value]="cfg('spCert')" (input)="setCfg('spCert', $any($event.target).value)"
+        placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+    </app-form-field>
+    <app-secret-field i18n-label="@@Saml_sp_key" label="This gateway's private key (PEM)" scope="infra"
+      [value]="cfg('spKey')" (valueChange)="setCfg('spKey', $event)"
+      [held]="secretHeld('spKey')" [at]="secretAt('spKey')" />
+  }
+
   @if (kind() === 'ldap') {
     <mat-form-field>
       <mat-label i18n="@@Dialect">Dialect</mat-label>
@@ -248,6 +328,62 @@
   </section>
 
   @if (!creating()) {
+    <mat-divider />
+    <!-- What the authority actually says: the groups a rule is written
+         against. Nobody can map a group they have never seen. -->
+    <section class="test">
+      <h3 i18n="@@Authority_test">Test</h3>
+      @if (kind() === 'ldap') {
+        <p class="hint text-muted" i18n="@@Authority_lookup_hint">
+          Ask the directory about someone, with the service account and no password: whoever has never
+          signed in here too.
+        </p>
+        <div class="lookup">
+          <mat-form-field subscriptSizing="dynamic">
+            <mat-label i18n="@@Login">Login</mat-label>
+            <input matInput autocomplete="off" spellcheck="false" [value]="lookupName()"
+              (input)="lookupName.set($any($event.target).value)" (keydown.enter)="lookup()" placeholder="jdupont" />
+          </mat-form-field>
+          <button matButton="tonal" (click)="lookup()" [disabled]="looking() || !lookupName().trim()">
+            @if (looking()) {<mat-icon spin>autorenew</mat-icon>} @else {<mat-icon>person_search</mat-icon>}
+            <ng-container i18n="@@Look_up">Look up</ng-container>
+          </button>
+        </div>
+        @if (lookedUp(); as who) {
+          <div class="person">
+            <div><strong>{{ who.username }}</strong> {{ who.fullname }} <span class="text-muted">{{ who.email }}</span></div>
+            <div class="mono subject">{{ who.subject }}</div>
+            <div class="chips">
+              @for (g of who.groups; track g) {
+                <span class="chip mono">{{ g }}</span>
+              } @empty {
+                <span class="text-muted" i18n="@@No_groups">No groups</span>
+              }
+            </div>
+          </div>
+        }
+      }
+      <h4 i18n="@@Seen_at_sign_in">Seen at sign-in</h4>
+      @for (person of people(); track person.externalId) {
+        <div class="person">
+          <div>
+            <strong>{{ person.username }}</strong> {{ person.fullname }}
+            <span class="text-muted">{{ seen(person.lastSeenAt || person.createdAt) }}</span>
+          </div>
+          <div class="chips">
+            @for (g of person.groups ?? []; track g) {
+              <span class="chip mono">{{ g }}</span>
+            } @empty {
+              <span class="text-muted" i18n="@@No_groups">No groups</span>
+            }
+          </div>
+        </div>
+      } @empty {
+        <p class="hint text-muted" i18n="@@Nobody_through_authority">
+          Nobody has signed in through this authority yet: its groups show here after the first sign-in.
+        </p>
+      }
+    </section>
     <mat-divider />
     <section class="danger-zone">
       <h3 i18n="@@Danger_zone">Danger zone</h3>

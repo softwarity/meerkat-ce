@@ -5,7 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RowActionsDirective } from '@softwarity/row-actions';
-import { Route, RouteHealth } from '../../api.service';
+import { Route, RouteHealth, RuntimeImage } from '../../api.service';
 import { AccessBadgesComponent } from '../endpoint-security/access-badges.component';
 import { AccessState, emptyAccess, isEmpty } from '../endpoint-security/access-editor.component';
 
@@ -141,13 +141,39 @@ export class RoutesTableComponent {
   }
 
   // The heart beside a route's name, or null when there is nothing to say:
-  // unknown yet, no upstream, or the route is off.
-  protected heart(r: Route): { down: boolean; tip: string } | null {
+  // unknown yet, no upstream, or the route is off. Three colours for a
+  // service the runtime counts: all replicas ready, some, none.
+  protected heart(r: Route): { state: 'up' | 'degraded' | 'down'; tip: string } | null {
     const h = this.health()[r.id];
     if (!r.enabled || !h?.target) return null;
     const why = h.targetWhy ?? '';
-    return h.target === 'up'
-      ? { down: false, tip: $localize`:@@Target_up_tip:Up: ${why}:WHY:` }
-      : { down: true, tip: $localize`:@@Target_down_tip:Down: ${why}:WHY:` };
+    const images = (h.replicas?.images ?? []).map((i) => `${i.ref}${i.digest ? ' @' + i.digest : ''} (${i.ready}/${i.count})`);
+    const tail = images.length ? '\n' + images.join('\n') : '';
+    switch (h.target) {
+      case 'up':
+        return { state: 'up', tip: $localize`:@@Target_up_tip:Up: ${why}:WHY:` + tail };
+      case 'degraded':
+        return { state: 'degraded', tip: $localize`:@@Target_degraded_tip:Degraded: ${why}:WHY:` + tail };
+      default:
+        return { state: 'down', tip: $localize`:@@Target_down_tip:Down: ${why}:WHY:` + tail };
+    }
+  }
+
+  // "2/3" beside the name, for a service the runtime counts.
+  protected replicas(r: Route): string {
+    const rep = this.health()[r.id]?.replicas;
+    return r.enabled && rep ? `${rep.ready}/${rep.wanted}` : '';
+  }
+
+  // What the replicas run, after the upstream: the tag, or the start of the
+  // digest when the tag says nothing ("latest", or none). Several during a
+  // rollout, each with how many run it.
+  protected images(r: Route): string {
+    const imgs = this.health()[r.id]?.replicas?.images ?? [];
+    if (!r.enabled || imgs.length === 0) return '';
+    const name = (i: RuntimeImage) =>
+      i.tag && i.tag !== 'latest' ? i.tag : `${i.tag || 'latest'}${i.digest ? ' ' + i.digest : ''}`;
+    if (imgs.length === 1) return name(imgs[0]);
+    return imgs.map((i) => `${name(i)} (${i.count})`).join(', ');
   }
 }

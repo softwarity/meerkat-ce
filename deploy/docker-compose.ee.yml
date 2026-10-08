@@ -44,6 +44,11 @@ services:
       # session. Without this mount the gateway runs exactly as before and the
       # tunnel simply says it cannot start.
       #
+      # The same socket feeds the route editor's discovery and the routes
+      # screen (whether each target runs, and on which image, from Docker's
+      # events). Without the tunnel, prefer the read-only proxy of
+      # docker-compose.yml to this mount.
+      #
       # It is a real grant: whoever can act as this container can act on this
       # Docker daemon. Mount it on the clusters your developers already trust,
       # not in front of customers.

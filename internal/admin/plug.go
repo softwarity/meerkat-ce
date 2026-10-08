@@ -43,6 +43,9 @@ type plugAnswer struct {
 	// DataOrigin is where the applications answer: the developer's profile
 	// page, where the key is deposited, lives there.
 	DataOrigin string `json:"dataOrigin"`
+	// Profile is the plug profile the commands name: the application's name,
+	// cut down to what plug accepts (store.PlugProfile).
+	Profile string `json:"profile"`
 	// Developers holds the dev capability, with their key if deposited: who
 	// could plug in, and who still has a key to deposit.
 	Developers []plugDeveloper `json:"developers"`
@@ -67,7 +70,8 @@ func (a *API) plugState(r *http.Request) (plugAnswer, error) {
 		PlugSetting: a.st.Plug(ctx), Enterprise: edition.Enterprise,
 		DevMode: a.st.DevMode(ctx), Production: store.Production(),
 		Status: devtunnel.CurrentStatus(), Version: devtunnel.ClientVersion(),
-		DefaultPort: store.DefaultPlugPort, DataOrigin: a.dataOrigin(r), Developers: []plugDeveloper{},
+		DefaultPort: store.DefaultPlugPort, DataOrigin: a.dataOrigin(r), Profile: a.st.PlugProfile(ctx),
+		Developers: []plugDeveloper{},
 	}
 	devs, err := a.st.Developers(ctx)
 	if err != nil {

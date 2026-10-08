@@ -1,12 +1,32 @@
 @use '../../../styles/table';
 
 :host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+/* The table screens' shape: the rules scroll in their frame, a FAB floats
+   over the bottom-right, and a rule opens in a right drawer. */
+mat-drawer-container {
+  height: 100%;
+  background: transparent;
+}
+mat-drawer-content {
   display: flex;
   flex-direction: column;
   position: relative;
   height: 100%;
-  min-height: 0;
   overflow: hidden;
+}
+mat-drawer {
+  width: min(520px, 96vw);
+  border-left: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-high);
+}
+// The hover colour is the shared mixin's (styles/_table.scss); the open rule
+// is marked like the open row of every other drawer screen.
+mat-row.selected {
+  background: var(--mat-sys-secondary-container);
 }
 .table-wrap {
   @include table.frame;

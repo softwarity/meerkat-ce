@@ -50,6 +50,8 @@ var readsNothing = map[string]bool{
 	// Asking a PostgreSQL server what it is before a copy: it reads, and
 	// creates not even a schema.
 	"POST /api/backup/check": true,
+	// Asking a directory about one person: it reads, with the service account.
+	"POST /api/auth-providers/{id}/lookup": true,
 	// The agent endpoint carries both kinds and sorts them per tool: an
 	// annotated read-only tool answers, a mutating one is refused by name.
 	"/mcp": true,

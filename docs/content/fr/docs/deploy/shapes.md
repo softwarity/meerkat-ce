@@ -96,6 +96,13 @@ export MEERKAT_ADMIN_PASSWORD='choose-one'
 docker stack deploy -c stack.swarm.yml meerkat
 ```
 
+La stack fait aussi tourner, sur chaque nœud, un proxy du socket Docker en lecture
+seule (`docker-proxy`, `mode: global`), sur un réseau que seule la gateway rejoint.
+Il laisse passer les lectures et refuse toute écriture. À travers lui, l'éditeur de
+routes propose les services Swarm, et la liste des routes montre les répliques prêtes
+et l'image de chaque cible, à partir des événements de chaque nœud : les événements
+d'un conteneur ne viennent que du nœud qui l'exécute.
+
 > [!WARNING]
 > Trois pods sur le stockage embarqué sont trois gateways : trois jeux de
 > routes, trois jeux de comptes, et une console qui montre celle des trois

@@ -67,8 +67,8 @@ func TestTheTargetCheckSaysWhetherEachTargetIsThere(t *testing.T) {
 	flips := 0
 	tc := TargetCheck{
 		Discover: swarmWith(
-			discovery.Service{Name: "stack_api", Names: []string{"api", "stack_api"}, Ready: 3, Wanted: 3, Reachable: true},
-			discovery.Service{Name: "stack_worker", Names: []string{"worker", "stack_worker"}, Ready: 0, Wanted: 2, Reachable: true},
+			discovery.Service{Name: "stack_api", Names: []string{"api", "stack_api"}, Ready: 3, Wanted: 3, Reachable: true, Counted: true},
+			discovery.Service{Name: "stack_worker", Names: []string{"worker", "stack_worker"}, Ready: 0, Wanted: 2, Reachable: true, Counted: true},
 		),
 		Dial: fn.dial, Proxy: noProxy, Flipped: func() { flips++ },
 	}
@@ -77,7 +77,7 @@ func TestTheTargetCheckSaysWhetherEachTargetIsThere(t *testing.T) {
 	}
 	h := rt.Health()
 	want := map[string][2]string{
-		"ready":    {TargetUp, "3 ready in Swarm"},
+		"ready":    {TargetUp, "3 of 3 ready in Swarm"},
 		"zero":     {TargetDown, "0 of 2 ready"},
 		"ext-ok":   {TargetUp, "answers"},
 		"ext-ok-2": {TargetUp, "answers"},
@@ -136,8 +136,8 @@ func TestWithoutDiscoveryEveryTargetIsDialled(t *testing.T) {
 	}
 }
 
-// Kubernetes lists its services without readiness, so a match is dialled
-// rather than read as zero ready.
+// A Kubernetes service the runtime did not count (no selector, or pods this
+// gateway may not read) is dialled rather than read as zero ready.
 func TestAKubernetesServiceIsDialled(t *testing.T) {
 	rt := newRouter(t, pathRoute("r", "r", 1, "/**", "http://api.shop.svc.cluster.local:80"))
 	fn := &fakeNet{}
@@ -209,5 +209,107 @@ func TestNoUpstreamNoDiscovery(t *testing.T) {
 	}
 	if asked {
 		t.Error("discovery was asked with no target to check")
+	}
+}
+
+// A counted service is read from its replicas, in three colours, and a
+// replica or an image moving is news even when the colour does not change.
+// An external host carries no replicas.
+func TestReplicasMakeThreeStates(t *testing.T) {
+	rt := newRouter(t,
+		pathRoute("full", "full", 1, "/a/**", "http://orders:8080"),
+		pathRoute("part", "part", 2, "/b/**", "http://billing:8080"),
+		pathRoute("none", "none", 3, "/c/**", "http://stock.shop.svc:8080"),
+		pathRoute("ext", "ext", 4, "/d/**", "https://partner.example"),
+	)
+	img := func(tag string, n int) []discovery.Image {
+		return []discovery.Image{{Ref: "orders:" + tag, Tag: tag, Count: n, Ready: n}}
+	}
+	services := []discovery.Service{
+		{Name: "orders", Names: []string{"orders", "orders.shop.svc"}, Ready: 3, Wanted: 3, Counted: true, Reachable: true, Images: img("1.4.0", 3)},
+		{Name: "billing", Names: []string{"billing"}, Ready: 2, Wanted: 3, Counted: true, Reachable: true},
+		{Name: "stock", Names: []string{"stock", "stock.shop.svc"}, Counted: true, Reachable: true},
+	}
+	flips := 0
+	tc := TargetCheck{
+		Discover: func(context.Context) discovery.Result {
+			return discovery.Result{Source: "kubernetes", Services: services}
+		},
+		Dial: (&fakeNet{}).dial, Proxy: noProxy, Flipped: func() { flips++ },
+	}
+	rt.CheckTargets(context.Background(), tc)
+	h := rt.Health()
+	for id, w := range map[string][2]string{
+		"full": {TargetUp, "3 of 3 ready in Kubernetes"},
+		"part": {TargetDegraded, "2 of 3 ready"},
+		"none": {TargetDown, "stopped (0 of 0)"},
+		"ext":  {TargetUp, "answers"},
+	} {
+		if h[id].Target != w[0] || h[id].TargetWhy != w[1] {
+			t.Errorf("%s: %q %q, want %q %q", id, h[id].Target, h[id].TargetWhy, w[0], w[1])
+		}
+	}
+	if r := h["full"].Replicas; r == nil || r.Ready != 3 || len(r.Images) != 1 || r.Images[0].Tag != "1.4.0" {
+		t.Errorf("full replicas: %+v", r)
+	}
+	if h["ext"].Replicas != nil {
+		t.Errorf("an external host carries replicas: %+v", h["ext"].Replicas)
+	}
+
+	// A rolling update: still all ready, but on two images. Same colour, news.
+	services[0].Images = append(img("1.4.1", 1), discovery.Image{Ref: "orders:1.4.0", Tag: "1.4.0", Count: 2, Ready: 2})
+	if !rt.CheckTargets(context.Background(), tc) || flips != 2 {
+		t.Errorf("an image moving did not wake the screen (%d)", flips)
+	}
+}
+
+// Without anything to dial, no timer runs: a round comes from the runtime's
+// events and from reloads only.
+func TestRoundsFollowEventsWithoutATimer(t *testing.T) {
+	rt := newRouter(t, pathRoute("r", "r", 1, "/**", "http://orders:8080"))
+	ready := 1
+	var mu sync.Mutex
+	changed := make(chan struct{}, 1)
+	rounds := make(chan struct{}, 8)
+	tc := TargetCheck{
+		Discover: func(context.Context) discovery.Result {
+			mu.Lock()
+			defer mu.Unlock()
+			rounds <- struct{}{}
+			return discovery.Result{Source: "swarm", Services: []discovery.Service{
+				{Name: "orders", Names: []string{"orders"}, Ready: ready, Wanted: 2, Counted: true, Reachable: true}}}
+		},
+		Dial: (&fakeNet{}).dial, Proxy: noProxy, Changed: changed,
+	}
+	// The reload that built the router already poked: a round of its own.
+	select {
+	case <-rt.reloaded:
+	default:
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go rt.WatchTargets(ctx, tc)
+	becomes := func(want string) {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for rt.Health()["r"].Target != want && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if got := rt.Health()["r"]; got.Target != want {
+			t.Fatalf("want %s, got %+v", want, got)
+		}
+	}
+	<-rounds
+	becomes(TargetDegraded)
+	mu.Lock()
+	ready = 2
+	mu.Unlock()
+	changed <- struct{}{}
+	<-rounds
+	becomes(TargetUp)
+	select {
+	case <-rounds:
+		t.Error("a round ran with no event and nothing to dial")
+	case <-time.After(300 * time.Millisecond):
 	}
 }

@@ -57,6 +57,15 @@ type Service struct {
 	// which is not the same as a broken one.
 	Ready  int `json:"ready"`
 	Wanted int `json:"wanted"`
+	// Counted says Ready and Wanted were really counted: always for Swarm and
+	// Docker, and for a Kubernetes service whose selector picks pods this
+	// gateway may read. A service that is not counted is dialled like any
+	// host, never read as zero of zero.
+	Counted bool `json:"counted,omitempty"`
+	// Images is what its replicas run, one entry per distinct image, most
+	// replicas first: two entries is a deployment in progress, or one that
+	// stopped half way.
+	Images []Image `json:"images,omitempty"`
 	// Reachable is false only when this gateway's own networks are KNOWN and
 	// the service shares none of them. Then NO name resolves from here, short
 	// or full - Swarm's DNS is per network, and a name outside it is not a
@@ -65,6 +74,103 @@ type Service struct {
 	Reachable bool `json:"reachable"`
 	// Suggested is the url a route would use, when there is an obvious one.
 	Suggested string `json:"suggested,omitempty"`
+}
+
+// Image is one image a service's replicas run, and how many of them.
+type Image struct {
+	// Ref is the image as it was asked for, without its digest
+	// (registry.example.com/team/orders:1.4.0).
+	Ref string `json:"ref"`
+	// Tag is the part after the colon, "" when none was given.
+	Tag string `json:"tag,omitempty"`
+	// Digest is the start of the pulled image's sha256, what tells two
+	// "latest" apart.
+	Digest string `json:"digest,omitempty"`
+	// Count is how many replicas run it, Ready how many of those are ready.
+	Count int `json:"count"`
+	Ready int `json:"ready"`
+}
+
+// parseImage splits a reference, and takes the digest from id when the
+// reference carries none (Kubernetes reports the pulled one apart).
+func parseImage(ref, id string) Image {
+	ref = strings.TrimSpace(ref)
+	digest := ""
+	if at := strings.Index(ref, "@"); at >= 0 {
+		digest = ref[at+1:]
+		ref = ref[:at]
+	}
+	if digest == "" {
+		if at := strings.Index(id, "@"); at >= 0 {
+			digest = id[at+1:]
+		} else if strings.HasPrefix(id, "sha256:") {
+			digest = id
+		}
+	}
+	digest = strings.TrimPrefix(digest, "sha256:")
+	if len(digest) > 12 {
+		digest = digest[:12]
+	}
+	img := Image{Ref: ref, Digest: digest}
+	// The tag is after the LAST colon, unless that colon belongs to a
+	// registry's port (localhost:5000/app has no tag).
+	if c := strings.LastIndex(ref, ":"); c >= 0 && !strings.Contains(ref[c:], "/") {
+		img.Tag = ref[c+1:]
+	}
+	return img
+}
+
+// imageTally counts replicas per image.
+type imageTally map[string]*Image
+
+func (t imageTally) add(img Image, ready bool) {
+	if img.Ref == "" {
+		return
+	}
+	key := img.Ref + "@" + img.Digest
+	e := t[key]
+	if e == nil {
+		cp := img
+		e = &cp
+		t[key] = e
+	}
+	e.Count++
+	if ready {
+		e.Ready++
+	}
+}
+
+func (t imageTally) list() []Image {
+	if len(t) == 0 {
+		return nil
+	}
+	// A replica still starting has no pulled digest yet: it runs the same
+	// reference as one that has, and showing it as a second image would read
+	// as a rollout that is not happening.
+	for key, e := range t {
+		if e.Digest != "" {
+			continue
+		}
+		for _, o := range t {
+			if o != e && o.Ref == e.Ref && o.Digest != "" {
+				o.Count += e.Count
+				o.Ready += e.Ready
+				delete(t, key)
+				break
+			}
+		}
+	}
+	out := make([]Image, 0, len(t))
+	for _, e := range t {
+		out = append(out, *e)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Ref+out[i].Digest < out[j].Ref+out[j].Digest
+	})
+	return out
 }
 
 // Port is one listening port.
@@ -99,6 +205,14 @@ const lookupTimeout = 5 * time.Second
 // orchestrator that schedules THIS gateway is the one whose answer is about
 // the network it can actually reach.
 func Discover(ctx context.Context) Result {
+	// The watcher's answer when it has one: the same runtime, already read,
+	// and kept current by its events.
+	currentMu.RLock()
+	w := current
+	currentMu.RUnlock()
+	if r, ok := w.Result(); ok {
+		return r
+	}
 	ctx, cancel := context.WithTimeout(ctx, lookupTimeout)
 	defer cancel()
 
@@ -176,6 +290,7 @@ func fromDocker(ctx context.Context) (Result, error) {
 }
 
 type swarmService struct {
+	ID   string `json:"ID"`
 	Spec struct {
 		Name         string            `json:"Name"`
 		Labels       map[string]string `json:"Labels"`
@@ -220,9 +335,10 @@ func fromSwarm(ctx context.Context, client *http.Client, base string) (Result, e
 	images := make([]string, 0, len(raw))
 	for _, s := range raw {
 		svc := Service{
-			Name:   s.Spec.Name,
-			Ready:  s.ServiceStatus.RunningTasks,
-			Wanted: s.ServiceStatus.DesiredTasks,
+			Name:    s.Spec.Name,
+			Ready:   s.ServiceStatus.RunningTasks,
+			Wanted:  s.ServiceStatus.DesiredTasks,
+			Counted: true,
 		}
 		ports := s.Spec.EndpointSpec.Ports
 		if len(ports) == 0 {
@@ -238,6 +354,7 @@ func fromSwarm(ctx context.Context, client *http.Client, base string) (Result, e
 		out = append(out, svc)
 	}
 	fillFromImages(ctx, client, base, out, images)
+	taskImages(ctx, client, base, raw, out)
 	// Order matters: the networks must be named before reach can be worked
 	// out, and reach must be known before a short alias can be called safe.
 	netName := nameTheNetworks(ctx, client, base, out)
@@ -248,6 +365,39 @@ func fromSwarm(ctx context.Context, client *http.Client, base string) (Result, e
 	}
 	sortByName(out)
 	return Result{Source: "swarm", Services: out, Reach: reach}, nil
+}
+
+// taskImages fills each service's images from its running tasks: the image a
+// task runs is pinned by digest when Swarm resolved it, so two tasks on
+// "latest" pulled a week apart show as two. Best effort: a listing that fails
+// leaves the images empty, and the counts stand.
+func taskImages(ctx context.Context, client *http.Client, base string, raw []swarmService, out []Service) {
+	var tasks []struct {
+		ServiceID string `json:"ServiceID"`
+		Spec      struct {
+			ContainerSpec struct {
+				Image string `json:"Image"`
+			} `json:"ContainerSpec"`
+		} `json:"Spec"`
+		Status struct {
+			State string `json:"State"`
+		} `json:"Status"`
+	}
+	filters := url.QueryEscape(`{"desired-state":["running"]}`)
+	if err := getJSON(ctx, client, base+"/tasks?filters="+filters, &tasks); err != nil {
+		return
+	}
+	tallies := map[string]imageTally{}
+	for _, t := range tasks {
+		if tallies[t.ServiceID] == nil {
+			tallies[t.ServiceID] = imageTally{}
+		}
+		running := t.Status.State == "running"
+		tallies[t.ServiceID].add(parseImage(t.Spec.ContainerSpec.Image, ""), running)
+	}
+	for i, s := range raw {
+		out[i].Images = tallies[s.ID].list()
+	}
 }
 
 // markReach says which services this gateway can actually name.
@@ -537,10 +687,12 @@ func exposedPorts(ctx context.Context, client *http.Client, base, ref string) []
 }
 
 type dockerContainer struct {
-	Names  []string `json:"Names"`
-	State  string   `json:"State"`
-	Labels map[string]string
-	Ports  []struct {
+	Names   []string `json:"Names"`
+	State   string   `json:"State"`
+	Image   string   `json:"Image"`
+	ImageID string   `json:"ImageID"`
+	Labels  map[string]string
+	Ports   []struct {
 		PrivatePort int `json:"PrivatePort"`
 		PublicPort  int `json:"PublicPort"`
 	} `json:"Ports"`
@@ -570,10 +722,13 @@ func fromContainers(ctx context.Context, client *http.Client, base string) (Resu
 		if name == "" {
 			continue
 		}
-		svc := Service{Name: name, Wanted: 1}
+		svc := Service{Name: name, Wanted: 1, Counted: true}
 		if c.State == "running" {
 			svc.Ready = 1
 		}
+		tally := imageTally{}
+		tally.add(parseImage(c.Image, c.ImageID), svc.Ready == 1)
+		svc.Images = tally.list()
 		seen := map[int]bool{}
 		for _, p := range c.Ports {
 			if p.PrivatePort == 0 || seen[p.PrivatePort] {

@@ -2,7 +2,7 @@
 title: Comment on se connecte
 section: Authentification
 order: 100
-summary: Les autorités capables de reconnaître une personne - comptes locaux, OIDC, annuaire, GitHub - et l'ordre dans lequel se déroule une connexion.
+summary: Les autorités capables de reconnaître une personne - comptes locaux, OIDC, SAML, annuaire, GitHub - et l'ordre dans lequel se déroule une connexion.
 ---
 
 # Comment on se connecte
@@ -17,19 +17,19 @@ personne a le droit de faire : une première connexion crée un compte qui n'a a
 tant qu'un administrateur ne l'a pas rattaché à une organisation et ne lui a pas attribué
 de rôles. Cette seconde moitié relève du [contrôle d'accès](/docs/access/overview).
 
-## Les quatre types
+## Les cinq types
 
 | Type | À quoi il sert | Sur la page de connexion | Édition |
 |---|---|---|---|
 | **Comptes locaux** | les comptes que Meerkat gère lui-même, avec un mot de passe qu'il conserve | le formulaire identifiant et mot de passe | les deux |
 | **OpenID Connect** | un fournisseur d'identité d'entreprise : Keycloak, Entra ID, Okta, Auth0, Google | un bouton par fournisseur | les deux |
+| **SAML 2.0** | un fournisseur d'identité qui parle SAML plutôt qu'OIDC : ADFS, Entra ID, Okta, Shibboleth | un bouton par fournisseur | **Enterprise** |
 | **Annuaire** | un annuaire LDAP ou un Active Directory, interrogé directement | aucun bouton : il répond au même formulaire | **Enterprise** |
 | **GitHub** | un compte GitHub, limité aux organisations que vous indiquez | un bouton | les deux |
 
 > [!NOTE]
-> SAML figure dans la console, en grisé, et Kerberos n'y figure pas du tout. Ni l'un ni
-> l'autre n'est implémenté : le choix SAML n'est là que pour montrer ce qui est prévu, et
-> son enregistrement est refusé. Ne bâtissez aucune intégration dessus.
+> Kerberos - la connexion unique de Windows - n'est pas encore implémenté. Ne bâtissez
+> aucune intégration dessus.
 
 Plusieurs autorités du même type peuvent coexister - deux fournisseurs OIDC, deux
 annuaires - chacune avec son nom, son bouton et ses politiques. L'autorité locale fait

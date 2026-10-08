@@ -34,6 +34,7 @@ import (
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/expiry"
 	"github.com/softwarity/meerkat/internal/gateway"
+	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/live"
 	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/mail"
@@ -530,6 +531,10 @@ func run(o options) error {
 	// counter, and the Users and Members screens re-read GET /api/sessions. A
 	// move on this node is told to the others over the bus, so a console held
 	// by another gateway hears of a sign-in it did not serve.
+	// The SAML assertions already spent (AUTH-19): the store's table, so a
+	// replay is refused on every node.
+	idp.SetAssertionLedger(st)
+
 	presence := live.NewPresence()
 	st.OnSessionsMoved(func() {
 		presence.Moved()
@@ -551,7 +556,11 @@ func run(o options) error {
 		st.Pause(arg == "on")
 		paused.Moved()
 	})
-	go router.WatchTargets(ctx, gateway.DefaultTargetCheck(routeHealth.Flipped))
+	// The runtime, watched (discovery.Watcher): its events, not a timer, are
+	// what say a target lost a replica or changed image.
+	runtime := discovery.NewWatcher()
+	go runtime.Run(ctx)
+	go router.WatchTargets(ctx, gateway.DefaultTargetCheck(runtime, routeHealth.Flipped))
 	liveServer := live.New(func(p live.Perimeter) live.Sources {
 		sources := live.Sources{
 			live.ChangesTopic: changes.For(p.Named, p.Quiet),
@@ -1049,6 +1058,11 @@ func purge(ctx context.Context, sessions *session.Manager, st *store.Store) {
 		slog.Error("audit purge failed", "err", err)
 	} else if n > 0 {
 		slog.Debug("purged old audit events", "count", n)
+	}
+	// The SAML assertions spent (AUTH-19), once they could not be posted
+	// again anyway.
+	if _, err := st.PurgeSpentAssertions(ctx, time.Now().Unix()); err != nil {
+		slog.Error("spent assertion purge failed", "err", err)
 	}
 	// The audited calls of the data plane (AUD-04), on their own, shorter
 	// lifetime: the one kind of the trail whose volume follows the traffic.

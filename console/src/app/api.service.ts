@@ -20,6 +20,9 @@ export interface PlugState extends PlugSetting {
   version?: string;
   defaultPort: number;
   dataOrigin: string;
+  // The profile the commands name: the application's name, cut down to what
+  // plug accepts.
+  profile: string;
   // One per workstation: plug keeps a key pair per profile.
   developers: { username: string; fullname?: string; keys: { fingerprint: string; comment?: string }[] }[];
 }
@@ -508,6 +511,27 @@ export interface DatabaseProbe {
   canCreate: boolean;
 }
 
+// One account linked to an authority, as it last described it.
+export interface LinkedPerson {
+  providerId: string;
+  externalId: string;
+  userId: string;
+  username: string;
+  fullname?: string;
+  groups?: string[];
+  createdAt: number;
+  lastSeenAt?: number;
+}
+
+// What a directory says about one person.
+export interface DirectoryPerson {
+  subject: string;
+  username: string;
+  email?: string;
+  fullname?: string;
+  groups: string[];
+}
+
 // A database copied into a PostgreSQL server: where, and every table counted
 // on both sides.
 export interface DatabaseCopy {
@@ -660,12 +684,31 @@ export interface RouteHealth {
   lastAt?: number;
   lastOkAt?: number;
   // Whether the service behind the route is there: from the runtime's replica
-  // count when discovery knows it, a TCP connect otherwise, and down whenever
-  // the circuit is open. Absent while unknown, and for a route with no
-  // upstream.
-  target?: 'up' | 'down';
+  // count when it counts the service (degraded when some replicas are ready,
+  // not all), a TCP connect otherwise, and down whenever the circuit is open.
+  // Absent while unknown, and for a route with no upstream.
+  target?: 'up' | 'degraded' | 'down';
   targetWhy?: string;
   targetAt?: number;
+  // The runtime's count and the images its replicas run, for a service it
+  // counts. Never for an external host.
+  replicas?: Replicas;
+}
+
+export interface Replicas {
+  ready: number;
+  wanted: number;
+  source: string;
+  // One per distinct image, most replicas first: two is a rollout.
+  images?: RuntimeImage[];
+}
+
+export interface RuntimeImage {
+  ref: string;
+  tag?: string;
+  digest?: string;
+  count: number;
+  ready: number;
 }
 
 export interface Param {
@@ -2067,6 +2110,17 @@ export class ApiService {
   }
 
   // Tries the configuration without signing anyone in.
+  // Who came in through an authority, with the groups each reported at their
+  // last sign-in - any kind.
+  authProviderPeople(id: string): Observable<LinkedPerson[]> {
+    return this.http.get<LinkedPerson[]>(`/api/auth-providers/${encodeURIComponent(id)}/people`);
+  }
+
+  // What a directory says about someone, without their password.
+  lookupAuthProvider(id: string, username: string): Observable<DirectoryPerson> {
+    return this.http.post<DirectoryPerson>(`/api/auth-providers/${encodeURIComponent(id)}/lookup`, { username });
+  }
+
   checkAuthProvider(id: string): Observable<{ ok: boolean; kind: string; name: string }> {
     return this.http.post<{ ok: boolean; kind: string; name: string }>(
       `/api/auth-providers/${encodeURIComponent(id)}/check`,

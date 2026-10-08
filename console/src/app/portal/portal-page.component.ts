@@ -379,6 +379,42 @@ export class PortalPageComponent {
     }
   }
 
+  // Moves the open module under another one, or detaches a sub-module to the
+  // top level, keeping everything it carries; then reopens it where it now is.
+  protected onRelocate(target: number | null): void {
+    const p = this.editingPath;
+    if (!p) return;
+    const ps = this.entries();
+    if (p.ci === null) {
+      // A top-level module going under another one: not with children of its
+      // own (the editor does not offer it), and without its home label, which
+      // only a parent has.
+      if (target === null || (ps[p.pi].children ?? []).length > 0) return;
+      const { children: _children, homeLabel: _home, ...rest } = ps[p.pi];
+      const moved: PortalSubEntry = { ...rest };
+      const without = ps.filter((_, j) => j !== p.pi);
+      const ti = target > p.pi ? target - 1 : target;
+      this.entries.set(without.map((x, j) => (j === ti ? { ...x, children: [...(x.children ?? []), moved] } : x)));
+      this.persist();
+      this.editChild(ti, (this.entries()[ti].children ?? []).length - 1);
+      return;
+    }
+    const child = (ps[p.pi].children ?? [])[p.ci];
+    const ci = p.ci;
+    const lifted = ps.map((x, j) => (j === p.pi ? { ...x, children: (x.children ?? []).filter((_, k) => k !== ci) } : x));
+    if (target === null) {
+      // Detached: a module of its own, right after the one it was under.
+      lifted.splice(p.pi + 1, 0, { ...child, children: [] });
+      this.entries.set(lifted);
+      this.persist();
+      this.editParent(p.pi + 1);
+      return;
+    }
+    this.entries.set(lifted.map((x, j) => (j === target ? { ...x, children: [...(x.children ?? []), child] } : x)));
+    this.persist();
+    this.editChild(target, (this.entries()[target].children ?? []).length - 1);
+  }
+
   protected onToggleDisabled(v: boolean): void {
     const p = this.editingPath;
     if (!p) return;
@@ -426,6 +462,10 @@ export class PortalPageComponent {
       canUp = idx > 0;
       canDown = idx < siblings - 1;
     }
+    // The other top-level modules, where this one could go.
+    const parents = this.entries()
+      .map((p, index) => ({ index, name: p.label || this.routeNameOf(p.routeId) }))
+      .filter((p) => !path || p.index !== path.pi);
     this.editing.set({
       title,
       isParent,
@@ -433,6 +473,13 @@ export class PortalPageComponent {
       existing: path !== null,
       canUp,
       canDown,
+      parents,
+      under: path && path.ci !== null ? path.pi : null,
+      above:
+        path && path.ci === null && path.pi > 0 && !(this.entries()[path.pi].children ?? []).length
+          ? path.pi - 1
+          : null,
+      hasChildren: !!path && path.ci === null && (this.entries()[path.pi].children ?? []).length > 0,
       routes: this.uiRoutes(),
       module: {
         routeId: m?.routeId ?? '',

@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/text/unicode/norm"
 )
 
 // What the developer tunnel (DEV-11) needs from the store: the server's own
@@ -277,6 +279,47 @@ func (p PlugSetting) Address() (host string, port int) {
 		port = DefaultPlugPort
 	}
 	return host, port
+}
+
+// DefaultPlugProfile names the profile when the application's name leaves
+// nothing a profile name can hold.
+const DefaultPlugProfile = "meerkat"
+
+// PlugProfile is the name a developer's plug profile takes for this gateway:
+// the application's name, as the branding sets it, cut down to what plug
+// accepts ([a-z0-9][a-z0-9._-]{0,62}): lower case, accents dropped, anything
+// else a dash, no leading dash or dot, 63 characters at most. The install
+// command creates the profile under it, and every other command passes it, so
+// a developer with several gateways tells them apart by name, not by host.
+func PlugProfile(appName string) string {
+	var b strings.Builder
+	for _, r := range norm.NFD.String(strings.ToLower(strings.TrimSpace(appName))) {
+		switch {
+		case unicode.Is(unicode.Mn, r):
+			// the accent a decomposed letter carried
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '.', r == '_', r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	name := strings.TrimLeft(b.String(), "-._")
+	if len(name) > 63 {
+		name = name[:63]
+	}
+	if name == "" {
+		return DefaultPlugProfile
+	}
+	return name
+}
+
+// PlugProfile is the profile name for this gateway, from its branding.
+func (s *Store) PlugProfile(ctx context.Context) string {
+	b := DefaultBranding()
+	if err := s.GetSetting(ctx, SettingBranding, &b); err != nil {
+		return PlugProfile("")
+	}
+	return PlugProfile(b.AppName)
 }
 
 // Developer is an account holding the developer capability, as the tunnel's

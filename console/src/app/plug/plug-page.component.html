@@ -24,22 +24,9 @@
 
   <ol class="steps">
     <li>
-      @if (os() === 'windows') {
-        <p i18n="@@Plug_step_install_windows">
-          <b>Install plug</b> from <b>Git Bash</b> (part of Git for Windows). It asks once for
-          Administrator rights.
-        </p>
-      } @else {
-        <p i18n="@@Plug_step_install_unix">
-          <b>Install plug</b> from a terminal. It may ask for your password once.
-        </p>
-      }
-      <app-snippet filename="install.sh" [downloadable]="false" [content]="installCmd()" />
-    </li>
-    <li>
-      <p i18n="@@Plug_step_rename">
-        <b>Name the profile</b>, passed with <code>-p</code> by every command below. The installer
-        names it after the host.
+      <p i18n="@@Plug_step_profile">
+        <b>Name the profile</b>: plug keeps one per gateway, and every command below passes it
+        with <code>-p</code>.
       </p>
       <app-form-field
         class="profile"
@@ -53,10 +40,22 @@
           matInput
           [value]="profile()"
           (input)="profile.set($any($event.target).value)"
-          [placeholder]="addr().host"
+          [placeholder]="state()?.profile ?? ''"
         />
       </app-form-field>
-      <app-snippet filename="rename.sh" [downloadable]="false" [content]="renameCmd()" />
+    </li>
+    <li>
+      @if (os() === 'windows') {
+        <p i18n="@@Plug_step_install_windows">
+          <b>Install plug</b> from <b>Git Bash</b> (part of Git for Windows). It asks once for
+          Administrator rights.
+        </p>
+      } @else {
+        <p i18n="@@Plug_step_install_unix">
+          <b>Install plug</b> from a terminal. It may ask for your password once.
+        </p>
+      }
+      <app-snippet filename="install.sh" [downloadable]="false" [content]="installCmd()" />
     </li>
     <li>
       <p i18n="@@Plug_step_keys">

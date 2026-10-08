@@ -10,7 +10,8 @@ import (
 )
 
 // RouteHealthTopic is what the routes screen subscribes to, to hear that a
-// route's target went up or down (SVC-04).
+// route's target went up, degraded or down, or that its replicas or images
+// moved (SVC-04, SVC-07).
 const RouteHealthTopic = "route-health"
 
 // RouteHealth tells the routes screen that a target flipped.

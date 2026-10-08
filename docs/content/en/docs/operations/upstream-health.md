@@ -73,22 +73,55 @@ meet that because somebody chose it.
 
 ## What the console shows
 
-Each route in the Routes list carries a **heart**: green when its target is up,
-broken and red when it is down, and the reason in the tooltip.
+Each route in the Routes list carries a **heart**, and the reason in its tooltip:
 
-The gateway checks every enabled route's target in the background, every 30
-seconds, never on the request path:
+| Heart | Means |
+|---|---|
+| Green | every replica of the service is ready, or an external host accepts a connection |
+| Orange | some replicas are ready, not all: the service answers, on less than it was given |
+| Red, broken | none is ready, none is wanted (scaled to zero), the host refuses, or the circuit is open |
 
-- a service that discovery knows (Docker, Swarm) is up when at least one replica is
-  ready, and down at zero;
-- anything else - an external host, a Kubernetes service - gets a plain TCP connect
-  with a 2 second timeout. A connect and nothing more: no HTTP request, so nothing
-  lands in the service's logs or counts against its limits. Behind an `HTTP_PROXY`,
-  the proxy is what gets dialled;
-- an open circuit is a target down, whatever the connect said: real traffic wins.
+For a service the runtime runs, the row also says **how many replicas are ready**
+(`2/3`, beside the name) and **which image they run** (after the upstream: the tag,
+or the start of the digest when the tag is `latest`). Two images on one service is
+a deployment under way, or one that stopped half way; the tooltip lists each image
+with its digest and how many replicas run it.
 
-A change is pushed to the open screen at once, no reload needed. A route nobody calls
-now has something to say. Not there yet: a service's own `/health`.
+### Without a timer
+
+The gateway does not ask the runtime on a schedule: it **listens** to it.
+
+- **Kubernetes**: it lists the Services and pods of its own namespace once, then
+  watches them. A pod that starts, becomes ready, crashes or is replaced arrives as an
+  event from the API server, and the screen changes with it. A Service's replicas are
+  the pods its selector picks. A Service without a selector has no pods to count, and
+  is checked like an external host.
+- **Docker and Swarm**: one inventory, then Docker's event stream. In a Swarm, a
+  container's events come only from the node it runs on, so the gateway listens to
+  every node, through the read-only socket proxy the stack deploys on each of them.
+- A stream that breaks is reopened, starting with a fresh inventory: nothing that
+  happened meanwhile is missed.
+
+What no event can tell is an **external host** going away. Those are checked with a
+plain TCP connect every 30 seconds, with a 2 second timeout: a connect and nothing
+more, no HTTP request, so nothing lands in the service's logs or counts against its
+limits. Behind an `HTTP_PROXY`, the proxy is what gets dialled. A gateway with no
+external target runs no timer at all. An external service never shows replicas or
+images: they are not the gateway's business.
+
+An open circuit is a target down, whatever the runtime or the connect said: real
+traffic wins.
+
+### What it needs
+
+| Runtime | Grant |
+|---|---|
+| Kubernetes | `list` and `watch` on `pods` and `services` in the gateway's namespace. The chart grants it with `rbac.watch`, on by default - see [Kubernetes](/docs/deploy/kubernetes) |
+| Docker | the Docker API, read-only: the socket proxy of the compose file, or the socket mounted for the tunnel |
+| Swarm | the socket proxy on every node (`mode: global`), which the stack deploys - see [Which shape to deploy](/docs/deploy/shapes) |
+
+Without the grant, the targets are checked by a connection, and the gateway says once
+which right it lacks.
 
 ## In a cluster
 

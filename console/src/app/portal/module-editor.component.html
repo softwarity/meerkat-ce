@@ -4,15 +4,33 @@
 </div>
 
 @if (data().existing) {
+  <!-- Two groups: where the module sits (order, level, parent), then the rest.
+       Each move applies at once. A module with sub-modules keeps its level:
+       the catalogue has two, and its children would have nowhere to go. -->
   <div class="quick">
     <button matIconButton [disabled]="!data().canUp" (click)="moved.emit(-1)" matTooltip="Move up" i18n-matTooltip="@@Move_up"><mat-icon>arrow_upward</mat-icon></button>
     <button matIconButton [disabled]="!data().canDown" (click)="moved.emit(1)" matTooltip="Move down" i18n-matTooltip="@@Move_down"><mat-icon>arrow_downward</mat-icon></button>
-    @if (data().isParent && data().bar) {
-      <button matButton (click)="addedSub.emit()">
-        <mat-icon>subdirectory_arrow_right</mat-icon><span i18n="@@Portal_add_submodule">Add a sub-module</span>
+    @if (data().bar) {
+      <button matIconButton disabledInteractive [disabled]="data().under === null" (click)="relocated.emit(null)"
+              [matTooltip]="data().under === null ? alreadyTop : detachTip"><mat-icon>format_indent_decrease</mat-icon></button>
+      <button matIconButton disabledInteractive [disabled]="data().above === null" (click)="relocated.emit(data().above)"
+              [matTooltip]="indentTip()"><mat-icon>format_indent_increase</mat-icon></button>
+      <button matButton disabledInteractive [disabled]="data().hasChildren || !data().parents.length"
+              [matMenuTriggerFor]="under" [matTooltip]="data().hasChildren ? hasChildrenHint : ''">
+        <span i18n="@@Portal_move_under">Move under</span><mat-icon iconPositionEnd>arrow_drop_down</mat-icon>
       </button>
+      <mat-menu #under="matMenu">
+        @for (p of data().parents; track p.index) {
+          <button mat-menu-item (click)="relocated.emit(p.index)">{{ p.name }}</button>
+        }
+      </mat-menu>
     }
     <span class="grow"></span>
+    @if (data().isParent && data().bar) {
+      <button matIconButton (click)="addedSub.emit()" matTooltip="Add a sub-module" i18n-matTooltip="@@Portal_add_submodule">
+        <mat-icon>add</mat-icon>
+      </button>
+    }
     <mat-slide-toggle [checked]="!disabled()" (change)="toggleDisabled(!$event.checked)"
                       matTooltip="Enabled" i18n-matTooltip="@@Enabled" />
     <button matIconButton (click)="removed.emit()" matTooltip="Remove" i18n-matTooltip="@@Remove"><mat-icon>delete</mat-icon></button>

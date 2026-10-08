@@ -80,3 +80,23 @@ func TestEndpointCallsHaveTheirOwnRetention(t *testing.T) {
 		t.Fatal("a retention that is not offered was accepted")
 	}
 }
+
+// An assertion is spent once: the second post of the same one is refused,
+// and the sweep forgets it only once it would have expired anyway.
+func TestASAMLAssertionIsSpentOnce(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	first, err := st.SpendAssertion(ctx, "idp|_a1", 100)
+	if err != nil || !first {
+		t.Fatalf("first use: %v %v", first, err)
+	}
+	if again, _ := st.SpendAssertion(ctx, "idp|_a1", 100); again {
+		t.Fatal("the same assertion was accepted twice")
+	}
+	if n, _ := st.PurgeSpentAssertions(ctx, 50); n != 0 {
+		t.Fatal("an assertion still valid was forgotten")
+	}
+	if n, _ := st.PurgeSpentAssertions(ctx, 200); n != 1 {
+		t.Fatal("an expired assertion was kept")
+	}
+}

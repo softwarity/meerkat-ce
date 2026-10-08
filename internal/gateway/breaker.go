@@ -252,7 +252,7 @@ func (rt *Router) Health() map[string]RouteHealth {
 		}
 		rh := out[c.id]
 		if t, ok := rt.targets.get(c.id); ok {
-			rh.Target, rh.TargetWhy, rh.TargetAt = t.State, t.Why, t.At
+			rh.Target, rh.TargetWhy, rh.TargetAt, rh.Replicas = t.State, t.Why, t.At, t.Replicas
 		}
 		// Read on the spot rather than waiting for the next round: a circuit
 		// that just opened is news now.
@@ -282,11 +282,17 @@ type RouteHealth struct {
 	LastError  string `json:"lastError,omitempty"`
 	LastAt     int64  `json:"lastAt,omitempty"`
 	LastOKAt   int64  `json:"lastOkAt,omitempty"`
-	// Target is whether the service behind the route is there: "up", "down",
+	// Target is whether the service behind the route is there: "up",
+	// "degraded" (some of its counted replicas ready, not all), "down",
 	// or empty when nothing is known yet - or never will be, for a route that
 	// answers by itself. TargetWhy says why in a few words, TargetAt when it
 	// was found out (unix seconds).
 	Target    string `json:"target,omitempty"`
 	TargetWhy string `json:"targetWhy,omitempty"`
 	TargetAt  int64  `json:"targetAt,omitempty"`
+	// Replicas is the runtime's count for a service it counts (target up,
+	// degraded or down from it), with the images they run. Absent for
+	// anything found out by a connect - an external host above all, whose
+	// replicas are nobody's business here.
+	Replicas *Replicas `json:"replicas,omitempty"`
 }

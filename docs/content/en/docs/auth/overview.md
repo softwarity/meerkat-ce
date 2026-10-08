@@ -2,7 +2,7 @@
 title: How someone signs in
 section: Authentication
 order: 100
-summary: The authorities that can recognise a person - local accounts, OIDC, a directory, GitHub - and the order the sign-in runs in.
+summary: The authorities that can recognise a person - local accounts, OIDC, SAML, a directory, GitHub - and the order the sign-in runs in.
 ---
 
 # How someone signs in
@@ -17,19 +17,19 @@ first sign-in produces an account that reaches nothing until an administrator
 places it in an organisation and grants roles. That half is
 [access control](/docs/access/overview).
 
-## The four kinds
+## The five kinds
 
 | Kind | What it is for | On the sign-in page | Edition |
 |---|---|---|---|
 | **Local accounts** | accounts Meerkat holds itself, with a password it stores | the username and password form | both |
 | **OpenID Connect** | a company identity provider: Keycloak, Entra ID, Okta, Auth0, Google | a button per provider | both |
+| **SAML 2.0** | an identity provider that speaks SAML rather than OIDC: ADFS, Entra ID, Okta, Shibboleth | a button per provider | **Enterprise** |
 | **Directory** | an LDAP directory or an Active Directory, asked straight | no button: it answers the same form | **Enterprise** |
 | **GitHub** | a GitHub account, restricted to the organisations you name | a button | both |
 
 > [!NOTE]
-> SAML appears in the console, greyed out, and Kerberos does not appear at all.
-> Neither is implemented: the SAML choice exists so the shape is visible, and
-> saving one is refused. Do not plan an integration on them.
+> Kerberos - the Windows single sign-on - is not implemented yet. Do not plan an
+> integration on it.
 
 Several authorities of the same kind can coexist - two OIDC providers, two
 directories - each with its own name, its own button and its own policies. The

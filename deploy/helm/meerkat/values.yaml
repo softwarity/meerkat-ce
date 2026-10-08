@@ -154,5 +154,12 @@ securityContext:
 # Read-only access to the gateway's own namespace: the services (route
 # discovery) and its own pod (the ports it is published on). Set false where
 # a service account may read nothing.
+#
+# watch adds the pods, listed and watched: the routes screen then shows each
+# service's ready replicas (green all, orange some, red none) and the image
+# they run, from the API server's events. It reads the environment variables
+# the pods' manifests declare, so set it false where those carry secrets in
+# clear; the targets are then checked by a connection, as before.
 rbac:
   read: true
+  watch: true

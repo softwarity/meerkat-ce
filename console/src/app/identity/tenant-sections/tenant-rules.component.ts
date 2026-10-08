@@ -1,15 +1,18 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialog } from '@angular/material/dialog';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
+import { RowActionsDirective } from '@softwarity/row-actions';
 import { ApiService, AuthProvider, Group, GroupRule } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { TenantScope } from '../tenant-scope';
-import { RuleDialogComponent, RuleDialogData } from './rule-dialog.component';
+import { RuleEditorComponent } from './rule-editor.component';
 
 // The rules that turn what an authority says into membership of THIS
 // organisation and groups within it (RBAC-10).
@@ -19,14 +22,23 @@ import { RuleDialogComponent, RuleDialogData } from './rule-dialog.component';
 // organisation, with which groups, is the organisation's own call. So these
 // rules are written here, by its administrators, and cannot reach anywhere
 // else.
+//
+// A rule opens in the right drawer, and the URL says which (.../rules/<id>,
+// .../rules/new): a refresh or a pasted link comes back to it, like routes,
+// roles and authorities. The same screen serves two addresses - an
+// organisation's rules, and Application's in single-organisation mode - so
+// the drawer's address is built from the one it was reached by.
 @Component({
   selector: 'app-tenant-rules',
   imports: [
     MatButtonModule,
     MatIconModule,
+    MatSidenavModule,
     MatTableModule,
     MatTooltipModule,
     LoadingIndicatorComponent,
+    RowActionsDirective,
+    RuleEditorComponent,
   ],
   templateUrl: './tenant-rules.component.html',
   styleUrl: './tenant-rules.component.scss',
@@ -34,7 +46,8 @@ import { RuleDialogComponent, RuleDialogData } from './rule-dialog.component';
 export class TenantRulesComponent {
   protected readonly scope = inject(TenantScope);
   private readonly api = inject(ApiService);
-  private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
+  private readonly ar = inject(ActivatedRoute);
   private readonly dialogs = inject(DialogsService);
   private readonly snack = inject(MatSnackBar);
 
@@ -43,7 +56,21 @@ export class TenantRulesComponent {
   protected readonly groups = signal<Group[]>([]);
   protected readonly authorities = signal<AuthProvider[]>([]);
   protected readonly reported = signal<string[]>([]);
-  protected readonly columns = ['when', 'grants', 'actions'];
+  protected readonly columns = ['when', 'grants'];
+
+  // The URL drives the drawer: the segment after rules, when there is one.
+  private readonly params = toSignal(this.ar.paramMap);
+  protected readonly editing = computed<GroupRule | 'new' | null>(() => {
+    const id = this.params()?.get('rule');
+    if (!id) return null;
+    if (id === 'new') return 'new';
+    return this.rules().find((r) => r.id === id) ?? null;
+  });
+  protected readonly editingRule = computed(() => {
+    const e = this.editing();
+    return e === null || e === 'new' ? null : e;
+  });
+  protected readonly enabledAuthorities = computed(() => this.authorities().filter((a) => a.enabled));
 
   // Nothing to map before an authority exists, and nothing to grant before the
   // organisation has a group: say which one is missing rather than showing an
@@ -79,29 +106,36 @@ export class TenantRulesComponent {
     });
   }
 
-  protected edit(rule?: GroupRule): void {
+  // The rules screen's own address, whichever of the two it was reached by.
+  private base(): string {
+    const path = this.router.url.split(/[?#]/)[0];
+    const m = /^(.*\/(?:group-)?rules)(?:\/[^/]+)?$/.exec(path);
+    return m ? m[1] : path;
+  }
+
+  protected open(rule: GroupRule): void {
+    void this.router.navigateByUrl(`${this.base()}/${encodeURIComponent(rule.id)}`);
+  }
+
+  protected openNew(): void {
+    void this.router.navigateByUrl(`${this.base()}/new`);
+  }
+
+  protected closeEditor(): void {
+    if (this.editing() !== null) void this.router.navigateByUrl(this.base());
+  }
+
+  protected save(result: Partial<GroupRule>): void {
     const t = this.scope.tenant();
     if (!t) return;
-    const data: RuleDialogData = {
-      rule,
-      tenantName: t.name,
-      groups: this.groups(),
-      authorities: this.authorities().filter((a) => a.enabled),
-      reported: this.reported(),
-    };
-    this.dialog
-      .open<RuleDialogComponent, RuleDialogData, Partial<GroupRule> | undefined>(RuleDialogComponent, {
-        data,
-        disableClose: true,
-      })
-      .afterClosed()
-      .subscribe((result) => {
-        if (!result) return;
-        this.api.saveGroupRule(t.id, { ...result, id: rule?.id }).subscribe({
-          next: () => this.load(t.id),
-          error: (err: unknown) => this.fail(err),
-        });
-      });
+    const editing = this.editingRule();
+    this.api.saveGroupRule(t.id, { ...result, id: editing?.id }).subscribe({
+      next: () => {
+        this.load(t.id);
+        this.closeEditor();
+      },
+      error: (err: unknown) => this.fail(err),
+    });
   }
 
   protected async remove(rule: GroupRule): Promise<void> {
@@ -117,7 +151,10 @@ export class TenantRulesComponent {
     });
     if (!ok) return;
     this.api.deleteGroupRule(t.id, rule.id).subscribe({
-      next: () => this.load(t.id),
+      next: () => {
+        if (this.editingRule()?.id === rule.id) this.closeEditor();
+        this.load(t.id);
+      },
       error: (err: unknown) => this.fail(err),
     });
   }

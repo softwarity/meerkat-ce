@@ -15,17 +15,19 @@
           (click)="$event.stopPropagation()"
         >drag_indicator</mat-icon>
         <span class="name-cell" [class.off]="!r.enabled">
-          <!-- Whether the route's TARGET is there (SVC-04): the service
-               discovery counts, or a host that accepts a connection, and down
-               too when the circuit is open. The slot stays empty while nothing
-               is known, for a route that answers by itself, and for a disabled
-               one, so the names stay aligned. -->
+          <!-- Whether the route's TARGET is there (SVC-04, SVC-07): the
+               replicas the runtime counts - all ready green, some orange, none
+               red - or a host that accepts a connection, and down too when the
+               circuit is open. The slot stays empty while nothing is known,
+               for a route that answers by itself, and for a disabled one, so
+               the names stay aligned. -->
           <span class="heart-slot">
             @if (heart(r); as h) {
-              <mat-icon class="heart" [class.down]="h.down" [matTooltip]="h.tip">{{ h.down ? 'heart_broken' : 'favorite' }}</mat-icon>
+              <mat-icon class="heart" [class]="h.state" [matTooltip]="h.tip" matTooltipClass="tooltip-lines">{{ h.state === 'down' ? 'heart_broken' : 'favorite' }}</mat-icon>
             }
           </span>
           <span class="name">{{ r.name }}</span>
+          @if (replicas(r); as n) {<span class="replicas mono">{{ n }}</span>}
           <!-- A route is always a service; UI comes on top (ROUTE-02), and it
                changes what the route can do - injections, the user button, path
                locales. Worth seeing without opening it. -->
@@ -71,7 +73,7 @@
             {{ summary(r) }}
             @if (filterNames(r); as f) {<span class="filters"> - {{ f }}</span>}
           </span>
-          <span class="target mono">{{ target(r) }}</span>
+          <span class="target mono">{{ target(r) }}@if (images(r); as v) {<span class="image"> - {{ v }}</span>}</span>
         </span>
         <span rowActions="tonal">
           @if (r.isUi && openUrl(r)) {

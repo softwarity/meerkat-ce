@@ -97,9 +97,6 @@ func New(p store.AuthProvider) (Driver, error) {
 		return newOIDC(p)
 	case store.ProviderGitHub:
 		return newOAuth2(p)
-	case store.ProviderSAML:
-		return nil, fmt.Errorf("idp: SAML support is not wired yet (available: %s, %s, %s)",
-			store.ProviderOIDC, store.ProviderLDAP, store.ProviderGitHub)
 	}
 	// Kinds that live outside this package register themselves - the
 	// directories (LDAP, Active Directory) are implemented under ee/ and are
@@ -116,7 +113,26 @@ func New(p store.AuthProvider) (Driver, error) {
 	if p.Kind == store.ProviderLDAP {
 		return nil, fmt.Errorf("idp: this build carries no directory driver (ee/directories is not linked in)")
 	}
+	if p.Kind == store.ProviderSAML {
+		return nil, fmt.Errorf("idp: this build carries no SAML driver (ee/saml is not linked in)")
+	}
 	return nil, fmt.Errorf("idp: unknown provider kind %q", p.Kind)
+}
+
+// Lookup is an authority that can describe a person it holds without their
+// credentials: a directory, searched with its service account. What the
+// console's test shows ("what does this directory say about jdupont, and
+// with which groups"), and what an authority that only proves WHO someone is
+// (Kerberos) asks a directory to learn the rest.
+type Lookup interface {
+	Lookup(ctx context.Context, username string) (Identity, error)
+}
+
+// ServiceMetadata is an authority that expects this gateway to describe itself
+// (SAML): the document its admin imports, built for one assertion consumer
+// service address.
+type ServiceMetadata interface {
+	Metadata(acs string) ([]byte, error)
 }
 
 // Factory builds a driver from a stored authority.
@@ -153,6 +169,8 @@ func SecretFields(kind string) []string {
 		return []string{"clientSecret"}
 	case store.ProviderLDAP:
 		return []string{"bindPassword"}
+	case store.ProviderSAML:
+		return []string{"spKey"}
 	}
 	return nil
 }
