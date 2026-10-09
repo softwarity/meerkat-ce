@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.3.0
+
 - **A route can serve files.** A new mode under Target, **Files**: upload a font, a
   stylesheet, a script or an image on the route and it answers them under its path -
   for the UI that needs a resource nothing behind the gateway serves, offline above
