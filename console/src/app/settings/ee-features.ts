@@ -74,6 +74,12 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     where: '/system/license',
     whereLabel: $localize`:@@License:License`,
   },
+  'DEV-02': {
+    label: $localize`:@@EE_DEV_02:Developer keys`,
+    what: $localize`:@@EE_DEV_02_what:Each developer registers the SSH keys of their machines, one per machine.`,
+    where: '/infra/plug',
+    whereLabel: $localize`:@@Plug:Plug`,
+  },
   'DEV-03': {
     label: $localize`:@@EE_DEV_03:Developer tunnel, laptop to cluster`,
     what: $localize`:@@EE_DEV_03_what:A developer's code calls the services of the cluster as if it ran there.`,
@@ -85,6 +91,10 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     what: $localize`:@@EE_DEV_04_what:The cluster's traffic for one service reaches a developer's machine.`,
     where: '/infra/plug',
     whereLabel: $localize`:@@Plug:Plug`,
+  },
+  'DEV-06': {
+    label: $localize`:@@EE_DEV_06:Substitution notice`,
+    what: $localize`:@@EE_DEV_06_what:Users are told when a service they use is answered by a developer's machine.`,
   },
   'DEV-07': {
     label: $localize`:@@EE_DEV_07:Tunnel lifecycle`,
