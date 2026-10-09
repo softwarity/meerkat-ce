@@ -19,10 +19,10 @@ arrangement is the normal way round.
 The tabs are real routes: a bookmark on the layout gallery comes back to the
 layout gallery.
 
-![Built-in pages on the Theme tab: the token table on the left, the two previews on the right with the theme carousel between them](img/console/built-in-pages-theme.webp)
+![Built-in pages on the Theme tab: the six core colours and the contrast on the left, the two previews on the right with the theme carousel between them](img/console/built-in-pages-theme.webp)
 
 The sign-in page as it is served, dark above and light below, with the theme
-carousel in the gap. On the left, one row per token, one column per scheme.
+carousel in the gap. On the left, the colours the theme is made from.
 
 ## The theme picker
 
@@ -36,18 +36,41 @@ from a preset) and delete one. The active theme cannot be deleted.
 
 ## Theme
 
-The two palettes of the theme, **dark and light side by side**, one row per token.
-Hovering a token name highlights the part of the preview it paints, which is the
-fastest way to find out what a name means.
+A theme is made the way [Material Theme Builder](https://material-foundation.github.io/material-theme-builder/)
+makes one, and it is the same theme: the same six colours give the same schemes,
+role for role.
+
+- **Core colours.** The **primary** is the source. **Secondary**, **tertiary**,
+  **error**, **neutral** (backgrounds and surfaces) and **neutral variant**
+  (medium emphasis and outlines) are derived from it until you set them - the
+  value shown greyed is the one they are derived as. The cross puts a colour back
+  to derived.
+- **Contrast**: standard, medium or high, for both schemes.
+- **Color match** is the builder's "stay true to my color inputs": containers keep
+  the tone of the colours given rather than the spec's.
+- **Generated roles** lists every Material 3 role the colours make, dark and light
+  side by side - read-only, they follow.
+
+Hovering a colour or a role makes what it paints blink in the preview, which is
+the fastest way to find out what a name means. The preview follows **as you
+pick**, on whatever page it shows: a mail and the portal bar are redrawn with the
+colours on screen too.
 
 - **The Dark and Light checkboxes** in the header decide which schemes the served
   pages offer at all. Untick one and the pages stop proposing it; you cannot
   untick both.
 - **Glow** is the decorative flow-page effects as one switch: the ambient halo
   behind the page, the logo and button glows, the app-name gradient. Unchecked
-  gives a flat design, and the colour those effects use then goes unused.
-- **Export** and **Import** carry a palette as a file, to move one between
-  installations.
+  gives a flat design.
+- **Export** writes the builder's JSON format (core colours, the six schemes, the
+  palettes), with Meerkat's own settings under a key of their own. **Import** reads
+  a builder export - whether Color match was on is read off the schemes it carries.
+  An export older than the builder's 2025 contrast rules imports by its colours,
+  and the screen says that some roles differ from the file.
+
+A theme typed token by token in an earlier version is converted on upgrade into
+the six colours that come closest to it: its primary stays, its surfaces and
+outlines take the Material 3 tones.
 
 Save is on this tab: a theme is an object of its own, and saving it is what
 changes what a live theme serves.

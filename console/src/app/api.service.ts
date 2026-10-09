@@ -1965,10 +1965,27 @@ export interface Theme {
   // gradient) in one switch (THEME-04). Absent on older payloads -> treat as
   // false (full effects).
   flat: boolean;
+  // The source colours (THEME-04), the way Material Theme Builder makes a
+  // theme: primary required, the others derived when absent. A theme typed
+  // token by token before they existed has none, and keeps its tokens.
+  colors?: ThemeColors;
+  contrast?: 'standard' | 'medium' | 'high';
+  colorMatch?: boolean;
+  // GENERATED from the colours by the gateway on save (whatever is sent here
+  // for a theme with colours is ignored).
   dark: Record<string, string>;
   light: Record<string, string>;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface ThemeColors {
+  primary: string;
+  secondary?: string;
+  tertiary?: string;
+  error?: string;
+  neutral?: string;
+  neutralVariant?: string;
 }
 
 @Service()

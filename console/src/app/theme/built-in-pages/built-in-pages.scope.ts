@@ -1,7 +1,8 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ApiService, Background, LogoSize, LocaleView, PageLayout, PreviewCategory, PreviewTemplate, Settings, Theme } from '../../api.service';
-import { CSS_VARS } from '../theme-tokens';
+import { ApiService, Background, LogoSize, LocaleView, PageLayout, PreviewCategory, PreviewTemplate, Settings, Theme, ThemeColors } from '../../api.service';
+import { Contrast, CoreKey, themeSchemes } from '../m3';
+import { CORE_DRIVES, cssVar } from '../theme-tokens';
 import { PRESET_PREFIX } from '../theme-carousel/theme-carousel.component';
 
 type Fit = 'cover' | 'contain' | 'tile';
@@ -51,8 +52,22 @@ export class BuiltInPagesScope {
   readonly selectedId = signal('');
   readonly name = signal('');
   readonly flat = signal(false);
-  readonly dark = signal<Record<string, string>>({});
-  readonly light = signal<Record<string, string>>({});
+  // What a theme is MADE of (THEME-04): six source colours, a contrast level
+  // and the builder's colour match. The palettes are not edited any more,
+  // they follow - generated here for the preview, by the generator the
+  // gateway runs on save.
+  readonly colors = signal<ThemeColors>({ primary: '#6750a4' });
+  readonly contrast = signal<Contrast>('standard');
+  readonly colorMatch = signal(false);
+  // The recipe as it was loaded: what "changed" is measured against.
+  private readonly baseline = signal<{ colors: ThemeColors; contrast: Contrast; colorMatch: boolean }>({
+    colors: { primary: '' },
+    contrast: 'standard',
+    colorMatch: false,
+  });
+  private readonly generated = computed(() => themeSchemes(this.colors(), this.contrast(), this.colorMatch()));
+  readonly dark = computed(() => this.generated().dark);
+  readonly light = computed(() => this.generated().light);
   // A built-in palette: shown, duplicated, never edited or deleted. Nothing
   // forbids it - there is simply no row to write to. The ring hands it over
   // under a namespaced id, because a copy keeps its source's id and the two
@@ -76,21 +91,61 @@ export class BuiltInPagesScope {
   readonly dirty = computed(() => {
     const t = this.selected();
     if (!t || this.readOnly()) return false;
-    const same = (a: Record<string, string>, b: Record<string, string>) => {
-      const ka = Object.keys(a), kb = Object.keys(b);
-      return ka.length === kb.length && ka.every((k) => a[k] === b[k]);
-    };
     return (
       this.name().trim() !== t.name ||
       this.flat() !== !!t.flat ||
-      !same(this.dark(), t.dark) ||
-      !same(this.light(), t.light)
+      this.recoloured()
     );
   });
 
-  // Hovered token (Theme tab) -> the CSS var the preview blinks.
+  // The colours on screen differ from the saved ones - which is also when the
+  // frames that cannot take colours live (a mail, the portal bar) need them
+  // handed over as a draft.
+  readonly recoloured = computed(() => {
+    const b = this.baseline();
+    const a = normalized(this.colors()), c = normalized(b.colors);
+    return (
+      KEYS.some((k) => (a[k] ?? '') !== (c[k] ?? '')) ||
+      this.contrast() !== b.contrast ||
+      this.colorMatch() !== b.colorMatch
+    );
+  });
+
+  // The unsaved recipe, for the frames that are reloaded rather than painted
+  // live. Settles a quarter second after the last change: a dragged colour
+  // picker fires dozens of values, and each would be a page load.
+  readonly draft = signal('');
+  private draftTimer?: ReturnType<typeof setTimeout>;
+  private readonly draftWatch = effect(() => {
+    const flatMoved = this.flat() !== !!this.selected()?.flat;
+    const value = this.recoloured() || flatMoved
+      ? JSON.stringify({ colors: normalized(this.colors()), contrast: this.contrast(), colorMatch: this.colorMatch(), flat: this.flat() })
+      : '';
+    clearTimeout(this.draftTimer);
+    if (!value) {
+      this.draft.set('');
+      return;
+    }
+    this.draftTimer = setTimeout(() => this.draft.set(value), 250);
+  });
+
+  // Hovered token or source colour (Theme tab) -> the CSS vars the preview
+  // blinks: a role is one, a source colour is everything it drives.
   private readonly hoverKey = signal('');
-  readonly highlightVar = computed(() => (this.hoverKey() ? CSS_VARS[this.hoverKey()] : ''));
+  readonly highlightVar = computed<string[]>(() => {
+    const k = this.hoverKey();
+    if (!k) return [];
+    const drives = CORE_DRIVES[k as CoreKey];
+    return (drives ?? [k]).map(cssVar);
+  });
+
+  // A file read in: the recipe replaces what is on screen, and is saved only
+  // when the operator says so.
+  loadRecipe(colors: ThemeColors, colorMatch: boolean, contrast?: Contrast): void {
+    this.colors.set(normalized(colors));
+    this.colorMatch.set(colorMatch);
+    if (contrast) this.contrast.set(contrast);
+  }
 
   // ── branding ──────────────────────────────────────────────────────────────
   readonly appName = signal('');
@@ -176,8 +231,15 @@ export class BuiltInPagesScope {
     this.selectedId.set(t.id);
     this.name.set(t.name);
     this.flat.set(!!t.flat);
-    this.dark.set({ ...t.dark });
-    this.light.set({ ...t.light });
+    const recipe = {
+      colors: normalized(t.colors ?? { primary: '#6750a4' }),
+      contrast: t.contrast || 'standard',
+      colorMatch: !!t.colorMatch,
+    };
+    this.baseline.set(recipe);
+    this.colors.set(recipe.colors);
+    this.contrast.set(recipe.contrast);
+    this.colorMatch.set(recipe.colorMatch);
   }
 
   loadThemes(keepSelection = false): void {
@@ -199,13 +261,7 @@ export class BuiltInPagesScope {
     if (!t) return;
     this.saving.set(true);
     this.api
-      .updateTheme({
-        ...t,
-        name: this.name().trim(),
-        flat: this.flat(),
-        dark: this.dark(),
-        light: this.light(),
-      })
+      .updateTheme({ ...t, name: this.name().trim(), flat: this.flat(), ...this.recipe() })
       .subscribe({
         next: () => {
           this.saving.set(false);
@@ -242,7 +298,12 @@ export class BuiltInPagesScope {
     // A copy of a BUILT-IN takes its name plain: "Forest" rather than "Forest
     // copy", because there is no editable Forest for it to be a copy of.
     const name = this.readOnly() ? this.uniqueName(base.name) : this.uniqueName(`${base.name} copy`);
-    this.create(name, { ...this.dark() }, { ...this.light() }, this.flat(), base.createdAt);
+    this.create({ name, flat: this.flat(), ...this.recipe(), createdAt: base.createdAt });
+  }
+
+  // What a save sends: the colours. The palettes are the gateway's to write.
+  private recipe(): Partial<Theme> {
+    return { colors: normalized(this.colors()), contrast: this.contrast(), colorMatch: this.colorMatch(), dark: {}, light: {} };
   }
 
   // Delete what is selected, which is the only thing the menu can name. A
@@ -252,10 +313,6 @@ export class BuiltInPagesScope {
     if (t && !this.readOnly() && !t.active) this.removeTheme(t);
   }
 
-  createFromPreset(p: Theme): void {
-    this.create(this.uniqueName(p.name), { ...p.dark }, { ...p.light }, p.flat);
-  }
-
   removeTheme(t: Theme): void {
     this.api.deleteTheme(t.id).subscribe({
       next: () => this.loadThemes(),
@@ -263,14 +320,8 @@ export class BuiltInPagesScope {
     });
   }
 
-  private create(
-    name: string,
-    dark: Record<string, string>,
-    light: Record<string, string>,
-    flat = false,
-    createdAt?: number,
-  ): void {
-    this.api.createTheme({ name, dark, light, flat, ...(createdAt ? { createdAt } : {}) }).subscribe({
+  private create(theme: Partial<Theme>): void {
+    this.api.createTheme(theme).subscribe({
       next: (created) => {
         this.selectedId.set(created.id);
         this.loadThemes(true);
@@ -439,4 +490,17 @@ export class BuiltInPagesScope {
       { duration: 4000 },
     );
   }
+}
+
+const KEYS: CoreKey[] = ['primary', 'secondary', 'tertiary', 'error', 'neutral', 'neutralVariant'];
+
+// Lower case, empty colours dropped: the form the gateway stores, so a theme
+// read back compares equal to the one that was saved.
+function normalized(c: ThemeColors): ThemeColors {
+  const out: ThemeColors = { primary: (c.primary ?? '').toLowerCase() };
+  for (const k of KEYS) {
+    const v = c[k];
+    if (k !== 'primary' && v) out[k] = v.toLowerCase();
+  }
+  return out;
 }

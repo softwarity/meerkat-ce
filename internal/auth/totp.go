@@ -615,9 +615,9 @@ const totpChallengeBody = `    <form method="post" action="/totp">
       .hint { margin: 0; font-size: .82rem; color: var(--mk-on-surface-variant); }
       form.signout { margin-top: 14px; }
       form.altmail { margin-top: 12px; }
-      .hint.sent { margin-top: 12px; color: var(--mk-primary); }
+      .hint.sent { margin-top: 12px; color: var(--mk-tertiary); }
       .trust { display: flex; align-items: center; gap: 9px; font-size: .82rem; color: var(--mk-on-surface-variant); cursor: pointer; }
-      .trust input { width: auto; margin: 0; accent-color: var(--mk-primary); }
+      .trust input { width: auto; margin: 0; accent-color: var(--mk-secondary); }
     </style>
     <form method="post" action="logout" class="leave">
       <button type="submit">{{.T.signOut}}</button>
@@ -632,12 +632,16 @@ const totpEnrollBody = `    <style>
       }
       .secret {
         margin: 0; padding: 8px 42px; text-align: center; font-family: var(--mk-mono); font-size: .8rem;
-        letter-spacing: .12em; word-break: break-all; color: var(--mk-on-surface-variant);
+        letter-spacing: .12em; word-break: break-all; color: var(--mk-on-tertiary-container);
+        background: var(--mk-tertiary-container);
+        border-radius: var(--mk-radius-small);
       }
       .codes {
         margin: 4px 0; padding: 14px 16px; list-style: none;
         display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px;
-        background: var(--mk-surface-container-high); border: 1px solid var(--mk-outline);
+        background: var(--mk-tertiary-container);
+        color: var(--mk-on-tertiary-container);
+        border: 1px solid color-mix(in srgb, var(--mk-tertiary) 30%, transparent);
         border-radius: var(--mk-radius-small);
         font-family: var(--mk-mono); font-size: .9rem; letter-spacing: .06em;
       }
@@ -679,9 +683,9 @@ const profileMFAManageBody = `    <style>
       .hint { margin: 0; font-size: .82rem; color: var(--mk-on-surface-variant); }
       .status {
         margin: 0 0 4px; padding: 9px 12px; border-radius: var(--mk-radius-small);
-        color: var(--mk-primary); font-size: .84rem; font-weight: 600;
-        background: color-mix(in srgb, var(--mk-primary) 12%, transparent);
-        border: 1px solid color-mix(in srgb, var(--mk-primary) 30%, transparent);
+        color: var(--mk-on-tertiary-container); font-size: .84rem; font-weight: 600;
+        background: var(--mk-tertiary-container);
+        border: 1px solid color-mix(in srgb, var(--mk-tertiary) 30%, transparent);
       }
       form.mfa-action { margin: 0; }
       button.danger {
@@ -700,7 +704,7 @@ const profileMFAManageBody = `    <style>
       .trusted h2 {
         margin: 0; padding: 12px 0 2px; text-align: start;
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
-        text-transform: uppercase; color: var(--mk-on-surface-variant); font-weight: 600;
+        text-transform: uppercase; color: var(--mk-primary); font-weight: 600;
       }
       /* the list lives in a PANEL, same family as the option blocks */
       .tb-panel {
@@ -712,7 +716,7 @@ const profileMFAManageBody = `    <style>
       .tb-panel::before {
         content: ''; position: absolute; inset: 0 0 auto 0; height: 2px;
         border-radius: var(--mk-radius-small) var(--mk-radius-small) 0 0;
-        background: linear-gradient(90deg, transparent, var(--mk-primary), transparent);
+        background: linear-gradient(90deg, transparent, var(--mk-primary-container), transparent);
         opacity: calc(.85 * var(--mk-glow, 1));
       }
       .tb {
@@ -720,13 +724,13 @@ const profileMFAManageBody = `    <style>
       }
       .tb + .tb { border-top: 1px solid color-mix(in srgb, var(--mk-outline) 45%, transparent); }
       .tb .tb-label { flex: 1; min-width: 0; font-size: .85rem; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .tb .tb-label.here { color: var(--mk-primary); font-weight: 500; }
+      .tb .tb-label.here { color: var(--mk-tertiary); font-weight: 500; }
       .tb .tb-exp { font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .1em; color: var(--mk-on-surface-variant); }
       .tb-this {
         font-family: var(--mk-mono); font-size: .58rem; letter-spacing: .12em;
-        text-transform: uppercase; color: var(--mk-primary);
+        text-transform: uppercase; color: var(--mk-on-tertiary-container);
         padding: 2px 8px; border-radius: 999px;
-        background: color-mix(in srgb, var(--mk-primary) 12%, transparent);
+        background: var(--mk-tertiary-container);
       }
       /* the row's form must NOT be the flow card: strip it entirely */
       .tb form {

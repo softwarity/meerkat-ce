@@ -33,7 +33,7 @@ type sessionView struct {
 const profileSessionsBody = `    <style>
       .ss-lines { flex: 1; min-width: 7.5rem; display: grid; gap: 3px; text-align: start; }
       .ss-label { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .ss-label.here { color: var(--mk-primary); font-weight: 500; }
+      .ss-label.here { color: var(--mk-tertiary); font-weight: 500; }
       .ss-meta { font-family: var(--mk-mono); font-size: .66rem; color: var(--mk-on-surface-variant); overflow-wrap: anywhere; }
       .ss-form { margin: 0; padding: 0; width: auto; background: none; border: 0; box-shadow: none; }
       .ss-form::before { display: none; }

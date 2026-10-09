@@ -119,12 +119,10 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		if !t.Active {
 			continue
 		}
-		// A preset the admin never touched travels as its NAME: the palettes
-		// are in the binary on the other side too, and twenty colour tokens
-		// that say "the ones you already have" are noise.
-		if presetLike(t) {
-			t.Dark, t.Light = nil, nil
-		}
+		// A theme travels as its colours: the palettes are generated from them
+		// on the other side, by the same generator, and a hundred tokens that
+		// say "what those six make" are noise.
+		t.Dark, t.Light = nil, nil
 		t.Rev = 0
 		doc.Themes = []store.Theme{t}
 		break
@@ -389,33 +387,6 @@ func settingSecretRefs(doc *Document, add func(string)) {
 			}
 		}
 	}
-}
-
-// presetLike reports whether t is one of the built-in palettes, unmodified.
-// Compared on what is actually seen - the two palettes and the flat switch -
-// not on the name, which an admin may rename without changing a colour.
-func presetLike(t store.Theme) bool {
-	for _, p := range store.PresetThemes() {
-		if p.ID != t.ID || p.Flat != t.Flat {
-			continue
-		}
-		if sameMap(p.Dark, t.Dark) && sameMap(p.Light, t.Light) {
-			return true
-		}
-	}
-	return false
-}
-
-func sameMap(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 // Section is one KIND of thing a document carries, and how much of it. The

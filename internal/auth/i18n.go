@@ -220,6 +220,9 @@ type flowChrome struct {
 	// preview lost its background and every layout looked identical, which is
 	// exactly what it was reported as.
 	Preview bool
+	// LayoutNames is the catalogue of arrangements, for a preview's live
+	// listener (previewLive) - empty on a served page.
+	LayoutNames []string
 	// PreviewErrors is every refusal the previewed page can give, stacked into
 	// one string (the .error block keeps newlines). Empty on a served page.
 	//

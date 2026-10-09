@@ -429,7 +429,7 @@ func TestInventorySaysWhatTravels(t *testing.T) {
 	}
 }
 
-// TestOnlyTheActiveThemeTravels, and an untouched preset travels as its NAME.
+// TestOnlyTheActiveThemeTravels, and travels as its source colours.
 // Carrying every theme made them 71% of a typical export, most of it the
 // built-in palettes the receiving gateway already ships.
 func TestOnlyTheActiveThemeTravels(t *testing.T) {
@@ -470,9 +470,10 @@ func TestOnlyTheActiveThemeTravels(t *testing.T) {
 	}
 }
 
-// TestATouchedThemeCarriesItsColours: the shortcut only applies to a preset
-// nobody edited. Change one token and the palettes have to travel, or the other
-// gateway would wear something else.
+// TestATouchedThemeCarriesItsColours: a theme travels as what makes it. A
+// generated one carries its source colours and contrast - the palettes are
+// rebuilt from them on the other side - and one typed token by token carries
+// its tokens, or the other gateway would wear something else.
 func TestATouchedThemeCarriesItsColours(t *testing.T) {
 	ctx := context.Background()
 	s := openTemp(t)
@@ -481,16 +482,54 @@ func TestATouchedThemeCarriesItsColours(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	active.Dark["primary"] = "#ff0000"
+	active.Colors.Secondary = "#ff0000"
+	active.Contrast = store.ContrastMedium
 	if err := s.SaveTheme(ctx, active); err != nil {
+		t.Fatal(err)
+	}
+	if active, err = s.GetActiveTheme(ctx); err != nil {
 		t.Fatal(err)
 	}
 	doc, _, err := Export(ctx, s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(doc.Themes) != 1 || doc.Themes[0].Dark["primary"] != "#ff0000" {
-		t.Fatalf("an edited theme must carry its colours: %+v", doc.Themes)
+	if len(doc.Themes) != 1 || doc.Themes[0].Colors.Secondary != "#ff0000" ||
+		doc.Themes[0].Contrast != store.ContrastMedium || doc.Themes[0].Dark != nil {
+		t.Fatalf("an edited theme must carry its colours and nothing they make: %+v", doc.Themes)
+	}
+	to := openTemp(t)
+	if _, err := Apply(ctx, to, doc, false); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	got, err := to.GetActiveTheme(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Dark["secondary"] != active.Dark["secondary"] || got.Light["surface"] != active.Light["surface"] {
+		t.Fatalf("the other side wears another palette: secondary %s vs %s", got.Dark["secondary"], active.Dark["secondary"])
+	}
+	// Applied twice, it is the same theme: the comparison sees the generated
+	// palettes, not a document without them.
+	plan, err := Apply(ctx, to, doc, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range plan.Changes {
+		if c.Kind == "theme" && c.Action != ActionSame {
+			t.Errorf("re-applying the same theme reports %s", c.Action)
+		}
+	}
+
+	// A file written before the colours carries tokens: it is applied as the
+	// colours that make them, like any theme saved that way.
+	old := Document{Themes: []store.Theme{{ID: "typed", Name: "Typed", Active: true,
+		Dark: map[string]string{"primary": "#ff0000"}}}}
+	if _, err := Apply(ctx, to, &old, false); err != nil {
+		t.Fatalf("Apply an old file: %v", err)
+	}
+	if got, err = to.GetTheme(ctx, "typed"); err != nil || got.Colors.Primary != "#ff0000" {
+		t.Fatalf("an old file's theme was not read as its colours: %+v, %v", got.Colors, err)
 	}
 }
 

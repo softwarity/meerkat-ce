@@ -20,9 +20,9 @@ const profilePasskeysBody = `    <style>
       .pk-date { font-family: var(--mk-mono); font-size: .68rem; color: var(--mk-on-surface-variant); }
       .pk-this {
         font-family: var(--mk-mono); font-size: .58rem; letter-spacing: .12em;
-        text-transform: uppercase; color: var(--mk-primary);
+        text-transform: uppercase; color: var(--mk-on-tertiary-container);
         padding: 2px 8px; border-radius: 999px;
-        background: color-mix(in srgb, var(--mk-primary) 12%, transparent);
+        background: var(--mk-tertiary-container);
       }
       /* small round button, same family as the scheme switch pills */
       .pk-x {

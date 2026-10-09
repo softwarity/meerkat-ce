@@ -182,7 +182,7 @@ const registerBody = `    <style>
         display: grid; place-items: center;
       }
       .captcha-new:hover {
-        color: var(--mk-primary); border-color: var(--mk-outline);
+        color: var(--mk-secondary); border-color: var(--mk-outline);
         background: var(--mk-surface-container); filter: none; box-shadow: none;
       }
       .captcha-new:active { transform: none; }

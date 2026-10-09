@@ -2,6 +2,22 @@
 
 ## NEXT RELEASE
 
+- **A theme is made the way Material Theme Builder makes one.** Six source colours -
+  the primary, and a secondary, tertiary, error, neutral and neutral variant that are
+  derived from it until you set them - one of the builder's three contrast levels, and
+  its "Color match". Both schemes, every Material 3 role, light and dark, are generated
+  from them, and they are the builder's own: a theme exported from the builder imports
+  role for role, and one made here exports in the builder's JSON format. Every theme is
+  converted on upgrade: one typed token by token becomes the six colours that come
+  closest to it, so its primary stays and its surfaces and outlines take the Material 3
+  tones.
+- **The built-in pages and the mails wear the whole theme, not only its primary.** As
+  Material 3 assigns them: the primary for the brand and the action, the secondary for
+  what is chosen or browsed (a selected choice, the current language, the portal's
+  current module), the tertiary for state and information (connected and current
+  badges, a code to copy, a met password rule, an explanation).
+- **The theme preview follows as you pick.** Every page of the catalogue repaints as a
+  colour moves, not only the specimen, and so do the mails and the portal bar.
 - **SAML 2.0 sign-in** (Enterprise). A SAML identity provider - ADFS, Entra ID,
   Okta, Shibboleth - is an authority like an OIDC one: a button on the sign-in
   page, its signed answer verified against the certificate in its metadata, and

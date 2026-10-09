@@ -538,7 +538,7 @@ const userButtonJS = `(() => {
           ' border: 1px solid var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent)); border-radius: ' + btnRadius + '; cursor: pointer;' +
           ' background: var(--mk-surface-container, Canvas); color: var(--mk-on-surface, CanvasText); font-family: var(--mk-font, system-ui);' +
           ' font-size: ' + Math.max(11, Math.round(h * 0.42)) + 'px; }' +
-          '.btn:hover { border-color: var(--mk-primary, color-mix(in srgb, CanvasText 45%, transparent)); }' +
+          '.btn:hover { border-color: var(--mk-secondary, var(--mk-primary, color-mix(in srgb, CanvasText 45%, transparent))); }' +
           '.ic { width: ' + ic + 'px; height: ' + ic + 'px; }' +
           '</style>' +
           '<button class="btn" id="signin" title="' + esc(L.signIn) + '" aria-label="' + esc(L.signIn) + '">' +
@@ -677,7 +677,7 @@ const userButtonJS = `(() => {
         ' border: 1px solid var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent)); border-radius: ' + btnRadius + '; cursor: pointer;' +
         ' background: var(--mk-surface-container, Canvas); color: var(--mk-on-surface, CanvasText); font-family: var(--mk-font, system-ui);' +
         ' font-size: ' + Math.max(11, Math.round(h * 0.42)) + 'px; }' +
-        '.btn:hover { border-color: var(--mk-primary, color-mix(in srgb, CanvasText 45%, transparent)); }' +
+        '.btn:hover { border-color: var(--mk-secondary, var(--mk-primary, color-mix(in srgb, CanvasText 45%, transparent))); }' +
         '.avatar { width: ' + (h - 6) + 'px; height: ' + (h - 6) + 'px; border-radius: ' + avatarRadius + ';' +
         ' display: grid; place-items: center; background: var(--mk-primary, color-mix(in srgb, CanvasText 82%, Canvas)); color: var(--mk-on-primary, Canvas);' +
         ' font-weight: 700; font-size: ' + Math.max(9, Math.round(h * 0.34)) + 'px; object-fit: cover; }' +
@@ -723,7 +723,7 @@ const userButtonJS = `(() => {
         ' line-height: 1; }' +
         '.sw svg { width: 18px; height: 18px; display: block; }' +
         '.sw:hover { border-color: var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent)); }' +
-        '.sw.on { color: var(--mk-primary, CanvasText); border-color: var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent));' +
+        '.sw.on { color: var(--mk-on-secondary-container, var(--mk-primary, CanvasText)); background: var(--mk-secondary-container, transparent); border-color: var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent));' +
         ' background: var(--mk-surface-container-high, color-mix(in srgb, CanvasText 10%, transparent)); }' +
         'hr { border: 0; border-top: 1px solid var(--mk-outline, color-mix(in srgb, CanvasText 15%, transparent)); margin: 6px 4px; }' +
         '.mark { font-weight: 700; }' +
@@ -757,7 +757,7 @@ const userButtonJS = `(() => {
         '.ip-tools button:hover { background: var(--mk-surface-container-high, color-mix(in srgb, CanvasText 10%, transparent)); }' +
         '.ip-cap-hint { flex-basis: 100%; margin: 0; }' +
         '.ip-opt { display: flex; align-items: center; gap: 8px; font-size: .85em; cursor: pointer; user-select: none; }' +
-        '.ip-opt input { margin: 0; accent-color: var(--mk-primary, CanvasText); }' +
+        '.ip-opt input { margin: 0; accent-color: var(--mk-secondary, var(--mk-primary, CanvasText)); }' +
         '.ip-note { margin: 0; font-size: .78em; opacity: .65; }' +
         '.ip-msg { margin: 0; font-size: .85em; color: var(--mk-error, color-mix(in srgb, red 70%, CanvasText)); }' +
         '.ip-actions { display: flex; justify-content: flex-end; }' +
@@ -813,7 +813,7 @@ const userButtonJS = `(() => {
         '.db-opt { display: flex; align-items: center; gap: 7px; padding: 3px 6px; border-radius: 6px;' +
         ' cursor: pointer; font-size: 12px; }' +
         '.db-opt:hover { background: var(--mk-surface-container-high, color-mix(in srgb, CanvasText 10%, transparent)); }' +
-        '.db-opt input { margin: 0; accent-color: var(--mk-primary, CanvasText); }' +
+        '.db-opt input { margin: 0; accent-color: var(--mk-secondary, var(--mk-primary, CanvasText)); }' +
         // margin-left auto: the actions sit apart, at the bar's right edge.
         '.db-apply { margin-inline-start: auto; padding: 4px 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer;' +
         ' background: var(--mk-primary, CanvasText); color: var(--mk-on-primary, Canvas); font: inherit; }' +

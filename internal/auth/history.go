@@ -129,7 +129,7 @@ const profileHistoryBody = `    <style>
       .lh-lines { flex: 1; min-width: 7.5rem; display: grid; gap: 3px; text-align: start; }
       .lh-label { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       /* the current browser needs no browser/os/ip - we ARE on it */
-      .lh-label.here { color: var(--mk-primary); font-weight: 500; }
+      .lh-label.here { color: var(--mk-tertiary); font-weight: 500; }
       .lh-meta {
         font-family: var(--mk-mono); font-size: .66rem;
         color: var(--mk-on-surface-variant); overflow-wrap: anywhere;

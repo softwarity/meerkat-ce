@@ -1766,8 +1766,8 @@
     "CE",
     "EE"
    ],
-   "en": "M3 editor saves a theme that pages use.",
-   "fr": "L'éditeur M3 enregistre un thème que les pages utilisent."
+   "en": "A theme made from six source colours and a contrast level is saved with the schemes Material Theme Builder makes of them, and the pages use it.",
+   "fr": "Un thème fait de six couleurs sources et d'un niveau de contraste est enregistré avec les schémas qu'en tire le Material Theme Builder, et les pages l'utilisent."
   },
   {
    "id": "THEME-05",

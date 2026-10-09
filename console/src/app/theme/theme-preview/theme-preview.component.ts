@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Background, LogoSize, PageLayout } from '../../api.service';
-import { CSS_VARS } from '../theme-tokens';
+import { cssVar } from '../theme-tokens';
 
 // The live preview: the gateway-rendered flow-page specimen, dark and light
 // SIDE BY SIDE, each scaled from its logical 1280×800 viewport to fit - the
@@ -48,7 +48,14 @@ export class ThemePreviewComponent {
   // judge, while one of them is the error colour the palette needs on screen.
   readonly allErrors = input(false);
   protected readonly isMail = computed(() => this.template().startsWith('mail:'));
-  readonly highlight = input('');
+  // The CSS vars to blink: one role, or every token a source colour drives.
+  readonly highlight = input<string[]>([]);
+  // The colours on screen and not saved, as the gateway's preview takes them.
+  // A page takes colours live over postMessage; a mail (inline styles) and
+  // the portal bar (a shadow DOM fed a payload) cannot, so THEIR frame is
+  // reloaded with the draft - already debounced by the scope.
+  readonly draft = input('');
+  private readonly reloads = computed(() => this.isMail() || this.template().startsWith('portal:'));
   // Which schemes the built-in pages offer, read-only here: the pane of a
   // scheme nobody will be served is dimmed, so the screen never shows a look
   // that cannot happen.
@@ -131,6 +138,7 @@ export class ThemePreviewComponent {
       locale: this.locale(),
     });
     if (this.allErrors()) q.set('errors', 'all');
+    if (this.reloads() && this.draft()) q.set('draft', this.draft());
     const raw = `/api/themes/${encodeURIComponent(id)}/preview?${q}`;
     return this.sanitizer.bypassSecurityTrustResourceUrl(raw);
   }
@@ -157,18 +165,18 @@ export class ThemePreviewComponent {
     layout: PageLayout,
   ): void {
     const vars: Record<string, string> = {};
-    for (const [key, cssVar] of Object.entries(CSS_VARS)) {
-      // Palettes come complete from the API; a token mid-typing may be empty -
-      // leave the frame's current value rather than inventing one.
+    for (const key of Object.keys(light)) {
+      // Palettes come complete; a token missing on one side is left to the
+      // frame's current value rather than invented.
       if (!light[key] || !dark[key]) continue;
-      vars[cssVar] = `light-dark(${light[key]}, ${dark[key]})`;
+      vars[cssVar(key)] = `light-dark(${light[key]}, ${dark[key]})`;
     }
     // The flat-design switch: 0 collapses every decorative effect at once.
     vars['--mk-glow'] = flat ? '0' : '1';
     this.post({ vars, brand: { name, tagline, logo, logoSize }, background, layout });
   }
 
-  private pushHighlight(cssVar: string): void {
-    this.post({ highlight: cssVar });
+  private pushHighlight(vars: string[]): void {
+    this.post({ highlight: vars });
   }
 }

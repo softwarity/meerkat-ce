@@ -66,13 +66,13 @@ const apiTokensBody = `    <style>
       .tk-panel::before {
         content: ''; position: absolute; inset: 0 0 auto 0; height: 2px;
         border-radius: var(--mk-radius-small) var(--mk-radius-small) 0 0;
-        background: linear-gradient(90deg, transparent, var(--mk-primary), transparent);
+        background: linear-gradient(90deg, transparent, var(--mk-primary-container), transparent);
         opacity: calc(.85 * var(--mk-glow, 1));
       }
       .tk-panel h2 {
         margin: 0; padding: 12px 0 4px; text-align: start;
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
-        text-transform: uppercase; color: var(--mk-on-surface-variant); font-weight: 600;
+        text-transform: uppercase; color: var(--mk-primary); font-weight: 600;
       }
       .tk-rows { max-height: 46vh; overflow-y: auto; }
       .tk { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
@@ -135,13 +135,15 @@ const apiTokensBody = `    <style>
         background: none; border: 1px solid var(--mk-outline); color: var(--mk-on-surface);
         box-shadow: none;
       }
-      .tk-ghost:hover { border-color: var(--mk-primary); filter: none; box-shadow: none; }
+      .tk-ghost:hover { border-color: var(--mk-secondary); filter: none; box-shadow: none; }
       /* the copy button (the chrome's [data-copy]) sits INSIDE the token box, top-right */
       .tk-copy { position: relative; margin: 4px 0 12px; }
       .tk-copy code {
         display: block; font-family: var(--mk-mono); font-size: .8rem; word-break: break-all; text-align: start;
         padding: 8px 42px 8px 10px; border-radius: var(--mk-radius-small);
-        background: var(--mk-surface); border: 1px solid var(--mk-outline);
+        background: var(--mk-tertiary-container);
+        color: var(--mk-on-tertiary-container);
+        border: 1px solid color-mix(in srgb, var(--mk-tertiary) 30%, transparent);
       }
       .tk-warn { margin: 0 0 4px; font-size: .76rem; color: var(--mk-on-surface-variant); text-align: start; }
     </style>

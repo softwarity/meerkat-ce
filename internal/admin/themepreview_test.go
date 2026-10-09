@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/softwarity/meerkat/internal/m3color"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -108,5 +110,39 @@ func TestTheOperatorDigestIsNotOffered(t *testing.T) {
 		if strings.HasSuffix(tpl.Key, ":digest") {
 			t.Fatalf("the operator digest is in the theme picker: %+v", tpl)
 		}
+	}
+}
+
+// A frame that cannot take colours over postMessage - a mail, the portal bar -
+// is reloaded with the editor's draft, and wears THOSE colours: generated
+// here, by the generator a save would use, from colours nobody saved yet.
+func TestAPreviewWearsItsDraft(t *testing.T) {
+	f := setupBare(t)
+	theme, err := f.api.st.GetActiveTheme(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft := `{"colors":{"primary":"#B33B15"},"contrast":"high","colorMatch":false,"flat":false}`
+	want, err := m3color.Scheme(m3color.Core{Primary: "#B33B15"}, false, m3color.ContrastHigh, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tpl := range []string{"mail:confirm", ""} {
+		r := f.get(t, "/api/themes/"+theme.ID+"/preview?scheme=light&template="+tpl+"&draft="+url.QueryEscape(draft), f.rootC)
+		body := strings.ToLower(readAll(t, r))
+		_ = r.Body.Close()
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("template %q: %d %s", tpl, r.StatusCode, body)
+		}
+		if !strings.Contains(body, strings.ToLower(want["primary"])) {
+			t.Errorf("template %q does not wear the draft's primary %s", tpl, want["primary"])
+		}
+	}
+	// A draft that is not one is refused with what it may hold.
+	r := f.get(t, "/api/themes/"+theme.ID+"/preview?scheme=light&draft="+url.QueryEscape(`{"colours":{}}`), f.rootC)
+	body := readAll(t, r)
+	_ = r.Body.Close()
+	if r.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(body, "allowed: colors, contrast, colorMatch, flat") {
+		t.Errorf("a malformed draft: %d %s", r.StatusCode, body)
 	}
 }

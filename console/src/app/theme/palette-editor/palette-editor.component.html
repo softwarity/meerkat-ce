@@ -1,8 +1,8 @@
 <mat-card appearance="outlined">
   <div class="head">
-    <!-- The theme's NAME where the column header used to say "Token": every
-         row below is a token, so the word said nothing, and a palette with no
-         name on it cannot be referred to out loud. -->
+    <!-- The theme's NAME where a column header would say "Token": every row
+         below is a colour of it, and a palette with no name on it cannot be
+         referred to out loud. -->
     @if (renaming()) {
       <input
         class="rename"
@@ -69,70 +69,116 @@
     ><ng-container i18n="@@Light">Light</ng-container></mat-checkbox>
   </div>
 
-  @for (group of tokenGroups; track group.label) {
-    <div class="group-label">{{ group.label }}</div>
-    @for (tok of group.tokens; track tok.key) {
-      <!-- "Glow" (the night token) is the decorative-glow colour: a checkbox on
-           its own line switches the flow-page effects on/off, and when off the
-           colour is unused, so its pickers are disabled. -->
-      @let glowLine = tok.key === 'night';
-      @let glowOff = glowLine && flat();
-      <div class="row" [class.dimmed]="glowOff">
-        @if (glowLine) {
-          <mat-checkbox
-            class="label glow-toggle"
-            [checked]="!flat()"
-            (change)="readOnly() || flat.set(!$event.checked)"
-            (mouseenter)="hoverToken.emit(tok.key)"
-            (mouseleave)="hoverToken.emit('')"
-            i18n-matTooltip="@@Glow_hint"
-            matTooltip="Halo, glows and app-name gradient on the flow pages. Uncheck for a flat design."
-          >{{ tok.label }}</mat-checkbox>
-        } @else {
-          <span class="label" (mouseenter)="hoverToken.emit(tok.key)" (mouseleave)="hoverToken.emit('')">{{ tok.label }}</span>
+  <!-- The six source colours, one for both schemes: the builder's model. A
+       colour nobody set shows the value it is derived as, and setting it is
+       a click on it. -->
+  <div class="group-label" i18n="@@Theme_core_colors">Core colours</div>
+  @for (row of coreRows; track row.key) {
+    @let set = isSet(row.key);
+    <div class="row core" [class.derived]="!set">
+      <span class="label" (mouseenter)="hoverToken.emit(row.key)" (mouseleave)="hoverToken.emit('')">
+        {{ row.label }}
+        @if (row.hint) {
+          <small>{{ row.hint }}</small>
         }
-        <span class="cell" [class.dimmed]="!darkOffered()">
-          <input
-            type="color"
-            [value]="dark()[tok.key] || '#000000'"
-            [disabled]="readOnly() || glowOff || !darkOffered()"
-            (input)="setColor('dark', tok.key, $any($event.target).value)"
-          />
-          <input
-            class="hex"
-            [value]="dark()[tok.key] || ''"
-            [disabled]="readOnly() || glowOff || !darkOffered()"
-            (change)="setColor('dark', tok.key, $any($event.target).value)"
-          />
-        </span>
-        <span class="cell" [class.dimmed]="!lightOffered()">
-          <input
-            type="color"
-            [value]="light()[tok.key] || '#ffffff'"
-            [disabled]="readOnly() || glowOff || !lightOffered()"
-            (input)="setColor('light', tok.key, $any($event.target).value)"
-          />
-          <input
-            class="hex"
-            [value]="light()[tok.key] || ''"
-            [disabled]="readOnly() || glowOff || !lightOffered()"
-            (change)="setColor('light', tok.key, $any($event.target).value)"
-          />
-        </span>
-      </div>
-    }
+      </span>
+      <span class="cell wide-cell">
+        <input
+          type="color"
+          [value]="shown()[row.key]"
+          [disabled]="readOnly()"
+          (input)="setColor(row.key, $any($event.target).value)"
+        />
+        <input
+          class="hex"
+          [value]="set ? colors()[row.key] : ''"
+          [placeholder]="shown()[row.key]"
+          [disabled]="readOnly()"
+          (change)="setColor(row.key, $any($event.target).value)"
+        />
+        @if (set && row.key !== 'primary' && !readOnly()) {
+          <button matIconButton class="unset" (click)="unset(row.key)"
+            matTooltip="Derive it from the primary again" i18n-matTooltip="@@Theme_core_unset"
+            aria-label="Derive it from the primary again" i18n-aria-label="@@Theme_core_unset">
+            <mat-icon>close</mat-icon>
+          </button>
+        } @else if (!set) {
+          <span class="derived-tag" i18n="@@Theme_core_derived">derived</span>
+        }
+      </span>
+    </div>
   }
 
+  <div class="group-label" i18n="@@Theme_contrast">Contrast</div>
+  <div class="row">
+    <mat-button-toggle-group
+      class="contrast"
+      hideSingleSelectionIndicator
+      [value]="contrast()"
+      (change)="contrast.set($event.value)"
+      [disabled]="readOnly()"
+      aria-label="Contrast"
+      i18n-aria-label="@@Theme_contrast"
+    >
+      @for (c of contrasts; track c) {
+        <mat-button-toggle [value]="c">{{ contrastLabel[c] }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
+  <div class="row switches">
+    <mat-checkbox
+      [checked]="colorMatch()"
+      [disabled]="readOnly()"
+      (change)="colorMatch.set($event.checked)"
+      i18n-matTooltip="@@Theme_color_match_hint"
+      matTooltip="Stay true to the colours given: containers keep their tone instead of the spec's"
+    ><ng-container i18n="@@Theme_color_match">Color match</ng-container></mat-checkbox>
+    <!-- The flow pages' decorative effects, on or off at once. -->
+    <mat-checkbox
+      [checked]="!flat()"
+      [disabled]="readOnly()"
+      (change)="flat.set(!$event.checked)"
+      (mouseenter)="hoverToken.emit('night')"
+      (mouseleave)="hoverToken.emit('')"
+      i18n-matTooltip="@@Glow_hint"
+      matTooltip="Halo, glows and app-name gradient on the flow pages. Uncheck for a flat design."
+    ><ng-container i18n="@@Glow">Glow</ng-container></mat-checkbox>
+  </div>
+
+  <!-- What the colours make: every role, both schemes, read-only. Hovering a
+       name blinks it in the preview. -->
+  <mat-expansion-panel class="roles" displayMode="flat">
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Theme_generated_roles">Generated roles</mat-panel-title>
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      @for (group of roleGroups; track group.label) {
+        <div class="group-label">{{ group.label }}</div>
+        @for (r of group.roles; track r) {
+          <div class="row role">
+            <span class="label" (mouseenter)="hoverToken.emit(r)" (mouseleave)="hoverToken.emit('')">{{ roleLabel(r) }}</span>
+            <span class="cell" [class.dimmed]="!darkOffered()">
+              <span class="swatch" [style.background]="dark()[r]"></span><code>{{ dark()[r] }}</code>
+            </span>
+            <span class="cell" [class.dimmed]="!lightOffered()">
+              <span class="swatch" [style.background]="light()[r]"></span><code>{{ light()[r] }}</code>
+            </span>
+          </div>
+        }
+      }
+    </ng-template>
+  </mat-expansion-panel>
+
   <div class="actions">
-    <button matButton (click)="exportPalette()"
-      matTooltip="Download this palette as a file" i18n-matTooltip="@@Theme_export_hint">
+    <button matButton (click)="exportTheme()"
+      matTooltip="Download as a Material Theme Builder file" i18n-matTooltip="@@Theme_export_hint2">
       <mat-icon>download</mat-icon><span i18n="@@Export">Export</span>
     </button>
     <button matButton (click)="fileInput.click()" [disabled]="readOnly()"
-      matTooltip="Load a palette from a file (review, then save)" i18n-matTooltip="@@Theme_import_hint">
+      matTooltip="Load a Material Theme Builder export (review, then save)" i18n-matTooltip="@@Theme_import_hint2">
       <mat-icon>upload</mat-icon><span i18n="@@Import">Import</span>
     </button>
-    <input #fileInput type="file" hidden accept="application/json,.json" (change)="importPalette($event)" />
+    <input #fileInput type="file" hidden accept="application/json,.json" (change)="importTheme($event)" />
     <span class="grow"></span>
     <button matButton="tonal" (click)="save.emit()" [disabled]="saving() || readOnly() || !dirty()"
       [matTooltip]="readOnly() ? tipReadOnly : (dirty() ? '' : tipClean)"

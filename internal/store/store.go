@@ -416,7 +416,14 @@ CREATE TABLE IF NOT EXISTS themes (
   -- The revision this row is on, raised by every write. See ErrStale: a save
   -- built on a version somebody has already replaced is refused rather than
   -- winning silently.
-  rev BIGINT NOT NULL DEFAULT 0
+  rev BIGINT NOT NULL DEFAULT 0,
+  -- The source colours (v76): a theme made the way Material Theme Builder
+  -- makes one is these, a contrast level and its "color match" switch; dark
+  -- and light are then generated from them. '{}' is a theme typed token by
+  -- token before they existed, which keeps its tokens.
+  colors      TEXT NOT NULL DEFAULT '{}',
+  contrast    TEXT NOT NULL DEFAULT '',
+  color_match BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Locale overrides (v61): the strings an integrator corrected or added, on top
@@ -1085,7 +1092,7 @@ CREATE TABLE IF NOT EXISTS saml_assertions (
 // installation is stamped 69, and checkNotNewer refuses to open a database
 // stamped higher than the build knows - so restarting the count at 1 would stop
 // every existing installation from starting.
-const schemaVersion = 75
+const schemaVersion = 77
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

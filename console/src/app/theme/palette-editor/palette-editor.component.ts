@@ -1,40 +1,43 @@
 import { Component, computed, inject, input, model, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { CSS_VARS, TOKEN_GROUPS } from '../theme-tokens';
+import { ThemeColors } from '../../api.service';
+import { Contrast, CoreKey, derivedCore, fromBuilderJson, isHex, toBuilderJson } from '../m3';
+import { CORE_ROWS, ROLE_GROUPS, roleLabel } from '../theme-tokens';
 
-// A palette file is the editor's own state, portable between installs: the two
-// colour maps plus the two switches that live in this card. A small version
-// marker so a stray JSON is not mistaken for one.
-interface PaletteFile {
-  meerkatThemePalette: 1;
-  pagesScheme: '' | 'light' | 'dark';
-  flat: boolean;
-  dark: Record<string, string>;
-  light: Record<string, string>;
+// A recipe read from a file, handed to the page: it replaces what is on
+// screen and is saved only when the operator says so.
+export interface ImportedRecipe {
+  colors: ThemeColors;
+  colorMatch: boolean;
+  contrast?: Contrast;
+  flat?: boolean;
+  pagesScheme?: '' | 'light' | 'dark';
 }
 
-const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const CONTRASTS: Contrast[] = ['standard', 'medium', 'high'];
 
-// The two palettes of a theme, dark and light side by side, one row per token.
-// Hovering a token name tells the page, which highlights the matching elements
-// in the preview.
+// A theme is made the way Material Theme Builder makes one: six source colours
+// (the primary required, the others derived until somebody sets them), a
+// contrast level, and its "color match". Every role of both schemes follows
+// from them - shown below, read-only, dark and light side by side. Hovering a
+// colour or a role tells the page, which blinks what it drives in the preview.
 @Component({
   selector: 'app-palette-editor',
   imports: [
     MatButtonModule,
+    MatButtonToggleModule,
     MatCardModule,
     MatCheckboxModule,
-    MatFormFieldModule,
+    MatExpansionModule,
     MatIconModule,
-    MatInputModule,
     MatMenuModule,
     MatTooltipModule,
   ],
@@ -54,15 +57,18 @@ export class PaletteEditorComponent {
     this.pagesScheme.set(on ? '' : scheme === 'dark' ? 'light' : 'dark');
   }
 
-  readonly dark = model.required<Record<string, string>>();
-  readonly light = model.required<Record<string, string>>();
+  readonly colors = model.required<ThemeColors>();
+  readonly contrast = model<Contrast>('standard');
+  readonly colorMatch = model(false);
+  // The schemes the colours make, for the read-only list of roles.
+  readonly dark = input.required<Record<string, string>>();
+  readonly light = input.required<Record<string, string>>();
   // Flat design: dropping every decorative flow-page effect (glows + app-name
   // gradient) at once. Surfaced as a "Glow" checkbox (checked = effects on), so
   // stored inverted. Two-way - the page persists it with the theme.
   readonly flat = model<boolean>(false);
-  // The theme this palette belongs to, named where the column header used to
-  // read "Token" - a word that told a reader nothing every row below did not
-  // already say. Two-way, because the pencil renames in place.
+  // The theme this palette belongs to, named where a column header would read
+  // "Token". Two-way, because the pencil renames in place.
   readonly name = model('');
   // A built-in palette is shown and duplicated, never written to: it is code,
   // and there is no row behind it.
@@ -81,49 +87,81 @@ export class PaletteEditorComponent {
   readonly save = output<void>();
   readonly duplicate = output<void>();
   readonly remove = output<void>();
+  readonly imported = output<ImportedRecipe>();
   readonly saving = input(false);
 
-  protected startRename(): void {
-    if (!this.readOnly()) this.renaming.set(true);
-  }
-
-  protected readonly tokenGroups = TOKEN_GROUPS;
+  protected readonly coreRows = CORE_ROWS;
+  protected readonly roleGroups = ROLE_GROUPS;
+  protected readonly roleLabel = roleLabel;
+  protected readonly contrasts = CONTRASTS;
+  protected readonly contrastLabel: Record<Contrast, string> = {
+    standard: $localize`:@@Theme_contrast_standard:Standard`,
+    medium: $localize`:@@Theme_contrast_medium:Medium`,
+    high: $localize`:@@Theme_contrast_high:High`,
+  };
+  // What the builder shows for a colour nobody set: its derived value.
+  protected readonly shown = computed(() => {
+    const d = derivedCore(this.colors());
+    return Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v.toLowerCase()])) as typeof d;
+  });
   protected readonly tipReadOnly = $localize`:@@Theme_builtin_hint2:Built-in palette: duplicate it first`;
   protected readonly tipClean = $localize`:@@Theme_nothing_to_save:Nothing changed`;
 
   private readonly snack = inject(MatSnackBar);
 
-  protected setColor(mode: 'dark' | 'light', key: string, value: string): void {
-    const target = mode === 'dark' ? this.dark : this.light;
-    target.update((m) => ({ ...m, [key]: value.trim().toLowerCase() }));
+  protected startRename(): void {
+    if (!this.readOnly()) this.renaming.set(true);
   }
 
-  // Export the palette as it stands in the editor (unsaved edits included), so a
-  // theme can be lifted from one install and dropped into another.
-  protected exportPalette(): void {
-    const file: PaletteFile = {
-      meerkatThemePalette: 1,
-      pagesScheme: this.pagesScheme(),
+  protected isSet(key: CoreKey): boolean {
+    return key === 'primary' || !!this.colors()[key];
+  }
+
+  protected setColor(key: CoreKey, value: string): void {
+    const v = value.trim().toLowerCase();
+    if (v && !isHex(v)) return;
+    this.colors.update((c) => {
+      const next = { ...c };
+      if (v) next[key] = v;
+      else if (key !== 'primary') delete next[key];
+      return next;
+    });
+  }
+
+  // Back to "derived from the primary". The primary has nothing to be derived
+  // from, so it has no such button.
+  protected unset(key: CoreKey): void {
+    if (key !== 'primary') this.setColor(key, '');
+  }
+
+  // Export in the builder's own JSON format, so the theme opens wherever a
+  // builder export does. Meerkat's switches ride along under a key of their
+  // own.
+  protected exportTheme(): void {
+    const json = toBuilderJson(this.colors(), {
+      name: this.name(),
+      contrast: this.contrast(),
+      colorMatch: this.colorMatch(),
       flat: this.flat(),
-      dark: this.dark(),
-      light: this.light(),
-    };
-    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+      pagesScheme: this.pagesScheme(),
+    });
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'theme-palette.json';
+    a.download = (this.name().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'theme') + '.json';
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  // Import fills the editor (it does NOT save): the operator reviews the colours
-  // in the preview, then saves. Only known tokens with a hex value are kept, so a
-  // hand-edited or foreign file cannot smuggle anything in.
-  protected importPalette(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = ''; // let the same file be picked again
+  // Import fills the editor (it does NOT save): the operator reviews the
+  // colours in the preview, then saves. A builder export carries the six
+  // colours; a palette file of the old editor carries tokens, and its colours
+  // are read off them the way a typed theme's are.
+  protected importTheme(event: Event): void {
+    const field = event.target as HTMLInputElement;
+    const file = field.files?.[0];
+    field.value = ''; // let the same file be picked again
     if (!file) return;
     file
       .text()
@@ -135,39 +173,57 @@ export class PaletteEditorComponent {
           this.fail($localize`:@@Theme_import_bad:That file is not valid JSON`);
           return;
         }
-        const o = data as Partial<PaletteFile>;
-        const dark = this.cleanColors(o.dark);
-        const light = this.cleanColors(o.light);
-        if (!dark && !light) {
-          this.fail($localize`:@@Theme_import_empty:No palette colours found in that file`);
+        const recipe = this.readRecipe(data);
+        if (!recipe) {
+          this.fail(
+            $localize`:@@Theme_import_empty2:No theme found in that file: expected a Material Theme Builder export (coreColors)`,
+          );
           return;
         }
-        if (dark) this.dark.set(dark);
-        if (light) this.light.set(light);
-        if (typeof o.flat === 'boolean') this.flat.set(o.flat);
-        if (o.pagesScheme === '' || o.pagesScheme === 'light' || o.pagesScheme === 'dark') {
-          this.pagesScheme.set(o.pagesScheme);
-        }
-        this.snack.open($localize`:@@Theme_imported:Palette imported - review it, then save`, undefined, {
-          duration: 3000,
-        });
+        this.imported.emit(recipe.recipe);
+        const said = {
+          exact: $localize`:@@Theme_imported2:Theme imported - review it, then save`,
+          older: $localize`:@@Theme_imported_regenerated:Theme imported from its colours. The file is an older builder export: its contrast rules have changed since, so some roles differ from the file`,
+          palette: $localize`:@@Theme_imported_palette:Old palette file: its six colours were read off its tokens - review them, then save`,
+        }[recipe.kind];
+        this.snack.open(said, undefined, { duration: recipe.kind === 'exact' ? 3000 : 8000 });
       })
       .catch(() => this.fail($localize`:@@Theme_import_read:Could not read that file`));
   }
 
-  // Keep only the tokens this editor knows, with a plausible hex value; drop
-  // everything else silently. Returns null when nothing survives.
-  private cleanColors(value: unknown): Record<string, string> | null {
-    if (!value || typeof value !== 'object') return null;
-    const out: Record<string, string> = {};
-    for (const key of Object.keys(CSS_VARS)) {
-      const v = (value as Record<string, unknown>)[key];
-      if (typeof v === 'string' && HEX.test(v.trim())) out[key] = v.trim().toLowerCase();
+  private readRecipe(data: unknown): { recipe: ImportedRecipe; kind: 'exact' | 'older' | 'palette' } | null {
+    const built = fromBuilderJson(data);
+    if (built) {
+      const m = built.meerkat;
+      const recipe: ImportedRecipe = { colors: built.core, colorMatch: built.colorMatch };
+      if (CONTRASTS.includes(m['contrast'] as Contrast)) recipe.contrast = m['contrast'] as Contrast;
+      if (typeof m['flat'] === 'boolean') recipe.flat = m['flat'];
+      if (m['pagesScheme'] === '' || m['pagesScheme'] === 'light' || m['pagesScheme'] === 'dark') {
+        recipe.pagesScheme = m['pagesScheme'];
+      }
+      return { recipe, kind: built.exact ? 'exact' : 'older' };
     }
-    return Object.keys(out).length ? out : null;
+    // The old editor's own file: two maps of tokens, read as the colours that
+    // make them - the rule the gateway applies (store.ColorsFromTokens).
+    const o = data as { dark?: Record<string, unknown>; light?: Record<string, unknown>; flat?: unknown };
+    const light = o?.light ?? {};
+    const dark = o?.dark ?? {};
+    const first = (...vs: unknown[]) => (vs.find(isHex) as string | undefined)?.toLowerCase();
+    const primary = first(dark['primary'], light['primary']);
+    if (!primary) return null;
+    const colors: ThemeColors = { primary };
+    const neutral = first(dark['surface'], light['surface']);
+    const error = first(light['error'], dark['error']);
+    const variant = first(dark['onSurfaceVariant'], light['onSurfaceVariant']);
+    if (neutral) colors.neutral = neutral;
+    if (error) colors.error = error;
+    if (variant) colors.neutralVariant = variant;
+    const recipe: ImportedRecipe = { colors, colorMatch: true };
+    if (typeof o.flat === 'boolean') recipe.flat = o.flat;
+    return { recipe, kind: 'palette' };
   }
 
   private fail(message: string): void {
-    this.snack.open(message, undefined, { duration: 4000 });
+    this.snack.open(message, undefined, { duration: 6000 });
   }
 }

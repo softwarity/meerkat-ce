@@ -204,22 +204,22 @@ const profileAuthoritiesBody = `    <style>
       .au-name { flex: 1; min-width: 0; font-size: .9rem; text-align: start; }
       .au-on {
         font-family: var(--mk-mono); font-size: .58rem; letter-spacing: .12em;
-        text-transform: uppercase; color: var(--mk-primary);
+        text-transform: uppercase; color: var(--mk-on-tertiary-container);
         padding: 3px 9px; border-radius: 999px; white-space: nowrap;
-        background: color-mix(in srgb, var(--mk-primary) 12%, transparent);
+        background: var(--mk-tertiary-container);
       }
       .au-sole { font-size: .68rem; color: var(--mk-on-surface-variant); white-space: nowrap; }
       .au-go, .row button {
         margin: 0; font-size: .78rem; text-decoration: none; white-space: nowrap;
         padding: 5px 14px; border-radius: 999px; width: auto;
-        border: 1px solid color-mix(in srgb, var(--mk-primary) 45%, transparent);
-        background: none; box-shadow: none; color: var(--mk-primary);
+        border: 1px solid color-mix(in srgb, var(--mk-secondary) 45%, transparent);
+        background: none; box-shadow: none; color: var(--mk-secondary);
       }
       .row button.au-off {
         border-color: color-mix(in srgb, var(--mk-error) 45%, transparent);
         color: var(--mk-error);
       }
-      .au-go:hover { background: color-mix(in srgb, var(--mk-primary) 10%, transparent); }
+      .au-go:hover { background: color-mix(in srgb, var(--mk-secondary-container) 60%, transparent); }
     </style>
     <div class="panel">
       <h2>{{.T.authorities}}</h2>

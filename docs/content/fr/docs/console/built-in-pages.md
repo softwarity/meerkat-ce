@@ -19,11 +19,11 @@ pendant qu'on évalue une disposition est la façon normale de procéder.
 Les onglets sont de véritables routes : un favori posé sur la galerie des dispositions
 ramène à la galerie des dispositions.
 
-![Built-in pages sur l'onglet Theme : le tableau des jetons de thème à gauche, les deux aperçus à droite avec le carrousel de thèmes entre eux](img/console/built-in-pages-theme.webp)
+![Built-in pages sur l'onglet Theme : les six couleurs sources et le contraste à gauche, les deux aperçus à droite avec le carrousel de thèmes entre eux](img/console/built-in-pages-theme.webp)
 
 La page de connexion telle qu'elle est servie, en mode sombre en haut et en mode clair
-en bas, avec le carrousel de thèmes entre les deux. À gauche, une ligne par jeton de
-thème et une colonne par mode.
+en bas, avec le carrousel de thèmes entre les deux. À gauche, les couleurs dont le thème
+est fait.
 
 ## Le sélecteur de thème
 
@@ -37,19 +37,40 @@ partant d'un préréglage) et en suppriment un. Le thème actif ne peut pas êtr
 
 ## Theme
 
-Les deux palettes du thème, **sombre et claire côte à côte**, avec une ligne par jeton.
-Survoler le nom d'un jeton met en évidence la partie de l'aperçu qu'il colore : c'est
-le moyen le plus rapide de comprendre à quoi correspond un nom.
+Un thème se fait comme dans le [Material Theme Builder](https://material-foundation.github.io/material-theme-builder/),
+et c'est le même thème : les mêmes six couleurs donnent les mêmes schémas, rôle pour
+rôle.
+
+- **Core colours.** La **primaire** est la source. **Secondaire**, **tertiaire**,
+  **erreur**, **neutre** (fonds et surfaces) et **neutre variante** (emphase moyenne et
+  contours) en sont dérivées tant qu'on ne les fixe pas - la valeur affichée en grisé
+  est celle dont elles sont dérivées. La croix remet une couleur en dérivée.
+- **Contrast** : standard, moyen ou élevé, pour les deux schémas.
+- **Color match** est le "rester fidèle à mes couleurs" du builder : les conteneurs
+  gardent le ton des couleurs données plutôt que celui de la spécification.
+- **Generated roles** liste chaque rôle Material 3 que font les couleurs, sombre et
+  clair côte à côte - en lecture seule, ils suivent.
+
+Survoler une couleur ou un rôle fait clignoter dans l'aperçu ce qu'il colore : c'est le
+moyen le plus rapide de comprendre à quoi correspond un nom. L'aperçu suit **pendant le
+choix**, sur la page qu'il montre, quelle qu'elle soit : un e-mail et la barre de
+portail sont redessinés avec les couleurs à l'écran eux aussi.
 
 - **Les cases Dark et Light** de l'en-tête déterminent quels modes proposent les pages
   servies. Décochez-en une et les pages cessent de proposer ce mode ; il est impossible
   de décocher les deux.
 - **Glow** regroupe sous un seul interrupteur les effets décoratifs des pages : le halo
   d'ambiance derrière la page, les lueurs du logo et des boutons, le dégradé du nom de
-  l'application. Décoché, le rendu est plat, et la couleur qu'utilisent ces effets ne
-  sert plus.
-- **Export** et **Import** transportent une palette sous forme de fichier, pour la
-  déplacer d'une installation à une autre.
+  l'application. Décoché, le rendu est plat.
+- **Export** écrit au format JSON du builder (couleurs sources, les six schémas, les
+  palettes), les réglages propres à Meerkat sous une clé à part. **Import** lit un
+  export du builder - on retrouve si Color match était actif en regardant les schémas
+  qu'il porte. Un export plus ancien que les règles de contraste de 2025 du builder
+  s'importe par ses couleurs, et l'écran signale que certains rôles diffèrent du fichier.
+
+Un thème saisi jeton par jeton dans une version antérieure est converti à la mise à
+jour en les six couleurs qui s'en approchent le plus : sa primaire reste, ses surfaces et
+ses contours prennent les tons de Material 3.
 
 Le bouton Save se trouve dans cet onglet : un thème est un objet à part entière, et
 c'est son enregistrement qui modifie ce que sert un thème en service.

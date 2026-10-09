@@ -69,7 +69,10 @@ const portalNavJS = `(function () {
       '--primary:var(--mk-primary,#3355dd);' +
       '--onprimary:var(--mk-on-primary,#fff);' +
       '--hover:color-mix(in srgb,var(--onsurface) 8%,transparent);' +
-      '--active:color-mix(in srgb,var(--primary) 20%,transparent);' +
+      // The current module wears the secondary container, as the navigation
+      // indicator does in Material 3; a theme without one falls back to a tint.
+      '--active:var(--mk-secondary-container,color-mix(in srgb,var(--primary) 20%,transparent));' +
+      '--onactive:var(--mk-on-secondary-container,var(--onsurface));' +
       '--error:var(--mk-error,#c0392b);}' +
     // shared icon (mask of the stored svg) and initial fallback
     '.ico{display:inline-block;width:22px;height:22px;flex:0 0 auto;background:currentColor;' +
@@ -100,7 +103,7 @@ const portalNavJS = `(function () {
       'border:0;background:transparent;font:inherit;cursor:pointer;white-space:nowrap;border-radius:10px;' +
       'padding:8px 12px;line-height:1;}' +
     'a.tab:hover,button.tab:hover{background:var(--hover);}' +
-    'a.tab.cur,button.tab.cur{background:var(--active);color:var(--onsurface);}' +
+    'a.tab.cur,button.tab.cur{background:var(--active);color:var(--onactive);}' +
     // edit-mode selection outline (console preview)
     '.tab.sel,.ritem.sel .pill{outline:2px solid var(--primary);outline-offset:1px;}' +
     '.ritem.sel{cursor:pointer;}' +
@@ -185,7 +188,7 @@ const portalNavJS = `(function () {
     // 0 + 24 expanded, the same 24px from the top either way.
     'a.ritem:first-child .pill,button.ritem:first-child .pill{margin-top:8px;}' +
     'a.ritem:hover .pill,button.ritem:hover .pill{background:var(--hover);}' +
-    'a.ritem.cur .pill,button.ritem.cur .pill{background:var(--active);color:var(--onsurface);}' +
+    'a.ritem.cur .pill,button.ritem.cur .pill{background:var(--active);color:var(--onactive);}' +
     '.rail.exp a.ritem .pill,.rail.exp button.ritem .pill{width:auto;height:48px;padding:0 16px 0 10px;gap:12px;margin-top:0;}' +
     '.rail.r.exp a.ritem .pill,.rail.r.exp button.ritem .pill{flex-direction:row-reverse;padding:0 10px 0 16px;}' +
     '.pill .badge{position:absolute;top:-6px;right:-6px;}' +

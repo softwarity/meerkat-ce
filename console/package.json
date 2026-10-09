@@ -27,6 +27,7 @@
     "@codemirror/legacy-modes": "^6.5.4",
     "@codemirror/merge": "^6.12.2",
     "@codemirror/search": "^6.7.2",
+    "@material/material-color-utilities": "0.3.0",
     "@softwarity/livewire": "^0.4.0",
     "@softwarity/loading-indicator": "^3.0.2",
     "@softwarity/rail-nav": "^1.2.1",

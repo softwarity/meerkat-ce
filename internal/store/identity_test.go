@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/softwarity/meerkat/internal/m3color"
 )
 
 func TestUserLifecycle(t *testing.T) {
@@ -329,7 +331,8 @@ func TestSessionCarriesTenant(t *testing.T) {
 func TestThemesLeaveTheStoreComplete(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()
-	// A theme saved with two tokens only comes back with EVERY token filled.
+	// A theme sent with two tokens only comes back with EVERY token filled,
+	// made from the colours read off those two.
 	if err := s.SaveTheme(ctx, Theme{ID: "amber", Name: "amber",
 		Dark: map[string]string{"primary": "#ffb86c"}, Light: map[string]string{"primary": "#b8860b"}}); err != nil {
 		t.Fatal(err)
@@ -338,16 +341,19 @@ func TestThemesLeaveTheStoreComplete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Dark["primary"] != "#ffb86c" || got.Light["primary"] != "#b8860b" {
-		t.Fatalf("explicit tokens lost: %+v", got)
+	if got.Colors.Primary != "#ffb86c" {
+		t.Fatalf("the primary was not read off the tokens: %+v", got.Colors)
 	}
-	def := DefaultTheme()
+	want, err := m3color.Scheme(got.Colors, true, m3color.ContrastStandard, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, key := range ThemeTokenKeys() {
 		if got.Dark[key] == "" || got.Light[key] == "" {
 			t.Fatalf("token %q not completed: dark=%q light=%q", key, got.Dark[key], got.Light[key])
 		}
-		if key != "primary" && got.Dark[key] != def.Dark[key] {
-			t.Fatalf("token %q should default to %q, got %q", key, def.Dark[key], got.Dark[key])
+		if w := strings.ToLower(want[key]); w != "" && got.Dark[key] != w {
+			t.Fatalf("token %q = %q, want the generated %q", key, got.Dark[key], w)
 		}
 	}
 }

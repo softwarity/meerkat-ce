@@ -2,8 +2,11 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/softwarity/meerkat/internal/m3color"
 )
 
 // The ledger: what a CREATE cannot say.
@@ -44,6 +47,84 @@ type migration struct {
 var migrations = []migration{
 	{Version: 71, Name: "a role is its name", Up: rolesKeyedByName},
 	{Version: 73, Name: "certificates are a pool, placed on planes", Up: certificatesPlaced},
+	{Version: 77, Name: "a theme is its source colours", Up: themesFromColours},
+}
+
+// themesFromColours turns every theme typed token by token into the six
+// colours that make it (v77), and stores what those make.
+//
+// The typed form has no future: the editor makes themes from colours, the
+// builder's JSON carries colours, and a second shape kept alive for old rows
+// is a second shape every reader has to handle. So the old rows are converted
+// rather than tolerated - ColorsFromTokens picks the colours, Generate writes
+// the schemes, and the look moves as little as Material 3 allows: a primary
+// comes back almost exactly, surfaces and outlines take the spec's tones.
+//
+// The columns may already be there: v76 added them without a step, and a
+// database that ran v76 has them; one coming from v75 or earlier does not, and
+// this step adds them itself - it cannot lean on the additive pass, which runs
+// after it.
+func themesFromColours(ctx context.Context, tx *transaction) error {
+	for _, col := range []struct{ name, ddl string }{
+		{"colors", `ALTER TABLE themes ADD COLUMN colors TEXT NOT NULL DEFAULT '{}'`},
+		{"contrast", `ALTER TABLE themes ADD COLUMN contrast TEXT NOT NULL DEFAULT ''`},
+		{"color_match", `ALTER TABLE themes ADD COLUMN color_match BOOLEAN NOT NULL DEFAULT FALSE`},
+	} {
+		has, err := tx.hasColumn(ctx, "themes", col.name)
+		if err != nil {
+			return err
+		}
+		if !has {
+			if _, err := tx.ExecContext(ctx, col.ddl); err != nil {
+				return fmt.Errorf("%s: %w", firstLine(col.ddl), err)
+			}
+		}
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT id, name, colors, dark, light FROM themes`)
+	if err != nil {
+		return err
+	}
+	type typed struct{ id, name, dark, light string }
+	var todo []typed
+	for rows.Next() {
+		var r typed
+		var colors string
+		if err := rows.Scan(&r.id, &r.name, &colors, &r.dark, &r.light); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		var c m3color.Core
+		_ = json.Unmarshal([]byte(colors), &c)
+		if c.Primary == "" {
+			todo = append(todo, r)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, r := range todo {
+		t := Theme{Name: r.name}
+		_ = json.Unmarshal([]byte(r.dark), &t.Dark)
+		_ = json.Unmarshal([]byte(r.light), &t.Light)
+		if err := t.Normalize(); err != nil {
+			// A row with no readable primary: it starts again from the default's
+			// colours rather than stopping every gateway that holds one.
+			def := DefaultTheme()
+			t.Colors, t.Contrast, t.ColorMatch = def.Colors, def.Contrast, def.ColorMatch
+			if err := t.Generate(); err != nil {
+				return fmt.Errorf("theme %q: %w", r.name, err)
+			}
+		}
+		cj, _ := json.Marshal(t.Colors)
+		dj, _ := json.Marshal(t.Dark)
+		lj, _ := json.Marshal(t.Light)
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE themes SET colors = ?, contrast = ?, color_match = ?, dark = ?, light = ?, rev = rev + 1 WHERE id = ?`,
+			string(cj), t.Contrast, t.ColorMatch, string(dj), string(lj), r.id); err != nil {
+			return fmt.Errorf("theme %q: %w", r.name, err)
+		}
+	}
+	return nil
 }
 
 // certificatesPlaced turns the certificate of a NAME into material PLACED on

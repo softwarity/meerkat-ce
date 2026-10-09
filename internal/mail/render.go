@@ -84,6 +84,9 @@ func ConsolePalette() map[string]string {
 		"primary": "#00363f", "onPrimary": "#ffffff",
 		"surface": "#f7fafb", "surfaceContainer": "#eceff0",
 		"onSurface": "#181c1d", "onSurfaceVariant": "#5b5f60", "outline": "#c4c7c8",
+		// The roles the console's teal (#2e8595) generates for them, light scheme.
+		"outlineVariant": "#bfc8cb", "secondary": "#4b6268",
+		"tertiaryContainer": "#dce1ff", "onTertiaryContainer": "#3d4665",
 	}
 }
 
@@ -150,7 +153,7 @@ var shell = template.Must(template.New("mail").Parse(`<!doctype html>
 <span style="display:none!important;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">{{.Preheader}}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{.Page}};">
   <tr><td align="center" style="padding:32px 16px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:{{.Card}};border:1px solid {{.Outline}};border-radius:14px;overflow:hidden;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:{{.Card}};border:1px solid {{.Divider}};border-radius:14px;overflow:hidden;">
       <tr><td style="background:{{.Primary}};padding:20px 28px;">
         {{if .LogoURL}}<img src="{{.LogoURL}}" alt="{{.AppName}}" height="28" style="height:28px;display:block;border:0;">
         {{else}}<span style="color:{{.OnPrimary}};font-size:18px;font-weight:600;letter-spacing:.02em;">{{.AppName}}</span>{{end}}
@@ -160,7 +163,7 @@ var shell = template.Must(template.New("mail").Parse(`<!doctype html>
         {{range .Intro}}<p style="margin:0 0 14px;font-size:15px;line-height:1.5;color:{{$.Text}};">{{.}}</p>{{end}}
         {{if .Code}}
         <div style="margin:22px 0;text-align:center;">
-          <div style="display:inline-block;background:{{.Page}};border:1px solid {{.Outline}};border-radius:10px;padding:14px 22px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:30px;font-weight:700;letter-spacing:.28em;color:{{.Text}};">{{.Code}}</div>
+          <div style="display:inline-block;background:{{.CodeBg}};border-radius:10px;padding:14px 22px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:30px;font-weight:700;letter-spacing:.28em;color:{{.OnCode}};">{{.Code}}</div>
           {{if .CodeNote}}<p style="margin:10px 0 0;font-size:13px;color:{{.Muted}};">{{.CodeNote}}</p>{{end}}
         </div>
         {{end}}
@@ -171,9 +174,9 @@ var shell = template.Must(template.New("mail").Parse(`<!doctype html>
         <p style="margin:0 0 14px;font-size:12px;color:{{.Muted}};word-break:break-all;">{{.Button.URL}}</p>
         {{end}}
         {{range .Groups}}
-        <p style="margin:20px 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:{{$.Muted}};">{{.Title}}</p>
+        <p style="margin:20px 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:{{$.Secondary}};">{{.Title}}</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          {{range .Items}}<tr><td style="padding:7px 0;border-top:1px solid {{$.Outline}};font-size:14px;color:{{$.Text}};">{{.}}</td></tr>{{end}}
+          {{range .Items}}<tr><td style="padding:7px 0;border-top:1px solid {{$.Divider}};font-size:14px;color:{{$.Text}};">{{.}}</td></tr>{{end}}
         </table>
         {{end}}
         {{range .Outro}}<p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:{{$.Muted}};">{{.}}</p>{{end}}
@@ -202,17 +205,29 @@ func renderHTML(brand Brand, palette map[string]string, spec Spec) string {
 		EvalNote                                             string
 		LogoURL                                              template.URL
 		Page, Card, Text, Muted, Outline, Primary, OnPrimary string
+		// The rest of the scheme, so a message is not one colour: a code is
+		// handed over on the tertiary container, a list is titled in the
+		// secondary, and the dividers are the outline variant Material 3
+		// draws them with.
+		Divider, Secondary, CodeBg, OnCode string
 	}{
-		Spec:      spec,
-		AppName:   brand.AppName,
-		EvalNote:  evalmark.MailNote,
-		Page:      color("surfaceContainer", "#e6e9ef"),
-		Card:      color("surface", "#eff1f5"),
+		Spec:     spec,
+		AppName:  brand.AppName,
+		EvalNote: evalmark.MailNote,
+		// The page's own layering: the ground is the surface, the card a
+		// container on it - the other way round put a beige ground around a
+		// white card, which no page of the flow ever shows.
+		Page:      color("surface", "#eff1f5"),
+		Card:      color("surfaceContainer", "#e6e9ef"),
 		Text:      color("onSurface", "#4c4f69"),
 		Muted:     color("onSurfaceVariant", "#6c6f85"),
 		Outline:   color("outline", "#acb0be"),
 		Primary:   color("primary", "#8839ef"),
 		OnPrimary: color("onPrimary", "#ffffff"),
+		Divider:   color("outlineVariant", color("outline", "#acb0be")),
+		Secondary: color("secondary", color("onSurfaceVariant", "#6c6f85")),
+		CodeBg:    color("tertiaryContainer", color("surfaceContainer", "#e6e9ef")),
+		OnCode:    color("onTertiaryContainer", color("onSurface", "#4c4f69")),
 	}
 	// An integrator's logo is a sanitized data: URI; Meerkat's own mark is not
 	// carried in mail (a mailed sentinel is Meerkat lore, not the app's).

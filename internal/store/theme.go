@@ -4,18 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/softwarity/meerkat/internal/m3color"
 )
 
 // Theme styles the SHARED flow pages only (login, select-tenant, OTP, password
 // pages - THEME-01/04): global level, never per tenant, and the admin console
 // keeps its own look. Several themes coexist and exactly one is active -
 // duplicate, tweak, preview, activate, roll back (the CFG-02 philosophy).
-// Dark and light palettes are independent; the pages emit one token block
-// using CSS light-dark(), so the visitor's scheme (later: their THEME-05
-// choice) picks the palette.
+//
+// A theme is made the way Material Theme Builder makes one: six source colours
+// (only the primary required), a contrast level, and the builder's "color
+// match" switch. Both schemes - every Material 3 role, light and dark - are
+// GENERATED from them on save (m3color), so the two can never disagree and a
+// theme exported from the builder is the same theme here. Dark and Light are
+// that output, stored so that every reader (the pages, the mails, the portal
+// bar) reads colours and not an algorithm; the pages emit them as one token
+// block using CSS light-dark(), so the visitor's scheme picks the palette.
+//
+// There is no other kind of theme. One that arrives as tokens - a palette
+// typed before the six colours, an old configuration file, an old client -
+// is turned into its colours on the way in (FromTokens) and stored like any
+// other; the themes already stored that way were converted by migration v77.
 type Theme struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -24,30 +40,104 @@ type Theme struct {
 	// pages (THEME-04): the logo/button/status glows, the ambient primary
 	// radial, and the app-name gradient. One switch drives them all through the
 	// --mk-glow token (1 = full effects, 0 = flat) - see CSS() and auth.flowTop.
-	Flat      bool              `json:"flat"`
-	Dark      map[string]string `json:"dark"`
-	Light     map[string]string `json:"light"`
-	CreatedAt int64             `json:"createdAt"`
-	UpdatedAt int64             `json:"updatedAt"`
+	Flat bool `json:"flat"`
+	// Colors are the source colours. An empty one other than the primary is
+	// derived from the primary, as the builder derives a colour nobody set.
+	Colors m3color.Core `json:"colors,omitzero"`
+	// Contrast is standard, medium or high - the builder's three levels,
+	// applied to both schemes.
+	Contrast string `json:"contrast,omitempty"`
+	// ColorMatch is the builder's "stay true to my color inputs": containers
+	// keep the tone of the colours given instead of the spec's.
+	ColorMatch bool              `json:"colorMatch,omitempty"`
+	Dark       map[string]string `json:"dark"`
+	Light      map[string]string `json:"light"`
+	CreatedAt  int64             `json:"createdAt"`
+	UpdatedAt  int64             `json:"updatedAt"`
 	// Rev is the revision this row was READ at, carried back by a save so a
 	// write built on a version somebody has replaced is refused. Zero means "I
 	// read no version" and still wins - see rev.go.
 	Rev int64 `json:"rev,omitempty"`
 }
 
-// themeTokens are the editable color tokens, in emission order. The CSS var is
-// --mk-<css>; the JSON key is <key>. Radius and fonts stay structural for now.
-var themeTokens = []struct{ Key, CSSVar string }{
-	{"primary", "--mk-primary"},
-	{"onPrimary", "--mk-on-primary"},
-	{"night", "--mk-night"},
-	{"surface", "--mk-surface"},
-	{"onSurface", "--mk-on-surface"},
-	{"surfaceContainer", "--mk-surface-container"},
-	{"surfaceContainerHigh", "--mk-surface-container-high"},
-	{"onSurfaceVariant", "--mk-on-surface-variant"},
-	{"outline", "--mk-outline"},
-	{"error", "--mk-error"},
+// The contrast levels, named as the builder names them.
+const (
+	ContrastStandard = "standard"
+	ContrastMedium   = "medium"
+	ContrastHigh     = "high"
+)
+
+var contrastLevel = map[string]float64{
+	ContrastStandard: m3color.ContrastStandard,
+	ContrastMedium:   m3color.ContrastMedium,
+	ContrastHigh:     m3color.ContrastHigh,
+}
+
+// GlowToken is the one token the Material spec has no role for: the tint of
+// the flow pages' ambient glow and of a dialog's backdrop. A deep tint of the
+// primary in the dark scheme, a pale one in the light - console/src/app/
+// theme/m3.ts makes it the same way, for the preview.
+const GlowToken = "night"
+
+// Generated reports whether the theme is made from source colours, as opposed
+// to a palette typed token by token before they existed.
+func (t Theme) Generated() bool { return t.Colors.Primary != "" }
+
+// ColorsFromTokens reads a theme typed token by token as the colours that make
+// the closest generated one: its dark primary as the source, its dark surface
+// as the neutral, its light error, its dark muted text as the neutral variant
+// - with Color match, which keeps the source's own chroma instead of the
+// spec's. Measured against Understory and the old built-in palettes, that rule
+// came closest of the ones tried. ok is false when no primary can be read.
+func ColorsFromTokens(dark, light map[string]string) (c m3color.Core, ok bool) {
+	pick := func(vs ...string) string {
+		for _, v := range vs {
+			if argb, err := m3color.ParseHex(v); err == nil {
+				return strings.ToLower(argb.Hex())
+			}
+		}
+		return ""
+	}
+	c = m3color.Core{
+		Primary:        pick(dark["primary"], light["primary"]),
+		Neutral:        pick(dark["surface"], light["surface"]),
+		Error:          pick(light["error"], dark["error"]),
+		NeutralVariant: pick(dark["onSurfaceVariant"], light["onSurfaceVariant"]),
+	}
+	return c, c.Primary != ""
+}
+
+// Normalize makes the theme what the store keeps: its colours, normalized,
+// and both schemes generated from them. A theme that came as tokens only is
+// first turned into colours (ColorsFromTokens).
+func (t *Theme) Normalize() error {
+	if !t.Generated() {
+		c, ok := ColorsFromTokens(t.Dark, t.Light)
+		if !ok {
+			return fmt.Errorf("theme colours: a primary colour is required (colors.primary, #rgb or #rrggbb)")
+		}
+		t.Colors, t.ColorMatch, t.Contrast = c, true, ""
+	}
+	return t.Generate()
+}
+
+// ThemeTokenKeys returns every colour token a theme carries: the 49 Material
+// roles, in the builder's order, then the glow.
+func ThemeTokenKeys() []string { return append(slices.Clone(m3color.Roles), GlowToken) }
+
+// ThemeCSSVar is the custom property a token is emitted as: --mk- and the
+// role in kebab case (surfaceContainerHigh -> --mk-surface-container-high).
+func ThemeCSSVar(key string) string {
+	var b strings.Builder
+	b.WriteString("--mk-")
+	for _, r := range key {
+		if r >= 'A' && r <= 'Z' {
+			b.WriteByte('-')
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // Branding is the application identity shown on the flow pages (THEME-02):
@@ -317,72 +407,124 @@ func checkImageDataURI(field, value string, limit int) error {
 	return fmt.Errorf("branding %s must be a base64 data URI of type png, jpeg, webp, svg+xml or x-icon", field)
 }
 
-// ThemeTokenKeys returns the editable token keys (console editor order).
-func ThemeTokenKeys() []string {
-	keys := make([]string, len(themeTokens))
-	for i, t := range themeTokens {
-		keys[i] = t.Key
+// Generate normalizes the source colours and the contrast and writes both
+// schemes from them. The colours are stored lower case, like every hex the
+// store keeps; the builder's export is upper case, and the console says so.
+func (t *Theme) Generate() error {
+	c := &t.Colors
+	for _, f := range []struct {
+		name string
+		v    *string
+	}{
+		{"primary", &c.Primary}, {"secondary", &c.Secondary}, {"tertiary", &c.Tertiary},
+		{"error", &c.Error}, {"neutral", &c.Neutral}, {"neutralVariant", &c.NeutralVariant},
+	} {
+		if *f.v == "" {
+			continue
+		}
+		argb, err := m3color.ParseHex(*f.v)
+		if err != nil {
+			return fmt.Errorf("theme colour %s: %w", f.name, err)
+		}
+		*f.v = strings.ToLower(argb.Hex())
 	}
-	return keys
-}
-
-// The presets share one surface/text system - Catppuccin Macchiato for dark,
-// its Latte counterpart for light - so only the ACCENT changes between them.
-// That is exactly what "different base themes, by main colour" means: pick a
-// hue, everything else stays coherent.
-var baseDark = map[string]string{
-	"surface": "#24273a", "onSurface": "#cad3f5",
-	"surfaceContainer": "#2a2e42", "surfaceContainerHigh": "#363a4f",
-	"onSurfaceVariant": "#a5adcb", "outline": "#494d64", "error": "#ed8796",
-}
-
-var baseLight = map[string]string{
-	"surface": "#eff1f5", "onSurface": "#4c4f69",
-	"surfaceContainer": "#e6e9ef", "surfaceContainerHigh": "#dce0e8",
-	"onSurfaceVariant": "#6c6f85", "outline": "#acb0be", "error": "#d20f39",
-}
-
-// themeAccent is the per-preset variation: primary, its on-color, and the glow
-// (night) tint, for both schemes. Everything else comes from the shared base.
-type themeAccent struct {
-	id, name                     string
-	dPrimary, dOnPrimary, dNight string
-	lPrimary, lOnPrimary, lNight string
-}
-
-// themeAccents are the built-in starting palettes (THEME-04): a spread of hues
-// on the same Catppuccin base. The first is the historical default; the console
-// seeds them all and re-offers them from the "+" so a wrecked one is one click
-// away.
-var themeAccents = []themeAccent{
-	{"sentinels-watch", "Sentinel's Watch", "#32d8f4", "#00363f", "#1b2f40", "#1a88b0", "#ffffff", "#a5c8d4"},
-	{"midnight", "Midnight", "#8aadf4", "#1e2030", "#1e2a4a", "#1e66f5", "#ffffff", "#b9c6f0"},
-	{"lavender", "Lavender", "#b7bdf8", "#1e2030", "#242747", "#7287fd", "#ffffff", "#c3c8f2"},
-	{"orchid", "Orchid", "#c6a0f6", "#1e2030", "#2a1f3d", "#8839ef", "#ffffff", "#cdb8ee"},
-	{"rose", "Rose", "#f5bde6", "#1e2030", "#3a2233", "#ea76cb", "#4a0e35", "#eec4e2"},
-	{"crimson", "Crimson", "#ed8796", "#1e2030", "#3a2026", "#d20f39", "#ffffff", "#edb9c1"},
-	{"ember", "Ember", "#f5a97f", "#1e2030", "#3a281e", "#e8590c", "#ffffff", "#f2c4a8"},
-	{"forest", "Forest", "#a6da95", "#1e2030", "#1e3226", "#40a02b", "#ffffff", "#b6d9ab"},
-}
-
-func (a themeAccent) theme() Theme {
-	dark := map[string]string{"primary": a.dPrimary, "onPrimary": a.dOnPrimary, "night": a.dNight}
-	light := map[string]string{"primary": a.lPrimary, "onPrimary": a.lOnPrimary, "night": a.lNight}
-	for k, v := range baseDark {
-		dark[k] = v
+	switch t.Contrast {
+	case "":
+		t.Contrast = ContrastStandard
+	case ContrastStandard, ContrastMedium, ContrastHigh:
+	default:
+		return fmt.Errorf("theme contrast %q: allowed are %s, %s, %s", t.Contrast, ContrastStandard, ContrastMedium, ContrastHigh)
 	}
-	for k, v := range baseLight {
-		light[k] = v
+	dark, light, err := schemes(*c, contrastLevel[t.Contrast], t.ColorMatch)
+	if err != nil {
+		return err
 	}
-	return Theme{ID: a.id, Name: a.name, Dark: dark, Light: light}
+	t.Dark, t.Light = dark, light
+	return nil
+}
+
+// schemes writes the two palettes of a set of source colours, glow included.
+func schemes(c m3color.Core, contrast float64, colorMatch bool) (dark, light map[string]string, err error) {
+	out := [2]map[string]string{}
+	for i, isDark := range []bool{true, false} {
+		s, err := m3color.Scheme(c, isDark, contrast, colorMatch)
+		if err != nil {
+			return nil, nil, fmt.Errorf("theme colour %w", err)
+		}
+		tone := 80.0
+		if isDark {
+			tone = 20
+		}
+		glow, err := m3color.Tone(c.Primary, 16, tone)
+		if err != nil {
+			return nil, nil, fmt.Errorf("theme colour primary: %w", err)
+		}
+		s[GlowToken] = glow
+		for k, v := range s {
+			s[k] = strings.ToLower(v)
+		}
+		out[i] = s
+	}
+	return out[0], out[1], nil
+}
+
+// themeSeed is a built-in palette: a name and the colours it is made from.
+type themeSeed struct {
+	id, name   string
+	colors     m3color.Core
+	colorMatch bool
+}
+
+// presetBase is what every built-in shares - the Catppuccin surface, error and
+// muted text they were cut from before they were generated - so only the
+// ACCENT changes between them. That is exactly what "different base themes,
+// by main colour" means: pick a hue, everything else stays coherent.
+//
+// They are the colours ColorsFromTokens reads off the palettes the built-ins
+// used to be, with its colour match: a gateway that stored one of them before
+// v77 holds, after the migration, exactly the built-in it was copied from.
+func presetBase(accent string) m3color.Core {
+	return m3color.Core{Primary: accent, Neutral: "#24273a", Error: "#d20f39", NeutralVariant: "#a5adcb"}
+}
+
+// themeSeeds are the built-in starting palettes (THEME-04): a spread of hues
+// on the same base. The first is the default.
+var themeSeeds = []themeSeed{
+	{"sentinels-watch", "Sentinel's Watch", presetBase("#32d8f4"), true},
+	{"midnight", "Midnight", presetBase("#8aadf4"), true},
+	{"lavender", "Lavender", presetBase("#b7bdf8"), true},
+	{"orchid", "Orchid", presetBase("#c6a0f6"), true},
+	{"rose", "Rose", presetBase("#f5bde6"), true},
+	{"crimson", "Crimson", presetBase("#ed8796"), true},
+	{"ember", "Ember", presetBase("#f5a97f"), true},
+	{"forest", "Forest", presetBase("#a6da95"), true},
+}
+
+// presets are generated once: a scheme is a few milliseconds of solving, and
+// the presets are read on every export and every fallback.
+var presets = sync.OnceValue(func() []Theme {
+	out := make([]Theme, len(themeSeeds))
+	for i, s := range themeSeeds {
+		t := Theme{ID: s.id, Name: s.name, Colors: s.colors, ColorMatch: s.colorMatch}
+		if err := t.Generate(); err != nil {
+			panic("store: built-in theme " + s.id + ": " + err.Error())
+		}
+		out[i] = t
+	}
+	return out
+})
+
+func (t Theme) clone() Theme {
+	t.Dark, t.Light = maps.Clone(t.Dark), maps.Clone(t.Light)
+	return t
 }
 
 // PresetThemes returns the built-in starting palettes (inactive copies - the
-// caller decides activation). The console lists them under the "+" button.
+// caller decides activation). The console lists them in its theme picker.
 func PresetThemes() []Theme {
-	out := make([]Theme, len(themeAccents))
-	for i, a := range themeAccents {
-		out[i] = a.theme()
+	out := make([]Theme, len(presets()))
+	for i, p := range presets() {
+		out[i] = p.clone()
 	}
 	return out
 }
@@ -390,7 +532,7 @@ func PresetThemes() []Theme {
 // DefaultTheme is "The Sentinel's Watch" (the first preset), marked active - the
 // fallback whenever no stored theme is available and the admin plane's own skin.
 func DefaultTheme() Theme {
-	t := themeAccents[0].theme()
+	t := presets()[0].clone()
 	t.Active = true
 	return t
 }
@@ -399,17 +541,18 @@ func DefaultTheme() Theme {
 // token via light-dark(), plus the structural tokens. This block is exactly
 // what the theme editor manages (THEME-04) - pages never hard-code colors.
 func (t Theme) CSS() string {
+	def := presets()[0]
 	var b strings.Builder
 	b.WriteString(":root {\n      color-scheme: light dark;\n")
-	for _, tok := range themeTokens {
-		light, dark := t.Light[tok.Key], t.Dark[tok.Key]
+	for _, key := range ThemeTokenKeys() {
+		light, dark := t.Light[key], t.Dark[key]
 		if light == "" {
-			light = DefaultTheme().Light[tok.Key]
+			light = def.Light[key]
 		}
 		if dark == "" {
-			dark = DefaultTheme().Dark[tok.Key]
+			dark = def.Dark[key]
 		}
-		fmt.Fprintf(&b, "      %s: light-dark(%s, %s);\n", tok.CSSVar, light, dark)
+		fmt.Fprintf(&b, "      %s: light-dark(%s, %s);\n", ThemeCSSVar(key), light, dark)
 	}
 	// --mk-glow scales every decorative effect at once: 1 = full glow, 0 = flat
 	// design (the rules in auth.flowTop multiply their blur and color-mix amount
@@ -428,44 +571,6 @@ func (t Theme) CSS() string {
 	return b.String()
 }
 
-// sanitizeThemeColors keeps only known tokens with plausible CSS color values
-// (hex forms) - the block is emitted into a <style>, nothing else may pass.
-func sanitizeThemeColors(in map[string]string) (map[string]string, error) {
-	out := map[string]string{}
-	for _, tok := range themeTokens {
-		v, ok := in[tok.Key]
-		if !ok || v == "" {
-			continue
-		}
-		v = strings.TrimSpace(strings.ToLower(v))
-		if !isHexColor(v) {
-			return nil, fmt.Errorf("theme token %q: %q is not a hex color (#rgb, #rrggbb or #rrggbbaa)", tok.Key, v)
-		}
-		out[tok.Key] = v
-	}
-	return out, nil
-}
-
-func isHexColor(v string) bool {
-	if len(v) == 0 || v[0] != '#' {
-		return false
-	}
-	hex := v[1:]
-	if len(hex) != 3 && len(hex) != 6 && len(hex) != 8 {
-		return false
-	}
-	for _, c := range hex {
-		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-			return false
-		}
-	}
-	return true
-}
-
-// seedThemes installs the built-in presets. A fresh table gets every preset,
-// the first one active. An already-populated table is topped up ONCE with any
-// preset it is missing (so upgrades gain the new palettes) - guarded by a
-// setting so a preset the admin later deletes is never resurrected.
 // seedThemes puts ONE theme in the database: the default, active.
 //
 // The others are not copied any more. A preset is code (PresetThemes), the
@@ -490,22 +595,20 @@ func (s *Store) seedThemes() error {
 	return s.ActivateTheme(ctx, t.ID)
 }
 
-// SaveTheme inserts or replaces a theme by ID after sanitizing its palettes.
+// SaveTheme inserts or replaces a theme by ID, generated from its colours -
+// whatever palettes came with it are the generator's to write, not the
+// caller's. A theme that came as tokens only is turned into colours first.
 func (s *Store) SaveTheme(ctx context.Context, t Theme) error {
 	// See rev.go: a write built on a version somebody has replaced is refused.
 	if err := s.checkRev(ctx, "themes", "theme", t.ID, t.Rev); err != nil {
 		return err
 	}
-	dark, err := sanitizeThemeColors(t.Dark)
-	if err != nil {
+	if err := t.Normalize(); err != nil {
 		return fmt.Errorf("store: theme %q: %w", t.Name, err)
 	}
-	light, err := sanitizeThemeColors(t.Light)
-	if err != nil {
-		return fmt.Errorf("store: theme %q: %w", t.Name, err)
-	}
-	dj, _ := json.Marshal(dark)
-	lj, _ := json.Marshal(light)
+	dj, _ := json.Marshal(t.Dark)
+	lj, _ := json.Marshal(t.Light)
+	cj, _ := json.Marshal(t.Colors)
 	now := time.Now().Unix()
 	// A caller may pin created_at (a duplicate inherits its source's, so it sorts
 	// right next to it - ListThemes orders by created_at then name); otherwise
@@ -514,13 +617,15 @@ func (s *Store) SaveTheme(ctx context.Context, t Theme) error {
 	if created <= 0 {
 		created = now
 	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO themes (id, name, active, flat, dark, light, created_at, updated_at, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO themes (id, name, active, flat, colors, contrast, color_match, dark, light, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
-		   name = excluded.name, flat = excluded.flat, dark = excluded.dark, light = excluded.light,
+		   name = excluded.name, flat = excluded.flat, colors = excluded.colors,
+		   contrast = excluded.contrast, color_match = excluded.color_match,
+		   dark = excluded.dark, light = excluded.light,
 		   updated_at = excluded.updated_at, rev = themes.rev + 1`,
-		t.ID, t.Name, t.Active, t.Flat, string(dj), string(lj), created, now)
+		t.ID, t.Name, t.Active, t.Flat, string(cj), t.Contrast, t.ColorMatch, string(dj), string(lj), created, now)
 	if err != nil {
 		return fmt.Errorf("store: save theme %q: %w", t.Name, err)
 	}
@@ -551,47 +656,61 @@ func (s *Store) ActivateTheme(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
+const themeColumns = `id, name, active, flat, colors, contrast, color_match, dark, light, created_at, updated_at, rev`
+
 // GetTheme returns one theme, or an error wrapping sql.ErrNoRows.
 func (s *Store) GetTheme(ctx context.Context, id string) (Theme, error) {
-	return s.themeRow(ctx, `SELECT id, name, active, flat, dark, light, created_at, updated_at, rev
-		 FROM themes WHERE id = ?`, id)
+	return s.themeRow(ctx, `SELECT `+themeColumns+` FROM themes WHERE id = ?`, id)
 }
 
 // GetActiveTheme returns the active theme (there is always exactly one).
 func (s *Store) GetActiveTheme(ctx context.Context) (Theme, error) {
-	return s.themeRow(ctx, `SELECT id, name, active, flat, dark, light, created_at, updated_at, rev
-		 FROM themes WHERE active = ?`, true)
+	return s.themeRow(ctx, `SELECT `+themeColumns+` FROM themes WHERE active = ?`, true)
 }
 
-// completePalettes materializes the default value of every missing token so a
-// theme always leaves the store COMPLETE - the editor, the live preview and
-// the emitted CSS all see the same full palettes (a partially-defined theme
-// otherwise renders differently in each).
+// completePalettes guarantees every token on the way out: a theme is
+// generated whole, so this only covers a row written by a build that knew
+// fewer roles - the same holes, filled the same way, in the editor, the
+// preview and the emitted CSS.
 func completePalettes(t *Theme) {
-	def := DefaultTheme()
 	if t.Dark == nil {
 		t.Dark = map[string]string{}
 	}
 	if t.Light == nil {
 		t.Light = map[string]string{}
 	}
-	for _, tok := range themeTokens {
-		if t.Dark[tok.Key] == "" {
-			t.Dark[tok.Key] = def.Dark[tok.Key]
+	var fill *Theme
+	for _, k := range ThemeTokenKeys() {
+		if t.Dark[k] != "" && t.Light[k] != "" {
+			continue
 		}
-		if t.Light[tok.Key] == "" {
-			t.Light[tok.Key] = def.Light[tok.Key]
+		if fill == nil {
+			g := Theme{Colors: t.Colors, Contrast: t.Contrast, ColorMatch: t.ColorMatch}
+			if g.Generate() != nil {
+				g = presets()[0]
+			}
+			fill = &g
+		}
+		if t.Dark[k] == "" {
+			t.Dark[k] = fill.Dark[k]
+		}
+		if t.Light[k] == "" {
+			t.Light[k] = fill.Light[k]
 		}
 	}
 }
 
-func (s *Store) themeRow(ctx context.Context, query string, args ...any) (Theme, error) {
+func scanTheme(r rowScanner) (Theme, error) {
 	var t Theme
-	var dark, light string
-	err := s.db.QueryRowContext(ctx, query, args...).
-		Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &dark, &light, &t.CreatedAt, &t.UpdatedAt, &t.Rev)
-	if err != nil {
-		return Theme{}, fmt.Errorf("store: get theme: %w", err)
+	var colors, dark, light string
+	if err := r.Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &colors, &t.Contrast, &t.ColorMatch,
+		&dark, &light, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
+		return Theme{}, err
+	}
+	if colors != "" {
+		if err := json.Unmarshal([]byte(colors), &t.Colors); err != nil {
+			return Theme{}, fmt.Errorf("store: theme %q: bad source colours: %w", t.ID, err)
+		}
 	}
 	if err := json.Unmarshal([]byte(dark), &t.Dark); err != nil {
 		return Theme{}, fmt.Errorf("store: theme %q: bad dark palette: %w", t.ID, err)
@@ -603,29 +722,28 @@ func (s *Store) themeRow(ctx context.Context, query string, args ...any) (Theme,
 	return t, nil
 }
 
+func (s *Store) themeRow(ctx context.Context, query string, args ...any) (Theme, error) {
+	t, err := scanTheme(s.db.QueryRowContext(ctx, query, args...))
+	if err != nil {
+		return Theme{}, fmt.Errorf("store: get theme: %w", err)
+	}
+	return t, nil
+}
+
 // ListThemes returns every theme in a stable order (creation order, then name)
 // that does NOT depend on which one is active.
 func (s *Store) ListThemes(ctx context.Context) ([]Theme, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, active, flat, dark, light, created_at, updated_at, rev FROM themes`)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+themeColumns+` FROM themes`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list themes: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var themes []Theme
 	for rows.Next() {
-		var t Theme
-		var dark, light string
-		if err := rows.Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &dark, &light, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
+		t, err := scanTheme(rows)
+		if err != nil {
 			return nil, fmt.Errorf("store: scan theme: %w", err)
 		}
-		if err := json.Unmarshal([]byte(dark), &t.Dark); err != nil {
-			return nil, fmt.Errorf("store: theme %q: bad dark palette: %w", t.ID, err)
-		}
-		if err := json.Unmarshal([]byte(light), &t.Light); err != nil {
-			return nil, fmt.Errorf("store: theme %q: bad light palette: %w", t.ID, err)
-		}
-		completePalettes(&t)
 		themes = append(themes, t)
 	}
 	if err := rows.Err(); err != nil {

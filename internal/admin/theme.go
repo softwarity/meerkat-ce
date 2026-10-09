@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/m3color"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -98,9 +100,10 @@ func (a *API) createTheme(w http.ResponseWriter, r *http.Request, actor store.Us
 	}
 	t.ID = newID()
 	t.Active = false // activation is an explicit, separate act
-	if len(t.Dark) == 0 && len(t.Light) == 0 {
+	// Nothing to make it from: it starts as the default does, from colours.
+	if !t.Generated() && len(t.Dark) == 0 && len(t.Light) == 0 {
 		base := store.DefaultTheme()
-		t.Dark, t.Light = base.Dark, base.Light
+		t.Colors, t.Contrast, t.ColorMatch = base.Colors, base.Contrast, base.ColorMatch
 	}
 	if err := a.st.SaveTheme(r.Context(), t); err != nil {
 		if conflict(w, err) {
@@ -194,6 +197,17 @@ func (a *API) previewTheme(w http.ResponseWriter, r *http.Request, _ store.User)
 		writeErr(w, http.StatusNotFound, err.Error())
 		return
 	}
+	// The colours on screen, before they are saved. A page takes them live
+	// over postMessage; a mail and the portal bar cannot - the first is inline
+	// styles, the second a shadow DOM fed by a payload - so their frame is
+	// reloaded with the draft, and generated here by the generator a save
+	// would use.
+	if raw := r.URL.Query().Get("draft"); raw != "" {
+		if err := applyDraft(&t, raw); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+	}
 	b := store.DefaultBranding()
 	if err := a.st.GetSetting(r.Context(), store.SettingBranding, &b); err != nil {
 		b = store.DefaultBranding()
@@ -261,6 +275,32 @@ func (a *API) previewTheme(w http.ResponseWriter, r *http.Request, _ store.User)
 		return
 	}
 	auth.WriteThemePreview(w, t, b, r.URL.Query().Get("scheme"), l, locale)
+}
+
+// themeDraft is what the editor holds and has not saved: the source colours
+// and the switches that make the palettes.
+type themeDraft struct {
+	Colors     m3color.Core `json:"colors"`
+	Contrast   string       `json:"contrast"`
+	ColorMatch bool         `json:"colorMatch"`
+	Flat       bool         `json:"flat"`
+}
+
+func applyDraft(t *store.Theme, raw string) error {
+	var d themeDraft
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&d); err != nil {
+		return fmt.Errorf("malformed draft (allowed: colors, contrast, colorMatch, flat): %w", err)
+	}
+	if d.Colors.Primary == "" {
+		return errors.New("draft: colors.primary is required")
+	}
+	t.Colors, t.Contrast, t.ColorMatch, t.Flat = d.Colors, d.Contrast, d.ColorMatch, d.Flat
+	if err := t.Generate(); err != nil {
+		return fmt.Errorf("draft: %w", err)
+	}
+	return nil
 }
 
 // previewSubject resolves what a preview is OF: a stored theme, or one of the

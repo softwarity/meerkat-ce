@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/icons"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -184,7 +185,7 @@ func portalPreviewHTML(key string, t store.Theme, b store.Branding, scheme strin
     .rows { margin-top: 24px; border: 1px solid var(--mk-outline-variant); border-radius: 14px; overflow: hidden; }
     .row { display: flex; align-items: center; gap: 12px; padding: 12px 18px; }
     .row + .row { border-top: 1px solid var(--mk-outline-variant); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mk-primary); flex: 0 0 auto; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mk-tertiary); flex: 0 0 auto; }
     .row .g { flex: 1 1 auto; color: var(--mk-on-surface-variant); font-size: 13px; }
     </style></head><body>` +
 		// The page agent, stood in for. The button asks the agent for its data
@@ -232,7 +233,7 @@ func portalPreviewHTML(key string, t store.Theme, b store.Branding, scheme strin
 		`<div class="row"><span class="dot"></span><b>AC-4822</b><span class="g">Northwind, one line</span></div>` +
 		`<div class="row"><span class="dot"></span><b>AC-4823</b><span class="g">Initech, six lines</span></div>` +
 		`</div></main>` +
-		`<script>` + userButtonJS + `</script>` + bars + `</body></html>`
+		`<script>` + strings.Replace(userButtonJS, "__MK_EVAL__", evalmark.MenuEntry, 1) + `</script>` + bars + `</body></html>`
 
 	return page, true
 }

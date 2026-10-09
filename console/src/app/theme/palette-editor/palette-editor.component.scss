@@ -41,6 +41,12 @@ mat-card {
   cursor: help;
   width: fit-content;
 
+  small {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
   &:hover {
     color: var(--mat-sys-secondary);
     text-decoration: underline dotted;
@@ -80,16 +86,48 @@ input[type='color'] {
   }
 }
 
-// The "Glow" line carries a checkbox as its label; keep it flush-left in the
-// token column, no extra left padding from the checkbox ripple area.
-.glow-toggle {
+/* One source colour serves both schemes, so its picker spans the Dark and
+   Light columns. */
+.wide-cell {
+  grid-column: 2 / 4;
+}
+
+/* A colour nobody set shows the value it is derived as, plainly second-hand:
+   the hex is a placeholder, and a word says why. */
+.row.derived input[type='color'] {
+  opacity: 0.6;
+}
+.derived-tag {
+  font-size: 0.7rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.unset {
+  @include mat.icon-button-density(-3);
+}
+
+.contrast {
+  grid-column: 1 / 4;
   justify-self: start;
+}
+.switches {
+  display: flex;
+  gap: 16px;
   margin-left: -8px;
 }
-// When glow is off its colour is unused: fade the whole line so the disabled
-// pickers read as inert, not broken.
-.row.dimmed {
-  opacity: 0.5;
+
+.roles {
+  margin-top: 14px;
+}
+.row.role .cell {
+  font-family: var(--mk-mono, monospace);
+  font-size: 0.7rem;
+}
+.swatch {
+  inline-size: 18px;
+  block-size: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  flex: none;
 }
 .actions {
   display: flex;

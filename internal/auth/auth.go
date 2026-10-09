@@ -58,33 +58,25 @@ var (
 	specimenPage        = flowPage("specimen", specimenBody)
 )
 
-// specimenBody is the REAL login screen with its error state made visible -
-// one honest screen, and together its elements already exercise every theme
-// token (fields, card, CTA, texts, outline, error, glow).
-const specimenBody = `    <form onsubmit="return false">
-      <p class="error">Access refused: outside your working hours.</p>
-      <label class="field">
-        <span>Username</span>
-        <input value="alice" readonly>
-      </label>
-      <label class="field">
-        <span>Password</span>
-        <input type="password" value="secret-secret" readonly>
-      </label>
-      <button type="button">Sign in</button>
-    </form>
-    <script>
+// previewLive is the listener the console's preview frames talk to - see the
+// comment at its top. Spliced into flowBottom behind .Preview.
+const previewLive = `    <script>
     // Live preview: the theme editor posts token values as the admin drags a
-    // color - applied straight to :root, no reload. Specimen page ONLY (the
-    // real flow pages never embed this). Same-origin messages, --mk-* vars
-    // carrying light-dark(#hex, #hex) values, nothing else passes.
-    let hiTimer = null, hiVar = null, hiPrev = '', bgOn = false;
+    // color - applied straight to :root, no reload. EVERY page the editor
+    // previews carries it (the real flow pages never do - it sits behind
+    // .Preview): a palette is judged on the page somebody stopped at, and a
+    // listener on the specimen alone made every other page wait for a save.
+    // Same-origin messages, --mk-* vars carrying light-dark(#hex, #hex)
+    // values, nothing else passes.
+    let hiTimer = null, hiVar = null, hiPrev = [], bgOn = false;
     function clearHighlight() {
       if (hiTimer) { clearInterval(hiTimer); hiTimer = null; }
       if (hiVar) {
-        if (hiPrev) document.documentElement.style.setProperty(hiVar, hiPrev);
-        else document.documentElement.style.removeProperty(hiVar);
-        hiVar = null; hiPrev = '';
+        hiVar.forEach((k, i) => {
+          if (hiPrev[i]) document.documentElement.style.setProperty(k, hiPrev[i]);
+          else document.documentElement.style.removeProperty(k);
+        });
+        hiVar = null; hiPrev = [];
       }
     }
     addEventListener('message', (e) => {
@@ -96,25 +88,28 @@ const specimenBody = `    <form onsubmit="return false">
         // a --mk-* light-dark(#hex, #hex) pair.
         if (k === '--mk-glow' && /^[01]$/.test(v)) {
           document.documentElement.style.setProperty(k, v);
-        } else if (/^--mk-[a-z-]+$/.test(k) && /^light-dark\((#[0-9a-f]{3,8}|black), (#[0-9a-f]{3,8}|black)\)$/.test(v)) {
+        } else if (/^--mk-[a-z-]+$/.test(k) && /^light-dark\((#[0-9a-f]{3,8}|black), (#[0-9a-f]{3,8}|black)\)$/i.test(v)) {
           document.documentElement.style.setProperty(k, v);
         }
       }
       if ('highlight' in e.data) {
-        // Hovering a token name in the editor BLINKS that token's value here:
-        // whatever it drives visibly flip-flops - the clearest possible "this
-        // is what changes". Hot pink on purpose: never part of a theme.
+        // Hovering a colour in the editor BLINKS what it drives here: the
+        // tokens it makes visibly flip-flop - the clearest possible "this is
+        // what changes". One token, or the several a source colour makes.
+        // Hot pink on purpose: never part of a theme.
         clearHighlight();
-        const k = e.data.highlight;
-        if (/^--mk-[a-z-]+$/.test(k)) {
-          hiVar = k;
-          hiPrev = document.documentElement.style.getPropertyValue(k);
+        const asked = [].concat(e.data.highlight || []).filter((k) => /^--mk-[a-z-]+$/.test(k));
+        if (asked.length) {
+          hiVar = asked;
+          hiPrev = asked.map((k) => document.documentElement.style.getPropertyValue(k));
           let on = false;
           const flash = () => {
             on = !on;
-            if (on) document.documentElement.style.setProperty(k, '#ff2d95');
-            else if (hiPrev) document.documentElement.style.setProperty(k, hiPrev);
-            else document.documentElement.style.removeProperty(k);
+            asked.forEach((k, i) => {
+              if (on) document.documentElement.style.setProperty(k, '#ff2d95');
+              else if (hiPrev[i]) document.documentElement.style.setProperty(k, hiPrev[i]);
+              else document.documentElement.style.removeProperty(k);
+            });
           };
           flash();
           hiTimer = setInterval(flash, 400);
@@ -208,6 +203,23 @@ const specimenBody = `    <form onsubmit="return false">
     </script>
 `
 
+// specimenBody is the REAL login screen with its error state made visible -
+// one honest screen, and together its elements already exercise every theme
+// token (fields, card, CTA, texts, outline, error, glow).
+const specimenBody = `    <form onsubmit="return false">
+      <p class="error">Access refused: outside your working hours.</p>
+      <label class="field">
+        <span>Username</span>
+        <input value="alice" readonly>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" value="secret-secret" readonly>
+      </label>
+      <button type="button">Sign in</button>
+    </form>
+`
+
 const flowTop = `<!doctype html>
 <html lang="{{.Lang}}" dir="{{.Dir}}">
 <head>
@@ -228,7 +240,7 @@ const flowTop = `<!doctype html>
       padding: 32px 16px 52px;
       background:
         radial-gradient(1000px 720px at 80% -12%, color-mix(in srgb, var(--mk-night) calc(62% * var(--mk-glow, 1)), transparent), transparent 62%),
-        radial-gradient(760px 460px at 50% 120%, color-mix(in srgb, var(--mk-primary) calc(15% * var(--mk-glow, 1)), transparent), transparent 60%),
+        radial-gradient(760px 460px at 50% 120%, color-mix(in srgb, var(--mk-tertiary) calc(18% * var(--mk-glow, 1)), transparent), transparent 60%),
         var(--mk-surface);
     }
     /* desert-dusk grain over the whole field */
@@ -280,9 +292,9 @@ const flowTop = `<!doctype html>
        coherent whatever preset is active; no theme carries a warning colour. */
     .why {
       margin: 0 0 2px; padding: 9px 12px; text-align: start; font-size: .82rem;
-      color: var(--mk-on-surface);
-      background: var(--mk-surface-container-high);
-      border-inline-start: 3px solid var(--mk-primary);
+      color: var(--mk-on-tertiary-container);
+      background: var(--mk-tertiary-container);
+      border-inline-start: 3px solid var(--mk-tertiary);
       border-radius: var(--mk-radius-small);
     }
     /* The way OUT of a step. The organisation chooser and the group chooser
@@ -310,7 +322,7 @@ const flowTop = `<!doctype html>
       box-shadow: none;
     }
     form.leave button:hover {
-      color: var(--mk-primary); text-decoration: underline;
+      color: var(--mk-secondary); text-decoration: underline;
       filter: none; box-shadow: none; transform: none;
     }
     /* The unavailable page (LIFE-05). Its statement is the whole page, so it
@@ -328,7 +340,7 @@ const flowTop = `<!doctype html>
     .maint-lead {
       margin: 0; text-align: center;
       font-family: var(--mk-mono); font-size: .95rem; font-weight: 600;
-      letter-spacing: .14em; text-transform: uppercase; color: var(--mk-on-surface);
+      letter-spacing: .14em; text-transform: uppercase; color: var(--mk-primary);
     }
     .maint-when {
       margin: 8px auto 0; max-width: 44ch; text-align: center;
@@ -343,11 +355,11 @@ const flowTop = `<!doctype html>
        itself broken. */
     .maint-dot {
       width: 8px; height: 8px; margin: 26px auto 0; border-radius: 50%;
-      background: var(--mk-primary); animation: maint-pulse 2.4s ease-in-out infinite;
+      background: var(--mk-tertiary); animation: maint-pulse 2.4s ease-in-out infinite;
     }
     @keyframes maint-pulse {
       0%, 100% { opacity: .35; box-shadow: 0 0 0 0 transparent; }
-      50% { opacity: 1; box-shadow: 0 0 14px 2px var(--mk-primary); }
+      50% { opacity: 1; box-shadow: 0 0 14px 2px var(--mk-tertiary); }
     }
     @media (prefers-reduced-motion: reduce) { .maint-dot { animation: none; opacity: .8; } }
     /* The footnote, only ever shown to whoever administers here. pre-line,
@@ -377,7 +389,7 @@ const flowTop = `<!doctype html>
       position: relative; z-index: 1; width: 44px; height: auto;
       color: var(--mk-primary);
       --meerkat-eye: var(--mk-surface);
-      filter: drop-shadow(0 0 calc(14px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary) calc(55% * var(--mk-glow, 1)), transparent));
+      filter: drop-shadow(0 0 calc(14px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary-container) calc(70% * var(--mk-glow, 1)), transparent));
     }
     /* The BOX the logo is drawn in, square and object-fit: contain, so any
        picture arrives whole. Its side is the branding's choice (LogoSize),
@@ -388,7 +400,7 @@ const flowTop = `<!doctype html>
     .applogo {
       position: relative; z-index: 1; object-fit: contain;
       width: var(--mk-logo, 56px); height: var(--mk-logo, 56px);
-      filter: drop-shadow(0 0 calc(14px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary) calc(45% * var(--mk-glow, 1)), transparent));
+      filter: drop-shadow(0 0 calc(14px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary-container) calc(60% * var(--mk-glow, 1)), transparent));
     }
     .applogo.large { --mk-logo: 88px; }
     .applogo.xlarge { --mk-logo: 128px; }
@@ -414,10 +426,10 @@ const flowTop = `<!doctype html>
        its own colour, since the wordmark paints its text with a gradient. */
     .wordmark .edition {
       display: inline-block; vertical-align: top; margin-left: -.1em;
-      padding: 3px 7px; border: 1px solid var(--mk-primary); border-radius: 999px;
+      padding: 3px 7px; border: 1px solid var(--mk-tertiary); border-radius: 999px;
       font-family: var(--mk-mono); font-size: .26em; font-weight: 700;
       letter-spacing: .1em; text-indent: 0; line-height: 1;
-      color: var(--mk-primary); -webkit-text-fill-color: var(--mk-primary);
+      color: var(--mk-tertiary); -webkit-text-fill-color: var(--mk-tertiary);
     }
     .tagline {
       margin: 8px 0 24px; font-family: var(--mk-mono); font-size: .68rem;
@@ -437,12 +449,14 @@ const flowTop = `<!doctype html>
       backdrop-filter: blur(calc(6px * var(--mk-glow, 1))); position: relative;
       animation: rise .7s .24s both;
     }
-    /* hairline mint accent along the top edge of the card */
+    /* The hairline along the top edge of the card, in the primary
+       CONTAINER: with Color match that is the source colour itself, the one
+       the integrator typed, which no other role carries untouched. */
     form::before, .panel::before {
       content: ''; position: absolute; inset: 0 0 auto 0; height: 2px;
       border-radius: var(--mk-radius) var(--mk-radius) 0 0;
-      background: linear-gradient(90deg, transparent, var(--mk-primary), transparent);
-      opacity: calc(.85 * var(--mk-glow, 1));
+      background: linear-gradient(90deg, transparent, var(--mk-primary-container), transparent);
+      opacity: calc(.95 * var(--mk-glow, 1));
     }
     /* A form INSIDE a card is not a card of its own - the card around it
        already carries the surface, the border and the padding. Written once,
@@ -459,7 +473,7 @@ const flowTop = `<!doctype html>
     /* A card's own heading: the same small caps the sections use, inside. */
     .panel > h2 {
       margin: 0; font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
-      text-transform: uppercase; color: var(--mk-on-surface-variant); font-weight: 600;
+      text-transform: uppercase; color: var(--mk-primary); font-weight: 600;
     }
     .panel > .panel-hint {
       margin: -8px 0 0; font-size: .76rem; color: var(--mk-on-surface-variant);
@@ -490,7 +504,7 @@ const flowTop = `<!doctype html>
       margin: 0; padding: 6px; border: 0; background: none; box-shadow: none;
       color: var(--mk-on-surface-variant); cursor: pointer; line-height: 0;
     }
-    .pw-toggle:hover { color: var(--mk-primary); filter: none; box-shadow: none; transform: translateY(-50%); }
+    .pw-toggle:hover { color: var(--mk-secondary); filter: none; box-shadow: none; transform: translateY(-50%); }
     .pw-toggle svg { display: block; }
     /* A copy button injected into every [data-copy] block - a command, a
        setup key, backup codes: things somebody takes elsewhere, one place. It
@@ -503,9 +517,9 @@ const flowTop = `<!doctype html>
       background: var(--mk-surface-container-high);
       color: var(--mk-on-surface-variant); cursor: pointer; display: grid; place-items: center; box-shadow: none;
     }
-    .cp-btn:hover { color: var(--mk-primary); border-color: var(--mk-outline); filter: none; box-shadow: none; transform: none; }
+    .cp-btn:hover { color: var(--mk-secondary); border-color: var(--mk-outline); filter: none; box-shadow: none; transform: none; }
     .cp-btn:active { transform: none; }
-    .cp-btn.ok { color: var(--mk-primary); border-color: var(--mk-primary); }
+    .cp-btn.ok { color: var(--mk-tertiary); border-color: var(--mk-tertiary); }
     .field > span {
       font-family: var(--mk-mono); font-size: .64rem; letter-spacing: .18em;
       text-transform: uppercase; color: var(--mk-on-surface-variant);
@@ -578,9 +592,9 @@ const flowTop = `<!doctype html>
       border: 1.5px solid currentColor; opacity: .45;
       transition: opacity .15s, background-color .15s;
     }
-    .pw-rules.typed > li.rule.met { color: var(--mk-primary); }
+    .pw-rules.typed > li.rule.met { color: var(--mk-tertiary); }
     .pw-rules.typed > li.rule.met::before {
-      opacity: 1; border-color: var(--mk-primary); background: var(--mk-primary);
+      opacity: 1; border-color: var(--mk-tertiary); background: var(--mk-tertiary);
     }
     .foot {
       margin: 22px 0 0; font-family: var(--mk-mono); font-size: .64rem;
@@ -590,25 +604,41 @@ const flowTop = `<!doctype html>
     }
     .foot::before {
       content: ''; width: 6px; height: 6px; border-radius: 50%;
-      background: var(--mk-primary); box-shadow: 0 0 calc(8px * var(--mk-glow, 1)) var(--mk-primary);
+      background: var(--mk-tertiary); box-shadow: 0 0 calc(8px * var(--mk-glow, 1)) var(--mk-tertiary);
     }
     /* tenant selection (TENANT-03) */
+    /* A page's title, and a card's: in the primary, as Material Theme
+       Builder sets its headings - the one place where the theme's own colour
+       is read as type rather than as a surface. */
     .lead {
       margin: 0; font-family: var(--mk-mono); font-size: .68rem;
-      letter-spacing: .18em; text-transform: uppercase; color: var(--mk-on-surface-variant);
+      letter-spacing: .18em; text-transform: uppercase; color: var(--mk-primary);
     }
+    /* An ALTERNATIVE action - another authority, a passkey, an organisation
+       to pick, a second way to get a code: Material 3's filled tonal button,
+       on the secondary container. The one filled primary button stays the
+       page's main action; these sit beside it without competing. */
     button.choice, a.choice {
       margin: 0; padding: 13px 16px; display: flex; align-items: center; gap: 12px;
-      background: var(--mk-surface-container-high); color: var(--mk-on-surface);
-      border: 1px solid var(--mk-outline); box-shadow: none; font-weight: 500;
+      background: var(--mk-secondary-container); color: var(--mk-on-secondary-container);
+      border: 1px solid transparent; box-shadow: none; font-weight: 500;
       transition: border-color .15s, transform .12s;
     }
-    button.choice:hover, a.choice:hover { border-color: var(--mk-primary); filter: none; box-shadow: none; }
+    button.choice:hover, a.choice:hover {
+      border-color: var(--mk-secondary); filter: none; box-shadow: none;
+      background: color-mix(in srgb, var(--mk-on-secondary-container) 8%, var(--mk-secondary-container));
+    }
+    button.choice .choice-type, a.choice .choice-type { color: inherit; opacity: .75; }
     a.choice { justify-content: center; text-decoration: none; border-radius: 10px; }
+    /* Two authorities in a row are two buttons: on a filled ground, with no
+       outline left to tell them apart, they need the gap the grid of a card
+       gives everything else. */
+    a.choice + a.choice { margin-top: 8px; }
     /* Connecting an agent (MCP-07): the page where somebody decides what an
        agent may do. Written HERE and not in the page's own body, for the
        reason the two comments above already paid for once. */
     .consent { gap: 18px; }
+    .consent h1 { color: var(--mk-primary); }
     .consent fieldset {
       margin: 0; padding: 0; border: 0; width: 100%;
       display: grid; gap: 8px;
@@ -624,13 +654,14 @@ const flowTop = `<!doctype html>
       border: 1px solid var(--mk-outline); border-radius: 10px;
       transition: border-color .15s;
     }
-    label.choice:hover { border-color: var(--mk-primary); }
+    label.choice:hover { border-color: var(--mk-secondary); }
     label.choice:has(input:checked) {
-      border-color: var(--mk-primary);
-      background: color-mix(in srgb, var(--mk-primary) 10%, var(--mk-surface-container-high));
+      border-color: var(--mk-secondary);
+      background: var(--mk-secondary-container); color: var(--mk-on-secondary-container);
     }
-    label.choice input { margin-top: 3px; accent-color: var(--mk-primary); }
+    label.choice input { margin-top: 3px; accent-color: var(--mk-secondary); }
     label.choice small { display: block; margin-top: 3px; color: var(--mk-on-surface-variant); }
+    label.choice:has(input:checked) small { color: var(--mk-on-secondary-container); opacity: .8; }
     .consent .actions { display: flex; gap: 10px; width: 100%; }
     .consent .actions button { flex: 1; margin: 0; }
     button.ghost {
@@ -659,7 +690,7 @@ const flowTop = `<!doctype html>
       color: var(--mk-on-surface); text-decoration: none; font-size: .82rem;
       background: var(--mk-surface-container);
     }
-    .public-links a:hover { border-color: var(--mk-primary); }
+    .public-links a:hover { border-color: var(--mk-secondary); }
     /* button.pk-btn: must out-rank button.choice, whose margin: 0 wins over
        a bare class selector */
     button.pk-btn { margin-top: 22px; width: 100%; justify-content: center; }
@@ -683,7 +714,7 @@ const flowTop = `<!doctype html>
       border: 1px solid transparent; border-radius: 999px; box-shadow: none; cursor: pointer;
     }
     .prefs button:hover { border-color: var(--mk-outline); filter: none; box-shadow: none; transform: none; }
-    .prefs button.on { color: var(--mk-primary); border-color: var(--mk-outline); background: var(--mk-surface-container); }
+    .prefs button.on { color: var(--mk-on-secondary-container); border-color: transparent; background: var(--mk-secondary-container); }
     .prefs .sep { width: 1px; height: 14px; background: var(--mk-outline); margin: 0 5px; }
     /* language icon-menu + the single 3-state scheme button */
     .langbox { position: relative; display: inline-flex; }
@@ -711,7 +742,7 @@ const flowTop = `<!doctype html>
       font-family: inherit; letter-spacing: 0; text-transform: none; font-size: .8rem;
       text-align: start; padding: 6px 10px; border-radius: 7px;
     }
-    .lang-menu button.on { color: var(--mk-primary); }
+    .lang-menu button.on { color: var(--mk-on-secondary-container); background: var(--mk-secondary-container); }
     /* the author display:grid above would beat the UA's [hidden] rule */
     .lang-menu[hidden] { display: none; }
     @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -966,7 +997,7 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
     };
   })();{{end}}
   </script>
-  {{if .Preview}}<script>
+  {{if .Preview}}` + previewLive + `<script>
   // NOTHING LEAVES A PREVIEW. These pages are the real ones, with real forms
   // and real links, and the console serves them from the ADMIN plane: a click
   // on "Create an account" walks the frame into the console, and a form posts
@@ -1172,7 +1203,7 @@ const profileBody = `    <style>
         background: var(--mk-surface-container-high); border: 1px solid var(--mk-outline);
         color: var(--mk-on-surface-variant);
       }
-      .avatar-wrap:hover .avatar-edit { color: var(--mk-primary); border-color: var(--mk-primary); }
+      .avatar-wrap:hover .avatar-edit { color: var(--mk-secondary); border-color: var(--mk-secondary); }
       /* The same round control in two states: a pencil that opens the file
          picker, or a cross that takes the photograph off. Replacing one with
          a photo is then two deliberate acts, and no page carries a standing
@@ -1193,9 +1224,9 @@ const profileBody = `    <style>
       .facts dd { margin: 0; text-align: end; overflow-wrap: anywhere; font-size: .92rem; }
       .notice {
         margin: 0; padding: 9px 12px; border-radius: var(--mk-radius-small);
-        color: var(--mk-primary); font-size: .82rem;
-        background: color-mix(in srgb, var(--mk-primary) 12%, transparent);
-        border: 1px solid color-mix(in srgb, var(--mk-primary) 30%, transparent);
+        color: var(--mk-on-tertiary-container); font-size: .82rem;
+        background: var(--mk-tertiary-container);
+        border: 1px solid color-mix(in srgb, var(--mk-tertiary) 30%, transparent);
       }
       form.signout { margin-top: 14px; }
       .mfa-link {
@@ -1205,13 +1236,13 @@ const profileBody = `    <style>
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
         transition: border-color .15s;
       }
-      .mfa-link:hover { border-color: var(--mk-primary); }
+      .mfa-link:hover { border-color: var(--mk-secondary); }
       .mfa-link .mfa-label { flex: 1; font-size: .9rem; }
       .mfa-link .mfa-state {
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .14em;
         text-transform: uppercase; color: var(--mk-on-surface-variant);
       }
-      .mfa-link .mfa-state.on { color: var(--mk-primary); }
+      .mfa-link .mfa-state.on { color: var(--mk-tertiary); }
       /* the way back into the applications, right from the hub */
       /* A card like the others: the list of applications used to sit on the
          background image, where a branded photograph decides whether it can
@@ -1265,7 +1296,7 @@ const profileBody = `    <style>
         border-radius: var(--mk-radius-small); padding: 7px 14px; cursor: pointer;
         font: inherit; font-size: .78rem; transition: border-color .15s, opacity .15s;
       }
-      .tz-btn:hover { border-color: var(--mk-primary); }
+      .tz-btn:hover { border-color: var(--mk-secondary); }
       .tz-save { background: var(--mk-primary); color: var(--mk-on-primary); border-color: transparent; font-weight: 600; }
       .tz-save:hover { border-color: transparent; }
       .tz-btn[disabled] { opacity: .4; cursor: default; }
@@ -1276,7 +1307,7 @@ const profileBody = `    <style>
         margin: 0 0 0 8px; padding: 0 4px; border: 0; background: none; box-shadow: none;
         color: var(--mk-on-surface-variant); cursor: pointer; font-size: .8rem; line-height: 1;
       }
-      .em-edit:hover { color: var(--mk-primary); filter: none; box-shadow: none; transform: none; }
+      .em-edit:hover { color: var(--mk-secondary); filter: none; box-shadow: none; transform: none; }
       .em-dialog {
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius);
         background: var(--mk-surface-container); color: var(--mk-on-surface);
@@ -1292,7 +1323,7 @@ const profileBody = `    <style>
         margin: 0; background: transparent; color: inherit; border: 1px solid var(--mk-outline);
         box-shadow: none; font-size: .82rem; padding: 8px 14px;
       }
-      .em-cancel:hover { filter: none; box-shadow: none; border-color: var(--mk-primary); }
+      .em-cancel:hover { filter: none; box-shadow: none; border-color: var(--mk-secondary); }
       .em-save { margin: 0; font-size: .82rem; padding: 8px 16px; }
     </style>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
@@ -1468,13 +1499,13 @@ const profileSecurityBody = `    <style>
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
         transition: border-color .15s;
       }
-      .mfa-link:hover { border-color: var(--mk-primary); }
+      .mfa-link:hover { border-color: var(--mk-secondary); }
       .mfa-link .mfa-label { flex: 1; font-size: .9rem; text-align: start; }
       .mfa-link .mfa-state {
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .14em;
         text-transform: uppercase; color: var(--mk-on-surface-variant);
       }
-      .mfa-link .mfa-state.on { color: var(--mk-primary); }
+      .mfa-link .mfa-state.on { color: var(--mk-tertiary); }
     </style>
     <p class="lead">{{.T.security}}</p>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
@@ -1526,14 +1557,14 @@ const profileDevBody = `    <style>
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
         background: var(--mk-surface-container); text-decoration: none;
       }
-      .dev-link:hover { border-color: var(--mk-primary); filter: none; box-shadow: none; transform: none; }
+      .dev-link:hover { border-color: var(--mk-secondary); filter: none; box-shadow: none; transform: none; }
       .dev-link .dl-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
       .dev-link .dl-label { font-size: .95rem; color: var(--mk-on-surface); }
       .dev-link .dl-state {
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .14em;
         text-transform: uppercase; color: var(--mk-on-surface-variant);
       }
-      .dev-link .dl-state.on { color: var(--mk-primary); }
+      .dev-link .dl-state.on { color: var(--mk-tertiary); }
       .dev-link .dl-desc { margin: 0; font-size: .76rem; color: var(--mk-on-surface-variant); }
     </style>
     <p class="lead">Developer</p>
@@ -1978,10 +2009,9 @@ func WriteThemePreview(
 	w.Header().Set("Cache-Control", "no-store")
 	_ = specimenPage.Execute(w, struct {
 		flowChrome
-		Next        string
-		Error       string
-		LayoutNames []string
-	}{LayoutNames: store.PageLayouts, flowChrome: previewChrome(t, b, scheme, l, locale)})
+		Next  string
+		Error string
+	}{flowChrome: previewChrome(t, b, scheme, l, locale)})
 }
 
 // previewChrome is the chrome a preview wears: a theme that may be neither
@@ -2016,8 +2046,11 @@ func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageL
 		//nolint:gosec // a constant from ee/eval, never anyone's input
 		EvalBanner: template.HTML(evalmark.FlowBanner),
 		Preview:    true,
-		Brand:      toBrandView(b),
-		Title:      "Theme preview - Meerkat",
+		// The arrangements the live listener may switch between - a name from
+		// a message becomes a class only if it is one of these.
+		LayoutNames: store.PageLayouts,
+		Brand:       toBrandView(b),
+		Title:       "Theme preview - Meerkat",
 		// The language the caller asked for, not English. Every page here is
 		// translated, and a preview that always spoke English could show the
 		// palette and never the TEXT - which is half of what a page looks

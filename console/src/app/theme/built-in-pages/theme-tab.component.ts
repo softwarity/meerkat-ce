@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { PaletteEditorComponent } from '../palette-editor/palette-editor.component';
+import { ImportedRecipe, PaletteEditorComponent } from '../palette-editor/palette-editor.component';
 import { BuiltInPagesScope } from './built-in-pages.scope';
 
 // The Theme tab: the palette editor, and nothing else. Everything it needs -
@@ -11,8 +11,11 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
   template: `
     @if (scope.selected()) {
       <app-palette-editor
-        [(dark)]="scope.dark"
-        [(light)]="scope.light"
+        [(colors)]="scope.colors"
+        [(contrast)]="scope.contrast"
+        [(colorMatch)]="scope.colorMatch"
+        [dark]="scope.dark()"
+        [light]="scope.light()"
         [(flat)]="scope.flat"
         [(name)]="scope.name"
         [readOnly]="scope.readOnly()"
@@ -25,10 +28,21 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
         (save)="scope.saveTheme()"
         (duplicate)="scope.createFrom()"
         (remove)="scope.removeSelected()"
+        (imported)="imported($event)"
       />
     }
   `,
 })
 export class ThemeTabComponent {
   protected readonly scope = inject(BuiltInPagesScope);
+
+  // A file's switches land where they live: the recipe on the scope, the
+  // offered schemes in the settings, written on the spot like their checkbox.
+  protected imported(r: ImportedRecipe): void {
+    this.scope.loadRecipe(r.colors, r.colorMatch, r.contrast);
+    if (r.flat !== undefined) this.scope.flat.set(r.flat);
+    if (r.pagesScheme !== undefined && r.pagesScheme !== this.scope.pagesScheme()) {
+      this.scope.setPagesScheme(r.pagesScheme);
+    }
+  }
 }

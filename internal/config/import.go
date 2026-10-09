@@ -622,22 +622,32 @@ func importThemes(ctx context.Context, st *store.Store, doc *Document, plan *Pla
 	for _, t := range doc.Themes {
 		seen[t.ID] = true
 		before, had := known[t.ID]
-		// No palettes means "the built-in one under this id", which is how an
-		// untouched preset travels. Fill it from what this gateway ships, or
-		// from what it already stores.
-		if len(t.Dark) == 0 && len(t.Light) == 0 {
-			switch {
-			case had:
-				t.Dark, t.Light = before.Dark, before.Light
-			default:
-				preset, ok := presetByID(t.ID)
-				if !ok {
-					return fmt.Errorf("config: theme %q carries no colours and %q is not a "+
-						"built-in palette of this Meerkat: export it again from a gateway that "+
-						"has its colours", t.Name, t.ID)
-				}
-				t.Dark, t.Light = preset.Dark, preset.Light
+		// Source colours are the theme: its palettes are generated here, now,
+		// so the comparison below sees what the save would store. A file
+		// written before them carries tokens, and is read as the colours that
+		// make them, exactly as the save would.
+		//
+		// Neither colours nor palettes means "the built-in one under this id",
+		// which is how an untouched preset travelled before themes were
+		// generated. Fill it from what this gateway ships, or from what it
+		// already stores.
+		switch {
+		case t.Generated() || len(t.Dark) > 0 || len(t.Light) > 0:
+			if err := t.Normalize(); err != nil {
+				return fmt.Errorf("config: theme %q: %w", t.Name, err)
 			}
+		default:
+			src, ok := before, had
+			if !ok {
+				src, ok = presetByID(t.ID)
+			}
+			if !ok {
+				return fmt.Errorf("config: theme %q carries no colours and %q is not a "+
+					"built-in palette of this Meerkat: export it again from a gateway that "+
+					"has its colours", t.Name, t.ID)
+			}
+			t.Colors, t.Contrast, t.ColorMatch = src.Colors, src.Contrast, src.ColorMatch
+			t.Dark, t.Light = src.Dark, src.Light
 		}
 		action := decide(had, before, t)
 		plan.Changes = append(plan.Changes, Change{

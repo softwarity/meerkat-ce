@@ -67,8 +67,11 @@ func (a *API) lookTools() []mcp.Tool {
 		{
 			Name: "list_themes", Allow: a.administersSomething, Title: "List the colour themes", ReadOnly: true,
 			Description: "The colour palettes this installation holds, and which one is active. Each theme " +
-				"carries its light and dark tokens as hex values - readable, comparable, and what a " +
-				"question like 'what is the primary colour here' is asking for.",
+				"carries the source colours it is made from (Material Theme Builder's six: primary, " +
+				"secondary, tertiary, error, neutral, neutralVariant - an absent one is derived), its " +
+				"contrast level, and the light and dark tokens generated from them as hex values - " +
+				"readable, comparable, and what a question like 'what is the primary colour here' is " +
+				"asking for.",
 			Schema: noArgs(),
 			Call:   a.toolListThemes,
 		},

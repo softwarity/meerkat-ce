@@ -155,6 +155,21 @@ type transaction struct {
 	paused *atomic.Bool
 }
 
+// hasColumn says whether a table has a column, read inside the transaction a
+// migration step runs in - the same introspection as columnsOf, per dialect.
+func (t *transaction) hasColumn(ctx context.Context, table, column string) (bool, error) {
+	query := `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`
+	if t.dialect == dialectPostgres {
+		query = `SELECT COUNT(*) FROM information_schema.columns
+		         WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`
+	}
+	var n int
+	if err := t.QueryRowContext(ctx, query, table, column).Scan(&n); err != nil {
+		return false, fmt.Errorf("store: columns of %s: %w", table, err)
+	}
+	return n > 0, nil
+}
+
 func (t *transaction) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	if t.paused != nil && t.paused.Load() {
 		return nil, ErrPaused
