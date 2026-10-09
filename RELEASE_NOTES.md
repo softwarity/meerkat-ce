@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.4.0
+
 - **The portal's rail works on a phone.** A container's modules no longer run off the
   edge of a narrow screen: they fold into one button naming the module you are on,
   which opens them as a menu - on a phone, or whenever they do not fit.
