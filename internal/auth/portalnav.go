@@ -52,9 +52,21 @@ const portalNavJS = `(function () {
     return '<svg class="' + cls + '" viewBox="0 -960 960 960" aria-hidden="true" focusable="false"><path d="' + path + '"/></svg>';
   }
 
+  // A face declared inside a shadow root is ignored by browsers: the theme's
+  // @font-face rules are lifted into the document once, where the bar's
+  // shadow DOM reads them like any other font of the page.
+  function liftFonts(css) {
+    var faces = (css || '').match(/@font-face\s*\{[^}]*\}/g);
+    if (!faces || document.getElementById('mk-fonts')) return;
+    var st = document.createElement('style');
+    st.id = 'mk-fonts';
+    st.textContent = faces.join('\n');
+    (document.head || document.documentElement).appendChild(st);
+  }
+
   var STYLE =
     ':host{all:initial;color-scheme:inherit;' +
-      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}' +
+      'font-family:var(--mk-font,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);}' +
     '*{box-sizing:border-box;}' +
     // an author display rule beats the UA [hidden]{display:none}; restore it so
     // el.hidden actually hides (the launcher, shown only on overflow).
@@ -670,6 +682,7 @@ const portalNavJS = `(function () {
         try { document.documentElement.style.colorScheme = this._previewScheme; } catch (e) {}
       }
       var style = document.createElement('style');
+      liftFonts(d.themeCss);
       style.textContent = '.mk{}' + (d.themeCss || '') + STYLE;
       this._root.appendChild(style);
       var wrap = document.createElement('div'); wrap.className = 'mk'; this._root.appendChild(wrap);

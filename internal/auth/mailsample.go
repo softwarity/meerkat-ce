@@ -190,5 +190,5 @@ func samplePalette(ctx context.Context, st *store.Store) map[string]string {
 	if err != nil || len(t.Light) == 0 {
 		t = store.DefaultTheme()
 	}
-	return t.Light
+	return t.MailPalette()
 }

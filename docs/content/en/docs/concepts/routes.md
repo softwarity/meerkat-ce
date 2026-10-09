@@ -59,7 +59,7 @@ Filters come in phases, and the console groups them the way they run:
 - **Gates** refuse before anything else: `max-request-body`, `max-request-headers`.
 - **Incoming** rewrites the request: `strip-prefix`, `prefix-path`, `rewrite-path`, `set-path`, `set-host`, `preserve-host`, and the whole family of header, query-parameter and cookie operations - set, add, remove, rename, copy, rewrite.
 - **Outgoing** rewrites the response: the same header family, plus `set-status`, `cache-control`, `security-headers`, `cookie-attributes`, `dedupe-response-header`, `rewrite-location`, `remove-json-fields`.
-- **Terminal** filters mean the route answers by itself: `redirect`, `maintenance`, `respond`.
+- **Terminal** filters mean the route answers by itself: `redirect`, `maintenance`, `respond`, `files`.
 
 A route carrying a terminal filter proxies nothing, so its incoming filters and
 its identity forwarding are dropped - the console disables those sections rather

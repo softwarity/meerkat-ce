@@ -48,6 +48,48 @@ var migrations = []migration{
 	{Version: 71, Name: "a role is its name", Up: rolesKeyedByName},
 	{Version: 73, Name: "certificates are a pool, placed on planes", Up: certificatesPlaced},
 	{Version: 77, Name: "a theme is its source colours", Up: themesFromColours},
+	{Version: 80, Name: "a route's custom code is an ordered list", Up: injectionsFromBlocks},
+}
+
+// injectionsFromBlocks turns the two free blocks of a UI route (customCss,
+// customJs) into the ordered list that replaced them (v80), at the place they
+// used to land, so no page changes. RouteUI's reader does the conversion -
+// it has to for packages exported by v1.0 - and this step writes its result,
+// so no row keeps a shape nothing else writes.
+func injectionsFromBlocks(ctx context.Context, tx *transaction) error {
+	rows, err := tx.QueryContext(ctx, `SELECT id, ui FROM routes`)
+	if err != nil {
+		return err
+	}
+	type row struct{ id, ui string }
+	var todo []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.ui); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if strings.Contains(r.ui, `"customCss"`) || strings.Contains(r.ui, `"customJs"`) {
+			todo = append(todo, r)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, r := range todo {
+		var ui RouteUI
+		if err := json.Unmarshal([]byte(r.ui), &ui); err != nil {
+			return fmt.Errorf("route %s: its ui block does not read: %w", r.id, err)
+		}
+		b, err := json.Marshal(ui)
+		if err != nil {
+			return fmt.Errorf("route %s: %w", r.id, err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE routes SET ui = ?, rev = rev + 1 WHERE id = ?`, string(b), r.id); err != nil {
+			return fmt.Errorf("route %s: %w", r.id, err)
+		}
+	}
+	return nil
 }
 
 // themesFromColours turns every theme typed token by token into the six

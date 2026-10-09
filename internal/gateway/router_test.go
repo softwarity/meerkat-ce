@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -93,7 +94,7 @@ func TestProxiesWithStripPrefixAndInjection(t *testing.T) {
 	)
 	// Injection rides the UI options now (the generic inject-head filter is gone).
 	r.IsUI = true
-	r.UI = &store.RouteUI{CustomJS: "meerkat()"}
+	r.UI = &store.RouteUI{Injections: []store.Injection{{Kind: "js", Code: "meerkat()", Position: "head-start"}}}
 	rt := newRouter(t, r)
 	res, body := get(t, rt, "/demo/page")
 	if res.StatusCode != http.StatusOK {
@@ -101,7 +102,7 @@ func TestProxiesWithStripPrefixAndInjection(t *testing.T) {
 	}
 	// Every UI page also carries the agent: it watches the session, so no
 	// route opts out of it.
-	want := "<html><head><script>\nmeerkat()\n</script></head><body>" +
+	want := "<html><head><script>\nmeerkat()\n</script>\n</head><body>" +
 		`<script defer src="/meerkat/page.js"></script>` + "ok</body></html>"
 	if body != want {
 		t.Fatalf("got %q, want %q", body, want)
@@ -1527,10 +1528,10 @@ func TestLocaleQueryFollowsThePerson(t *testing.T) {
 func TestCodeBlocksAreNotVaultReferences(t *testing.T) {
 	r := pathRoute("ui", "ui", 1, "/app/**", "http://up")
 	r.IsUI = true
-	r.UI = &store.RouteUI{
-		CustomJS:  "if ($rootScope.ready) { $translate.use('fr'); }",
-		CustomCSS: "a[href$='.pdf'] { color: red }",
-	}
+	r.UI = &store.RouteUI{Injections: []store.Injection{
+		{Kind: "js", Code: "if ($rootScope.ready) { $translate.use('fr'); }", Position: "head-end"},
+		{Kind: "css", Code: "a[href$='.pdf'] { color: red }", Position: "head-end"},
+	}}
 	r.Locales = &store.LocalesConfig{
 		Mechanism: store.LocaleScript,
 		OnChange:  "$translate.use(locale);\n$rootScope.$applyAsync();",
@@ -1546,8 +1547,8 @@ func TestCodeBlocksAreNotVaultReferences(t *testing.T) {
 	if expanded.Locales.OnChange != r.Locales.OnChange {
 		t.Errorf("the script came back changed:\n%s", expanded.Locales.OnChange)
 	}
-	if expanded.UI.CustomJS != r.UI.CustomJS || expanded.UI.CustomCSS != r.UI.CustomCSS {
-		t.Errorf("an injected block came back changed:\n%s\n%s", expanded.UI.CustomJS, expanded.UI.CustomCSS)
+	if !slices.Equal(expanded.UI.Injections, r.UI.Injections) {
+		t.Errorf("an injected block came back changed:\n%v", expanded.UI.Injections)
 	}
 
 	// What is NOT code still resolves: the upstream keeps its reference.

@@ -225,3 +225,21 @@ input[type='color'] {
   line-height: 1.25;
   color: var(--mat-sys-on-surface-variant);
 }
+
+/* A font picker spans the Dark and Light columns, like a core colour: one
+   typeface serves both schemes. */
+.font-field {
+  grid-column: 2 / 4;
+  width: 100%;
+  @include mat.form-field-density(-4);
+}
+
+/* The name across the header, the scheme checkboxes on the line below it. */
+.head .theme-name,
+.head .rename {
+  grid-column: 1 / -1;
+}
+.scheme-label {
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant);
+}

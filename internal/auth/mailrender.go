@@ -21,7 +21,7 @@ func (h *Handler) mailPalette(ctx context.Context) map[string]string {
 	if err != nil || len(t.Light) == 0 {
 		t = store.DefaultTheme()
 	}
-	return t.Light
+	return t.MailPalette()
 }
 
 // buildMail composes a themed message for this account, from the brand the

@@ -24,7 +24,7 @@ language picker without anyone opening its source.
 | User button | a `meerkat-user-button` Web Component: who you are, organisation, language, sign out | a switch on the route |
 | Navigation portal | a `meerkat-portal-nav` bar listing the applications this person may open | the global catalogue in `portal` mode; it replaces the standalone button |
 | Identity stamp | roles and user fields written into the page's own markup, server-side | a switch on the route, per field |
-| Custom CSS and JS | whatever you wrote in the route's Injections section | non-empty |
+| Custom CSS and JS | the blocks of the route's Custom section, written there or uploaded as files | at least one block |
 | Locale hook | a function the gateway calls when the visitor changes language | a route whose locales travel by script |
 
 The user button also carries the entry points to what the gateway holds for that
@@ -91,6 +91,42 @@ Neither of these is how an **upstream service** learns who is calling. That is a
 separate mechanism - headers or a signed JWT, configured in the route's Identity
 section - and the gateway purges any inbound value of those headers first, so a
 caller cannot claim to be somebody.
+
+## Your own CSS and JavaScript
+
+The route's **Custom** section holds a list of blocks. Each is **CSS or
+JavaScript**, **written in the console** or **uploaded as a file**, and lands in
+one of three places:
+
+![The Custom section of Billing: a stylesheet written in the console at the end of the head, and a script uploaded as a file, deferred at the end of the body](img/console/route-editor-custom.webp)
+
+| Place | Where | What it is for |
+|---|---|---|
+| Start of the head | right after `<head>` | a script that must run before anything else |
+| End of the head | right before `</head>` | **the default.** A stylesheet there comes after the application's own, so its rules win at equal weight |
+| End of the body | right before `</body>` | a script that needs the page's markup |
+
+Within one place the blocks keep the **order of the list**, which you drag: a
+library goes above the code that uses it. A script **runs**:
+
+- **where it stands** - the browser stops parsing until it has run;
+- **deferred** - once the page is parsed, in the list's order (the default for a
+  file);
+- **async** - as soon as it arrives, in no particular order;
+- as a **module**.
+
+Deferred and async apply to a **file** only: a browser ignores them on a script
+written in the page.
+
+An uploaded file is not pasted into the page: it is linked from
+`/meerkat/route-assets/<route id>/<name>?v=<version>`. The version changes with
+the content, so the browser keeps the file for good and fetches it again only
+when you upload a new one. Only the files a block names are served there, and a
+file the list stops naming is deleted at the next save.
+
+A route written before this list had two free blocks, CSS and JavaScript; they
+became its first two entries, at the start of the head where they were injected,
+so no page changed.
 
 ## Where the assets come from
 

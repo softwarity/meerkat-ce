@@ -68,6 +68,10 @@ type Document struct {
 	// and diff. It is filled by an export and by reading a package, and it is
 	// what MarshalBundle writes beside the YAML.
 	Specs map[string][]byte `json:"-"`
+	// Files holds the files uploaded on routes (ROUTE-22), by route id. Like
+	// the specs they ride beside the document, under assets/files/<route id>/,
+	// never inline.
+	Files map[string][]store.RouteFile `json:"-"`
 }
 
 // Empty reports whether the document would change nothing, which is what a

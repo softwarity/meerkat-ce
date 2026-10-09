@@ -232,6 +232,22 @@ CREATE TABLE IF NOT EXISTS route_specs (
   PRIMARY KEY (route_id, kind)
 );
 
+-- Files uploaded on a route (v79, ROUTE-22): what a route in the "files"
+-- mode serves under its own path. Out of the routes table for the reason
+-- route_specs is: every listing reads routes in full. The content is base64
+-- in TEXT, the schema keeping to the three column types both dialects spell
+-- alike.
+CREATE TABLE IF NOT EXISTS route_files (
+  route_id     TEXT NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  content_type TEXT NOT NULL DEFAULT '',
+  size         BIGINT NOT NULL DEFAULT 0,
+  sha          TEXT NOT NULL DEFAULT '',
+  content      TEXT NOT NULL DEFAULT '',
+  updated_at   BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (route_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id                   TEXT PRIMARY KEY,
   username             TEXT NOT NULL UNIQUE,
@@ -423,7 +439,10 @@ CREATE TABLE IF NOT EXISTS themes (
   -- token before they existed, which keeps its tokens.
   colors      TEXT NOT NULL DEFAULT '{}',
   contrast    TEXT NOT NULL DEFAULT '',
-  color_match BOOLEAN NOT NULL DEFAULT FALSE
+  color_match BOOLEAN NOT NULL DEFAULT FALSE,
+  -- The typefaces (v78): display, body and code, each a family the gateway
+  -- ships or absent for the system's.
+  fonts       TEXT NOT NULL DEFAULT '{}'
 );
 
 -- Locale overrides (v61): the strings an integrator corrected or added, on top
@@ -1092,7 +1111,7 @@ CREATE TABLE IF NOT EXISTS saml_assertions (
 // installation is stamped 69, and checkNotNewer refuses to open a database
 // stamped higher than the build knows - so restarting the count at 1 would stop
 // every existing installation from starting.
-const schemaVersion = 77
+const schemaVersion = 80
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -1739,10 +1758,9 @@ type RouteUI struct {
 	Roles      *RolesConfig    `json:"roles,omitempty"`
 	UserInfo   *UserInfoConfig `json:"userInfo,omitempty"`
 	UserButton UserButton      `json:"userButton"`
-	// CustomCSS is injected verbatim inside a <style> tag after <head>.
-	CustomCSS string `json:"customCss,omitempty"`
-	// CustomJS is injected verbatim inside a <script> tag after <head>.
-	CustomJS string `json:"customJs,omitempty"`
+	// Injections are the route's own CSS and JavaScript, in the order they
+	// land in each place of the page (see Injection).
+	Injections []Injection `json:"injections,omitempty"`
 }
 
 // IdentityFields are the signed-in user's facts a route may forward to its
@@ -1920,6 +1938,11 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 	if err := SanitizeCircuitBreaker(r.Breaker); err != nil {
 		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
 	}
+	if r.UI != nil {
+		if err := CheckInjections(r.UI.Injections); err != nil {
+			return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
+		}
+	}
 	if r.API != nil && r.API.Security != nil {
 		for i := range r.API.Security.Endpoints {
 			if err := SanitizeAccess(&r.API.Security.Endpoints[i].Access); err != nil {
@@ -1927,6 +1950,16 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 					r.API.Security.Endpoints[i].Method, r.API.Security.Endpoints[i].Path, err))
 			}
 		}
+	}
+	// The name is unique (routes_name_key). Said here, in words, rather than
+	// left to the constraint: the database's refusal reached the console as an
+	// internal error, which tells nobody that a name is taken.
+	var other string
+	switch err := s.db.QueryRowContext(ctx, `SELECT id FROM routes WHERE name = ? AND id <> ?`, r.Name, r.ID).Scan(&other); {
+	case err == nil:
+		return invalidf(fmt.Errorf("route %q: another route already has this name - names are unique", r.Name))
+	case !errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("store: route %q: %w", r.Name, err)
 	}
 	preds, err := json.Marshal(orEmpty(r.Predicates))
 	if err != nil {

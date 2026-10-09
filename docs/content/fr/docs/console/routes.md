@@ -154,7 +154,7 @@ Une section UI une fois la case cochée : ici Color scheme, qui indique comment
 l'application servie reçoit le choix d'un thème clair ou sombre.
 
 - **Incoming**, **Identity** et **Auth forward** sont désactivées quand la route
-  répond d'elle-même (redirect, maintenance, respond). Ce n'est pas une question
+  répond d'elle-même (redirect, maintenance, respond, files). Ce n'est pas une question
   de présentation : sur une telle route, la gateway écarte tous les filtres de
   requête, et les modifier reviendrait à écrire des réglages qu'elle ignore.
 
@@ -168,6 +168,7 @@ Le mode détermine tout le reste du panneau.
 | **Redirect** | Envoie le navigateur ailleurs |
 | **Maintenance** | Sert la page d'indisponibilité intégrée |
 | **Respond** | Construit une réponse à partir d'un gabarit, sans rien appeler |
+| **Files** | Sert des fichiers téléversés sur la route - une police, une feuille de style, un script - sans rien appeler |
 
 Sur une route en mode proxy, vous réglez aussi :
 

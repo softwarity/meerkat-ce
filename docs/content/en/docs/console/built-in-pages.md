@@ -19,7 +19,7 @@ arrangement is the normal way round.
 The tabs are real routes: a bookmark on the layout gallery comes back to the
 layout gallery.
 
-![Built-in pages on the Theme tab: the six core colours and the contrast on the left, the two previews on the right with the theme carousel between them](img/console/built-in-pages-theme.webp)
+![Built-in pages on the Theme tab: the six core colours, the contrast and the typography on the left, the two previews on the right with the theme carousel between them](img/console/built-in-pages-theme.webp)
 
 The sign-in page as it is served, dark above and light below, with the theme
 carousel in the gap. On the left, the colours the theme is made from.
@@ -48,6 +48,11 @@ role for role.
 - **Contrast**: standard, medium or high, for both schemes.
 - **Color match** is the builder's "stay true to my color inputs": containers keep
   the tone of the colours given rather than the spec's.
+- **Typography**: a **display** face for the titles and the application's name, a
+  **body** face for the text and buttons, a **code** face for codes, keys, fields and
+  labels - each one of fourteen families the gateway ships and serves itself, or the
+  system's. Behind any choice, Noto draws Arabic, Hebrew, Devanagari and Thai; Chinese,
+  Japanese and Korean use the system's fonts. Each family is shown in itself.
 - **Generated roles** lists every Material 3 role the colours make, dark and light
   side by side - read-only, they follow.
 

@@ -53,6 +53,13 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 	} else if err != nil {
 		return nil, nil, err
 	}
+	// The files uploaded on routes: they have no other home than this gateway
+	// either, and a files route imported without them answers 404 to all.
+	if files, err := st.RouteFileContents(ctx); err == nil && len(files) > 0 {
+		doc.Files = files
+	} else if err != nil {
+		return nil, nil, err
+	}
 
 	roles, err := st.ListRoles(ctx)
 	if err != nil {
@@ -223,7 +230,7 @@ func trimUI(ui *store.RouteUI) {
 // isZeroUI reports whether a ui block holds nothing anyone asked for.
 func isZeroUI(ui *store.RouteUI) bool {
 	return !ui.UserButton.Enabled && ui.Scheme == nil && ui.Roles == nil &&
-		ui.UserInfo == nil && ui.CustomCSS == "" && ui.CustomJS == ""
+		ui.UserInfo == nil && len(ui.Injections) == 0
 }
 
 // stripSecrets empties every declared secret field that does not hold a

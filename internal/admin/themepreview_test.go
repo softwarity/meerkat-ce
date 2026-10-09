@@ -142,7 +142,7 @@ func TestAPreviewWearsItsDraft(t *testing.T) {
 	r := f.get(t, "/api/themes/"+theme.ID+"/preview?scheme=light&draft="+url.QueryEscape(`{"colours":{}}`), f.rootC)
 	body := readAll(t, r)
 	_ = r.Body.Close()
-	if r.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(body, "allowed: colors, contrast, colorMatch, flat") {
+	if r.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(body, "allowed: colors, contrast, colorMatch, flat, fonts") {
 		t.Errorf("a malformed draft: %d %s", r.StatusCode, body)
 	}
 }

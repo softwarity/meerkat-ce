@@ -21,7 +21,7 @@
         <mat-icon>download</mat-icon>
         <span i18n="@@Locale_export_all">Export the whole language</span>
       </button>
-      <button mat-menu-item (click)="file.click()">
+      <button mat-menu-item (click)="chooseImport()">
         <mat-icon>upload</mat-icon>
         <span i18n="@@Locale_import">Import a file</span>
       </button>
@@ -46,7 +46,6 @@
         </div>
       }
     </mat-menu>
-    <input #file type="file" hidden accept="application/json,.json" (change)="import($event)" />
   </div>
 
   @if (loading()) {

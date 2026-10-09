@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService, VaultImportReport } from '../api.service';
+import { FileButtonComponent } from '../shared/file-pick';
 
 export interface VaultFileDialogData {
   mode: 'export' | 'import';
@@ -22,6 +23,7 @@ export interface VaultFileDialogData {
 @Component({
   selector: 'app-vault-file-dialog',
   imports: [
+    FileButtonComponent,
     MatButtonModule,
     MatCheckboxModule,
     MatDialogModule,
@@ -98,11 +100,9 @@ export interface VaultFileDialogData {
           unless you tick the box below.
         </p>
         <div class="file">
-          <button matButton="outlined" (click)="picker.click()">
-            <mat-icon>upload_file</mat-icon>
+          <app-file-button appearance="outlined" accept=".json,application/json" (picked)="pick($event[0])">
             <ng-container i18n="@@Choose_a_file">Choose a file</ng-container>
-          </button>
-          <input #picker type="file" accept=".json,application/json" hidden (change)="pick($event)" />
+          </app-file-button>
           @if (filename()) {
             <span class="filename">{{ filename() }}</span>
           }
@@ -247,11 +247,7 @@ export class VaultFileDialogComponent {
     );
   }
 
-  protected pick(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const picked = input.files?.[0];
-    input.value = '';
-    if (!picked) return;
+  protected pick(picked: File): void {
     void picked.text().then((text) => {
       this.file.set(text);
       this.filename.set(picked.name);

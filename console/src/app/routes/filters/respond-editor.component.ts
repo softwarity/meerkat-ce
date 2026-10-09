@@ -1,4 +1,4 @@
-import { afterNextRender, Component, ElementRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, DestroyRef, ElementRef, inject, model, output, signal, viewChild } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EditorView } from '@codemirror/view';
@@ -131,6 +131,9 @@ export class RespondEditorComponent {
   private timer?: ReturnType<typeof setTimeout>;
 
   constructor() {
+    // The editor holds listeners and a DOM of its own: released with the
+    // component, or each opening of a route left one behind.
+    inject(DestroyRef).onDestroy(() => this.view?.destroy());
     afterNextRender(() => {
       this.view = new EditorView({
         state: EditorState.create({

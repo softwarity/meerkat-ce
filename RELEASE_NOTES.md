@@ -2,6 +2,20 @@
 
 ## NEXT RELEASE
 
+- **A route can serve files.** A new mode under Target, **Files**: upload a font, a
+  stylesheet, a script or an image on the route and it answers them under its path -
+  for the UI that needs a resource nothing behind the gateway serves, offline above
+  all. Each file is served under a name you choose - not the one it had on disk - with
+  a type you can correct; ETags and CORS are handled, and the files travel in a
+  configuration export.
+- **A route's own CSS and JavaScript is an ordered list.** Each block is written in the
+  console or uploaded as a file, placed at the start or the end of the head or at the
+  end of the body, and a script runs where it stands, deferred, async or as a module.
+  A stylesheet now lands at the end of the head by default, after the application's
+  own, so its rules win. The two free blocks a route had became its first two
+  entries, where they were - no page changes.
+- **The console updates live over HTTPS too.** Its live channel never connected on the
+  console's HTTPS port: screens waited for a reload to show what had moved.
 - **A theme is made the way Material Theme Builder makes one.** Six source colours -
   the primary, and a secondary, tertiary, error, neutral and neutral variant that are
   derived from it until you set them - one of the builder's three contrast levels, and
@@ -16,6 +30,11 @@
   what is chosen or browsed (a selected choice, the current language, the portal's
   current module), the tertiary for state and information (connected and current
   badges, a code to copy, a met password rule, an explanation).
+- **A theme chooses its fonts**: a display face for the titles, a body face for the
+  text and a monospace for codes and labels, among fourteen families the gateway ships
+  and serves itself - no font CDN, nothing to fetch offline. Behind any choice, Noto
+  draws Arabic, Hebrew, Devanagari and Thai, and Chinese, Japanese and Korean use the
+  system's fonts, so all twenty languages render.
 - **The theme preview follows as you pick.** Every page of the catalogue repaints as a
   colour moves, not only the specimen, and so do the mails and the portal bar.
 - **SAML 2.0 sign-in** (Enterprise). A SAML identity provider - ADFS, Entra ID,

@@ -85,3 +85,20 @@ func TestRenderToleratesAThinPalette(t *testing.T) {
 		t.Errorf("an empty colour slipped through:\n%s", out)
 	}
 }
+
+// A mail is set in the theme's stacks, quoted names intact: html/template
+// would neutralise a CSS value it does not know to be ours.
+func TestAMailIsSetInTheThemeFonts(t *testing.T) {
+	msg := Compose("a@b.c", Brand{AppName: "App"},
+		map[string]string{"font": "'Inter', system-ui, sans-serif", "mono": "'JetBrains Mono', monospace"},
+		Spec{Subject: "s", Heading: "h", Code: "123456"})
+	// The quotes are entities inside the attribute, which a client decodes.
+	for _, want := range []string{"font-family:&#39;Inter&#39;, system-ui, sans-serif", "font-family:&#39;JetBrains Mono&#39;, monospace"} {
+		if !strings.Contains(msg.HTML, want) {
+			t.Errorf("the mail lacks %q", want)
+		}
+	}
+	if strings.Contains(msg.HTML, "ZgotmplZ") {
+		t.Error("a font stack was neutralised by the template")
+	}
+}

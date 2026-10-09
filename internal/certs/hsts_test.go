@@ -1,9 +1,12 @@
 package certs
 
 import (
+	"context"
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -146,5 +149,41 @@ func TestTheConsoleWithdrawsHSTS(t *testing.T) {
 	h.ServeHTTP(rec, plain)
 	if got := rec.Header().Get("Strict-Transport-Security"); got != "" {
 		t.Fatalf("sent over plain HTTP: %q", got)
+	}
+}
+
+// A websocket goes through the wrapper: the console's live channel on HTTPS
+// was a 101 then a 500 because the hijack was not forwarded.
+func TestHSTSLetsAWebsocketHijack(t *testing.T) {
+	var hijacked bool
+	h := ForgetHSTS(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("the HSTS wrapper hides http.Hijacker")
+		}
+		conn, _, err := hj.Hijack()
+		if err != nil {
+			t.Fatalf("hijack: %v", err)
+		}
+		hijacked = true
+		_, _ = conn.Write([]byte("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"))
+		_ = conn.Close()
+	}))
+	srv := httptest.NewTLSServer(h)
+	defer srv.Close()
+	host := strings.TrimPrefix(srv.URL, "https://127.0.0.1")
+	req, _ := http.NewRequest("GET", "https://meerkat.example"+host+"/api/live", nil)
+	client := srv.Client()
+	client.Transport.(*http.Transport).DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, strings.TrimPrefix(srv.URL, "https://"))
+	}
+	client.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify = true
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if !hijacked || resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Errorf("hijacked %v, status %d", hijacked, resp.StatusCode)
 	}
 }

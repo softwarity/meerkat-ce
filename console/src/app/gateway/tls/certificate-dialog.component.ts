@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { FileButtonComponent, FileDropDirective } from '../../shared/file-pick';
 
 // The four doors an operator opens by hand, in one dialog. Each makes ONE
 // certificate for the pool; where it is served is decided afterwards, by
@@ -36,6 +37,8 @@ export interface CertificateDialogResult {
 @Component({
   selector: 'app-certificate-dialog',
   imports: [
+    FileButtonComponent,
+    FileDropDirective,
     MatButtonModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -70,8 +73,6 @@ export class CertificateDialogComponent {
   protected readonly keystore = signal('');
   protected readonly password = model('');
 
-  // Something is being dragged over the dialog: the drop target lights up.
-  protected readonly over = signal(false);
   protected readonly dropError = signal('');
 
   protected readonly title = computed(() => {
@@ -124,32 +125,14 @@ export class CertificateDialogComponent {
 
   // ── files ──────────────────────────────────────────────────────────────────
 
-  protected dragOver(e: DragEvent): void {
-    if (!e.dataTransfer?.types.includes('Files')) return;
-    e.preventDefault();
-    this.over.set(true);
-  }
-
-  protected async drop(e: DragEvent): Promise<void> {
-    e.preventDefault();
-    this.over.set(false);
-    const files = [...(e.dataTransfer?.files ?? [])];
+  // Files chosen or dropped anywhere on the dialog: a keystore door takes the
+  // first, a PEM door sorts each one by what it holds.
+  protected async take(files: File[]): Promise<void> {
     if (this.door === 'keystore') {
       if (files[0]) await this.readKeystore(files[0]);
       return;
     }
     for (const f of files) await this.readPem(f);
-  }
-
-  protected async pick(e: Event, slot?: 'cert' | 'key'): Promise<void> {
-    const input = e.target as HTMLInputElement;
-    const files = [...(input.files ?? [])];
-    input.value = '';
-    if (this.door === 'keystore') {
-      if (files[0]) await this.readKeystore(files[0]);
-      return;
-    }
-    for (const f of files) await this.readPem(f, slot);
   }
 
   // A PEM file is sorted by what it holds, not by where it was dropped: the

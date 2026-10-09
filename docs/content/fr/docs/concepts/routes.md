@@ -63,7 +63,7 @@ ils s'exécutent :
 - **Gates** refuse avant toute autre chose : `max-request-body`, `max-request-headers`.
 - **Incoming** réécrit la requête : `strip-prefix`, `prefix-path`, `rewrite-path`, `set-path`, `set-host`, `preserve-host`, et toute la famille des opérations sur les en-têtes, les paramètres de requête et les cookies - définir, ajouter, supprimer, renommer, copier, réécrire.
 - **Outgoing** réécrit la réponse : la même famille pour les en-têtes, plus `set-status`, `cache-control`, `security-headers`, `cookie-attributes`, `dedupe-response-header`, `rewrite-location`, `remove-json-fields`.
-- Avec un filtre **Terminal**, la route répond d'elle-même : `redirect`, `maintenance`, `respond`.
+- Avec un filtre **Terminal**, la route répond d'elle-même : `redirect`, `maintenance`, `respond`, `files`.
 
 Une route qui porte un filtre terminal ne relaie rien : ses filtres entrants et
 la transmission de l'identité sont donc abandonnés. La console désactive ces

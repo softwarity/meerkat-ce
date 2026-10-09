@@ -223,6 +223,8 @@ type flowChrome struct {
 	// LayoutNames is the catalogue of arrangements, for a preview's live
 	// listener (previewLive) - empty on a served page.
 	LayoutNames []string
+	// FontStacks are the stacks the same listener may set, by family.
+	FontStacks map[string]string
 	// PreviewErrors is every refusal the previewed page can give, stacked into
 	// one string (the .error block keeps newlines). Empty on a served page.
 	//

@@ -149,9 +149,9 @@ func renderText(brand Brand, spec Spec) string {
 // a placeholder filled from the theme; every style is inline.
 var shell = template.Must(template.New("mail").Parse(`<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:{{.Page}};color:{{.Text}};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:{{.Page}};color:{{.Text}};font-family:{{.Font}};">
 <span style="display:none!important;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">{{.Preheader}}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{.Page}};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{.Page}};font-family:{{.Font}};">
   <tr><td align="center" style="padding:32px 16px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:{{.Card}};border:1px solid {{.Divider}};border-radius:14px;overflow:hidden;">
       <tr><td style="background:{{.Primary}};padding:20px 28px;">
@@ -163,7 +163,7 @@ var shell = template.Must(template.New("mail").Parse(`<!doctype html>
         {{range .Intro}}<p style="margin:0 0 14px;font-size:15px;line-height:1.5;color:{{$.Text}};">{{.}}</p>{{end}}
         {{if .Code}}
         <div style="margin:22px 0;text-align:center;">
-          <div style="display:inline-block;background:{{.CodeBg}};border-radius:10px;padding:14px 22px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:30px;font-weight:700;letter-spacing:.28em;color:{{.OnCode}};">{{.Code}}</div>
+          <div style="display:inline-block;background:{{.CodeBg}};border-radius:10px;padding:14px 22px;font-family:{{.Mono}};font-size:30px;font-weight:700;letter-spacing:.28em;color:{{.OnCode}};">{{.Code}}</div>
           {{if .CodeNote}}<p style="margin:10px 0 0;font-size:13px;color:{{.Muted}};">{{.CodeNote}}</p>{{end}}
         </div>
         {{end}}
@@ -210,6 +210,9 @@ func renderHTML(brand Brand, palette map[string]string, spec Spec) string {
 		// secondary, and the dividers are the outline variant Material 3
 		// draws them with.
 		Divider, Secondary, CodeBg, OnCode string
+		// The theme's text and code stacks (store.Theme.MailPalette), ours,
+		// never anybody's input - hence typed as CSS for the template.
+		Font, Mono template.CSS
 	}{
 		Spec:     spec,
 		AppName:  brand.AppName,
@@ -228,6 +231,10 @@ func renderHTML(brand Brand, palette map[string]string, spec Spec) string {
 		Secondary: color("secondary", color("onSurfaceVariant", "#6c6f85")),
 		CodeBg:    color("tertiaryContainer", color("surfaceContainer", "#e6e9ef")),
 		OnCode:    color("onTertiaryContainer", color("onSurface", "#4c4f69")),
+		//nolint:gosec // our own font stacks, or the defaults below
+		Font: template.CSS(color("font", "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif")),
+		//nolint:gosec // our own font stacks, or the defaults below
+		Mono: template.CSS(color("mono", "'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace")),
 	}
 	// An integrator's logo is a sanitized data: URI; Meerkat's own mark is not
 	// carried in mail (a mailed sentinel is Meerkat lore, not the app's).

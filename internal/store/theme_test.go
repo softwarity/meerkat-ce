@@ -387,3 +387,37 @@ func TestAMigratedBuiltInIsTheBuiltIn(t *testing.T) {
 			got.Colors, got.ColorMatch, want.Colors, want.ColorMatch)
 	}
 }
+
+// A theme's typefaces are families the gateway ships, each in a slot that
+// takes its kind; the CSS declares their faces and sets the stacks.
+func TestAThemeIsSetInItsFonts(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	th := Theme{ID: "typo", Name: "Typo", Colors: m3color.Core{Primary: "#6750a4"},
+		Fonts: ThemeFonts{Display: "Playfair Display", Body: "Inter", Code: "JetBrains Mono"}}
+	if err := s.SaveTheme(ctx, th); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetTheme(ctx, "typo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Fonts != th.Fonts {
+		t.Fatalf("fonts came back as %+v", got.Fonts)
+	}
+	css := got.CSS()
+	for _, want := range []string{"font-family: 'Playfair Display'", "--mk-font: 'Inter', 'Noto Sans Arabic'",
+		"--mk-display: 'Playfair Display'", "--mk-mono: 'JetBrains Mono'", "/meerkat/fonts/inter-latin.woff2?v="} {
+		if !strings.Contains(css, want) {
+			t.Errorf("the CSS lacks %q", want)
+		}
+	}
+	// No font chosen: the system's, and no display face at all.
+	if css := DefaultTheme().CSS(); strings.Contains(css, "@font-face") || strings.Contains(css, "--mk-display") {
+		t.Errorf("a theme with no font declares one:\n%s", css)
+	}
+	th.Fonts.Code = "Inter"
+	if err := s.SaveTheme(ctx, th); err == nil || !strings.Contains(err.Error(), "allowed are JetBrains Mono, Roboto Mono") {
+		t.Errorf("Inter as the code font: %v", err)
+	}
+}

@@ -71,7 +71,7 @@ const apiTokensBody = `    <style>
       }
       .tk-panel h2 {
         margin: 0; padding: 12px 0 4px; text-align: start;
-        font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
+        font-family: var(--mk-display, var(--mk-mono)); font-size: .62rem; letter-spacing: .16em;
         text-transform: uppercase; color: var(--mk-primary); font-weight: 600;
       }
       .tk-rows { max-height: 46vh; overflow-y: auto; }

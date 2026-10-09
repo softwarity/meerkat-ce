@@ -53,6 +53,10 @@
         }
       </mat-menu>
     }
+    <!-- The name takes the whole first line - beside the two checkboxes it was
+         cut to its first two letters - and the checkboxes sit under it, in
+         the Dark and Light columns the roles below line up with. -->
+    <span class="scheme-label" i18n="@@Theme_schemes_offered">Schemes offered</span>
     <mat-checkbox
       [checked]="darkOffered()"
       [disabled]="darkOffered() && !lightOffered()"
@@ -145,6 +149,41 @@
     ><ng-container i18n="@@Glow">Glow</ng-container></mat-checkbox>
   </div>
 
+  <!-- The typefaces: the builder's display and body fonts, and the monospace
+       our codes and labels are set in. Each family is shown in itself; the
+       files are the gateway's own, nothing is fetched from a CDN. -->
+  <div class="group-label" i18n="@@Theme_typography">Typography</div>
+  @for (slot of fontSlots; track slot.key) {
+    <div class="row font-row">
+      <span class="label">
+        {{ slot.label }}
+        <small>{{ slot.hint }}</small>
+      </span>
+      <mat-form-field class="font-field" subscriptSizing="dynamic">
+        <mat-select
+          [value]="fonts()[slot.key] ?? ''"
+          (selectionChange)="setFont(slot.key, $event.value)"
+          [disabled]="readOnly()"
+          [aria-label]="slot.label"
+        >
+          <mat-select-trigger>
+            <span [style.font-family]="stackOf(fonts()[slot.key], slot.kinds[0])">{{ fonts()[slot.key] || systemLabel }}</span>
+          </mat-select-trigger>
+          <mat-option value=""><span [style.font-family]="stackOf('', slot.kinds[0])">{{ systemLabel }}</span></mat-option>
+          @for (kind of slot.kinds; track kind) {
+            <mat-optgroup [label]="kindLabel[kind]">
+              <ng-container>
+                @for (f of familiesOf(kind); track f.family) {
+                  <mat-option [value]="f.family"><span [style.font-family]="stackOf(f.family, kind)">{{ f.family }}</span></mat-option>
+                }
+              </ng-container>
+            </mat-optgroup>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+  }
+
   <!-- What the colours make: every role, both schemes, read-only. Hovering a
        name blinks it in the preview. -->
   <mat-expansion-panel class="roles" displayMode="flat">
@@ -174,11 +213,11 @@
       matTooltip="Download as a Material Theme Builder file" i18n-matTooltip="@@Theme_export_hint2">
       <mat-icon>download</mat-icon><span i18n="@@Export">Export</span>
     </button>
-    <button matButton (click)="fileInput.click()" [disabled]="readOnly()"
+    <app-file-button appearance="text" icon="upload" accept="application/json,.json" [disabled]="readOnly()"
+      (picked)="importTheme($event[0])"
       matTooltip="Load a Material Theme Builder export (review, then save)" i18n-matTooltip="@@Theme_import_hint2">
-      <mat-icon>upload</mat-icon><span i18n="@@Import">Import</span>
-    </button>
-    <input #fileInput type="file" hidden accept="application/json,.json" (change)="importTheme($event)" />
+      <span i18n="@@Import">Import</span>
+    </app-file-button>
     <span class="grow"></span>
     <button matButton="tonal" (click)="save.emit()" [disabled]="saving() || readOnly() || !dirty()"
       [matTooltip]="readOnly() ? tipReadOnly : (dirty() ? '' : tipClean)"

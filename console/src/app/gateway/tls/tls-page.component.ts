@@ -41,6 +41,7 @@ import {
   CertificateDialogResult,
   CertificateDoor,
 } from './certificate-dialog.component';
+import { FileButtonComponent, FileDropDirective } from '../../shared/file-pick';
 
 // A pool, then a placement.
 //
@@ -718,26 +719,18 @@ export class TlsPageComponent {
 // impossible.
 @Component({
   selector: 'app-adopt-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, FormFieldComponent],
+  imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, FormFieldComponent, FileButtonComponent, FileDropDirective],
   template: `
     <h2 mat-dialog-title i18n="@@Adopt_the_signed_certificate">Adopt the signed certificate</h2>
-    <mat-dialog-content
-      class="adopt"
-      [class.over]="over()"
-      (dragover)="dragOver($event)"
-      (dragleave)="over.set(false)"
-      (drop)="drop($event)"
-    >
+    <mat-dialog-content class="adopt" appFileDrop dropClass="over" accept=".pem,.crt,.cer,.txt" (filesDropped)="read($event[0])">
       <p i18n="@@Adopt_note2">
         The certificate the authority signed for this request: paste it, choose its file, or drop
         it here. It must match the private key this request was made with, which never left.
       </p>
       <div class="file">
-        <button matButton="outlined" type="button" (click)="picker.click()">
-          <mat-icon>folder_open</mat-icon>
+        <app-file-button appearance="outlined" icon="folder_open" accept=".pem,.crt,.cer,.txt" (picked)="read($event[0])">
           <ng-container i18n="@@Choose_the_file">Choose the file</ng-container>
-        </button>
-        <input #picker type="file" accept=".pem,.crt,.cer,.txt" hidden (change)="pick($event)" />
+        </app-file-button>
         @if (fileName()) {
           <span class="picked">{{ fileName() }}</span>
         }
@@ -805,32 +798,11 @@ export class AdoptDialogComponent {
   protected readonly ref = inject(MatDialogRef<AdoptDialogComponent, string>);
   protected readonly pem = signal('');
   protected readonly fileName = signal('');
-  protected readonly over = signal(false);
   protected readonly error = signal('');
-
-  protected dragOver(e: DragEvent): void {
-    if (!e.dataTransfer?.types.includes('Files')) return;
-    e.preventDefault();
-    this.over.set(true);
-  }
-
-  protected async drop(e: DragEvent): Promise<void> {
-    e.preventDefault();
-    this.over.set(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file) await this.read(file);
-  }
-
-  protected async pick(e: Event): Promise<void> {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (file) await this.read(file);
-  }
 
   // Only the certificate blocks: an authority often sends the chain in the
   // same file, which is welcome, and sometimes more, which is not.
-  private async read(file: File): Promise<void> {
+  protected async read(file: File): Promise<void> {
     this.error.set('');
     const certs = (await file.text()).match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g);
     if (!certs) {

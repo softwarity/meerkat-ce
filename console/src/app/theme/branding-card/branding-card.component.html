@@ -10,11 +10,10 @@
 
   <div
     class="dropzone"
-    [class.dragging]="dragging()"
-    (click)="logoInput.click()"
-    (dragover)="$event.preventDefault(); dragging.set(true)"
-    (dragleave)="dragging.set(false)"
-    (drop)="onDrop($event)"
+    appFileDrop
+    [accept]="accept('logo')"
+    (click)="choose('logo')"
+    (filesDropped)="use('logo', $event[0])"
   >
     @if (logo()) {
       <img class="logo-preview" [src]="logo()" alt="" />
@@ -38,13 +37,6 @@
       </svg>
       <span class="dz-hint" i18n="@@Drop_your_logo_here_or_click">Drop your logo here, or click</span>
     }
-    <input
-      #logoInput
-      type="file"
-      accept="image/png,image/jpeg,image/webp,image/svg+xml"
-      hidden
-      (change)="onLogoFile($event)"
-    />
   </div>
 
   <!-- The browser tab. Left alone it follows the logo, which is what almost
@@ -53,11 +45,10 @@
   <div class="tab-icon">
     <div
       class="dropzone small"
-      [class.dragging]="draggingIcon()"
-      (click)="faviconInput.click()"
-      (dragover)="$event.preventDefault(); draggingIcon.set(true)"
-      (dragleave)="draggingIcon.set(false)"
-      (drop)="onIconDrop($event)"
+      appFileDrop
+      [accept]="accept('icon')"
+      (click)="choose('icon')"
+      (filesDropped)="use('icon', $event[0])"
     >
       @if (tabIcon(); as icon) {
         <img class="icon-preview" [src]="icon" alt="" />
@@ -82,13 +73,6 @@
         <mat-icon>close</mat-icon>
       </button>
     }
-    <input
-      #faviconInput
-      type="file"
-      accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,image/webp"
-      hidden
-      (change)="onFaviconFile($event)"
-    />
   </div>
 
   <!-- The picture behind the pages. It is fetched once from the gateway and
@@ -112,11 +96,10 @@
     }
     <div
       class="dropzone wide"
-      [class.dragging]="draggingBg()"
-      (click)="bgInput.click()"
-      (dragover)="$event.preventDefault(); draggingBg.set(true)"
-      (dragleave)="draggingBg.set(false)"
-      (drop)="onBackgroundDrop($event)"
+      appFileDrop
+      [accept]="accept('background')"
+      (click)="choose('background')"
+      (filesDropped)="use('background', $event[0])"
     >
       @if (background()) {
         <img class="bg-preview" [src]="background()" alt="" />
@@ -136,7 +119,6 @@
         <mat-icon class="bg-empty">wallpaper</mat-icon>
         <span class="dz-hint" i18n="@@Drop_a_background_here_or_click">Drop a background here, or click</span>
       }
-      <input #bgInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden (change)="onBackgroundFile($event)" />
     </div>
 
     @if (background()) {
@@ -177,11 +159,10 @@
       <div class="scheme-label" i18n="@@Dark_scheme">Dark scheme</div>
       <div
         class="dropzone wide"
-        [class.dragging]="draggingBgDark()"
-        (click)="bgDarkInput.click()"
-        (dragover)="$event.preventDefault(); draggingBgDark.set(true)"
-        (dragleave)="draggingBgDark.set(false)"
-        (drop)="onBackgroundDarkDrop($event)"
+        appFileDrop
+        [accept]="accept('backgroundDark')"
+        (click)="choose('backgroundDark')"
+        (filesDropped)="use('backgroundDark', $event[0])"
       >
         @if (backgroundDark()) {
           <img class="bg-preview" [src]="backgroundDark()" alt="" />
@@ -201,7 +182,6 @@
           <mat-icon class="bg-empty">wallpaper</mat-icon>
           <span class="dz-hint" i18n="@@Drop_a_background_here_or_click">Drop a background here, or click</span>
         }
-        <input #bgDarkInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden (change)="onBackgroundDarkFile($event)" />
       </div>
 
       @if (backgroundDark()) {

@@ -161,3 +161,39 @@ func TestTheLedgerIsOrdered(t *testing.T) {
 		t.Errorf("the ledger reaches v%d and the build carries v%d: bump schemaVersion", last, schemaVersion)
 	}
 }
+
+// v80: a route's two free blocks become the ordered list, where they used to
+// land, and the row stops carrying the old keys.
+func TestTheFreeBlocksBecomeTheList(t *testing.T) {
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+	ctx := context.Background()
+	if err := st.SaveRoute(ctx, Route{ID: "ui", Name: "ui", Enabled: true, IsUI: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.db.ExecContext(ctx, `UPDATE routes SET ui = ? WHERE id = ?`,
+		`{"userButton":{"enabled":true},"customCss":"a { color: red }","customJs":"go()"}`, "ui"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.runMigrations([]migration{{Version: schemaVersion, Name: "v80", Up: injectionsFromBlocks}}, schemaVersion-1); err != nil {
+		t.Fatal(err)
+	}
+	var raw string
+	if err := st.db.QueryRowContext(ctx, `SELECT ui FROM routes WHERE id = ?`, "ui").Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(raw, "customCss") || strings.Contains(raw, "customJs") {
+		t.Errorf("the old keys survived: %s", raw)
+	}
+	r, err := st.GetRoute(ctx, "ui")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Injection{{Kind: "css", Code: "a { color: red }", Position: "head-start"}, {Kind: "js", Code: "go()", Position: "head-start"}}
+	if !r.UI.UserButton.Enabled || len(r.UI.Injections) != 2 || r.UI.Injections[0] != want[0] || r.UI.Injections[1] != want[1] {
+		t.Errorf("%+v", r.UI)
+	}
+}

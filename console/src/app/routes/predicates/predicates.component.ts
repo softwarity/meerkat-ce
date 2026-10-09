@@ -41,6 +41,8 @@ const MULTI_INSTANCE = ['header', 'cookie', 'query'];
 export class PredicatesComponent implements FormValueControl<Spec[]> {
   readonly value = model<Spec[]>([]);
   readonly entries = input.required<CatalogEntry[]>();
+  // The route's name, which a path predicate starts from.
+  readonly routeName = input('');
   readonly errors = input<readonly ValidationError.WithOptionalFieldTree[]>([]);
 
   protected readonly ordered = computed(() => {
@@ -98,7 +100,13 @@ export class PredicatesComponent implements FormValueControl<Spec[]> {
   }
 
   protected add(type: string): void {
-    this.value.update((list) => [...list, { type, ...(Object.keys(this.initialArgs(type)).length ? { args: this.initialArgs(type) } : {}) }]);
+    const args = this.initialArgs(type);
+    // A path starts as the route's own name, /name/**: the route is named
+    // after what it serves, and that is the path nearly every one ends up on.
+    // An unnamed route starts empty, rather than on a guess.
+    const slug = this.routeName().trim().toLowerCase().replace(/[^a-z0-9._~-]+/g, '-').replace(/^-+|-+$/g, '');
+    if (type === 'path' && args['patterns'] === undefined && slug) args['patterns'] = [`/${slug}/**`];
+    this.value.update((list) => [...list, { type, ...(Object.keys(args).length ? { args } : {}) }]);
   }
 
   protected updateAt(index: number, spec: Spec): void {

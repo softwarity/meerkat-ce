@@ -4,7 +4,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { filter, map } from 'rxjs';
@@ -41,7 +40,6 @@ export class TenantPageComponent {
   readonly id = input.required<string>();
 
   private readonly api = inject(ApiService);
-  private readonly snack = inject(MatSnackBar);
   private readonly router = inject(Router);
   protected readonly scope = inject(TenantScope);
 

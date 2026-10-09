@@ -1,4 +1,4 @@
-import { Component, computed, inject, model, output, signal } from '@angular/core';
+import { Component, computed, inject, model, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -8,6 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { FileDropDirective, pickFiles } from '../../shared/file-pick';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 type BackgroundFit = 'cover' | 'contain' | 'tile';
@@ -25,6 +26,8 @@ const ACCEPTED_ICON = [
 // Global application identity (THEME-02): name, tagline, and the logo as a
 // drop zone whose empty state IS the flow pages' generic placeholder mark.
 // Two-way model signals - the page owns persistence.
+type Slot = 'logo' | 'icon' | 'background' | 'backgroundDark';
+
 @Component({
   selector: 'app-branding-card',
   imports: [
@@ -37,6 +40,7 @@ const ACCEPTED_ICON = [
     MatSelectModule,
     MatSliderModule,
     MatTooltipModule,
+    FileDropDirective,
   ],
   templateUrl: './branding-card.component.html',
   styleUrl: './branding-card.component.scss',
@@ -58,10 +62,6 @@ export class BrandingCardComponent {
   readonly backgroundDimDark = model.required<number>();
   readonly changed = output<void>();
 
-  protected readonly dragging = signal(false);
-  protected readonly draggingIcon = signal(false);
-  protected readonly draggingBg = signal(false);
-  protected readonly draggingBgDark = signal(false);
   protected readonly fits: { value: BackgroundFit; label: string }[] = [
     { value: 'cover', label: $localize`:@@Fit_cover:Cover` },
     { value: 'contain', label: $localize`:@@Fit_contain:Contain` },
@@ -74,34 +74,31 @@ export class BrandingCardComponent {
 
   private readonly snack = inject(MatSnackBar);
 
-  protected onLogoFile(ev: Event): void {
-    this.readFile((ev.target as HTMLInputElement).files?.[0]);
+  // The four pictures this card takes, each with what it accepts and how big
+  // it may be. One table, read by the chooser and by a drop alike.
+  private readonly slots: Record<Slot, { types: string[]; maxBytes: number; what: string; target: { set(value: string): void } }> = {
+    logo: { types: ACCEPTED, maxBytes: 200_000, what: 'logo', target: { set: (v) => this.logo.set(v) } },
+    // A 32-pixel square: past 40 KiB it is a photo someone picked by mistake,
+    // and it would be fetched by every sign-in page.
+    icon: { types: ACCEPTED_ICON, maxBytes: 40_000, what: 'icon', target: { set: (v) => this.favicon.set(v) } },
+    // A full-screen picture, so a wider budget than a logo - but it is fetched
+    // once from /meerkat/background and cached, never inlined in a page.
+    background: { types: ACCEPTED, maxBytes: 1_000_000, what: 'background', target: { set: (v) => this.bgTarget.set(v) } },
+    backgroundDark: { types: ACCEPTED, maxBytes: 1_000_000, what: 'background', target: { set: (v) => this.bgDarkTarget.set(v) } },
+  };
+
+  protected accept(slot: Slot): string {
+    return this.slots[slot].types.join(',');
   }
 
-  protected onDrop(ev: DragEvent): void {
-    ev.preventDefault();
-    this.dragging.set(false);
-    this.readFile(ev.dataTransfer?.files?.[0]);
+  protected async choose(slot: Slot): Promise<void> {
+    const [file] = await pickFiles({ accept: this.accept(slot) });
+    this.use(slot, file);
   }
 
-  protected onIconDrop(ev: DragEvent): void {
-    ev.preventDefault();
-    this.draggingIcon.set(false);
-    this.read(ev.dataTransfer?.files?.[0], ACCEPTED_ICON, 40_000, 'icon', this.favicon);
-  }
-
-  // A full-screen picture, so a wider budget than a logo - but it is fetched
-  // once from /meerkat/background and cached, never inlined in a page.
-  protected onBackgroundFile(ev: Event): void {
-    const input = ev.target as HTMLInputElement;
-    this.read(input.files?.[0], ACCEPTED, 1_000_000, 'background', this.bgTarget);
-    input.value = '';
-  }
-
-  protected onBackgroundDrop(ev: DragEvent): void {
-    ev.preventDefault();
-    this.draggingBg.set(false);
-    this.read(ev.dataTransfer?.files?.[0], ACCEPTED, 1_000_000, 'background', this.bgTarget);
+  protected use(slot: Slot, file: File | undefined): void {
+    const s = this.slots[slot];
+    this.read(file, s.types, s.maxBytes, s.what, s.target);
   }
 
   // The first picture arrives with a veil already on it. At zero, a photograph
@@ -118,18 +115,6 @@ export class BrandingCardComponent {
   };
 
   // The dark scheme's own picture, same rules as the light one.
-  protected onBackgroundDarkFile(ev: Event): void {
-    const input = ev.target as HTMLInputElement;
-    this.read(input.files?.[0], ACCEPTED, 1_000_000, 'background', this.bgDarkTarget);
-    input.value = '';
-  }
-
-  protected onBackgroundDarkDrop(ev: DragEvent): void {
-    ev.preventDefault();
-    this.draggingBgDark.set(false);
-    this.read(ev.dataTransfer?.files?.[0], ACCEPTED, 1_000_000, 'background', this.bgDarkTarget);
-  }
-
   private readonly bgDarkTarget = {
     set: (value: string) => {
       const first = !this.backgroundDark();
@@ -137,18 +122,6 @@ export class BrandingCardComponent {
       if (value && first && this.backgroundDimDark() === 0) this.backgroundDimDark.set(35);
     },
   };
-
-  protected onFaviconFile(ev: Event): void {
-    const input = ev.target as HTMLInputElement;
-    // A 32-pixel square: past 40 KiB it is a photo someone picked by mistake,
-    // and it would be fetched by every sign-in page.
-    this.read(input.files?.[0], ACCEPTED_ICON, 40_000, 'icon', this.favicon);
-    input.value = ''; // re-picking the same file must fire change again
-  }
-
-  private readFile(file: File | undefined): void {
-    this.read(file, ACCEPTED, 200_000, 'logo', this.logo);
-  }
 
   private read(
     file: File | undefined,

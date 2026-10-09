@@ -7,12 +7,12 @@
 // working tree, a disposable database, a browser driven at a fixed size - so a
 // retake is one command and produces the same frame every time.
 //
-//   node e2e/scripts/capture-docs.mjs
+//   node e2e/scripts/capture-docs.mjs [file...]
 //
 // Ports are offset again from the e2e ones, so a running `make dev` AND a
 // running suite both stay out of the way.
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, readdirSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { hostname } from 'node:os';
 import { chromium, request } from '@playwright/test';
@@ -34,6 +34,11 @@ const PASSWORD = 'Capture-Root-Password-1';
 const VIEW = { width: 1600, height: 1000 };
 
 const log = (...a) => console.log('[capture]', ...a);
+
+// Retaking a few screens is `node e2e/scripts/capture-docs.mjs routes-list
+// tls`: the others are left as they are - a retake of everything also
+// redraws the screens whose data moves (curves, times) for nothing.
+const ONLY = process.argv.slice(2);
 
 // ─── the gateway ────────────────────────────────────────────────────────────
 
@@ -119,6 +124,11 @@ const ROUTES = [
     limits: [{ per: 'user', requests: 120, window: 'PT1M' }],
     ui: {
       userButton: { enabled: true },
+      // The Custom section's list: a block written here, and a file the seed
+      // uploads below.
+      injections: [
+        { kind: 'css', code: ':root { --acme-brand: #0b5cad; }\n.app-header { background: var(--acme-brand); }', position: 'head-end' },
+      ],
       scheme: {
         select: true, mechanism: 'class', tag: 'html',
         light: 'acme-light', dark: 'acme-dark',
@@ -410,6 +420,20 @@ async function seedEverythingElse(api) {
     await soft(`configuration ${c.name}`, () => api.post('/api/configurations', { data: c }));
   }
 
+  // Billing's custom code takes a script from a file, deferred at the end of
+  // the body: uploaded on the route, then named by a block.
+  const billingRoute = ROUTES.find((r) => r.id === 'billing');
+  if (await soft('billing script', () => api.put('/api/routes/billing/files/acme-analytics.js', {
+    headers: { 'Content-Type': 'text/javascript' },
+    data: 'window.acmeAnalytics = { page: location.pathname };\n',
+  }))) {
+    await soft('billing custom code', () => api.put('/api/routes/billing', { data: {
+      ...billingRoute,
+      ui: { ...billingRoute.ui, injections: [...billingRoute.ui.injections,
+        { kind: 'js', file: 'acme-analytics.js', position: 'body-end', load: 'defer' }] },
+    } }));
+  }
+
   // Some traffic, so the metrics have curves: a refusal, a maintenance page,
   // upstreams that do not answer.
   const plane = await request.newContext({ baseURL: DATA });
@@ -429,6 +453,25 @@ const click = (name) => async (page) => {
   await page.getByRole('button', { name }).first().click();
   await page.waitForTimeout(900);
 };
+// A route in the Files mode (ROUTE-22), laid down just before its own shot:
+// in the fixture it would be a sixth route on the routes screen, whose
+// captions count five.
+const FONTS = {
+  id: 'fonts', name: 'Fonts', order: 6, enabled: true,
+  predicates: [{ type: 'path', args: { patterns: ['/fonts/**'] } }],
+  filters: [{ type: 'files', args: { cors: true, maxAge: 86400 } }],
+};
+async function seedFonts(page) {
+  const api = page.request;
+  await api.put(`${ADMIN}/api/routes/fonts`, { data: FONTS });
+  const css = '@font-face {\n  font-family: "Inter";\n  src: url(files/inter-latin.woff2) format("woff2");\n}\n';
+  await api.put(`${ADMIN}/api/routes/fonts/files/inter.css`, { headers: { 'Content-Type': 'text/css' }, data: css });
+  for (const f of ['inter-latin.woff2', 'inter-latin-ext.woff2']) {
+    const body = readFileSync(`${repo}/internal/fonts/files/${f}`);
+    await api.put(`${ADMIN}/api/routes/fonts/files/files/${f}`, { headers: { 'Content-Type': 'font/woff2' }, data: body });
+  }
+}
+
 const SHOTS = [
   // ── Infra ──
   { file: 'routes-list', path: '/infra/routes' },
@@ -437,6 +480,8 @@ const SHOTS = [
   { file: 'route-editor-predicates', path: '/infra/routes/orders-api/predicates' },
   { file: 'route-editor-filters', path: '/infra/routes/billing/modin' },
   { file: 'route-editor-color-scheme', path: '/infra/routes/billing/scheme' },
+  { file: 'route-editor-custom', path: '/infra/routes/billing/custom' },
+  { file: 'route-editor-files', path: '/infra/routes/fonts/target', prepare: seedFonts, settle: 1600 },
   { file: 'endpoint-security', path: '/infra/endpoint-security?route=orders-api', settle: 2000 },
   {
     file: 'endpoint-rule', path: '/infra/endpoint-security?route=orders-api', settle: 2000,
@@ -526,6 +571,14 @@ async function shoot(storageState) {
 
   mkdirSync(`${tmp}/png`, { recursive: true });
   for (const s of SHOTS) {
+    if (ONLY.length && !ONLY.includes(s.file)) continue;
+    if (s.prepare) {
+      try {
+        await s.prepare(page);
+      } catch (e) {
+        log('! could not lay down what', s.file, 'shows:', e.message.split('\n')[0]);
+      }
+    }
     const path = typeof s.path === 'function' ? s.path() : s.path;
     if (!path) {
       log('! skipped', s.file, '- the seed did not create what it shows');

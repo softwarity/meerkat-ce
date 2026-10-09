@@ -10,6 +10,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/fonts"
 	"github.com/softwarity/meerkat/internal/m3color"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -28,6 +29,7 @@ func (a *API) registerThemes(mux Mux) {
 	mux.Handle("POST /api/themes/{id}/activate", a.appAdmin(a.activateTheme))
 	mux.Handle("GET /api/themes/{id}/preview", a.appAdmin(a.previewTheme))
 	mux.Handle("GET /api/themes/templates", a.appAdmin(a.listTemplates))
+	mux.Handle("GET /api/themes/fonts", a.appAdmin(a.listFonts))
 	mux.Handle("GET /api/branding", a.appAdmin(a.getBranding))
 	mux.Handle("PUT /api/branding", a.appAdmin(a.putBranding))
 }
@@ -67,6 +69,28 @@ func (a *API) putBranding(w http.ResponseWriter, r *http.Request, actor store.Us
 	}
 	a.auditUpdate(r.Context(), actor, "theme.branding", "theme", "", "branding", "", old, b)
 	writeJSON(w, http.StatusOK, b)
+}
+
+// listFonts is the typefaces a theme may choose (THEME-09) and the faces to
+// draw them with: the editor sets each choice in its own font, which it can
+// only do with the faces declared in the console's page.
+func (a *API) listFonts(w http.ResponseWriter, _ *http.Request, _ store.User) {
+	type family struct {
+		Family   string `json:"family"`
+		Kind     string `json:"kind"`
+		Category string `json:"category"`
+	}
+	var names []string
+	out := struct {
+		Families []family `json:"families"`
+		CSS      string   `json:"css"`
+	}{Families: []family{}}
+	for _, f := range fonts.Families() {
+		out.Families = append(out.Families, family{f.Family, f.Kind, f.Category})
+		names = append(names, f.Family)
+	}
+	out.CSS = fonts.FaceCSS(names...)
+	writeJSON(w, http.StatusOK, out)
 }
 
 // listPresets returns the built-in starting palettes (THEME-04) - the console
@@ -238,7 +262,7 @@ func (a *API) previewTheme(w http.ResponseWriter, r *http.Request, _ store.User)
 	// real message: previewing "account confirmation" must not mint a token,
 	// and previewing a list must not read anybody's data.
 	if kind, ok := strings.CutPrefix(r.URL.Query().Get("template"), "mail:"); ok {
-		msg, found := auth.SampleMailWith(r.Context(), a.st, kind, locale, originOf(r), t.Light)
+		msg, found := auth.SampleMailWith(r.Context(), a.st, kind, locale, originOf(r), t.MailPalette())
 		if !found {
 			writeErr(w, http.StatusNotFound, "unknown mail template "+kind+
 				" (known: "+strings.Join(mailTemplateKeys(), ", ")+")")
@@ -280,10 +304,11 @@ func (a *API) previewTheme(w http.ResponseWriter, r *http.Request, _ store.User)
 // themeDraft is what the editor holds and has not saved: the source colours
 // and the switches that make the palettes.
 type themeDraft struct {
-	Colors     m3color.Core `json:"colors"`
-	Contrast   string       `json:"contrast"`
-	ColorMatch bool         `json:"colorMatch"`
-	Flat       bool         `json:"flat"`
+	Colors     m3color.Core     `json:"colors"`
+	Contrast   string           `json:"contrast"`
+	ColorMatch bool             `json:"colorMatch"`
+	Flat       bool             `json:"flat"`
+	Fonts      store.ThemeFonts `json:"fonts"`
 }
 
 func applyDraft(t *store.Theme, raw string) error {
@@ -291,12 +316,12 @@ func applyDraft(t *store.Theme, raw string) error {
 	dec := json.NewDecoder(strings.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&d); err != nil {
-		return fmt.Errorf("malformed draft (allowed: colors, contrast, colorMatch, flat): %w", err)
+		return fmt.Errorf("malformed draft (allowed: colors, contrast, colorMatch, flat, fonts): %w", err)
 	}
 	if d.Colors.Primary == "" {
 		return errors.New("draft: colors.primary is required")
 	}
-	t.Colors, t.Contrast, t.ColorMatch, t.Flat = d.Colors, d.Contrast, d.ColorMatch, d.Flat
+	t.Colors, t.Contrast, t.ColorMatch, t.Flat, t.Fonts = d.Colors, d.Contrast, d.ColorMatch, d.Flat, d.Fonts
 	if err := t.Generate(); err != nil {
 		return fmt.Errorf("draft: %w", err)
 	}

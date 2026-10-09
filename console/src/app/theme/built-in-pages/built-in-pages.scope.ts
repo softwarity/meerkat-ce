@@ -1,6 +1,6 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ApiService, Background, LogoSize, LocaleView, PageLayout, PreviewCategory, PreviewTemplate, Settings, Theme, ThemeColors } from '../../api.service';
+import { ApiService, Background, FontCatalogue, LogoSize, LocaleView, PageLayout, PreviewCategory, PreviewTemplate, Settings, Theme, ThemeColors, ThemeFonts } from '../../api.service';
 import { Contrast, CoreKey, themeSchemes } from '../m3';
 import { CORE_DRIVES, cssVar } from '../theme-tokens';
 import { PRESET_PREFIX } from '../theme-carousel/theme-carousel.component';
@@ -59,11 +59,17 @@ export class BuiltInPagesScope {
   readonly colors = signal<ThemeColors>({ primary: '#6750a4' });
   readonly contrast = signal<Contrast>('standard');
   readonly colorMatch = signal(false);
+  // The typefaces, each a family the gateway ships or none for the system's.
+  readonly fonts = signal<ThemeFonts>({});
+  // What the gateway ships, and the faces that draw it - declared once in the
+  // console's own page, so the pickers show each family in itself.
+  readonly fontCatalogue = signal<FontCatalogue['families']>([]);
   // The recipe as it was loaded: what "changed" is measured against.
-  private readonly baseline = signal<{ colors: ThemeColors; contrast: Contrast; colorMatch: boolean }>({
+  private readonly baseline = signal<{ colors: ThemeColors; contrast: Contrast; colorMatch: boolean; fonts: ThemeFonts }>({
     colors: { primary: '' },
     contrast: 'standard',
     colorMatch: false,
+    fonts: {},
   });
   private readonly generated = computed(() => themeSchemes(this.colors(), this.contrast(), this.colorMatch()));
   readonly dark = computed(() => this.generated().dark);
@@ -107,7 +113,8 @@ export class BuiltInPagesScope {
     return (
       KEYS.some((k) => (a[k] ?? '') !== (c[k] ?? '')) ||
       this.contrast() !== b.contrast ||
-      this.colorMatch() !== b.colorMatch
+      this.colorMatch() !== b.colorMatch ||
+      FONT_SLOTS.some((k) => (this.fonts()[k] ?? '') !== (b.fonts[k] ?? ''))
     );
   });
 
@@ -119,7 +126,7 @@ export class BuiltInPagesScope {
   private readonly draftWatch = effect(() => {
     const flatMoved = this.flat() !== !!this.selected()?.flat;
     const value = this.recoloured() || flatMoved
-      ? JSON.stringify({ colors: normalized(this.colors()), contrast: this.contrast(), colorMatch: this.colorMatch(), flat: this.flat() })
+      ? JSON.stringify({ colors: normalized(this.colors()), contrast: this.contrast(), colorMatch: this.colorMatch(), flat: this.flat(), fonts: this.fonts() })
       : '';
     clearTimeout(this.draftTimer);
     if (!value) {
@@ -141,7 +148,8 @@ export class BuiltInPagesScope {
 
   // A file read in: the recipe replaces what is on screen, and is saved only
   // when the operator says so.
-  loadRecipe(colors: ThemeColors, colorMatch: boolean, contrast?: Contrast): void {
+  loadRecipe(colors: ThemeColors, colorMatch: boolean, contrast?: Contrast, fonts?: ThemeFonts): void {
+    if (fonts) this.fonts.set({ ...fonts });
     this.colors.set(normalized(colors));
     this.colorMatch.set(colorMatch);
     if (contrast) this.contrast.set(contrast);
@@ -183,6 +191,19 @@ export class BuiltInPagesScope {
   constructor() {
     this.loadThemes();
     this.api.listPresets().subscribe({ next: (p) => this.presets.set(p) });
+    this.api.listFonts().subscribe({
+      next: (c) => {
+        this.fontCatalogue.set(c.families);
+        // The faces, once, in the console's document: they are files of the
+        // gateway this console is served by, nothing leaves for a CDN.
+        if (!document.getElementById('mk-console-fonts')) {
+          const style = document.createElement('style');
+          style.id = 'mk-console-fonts';
+          style.textContent = c.css;
+          document.head.appendChild(style);
+        }
+      },
+    });
     this.reloadLocales();
     this.api.previewTemplates().subscribe({
       next: (c) => {
@@ -235,11 +256,13 @@ export class BuiltInPagesScope {
       colors: normalized(t.colors ?? { primary: '#6750a4' }),
       contrast: t.contrast || 'standard',
       colorMatch: !!t.colorMatch,
+      fonts: { ...(t.fonts ?? {}) },
     };
     this.baseline.set(recipe);
     this.colors.set(recipe.colors);
     this.contrast.set(recipe.contrast);
     this.colorMatch.set(recipe.colorMatch);
+    this.fonts.set({ ...recipe.fonts });
   }
 
   loadThemes(keepSelection = false): void {
@@ -303,7 +326,7 @@ export class BuiltInPagesScope {
 
   // What a save sends: the colours. The palettes are the gateway's to write.
   private recipe(): Partial<Theme> {
-    return { colors: normalized(this.colors()), contrast: this.contrast(), colorMatch: this.colorMatch(), dark: {}, light: {} };
+    return { colors: normalized(this.colors()), contrast: this.contrast(), colorMatch: this.colorMatch(), fonts: this.fonts(), dark: {}, light: {} };
   }
 
   // Delete what is selected, which is the only thing the menu can name. A
@@ -491,6 +514,8 @@ export class BuiltInPagesScope {
     );
   }
 }
+
+const FONT_SLOTS: (keyof ThemeFonts)[] = ['display', 'body', 'code'];
 
 const KEYS: CoreKey[] = ['primary', 'secondary', 'tertiary', 'error', 'neutral', 'neutralVariant'];
 

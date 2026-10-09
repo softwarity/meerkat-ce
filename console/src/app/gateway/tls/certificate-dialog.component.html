@@ -1,12 +1,6 @@
 <h2 mat-dialog-title>{{ title() }}</h2>
 
-<mat-dialog-content
-  class="body"
-  [class.over]="over()"
-  (dragover)="dragOver($event)"
-  (dragleave)="over.set(false)"
-  (drop)="drop($event)"
->
+<mat-dialog-content class="body" appFileDrop multiple dropClass="over" (filesDropped)="take($event)">
   @switch (door) {
     @case ('pem') {
       <p class="note" i18n="@@Import_pem_note">
@@ -15,11 +9,9 @@
         shown again.
       </p>
       <div class="file">
-        <button matButton="outlined" type="button" (click)="both.click()">
-          <mat-icon>folder_open</mat-icon>
+        <app-file-button appearance="outlined" icon="folder_open" accept=".pem,.crt,.cer,.key,.txt" multiple (picked)="take($event)">
           <ng-container i18n="@@Choose_the_files">Choose the files</ng-container>
-        </button>
-        <input #both type="file" accept=".pem,.crt,.cer,.key,.txt" multiple hidden (change)="pick($event)" />
+        </app-file-button>
         <span class="picked">
           @if (certFile()) {
             <mat-icon>description</mat-icon>{{ certFile() }}
@@ -67,10 +59,9 @@
         } @else {
           <span i18n="@@Drop_the_keystore">Drop the keystore here</span>
         }
-        <button matButton="outlined" type="button" (click)="ks.click()">
+        <app-file-button appearance="outlined" accept=".p12,.pfx" (picked)="take($event)">
           <ng-container i18n="@@Choose_a_keystore">Choose a keystore</ng-container>
-        </button>
-        <input #ks type="file" accept=".p12,.pfx" hidden (change)="pick($event)" />
+        </app-file-button>
       </div>
       <app-form-field i18n-label="@@Keystore_password" label="Keystore password" revealable>
         <input matInput type="password" [value]="password()" (input)="password.set($any($event.target).value)" />

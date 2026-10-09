@@ -92,13 +92,21 @@ for edition in "${editions[@]}"; do
     fi
     exit 1
   fi
-  # The image that runs is the one just built, and it is the edition asked for.
-  # A few tries: the new pod is Ready before its first lines can be read.
-  said=false
-  for _ in 1 2 3 4 5 6; do
-    if kubectl -n "$NAMESPACE" logs "$deploy" 2>/dev/null | grep -q "$says"; then said=true; break; fi
-    sleep 2
+  # The image that runs is the one just built, and it is the edition asked for
+  # - on EVERY pod of the release: "kubectl logs deploy/..." reads one pod,
+  # picked at random, and a clustered release has several, so the check used
+  # to fail on whichever had not written its first lines yet. A few tries
+  # each: a pod is Ready before its first lines can be read. Only the pods of
+  # the image just built: an old pod still terminating is Running too, and its
+  # log vanishes with it while it is being read.
+  for pod in $(kubectl -n "$NAMESPACE" get pods -l "app.kubernetes.io/instance=$release" \
+      -o jsonpath="{range .items[?(@.spec.containers[0].image==\"meerkat:$tag\")]}{.metadata.name}{'\\n'}{end}"); do
+    said=false
+    for _ in $(seq 1 15); do
+      if kubectl -n "$NAMESPACE" logs "pod/$pod" 2>/dev/null | grep -q "$says"; then said=true; break; fi
+      sleep 2
+    done
+    $said || { echo "   $release: pod $pod does not say '$says'" >&2; exit 1; }
   done
-  $said || { echo "   $release does not say '$says'" >&2; exit 1; }
   echo "   $release runs meerkat:$tag ($says), app :${ports[0]}/:${ports[1]}, console :${ports[2]}/:${ports[3]}$([ -n "$plug" ] && echo ", plug :$plug") on a first install"
 done

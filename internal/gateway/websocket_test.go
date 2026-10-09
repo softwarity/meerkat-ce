@@ -133,7 +133,7 @@ func TestWebSocketCrossesAUIRouteWithItsInjections(t *testing.T) {
 	r.IsUI = true
 	r.UI = &store.RouteUI{
 		UserButton: store.UserButton{Enabled: true},
-		CustomCSS:  "body { color: red }",
+		Injections: []store.Injection{{Kind: "css", Code: "body { color: red }", Position: "head-end"}},
 	}
 	rt := newRouter(t, r)
 	srv := httptest.NewServer(rt)

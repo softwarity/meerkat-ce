@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/fonts"
 	"github.com/softwarity/meerkat/internal/m3color"
 )
 
@@ -49,15 +50,39 @@ type Theme struct {
 	Contrast string `json:"contrast,omitempty"`
 	// ColorMatch is the builder's "stay true to my color inputs": containers
 	// keep the tone of the colours given instead of the spec's.
-	ColorMatch bool              `json:"colorMatch,omitempty"`
-	Dark       map[string]string `json:"dark"`
-	Light      map[string]string `json:"light"`
-	CreatedAt  int64             `json:"createdAt"`
-	UpdatedAt  int64             `json:"updatedAt"`
+	ColorMatch bool `json:"colorMatch,omitempty"`
+	// Fonts are the typefaces the pages are set in (THEME-09), each one of
+	// the families the gateway ships (internal/fonts) or none for the
+	// system's - Material Theme Builder's display and body fonts, plus the
+	// monospace our labels and codes are set in.
+	Fonts     ThemeFonts        `json:"fonts,omitzero"`
+	Dark      map[string]string `json:"dark"`
+	Light     map[string]string `json:"light"`
+	CreatedAt int64             `json:"createdAt"`
+	UpdatedAt int64             `json:"updatedAt"`
 	// Rev is the revision this row was READ at, carried back by a save so a
 	// write built on a version somebody has replaced is refused. Zero means "I
 	// read no version" and still wins - see rev.go.
 	Rev int64 `json:"rev,omitempty"`
+}
+
+// ThemeFonts are the three typefaces of a theme. Display sets the titles and
+// the application's name, Body everything else, Code what is copied - a
+// code, a token, a key - and the small capitals of the labels.
+type ThemeFonts struct {
+	Display string `json:"display,omitempty"`
+	Body    string `json:"body,omitempty"`
+	Code    string `json:"code,omitempty"`
+}
+
+func (f ThemeFonts) check() error {
+	if err := fonts.Check("display", f.Display, fonts.KindSans, fonts.KindSerif); err != nil {
+		return err
+	}
+	if err := fonts.Check("body", f.Body, fonts.KindSans, fonts.KindSerif); err != nil {
+		return err
+	}
+	return fonts.Check("code", f.Code, fonts.KindMono)
 }
 
 // The contrast levels, named as the builder names them.
@@ -411,6 +436,9 @@ func checkImageDataURI(field, value string, limit int) error {
 // schemes from them. The colours are stored lower case, like every hex the
 // store keeps; the builder's export is upper case, and the console says so.
 func (t *Theme) Generate() error {
+	if err := t.Fonts.check(); err != nil {
+		return fmt.Errorf("theme %w", err)
+	}
 	c := &t.Colors
 	for _, f := range []struct {
 		name string
@@ -543,6 +571,10 @@ func DefaultTheme() Theme {
 func (t Theme) CSS() string {
 	def := presets()[0]
 	var b strings.Builder
+	// The faces first: an @font-face cannot sit inside a rule. Declaring one
+	// downloads nothing - a file is fetched only for a character of its range
+	// that the page sets in that family.
+	b.WriteString(fonts.FaceCSS(t.Fonts.Display, t.Fonts.Body, t.Fonts.Code))
 	b.WriteString(":root {\n      color-scheme: light dark;\n")
 	for _, key := range ThemeTokenKeys() {
 		light, dark := t.Light[key], t.Dark[key]
@@ -562,13 +594,45 @@ func (t Theme) CSS() string {
 	if t.Flat {
 		glow = "0"
 	}
+	// The display face is declared only when one is chosen: the titles fall
+	// back, each to the face it is set in without one.
+	display := ""
+	if t.Fonts.Display != "" {
+		display = "\n      --mk-display: " + fonts.Stack(t.Fonts.Display) + ";"
+	}
 	fmt.Fprintf(&b, `      --mk-radius: 16px;
       --mk-radius-small: 10px;
-      --mk-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      --mk-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+      --mk-font: %s;
+      --mk-mono: %s;%s
       --mk-glow: %s;
-    }`, glow)
+    }`, FontStack(t.Fonts.Body, fonts.KindSans), FontStack(t.Fonts.Code, fonts.KindMono), display, glow)
 	return b.String()
+}
+
+// FontStack is the font-family value of a slot: the chosen family's stack,
+// or the system's when none is - the stacks the pages always had.
+func FontStack(name, kind string) string {
+	if name != "" {
+		return fonts.Stack(name)
+	}
+	if kind == fonts.KindMono {
+		return "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+	}
+	return "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+}
+
+// MailPalette is what a mail is drawn with: the LIGHT scheme (a mail commits
+// to one look, every client second-guesses a dark one) and the theme's text
+// and code stacks under "font" and "mono". A client that does not load web
+// fonts - most do not - lands on the system font at the end of the stack.
+func (t Theme) MailPalette() map[string]string {
+	p := maps.Clone(t.Light)
+	if p == nil {
+		p = map[string]string{}
+	}
+	p["font"] = FontStack(t.Fonts.Body, fonts.KindSans)
+	p["mono"] = FontStack(t.Fonts.Code, fonts.KindMono)
+	return p
 }
 
 // seedThemes puts ONE theme in the database: the default, active.
@@ -609,6 +673,7 @@ func (s *Store) SaveTheme(ctx context.Context, t Theme) error {
 	dj, _ := json.Marshal(t.Dark)
 	lj, _ := json.Marshal(t.Light)
 	cj, _ := json.Marshal(t.Colors)
+	fj, _ := json.Marshal(t.Fonts)
 	now := time.Now().Unix()
 	// A caller may pin created_at (a duplicate inherits its source's, so it sorts
 	// right next to it - ListThemes orders by created_at then name); otherwise
@@ -618,14 +683,14 @@ func (s *Store) SaveTheme(ctx context.Context, t Theme) error {
 		created = now
 	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO themes (id, name, active, flat, colors, contrast, color_match, dark, light, created_at, updated_at, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+		`INSERT INTO themes (id, name, active, flat, colors, contrast, color_match, fonts, dark, light, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, flat = excluded.flat, colors = excluded.colors,
-		   contrast = excluded.contrast, color_match = excluded.color_match,
+		   contrast = excluded.contrast, color_match = excluded.color_match, fonts = excluded.fonts,
 		   dark = excluded.dark, light = excluded.light,
 		   updated_at = excluded.updated_at, rev = themes.rev + 1`,
-		t.ID, t.Name, t.Active, t.Flat, string(cj), t.Contrast, t.ColorMatch, string(dj), string(lj), created, now)
+		t.ID, t.Name, t.Active, t.Flat, string(cj), t.Contrast, t.ColorMatch, string(fj), string(dj), string(lj), created, now)
 	if err != nil {
 		return fmt.Errorf("store: save theme %q: %w", t.Name, err)
 	}
@@ -656,7 +721,7 @@ func (s *Store) ActivateTheme(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
-const themeColumns = `id, name, active, flat, colors, contrast, color_match, dark, light, created_at, updated_at, rev`
+const themeColumns = `id, name, active, flat, colors, contrast, color_match, fonts, dark, light, created_at, updated_at, rev`
 
 // GetTheme returns one theme, or an error wrapping sql.ErrNoRows.
 func (s *Store) GetTheme(ctx context.Context, id string) (Theme, error) {
@@ -702,14 +767,19 @@ func completePalettes(t *Theme) {
 
 func scanTheme(r rowScanner) (Theme, error) {
 	var t Theme
-	var colors, dark, light string
+	var colors, fontsJSON, dark, light string
 	if err := r.Scan(&t.ID, &t.Name, &t.Active, &t.Flat, &colors, &t.Contrast, &t.ColorMatch,
-		&dark, &light, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
+		&fontsJSON, &dark, &light, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
 		return Theme{}, err
 	}
 	if colors != "" {
 		if err := json.Unmarshal([]byte(colors), &t.Colors); err != nil {
 			return Theme{}, fmt.Errorf("store: theme %q: bad source colours: %w", t.ID, err)
+		}
+	}
+	if fontsJSON != "" {
+		if err := json.Unmarshal([]byte(fontsJSON), &t.Fonts); err != nil {
+			return Theme{}, fmt.Errorf("store: theme %q: bad fonts: %w", t.ID, err)
 		}
 	}
 	if err := json.Unmarshal([]byte(dark), &t.Dark); err != nil {

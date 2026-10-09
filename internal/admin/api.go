@@ -168,6 +168,7 @@ func (a *API) Register(mux Mux) {
 	mux.Handle("PUT /api/routes/{id}", a.infraAdmin(a.putRoute))
 	mux.Handle("DELETE /api/routes/{id}", a.infraAdmin(a.deleteRoute))
 	a.registerOpenAPI(mux)
+	a.registerRouteFiles(mux)
 	a.registerSigning(mux)
 	a.registerVault(mux)
 	a.registerMailRelay(mux)
@@ -411,6 +412,22 @@ func (a *API) saveRoute(ctx context.Context, actor store.User, route store.Route
 	}
 	if err := a.st.SaveRoute(ctx, route); err != nil {
 		return route, err
+	}
+	// Same rule for uploaded files: a route that does not serve them (the
+	// files mode) keeps only those its custom code names. A block removed
+	// takes its file with it, rather than leaving bytes nobody sees.
+	if _, isFiles, _ := routing.FilesOf(route.Filters); !isFiles {
+		keep := map[string]bool{}
+		if route.UI != nil {
+			for _, in := range route.UI.Injections {
+				if in.File != "" {
+					keep[in.File] = true
+				}
+			}
+		}
+		if _, err := a.st.PruneRouteFiles(ctx, route.ID, keep); err != nil {
+			return route, err
+		}
 	}
 	if err := a.reloadRouting(ctx); err != nil {
 		// This route is valid, so a reload failure means another stored route

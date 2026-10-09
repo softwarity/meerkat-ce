@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { Background, LogoSize, PageLayout } from '../../api.service';
+import { Background, LogoSize, PageLayout, ThemeFonts } from '../../api.service';
 import { cssVar } from '../theme-tokens';
 
 // The live preview: the gateway-rendered flow-page specimen, dark and light
@@ -36,6 +36,9 @@ export class ThemePreviewComponent {
   // long before it is saved, so the panes show it from the drop.
   readonly background = input<Background>({});
   readonly flat = input(false); // flat design -> --mk-glow 0, effects off
+  // The typefaces, by family name: the frame maps a name to the stack the
+  // gateway wrote into it, so only a family it ships can be set.
+  readonly fonts = input<ThemeFonts>({});
   // Which template the panes render. "specimen" is the flow-page composite;
   // "mail:<kind>" is a sample message, and those have no dark half - a mail is
   // built from light colours inline, because an e-mail client second-guesses a
@@ -108,6 +111,7 @@ export class ThemePreviewComponent {
         this.flat(),
         this.background(),
         this.layout(),
+        this.fonts(),
       ),
     );
     effect(() => this.pushHighlight(this.highlight()));
@@ -125,6 +129,7 @@ export class ThemePreviewComponent {
       this.flat(),
       this.background(),
       this.layout(),
+      this.fonts(),
     );
   }
 
@@ -163,6 +168,7 @@ export class ThemePreviewComponent {
     flat: boolean,
     background: Background,
     layout: PageLayout,
+    fonts: ThemeFonts,
   ): void {
     const vars: Record<string, string> = {};
     for (const key of Object.keys(light)) {
@@ -173,7 +179,13 @@ export class ThemePreviewComponent {
     }
     // The flat-design switch: 0 collapses every decorative effect at once.
     vars['--mk-glow'] = flat ? '0' : '1';
-    this.post({ vars, brand: { name, tagline, logo, logoSize }, background, layout });
+    this.post({
+      vars,
+      brand: { name, tagline, logo, logoSize },
+      background,
+      layout,
+      fonts: { display: fonts.display ?? '', body: fonts.body ?? '', code: fonts.code ?? '' },
+    });
   }
 
   private pushHighlight(vars: string[]): void {

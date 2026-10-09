@@ -1086,6 +1086,20 @@
    "fr": "La réponse par gabarit affiche l'identité de l'appelant."
   },
   {
+   "id": "ROUTE-22",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A files route serves what was uploaded on it, with its type, an ETag and CORS, and travels in an export.",
+   "fr": "Une route Files sert ce qui a été téléversé sur elle, avec son type, un ETag et CORS, et voyage dans un export."
+  },
+  {
    "id": "ROUTE-18",
    "priority": "P2",
    "feasibility": "easy",
@@ -1166,8 +1180,8 @@
     "CE",
     "EE"
    ],
-   "en": "HTML injection present on UI routes, absent on API routes.",
-   "fr": "L'injection HTML est présente sur les routes d'interface, absente sur les routes d'API."
+   "en": "HTML injection present on UI routes, absent on API routes; a route's own blocks land at their place in the list's order, and an uploaded file is linked from /meerkat/route-assets/ and served with a lasting cache.",
+   "fr": "L'injection HTML est présente sur les routes d'interface, absente sur les routes d'API ; les blocs propres à une route se placent à leur endroit dans l'ordre de la liste, et un fichier téléversé est lié depuis /meerkat/route-assets/ et servi avec un cache durable."
   },
   {
    "id": "UIF-03",
@@ -1838,6 +1852,20 @@
    ],
    "en": "Brand background rendered.",
    "fr": "Le fond de marque s'affiche."
+  },
+  {
+   "id": "THEME-09",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A theme's fonts are served by the gateway itself and set the pages, nothing fetched from a CDN.",
+   "fr": "Les polices d'un thème sont servies par la gateway elle-même et habillent les pages, sans rien demander à un CDN."
   },
   {
    "id": "CONSOLE-01",

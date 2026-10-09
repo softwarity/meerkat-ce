@@ -576,6 +576,26 @@
   },
   {
     "method": "GET",
+    "path": "/api/routes/{id}/files",
+    "guard": "gw"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/routes/{id}/files/{name...}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/routes/{id}/files/{name...}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/routes/{id}/files/{name...}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/routes/{id}/operations",
     "guard": "gw"
   },
@@ -902,6 +922,11 @@
   {
     "method": "POST",
     "path": "/api/themes",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/themes/fonts",
     "guard": "appAdmin"
   },
   {

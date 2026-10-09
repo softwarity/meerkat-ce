@@ -228,6 +228,7 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"POST /api/routes/reorder": true, "PUT /api/routes/{id}": true,
 		"DELETE /api/routes/{id}": true, "PUT /api/routes/{id}/security": true, "PUT /api/routes/{id}/audit": true,
 		"PUT /api/routes/{id}/spec": true, "DELETE /api/routes/{id}/spec": true,
+		"PUT /api/routes/{id}/files/{name...}": true, "PATCH /api/routes/{id}/files/{name...}": true, "DELETE /api/routes/{id}/files/{name...}": true,
 		"PUT /api/settings": true, "PUT /api/settings/agent": true, "PUT /api/settings/issues": true,
 		"PUT /api/settings/telemetry": true,
 		"PUT /api/settings/plug":      true,

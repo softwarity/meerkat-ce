@@ -6,9 +6,11 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ThemeColors } from '../../api.service';
+import { FileButtonComponent } from '../../shared/file-pick';
+import { FontCatalogue, ThemeColors, ThemeFonts } from '../../api.service';
 import { Contrast, CoreKey, derivedCore, fromBuilderJson, isHex, toBuilderJson } from '../m3';
 import { CORE_ROWS, ROLE_GROUPS, roleLabel } from '../theme-tokens';
 
@@ -18,6 +20,7 @@ export interface ImportedRecipe {
   colors: ThemeColors;
   colorMatch: boolean;
   contrast?: Contrast;
+  fonts?: ThemeFonts;
   flat?: boolean;
   pagesScheme?: '' | 'light' | 'dark';
 }
@@ -39,7 +42,9 @@ const CONTRASTS: Contrast[] = ['standard', 'medium', 'high'];
     MatExpansionModule,
     MatIconModule,
     MatMenuModule,
+    MatSelectModule,
     MatTooltipModule,
+    FileButtonComponent,
   ],
   templateUrl: './palette-editor.component.html',
   styleUrl: './palette-editor.component.scss',
@@ -60,6 +65,39 @@ export class PaletteEditorComponent {
   readonly colors = model.required<ThemeColors>();
   readonly contrast = model<Contrast>('standard');
   readonly colorMatch = model(false);
+  // The typefaces, and the families the gateway ships to choose them from.
+  readonly fonts = model<ThemeFonts>({});
+  readonly fontCatalogue = input<FontCatalogue['families']>([]);
+  protected readonly fontSlots: { key: keyof ThemeFonts; label: string; hint: string; kinds: string[] }[] = [
+    { key: 'display', label: $localize`:@@Theme_font_display:Display`, hint: $localize`:@@Theme_font_display_hint:Titles and the application's name`, kinds: ['sans', 'serif'] },
+    { key: 'body', label: $localize`:@@Theme_font_body:Body`, hint: $localize`:@@Theme_font_body_hint:Text and buttons`, kinds: ['sans', 'serif'] },
+    { key: 'code', label: $localize`:@@Theme_font_code:Code`, hint: $localize`:@@Theme_font_code_hint:Codes, keys, fields and labels`, kinds: ['mono'] },
+  ];
+  protected readonly systemLabel = $localize`:@@Theme_font_system:System`;
+  protected readonly kindLabel: Record<string, string> = {
+    sans: $localize`:@@Theme_font_sans:Sans serif`,
+    serif: $localize`:@@Theme_font_serif:Serif`,
+    mono: $localize`:@@Theme_font_mono:Monospace`,
+  };
+
+  protected familiesOf(kind: string) {
+    return this.fontCatalogue().filter((f) => f.kind === kind);
+  }
+
+  // How a family is shown in a picker: in itself, the system's behind it.
+  protected stackOf(family: string | undefined, kind: string): string {
+    const system = kind === 'mono' ? 'ui-monospace, monospace' : 'system-ui, sans-serif';
+    return family ? `'${family}', ${system}` : system;
+  }
+
+  protected setFont(key: keyof ThemeFonts, family: string): void {
+    this.fonts.update((f) => {
+      const next = { ...f };
+      if (family) next[key] = family;
+      else delete next[key];
+      return next;
+    });
+  }
   // The schemes the colours make, for the read-only list of roles.
   readonly dark = input.required<Record<string, string>>();
   readonly light = input.required<Record<string, string>>();
@@ -141,6 +179,7 @@ export class PaletteEditorComponent {
     const json = toBuilderJson(this.colors(), {
       name: this.name(),
       contrast: this.contrast(),
+      fonts: this.fonts(),
       colorMatch: this.colorMatch(),
       flat: this.flat(),
       pagesScheme: this.pagesScheme(),
@@ -158,11 +197,7 @@ export class PaletteEditorComponent {
   // colours in the preview, then saves. A builder export carries the six
   // colours; a palette file of the old editor carries tokens, and its colours
   // are read off them the way a typed theme's are.
-  protected importTheme(event: Event): void {
-    const field = event.target as HTMLInputElement;
-    const file = field.files?.[0];
-    field.value = ''; // let the same file be picked again
-    if (!file) return;
+  protected importTheme(file: File): void {
     file
       .text()
       .then((text) => {
@@ -197,6 +232,17 @@ export class PaletteEditorComponent {
       const m = built.meerkat;
       const recipe: ImportedRecipe = { colors: built.core, colorMatch: built.colorMatch };
       if (CONTRASTS.includes(m['contrast'] as Contrast)) recipe.contrast = m['contrast'] as Contrast;
+      // Only families this gateway ships: a name from another one, or a
+      // typo, would be a font the pages cannot draw.
+      const f = m['fonts'] as Record<string, unknown> | undefined;
+      if (f && typeof f === 'object') {
+        const known = new Set(this.fontCatalogue().map((c) => c.family));
+        const fonts: ThemeFonts = {};
+        for (const k of ['display', 'body', 'code'] as const) {
+          if (typeof f[k] === 'string' && known.has(f[k] as string)) fonts[k] = f[k] as string;
+        }
+        recipe.fonts = fonts;
+      }
       if (typeof m['flat'] === 'boolean') recipe.flat = m['flat'];
       if (m['pagesScheme'] === '' || m['pagesScheme'] === 'light' || m['pagesScheme'] === 'dark') {
         recipe.pagesScheme = m['pagesScheme'];

@@ -34,6 +34,7 @@ import {
   PullResultDialogComponent,
 } from './pick-location-dialog.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
+import { FileButtonComponent } from '../../shared/file-pick';
 
 // One row per configuration, and the CURRENT one is the first of them.
 //
@@ -53,6 +54,7 @@ type Row = SavedConfiguration & { current?: boolean };
 @Component({
   selector: 'app-configuration-management',
   imports: [
+    FileButtonComponent,
     DatePipe,
     MatButtonModule,
     MatCardModule,
@@ -194,9 +196,6 @@ type Row = SavedConfiguration & { current?: boolean };
         font-size: 0.8rem;
         font-variant-numeric: tabular-nums;
       }
-      input[type='file'] {
-        display: none;
-      }
       /* Where a row lives in git, and whether it is level with it. One icon and
          one name: the full URL belongs in the tooltip, where a line of it does
          not push the dates off the row. */
@@ -247,10 +246,9 @@ type Row = SavedConfiguration & { current?: boolean };
           <!-- No lock: a file exported here must be able to come back in on
                the same image. What the community image does not run is taken
                out of the document by the server and named in the plan. -->
-          <button matButton="outlined" [disabled]="busy()" (click)="picker.click()">
-            <mat-icon>upload_file</mat-icon>
+          <app-file-button appearance="outlined" accept=".yaml,.yml,.json,.zip" [disabled]="busy()" (picked)="pick($event[0])">
             <ng-container i18n="@@Import_a_file">Import a file</ng-container>
-          </button>
+          </app-file-button>
           <!-- The same act as importing a file, with the bytes coming from a
                repository instead of a download folder: it SHELVES and applies
                nothing. Hence a button beside that one rather than a screen of
@@ -265,7 +263,6 @@ type Row = SavedConfiguration & { current?: boolean };
             />
           </button>
         </div>
-        <input #picker type="file" accept=".yaml,.yml,.json,.zip" (change)="pick($event)" />
 
 
         <mat-table [dataSource]="rows()">
@@ -827,11 +824,7 @@ export class ConfigurationManagementComponent {
   // this gateway that file; ADDING it is a merge, for a file that holds a part.
   // The third is what the old Import tab expressed as a pruning checkbox, and
   // it must not be lost with the tab.
-  protected async pick(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
+  protected async pick(file: File): Promise<void> {
     const outcome = await firstValueFrom(
       this.dialog
         .open(ImportDialogComponent, {

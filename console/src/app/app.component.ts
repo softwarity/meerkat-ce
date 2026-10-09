@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -14,8 +14,8 @@ import {
   RailnavItemComponent,
   RailnavSpacerComponent,
 } from '@softwarity/rail-nav';
-import { catchError, filter, firstValueFrom, map, of } from 'rxjs';
-import { ApiService, Tenant } from './api.service';
+import { filter, firstValueFrom, map } from 'rxjs';
+import { ApiService } from './api.service';
 import type { TenantDialogResult } from './identity/tenant-dialog.component';
 import { LiveChangesService } from './shared/live-changes.service';
 import { TenantsService } from './shared/tenants.service';

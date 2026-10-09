@@ -19,7 +19,7 @@ pendant qu'on évalue une disposition est la façon normale de procéder.
 Les onglets sont de véritables routes : un favori posé sur la galerie des dispositions
 ramène à la galerie des dispositions.
 
-![Built-in pages sur l'onglet Theme : les six couleurs sources et le contraste à gauche, les deux aperçus à droite avec le carrousel de thèmes entre eux](img/console/built-in-pages-theme.webp)
+![Built-in pages sur l'onglet Theme : les six couleurs sources, le contraste et la typographie à gauche, les deux aperçus à droite avec le carrousel de thèmes entre eux](img/console/built-in-pages-theme.webp)
 
 La page de connexion telle qu'elle est servie, en mode sombre en haut et en mode clair
 en bas, avec le carrousel de thèmes entre les deux. À gauche, les couleurs dont le thème
@@ -48,6 +48,12 @@ rôle.
 - **Contrast** : standard, moyen ou élevé, pour les deux schémas.
 - **Color match** est le "rester fidèle à mes couleurs" du builder : les conteneurs
   gardent le ton des couleurs données plutôt que celui de la spécification.
+- **Typography** : une police **display** pour les titres et le nom de l'application,
+  une police **body** pour le texte et les boutons, une police **code** pour les codes,
+  les clés, les champs et les libellés - chacune parmi quatorze familles que la gateway
+  livre et sert elle-même, ou celle du système. Derrière n'importe quel choix, Noto
+  dessine l'arabe, l'hébreu, le devanagari et le thaï ; le chinois, le japonais et le
+  coréen utilisent les polices du système. Chaque famille s'affiche dans son propre dessin.
 - **Generated roles** liste chaque rôle Material 3 que font les couleurs, sombre et
   clair côte à côte - en lecture seule, ils suivent.
 

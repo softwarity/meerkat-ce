@@ -9,6 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService, LocaleString } from '../../api.service';
 import { BuiltInPagesScope } from './built-in-pages.scope';
+import { pickFiles } from '../../shared/file-pick';
 
 // The Locale tab: the strings of the page on the right, in the language on the
 // left (I18N-05).
@@ -201,11 +202,12 @@ export class LocaleTabComponent {
   // Import a file. It replaces this language's layer WHOLE when it carries the
   // whole catalogue: a file is the complete picture of what it says, and
   // merging it would leave behind entries it deliberately dropped.
-  protected import(ev: Event): void {
-    const input = ev.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
+  protected async chooseImport(): Promise<void> {
+    const [file] = await pickFiles({ accept: 'application/json,.json' });
+    if (file) this.import(file);
+  }
+
+  protected import(file: File): void {
     file.text().then((text) => {
       let parsed: { code?: string; scope?: string; strings?: Record<string, string> };
       try {

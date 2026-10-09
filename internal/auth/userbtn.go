@@ -373,6 +373,16 @@ func writeUserButtonJSON(w http.ResponseWriter, payload userButtonPayload) {
 // the page agent's (page.go). The button asks; it no longer acts. That is why
 // it can sit behind a frame guard without taking the page's behaviour with it.
 const userButtonJS = `(() => {
+  // A face declared inside a shadow root is ignored by browsers: the theme's
+  // @font-face rules are lifted into the document once.
+  const liftFonts = (css) => {
+    const faces = (css || '').match(/@font-face\s*\{[^}]*\}/g);
+    if (!faces || document.getElementById('mk-fonts')) return;
+    const st = document.createElement('style');
+    st.id = 'mk-fonts';
+    st.textContent = faces.join('\n');
+    (document.head || document.documentElement).appendChild(st);
+  };
   if (customElements.get('meerkat-user-button')) return;
 
   const COOKIE_SCHEME = 'MEERKAT_SCHEME';
@@ -528,6 +538,7 @@ const userButtonJS = `(() => {
       if (!auth) {
         const compact = !namePos;
         const ic = Math.round(h * 0.58);
+        liftFonts(data.themeCss);
         this.shadowRoot.innerHTML =
           '<style>' + (data.themeCss || '') + '</style>' +
           '<style>' +
@@ -667,11 +678,12 @@ const userButtonJS = `(() => {
         items.push('<button class="item out" id="logout"><span>' + esc(L.signOut) + '</span></button>');
       }
 
+      liftFonts(data.themeCss);
       this.shadowRoot.innerHTML =
         '<style>' + (data.themeCss || '') + '</style>' +
         '<style>' +
         ':host { all: initial; color-scheme: light dark; ' + hostPos + ' }' +
-        '* { box-sizing: border-box; font-family: system-ui, sans-serif; }' +
+        '* { box-sizing: border-box; font-family: var(--mk-font, system-ui, sans-serif); }' +
         '.btn { display: flex; align-items: center; gap: .45em; height: ' + h + 'px;' +
         ' padding: 0 ' + (namePos === 'after' && auth ? '.55em' : '.15em') + ' 0 ' + (namePos === 'before' && auth ? '.55em' : '.15em') + ';' +
         ' border: 1px solid var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent)); border-radius: ' + btnRadius + '; cursor: pointer;' +

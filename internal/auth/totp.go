@@ -703,7 +703,7 @@ const profileMFAManageBody = `    <style>
       /* the section title lives INSIDE the panel, like the 2FA card's lead */
       .trusted h2 {
         margin: 0; padding: 12px 0 2px; text-align: start;
-        font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
+        font-family: var(--mk-display, var(--mk-mono)); font-size: .62rem; letter-spacing: .16em;
         text-transform: uppercase; color: var(--mk-primary); font-weight: 600;
       }
       /* the list lives in a PANEL, same family as the option blocks */

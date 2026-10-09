@@ -49,6 +49,7 @@ import {
   IDENTITY_FIELDS,
   IdentityAttr,
   IdentityForward,
+  Injection,
   LocaleMechanism,
   PAGE_USER_FIELDS,
   RateLimit,
@@ -96,8 +97,11 @@ import {
 } from "../predicates/args";
 import { internalUpstream, missingArgs, upstreamProblem } from "./gaps";
 import { PredicatesComponent } from "../predicates/predicates.component";
+import { InjectionsComponent } from "../custom-code/injections.component";
 import { COMMON_LOCALES } from "../../shared/common-locales";
 import { canonicalTag, languageName } from "../../shared/language-name";
+import { FileButtonComponent } from "../../shared/file-pick";
+import { FilesFilterComponent } from "../filters/files-filter.component";
 
 // What an empty language script opens on. A sentence describing an argument
 // is read once and forgotten; a line of code that runs names it, shows its
@@ -155,15 +159,11 @@ const LOCALE_MECHANISMS: {
   },
 ];
 
-// The four code blocks a route can carry, and the draft field each edits.
+// The two hooks a route can carry as code, and the draft field each edits.
 // One map, so the dialog, the line count and the save all name the same field.
-type CodeKind = "css" | "js" | "onLocaleChange" | "onSchemeChange";
-const CODE_FIELD: Record<
-  CodeKind,
-  "customCss" | "customJs" | "localesOnChange" | "schemeScript"
-> = {
-  css: "customCss",
-  js: "customJs",
+// The route's own CSS and JavaScript are a list of their own (app-injections).
+type CodeKind = "onLocaleChange" | "onSchemeChange";
+const CODE_FIELD: Record<CodeKind, "localesOnChange" | "schemeScript"> = {
   onLocaleChange: "localesOnChange",
   onSchemeChange: "schemeScript",
 };
@@ -438,8 +438,7 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     localesHeader: r?.locales?.header ?? "",
     localesParam: r?.locales?.param ?? "",
     localesOnChange: r?.locales?.onChange ?? "",
-    customCss: r?.ui?.customCss ?? "",
-    customJs: r?.ui?.customJs ?? "",
+    injections: r?.ui?.injections ?? ([] as Injection[]),
     // The app's menu label: when set, the route shows in the user's apps menu
     // (subject to access). Empty = the app is reachable but not listed.
     // The route's place in the telemetry (OBS-04). Two answers: whether this
@@ -480,6 +479,8 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
   selector: "app-route-editor",
   imports: [
     FormField,
+    FileButtonComponent,
+    FilesFilterComponent,
     MatAutocompleteModule,
     MatButtonModule,
     MatCheckboxModule,
@@ -494,6 +495,7 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     MatTooltipModule,
     RouterLink,
     PredicatesComponent,
+    InjectionsComponent,
     FiltersComponent,
     MaintenanceFilterComponent,
     RedirectFilterComponent,
@@ -623,10 +625,43 @@ export class RouteEditorComponent {
               status: 200,
               body: RESPOND_EXAMPLE,
             }
-          : {};
+          : m === "files"
+            ? { cors: true, maxAge: 3600 }
+            : {};
       return { ...d, ...ui, filters: [...rest, { type: m, args }] };
     });
   }
+
+  // Where a files route serves its files, for the links of its panel.
+  protected readonly filesPrefix = computed(() => matchPrefix(this.draft().predicates));
+
+  // A file is stored against a route that exists: the panel asks for a save
+  // first when the route has never been saved, and gets its id back. The
+  // parent is told, so the editor is handed the created route and every
+  // upload after this one goes to it.
+  protected readonly ensureSaved = (): Promise<string> =>
+    new Promise((resolve, reject) =>
+      this.save(
+        (out) => {
+          resolve(out.id);
+          this.saved.emit(out);
+        },
+        (msg) => reject(new Error(msg)),
+      ),
+    );
+
+  // What the custom code list calls to save the route as it stands - its code
+  // dialog's Save, and an uploaded file landing with the block naming it.
+  protected readonly persist = (): void => this.save();
+
+  // Why a route cannot be saved yet, said where the upload is: saving is what
+  // an upload starts with, and a refusal in the footer after a click on
+  // "Upload" explained nothing.
+  protected readonly saveBlocker = computed(() => {
+    const g = this.gaps()[0];
+    if (!g) return "";
+    return g.section ? `${g.message} (${SECTION_LABEL[g.section]})` : g.message;
+  });
 
   protected patchTerminal(spec: Spec): void {
     this.draft.update((d) => ({
@@ -706,9 +741,7 @@ export class RouteEditorComponent {
     () => (this.auditUpload() ?? this.route()?.api?.audit ?? []).length,
   );
 
-  protected uploadAudit(input: HTMLInputElement): void {
-    const file = input.files?.[0];
-    input.value = "";
+  protected uploadAudit(file: File | undefined): void {
     if (!file) return;
     this.auditUploadError.set("");
     file.text().then((text) => {
@@ -1726,12 +1759,12 @@ export class RouteEditorComponent {
   }
 
   // The code editor (CodeMirror) is LAZY-imported: it never weighs on the
-  // initial bundle, only on the first "Add CSS/JavaScript" click.
+  // initial bundle, only on the first click that opens it.
   protected async editCode(kind: CodeKind): Promise<void> {
     const mod = await this.lazy.load(() => import("../code-dialog.component"));
     if (!mod) return;
     const { CodeDialogComponent } = mod;
-    const language = kind === "css" ? "css" : "js";
+    const language = "js";
     // The language script is handed the choice; it has to be told under what
     // name, or it is written by guesswork.
     const data =
@@ -1779,12 +1812,18 @@ export class RouteEditorComponent {
     return code ? code.split("\n").length : 0;
   }
 
-  protected save(after?: (out: Route) => void): void {
+  // The id a NEW route is created under, drawn once. Drawn at each save, a
+  // second save before the parent hands the created route back - a second
+  // file uploaded, say - created a second route with the same name, and the
+  // gateway refused the duplicate.
+  private createdId?: string;
+
+  protected save(after?: (out: Route) => void, failed?: (msg: string) => void): void {
     this.error.set("");
     this.saving.set(true);
     const d = this.draft();
     const route: Route = {
-      id: this.route()?.id ?? crypto.randomUUID(),
+      id: this.route()?.id ?? (this.createdId ??= crypto.randomUUID()),
       // What this screen was opened on. The server refuses the save if the
       // route has moved since - this editor carries over the blocks it does
       // not edit (the endpoint policies, the deposited spec), and carrying
@@ -1913,8 +1952,7 @@ export class RouteEditorComponent {
           padY: d.btnPadY,
           inFrame: d.btnInFrame,
         },
-        customCss: d.customCss,
-        customJs: d.customJs,
+        injections: d.injections.length ? d.injections : undefined,
       };
     }
     const identity = this.buildIdentity();
@@ -1941,6 +1979,7 @@ export class RouteEditorComponent {
             ? err.error.error
             : $localize`:@@Save_failed:Save failed`;
         this.error.set(msg);
+        failed?.(msg);
       },
     });
   }
@@ -2006,8 +2045,7 @@ export class RouteEditorComponent {
 
   // Deposit: the route has to exist first (the file is stored against it), so
   // this saves it the same way the endpoint-security button does.
-  protected depositSpec(files: FileList | null): void {
-    const file = files?.[0];
+  protected depositSpec(file: File | undefined): void {
     if (!file) return;
     this.error.set("");
     this.save((out) => {

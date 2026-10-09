@@ -30,6 +30,7 @@ import (
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/events"
+	"github.com/softwarity/meerkat/internal/fonts"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -164,6 +165,22 @@ const previewLive = `    <script>
       // switching one is switching a class. The names are checked against the
       // catalogue the server wrote into the page - nothing else becomes a
       // class here.
+      // The typefaces, live, by NAME: the stacks are the server's, written
+      // into the page, so nothing from a message reaches a font-family but a
+      // family this gateway ships. An empty slot is the system's again.
+      if (e.data.fonts) {
+        const stacks = {{.FontStacks}};
+        const root = document.documentElement.style;
+        const f = e.data.fonts;
+        const set = (v, name, none) => {
+          if (typeof name !== 'string') return;
+          if (name && stacks[name]) root.setProperty(v, stacks[name]);
+          else if (!name) { if (none) root.setProperty(v, none); else root.removeProperty(v); }
+        };
+        set('--mk-display', f.display, '');
+        set('--mk-font', f.body, stacks['']);
+        set('--mk-mono', f.code, stacks['mono:']);
+      }
       if ('layout' in e.data) {
         const lay = e.data.layout || {};
         const names = {{.LayoutNames}};
@@ -339,7 +356,7 @@ const flowTop = `<!doctype html>
        link and controls were all centred. */
     .maint-lead {
       margin: 0; text-align: center;
-      font-family: var(--mk-mono); font-size: .95rem; font-weight: 600;
+      font-family: var(--mk-display, var(--mk-mono)); font-size: .95rem; font-weight: 600;
       letter-spacing: .14em; text-transform: uppercase; color: var(--mk-primary);
     }
     .maint-when {
@@ -415,7 +432,10 @@ const flowTop = `<!doctype html>
       animation: ping 2.8s ease-out infinite;
     }
     .mark.pulse::after { animation-delay: 1.4s; }
+    /* The titles are set in the theme's DISPLAY face when it has one (the
+       builder's display font), each in the face it always had otherwise. */
     .wordmark {
+      font-family: var(--mk-display, inherit);
       margin: 0; font-weight: 800; font-size: 2.6rem; line-height: 1;
       letter-spacing: .34em; text-indent: .34em;
       background: linear-gradient(180deg, var(--mk-on-surface), color-mix(in srgb, var(--mk-primary) calc(100% * var(--mk-glow, 1)), var(--mk-on-surface)));
@@ -472,7 +492,7 @@ const flowTop = `<!doctype html>
     .panel > .rows .row form { width: auto; display: inline-grid; }
     /* A card's own heading: the same small caps the sections use, inside. */
     .panel > h2 {
-      margin: 0; font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
+      margin: 0; font-family: var(--mk-display, var(--mk-mono)); font-size: .62rem; letter-spacing: .16em;
       text-transform: uppercase; color: var(--mk-primary); font-weight: 600;
     }
     .panel > .panel-hint {
@@ -560,7 +580,7 @@ const flowTop = `<!doctype html>
     button {
       margin-top: 4px; padding: 12px; border: 0; border-radius: var(--mk-radius-small);
       background: var(--mk-primary); color: var(--mk-on-primary);
-      font-size: .95rem; font-weight: 700; letter-spacing: .02em; cursor: pointer;
+      font-family: inherit; font-size: .95rem; font-weight: 700; letter-spacing: .02em; cursor: pointer;
       box-shadow: 0 8px calc(24px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary) calc(26% * var(--mk-glow, 1)), transparent);
       transition: transform .12s, box-shadow .2s, filter .2s;
     }
@@ -611,7 +631,7 @@ const flowTop = `<!doctype html>
        Builder sets its headings - the one place where the theme's own colour
        is read as type rather than as a surface. */
     .lead {
-      margin: 0; font-family: var(--mk-mono); font-size: .68rem;
+      margin: 0; font-family: var(--mk-display, var(--mk-mono)); font-size: .68rem;
       letter-spacing: .18em; text-transform: uppercase; color: var(--mk-primary);
     }
     /* An ALTERNATIVE action - another authority, a passkey, an organisation
@@ -638,7 +658,7 @@ const flowTop = `<!doctype html>
        agent may do. Written HERE and not in the page's own body, for the
        reason the two comments above already paid for once. */
     .consent { gap: 18px; }
-    .consent h1 { color: var(--mk-primary); }
+    .consent h1 { color: var(--mk-primary); font-family: var(--mk-display, inherit); }
     .consent fieldset {
       margin: 0; padding: 0; border: 0; width: 100%;
       display: grid; gap: 8px;
@@ -2014,6 +2034,28 @@ func WriteThemePreview(
 	}{flowChrome: previewChrome(t, b, scheme, l, locale)})
 }
 
+// fontNames are the families a preview declares the faces of.
+func fontNames() []string {
+	var out []string
+	for _, f := range fonts.Families() {
+		out = append(out, f.Family)
+	}
+	return out
+}
+
+// fontStacks is the stack of every family by name, plus the two system
+// stacks a cleared slot goes back to ("" for text, "mono:" for code).
+func fontStacks() map[string]string {
+	m := map[string]string{
+		"":      store.FontStack("", fonts.KindSans),
+		"mono:": store.FontStack("", fonts.KindMono),
+	}
+	for _, f := range fonts.Families() {
+		m[f.Family] = fonts.Stack(f.Family)
+	}
+	return m
+}
+
 // previewChrome is the chrome a preview wears: a theme that may be neither
 // saved nor active, a forced scheme, and no request behind it. Shared by the
 // specimen and the pages so the two can never drift into showing the same
@@ -2030,7 +2072,13 @@ func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageL
 	// The forced scheme rides on Scheme below: the template emits the
 	// color-scheme rule AND the body class from it, so adding the rule here too
 	// would write it twice.
+	// Every face the gateway ships, not only the theme's: the editor switches
+	// a font over postMessage, and a face the page never declared would be a
+	// font the frame cannot draw until it reloads.
 	css := t.CSS()
+	if i := strings.Index(css, ":root"); i >= 0 {
+		css = fonts.FaceCSS(fontNames()...) + css[i:]
+	}
 	// A layout the caller asked for is shown even if it was never saved -
 	// that is what choosing one in the console means. An unknown name falls
 	// back rather than rendering a body class nothing dresses.
@@ -2049,8 +2097,11 @@ func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageL
 		// The arrangements the live listener may switch between - a name from
 		// a message becomes a class only if it is one of these.
 		LayoutNames: store.PageLayouts,
-		Brand:       toBrandView(b),
-		Title:       "Theme preview - Meerkat",
+		// The stacks the live listener may set, by family: a name from a
+		// message becomes a font-family only if it is one of these.
+		FontStacks: fontStacks(),
+		Brand:      toBrandView(b),
+		Title:      "Theme preview - Meerkat",
 		// The language the caller asked for, not English. Every page here is
 		// translated, and a preview that always spoke English could show the
 		// palette and never the TEXT - which is half of what a page looks
@@ -2199,6 +2250,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+faviconPath, h.favicon)
 	// The old path, kept because pages cached in a browser still ask for it.
 	mux.HandleFunc("GET /meerkat/favicon.svg", h.favicon)
+	// The typefaces the theme may choose (THEME-09), served by the gateway
+	// itself on both planes: the console's preview reads them from the
+	// admin plane, the flow pages from the data plane.
+	mux.Handle("GET "+fonts.Prefix+"{file...}", fonts.Handler())
 	mux.HandleFunc("GET "+backgroundPath, h.background)
 	mux.HandleFunc("GET "+backgroundDarkPath, h.backgroundDark)
 	mux.HandleFunc("GET /login", h.showLogin)

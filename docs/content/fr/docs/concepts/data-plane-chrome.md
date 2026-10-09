@@ -26,7 +26,7 @@ personne n'ouvre ses sources.
 | Bouton utilisateur | un Web Component `meerkat-user-button` : qui vous êtes, l'organisation, la langue, la déconnexion | un interrupteur sur la route |
 | Portail de navigation | une barre `meerkat-portal-nav` qui liste les applications que cette personne peut ouvrir | le catalogue global en mode `portal` ; elle remplace le bouton seul |
 | Marquage d'identité | les rôles et les champs de l'utilisateur écrits dans le balisage même de la page, côté serveur | un interrupteur sur la route, champ par champ |
-| CSS et JS personnalisés | ce que vous avez écrit dans la section Injections de la route | un contenu non vide |
+| CSS et JS personnalisés | les blocs de la section Custom de la route, écrits là ou téléversés en fichiers | au moins un bloc |
 | Point d'accroche de langue | une fonction que la gateway appelle quand le visiteur change de langue | une route dont la langue est transmise par script |
 
 Le bouton utilisateur donne aussi accès à ce que la gateway détient pour
@@ -97,6 +97,45 @@ qui appelle. Il s'agit d'un mécanisme distinct - des en-têtes ou un JWT signé
 configurés dans la section Identity de la route - et la gateway commence par
 purger toute valeur entrante de ces en-têtes : un appelant ne peut donc pas se
 faire passer pour quelqu'un d'autre.
+
+## Votre propre CSS et JavaScript
+
+La section **Custom** de la route tient une liste de blocs. Chacun est du **CSS
+ou du JavaScript**, **écrit dans la console** ou **téléversé en fichier**, et se
+place à l'un de trois endroits :
+
+![La section Custom de Billing : une feuille de style écrite dans la console en fin de head, et un script téléversé en fichier, différé en fin de body](img/console/route-editor-custom.webp)
+
+| Endroit | Où | À quoi il sert |
+|---|---|---|
+| Début du head | juste après `<head>` | un script qui doit tourner avant tout le reste |
+| Fin du head | juste avant `</head>` | **le défaut.** Une feuille de style placée là vient après celles de l'application : à poids égal, ses règles l'emportent |
+| Fin du body | juste avant `</body>` | un script qui a besoin du balisage de la page |
+
+À un même endroit, les blocs gardent **l'ordre de la liste**, qui se réordonne
+par glisser-déposer : une bibliothèque passe au-dessus du code qui s'en sert. Un
+script **s'exécute** :
+
+- **là où il est** : le navigateur suspend l'analyse de la page le temps qu'il
+  tourne ;
+- **différé** : une fois la page analysée, dans l'ordre de la liste (le défaut
+  pour un fichier) ;
+- **async** : dès qu'il arrive, sans ordre garanti ;
+- comme **module**.
+
+Différé et async ne valent que pour un **fichier** : un navigateur les ignore sur
+un script écrit dans la page.
+
+Un fichier téléversé n'est pas recopié dans la page : il est lié depuis
+`/meerkat/route-assets/<id de route>/<nom>?v=<version>`. La version change avec
+le contenu, donc le navigateur garde le fichier pour de bon et ne le
+redemande qu'au téléversement d'une nouvelle version. Seuls les fichiers qu'un
+bloc nomme sont servis là, et un fichier que la liste ne nomme plus est supprimé
+au prochain enregistrement.
+
+Une route écrite avant cette liste avait deux blocs libres, CSS et JavaScript ;
+ils en sont devenus les deux premières entrées, au début du head où ils étaient
+injectés : aucune page n'a changé.
 
 ## D'où viennent les ressources
 

@@ -144,7 +144,7 @@ A UI section once the box is ticked: here Color scheme, which says how the serve
 application takes a light or dark choice.
 
 - **Incoming**, **Identity** and **Auth forward** are disabled when the route
-  answers by itself (redirect, maintenance, respond). This is not tidiness: the
+  answers by itself (redirect, maintenance, respond, files). This is not tidiness: the
   gateway drops every request filter on such a route, so editing them would
   write settings it throws away.
 
@@ -158,6 +158,7 @@ The mode decides everything else on the panel.
 | **Redirect** | Sends the browser elsewhere |
 | **Maintenance** | Serves the built-in unavailable page |
 | **Respond** | Builds an answer from a template, calling nothing |
+| **Files** | Serves files uploaded on the route - a font, a stylesheet, a script - calling nothing |
 
 On a proxy route you also set:
 

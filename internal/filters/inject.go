@@ -79,6 +79,64 @@ func injectAtBodyStart(body, frag []byte) []byte {
 	return append(out, body[at:]...)
 }
 
+// InjectBeforeHeadEnd inserts fragment right before </head>: after
+// everything the page puts in its head, its own stylesheets included - which
+// is where an override has to stand to win. A document without a closing
+// head tag takes it before <body>, then at the top like InjectAfterHead.
+func InjectBeforeHeadEnd(fragment string) func(*http.Response) error {
+	frag := []byte(fragment)
+	return func(res *http.Response) error {
+		if !isHTML(res) || len(frag) == 0 {
+			return nil
+		}
+		return rewriteHTMLBody(res, func(body []byte) []byte {
+			body, frag := admitScripts(res, body, frag)
+			if loc := headEnd.FindIndex(body); loc != nil {
+				return insertAt(body, loc[0], frag)
+			}
+			if loc := bodyTag.FindIndex(body); loc != nil {
+				return insertAt(body, loc[0], frag)
+			}
+			return injectAfterHead(body, frag)
+		})
+	}
+}
+
+// InjectAtBodyEnd inserts fragment right before the LAST </body> - a script
+// there runs once the page's own markup is parsed. A document without one
+// takes it before </html>, then at its very end.
+func InjectAtBodyEnd(fragment string) func(*http.Response) error {
+	frag := []byte(fragment)
+	return func(res *http.Response) error {
+		if !isHTML(res) || len(frag) == 0 {
+			return nil
+		}
+		return rewriteHTMLBody(res, func(body []byte) []byte {
+			if !isDocument(body) && headTag.FindIndex(body) == nil && bodyTag.FindIndex(body) == nil {
+				return body
+			}
+			body, frag := admitScripts(res, body, frag)
+			if all := bodyEnd.FindAllIndex(body, -1); len(all) > 0 {
+				return insertAt(body, all[len(all)-1][0], frag)
+			}
+			if all := htmlEnd.FindAllIndex(body, -1); len(all) > 0 {
+				return insertAt(body, all[len(all)-1][0], frag)
+			}
+			return append(append([]byte{}, body...), frag...)
+		})
+	}
+}
+
+var bodyEnd = regexp.MustCompile(`(?i)</body\s*>`)
+var htmlEnd = regexp.MustCompile(`(?i)</html\s*>`)
+
+func insertAt(body []byte, at int, frag []byte) []byte {
+	out := make([]byte, 0, len(body)+len(frag))
+	out = append(out, body[:at]...)
+	out = append(out, frag...)
+	return append(out, body[at:]...)
+}
+
 // InjectAfterHeadFunc is InjectAfterHead with a PER-RESPONSE fragment: f runs
 // on each HTML response (res.Request carries the caller's cookies/context, so
 // the fragment can be session-specific). An empty fragment skips the rewrite

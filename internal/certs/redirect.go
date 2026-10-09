@@ -1,8 +1,12 @@
 package certs
 
 import (
+	"bufio"
+	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -219,6 +223,26 @@ type hstsWriter struct {
 	http.ResponseWriter
 	value   string
 	stamped bool
+	// wrote: the status is on its way. A second WriteHeader is a bug in the
+	// handler below; net/http ignores it and logs THIS wrapper as the culprit,
+	// which sent nobody to the right place. It is ignored here too, and named
+	// once, by the caller's own file and line.
+	wrote bool
+}
+
+// duplicateHeaders remembers which callers were already reported, so a
+// handler that does it on every request is one line, not a flood.
+var duplicateHeaders sync.Map
+
+func reportDuplicateHeader() {
+	_, file, line, ok := runtime.Caller(2)
+	if !ok {
+		return
+	}
+	where := fmt.Sprintf("%s:%d", file, line)
+	if _, seen := duplicateHeaders.LoadOrStore(where, true); !seen {
+		slog.Warn("a handler wrote its status twice, the second is ignored", "caller", where)
+	}
 }
 
 func (w *hstsWriter) stamp() {
@@ -232,23 +256,50 @@ func (w *hstsWriter) stamp() {
 }
 
 func (w *hstsWriter) WriteHeader(code int) {
+	// 1xx are interim answers (103 Early Hints): a final status still follows.
+	if code >= 200 {
+		if w.wrote {
+			reportDuplicateHeader()
+			return
+		}
+		w.wrote = true
+	}
 	w.stamp()
 	w.ResponseWriter.WriteHeader(code)
 }
 
 func (w *hstsWriter) Write(b []byte) (int, error) {
 	w.stamp()
+	w.wrote = true
 	return w.ResponseWriter.Write(b)
 }
 
 func (w *hstsWriter) Flush() {
 	w.stamp()
+	// A flush sends the status - 200 when none was written - so a status
+	// written after it is the second one.
+	w.wrote = true
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
 func (w *hstsWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// Hijack is forwarded EXPLICITLY, for the reason statusWriter forwards it: a
+// websocket library asks `w.(http.Hijacker)` and does not follow Unwrap. The
+// console's live channel goes through this wrapper on HTTPS, and every upgrade
+// there was a 101 then a 500 - the screens never heard anything move, and the
+// browser retried every few seconds.
+func (w *hstsWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.stamp()
+	w.wrote = true
+	hj, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hj.Hijack()
+}
 
 // hstsHost says whether a host may be sent HSTS. Never localhost: the promise
 // is per host name and ALL its ports, so a development gateway on

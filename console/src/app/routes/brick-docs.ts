@@ -32,6 +32,7 @@ const DOCS: Record<string, string> = {
   'set-status': $localize`:@@doc_Force_the_response_status:Force the response status code`,
   redirect: $localize`:@@doc_Answer_with_a_redirect:Answer with a redirect instead of proxying`,
   maintenance: $localize`:@@doc_Answer_503_unavailable:Answer 503 with the gateway's unavailable page`,
+  files: $localize`:@@doc_Serve_uploaded_files:Serve files uploaded on the route instead of proxying`,
 };
 
 export function brickDoc(type: string): string {

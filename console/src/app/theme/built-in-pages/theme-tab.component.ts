@@ -14,6 +14,8 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
         [(colors)]="scope.colors"
         [(contrast)]="scope.contrast"
         [(colorMatch)]="scope.colorMatch"
+        [(fonts)]="scope.fonts"
+        [fontCatalogue]="scope.fontCatalogue()"
         [dark]="scope.dark()"
         [light]="scope.light()"
         [(flat)]="scope.flat"
@@ -39,7 +41,7 @@ export class ThemeTabComponent {
   // A file's switches land where they live: the recipe on the scope, the
   // offered schemes in the settings, written on the spot like their checkbox.
   protected imported(r: ImportedRecipe): void {
-    this.scope.loadRecipe(r.colors, r.colorMatch, r.contrast);
+    this.scope.loadRecipe(r.colors, r.colorMatch, r.contrast, r.fonts);
     if (r.flat !== undefined) this.scope.flat.set(r.flat);
     if (r.pagesScheme !== undefined && r.pagesScheme !== this.scope.pagesScheme()) {
       this.scope.setPagesScheme(r.pagesScheme);

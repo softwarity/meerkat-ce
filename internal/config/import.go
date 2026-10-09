@@ -3,12 +3,15 @@ package config
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/idp"
+	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
 )
@@ -88,7 +91,8 @@ func (p *Plan) Touches() bool {
 
 // MissingFile names a media the document points at without carrying it.
 type MissingFile struct {
-	// Kind is what the file is: "openapi" today, the only media a route holds.
+	// Kind is what the file is: "openapi" for a deposited spec, "files" for a
+	// files route (ROUTE-22) that arrived without any of its files.
 	Kind  string `json:"kind"`
 	Route string `json:"route"`
 	Name  string `json:"name"`
@@ -433,6 +437,10 @@ func importRoutes(ctx context.Context, st *store.Store, doc *Document, plan *Pla
 	if err != nil {
 		return err
 	}
+	storedFiles, err := st.RouteFileContents(ctx)
+	if err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	for _, r := range doc.Routes {
 		seen[r.ID] = true
@@ -445,6 +453,9 @@ func importRoutes(ctx context.Context, st *store.Store, doc *Document, plan *Pla
 			if err := st.SaveRoute(ctx, r); err != nil {
 				return fmt.Errorf("config: route %q: %w", r.Name, err)
 			}
+		}
+		if err := importRouteFiles(ctx, st, plan, r, doc.Files[r.ID], storedFiles[r.ID], commit); err != nil {
+			return err
 		}
 		decl := r.Spec()
 		if decl.Type != store.SpecFile {
@@ -923,6 +934,42 @@ func presetByID(id string) (store.Theme, bool) {
 		}
 	}
 	return store.Theme{}, false
+}
+
+// importRouteFiles applies the files a document carries for a route: each one
+// added or replaced, unless it is byte for byte the one already here. A files
+// route that arrives with none, and has none here, is said - it would answer
+// 404 to everything - and nothing is destroyed: a file a document does not
+// carry is a file it does not remove.
+func importRouteFiles(ctx context.Context, st *store.Store, plan *Plan, r store.Route,
+	carried, stored []store.RouteFile, commit bool) error {
+	if len(carried) == 0 {
+		if _, files, _ := routing.FilesOf(r.Filters); files && len(stored) == 0 {
+			plan.MissingFiles = append(plan.MissingFiles, MissingFile{Kind: "files", Route: r.Name, Name: "*"})
+		}
+		return nil
+	}
+	have := map[string]string{}
+	for _, f := range stored {
+		have[f.Name] = f.SHA
+	}
+	for _, f := range carried {
+		sum := sha256.Sum256(f.Data)
+		action := ActionAdd
+		if was, ok := have[f.Name]; ok {
+			action = ActionUpdate
+			if was == hex.EncodeToString(sum[:]) {
+				action = ActionSame
+			}
+		}
+		plan.Changes = append(plan.Changes, Change{Kind: "route.file", ID: r.ID, Label: r.Name + "/" + f.Name, Action: action})
+		if commit && action != ActionSame {
+			if _, err := st.SetRouteFile(ctx, r.ID, f.Name, f.Data); err != nil {
+				return fmt.Errorf("config: route %q: %w", r.Name, err)
+			}
+		}
+	}
+	return nil
 }
 
 // byDepth orders roles parents-first. A role whose parent is not in the list is

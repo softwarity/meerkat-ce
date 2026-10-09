@@ -67,7 +67,13 @@ var imageFields = []struct {
 // HasImage reports whether doc carries a picture, which is what decides between
 // a plain file and a package: a ZIP holding nothing but one YAML would be a
 // wrapper nobody asked for.
-func HasImage(doc *Document) bool { return imageBytes(doc) > 0 || len(doc.Specs) > 0 }
+func HasImage(doc *Document) bool {
+	return imageBytes(doc) > 0 || len(doc.Specs) > 0 || len(doc.Files) > 0
+}
+
+// fileDir holds the files uploaded on routes (ROUTE-22), one directory per
+// route id, each file under the name it is served by.
+const fileDir = "assets/files"
 
 // specDir holds the OpenAPI files a package carries, one directory per route:
 // two routes may both have deposited an "openapi.yaml", and the branding's
@@ -118,6 +124,11 @@ func Split(doc *Document) ([]byte, map[string][]byte, error) {
 	}
 	for name, content := range specAssets(doc) {
 		assets[name] = content
+	}
+	for id, files := range doc.Files {
+		for _, f := range files {
+			assets[path.Join(fileDir, id, f.Name)] = f.Data
+		}
 	}
 	// The document is copied before being rewritten: the caller's own document
 	// must not come back with paths where its images used to be.
@@ -305,15 +316,29 @@ func Assemble(files map[string][]byte) (*Document, error) {
 			parsed.Specs[r.ID] = content
 		}
 	}
+	// The files uploaded on routes: every entry under a route's directory is
+	// one of its files, named by the rest of its path.
+	for _, r := range parsed.Routes {
+		dir := path.Join(fileDir, r.ID) + "/"
+		for name, content := range files {
+			if rest, ok := strings.CutPrefix(name, dir); ok && rest != "" {
+				if parsed.Files == nil {
+					parsed.Files = map[string][]store.RouteFile{}
+				}
+				parsed.Files[r.ID] = append(parsed.Files[r.ID], store.RouteFile{Name: rest, Data: content})
+			}
+		}
+		sort.Slice(parsed.Files[r.ID], func(i, j int) bool { return parsed.Files[r.ID][i].Name < parsed.Files[r.ID][j].Name })
+	}
 	return inlineAssets(parsed, files)
 }
 
 // maxAsset bounds one file inside a package. It is sized on the biggest media a
-// configuration may carry, which is no longer a picture but a deposited OpenAPI
-// spec (the store refuses one over 4 MiB); the branding refuses a background
-// over ~1 400 000 characters of its own. This stops a package from being read
-// into memory before either refusal can happen.
-const maxAsset = 4 << 20
+// configuration may carry, a file uploaded on a route (the store refuses one
+// over 10 MiB); a deposited spec stops at 4 MiB and the branding refuses a
+// background over ~1 400 000 characters of its own. This stops a package from
+// being read into memory before any of those refusals can happen.
+const maxAsset = store.MaxRouteFileBytes
 
 // inlineAssets puts the pictures back where the document points at them.
 func inlineAssets(doc *Document, files map[string][]byte) (*Document, error) {

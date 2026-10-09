@@ -143,7 +143,7 @@
              between them makes the reader work out which is which. -->
         <h3 class="sub" i18n="@@How_it_answers">How it answers</h3>
         <p class="section-hint" i18n="@@Target_hint">
-          Proxy fetches from a service; the other three answer here, without calling anything.
+          Proxy fetches from a service; the others answer here, without calling anything.
         </p>
         <mat-form-field>
           <mat-label i18n="@@Mode">Mode</mat-label>
@@ -152,6 +152,7 @@
             <mat-option value="redirect" i18n="@@Mode_redirect">Redirect - send the browser elsewhere</mat-option>
             <mat-option value="maintenance" i18n="@@Mode_maintenance">Maintenance - the built-in unavailable page</mat-option>
             <mat-option value="respond" i18n="@@Mode_respond">Respond - an answer built from a template</mat-option>
+            <mat-option value="files" i18n="@@Mode_files">Files - serve files uploaded here</mat-option>
           </mat-select>
         </mat-form-field>
         @if (mode() === 'proxy') {
@@ -273,17 +274,11 @@
         </mat-form-field>
         } @else if (draft().specSource === 'file') {
         <div class="spec-file">
-          <input
-            type="file"
-            hidden
-            #specInput
+          <app-file-button
             accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
-            (change)="depositSpec(specInput.files)"
-          />
-          <button matButton="tonal" type="button" [disabled]="saving()" (click)="specInput.click()">
-            <mat-icon>upload_file</mat-icon>
-            <span i18n="@@Deposit_a_file">Deposit a file</span>
-          </button>
+            [disabled]="saving()"
+            (picked)="depositSpec($event[0])"
+          ><span i18n="@@Deposit_a_file">Deposit a file</span></app-file-button>
           @if (draft().specFilename) {
           <span class="spec-name">{{ draft().specFilename }}</span>
           <button
@@ -330,6 +325,7 @@
               @case ('redirect') {<app-redirect-filter [spec]="t" (specChange)="patchTerminal($event)" />}
               @case ('maintenance') {<app-maintenance-filter [spec]="t" (specChange)="patchTerminal($event)" />}
               @case ('respond') {<app-respond-filter [spec]="t" (specChange)="patchTerminal($event)" />}
+              @case ('files') {<app-files-filter [spec]="t" (specChange)="patchTerminal($event)" [routeId]="route()?.id" [prefix]="filesPrefix()" [ensureSaved]="ensureSaved" [blocker]="route() ? '' : saveBlocker()" />}
             }
           }
         }
@@ -359,7 +355,7 @@
         />
       }
       @case ('predicates') {
-        <app-predicates [formField]="f.predicates" [entries]="predicateEntries()" />
+        <app-predicates [formField]="f.predicates" [entries]="predicateEntries()" [routeName]="draft().name" />
       }
       @case ('gates') {
         <!-- No section hint here: the palette component already carries the
@@ -1170,16 +1166,14 @@
           }
         </p>
         <div class="css-row" ee-feature="AUD-04">
-          <button matButton="tonal" type="button" (click)="auditFile.click()" [disabled]="!route() || mode() === 'redirect'">
-            <mat-icon>upload_file</mat-icon>
+          <app-file-button accept="application/json,.json" [disabled]="!route() || mode() === 'redirect'" (picked)="uploadAudit($event[0])">
             <ng-container i18n="@@Upload_audit">Upload audit configuration</ng-container>
-          </button>
+          </app-file-button>
           <app-ee-lock
             feature="AUD-04"
             i18n-why="@@Endpoint_audit_ee_why"
             why="Record chosen operations of a route in the audit trail, and send them to your collector."
           />
-          <input #auditFile type="file" accept="application/json,.json" hidden (change)="uploadAudit(auditFile)" />
         </div>
         @if (auditUploadError(); as err) {
           <p class="section-hint error">{{ err }}</p>
@@ -1187,41 +1181,10 @@
         </div>
       }
       @case ('custom') {
-        <p class="section-hint" i18n="@@Custom_hint">
-          Your own CSS and JavaScript, injected into this application's pages.
+        <p class="section-hint" i18n="@@Custom_hint3">
+          Your own CSS and JavaScript, injected into this application's pages in the list's order within each place.
         </p>
-        <h3 class="sub" i18n="@@Custom_CSS">Custom CSS</h3>
-        <div class="css-row">
-          <button matButton="tonal" (click)="editCode('css')">
-            <mat-icon>css</mat-icon>
-            @if (codeLines('css')) {
-              <ng-container i18n="@@Edit_CSS">Edit CSS</ng-container>
-            } @else {
-              <ng-container i18n="@@Add_CSS">Add CSS</ng-container>
-            }
-          </button>
-          @if (codeLines('css'); as n) {
-            <span class="css-size" i18n="@@N_lines">{{ n }} lines</span>
-          }
-        </div>
-
-        <h3 class="sub" i18n="@@Custom_JavaScript">Custom JavaScript</h3>
-        <p class="section-hint" i18n="@@Custom_JS_hint">
-          Runs right after the head opens.
-        </p>
-        <div class="css-row">
-          <button matButton="tonal" (click)="editCode('js')">
-            <mat-icon>javascript</mat-icon>
-            @if (codeLines('js')) {
-              <ng-container i18n="@@Edit_JavaScript">Edit JavaScript</ng-container>
-            } @else {
-              <ng-container i18n="@@Add_JavaScript">Add JavaScript</ng-container>
-            }
-          </button>
-          @if (codeLines('js'); as n) {
-            <span class="css-size" i18n="@@N_lines">{{ n }} lines</span>
-          }
-        </div>
+        <app-injections [formField]="f.injections" [routeId]="route()?.id" [ensureSaved]="ensureSaved" [persist]="persist" />
       }
     }
 

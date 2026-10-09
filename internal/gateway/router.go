@@ -96,6 +96,9 @@ type Router struct {
 	// id. Written by Reload under the same lock, read by Problems.
 	problems map[string]string
 	needDraw bool // at least one route uses weight predicates
+	// assets are the files a UI route's custom code names, by route id then
+	// name, served at store.RouteAssetPath (injections.go).
+	assets map[string]map[string]store.RouteFile
 
 	// uiSims holds the running UI tests (uisim.go): a developer session
 	// browsing ONE route as a simulated identity. Per process, TTL-bounded.
@@ -252,6 +255,13 @@ func (rt *Router) Reload(ctx context.Context) error {
 		slog.Warn("deposited openapi specs unavailable", "err", err)
 		specs = map[string][]byte{}
 	}
+	// The files uploaded on routes (ROUTE-22), read once per reload and served
+	// from memory, like the specs.
+	files, err := rt.st.RouteFileContents(ctx)
+	if err != nil {
+		slog.Warn("route files unavailable", "err", err)
+		files = map[string][]store.RouteFile{}
+	}
 	// What the installation asks of every route unless a route says otherwise
 	// (PERF-02 for the memory ceiling, ROUTE-07 for the waits). Read BEFORE
 	// compiling, because the compilation is what bakes the waits into a
@@ -263,6 +273,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 	// What each route that will NOT be served says for itself. Replaced whole on
 	// every reload, so a route that was mended stops being listed.
 	problems := map[string]string{}
+	assets := map[string]map[string]store.RouteFile{}
 	compiled := make([]compiledRoute, 0, len(stored))
 	var allPreds []*routing.CompiledPredicates
 	needDraw := false
@@ -291,7 +302,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 				"route", raw.Name, "names", missing)
 			continue
 		}
-		cr, err := rt.compile(r, specs[raw.ID], portalOn)
+		cr, err := rt.compile(r, specs[raw.ID], files[raw.ID], portalOn)
 		if err != nil {
 			// LEFT OUT rather than fatal. A route is refused at save time, so a
 			// stored one that no longer compiles came from somewhere else: a
@@ -321,6 +332,9 @@ func (rt *Router) Reload(ctx context.Context) error {
 		compiled = append(compiled, cr)
 		allPreds = append(allPreds, &compiled[len(compiled)-1].preds)
 		needDraw = needDraw || cr.preds.HasWeight()
+		if named := injectedFiles(r, files[raw.ID]); named != nil {
+			assets[raw.ID] = named
+		}
 	}
 	if err := routing.ResolveWeights(allPreds); err != nil {
 		return fmt.Errorf("gateway: %w", err)
@@ -380,6 +394,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 	rt.mu.Lock()
 	rt.routes = compiled
 	rt.problems = problems
+	rt.assets = assets
 	rt.needDraw = needDraw
 	rt.signing = sset
 	rt.maintenance, rt.maintenancePage = maint, renderMaintenance(maint)
@@ -603,9 +618,13 @@ func restoreCode(original store.Route, resolved *store.Route, missing []string) 
 		}
 	}
 	if original.UI != nil && resolved.UI != nil {
-		note(original.UI.CustomJS)
-		note(original.UI.CustomCSS)
-		resolved.UI.CustomJS, resolved.UI.CustomCSS = original.UI.CustomJS, original.UI.CustomCSS
+		// A copy, not the original's array: the expanded route is handed on,
+		// and two routes sharing one backing array is one edit away from a
+		// surprise.
+		resolved.UI.Injections = slices.Clone(original.UI.Injections)
+		for _, in := range original.UI.Injections {
+			note(in.Code)
+		}
 	}
 	if original.Locales != nil && resolved.Locales != nil {
 		note(original.Locales.OnChange)
@@ -689,6 +708,12 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// catch-all trap must never swallow it).
 	if req.Method == http.MethodGet && req.URL.Path == JWKSPath {
 		rt.serveJWKS(w)
+		return
+	}
+	// So are the files a route's custom code links (injections.go): the
+	// route's own path belongs to the application behind it.
+	if (req.Method == http.MethodGet || req.Method == http.MethodHead) && strings.HasPrefix(req.URL.Path, store.RouteAssetPath) {
+		rt.serveRouteAsset(w, req)
 		return
 	}
 	// The admin console's swagger page (Try it out) calls the routes straight
@@ -824,7 +849,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	dropSpan(req.Context())
 }
 
-func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compiledRoute, error) {
+func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFile, portalOn bool) (compiledRoute, error) {
 	preds, err := routing.CompilePredicates(r.Predicates)
 	if err != nil {
 		return compiledRoute{}, err
@@ -903,16 +928,11 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 	if r.Identity != nil && r.Identity.Mechanism != "" {
 		filters.Request = append(filters.Request, rt.identityForwardFilter(*r.Identity, r.Name))
 	}
-	// A UI route's custom CSS rides a <style> tag ("</style" is refused at
-	// validation, so the block cannot break out).
-	if r.IsUI && r.UI != nil && r.UI.CustomCSS != "" {
-		filters.Response = append(filters.Response,
-			filtering.InjectAfterHead("<style>\n"+r.UI.CustomCSS+"\n</style>"))
-	}
-	// Same deal for the custom JS, on a <script> tag ("</script" refused).
-	if r.IsUI && r.UI != nil && r.UI.CustomJS != "" {
-		filters.Response = append(filters.Response,
-			filtering.InjectAfterHead("<script>\n"+r.UI.CustomJS+"\n</script>"))
+	// A UI route's own CSS and JavaScript, in its order, at its places (see
+	// store.Injection). A block cannot break out of its tag: the closing tag
+	// is refused at validation.
+	if r.IsUI && r.UI != nil && len(r.UI.Injections) > 0 {
+		filters.Response = append(filters.Response, injectionFilters(r.ID, r.UI.Injections, files)...)
 	}
 	// The language hook (I18N-04): declared per route, it lands as a function
 	// on the window rather than as an attribute on the button - it is code,
@@ -952,6 +972,19 @@ func (rt *Router) compile(r store.Route, deposited []byte, portalOn bool) (compi
 	upstream := ""
 	if filters.Terminal != nil {
 		handler = filters.Terminal
+		// A files route (ROUTE-22) answers from the files uploaded on it,
+		// handed over here because they are not arguments of the brick.
+		if opt, ok, err := routing.FilesOf(r.Filters); ok {
+			if err != nil {
+				return compiledRoute{}, err
+			}
+			served := make([]routing.ServedFile, 0, len(files))
+			for _, f := range files {
+				served = append(served, routing.ServedFile{Name: f.Name, ContentType: f.ContentType,
+					SHA: f.SHA, Data: f.Data, Modified: time.Unix(f.UpdatedAt, 0)})
+			}
+			handler = routing.FilesHandler(routeMatchPrefix(r), served, opt)
+		}
 		// Outgoing filters apply to what the route answers itself, exactly as
 		// they do to a proxied response: a CORS or Cache-Control header on an
 		// identity endpoint is the same need either way.
@@ -1381,24 +1414,11 @@ func validateRouteType(r store.Route) error {
 			}
 		}
 	}
-	// The custom CSS travels verbatim inside a <style> tag: a closing tag
-	// would break out of it, and 64 KiB is plenty for page tweaks.
-	if css := r.UI.CustomCSS; css != "" {
-		if strings.Contains(strings.ToLower(css), "</style") {
-			return fmt.Errorf("custom css must not contain \"</style\"")
-		}
-		if len(css) > 64<<10 {
-			return fmt.Errorf("custom css is too large (%d bytes): the limit is 64 KiB", len(css))
-		}
-	}
-	// The custom JS travels verbatim inside a <script> tag: same escape rule.
-	if js := r.UI.CustomJS; js != "" {
-		if strings.Contains(strings.ToLower(js), "</script") {
-			return fmt.Errorf("custom js must not contain \"</script\"")
-		}
-		if len(js) > 64<<10 {
-			return fmt.Errorf("custom js is too large (%d bytes): the limit is 64 KiB", len(js))
-		}
+	// The custom code travels verbatim inside <style> and <script> tags: a
+	// closing tag would break out of one, and 64 KiB a block is plenty for page
+	// tweaks. Checked on a copy: filling the default place is the store's job.
+	if err := store.CheckInjections(slices.Clone(r.UI.Injections)); err != nil {
+		return err
 	}
 	// And the language hook, which rides the same way.
 	if r.Locales != nil && r.Locales.OnChange != "" {

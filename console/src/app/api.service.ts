@@ -349,6 +349,19 @@ export interface LocalesConfig {
   onChange?: string;
 }
 
+// One block of a UI route's own CSS or JavaScript: written here (code) or a
+// file uploaded on the route (file), placed at the start or the end of the
+// head or at the end of the body, in the list's order within each place.
+export type InjectionPosition = 'head-start' | 'head-end' | 'body-end';
+export type InjectionLoad = '' | 'defer' | 'async' | 'module';
+export interface Injection {
+  kind: 'css' | 'js';
+  code?: string;
+  file?: string;
+  position: InjectionPosition;
+  load?: InjectionLoad;
+}
+
 // UI-route options: color-scheme interaction, roles/user-info injections,
 // user button, and free CSS/JS blocks injected into the pages.
 export interface RouteUIOptions {
@@ -356,8 +369,8 @@ export interface RouteUIOptions {
   roles?: RolesConfig;
   userInfo?: UserInfoConfig;
   userButton: UserButtonOptions;
-  customCss?: string;
-  customJs?: string;
+  // The route's own CSS and JavaScript, in order (see Injection).
+  injections?: Injection[];
   // The app's menu label: when set, the route shows in the user's apps menu
 }
 
@@ -1971,12 +1984,41 @@ export interface Theme {
   colors?: ThemeColors;
   contrast?: 'standard' | 'medium' | 'high';
   colorMatch?: boolean;
+  // The typefaces (THEME-09): families the gateway ships, absent for the
+  // system's.
+  fonts?: ThemeFonts;
   // GENERATED from the colours by the gateway on save (whatever is sent here
   // for a theme with colours is ignored).
   dark: Record<string, string>;
   light: Record<string, string>;
   createdAt: number;
   updatedAt: number;
+}
+
+// A file uploaded on a route (ROUTE-22), its content left on the gateway.
+export interface RouteFile {
+  name: string;
+  contentType: string;
+  size: number;
+  sha: string;
+  updatedAt: number;
+}
+
+// A relative path, each segment encoded and the slashes kept.
+function encodePath(p: string): string {
+  return p.split('/').map(encodeURIComponent).join('/');
+}
+
+export interface ThemeFonts {
+  display?: string;
+  body?: string;
+  code?: string;
+}
+
+// The typefaces a theme may choose, and the faces that draw them.
+export interface FontCatalogue {
+  families: { family: string; kind: 'sans' | 'serif' | 'mono'; category: string }[];
+  css: string;
 }
 
 export interface ThemeColors {
@@ -2072,6 +2114,24 @@ export class ApiService {
     return this.http.put<SpecDeposit>(`/api/routes/${encodeURIComponent(id)}/spec`, file, {
       params,
     });
+  }
+
+  // The files a route in the "files" mode serves (ROUTE-22).
+  listRouteFiles(id: string): Observable<RouteFile[]> {
+    return this.http.get<RouteFile[]>(`/api/routes/${encodeURIComponent(id)}/files`);
+  }
+
+  putRouteFile(id: string, name: string, file: Blob): Observable<RouteFile> {
+    return this.http.put<RouteFile>(`/api/routes/${encodeURIComponent(id)}/files/${encodePath(name)}`, file);
+  }
+
+  // Renames a file or corrects its type; an empty field keeps the value.
+  updateRouteFile(id: string, name: string, change: { name?: string; contentType?: string }): Observable<RouteFile> {
+    return this.http.patch<RouteFile>(`/api/routes/${encodeURIComponent(id)}/files/${encodePath(name)}`, change);
+  }
+
+  deleteRouteFile(id: string, name: string): Observable<void> {
+    return this.http.delete<void>(`/api/routes/${encodeURIComponent(id)}/files/${encodePath(name)}`);
   }
 
   // Drops the deposited file AND the declaration naming it: a route left
@@ -2804,6 +2864,10 @@ export class ApiService {
   }
 
   // Built-in starting palettes (THEME-04) - offered under the "+" button.
+  listFonts(): Observable<FontCatalogue> {
+    return this.http.get<FontCatalogue>('/api/themes/fonts');
+  }
+
   listPresets(): Observable<Theme[]> {
     return this.http.get<Theme[]>('/api/themes/presets');
   }
