@@ -22,8 +22,8 @@ visible après coup.
 - **Le routage** : le catalogue de prédicats et de filtres, modifiable à chaud et
   appliqué dès la requête suivante. Voir les [prédicats](/docs/predicates/overview)
   et les [filtres](/docs/filters/overview).
-- **L'identité** : comptes locaux, OpenID Connect, LDAP et Active Directory,
-  GitHub, tous testés face à de vrais serveurs. Sessions, jetons d'API, jetons
+- **L'identité** : comptes locaux, OpenID Connect, SAML 2.0, LDAP et Active
+  Directory, GitHub, tous testés face à de vrais serveurs. Sessions, jetons d'API, jetons
   signés transmis aux upstreams.
 - **L'accès** : un catalogue hiérarchique de rôles, des groupes par organisation,
   les organisations elles-mêmes, une règle par route, et une sécurité par endpoint
@@ -105,9 +105,6 @@ indique, ligne par ligne, ce qui manque à chacune.
 - **Un assistant de découverte** : la gateway sait déjà lire le socket Docker
   et un namespace Kubernetes. Il manque l'écran qui en fait "analyser, choisir un
   conteneur, obtenir une route".
-- **SAML**, pour les entreprises dont le fournisseur d'identité ne parle pas
-  OpenID Connect. On peut déjà l'enregistrer, et la fabrique le refuse : c'est
-  honnête, mais pas encore utile.
 - **Se connecter en tant que** : ce qu'un support fait tous les jours, et qui
   passe aujourd'hui par demander son mot de passe à quelqu'un.
 - **Un cache de réponses**, puisque la gateway est déjà le seul endroit qui

@@ -31,9 +31,8 @@ en mémoire, au repos
 dépendance
 :::
 
-Ce que la gateway coûte à une requête est mesuré à côté de Kong, APISIX et
-Traefik, sur la même machine : [les chiffres](/product/performance) sont
-recalculés à chaque commit.
+Et elle est rapide : mesurée à côté de Kong, APISIX et Traefik, chacun sur le
+même CPU, avec [des chiffres](/product/performance) tenus à jour par la CI.
 
 ::: lead
 Vos services reçoivent des requêtes déjà authentifiées, accompagnées d'un jeton
@@ -52,32 +51,33 @@ en jours d'ingénierie.
 
 Installer la gateway, puis Prometheus, puis Grafana, puis écrire du YAML
 pour tout : Meerkat existe pour rompre avec ce schéma. Les chiffres de trafic,
-le journal d'audit, les quotas et l'état de santé sont des écrans de la
-console, et toute la gateway tient dans un binaire au stockage embarqué.
+le journal d'audit, les règles de quotas et la santé des services sont des
+écrans de la console, et toute la gateway tient dans un binaire au stockage embarqué.
 
 ### L'identité fait partie du produit
 
 Les comptes, les rôles, les groupes, les organisations et les pages de
-connexion sont dans la gateway, pas à côté. Les annuaires d'entreprise -
-OpenID Connect, LDAP, Active Directory, GitHub - authentifient ; ils ne
-décident jamais des rôles.
+connexion sont dans la gateway, pas à côté. L'annuaire de votre entreprise -
+OpenID Connect, GitHub, et avec Enterprise SAML, LDAP ou Active Directory -
+connecte les utilisateurs, et en Enterprise ses groupes peuvent accorder des
+rôles.
 
-### Sans mot de passe, d'abord
+### Une connexion solide, intégrée
 
-Les passkeys sont un facteur à part entière, le TOTP se souvient d'un
-navigateur auquel vous faites confiance, et une politique de mots de passe se
+Les passkeys comme premier facteur, une application d'authentification qui se
+souvient d'un navigateur de confiance, et une politique de mots de passe qui se
 règle au lieu de se réécrire.
 
 ### Elle habille vos pages
 
 Le bouton de compte, le portail de navigation, le mode clair ou sombre et le
-CSS par rôle sont injectés dans les pages que relaie la gateway. Votre
+CSS par rôle sont ajoutés aux pages que sert la gateway. Votre
 application en bénéficie quel que soit le langage dans lequel elle est écrite,
 et n'embarque aucune bibliothèque pour cela.
 
 ### Modifiée à chaud, jamais redémarrée
 
-Onze prédicats décident qu'une requête relève d'une route, trente-trois filtres
+Onze prédicats décident qu'une requête relève d'une route, trente-quatre filtres
 la transforment, et un changement s'applique dès la requête suivante. Il n'y a
 pas de fichier de configuration à redéployer.
 
@@ -119,8 +119,8 @@ payer. Lisez le code, modifiez-le, livrez-le dans votre propre produit ; deux
 ans après sa publication, chaque version passe sous licence Apache 2.0.
 
 Enterprise est ce qu'il vous faut dès que l'installation grandit : plusieurs
-organisations, Active Directory, plusieurs gateways derrière un même point
-d'entrée. Jamais une brique de sécurité : TLS, le second facteur, les passkeys,
+organisations, SAML, LDAP et Active Directory, plusieurs gateways derrière un même
+point d'entrée. Jamais une brique de sécurité : TLS, le second facteur, les passkeys,
 le coffre et le journal d'audit sont gratuits et le resteront. Team, c'est
 Enterprise pour un cluster de taille connue, et l'édition d'évaluation, c'est
 Enterprise avec une mention affichée, gratuite, pour tout essayer d'abord.

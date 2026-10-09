@@ -82,12 +82,13 @@ all and answers the question *by what may somebody sign in here*.
 | OIDC - any conforming provider: Keycloak, Entra ID, Okta | shipped |
 | GitHub | shipped |
 | LDAP / Active Directory | shipped, Enterprise edition |
-| SAML 2.0 | not built - the kind can be stored, and is refused when used |
+| SAML 2.0 | shipped, Enterprise edition |
 | Kerberos / SPNEGO | not built |
 
 An external authority answers the **first factor only**. It says this is the
-person; it never decides what they may do here - that is the gateway's, and it
-comes from roles, groups and memberships.
+person; what they may do here is the gateway's, and it comes from roles, groups
+and memberships - which an Enterprise group rule can derive from the
+directory's own groups at each sign-in.
 
 Several settings are per-authority, with a third state that inherits the global
 one: whether a second factor is required, whether passkeys are allowed, and

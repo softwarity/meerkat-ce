@@ -21,8 +21,8 @@ transform it, an access rule decides, and what happened is visible afterwards.
 - **Routing**: the predicate and filter catalogue, edited hot, applied on the
   next request. See [predicates](/docs/predicates/overview) and
   [filters](/docs/filters/overview).
-- **Identity**: local accounts, OpenID Connect, LDAP and Active Directory,
-  GitHub - all tested against real servers. Sessions, API tokens, signed
+- **Identity**: local accounts, OpenID Connect, SAML 2.0, LDAP and Active
+  Directory, GitHub - all tested against real servers. Sessions, API tokens, signed
   tokens to upstreams.
 - **Access**: a hierarchical role catalogue, groups per organisation,
   organisations themselves, a rule per route, and per-endpoint security read
@@ -97,9 +97,6 @@ line, what is missing from each.
 - **A discovery wizard**: the gateway can already read the Docker socket and a
   Kubernetes namespace. Turning that into "scan, pick a container, get a route"
   is the screen that is missing.
-- **SAML**, for the enterprises whose identity provider does not speak OpenID
-  Connect. It is registrable today and refuses at the factory, which is honest
-  and not yet useful.
 - **Sign in as**: what a support desk does every day, and which today is done
   by asking somebody for their password.
 - **A response cache**, because the gateway is already the only place that sees

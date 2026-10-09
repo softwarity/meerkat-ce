@@ -82,6 +82,26 @@ mat-form-field {
   margin: 4px 0;
   font-size: 0.8rem;
 }
+.hint.error {
+  color: var(--mat-sys-error);
+}
+.svg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  .hint {
+    flex: 1 1 auto;
+  }
+  app-file-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+.icon-paste.dragging {
+  outline: 2px dashed var(--mat-sys-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
 // The paste box fills the space the icon grid would take in search mode: it
 // grows (overriding the generic .body > mat-form-field which stays fixed), and

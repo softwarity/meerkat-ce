@@ -2,6 +2,15 @@
 
 ## NEXT RELEASE
 
+- **The portal's rail works on a phone.** A container's modules no longer run off the
+  edge of a narrow screen: they fold into one button naming the module you are on,
+  which opens them as a menu - on a phone, or whenever they do not fit.
+- **A portal icon can come from an SVG file.** Beside pasting it, the SVG mode takes a
+  file dropped on the box or chosen from the disk; a file that is not an SVG is named
+  and refused.
+- **The portal preview comes back after a mode change.** Going from Portal to Links
+  or None and back left the preview's bar empty until the screen was opened again.
+
 ---
 
 ## 1.3.0

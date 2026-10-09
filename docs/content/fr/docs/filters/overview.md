@@ -2,7 +2,7 @@
 title: Filtres
 section: Filtres
 order: 60
-summary: Ce qu'est un filtre, les quatre phases où il peut s'exécuter, et les trente-trois filtres du catalogue.
+summary: Ce qu'est un filtre, les quatre phases où il peut s'exécuter, et les trente-quatre filtres du catalogue.
 ---
 
 # Filtres
@@ -57,8 +57,9 @@ volumineux" ne veut pas dire "pas pour cette route" : cela veut dire non.
 ## Ce que veut dire terminal
 
 Un filtre terminal répond lui-même pour la route, et l'upstream n'est donc jamais
-appelé. Ils sont trois : [redirect](/docs/filters/redirect),
-[respond](/docs/filters/respond) et [maintenance](/docs/filters/maintenance).
+appelé. Ils sont quatre : [redirect](/docs/filters/redirect),
+[respond](/docs/filters/respond), [files](/docs/filters/files) et
+[maintenance](/docs/filters/maintenance).
 
 - **Un seul par route.** Un second filtre terminal sur la même route est refusé.
 - **Les filtres de requête sont ignorés**, et la gateway journalise leur nombre : il n'y a plus de requête transmise à modifier.
@@ -122,6 +123,7 @@ appelé. Ils sont trois : [redirect](/docs/filters/redirect),
 
 | Type | Ce que ça fait |
 | --- | --- |
+| [files](/docs/filters/files) | Répond avec les fichiers téléversés sur la route, sans rien transmettre. |
 | [maintenance](/docs/filters/maintenance) | Répond `503` avec la page d'indisponibilité de la gateway, sans rien transmettre à l'upstream. |
 | [redirect](/docs/filters/redirect) | Répond par une redirection, sans rien transmettre à l'upstream. |
 | [respond](/docs/filters/respond) | Répond à partir d'un gabarit, avec l'appelant connecté à disposition. |

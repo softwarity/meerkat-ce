@@ -26,8 +26,8 @@ License. No account, no key, no expiry.
 ### Evaluation - free
 
 **Eval.** Everything, Enterprise included, to try before a conversation:
-several organisations, LDAP and Active Directory, the cluster, ACME, the
-OpenTelemetry export, the developer tunnel. No time limit, no counter, nothing
+several organisations, SAML, LDAP and Active Directory, the cluster, ACME,
+configurations in git, the OpenTelemetry export, the developer tunnel. No time limit, no counter, nothing
 switched off.
 
 What it carries instead is a notice - *evaluation version, not licensed for
@@ -39,7 +39,7 @@ across the console. No setting removes it.
 ### Team - talk to us
 
 **TE.** Everything Enterprise does, for an installation of a known size: a
-cluster of a few gateways, the number set by your licence. No notice, and
+cluster of a few gateways, the number set by your agreement. No notice, and
 support from the people who wrote the gateway.
 
 The sizes and what each costs are being settled. Tell us how many gateways you
@@ -62,7 +62,7 @@ Priced for the installation, **not per user, not per request, not per route**.
 | **Production use** | Yes | No | Yes | Yes |
 | **The Enterprise capabilities** | - | Yes | Yes | Yes |
 | **Evaluation notice** | - | On every surface | - | - |
-| **Gateways in a cluster** | One | Not limited | Limited by the licence | Not limited |
+| **Gateways in a cluster** | One | Not limited | Set by your agreement | Not limited |
 | **Support** | The public repository | The public repository | Part of the agreement | Part of the agreement |
 
 What "the Enterprise capabilities" are, row by row, is on
@@ -70,9 +70,8 @@ What "the Enterprise capabilities" are, row by row, is on
 
 ## An image built for you
 
-A Team or an Enterprise image is **built for your company**: it carries your
-licence - your name, what it covers - from the moment it is made. That is why
-there is still nothing to activate: no key to install, no activation server to
+A Team or an Enterprise image is **built for your company**, under your
+agreement. There is still nothing to activate: no key to install, no activation server to
 reach, no entitlement to renew, nothing that expires in the middle of a night.
 The gateway never calls us, and there is no usage report anywhere in it.
 

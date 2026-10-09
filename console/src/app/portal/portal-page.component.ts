@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -106,6 +106,16 @@ export class PortalPageComponent {
     // plane does - a route that stopped serving pages is a module that no
     // longer has anything behind it.
     live.on('route', () => this.loadRoutes());
+
+    // The frame lives inside the portal mode's block: leaving the mode destroys
+    // it, coming back makes a NEW one, which has to say it is ready before it
+    // is posted anything. Without this reset the old frame's "ready" stood,
+    // the new one's changed nothing, and the bar came back empty until the
+    // screen was opened again.
+    effect(() => {
+      this.frame();
+      untracked(() => this.frameReady.set(false));
+    });
 
     // The preview: post the draft whenever it (or the selection) changes and the
     // frame is ready.

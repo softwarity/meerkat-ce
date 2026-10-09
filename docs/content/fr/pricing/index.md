@@ -27,8 +27,8 @@ License. Pas de compte à créer, pas de clé, pas de date d'expiration.
 ### Évaluation - gratuite
 
 **Eval.** Tout le produit, Enterprise compris, pour essayer avant d'en parler :
-plusieurs organisations, LDAP et Active Directory, le cluster, ACME, l'export
-OpenTelemetry, le tunnel développeur. Aucune limite de durée, aucun compteur,
+plusieurs organisations, SAML, LDAP et Active Directory, le cluster, ACME, les
+configurations dans git, l'export OpenTelemetry, le tunnel développeur. Aucune limite de durée, aucun compteur,
 rien de désactivé.
 
 En contrepartie, elle affiche une mention - *version d'évaluation, sans licence
@@ -41,7 +41,7 @@ retire.
 ### Team - parlons-en
 
 **TE.** Tout ce que fait Enterprise, pour une installation de taille connue :
-un cluster de quelques gateways, dont votre licence fixe le nombre. Sans
+un cluster de quelques gateways, dont votre contrat fixe le nombre. Sans
 mention d'évaluation, et avec le support de ceux qui ont écrit la gateway.
 
 Les tailles et leur prix sont en cours de définition. Dites-nous combien de
@@ -65,7 +65,7 @@ route**.
 | **Usage en production** | Oui | Non | Oui | Oui |
 | **Les capacités Enterprise** | - | Oui | Oui | Oui |
 | **Mention d'évaluation** | - | Partout | - | - |
-| **Gateways dans un cluster** | Une | Sans limite | Limitées par la licence | Sans limite |
+| **Gateways dans un cluster** | Une | Sans limite | Fixé par votre contrat | Sans limite |
 | **Support** | Le dépôt public | Le dépôt public | Compris dans l'accord | Compris dans l'accord |
 
 La page [Éditions](/product/editions) détaille, ligne par ligne, ce que sont
@@ -73,9 +73,8 @@ La page [Éditions](/product/editions) détaille, ligne par ligne, ce que sont
 
 ## Une image construite pour vous
 
-Une image Team ou Enterprise est **construite pour votre société** : elle porte
-votre licence - votre nom, ce qu'elle couvre - dès sa fabrication. C'est
-pourquoi il n'y a toujours rien à activer : pas de clé à installer, pas de
+Une image Team ou Enterprise est **construite pour votre société**, dans le
+cadre de votre contrat. Il n'y a toujours rien à activer : pas de clé à installer, pas de
 serveur d'activation à joindre, pas de droit à renouveler, rien qui expire au
 milieu de la nuit. La gateway ne nous appelle jamais, et elle ne contient
 aucun rapport d'usage.

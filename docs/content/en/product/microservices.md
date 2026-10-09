@@ -26,12 +26,12 @@ The path of one request: it reaches the gateway, which decides, and leaves for
 the service concerned - an interface or an API.
 :::
 
-A **UI route** is a page a person looks at, so the gateway dresses it on the
+A **UI route** is a page a person looks at, so the gateway adds to it on the
 way through: the navigation portal, the account button, the theme, light and
 dark mode, injected into the HTML. The application carries nothing for that and
-does not even know it is being dressed.
+does not even know.
 
-An **API route** is called by a program, so there is nothing to dress. It
+An **API route** is called by a program, so there is nothing to add. It
 receives a signed token saying who is calling, with their roles and their
 organisation, and it authenticates nobody. A service is often both: its pages
 behind a UI route, its own API behind an API route.
@@ -43,10 +43,10 @@ One published point, several interchangeable replicas behind it, and your
 services staying inside.
 :::
 
-Your ingress publishes one thing: the gateway's data plane. Your services stay
-reachable from inside the cluster only, which means none of them has a door to
-guard. The admin console is not on that port at all: it is the second plane, on
-an internal network.
+Your ingress publishes one thing: the gateway's application port. Your services
+stay reachable from inside the cluster only, so none of them has a door to
+guard. The admin console is not on that port at all: it has its own, on an
+internal network.
 
 Behind the ingress, several replicas serve the same routes. They never talk to
 each other: what they have in common is in the database, and a route that
@@ -79,10 +79,10 @@ other.
 Who gets through is decided at the door, per route and down to one operation of
 your OpenAPI spec. The rule changes without redeploying the service it protects.
 
-### The dressing
+### The shared interface
 
 The navigation portal, the account button and the theme arrive in the HTML on
-the way through. One more interface gets them without being touched.
+the way through. A new application gets them without a line of code.
 :::
 
 ## Where the gateway does not go
@@ -103,8 +103,8 @@ or by letting an agent do it.
 
 ### Say whether it is an interface or an API
 
-That is what decides whether the response is dressed or the request leaves with
-a signed token.
+That decides whether the page gets the portal and the account button, or the
+request leaves with a signed token.
 
 ### Set the access rule
 

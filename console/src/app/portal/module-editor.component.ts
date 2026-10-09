@@ -10,6 +10,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { ApiService, BankIcon, Route } from '../api.service';
+import { FileButtonComponent, FileDropDirective } from '../shared/file-pick';
 import { SvgIconComponent } from './svg-icon.component';
 
 // One entry as it is edited (PORTAL-01): a module - which UI route it opens -
@@ -59,6 +60,8 @@ export interface ModuleFormData {
 @Component({
   selector: 'app-module-editor',
   imports: [
+    FileButtonComponent,
+    FileDropDirective,
     MatButtonModule,
     MatButtonToggleModule,
     MatIconModule,
@@ -135,6 +138,20 @@ export class ModuleEditorComponent implements OnInit {
 
   protected pick(svg: string): void {
     this.icon.set(svg);
+  }
+
+  // An SVG file, chosen or dropped, lands in the paste box as if pasted: the
+  // same text, read the same way when saved.
+  protected readonly svgError = signal('');
+  protected async loadSvg(file: File | undefined): Promise<void> {
+    this.svgError.set('');
+    if (!file) return;
+    const text = (await file.text()).trim();
+    if (!/<svg[\s>]/i.test(text)) {
+      this.svgError.set($localize`:@@Portal_not_svg:${file.name}:NAME: is not an SVG file.`);
+      return;
+    }
+    this.icon.set(text);
   }
 
   // A module needs its route, a container its label: neither has anything

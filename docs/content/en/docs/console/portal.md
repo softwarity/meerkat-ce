@@ -39,8 +39,10 @@ bar, come back: the entries stay.
    both, and whether the application name sits beside the logo.
 4. **Check it narrow** (*Portal* mode). The three width buttons put the preview
    in tablet and phone, to watch the overflow chevrons and the waffle launcher
-   appear when the tabs no longer fit. Only full width is editable, and the
-   width is never saved.
+   appear when the tabs no longer fit. In the rail layout, a container's modules
+   fold into one button that names the module you are on and opens them as a
+   menu - on a phone, or as soon as they do not fit on one line. Only full width
+   is editable, and the width is never saved.
 
 ## An entry
 
@@ -53,7 +55,7 @@ bar, come back: the entries stay.
 - **Label** - required on a container; on a module, empty takes the route's
   name.
 - **Description** - the tooltip.
-- **Icon** (*Portal* mode) - search the embedded icon set, or paste an SVG.
+- **Icon** (*Portal* mode) - search the embedded icon set, or give an SVG: paste it, drop its file, or choose the file.
 
 A container opens its first sub-module the visitor may open, and is not shown to
 a visitor who may open none of them.

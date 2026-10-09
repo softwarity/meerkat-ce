@@ -41,6 +41,7 @@ const portalNavJS = `(function () {
     menuOpen: 'M120-240v-80h520v80H120Zm664-40L584-480l200-200 56 56-144 144 144 144-56 56ZM120-440v-80h400v80H120Zm0-200v-80h520v80H120Z',
     account: 'M234-276q51-39 114-61.5T480-360q69 0 132 22.5T726-276q35-41 54.5-93T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 59 19.5 111t54.5 93Zm246-164q-59 0-99.5-40.5T340-580q0-59 40.5-99.5T480-720q59 0 99.5 40.5T620-580q0 59-40.5 99.5T480-440Zm0 360q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z',
     left: 'M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z',
+    expand: 'M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z',
     right: 'M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z',
     lightMode: 'M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z',
     darkMode: 'M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z'
@@ -129,6 +130,17 @@ const portalNavJS = `(function () {
       'padding:0 8px;overflow-x:auto;scrollbar-width:none;background:var(--surface);color:var(--onsurface);' +
       'border-bottom:1px solid var(--outline);}' +
     '.strip::-webkit-scrollbar{display:none;}' +
+    '.stabs{display:flex;align-items:center;gap:2px;min-width:0;}' +
+    // Phone width, or modules that do not fit: ONE button naming where one is,
+    // opening the modules as a menu - a strip that scrolls sideways hides the
+    // ones past the edge, and nothing says they are there.
+    '.smenu .cr svg{width:20px;height:20px;}' +
+    '.cmenu{position:fixed;z-index:2147483110;background:var(--surface);color:var(--onsurface);' +
+      'border:1px solid var(--outline);border-radius:14px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.28);' +
+      'display:flex;flex-direction:column;gap:2px;min-width:200px;max-width:calc(100vw - 16px);' +
+      'max-height:calc(100dvh - ' + (STRIP_H + 16) + 'px);overflow-y:auto;}' +
+    '.cmenu[hidden]{display:none;}' +
+    '.cmenu .tab{width:100%;justify-content:flex-start;padding:10px 12px;}' +
     // ---- rail (rail-nav) ----
     '.rail{position:fixed;top:0;bottom:0;width:' + RAIL_W + 'px;z-index:2147483100;display:flex;flex-direction:column;' +
       'background:var(--surface);color:var(--onsurface);transition:width .2s ease;overflow:visible;}' +
@@ -663,11 +675,50 @@ const portalNavJS = `(function () {
     // A container's modules, and nothing before them: a container has no page
     // of its own to go back to.
     _buildStrip(children, currentChild) {
-      var d = this._data;
+      var self = this, d = this._data;
       var strip = document.createElement('nav'); strip.className = 'strip';
       strip.style[d.side === 'right' ? 'right' : 'left'] = RAIL_W + 'px';
       strip.style[d.side === 'right' ? 'left' : 'right'] = '0';
-      for (var i = 0; i < children.length; i++) strip.appendChild(this._tab(children[i], children[i] === currentChild));
+      var tabs = document.createElement('div'); tabs.className = 'stabs';
+      for (var i = 0; i < children.length; i++) tabs.appendChild(this._tab(children[i], children[i] === currentChild));
+      strip.appendChild(tabs);
+
+      // The same modules behind one button, for when the strip cannot hold
+      // them (decided in _updateArrows). It names the module one is on, or the
+      // container when none is, so the button says where one stands.
+      var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'tab cur smenu'; btn.hidden = true;
+      var here = currentChild || this._current || {};
+      var g = this._glyph(here); if (g) btn.appendChild(g);
+      var l = document.createElement('span'); l.textContent = here.label || ''; btn.appendChild(l);
+      var chev = document.createElement('span'); chev.className = 'cr'; chev.innerHTML = chrome(P.expand); btn.appendChild(chev);
+      btn.setAttribute('aria-haspopup', 'menu');
+      btn.setAttribute('aria-expanded', 'false');
+      strip.appendChild(btn);
+
+      var menu = document.createElement('div'); menu.className = 'cmenu'; menu.hidden = true;
+      menu.setAttribute('role', 'menu');
+      for (var j = 0; j < children.length; j++) {
+        var t = this._tab(children[j], children[j] === currentChild);
+        t.setAttribute('role', 'menuitem');
+        // A menu says what each line is: the label shows whatever the bar's
+        // display setting, an icon alone in a list reads as nothing.
+        if (!this._showLabel()) {
+          var tl = document.createElement('span'); tl.textContent = children[j].label || ''; t.appendChild(tl);
+        }
+        menu.appendChild(t);
+      }
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+        btn.setAttribute('aria-expanded', String(!menu.hidden));
+        if (!menu.hidden) {
+          var r = btn.getBoundingClientRect();
+          menu.style.top = (r.bottom + 4) + 'px';
+          if (d.side === 'right') { menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px'; menu.style.left = 'auto'; }
+          else { menu.style.left = Math.max(8, r.left) + 'px'; menu.style.right = 'auto'; }
+        }
+      });
+      this._stripTabsEl = tabs; this._stripBtnEl = btn; this._cmenuEl = menu;
       return strip;
     }
 
@@ -688,6 +739,7 @@ const portalNavJS = `(function () {
       var wrap = document.createElement('div'); wrap.className = 'mk'; this._root.appendChild(wrap);
       this._tabsEl = this._leftEl = this._rightEl = this._ritemsEl = this._launchEl = null;
       this._railEl = this._backdropEl = this._spacerEl = null;
+      this._stripTabsEl = this._stripBtnEl = this._cmenuEl = null;
 
       this._grid = this._buildGrid(); wrap.appendChild(this._grid);
       var backdrop = document.createElement('div'); backdrop.className = 'backdrop' + (this._expanded ? ' on' : '');
@@ -704,7 +756,10 @@ const portalNavJS = `(function () {
         });
         wrap.appendChild(rail);
         var hasStrip = children.length > 0;
-        if (hasStrip) wrap.appendChild(this._buildStrip(children, currentChild));
+        if (hasStrip) {
+          wrap.appendChild(this._buildStrip(children, currentChild));
+          wrap.appendChild(this._cmenuEl);
+        }
         this._offset('rail', d.side, hasStrip);
       } else {
         // parents in the header, children in the rail
@@ -721,7 +776,10 @@ const portalNavJS = `(function () {
       }
 
       if (this._onDoc) document.removeEventListener('click', this._onDoc);
-      this._onDoc = function () { if (self._grid) self._grid.hidden = true; };
+      this._onDoc = function () {
+        if (self._grid) self._grid.hidden = true;
+        if (self._cmenuEl) { self._cmenuEl.hidden = true; self._stripBtnEl.setAttribute('aria-expanded', 'false'); }
+      };
       document.addEventListener('click', this._onDoc);
       if (this._onResize) window.removeEventListener('resize', this._onResize);
       this._onResize = function () { self._updateArrows(); };
@@ -754,6 +812,7 @@ const portalNavJS = `(function () {
     }
 
     _updateArrows() {
+      this._updateStrip();
       var t = this._tabsEl, l = this._leftEl, r = this._rightEl, launch = this._launchEl;
       if (t) {
         // Phone width: hide the tab strip (and its chevrons) entirely and leave
@@ -780,6 +839,20 @@ const portalNavJS = `(function () {
       // items overflow the rail's height - otherwise every parent is in view.
       var ri = this._ritemsEl;
       if (launch && ri) launch.hidden = ri.scrollHeight <= ri.clientHeight + 2;
+    }
+
+    // The modules strip shows its tabs when they fit and the viewport is not a
+    // phone's; otherwise the one button and its menu. Measured with the tabs
+    // shown, since a hidden row has no width to compare.
+    _updateStrip() {
+      var tabs = this._stripTabsEl, btn = this._stripBtnEl;
+      if (!tabs || !btn) return;
+      tabs.hidden = false;
+      var strip = tabs.parentNode;
+      var fold = window.innerWidth < NARROW || tabs.scrollWidth > strip.clientWidth - 16;
+      tabs.hidden = fold;
+      btn.hidden = !fold;
+      if (!fold && this._cmenuEl) this._cmenuEl.hidden = true;
     }
 
     _offset(layout, side, hasSecondary) {

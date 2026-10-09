@@ -20,7 +20,7 @@ your services do not have to.
 ## Reference
 
 - **[Predicates](/docs/predicates/overview)** - the eleven ways a route decides a request is for it.
-- **[Filters](/docs/filters/overview)** - the thirty-three ways it transforms one.
+- **[Filters](/docs/filters/overview)** - the thirty-four ways it transforms one.
 - **[The console](/docs/console/overview)** - every screen, and what it is for.
 
 ## Looking after it

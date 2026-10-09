@@ -31,9 +31,8 @@ in memory, at rest
 dependencies
 :::
 
-What the gateway costs a request is measured next to Kong, APISIX and Traefik
-on the same machine: [the figures](/product/performance) are recomputed on
-every commit.
+And it is fast: measured next to Kong, APISIX and Traefik, each on the same
+CPU, with [the figures](/product/performance) kept current by the CI.
 
 ::: lead
 Your services receive requests that are already authenticated, carrying a
@@ -52,29 +51,30 @@ licences and in engineering days.
 
 Install the gateway, then Prometheus, then Grafana, then write YAML for
 everything: that is the pattern Meerkat exists to break. Traffic figures, audit
-trail, quotas and health are screens in the console, and the whole gateway is
-one binary with embedded storage.
+trail, quota rules and service health are screens in the console, and the whole
+gateway is one binary with embedded storage.
 
 ### Identity is part of the product
 
 Accounts, roles, groups, organisations and the sign-in pages are in the
-gateway, not beside it. Enterprise directories - OpenID Connect, LDAP, Active
-Directory, GitHub - authenticate; they never decide roles.
+gateway, not beside it. Your corporate directory - OpenID Connect, GitHub, and
+with Enterprise SAML, LDAP or Active Directory - signs people in, and in
+Enterprise its groups can grant roles.
 
-### Passwordless first
+### Strong sign-in, built in
 
-Passkeys are a first-class factor, TOTP remembers a browser you trust, and a
-password policy is a setting rather than a rewrite.
+Passkeys as a first factor, an authenticator app that remembers a browser you
+trust, and a password policy that is a setting rather than a rewrite.
 
-### It dresses your pages
+### It completes your pages
 
-The account button, the navigation portal, the light and dark scheme and the
-per-role CSS are injected into the pages the gateway proxies. Your application
+The account button, the navigation portal, light and dark mode and the per-role
+CSS are added to the pages the gateway serves. Your application
 gets them whatever it is written in, and it ships no library for it.
 
 ### Edited hot, never restarted
 
-Eleven predicates decide that a request is for a route, thirty-three filters
+Eleven predicates decide that a request is for a route, thirty-four filters
 transform it, and a change applies on the next request. There is no
 configuration file to redeploy.
 
@@ -115,7 +115,8 @@ code, change it, ship it inside your own product; two years after each release,
 that version becomes plain Apache 2.0.
 
 Enterprise is what you need once the installation grows: several
-organisations, Active Directory, several gateways behind one entry point. Never
+organisations, SAML, LDAP and Active Directory, several gateways behind one entry
+point. Never
 a security primitive - TLS, two-factor, passkeys, the vault and the audit trail
 are free and stay free. Team is Enterprise for a cluster of a known size, and
 the evaluation edition is Enterprise with a notice on it, free, to try all of

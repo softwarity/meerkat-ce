@@ -103,10 +103,18 @@
         }
       </div>
     } @else {
-      <p class="hint text-muted" i18n="@@Portal_paste_hint">
-        Paste an SVG. Only its shape is kept, so it takes the bar's colour.
-      </p>
-      <mat-form-field appearance="outline" class="icon-paste">
+      <div class="svg-row">
+        <p class="hint text-muted" i18n="@@Portal_paste_hint3">
+          Paste an SVG or drop its file. Only its shape is kept: it takes the bar's colour.
+        </p>
+        <app-file-button appearance="text" accept=".svg,image/svg+xml" (picked)="loadSvg($event[0])">
+          <span i18n="@@Portal_choose_svg">Choose a file</span>
+        </app-file-button>
+      </div>
+      @if (svgError(); as e) {
+        <p class="hint error">{{ e }}</p>
+      }
+      <mat-form-field appearance="outline" class="icon-paste" appFileDrop (filesDropped)="loadSvg($event[0])">
         <textarea matInput rows="6" [value]="icon()" (input)="icon.set($any($event.target).value)"
                   placeholder="&lt;svg viewBox=&quot;0 0 24 24&quot;&gt;&lt;path d=&quot;...&quot;/&gt;&lt;/svg&gt;"></textarea>
       </mat-form-field>

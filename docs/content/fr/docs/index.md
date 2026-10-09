@@ -20,7 +20,7 @@ et de l'observation, pour que vos services n'aient plus à s'en occuper.
 ## Référence
 
 - **[Prédicats](/docs/predicates/overview)** - les onze façons dont une route décide qu'une requête lui est destinée.
-- **[Filtres](/docs/filters/overview)** - les trente-trois façons dont elle la transforme.
+- **[Filtres](/docs/filters/overview)** - les trente-quatre façons dont elle la transforme.
 - **[La console](/docs/console/overview)** - chaque écran, et ce à quoi il sert.
 
 ## Au quotidien

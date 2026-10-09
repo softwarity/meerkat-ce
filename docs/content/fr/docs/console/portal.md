@@ -41,8 +41,11 @@ transformer en barre, puis revenir en arrière : les entrées sont conservées.
 4. **Vérifiez le rendu sur un écran étroit** (mode *Portal*). Les trois boutons de
    largeur font passer l'aperçu au format tablette ou téléphone : vous voyez ainsi
    apparaître les chevrons de débordement et le lanceur d'applications lorsque les
-   onglets ne tiennent plus. L'édition n'est possible qu'en pleine largeur, et la
-   largeur choisie n'est jamais enregistrée.
+   onglets ne tiennent plus. En disposition rail, les modules d'un conteneur se
+   replient dans un seul bouton, qui nomme le module où l'on se trouve et les
+   ouvre en menu : sur téléphone, ou dès qu'ils ne tiennent plus sur une ligne.
+   L'édition n'est possible qu'en pleine largeur, et la largeur choisie n'est
+   jamais enregistrée.
 
 ## Une entrée
 
@@ -55,7 +58,7 @@ transformer en barre, puis revenir en arrière : les entrées sont conservées.
 - **Label** - obligatoire pour un conteneur ; pour un module, laissé vide, il
   reprend le nom de la route.
 - **Description** - le texte de l'infobulle.
-- **Icon** (mode *Portal*) - cherchez dans le jeu d'icônes embarqué, ou collez un SVG.
+- **Icon** (mode *Portal*) - cherchez dans le jeu d'icônes embarqué, ou fournissez un SVG : collez-le, déposez son fichier ou choisissez-le.
 
 Un conteneur ouvre son premier sous-module que le visiteur a le droit d'ouvrir,
 et il n'est pas affiché pour un visiteur qui ne peut en ouvrir aucun.

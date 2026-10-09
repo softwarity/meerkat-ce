@@ -2,7 +2,7 @@
 title: Filters
 section: Filters
 order: 60
-summary: What a filter is, the four phases one can run in, and the thirty-three of them.
+summary: What a filter is, the four phases one can run in, and the thirty-four of them.
 ---
 
 # Filters
@@ -56,8 +56,9 @@ route", it is no.
 ## What terminal means
 
 A terminal filter answers the route itself, so the upstream is never called:
-[redirect](/docs/filters/redirect), [respond](/docs/filters/respond) and
-[maintenance](/docs/filters/maintenance) are the three.
+[redirect](/docs/filters/redirect), [respond](/docs/filters/respond),
+[files](/docs/filters/files) and [maintenance](/docs/filters/maintenance) are
+the four.
 
 - **One per route.** A second terminal on the same route is refused.
 - **Request filters are dropped** and the gateway logs how many: there is no proxied request left for them to change.
@@ -121,6 +122,7 @@ A terminal filter answers the route itself, so the upstream is never called:
 
 | Type | What it does |
 | --- | --- |
+| [files](/docs/filters/files) | Answers with files uploaded on the route, instead of proxying. |
 | [maintenance](/docs/filters/maintenance) | Answers `503` with the gateway's unavailable page instead of proxying. |
 | [redirect](/docs/filters/redirect) | Answers with a redirect instead of proxying. |
 | [respond](/docs/filters/respond) | Answers from a template, with the signed-in caller available to it. |

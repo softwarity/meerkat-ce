@@ -89,13 +89,13 @@ ici ?*
 | OIDC - tout fournisseur conforme : Keycloak, Entra ID, Okta | livré |
 | GitHub | livré |
 | LDAP / Active Directory | livré, édition Enterprise |
-| SAML 2.0 | non réalisé - ce type peut être enregistré, et il est refusé à l'usage |
+| SAML 2.0 | livré, édition Enterprise |
 | Kerberos / SPNEGO | non réalisé |
 
 Une autorité externe ne répond que du **premier facteur**. Elle dit que c'est
-bien cette personne ; elle ne décide jamais de ce que cette personne peut faire
-ici. Cela relève de la gateway, et découle des rôles, des groupes et des
-appartenances.
+bien cette personne ; ce qu'elle peut faire ici relève de la gateway, et découle
+des rôles, des groupes et des appartenances - qu'une règle de groupe Enterprise
+peut déduire, à chaque connexion, des groupes de l'annuaire.
 
 Plusieurs réglages se définissent par autorité, avec un troisième état qui
 hérite du réglage global : l'obligation d'un second facteur, l'autorisation des

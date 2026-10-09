@@ -45,10 +45,10 @@ Un seul point publié, plusieurs répliques interchangeables derrière lui, et v
 services qui restent à l'intérieur.
 :::
 
-Votre ingress ne publie qu'une chose : le plan de données de la gateway. Vos
+Votre ingress ne publie qu'une chose : le port applicatif de la gateway. Vos
 services ne restent joignables que depuis l'intérieur du cluster : aucun d'eux
-n'a donc de porte à garder. La console d'administration, elle, n'est pas du
-tout sur ce port : c'est le second plan, sur un réseau interne.
+n'a donc de porte à garder. La console d'administration n'est pas du tout sur
+ce port : elle a le sien, sur un réseau interne.
 
 Derrière l'ingress, plusieurs répliques servent les mêmes routes. Elles ne se
 parlent jamais : ce qu'elles ont en commun est dans la base de données, et une
