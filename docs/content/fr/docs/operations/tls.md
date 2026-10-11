@@ -262,6 +262,8 @@ metadata:
 spec:
   secretName: meerkat-internal-tls
   dnsNames:
+    - meerkat-internal
+    - meerkat-internal.shop
     - meerkat-internal.shop.svc
     - meerkat-internal.shop.svc.cluster.local
   issuerRef:

@@ -121,12 +121,13 @@ service:
 # is served on its own, the key never enters the database.
 internalTls:
   # An existing kubernetes.io/tls Secret - one cert-manager writes for a
-  # Certificate whose dnsNames are <release>-internal.<namespace>.svc and
-  # <release>-internal.<namespace>.svc.cluster.local, for instance.
+  # Certificate carrying the internal Service's names, <release>-meerkat-internal
+  # and its .<namespace>, .<namespace>.svc and .<namespace>.svc.cluster.local
+  # forms (the TLS screen's "Where does its certificate come from?" writes it).
   secretName: ""
   # OpenShift: have the service CA issue it for the internal Service, and
-  # renew it. The Secret is then <release>-internal-tls, and secretName is not
-  # needed.
+  # renew it. The Secret is then <release>-meerkat-internal-tls, and secretName
+  # is not needed.
   openshiftServingCert: false
   # A spare way, for a cluster with cert-manager and nobody to write the
   # Certificate above (SSL-13): the console's Add certificate, From

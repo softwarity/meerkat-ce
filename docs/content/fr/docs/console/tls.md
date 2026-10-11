@@ -69,8 +69,8 @@ noms de cette gateway, et ajoute ce qui lui est propre : la valeur du chart qui
 le monte, et son étiquette Internal.
 
 **Add certificate, Ask cert-manager**, sur Kubernetes seulement, fait demander à la
-gateway son certificat interne à cert-manager : vous choisissez l'émetteur, la gateway
-décide le reste. L'entrée est grisée ailleurs, avec sa raison. Voir
+gateway son certificat interne à cert-manager : aussitôt quand un seul émetteur
+convient, après l'avoir choisi quand il y en a plusieurs ; la gateway décide le reste. L'entrée est grisée ailleurs, avec sa raison. Voir
 [Demandé à cert-manager](/docs/operations/tls#demand-cert-manager).
 
 **Add certificate, From the file system** liste ce que le runtime a monté dans le

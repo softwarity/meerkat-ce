@@ -44,7 +44,10 @@ doit pouvoir les lire avant de détenir quoi que ce soit. `meerkat` ci-dessous
 est le nom de la gateway dans nos fichiers de déploiement ; le tiroir JWT écrit le
 vrai, demandé au runtime - sur Kubernetes le nom complet du Service, par exemple
 `http://meerkat-internal.shop.svc.cluster.local:7070`, sur Swarm ou compose celui
-du service.
+du service. Dès qu'un certificat est placé sur le plan interne, le même contenu est
+servi en HTTPS sur **7443**, et le tiroir donne l'adresse en `https://` ; les
+services font alors confiance à l'autorité qui l'a signé
+([TLS](/docs/operations/tls#un-certificat-depuis-le-systme-de-fichiers)).
 
 ### Recommandé : le document de découverte
 

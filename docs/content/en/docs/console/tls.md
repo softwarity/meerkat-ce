@@ -65,8 +65,8 @@ them over HTTPS. **Only Meerkat** fills them with this gateway's own names, and
 adds what is its own: the chart value that mounts it, and its Internal tag.
 
 **Add certificate, Ask cert-manager**, on Kubernetes only, has the gateway ask
-cert-manager for its internal certificate: pick the issuer, the rest is decided by
-the gateway. It is greyed elsewhere, with the reason. See
+cert-manager for its internal certificate: at once when one issuer fits, after
+picking it when several do; the rest is decided by the gateway. It is greyed elsewhere, with the reason. See
 [Asked of cert-manager](/docs/operations/tls#asked-of-cert-manager).
 
 **Add certificate, From the file system** lists what the runtime mounted in the

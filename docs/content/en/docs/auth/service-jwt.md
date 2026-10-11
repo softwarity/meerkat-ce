@@ -42,7 +42,10 @@ no power, and a service has to read them before it holds anything at all.
 `meerkat` below is the gateway's name in our deployment files; the JWT drawer
 writes the real one, asked of the runtime - on Kubernetes the Service's full
 name, such as `http://meerkat-internal.shop.svc.cluster.local:7070`, on Swarm
-or compose the service's.
+or compose the service's. Once a certificate is placed on the internal plane,
+the same is served in HTTPS on **7443**, and the drawer gives the `https://`
+address; the services then trust the authority that signed it
+([TLS](/docs/operations/tls#a-certificate-from-the-file-system)).
 
 ### Recommended: the discovery document
 

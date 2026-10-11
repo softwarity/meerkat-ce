@@ -206,6 +206,9 @@ from inside the cluster, by the gateway's internal name.
 http://meerkat:7070/api/schedules
 ```
 
+In HTTPS on 7443 once a certificate is placed on the internal plane; the
+scheduler's page gives the address, as the runtime names it.
+
 That port is never put behind an ingress, and it answers **tokens only**: a
 browser session is refused there. Inside the cluster is a place, not a
 credential - any pod can reach a ClusterIP - so nothing on this port gives any
