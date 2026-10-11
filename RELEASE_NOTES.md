@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.5.0
+
 - **A third port for what your services call.** The internal plane (`:7070`,
   `MEERKAT_INTERNAL_ADDR`) serves the JWKS your services verify the identity JWT
   with, and the scheduler's API, inside the cluster only: the chart gives it its own
