@@ -131,8 +131,8 @@
     "CE",
     "EE"
    ],
-   "en": "The JWT a service receives verifies against /.well-known/jwks.json, from ANY node of a cluster.",
-   "fr": "Le JWT que reçoit un service se vérifie avec /.well-known/jwks.json, depuis N'IMPORTE QUEL nœud d'un cluster."
+   "en": "The JWT a service receives verifies against the JWKS of the internal plane (:7070/.well-known/jwks.json), from ANY node of a cluster; the application port does not serve it.",
+   "fr": "Le JWT que reçoit un service se vérifie avec le JWKS du plan interne (:7070/.well-known/jwks.json), depuis N'IMPORTE QUEL nœud d'un cluster ; le port applicatif ne le sert pas."
   },
   {
    "id": "AUTH-07",
@@ -1322,15 +1322,17 @@
   },
   {
    "id": "SAUTH-04",
-   "priority": "-",
-   "feasibility": "out",
-   "targets": [],
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
    "editions": [
     "CE",
     "EE"
    ],
-   "en": "Retired (JWKS is enough).",
-   "fr": "Retirée (le JWKS suffit)."
+   "en": "The internal plane's /.well-known/openid-configuration names the issuer the tokens carry and a jwks_uri that answers; setting the issuer changes both the document and the next token.",
+   "fr": "Le /.well-known/openid-configuration du plan interne nomme l'émetteur que portent les jetons et un jwks_uri qui répond ; régler l'émetteur change à la fois le document et le jeton suivant."
   },
   {
    "id": "SAUTH-05",
@@ -1428,6 +1430,20 @@
    ],
    "en": "Reminder date feeds the digest.",
    "fr": "La date de rappel alimente le récapitulatif quotidien."
+  },
+  {
+   "id": "VAULT-07",
+   "priority": "P3",
+   "feasibility": "hard",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A service reads a vault value on the internal plane with a token allowed to read it, and each read is in the audit trail.",
+   "fr": "Un service lit une valeur du coffre sur le plan interne avec un jeton autorisé à la lire, et chaque lecture figure au journal d'audit."
   },
   {
    "id": "SSL-01",
@@ -1546,6 +1562,77 @@
    ],
    "en": "Placement on a plane reloads the door on every node; conflict named; fallback = oldest placed.",
    "fr": "Placer un certificat sur un plan recharge la porte sur tous les nœuds ; un conflit est nommé ; le certificat de repli est le plus anciennement placé."
+  },
+  {
+   "id": "SSL-09",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An upstream in HTTPS signed by a private authority is a 502 until that authority is imported - chosen, dropped as a file or pasted - then answers on every node; a private key is refused.",
+   "fr": "Un upstream en HTTPS signé par une autorité privée répond 502 tant que cette autorité n'est pas importée - choisie, déposée en fichier ou collée -, puis répond sur chaque nœud ; une clé privée est refusée."
+  },
+  {
+   "id": "SSL-10",
+   "priority": "P3",
+   "feasibility": "medium",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An upstream that requires a client certificate accepts the route's, and refuses the same call without it.",
+   "fr": "Un upstream qui exige un certificat client accepte celui de la route, et refuse le même appel sans lui."
+  },
+  {
+   "id": "SSL-11",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A TLS Secret mounted in the pod is offered from the mount table with its key, taken by its paths only, and a renewal written into the Secret is served on every node without a restart.",
+   "fr": "Un Secret TLS monté dans le pod est proposé depuis la table des montages avec sa clé, pris par ses seuls chemins, et un renouvellement écrit dans le Secret est servi sur chaque nœud sans redémarrage."
+  },
+  {
+   "id": "SSL-12",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A certificate placed on the internal plane opens :7443; a service trusting its authority reaches the JWKS and the discovery document over HTTPS, whose jwks_uri is https.",
+   "fr": "Un certificat placé sur le plan interne ouvre :7443 ; un service qui fait confiance à son autorité atteint le JWKS et le document de découverte en HTTPS, dont le jwks_uri est en https."
+  },
+  {
+   "id": "SSL-13",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "With internalTls.certManager, the gateway lists the ready issuers, creates its Certificate for its internal names, serves the Secret on :7443 without a mount or a restart, follows a renewal on every node, and deleting it removes the Certificate and the Secret; on Swarm or compose the entry is greyed with its reason.",
+   "fr": "Avec internalTls.certManager, la gateway liste les émetteurs prêts, crée son Certificate pour ses noms internes, sert le Secret sur :7443 sans montage ni redémarrage, suit un renouvellement sur chaque nœud, et le supprimer retire le Certificate et le Secret ; sur Swarm ou compose l'entrée est grisée avec sa raison."
   },
   {
    "id": "NOTIF-01",
@@ -3403,6 +3490,21 @@
    ],
    "en": "cosign verify succeeds on the image under test with the workflow's identity, for the digest and for each architecture; an unsigned or re-pushed image fails.",
    "fr": "cosign verify réussit sur l'image testée avec l'identité du workflow, pour le digest et pour chaque architecture ; une image non signée ou poussée à nouveau échoue."
+  },
+  {
+   "id": "DEPLOY-09",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "The internal plane answers the JWKS without a token and the scheduler API with a schedules token only, refuses a browser session, and the chart publishes it on a ClusterIP Service nothing else points at; the application port serves no JWKS.",
+   "fr": "Le plan interne sert le JWKS sans jeton et l'API du scheduler avec un jeton schedules seulement, refuse une session de navigateur, et le chart le publie sur un Service ClusterIP vers lequel rien d'autre ne pointe ; le port applicatif ne sert aucun JWKS."
   },
   {
    "id": "EVAL-01",

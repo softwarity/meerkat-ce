@@ -180,3 +180,72 @@ subjects:
 {{- end }}
 {{- end }}
 {{- end }}
+{{- with include "meerkat.issuedSecret" . }}
+---
+# The internal plane's certificate asked of cert-manager by the gateway itself
+# (internalTls.certManager, SSL-13). Creating a Certificate cannot be granted
+# on one name - Kubernetes has no such thing for a create - so this namespace's
+# Certificates may be created; everything else is on the one name the gateway
+# uses: its Certificate, and the Secret cert-manager writes for it, read and
+# watched through the API instead of mounted. The issuers are listed so the
+# console offers them; nothing about them is written.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "meerkat.fullname" $ }}-cert-manager
+  labels: {{- include "meerkat.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["create"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    resourceNames: [{{ . | quote }}]
+    verbs: ["get", "list", "watch", "patch", "delete"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["issuers"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ . | quote }}]
+    verbs: ["get", "list", "watch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "meerkat.fullname" $ }}-cert-manager
+  labels: {{- include "meerkat.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "meerkat.fullname" $ }}-cert-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" $ }}
+---
+# The cluster's issuers, read: a ClusterIssuer has no namespace, so the right
+# to list them is a cluster one. Read only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $.Release.Namespace }}-{{ include "meerkat.fullname" $ }}-cluster-issuers
+  labels: {{- include "meerkat.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["clusterissuers"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $.Release.Namespace }}-{{ include "meerkat.fullname" $ }}-cluster-issuers
+  labels: {{- include "meerkat.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $.Release.Namespace }}-{{ include "meerkat.fullname" $ }}-cluster-issuers
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}

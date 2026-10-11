@@ -2,7 +2,7 @@
 title: TLS et certificats
 section: Exploitation
 order: 224
-summary: Les quatre façons de faire entrer un certificat, ce que contient la base de données, et ce qu'un cluster doit partager.
+summary: Les cinq façons de faire entrer un certificat, les trois portes où le placer, ce que contient la base, et ce qu'un cluster doit partager.
 ---
 
 # TLS et certificats
@@ -19,14 +19,16 @@ activé sans rien derrière est un interrupteur qui ment.
 
 ![L'écran TLS](img/console/tls.webp)
 
-## Les quatre portes
+## Les façons d'entrer
 
 Aucune n'est facultative, car les environnements où tourne Meerkat ne se ressemblent
 pas (SSL-01) :
 
-| Porte | Quand c'est la bonne |
+| Façon | Quand c'est la bonne |
 |---|---|
 | **Import** | vous détenez déjà le certificat et sa clé |
+| **Depuis le système de fichiers** | le runtime le monte - un Secret Kubernetes, un secret Swarm, un volume compose - et le renouvelle |
+| **Ask cert-manager** | Kubernetes seulement, pour le plan interne : la gateway demande elle-même à cert-manager, quand personne n'a écrit son Certificate |
 | **Auto-signé** | un labo, un nom interne, un premier déploiement |
 | **Demande de signature** | la gateway crée la clé et la CSR, votre autorité signe, vous importez la réponse |
 | **ACME** | une autorité émet et renouvelle toute seule |
@@ -43,10 +45,14 @@ sans s'arrêter (SSL-02) :
 |---|---|---|
 | Données | `MEERKAT_ADDR`, `:8080` | `MEERKAT_TLS_ADDR`, `:8443` |
 | Contrôle | `MEERKAT_ADMIN_ADDR`, `:9090` | `MEERKAT_ADMIN_TLS_ADDR`, `:9443` |
+| Interne | `MEERKAT_INTERNAL_ADDR`, `:7070` | `MEERKAT_INTERNAL_TLS_ADDR`, `:7443` |
 
 Un port dont on ne peut pas nommer le protocole est un port pour lequel personne ne peut
 écrire ni règle de pare-feu ni procédure d'exploitation : voilà pourquoi il y en a
-quatre et non deux.
+deux par plan. La porte HTTPS du plan interne présente un certificat pour le nom par
+lequel les services l'appellent - celui de son Service, dans le cluster -, qui vient de la
+PKI du cluster, lu depuis le système de fichiers (ci-dessous). Aucune autorité publique ne
+voit ces noms : ACME n'y est donc pas proposé.
 
 **Ce sont les ports vus de l'intérieur.** Entre eux et un navigateur, il y a en général
 une correspondance de ports : un Service Kubernetes qui publie `9443` sur `19443`, un
@@ -121,8 +127,7 @@ Sur le **plan de données uniquement**, le port en clair peut rediriger vers le 
 HTTPS (SSL-06). Les deux health checks en sont dispensés : un `308` serait interprété
 comme "pas prêt". Il en va de même de toute requête destinée à un nom qu'aucun
 certificat placé sur l'application ne porte : un service interne au cluster qui appelle
-`http://meerkat-meerkat.ns.svc:8080` - pour récupérer le JWKS, pour un appel d'API
-interne - serait renvoyé vers un certificat établi pour un autre nom, signé par une
+`http://meerkat-meerkat.ns.svc:8080` - pour un appel d'API interne - serait renvoyé vers un certificat établi pour un autre nom, signé par une
 autorité à laquelle il ne fait pas confiance, et échouerait.
 
 Quand la redirection est active, chaque réponse HTTPS du plan de données porte aussi
@@ -207,14 +212,152 @@ cache partagé, que tous les nœuds lisent. Les commandes et les autorités voya
 un export de configuration - la clé HMAC d'un compte sous la forme d'un `$name`, jamais
 d'un littéral ; ce que l'autorité a émis reste dans le cache.
 
+## Un certificat depuis le système de fichiers
+
+Sur Kubernetes, Swarm ou compose, le certificat que la gateway doit présenter existe le
+plus souvent déjà, créé et renouvelé par la plateforme : cert-manager l'écrit dans un
+Secret, l'autorité de service d'OpenShift en écrit un pour un Service, Swarm fournit un
+secret, compose monte un volume. La gateway ne demande pas où : elle lit sa propre **table
+des montages**, qui liste tout ce que le déploiement a monté dans son conteneur, quel que
+soit l'endroit choisi par le manifeste.
+
+**Add certificate, From the file system** montre les montages qui contiennent un
+certificat, chacun avec la clé privée trouvée à côté - un certificat sans clé ne sert rien
+et ne peut pas être choisi. Les montages qui ne sont jamais une PKI sont écartés : les
+pseudo-fichiers du processus, ce que reçoit tout conteneur (`/etc/hosts`,
+`/etc/resolv.conf`), le jeton du ServiceAccount, et le dossier de données, où se trouvent
+la base et la clé du coffre. Le contenu d'un fichier n'est jamais montré : ce qu'il est,
+ses noms, sa fin.
+
+Seuls les **chemins** sont gardés : la clé reste dans son fichier et n'entre jamais en
+base. Chaque nœud lit ses propres fichiers, toutes les trente secondes, et recharge ses
+portes quand ils ont changé - un renouvellement par cert-manager ou par l'autorité de
+service est servi sans redémarrage et sans que personne n'enregistre rien. La réserve
+affiche la nouvelle date de fin.
+
+Un certificat du système de fichiers se place comme les autres. Le plan **Internal**
+n'accepte qu'un certificat qui porte l'un des noms par lesquels les services l'appellent - lu
+auprès du runtime, un joker compte -, et il y ouvre la porte HTTPS sur `:7443`, et le tiroir JWT comme la page du scheduler nomment
+dès lors l'adresse en `https://`. Les services qui l'appellent doivent faire confiance à
+l'autorité qui l'a signé - le cluster la distribue généralement déjà : une ConfigMap
+annotée `service.beta.openshift.io/inject-cabundle` sur OpenShift, un bundle trust-manager
+avec cert-manager.
+
+Avec le chart Helm, le Secret est monté dans `/etc/meerkat/tls/internal` :
+
+```yaml
+internalTls:
+  # un Secret kubernetes.io/tls existant, de cert-manager par exemple
+  secretName: meerkat-internal-tls
+  # ou, sur OpenShift, laisser l'autorité de service en émettre et en renouveler un
+  openshiftServingCert: true
+```
+
+::: details Un Certificate cert-manager pour le plan interne
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: meerkat-internal
+spec:
+  secretName: meerkat-internal-tls
+  dnsNames:
+    - meerkat-internal.shop.svc
+    - meerkat-internal.shop.svc.cluster.local
+  issuerRef:
+    name: cluster-ca
+    kind: ClusterIssuer
+```
+:::
+
+## Demandé à cert-manager
+
+Sur Kubernetes, la façon habituelle de donner son certificat au plan interne est celle
+ci-dessus : un Certificate déclaré avec le déploiement, son Secret monté. **Add
+certificate, Ask cert-manager** est la voie de secours, pour un cluster qui a cert-manager
+et personne pour écrire ce manifeste. Partout ailleurs, l'entrée est grisée avec sa raison :
+sur Swarm ou compose, sans cert-manager, ou quand le chart ne l'a pas autorisée.
+
+Avec un seul émetteur de ce genre, le clic le sollicite aussitôt - supprimer le
+certificat est le retour en arrière ; avec plusieurs, la console choisit l'**émetteur**, parmi les ClusterIssuers et les Issuers du
+namespace que la gateway a trouvés prêts et qui signent avec une autorité - `ca`, `vault`,
+`venafi`. Un émetteur `selfSigned` est écarté, son certificat étant sa propre autorité,
+une nouvelle à chaque renouvellement ; un émetteur ACME aussi, une autorité publique ne
+voyant aucun des noms du cluster. Tout le reste est décidé par la gateway : les noms
+sont ceux que le runtime résout vers le plan interne, le Certificate est créé dans son
+propre namespace, sous le seul nom que le chart autorise
+(`<release>-meerkat-internal-issued`), avec une nouvelle clé ECDSA à chaque renouvellement.
+
+Le Secret qu'écrit cert-manager est **lu par l'API et surveillé**, pas monté : pas de
+Deployment à modifier, pas de redémarrage. Quand cert-manager renouvelle - il réécrit le
+même Secret avant l'échéance -, le serveur API prévient chaque nœud, qui recharge sa porte.
+Chaque nœud garde la clé en mémoire ; la base garde le nom du Secret et le dernier
+certificat, jamais la clé. La réserve affiche qui signe - `cert-manager: <émetteur>` - et quand il sera renouvelé, ou la
+raison donnée par cert-manager quand il refuse. Il est placé sur la porte Internal quand
+elle est vide ; le supprimer de la réserve supprime le Certificate et son Secret.
+
+```yaml
+internalTls:
+  # autorise la gateway à créer son Certificate, lire son Secret, lister les émetteurs
+  certManager: true
+```
+
+Le chart accorde alors, dans le namespace de la gateway, la création de Certificates -
+Kubernetes ne sait pas restreindre une création à un nom - et tout le reste sur ce seul
+nom : son Certificate, son Secret. Lister les ClusterIssuers est une lecture à l'échelle du
+cluster. Avec [approver-policy](https://cert-manager.io/docs/policy/approval/approver-policy/),
+les demandes du ServiceAccount de la gateway peuvent être limitées à ses propres noms.
+
+## Appeler des upstreams en HTTPS
+
+Les certificats ci-dessus sont ce que la gateway **présente**. Quand c'est la
+gateway qui appelle - une route dont la cible est `https://...` -, elle
+**vérifie** le certificat que présente l'upstream, et il lui faut pour cela
+l'autre moitié : les autorités en qui elle a confiance. Elles ont leur propre
+dépôt, **Trusted authorities** sur l'écran TLS, à part de la réserve : des
+certificats publics uniquement, jamais une clé.
+
+Par défaut, la gateway fait confiance aux autorités publiques que porte son
+image. Un upstream interne à un cluster est le plus souvent signé par
+l'autorité du cluster ou par celle de l'entreprise, qu'aucune image ne connaît :
+ajoutez-la, et les routes vers cet upstream se vérifient. Elle s'ajoute aux
+autorités publiques, sans jamais les remplacer : un upstream public continue de
+se vérifier.
+
+Une autorité s'ajoute dans une seule fenêtre : un nom, et son certificat - un
+fichier choisi ou déposé sur la fenêtre, ou le PEM collé. Un PEM peut contenir
+plusieurs certificats - une racine et une intermédiaire, ou l'ancienne et la
+nouvelle autorité le temps que l'une remplace l'autre. Une clé privée qu'il
+contiendrait est refusée, avec la raison : ce que la gateway présente va dans la
+réserve.
+
+Vérifier un upstream ne demande que le **certificat** de l'autorité, jamais sa
+clé privée - celle-là signe les certificats des Services, et reste dans la PKI
+du cluster (cert-manager, une autorité d'entreprise). Prenez le certificat
+qu'elle publie.
+
+**Ce que garantit une autorité n'est pas un nom DNS.** Vérifier un upstream pose
+deux questions : son certificat remonte-t-il à une autorité de confiance, et
+porte-t-il le nom qu'appelle la route - l'hôte de l'URL de la cible, par exemple
+`orders.shop.svc.cluster.local` ? La première relève de ce dépôt ; la seconde,
+du certificat de l'upstream lui-même. Noms internes et externes ne se croisent
+jamais ici : le certificat que la gateway présente aux navigateurs ne joue aucun
+rôle dans ce qu'elle appelle, et une autorité d'entreprise qui signe des
+certificats internes comme externes tient en une seule entrée. Une route qui
+appelle `https://orders:8443` alors que le certificat ne nomme que
+`orders.shop.svc` échoue sur le nom, même avec la bonne autorité en place.
+
 ## Ce que contient la base de données
 
 | Stocké | Comment |
 |---|---|
 | Le certificat lui-même | en clair - c'est ce que la gateway présente à chaque visiteur |
 | La clé privée | **scellée** avec la clé maîtresse du coffre. Elle ne quitte jamais la gateway : ni dans une réponse d'API, ni dans un export, ni dans un journal |
+| Un certificat du système de fichiers | ses deux chemins, et le dernier certificat lu - jamais sa clé |
+| Un certificat de cert-manager | le nom de son Secret, et le dernier certificat lu - jamais sa clé |
 | La demande de signature en attente | en clair, et téléchargeable |
 | La clé du compte ACME et les certificats émis | scellés, dans le cache ACME |
+| Une autorité de confiance | en clair - un certificat public |
 
 La console vérifie aussi en permanence que le certificat répond bien pour l'hôte sous
 lequel il a été enregistré. Un certificat qui ne couvre rien échoue au moment de la
@@ -252,3 +395,10 @@ pas cité.
 
 - **HTTP/3** (SSL-07) : il faudrait une dépendance QUIC extérieure à la bibliothèque
  standard, une écoute UDP et `Alt-Svc`.
+- **Les autorités de confiance ne servent qu'aux upstreams** (SSL-09). Les autres
+ connexions qu'ouvre la gateway - un annuaire en LDAPS, un fournisseur OpenID Connect,
+ le relais mail, le collecteur, un emplacement git - ne font encore confiance qu'aux
+ autorités publiques ; leur expiration n'est pas encore dans le récapitulatif quotidien.
+- **Un certificat client pour un upstream qui en demande un** (SSL-10, mTLS).
+- **Les commandes d'une autorité ACME sur le plan interne** : refusées, puisqu'une
+ autorité publique ne voit pas les noms du cluster.

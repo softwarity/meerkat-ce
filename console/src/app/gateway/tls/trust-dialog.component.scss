@@ -1,0 +1,41 @@
+.body {
+  display: grid;
+  gap: 4px;
+  min-width: 520px;
+  border-radius: 8px;
+  outline: 2px dashed transparent;
+  outline-offset: -4px;
+}
+// A file held over the dialog: the whole of it takes the drop.
+.body.over {
+  outline-color: var(--mat-sys-primary);
+}
+.note {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+.file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pem textarea {
+  font-family: var(--mk-mono, monospace);
+  font-size: 0.8rem;
+}
+.problem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}
+.problem mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}

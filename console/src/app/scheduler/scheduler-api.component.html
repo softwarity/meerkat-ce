@@ -6,7 +6,7 @@
       >
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
-      <p class="base"><code>http://meerkat:9090/api/schedules</code></p>
+      <p class="base"><code>{{ origin() }}/api/schedules</code></p>
       <table class="fields">
         <tbody>
           <tr>
@@ -50,6 +50,12 @@
         each schedule's <code>roles</code>, so one token serves all your
         endpoints.
       </p>
+      <p class="hint" i18n="@@Sched_api_where_3">
+        This is the <b>internal plane</b>: a port inside the cluster, never
+        behind an ingress, that answers tokens only. Services write their
+        schedules there. This console reads them and pauses, resumes, runs or
+        deletes them, but creates and changes none.
+      </p>
       <!-- The screen that mints one, one click away: an operator reading this
            has the console in front of them. Hidden for whoever cannot mint -
            a control-plane token is root's - so the link never opens a door
@@ -75,7 +81,7 @@
         <code>POST</code> returns an id. Or file the schedule under your own
         <code>metadata</code> and find it that way.
       </p>
-      <app-snippet filename="write-schedule.sh" [content]="writeCmd" />
+      <app-snippet filename="write-schedule.sh" [content]="writeCmd()" />
       <p class="hint" i18n="@@Sched_api_write_2">
         <b>A cadence</b>, counted from the end of the last run:
       </p>
@@ -239,7 +245,7 @@
         expression; all conditions apply. <code>tenant</code> and
         <code>route</code> also filter.
       </p>
-      <app-snippet filename="read-schedules.sh" [content]="readCmd" />
+      <app-snippet filename="read-schedules.sh" [content]="readCmd()" />
     </ng-template>
   </mat-expansion-panel>
 
@@ -277,7 +283,7 @@
         progress, then its end. Any other answer closes it: 2xx done, the rest
         failed.
       </p>
-      <app-snippet filename="report-run.sh" [content]="reportCmd" />
+      <app-snippet filename="report-run.sh" [content]="reportCmd()" />
       <p class="hint" i18n="@@Sched_api_long_2">
         After a 202 the call is never resent. Without a report for five
         minutes, the run closes as lost. Every report renews the lease.
@@ -320,7 +326,7 @@
         <code>failed</code>, <code>lost</code>, <code>dropped</code> when too
         late), the answer, the node and the attempt.
       </p>
-      <app-snippet filename="schedule-runs.sh" [content]="runsCmd" />
+      <app-snippet filename="schedule-runs.sh" [content]="runsCmd()" />
       <p class="hint" i18n="@@Sched_api_history_2">
         Replay a run by its id: it goes out as a new run with today's payload.
         Same button on each run in the schedule's drawer.

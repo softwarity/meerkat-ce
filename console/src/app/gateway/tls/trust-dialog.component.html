@@ -1,0 +1,26 @@
+<h2 mat-dialog-title i18n="@@Trust_title_add">Add an authority</h2>
+
+<mat-dialog-content class="body" appFileDrop dropClass="over" (filesDropped)="take($event)">
+  <p class="note" i18n="@@Trust_pem_note">
+    The authority's certificate, or several in one file: choose the file, drop it here, or paste it.
+  </p>
+  <div class="file">
+    <app-file-button appearance="outlined" icon="folder_open" accept=".pem,.crt,.cer,.txt" (picked)="take($event)">
+      <span i18n="@@Choose_a_file">Choose a file</span>
+    </app-file-button>
+  </div>
+  <app-form-field subscriptSizing="dynamic" i18n-label="@@Name" label="Name">
+    <input matInput [formField]="f.name" />
+  </app-form-field>
+  <app-form-field class="pem" subscriptSizing="dynamic" i18n-label="@@PEM" label="PEM" [error]="pemMessage()" [clearable]="false">
+    <textarea matInput rows="9" [formField]="f.pem" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+  </app-form-field>
+  @if (error(); as e) {
+    <p class="problem"><mat-icon>error</mat-icon><span>{{ e }}</span></p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton mat-dialog-close i18n="@@Cancel">Cancel</button>
+  <button matButton="filled" [disabled]="f().invalid() || saving()" (click)="submit()" i18n="@@Add">Add</button>
+</mat-dialog-actions>

@@ -14,9 +14,12 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/cluster"
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
@@ -40,6 +43,17 @@ type API struct {
 	// DataAddr is the data plane's listen address (main's -addr), for the few
 	// admin features that must name the sibling plane (e.g. OIDC callbacks).
 	DataAddr string
+	// InternalAddr is the internal plane's listen address (main's
+	// -internal-addr): the console names its port beside the JWKS, and the
+	// scheduler's how-to beside the API.
+	InternalAddr string
+	// InternalTLSAddr is the internal plane's HTTPS door (SSL-12): the address
+	// the console names once a certificate is placed there.
+	InternalTLSAddr string
+	// DataDir is the gateway's data directory (main's -data): the mount the
+	// file-system certificate door never looks into, since the database and
+	// the vault key live there.
+	DataDir string
 
 	// ReleaseNotes is RELEASE_NOTES.md as the binary carries it (the root
 	// package embeds it; main wires it). Empty in tests that do not ask.
@@ -98,6 +112,32 @@ type API struct {
 	// administrative write is recorded there by the audit funnel. Nil in the
 	// tests, and in a build with no live channel.
 	Changes ChangeJournal
+
+	// movedWarned remembers the service tokens already told that the
+	// scheduler's door moved to the internal plane (internalplane.go).
+	movedWarned sync.Map
+	// internalOrigin is where the services of this runtime reach the internal
+	// plane, as the runtime names it (discovery.InternalOrigin), asked when a
+	// screen needs it and kept a minute (internalplane.go).
+	internalOrigin atomic.Pointer[internalOriginAt]
+	// LookupInternal asks the runtime; nil is discovery.InternalOrigin. A test
+	// replaces it rather than reach a cluster.
+	LookupInternal func(ctx context.Context, port int) discovery.Internal
+	// CertManager asks cert-manager for the internal plane's certificate
+	// (SSL-13); nil when it cannot, and CertManagerWhy says why - another
+	// runtime, or a chart that did not grant it.
+	CertManager    CertManager
+	CertManagerWhy string
+}
+
+// CertManager is what the API asks of cert-manager (discovery.CertManager): a
+// test hands it a fake rather than reach a cluster.
+type CertManager interface {
+	SecretName() string
+	Issuers(ctx context.Context) ([]discovery.Issuer, error)
+	Ensure(ctx context.Context, issuerKind, issuerName string, names []string) error
+	Status(ctx context.Context) (discovery.IssuedStatus, error)
+	Delete(ctx context.Context) error
 }
 
 // LiveChannel serves the console's socket for one caller.
@@ -199,6 +239,7 @@ func (a *API) Register(mux Mux) {
 	a.registerPause(mux)
 	a.registerCertificates(mux)
 	a.registerAuthorities(mux)
+	a.registerTrust(mux)
 	a.registerSchedules(mux)
 	a.registerTelemetry(mux)
 	a.registerPlug(mux)

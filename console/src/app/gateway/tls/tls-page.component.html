@@ -5,6 +5,12 @@
 <mat-drawer position="end" mode="over" [opened]="helpOpen()" (closed)="helpOpen.set(false)">
   @if (drawer() === 'authorities') {
     <app-authorities-panel (closed)="helpOpen.set(false)" (changed)="authorities.set($event)" />
+  } @else if (drawer() === 'internal') {
+    <app-internal-help
+      [origin]="edition.value()?.internalOrigin ?? ''"
+      [source]="edition.value()?.internalSource ?? ''"
+      (closed)="helpOpen.set(false)"
+    />
   } @else {
   <div class="drawer-head">
     <h2 i18n="@@Tls_local_title">HTTPS on a local machine</h2>
@@ -131,7 +137,9 @@
             why="Have Let's Encrypt, ZeroSSL or your own authority issue and renew certificates on their own."
           />
         </span>
-        <button matButton="tonal" [matMenuTriggerFor]="doors">
+        <!-- Opened, the menu asks again whether cert-manager can be asked: a
+             chart value changed since the page loaded is seen at once. -->
+        <button matButton="tonal" [matMenuTriggerFor]="doors" (menuOpened)="certManager.reload()">
           <mat-icon>add</mat-icon>
           <ng-container i18n="@@Add_certificate">Add certificate</ng-container>
         </button>
@@ -143,6 +151,20 @@
           <button mat-menu-item (click)="add('pem')">
             <mat-icon>description</mat-icon>
             <span i18n="@@Import_PEM_pair">Import a PEM pair</span>
+          </button>
+          <button mat-menu-item (click)="addFromFiles()">
+            <mat-icon>folder_open</mat-icon>
+            <span i18n="@@From_the_file_system">From the file system</span>
+          </button>
+          <!-- Kubernetes only: greyed elsewhere, with the reason. -->
+          <button mat-menu-item (click)="addFromCertManager()" [disabled]="certManager.isLoading() || !certManager.value()?.available">
+            <mat-icon>verified</mat-icon>
+            <span class="way-in">
+              <span i18n="@@Ask_cert_manager">Ask cert-manager</span>
+              @if (certManagerWhy(); as w) {
+                <small class="why">{{ w }}</small>
+              }
+            </span>
           </button>
           <button mat-menu-item (click)="add('keystore')">
             <mat-icon>inventory_2</mat-icon>
@@ -161,9 +183,8 @@
           }
         </mat-menu>
       </div>
-      <p class="note" i18n="@@Pool_note">
-        A certificate answers for the names it carries. Drag it onto the console, the application,
-        or both - or use its menu.
+      <p class="note" i18n="@@Pool_note3">
+        A certificate answers for the names it carries. Drag it onto a door below, or click the door's tag.
       </p>
       <div
         class="pool"
@@ -213,10 +234,6 @@
           <mat-icon class="grip" [class.spin]="c.status === 'requesting'">{{ c.pending ? icon(c) : c.status === 'requesting' ? 'progress_activity' : 'drag_indicator' }}</mat-icon>
           <code>{{ namesOf(c).join(', ') }}</code>
         </span>
-        <span class="badge" [class.warn]="c.info.selfSigned && !c.pending"
-          [matTooltip]="c.info.selfSigned && !c.pending ? selfSignedWarning : ''"
-          >{{ sourceLabel(c) }}</span
-        >
         @if (c.pending) {
           <button matButton="tonal" (click)="adopt(c)">
             <mat-icon>how_to_reg</mat-icon>
@@ -234,23 +251,9 @@
             <mat-icon>download</mat-icon>
           </button>
         }
-        <button matIconButton [matMenuTriggerFor]="actions" i18n-matTooltip="@@Actions" matTooltip="Actions">
-          <mat-icon>more_vert</mat-icon>
+        <button matIconButton (click)="remove(c)" i18n-matTooltip="@@Delete" matTooltip="Delete" i18n-aria-label="@@Delete" aria-label="Delete">
+          <mat-icon>delete</mat-icon>
         </button>
-        <mat-menu #actions>
-          @if (!c.pending) {
-            @for (plane of planes; track plane) {
-              <button mat-menu-item (click)="toggle(c, plane)">
-                <mat-icon>{{ c[plane] ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-                <span i18n="@@Serve_on_plane">Serve on {{ planeLabel(plane) }}</span>
-              </button>
-            }
-          }
-          <button mat-menu-item (click)="remove(c)">
-            <mat-icon>delete</mat-icon>
-            <span i18n="@@Delete">Delete</span>
-          </button>
-        </mat-menu>
         <span class="says">
           {{ says(c) }}
           @if (!c.pending && !c.waiting) {
@@ -265,25 +268,62 @@
               >
             }
           }
-          @for (plane of planes; track plane) {
-            @if (c[plane]) {
-              <span class="on-plane">{{ planeLabel(plane) }}</span>
+          <!-- Where it came from, then the doors: each one a switch - lit
+               where it is served, a click to serve it there or take it off.
+               The keyboard's way to what a drag does. -->
+          <span class="badge" [class.warn]="c.info.selfSigned && !c.pending"
+            [matTooltip]="c.info.selfSigned && !c.pending ? selfSignedWarning : ''"
+            >{{ sourceLabel(c) }}</span
+          >
+          @if (!c.pending) {
+            <!-- Only the doors that can take it: the internal one for a
+                 certificate carrying its names, the other two for one that
+                 carries more than those. Placed already, it stays, to be
+                 taken off. -->
+            @for (plane of planes; track plane) {
+              @if (c[plane] || fits(c, plane)) {
+                <button
+                  type="button"
+                  class="on-plane"
+                  [class.off]="!c[plane]"
+                  [attr.aria-pressed]="c[plane]"
+                  (click)="toggle(c, plane)"
+                  [matTooltip]="c[plane] ? takeOffTip(plane) : serveOnTip(plane)"
+                >{{ planeLabel(plane) }}</button>
+              }
             }
           }
         </span>
       </ng-template>
     </section>
 
-    <!-- The two doors, side by side: what each one presents. -->
-    <div class="planes">
+    <!-- The three doors, one per row, each folding to a line: its name,
+         what it presents, its ports. The line is a drop target too, so a
+         certificate is placed on a folded door without opening it. -->
+    <mat-accordion class="planes" multi>
       @for (plane of planes; track plane) {
-        <section class="card plane">
-          <div class="plane-head">
-            <h2>{{ planeLabel(plane) }}</h2>
+        <mat-expansion-panel class="plane" [expanded]="isOpen(plane)" (opened)="setOpen(plane, true)" (closed)="setOpen(plane, false)">
+          <mat-expansion-panel-header class="plane-header">
+            <mat-panel-title>{{ planeLabel(plane) }}</mat-panel-title>
+            <mat-panel-description class="plane-line">
+              <span
+                class="summary"
+                cdkDropList
+                [cdkDropListData]="plane"
+                [cdkDropListSortingDisabled]="true"
+                [cdkDropListEnterPredicate]="accepts(plane)"
+                (cdkDropListDropped)="dropped($event)"
+              >
+                @for (c of on(plane); track c.id) {
+                  <code class="chip {{ level(c) }}" [matTooltip]="namesOf(c).join(', ')">{{ namesOf(c)[0] }}@if (namesOf(c).length > 1) {<span class="more"> +{{ namesOf(c).length - 1 }}</span>}</code>
+                } @empty {
+                  <span class="nothing" i18n="@@Nothing_placed">No certificate</span>
+                }
+              </span>
             <!-- The two doors of the plane, by the ports the world reaches:
                  what an operator types, not what the container listens on. -->
             <span class="doors">
-              <span class="door">HTTP:{{ outsidePort(plane, 'http') }}</span>
+              <span class="way-in">HTTP:{{ outsidePort(plane, 'http') }}</span>
               @if (unpublished(plane); as port) {
                 <span
                   class="door bad"
@@ -300,19 +340,30 @@
                 >
               }
             </span>
-          </div>
+            </mat-panel-description>
+          </mat-expansion-panel-header>
           <div
             class="zone"
             cdkDropList
             [cdkDropListData]="plane"
             [cdkDropListSortingDisabled]="true"
+            [cdkDropListEnterPredicate]="accepts(plane)"
             (cdkDropListDropped)="dropped($event)"
           >
-            @for (c of plane === 'console' ? onConsole() : onApp(); track c.id) {
+            @for (c of on(plane); track c.id) {
               <div class="placed {{ level(c) }}" cdkDrag [cdkDragData]="c">
                 <mat-icon class="grip">drag_indicator</mat-icon>
-                <code>{{ namesOf(c).join(', ') }}</code>
-                <span class="when">{{ short(c) }}</span>
+                <!-- The first name, and how many more: a certificate for the
+                     four spellings of a Service name would fill the card. -->
+                <!-- One line for the name, the state under it: in a door a
+                     third of the screen wide, side by side they cut the name
+                     a letter at a time. -->
+                <span class="what">
+                  <code [matTooltip]="namesOf(c).length > 1 ? namesOf(c).join(', ') : ''"
+                    >{{ namesOf(c)[0] }}@if (namesOf(c).length > 1) {<span class="more"> +{{ namesOf(c).length - 1 }}</span>}</code
+                  >
+                  <span class="when">{{ short(c) }}</span>
+                </span>
                 <button
                   matIconButton
                   (click)="toggle(c, plane)"
@@ -339,7 +390,46 @@
               >
             </p>
           }
-          @if (secure(plane) && !unpublished(plane) && namesOn(plane).length) {
+          @if (plane === 'internal') {
+            <!-- Where its certificate comes from, for this platform: the
+                 question anybody in front of an empty internal door has. -->
+            <p class="how">
+              <button matButton (click)="openDrawer('internal')">
+                <mat-icon>help</mat-icon>
+                <ng-container i18n="@@Internal_help_button">Where does its certificate come from?</ng-container>
+              </button>
+              @if (!onInternal().length && certManager.value()?.available) {
+                <button matButton (click)="addFromCertManager()">
+                  <mat-icon>verified</mat-icon>
+                  <ng-container i18n="@@Ask_cert_manager">Ask cert-manager</ng-container>
+                </button>
+              }
+            </p>
+          }
+          @if (plane === 'internal' && internalNames().length) {
+            <!-- What the runtime resolves to this door: a certificate carries
+                 one of these names, or it is refused here. -->
+            <p class="called">
+              <span i18n="@@Internal_called_as">Called as</span>
+              @for (n of internalNames(); track n) {
+                <code [class.covered]="internalCovers(n)">
+                  @if (internalCovers(n)) {
+                    <mat-icon>check</mat-icon>
+                  }
+                  {{ n }}
+                </code>
+              }
+            </p>
+          }
+          @if (plane === 'internal' && internalUncovered()) {
+            <p class="problem">
+              <mat-icon>warning</mat-icon>
+              <span i18n="@@Internal_names_uncovered">No certificate here carries one of these names.</span>
+            </p>
+          }
+          <!-- Not for the internal plane: its names are the cluster's, which a
+               browser outside cannot resolve. -->
+          @if (plane !== 'internal' && secure(plane) && !unpublished(plane) && namesOn(plane).length) {
             <span class="links">
               @for (n of namesOn(plane); track n) {
                 <a [href]="link(plane, n, 'https')" target="_blank" rel="noopener">
@@ -369,10 +459,8 @@
                 Place a certificate on the application first.
               </p>
             } @else {
-              <p class="note" i18n="@@Force_https_note">
-                Plain HTTP callers are redirected to HTTPS when a certificate here carries the name
-                they used: a service calling by its cluster name stays in the clear. Never the
-                console nor the liveness probe; it stands down if every certificate expires.
+              <p class="note" i18n="@@Force_https_note2">
+                Redirects to HTTPS the names a certificate here carries. Internal names stay in HTTP.
               </p>
             }
             <!-- HSTS follows the redirect: forcing HTTPS is already the
@@ -391,20 +479,17 @@
                 }
               </mat-select>
             </mat-form-field>
-            <p class="note" i18n="@@Hsts_note">
-              With HTTPS forced, browsers are told to use HTTPS only for this duration, even if the
-              certificates go: start short. Not sent to localhost or an IP address.
-            </p>
-            <p class="note" i18n="@@Hsts_port_note">
-              HSTS is sent only when HTTPS is reached on port 443, plain HTTP being on 80: a browser
-              applies it to every port of the name and keeps the port when it switches, so on other
-              ports it would break every plain address. There, the redirect alone does the work, and
-              browsers are told to forget a promise made before.
+            <p class="note" i18n="@@Hsts_note2">
+              Browsers then refuse plain HTTP for this long: start short. Sent on port 443 only.
             </p>
           }
-        </section>
+        </mat-expansion-panel>
       }
-    </div>
+    </mat-accordion>
+
+    <!-- What the gateway ACCEPTS when it calls an upstream (SSL-09): its own
+         store, apart from the pool of what it presents. -->
+    <app-trusted-authorities />
 
     @for (p of problems(); track p) {
       <p class="problem"><mat-icon>error</mat-icon><span>{{ p }}</span></p>

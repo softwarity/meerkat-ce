@@ -84,12 +84,17 @@ cœur change d'état, la liste se met à jour sans rechargement.
   que l'interrupteur est actif, le bouton lui-même vire à l'ambre et affiche
   *Unavailable* : personne n'a besoin de l'ouvrir pour le savoir.
 - **JWT** rassemble les clés qui signent le JWT d'identité que vérifient vos
-  services : le JWKS à fournir à un backend, la partie publique de chaque
-  algorithme, la rotation, et quelles routes signent avec quelle clé.
-  Un service qui pointe sur le JWKS n'a besoin de rien d'autre : le `kid` du jeton
-  désigne la clé, et la clé porte son algorithme. L'algorithme se choisit donc une
-  seule fois, dans Auth forward. Le service le lit sur la clé, jamais dans
-  l'en-tête du jeton.
+  services : le document de découverte à fournir à un backend - l'adresse
+  recommandée - et le JWKS à côté, l'émetteur que porte chaque jeton (`meerkat`
+  tant qu'il n'est pas réglé), la partie publique de chaque algorithme, la
+  rotation, et quelles routes signent avec quelle clé.
+  Un service qui pointe sur le document de découverte n'a besoin de rien
+  d'autre : il y apprend l'émetteur et les clés. Le `kid` du jeton désigne la
+  clé, et la clé porte son algorithme : l'algorithme se choisit donc une seule
+  fois, dans Auth forward, et le service le lit sur la clé, jamais dans
+  l'en-tête du jeton. Les deux adresses sont sur le plan interne, port 7070, et
+  seulement là. Voir
+  [Le JWT d'identité](/docs/auth/service-jwt).
 
 ## L'éditeur
 

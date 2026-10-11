@@ -15,7 +15,7 @@ your services do not have to.
 
 - **[What Meerkat is](/product/what-is-meerkat)** - what the product does, in two minutes.
 - **[Quick start](/docs/start/quick-start)** - a gateway running and a first application behind it.
-- **[Concepts](/docs/concepts/architecture)** - the two planes, routes, identity, access.
+- **[Concepts](/docs/concepts/architecture)** - the three planes, routes, identity, access.
 
 ## Reference
 

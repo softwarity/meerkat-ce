@@ -877,6 +877,27 @@ func TestIdentityForwardJWT(t *testing.T) {
 		t.Fatalf("missing exp claim: %+v", claims)
 	}
 
+	// The issuer is the installation's to set (AUTH-06), and the next
+	// request after the reload carries it.
+	if err := st.SetJWTIssuer(ctx, "http://meerkat:7070"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := http.NewRequest("GET", srv.URL+"/get", nil)
+	again.AddCookie(cookie)
+	res3, err := http.DefaultClient.Do(again)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body3, _ := io.ReadAll(res3.Body)
+	_ = res3.Body.Close()
+	payload3, _ := base64.RawURLEncoding.DecodeString(strings.Split(strings.TrimPrefix(string(body3), "Bearer "), ".")[1])
+	if !strings.Contains(string(payload3), `"iss":"http://meerkat:7070"`) {
+		t.Fatalf("the issuer set is not the one signed: %s", payload3)
+	}
+
 	// Anonymous: no token at all, and the inbound spoof is gone.
 	anon, _ := http.NewRequest("GET", srv.URL+"/get", nil)
 	anon.Header.Set("Authorization", "Bearer spoofed")
@@ -925,8 +946,11 @@ func TestIdentityForwardSignedJWT(t *testing.T) {
 	srv := httptest.NewServer(rt)
 	t.Cleanup(srv.Close)
 
-	// The JWKS is public and carries an ES256 EC key.
-	pub, kid := fetchES256JWK(t, srv.URL+JWKSPath)
+	// The JWKS is public and carries an ES256 EC key. It is read where the
+	// internal plane mounts it: this plane serves it only when told to.
+	internal := httptest.NewServer(http.HandlerFunc(rt.ServeJWKS))
+	t.Cleanup(internal.Close)
+	pub, kid := fetchES256JWK(t, internal.URL+JWKSPath)
 
 	rec := httptest.NewRecorder()
 	if _, err := sm.Issue(ctx, rec, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
@@ -2166,5 +2190,34 @@ func TestAOneLookApplicationDressesItsDocument(t *testing.T) {
 	switchable := route(&store.SchemeConfig{Select: true, Mechanism: "class", Light: "lt", Dark: "dk", Button: "dark"})
 	if got := pageAgentFragment(switchable, nil); strings.Contains(got, "scheme-wear") {
 		t.Errorf("a route whose application switches was pinned to one look:\n%s", got)
+	}
+}
+
+// TestTheApplicationPortDoesNotServeTheJWKS: the keys live on the internal
+// plane, and on this one the path is an ordinary one - the catch-all route
+// behind it gets it.
+func TestTheApplicationPortDoesNotServeTheJWKS(t *testing.T) {
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "the application")
+	}))
+	t.Cleanup(upstream.Close)
+	if err := st.SaveRoute(ctx, store.Route{ID: "r", Name: "app", Enabled: true, Upstream: upstream.URL,
+		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/**"}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	rt := New(st, session.NewManager(st))
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	rt.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, JWKSPath, nil))
+	if got := rec.Body.String(); got != "the application" {
+		t.Fatalf("the path belongs to the routes on this plane: got %q", got)
 	}
 }

@@ -319,7 +319,7 @@ export class AccessTokensPageComponent {
           @switch (scope()) {
             @case ('schedules') {
               <ng-container i18n="@@Perimeter_schedules_hint">
-                Opens /api/schedules and nothing else. A backend service's credential.
+                Opens /api/schedules and nothing else, on the internal plane. A backend service's credential.
               </ng-container>
             }
             @case ('readonly') {

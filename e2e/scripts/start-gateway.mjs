@@ -29,6 +29,7 @@ const child = spawn(
   [
     '-addr', ':18082',
     '-admin-addr', ':19092',
+    '-internal-addr', ':17072',
     '-console-url', 'http://localhost:14200',
     '-data', `${tmp}/data`,
     // The shape the binary can serve. The community one starts single

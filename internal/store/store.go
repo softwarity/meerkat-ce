@@ -44,6 +44,9 @@ type Store struct {
 	// sessionsMoved is told that somebody signed in, out, finished a sign-in
 	// step or changed organisation (OnSessionsMoved). Nil until wired.
 	sessionsMoved atomic.Pointer[func()]
+	// issuedPair is where a certificate cert-manager issued (SSL-13) is read
+	// on this node: the Secret as the watch last saw it. Nil until wired.
+	issuedPair atomic.Pointer[func(secret string) (certPEM, keyPEM string, ok bool)]
 }
 
 // OnSessionsMoved names what to call when the set of open sessions changes:
@@ -912,7 +915,21 @@ CREATE TABLE IF NOT EXISTS certificates (
   -- and ip_addresses, read from the material rather than filed beside it.
   on_console   BOOLEAN NOT NULL DEFAULT FALSE,
   on_app       BOOLEAN NOT NULL DEFAULT FALSE,
+  -- The internal plane (SSL-12): what the services behind the gateway call.
+  on_internal  BOOLEAN NOT NULL DEFAULT FALSE,
   source       TEXT NOT NULL DEFAULT 'import',
+  -- A certificate read from the file system (SSL-11): the two files a
+  -- runtime mounted - a Kubernetes Secret, a Swarm secret, a compose volume.
+  -- Only the paths are kept: the key never enters the database, and the files
+  -- are read again when they change, which is how a renewal by the cluster is
+  -- served. cert_pem keeps the last certificate read, for the screen and the
+  -- expiry digest.
+  cert_path    TEXT NOT NULL DEFAULT '',
+  key_path     TEXT NOT NULL DEFAULT '',
+  -- A certificate cert-manager issued on the gateway's request (SSL-13): the
+  -- Certificate and its Secret, read through the API and watched. Like a file
+  -- one, its key stays where it is - in the Secret, and in memory.
+  secret_name  TEXT NOT NULL DEFAULT '',
   cert_pem     TEXT NOT NULL DEFAULT '',
   key_sealed   TEXT NOT NULL DEFAULT '',
   csr_pem      TEXT NOT NULL DEFAULT '',
@@ -1098,6 +1115,17 @@ CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);
 CREATE TABLE IF NOT EXISTS saml_assertions (
   id      TEXT PRIMARY KEY,
   expires BIGINT NOT NULL
+);
+-- The authorities this gateway trusts when IT calls (SSL-09): an upstream in
+-- HTTPS signed by a cluster's or a company's own CA. Public certificates only,
+-- never a key - the certificates Meerkat PRESENTS are the pool above, and the
+-- two are kept apart on purpose.
+CREATE TABLE IF NOT EXISTS trusted_authorities (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL UNIQUE,
+  pem        TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL DEFAULT 0,
+  updated_at BIGINT NOT NULL DEFAULT 0
 );`
 
 // schemaVersion is a VERSION, not a count of migrations.
@@ -1111,7 +1139,10 @@ CREATE TABLE IF NOT EXISTS saml_assertions (
 // installation is stamped 69, and checkNotNewer refuses to open a database
 // stamped higher than the build knows - so restarting the count at 1 would stop
 // every existing installation from starting.
-const schemaVersion = 80
+// 81 carries no step. A build of 2026-10-09 that never shipped stamped the
+// databases it ran on with it (a switch that kept the JWKS on the application
+// port, removed the same day); the number stays so those databases still open.
+const schemaVersion = 81
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

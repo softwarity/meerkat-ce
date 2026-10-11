@@ -7,6 +7,9 @@ import { defineConfig } from '@playwright/test';
 export const CONSOLE_PORT = 14200;
 export const DATA_URL = 'http://localhost:18082';
 export const ADMIN_URL = 'http://localhost:19092';
+// The internal plane: what the services behind the gateway call (the JWKS,
+// the scheduler's API).
+export const INTERNAL_URL = 'http://localhost:17072';
 export const ROOT_PASSWORD = 'e2e-Root-Password-1';
 
 export default defineConfig({

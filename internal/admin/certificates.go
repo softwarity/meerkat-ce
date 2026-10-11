@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -31,6 +32,13 @@ import (
 func (a *API) registerCertificates(mux Mux) {
 	mux.Handle("GET /api/certificates", a.infraAdmin(a.listCertificates))
 	mux.Handle("POST /api/certificates/import", a.infraAdmin(a.importCertificate))
+	// The certificates a runtime mounted in this container, and one of them
+	// taken into the pool by its paths (SSL-11).
+	mux.Handle("GET /api/certificates/mounted", a.infraAdmin(a.mountedCertificates))
+	mux.Handle("POST /api/certificates/file", a.infraAdmin(a.fileCertificate))
+	// The internal plane's certificate asked of cert-manager (SSL-13).
+	mux.Handle("GET /api/certificates/cert-manager", a.infraAdmin(a.getCertManager))
+	mux.Handle("POST /api/certificates/cert-manager", a.infraAdmin(a.askCertManager))
 	mux.Handle("POST /api/certificates/self-signed", a.infraAdmin(a.selfSignedCertificate))
 	mux.Handle("POST /api/certificates/signing-request", a.infraAdmin(a.newSigningRequest))
 	mux.Handle("POST /api/certificates/acme", a.infraAdmin(a.newACMEOrder))
@@ -61,6 +69,8 @@ type certView struct {
 	// requesting, or failed with the authority's own Error.
 	Status string `json:"status,omitempty"`
 	Error  string `json:"error,omitempty"`
+	// RenewsAt is when cert-manager renews a certificate it issued (SSL-13).
+	RenewsAt int64 `json:"renewsAt,omitempty"`
 }
 
 func viewOf(c store.Certificate) certView {
@@ -141,6 +151,10 @@ func (a *API) listCertificates(w http.ResponseWriter, r *http.Request, _ store.U
 			out = append(out, a.orderView(r.Context(), c))
 			continue
 		}
+		if c.Source == store.CertSourceCertManager {
+			out = append(out, a.issuedView(r, c))
+			continue
+		}
 		out = append(out, viewOf(c))
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt < out[j].CreatedAt })
@@ -167,7 +181,20 @@ func (a *API) find(ctx context.Context, id string) (store.Certificate, bool) {
 type placement struct {
 	Console bool `json:"console,omitempty"`
 	App     bool `json:"app,omitempty"`
-	Replace bool `json:"replace,omitempty"`
+	// Internal is the internal plane's HTTPS door (SSL-12).
+	Internal bool `json:"internal,omitempty"`
+	Replace  bool `json:"replace,omitempty"`
+}
+
+// on says whether p asks for plane.
+func (p placement) on(plane string) bool {
+	switch plane {
+	case store.PlaneConsole:
+		return p.Console
+	case store.PlaneInternal:
+		return p.Internal
+	}
+	return p.App
 }
 
 // placeConflict is a certificate already placed on a plane and answering for one of
@@ -191,8 +218,8 @@ func conflicts(all []store.Certificate, c store.Certificate, p placement) []plac
 		mine[strings.ToLower(n)] = true
 	}
 	var out []placeConflict
-	for _, plane := range []string{store.PlaneConsole, store.PlaneApp} {
-		if (plane == store.PlaneConsole && !p.Console) || (plane == store.PlaneApp && !p.App) {
+	for _, plane := range store.CertPlanes {
+		if !p.on(plane) {
 			continue
 		}
 		for _, o := range all {
@@ -227,7 +254,40 @@ func (a *API) place(w http.ResponseWriter, r *http.Request, c *store.Certificate
 			return false
 		}
 	}
-	if (p.Console || p.App) && c.Pending() {
+	// An authority issues for names the world reaches; the internal plane is
+	// reached by names inside the cluster, which no public authority can see.
+	if p.Internal && c.Source == store.CertSourceACME {
+		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"%s is asked of an ACME authority: the internal plane is reached by names inside the cluster, "+
+				"so it presents a certificate from the cluster's own PKI - from the file system, or imported", c.Name()))
+		return false
+	}
+	// The internal plane knows what it must present: the names its runtime
+	// resolves to it, the ones the services call (discovery.InternalOrigin). A
+	// certificate that carries none of them would fail every one of their
+	// handshakes, so it is refused here rather than warned about after. When
+	// no runtime can say, there is nothing to hold it to.
+	if p.Internal && !c.Internal && !c.Pending() {
+		if names := a.internalNames(r.Context()); len(names) > 0 && !coversOne(c.Names(), names) {
+			writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+				"the services call the internal plane as %s, and %s carries %s: it would fail every one of their handshakes",
+				strings.Join(names, " or "), c.Name(), strings.Join(c.Names(), ", ")))
+			return false
+		}
+	}
+	// The mirror: the internal plane's names reach its own Service, which
+	// publishes 7070 and 7443 and nothing else. A certificate carrying only
+	// them would answer for names by which nobody reaches the console or the
+	// application.
+	if ((p.Console && !c.Console) || (p.App && !c.App)) && !c.Pending() {
+		if names := a.internalNames(r.Context()); len(names) > 0 && onlyInternal(c.Names(), names) {
+			writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+				"%s carries only the internal plane's names (%s): they reach its ports, never the console's or the application's - it belongs on Internal",
+				c.Name(), strings.Join(c.Names(), ", ")))
+			return false
+		}
+	}
+	if (p.Console || p.App || p.Internal) && c.Pending() {
 		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
 			"%s is a signing request: it serves nothing until the signed certificate is adopted", c.Name()))
 		return false
@@ -268,9 +328,12 @@ func (a *API) place(w http.ResponseWriter, r *http.Request, c *store.Certificate
 	}
 	for _, x := range in {
 		o := byID[x.ID]
-		if x.Plane == store.PlaneConsole {
+		switch x.Plane {
+		case store.PlaneConsole:
 			o.Console = false
-		} else {
+		case store.PlaneInternal:
+			o.Internal = false
+		default:
 			o.App = false
 		}
 		byID[x.ID] = o
@@ -278,12 +341,12 @@ func (a *API) place(w http.ResponseWriter, r *http.Request, c *store.Certificate
 			setOrder(o.ID, o.Console, o.App)
 			continue
 		}
-		if err := a.st.PlaceCertificate(r.Context(), o.ID, o.Console, o.App); err != nil {
+		if err := a.st.PlaceCertificate(r.Context(), o.ID, o.Console, o.App, o.Internal); err != nil {
 			a.internal(w, err)
 			return false
 		}
 	}
-	c.Console, c.App = p.Console, p.App
+	c.Console, c.App, c.Internal = p.Console, p.App, p.Internal
 	if c.Source == store.CertSourceACME {
 		if !setOrder(c.ID, c.Console, c.App) {
 			orders = append(orders, certs.ACMEOrder{
@@ -316,22 +379,26 @@ func ordersMoved(in []placeConflict, byID map[string]store.Certificate) bool {
 }
 
 func planeWord(plane string) string {
-	if plane == store.PlaneConsole {
+	switch plane {
+	case store.PlaneConsole:
 		return "console"
+	case store.PlaneInternal:
+		return "internal plane"
 	}
 	return "application"
 }
 
 func where(c store.Certificate) string {
-	switch {
-	case c.Console && c.App:
-		return "console, application"
-	case c.Console:
-		return "console"
-	case c.App:
-		return "application"
+	var on []string
+	for _, plane := range store.CertPlanes {
+		if c.On(plane) {
+			on = append(on, planeWord(plane))
+		}
 	}
-	return "reserve"
+	if len(on) == 0 {
+		return "reserve"
+	}
+	return strings.Join(on, ", ")
 }
 
 // placeCertificate moves one certificate onto or off the planes. Saving IS
@@ -696,6 +763,14 @@ func (a *API) deleteCertificate(w http.ResponseWriter, r *http.Request, actor st
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	// What cert-manager issued goes with it: the Certificate, so nothing
+	// renews it for nobody, and the Secret it wrote.
+	if row.Source == store.CertSourceCertManager && a.CertManager != nil {
+		if err := a.CertManager.Delete(r.Context()); err != nil {
+			writeErr(w, http.StatusBadGateway, err.Error()+": the certificate stays in the pool until it can be removed from the cluster")
+			return
+		}
+	}
 	if err := a.st.DeleteCertificate(r.Context(), row.ID); err != nil {
 		if errors.Is(err, store.ErrNoRows) {
 			writeErr(w, http.StatusNotFound, "certificate not found")
@@ -815,4 +890,97 @@ func (a *API) applyTLS(ctx context.Context) {
 	}
 	_ = a.TLS.Reload(ctx)
 	a.announce(ctx, store.TopicCertificates)
+}
+
+// mountedView is what the file system offers: the mounts holding a
+// certificate, or why there is nothing to look at.
+type mountedView struct {
+	Mounts []certs.MountedPKI `json:"mounts"`
+	Why    string             `json:"why,omitempty"`
+}
+
+// mounted reads the mount table, leaving the data directory out: the
+// database and the vault key are not files to browse.
+func (a *API) mounted() ([]certs.MountedPKI, bool) {
+	var exclude []string
+	if a.DataDir != "" {
+		exclude = append(exclude, a.DataDir)
+	}
+	return certs.MountedPKIs(exclude...)
+}
+
+func (a *API) mountedCertificates(w http.ResponseWriter, _ *http.Request, _ store.User) {
+	found, ok := a.mounted()
+	v := mountedView{Mounts: found}
+	switch {
+	case !ok:
+		v.Why = "this gateway does not run in a Linux container: there is no mount table to read"
+	case len(found) == 0:
+		v.Why = "nothing mounted in this container holds a certificate: mount the Secret, the Swarm secret or the volume, then look again"
+	}
+	if v.Mounts == nil {
+		v.Mounts = []certs.MountedPKI{}
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+// filePayload names a certificate and its key by their paths, and where to
+// place it.
+type filePayload struct {
+	placement
+	CertPath string `json:"certPath"`
+	KeyPath  string `json:"keyPath"`
+}
+
+// fileCertificate takes a mounted certificate into the pool. The paths must be
+// ones the mount table offers right now - this endpoint does not open an
+// arbitrary file because somebody typed its name - and only they are stored:
+// the key stays in its file, read again when it changes.
+func (a *API) fileCertificate(w http.ResponseWriter, r *http.Request, actor store.User) {
+	var p filePayload
+	if err := decodeStrict(r, &p); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed certificate: "+err.Error())
+		return
+	}
+	found, _ := a.mounted()
+	offered := false
+	for _, m := range found {
+		for _, c := range m.Certificates {
+			if c.Path == p.CertPath && c.KeyPath != "" && c.KeyPath == p.KeyPath {
+				offered = true
+			}
+		}
+	}
+	if !offered {
+		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"%s and %s are not a certificate and its key mounted in this container: pick one the file system offers", p.CertPath, p.KeyPath))
+		return
+	}
+	cb, err := os.ReadFile(p.CertPath)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	kb, err := os.ReadFile(p.KeyPath)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	m, err := certs.ParsePEM(string(cb), string(kb))
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	// The certificate as the file holds it, so a renewal is told apart by a
+	// byte-for-byte comparison; the key is not kept at all.
+	row := store.Certificate{
+		ID: newID(), Source: store.CertSourceFile, CertPath: p.CertPath, KeyPath: p.KeyPath,
+		CertPEM: string(cb), Info: m.Info,
+	}
+	if !a.place(w, r, &row, p.placement) {
+		return
+	}
+	a.applyTLS(r.Context())
+	a.auditEvent(r.Context(), actor, "certificate.file", "certificate", row.ID, row.Name(), p.CertPath, where(row))
+	writeJSON(w, http.StatusCreated, viewOf(row))
 }

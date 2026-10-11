@@ -26,6 +26,10 @@ Les deux ports publiés remplissent deux fonctions distinctes :
 | 8080 | plan de données | vos utilisateurs - c'est le port exposé au réseau |
 | 9090 | plan de contrôle | la console d'administration - gardez-le en interne |
 
+Un troisième port, **7070**, est le plan interne : ce qu'appellent vos services
+(le JWKS, l'API du scheduler). Il n'est pas publié, et un service du même réseau
+l'atteint par son nom.
+
 `/data` contient tout ce que la gateway sait : les routes, les comptes, le
 coffre, les certificats. Sauvegarder ce volume, c'est sauvegarder la gateway.
 

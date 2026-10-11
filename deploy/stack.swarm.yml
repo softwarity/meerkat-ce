@@ -38,6 +38,8 @@ services:
       - target: 9090
         published: 9090
         mode: ingress
+      # 7070, the internal plane, is not published: your services reach it
+      # over the stack's overlay network, as http://meerkat:7070.
     environment:
       # The shared state. This line is what makes three tasks one gateway.
       MEERKAT_DATABASE_URL: ${MEERKAT_DATABASE_URL:?point it at a PostgreSQL every node can reach}

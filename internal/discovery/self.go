@@ -90,29 +90,54 @@ func Self(ctx context.Context) Published {
 	return out
 }
 
-// selfKubernetes reads this pod, then every Service of the namespace whose
-// selector picks it, and maps each port the way the world reaches it: a
-// LoadBalancer on its port, a NodePort on its node port. A ClusterIP is only
-// reachable from inside the cluster, so it publishes nothing here.
-func selfKubernetes(ctx context.Context) (Published, error) {
+// k8sSelf is this pod and the Services of its namespace, as the API server
+// says them: what both Self and Internal read.
+type k8sSelf struct {
+	namespace string
+	labels    map[string]string
+	// named maps a container port's name to its number, for a Service whose
+	// targetPort names it.
+	named    map[string]int
+	services []selfService
+}
+
+type selfService struct {
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
+	Spec struct {
+		Type     string            `json:"type"`
+		Selector map[string]string `json:"selector"`
+		Ports    []struct {
+			Port       int    `json:"port"`
+			NodePort   int    `json:"nodePort"`
+			TargetPort any    `json:"targetPort"`
+			Name       string `json:"name"`
+		} `json:"ports"`
+	} `json:"spec"`
+}
+
+// readK8sSelf reads this pod, then every Service of the namespace.
+func readK8sSelf(ctx context.Context) (k8sSelf, error) {
 	token, err := os.ReadFile(saDir + "/token")
 	if err != nil {
-		return Published{}, fmt.Errorf("no service account token: %w", err)
+		return k8sSelf{}, fmt.Errorf("no service account token: %w", err)
 	}
 	ns, err := os.ReadFile(saDir + "/namespace")
 	if err != nil {
-		return Published{}, fmt.Errorf("no namespace: %w", err)
+		return k8sSelf{}, fmt.Errorf("no namespace: %w", err)
 	}
 	client, err := k8sClient()
 	if err != nil {
-		return Published{}, err
+		return k8sSelf{}, err
 	}
 	port := os.Getenv("KUBERNETES_SERVICE_PORT")
 	if port == "" {
 		port = "443"
 	}
+	self := k8sSelf{namespace: strings.TrimSpace(string(ns)), named: map[string]int{}}
 	api := "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), port) +
-		"/api/v1/namespaces/" + strings.TrimSpace(string(ns))
+		"/api/v1/namespaces/" + self.namespace
 	auth := []string{"Authorization", "Bearer " + strings.TrimSpace(string(token))}
 	host, _ := os.Hostname()
 	var pod struct {
@@ -129,48 +154,54 @@ func selfKubernetes(ctx context.Context) (Published, error) {
 		} `json:"spec"`
 	}
 	if err := getJSON(ctx, client, api+"/pods/"+host, &pod, auth...); err != nil {
-		return Published{}, err
+		return k8sSelf{}, err
 	}
-	named := map[string]int{}
+	self.labels = pod.Metadata.Labels
 	for _, c := range pod.Spec.Containers {
 		for _, p := range c.Ports {
 			if p.Name != "" {
-				named[p.Name] = p.ContainerPort
+				self.named[p.Name] = p.ContainerPort
 			}
 		}
 	}
 	var list struct {
-		Items []struct {
-			Spec struct {
-				Type     string            `json:"type"`
-				Selector map[string]string `json:"selector"`
-				Ports    []struct {
-					Port       int    `json:"port"`
-					NodePort   int    `json:"nodePort"`
-					TargetPort any    `json:"targetPort"`
-					Name       string `json:"name"`
-				} `json:"ports"`
-			} `json:"spec"`
-		} `json:"items"`
+		Items []selfService `json:"items"`
 	}
 	if err := getJSON(ctx, client, api+"/services", &list, auth...); err != nil {
+		return k8sSelf{}, err
+	}
+	self.services = list.Items
+	return self, nil
+}
+
+// inside is the container port a Service port sends to.
+func (s k8sSelf) inside(targetPort any, port int) int {
+	switch t := targetPort.(type) {
+	case float64:
+		return int(t)
+	case string:
+		return s.named[t]
+	case nil:
+		return port
+	}
+	return 0
+}
+
+// selfKubernetes maps each port of this pod the way the world reaches it: a
+// LoadBalancer on its port, a NodePort on its node port. A ClusterIP is only
+// reachable from inside the cluster, so it publishes nothing here.
+func selfKubernetes(ctx context.Context) (Published, error) {
+	self, err := readK8sSelf(ctx)
+	if err != nil {
 		return Published{}, err
 	}
 	out := Published{Ports: map[int]int{}, Source: "kubernetes"}
-	for _, svc := range list.Items {
-		if len(svc.Spec.Selector) == 0 || !selects(svc.Spec.Selector, pod.Metadata.Labels) {
+	for _, svc := range self.services {
+		if len(svc.Spec.Selector) == 0 || !selects(svc.Spec.Selector, self.labels) {
 			continue
 		}
 		for _, p := range svc.Spec.Ports {
-			inside := 0
-			switch t := p.TargetPort.(type) {
-			case float64:
-				inside = int(t)
-			case string:
-				inside = named[t]
-			case nil:
-				inside = p.Port
-			}
+			inside := self.inside(p.TargetPort, p.Port)
 			if inside == 0 {
 				continue
 			}

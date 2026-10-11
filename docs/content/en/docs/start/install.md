@@ -134,6 +134,8 @@ Every flag has a `MEERKAT_*` equivalent, and the flag wins. `./bin/meerkat
 |---|---|---|---|
 | `-addr` | `MEERKAT_ADDR` | `:8080` | data plane, plain HTTP |
 | `-admin-addr` | `MEERKAT_ADMIN_ADDR` | `:9090` | control plane, plain HTTP |
+| `-internal-addr` | `MEERKAT_INTERNAL_ADDR` | `:7070` | internal plane, plain HTTP: what the services behind the gateway call, never published |
+| `-internal-tls-addr` | `MEERKAT_INTERNAL_TLS_ADDR` | `:7443` | internal plane HTTPS, opened when a certificate is placed on it |
 | `-tls-addr` | `MEERKAT_TLS_ADDR` | `:8443` | data plane HTTPS, opened when TLS is switched on |
 | `-admin-tls-addr` | `MEERKAT_ADMIN_TLS_ADDR` | `:9443` | control plane HTTPS, same |
 
@@ -212,7 +214,7 @@ takes over, and switching it off again stops the export until the next start. Se
 
 ## Probes
 
-Both planes answer both probes.
+The data and control planes answer both probes; the internal plane answers `/healthz`.
 
 | Path | Answers |
 |---|---|

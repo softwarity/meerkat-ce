@@ -48,6 +48,12 @@ spec:
               containerPort: 8080
             - name: admin
               containerPort: 9090
+            # The internal plane: the JWKS and the scheduler's API, for the
+            # services of this cluster.
+            - name: internal
+              containerPort: 7070
+            - name: internal-tls
+              containerPort: 7443
             # The HTTPS doors. They open once a certificate is posted (Infra,
             # TLS); until then the published ports refuse the connection.
             - name: app-tls
@@ -59,6 +65,12 @@ spec:
               containerPort: {{ .Values.plug.port }}
             {{- end }}
           env:
+            {{- with include "meerkat.issuedSecret" . }}
+            # The Certificate it may ask cert-manager for (SSL-13), and the
+            # Secret it reads: the name the Role below is granted on.
+            - name: MEERKAT_CERT_MANAGER_SECRET
+              value: {{ . | quote }}
+            {{- end }}
             {{- $watched := ((.Values.rbac | default dict).watchNamespaces | default list) }}
             {{- if and $watched (ne ((.Values.rbac | default dict).watch) false) }}
             # The other namespaces the runtime watcher follows, beside its own:
@@ -121,10 +133,25 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            {{- if include "meerkat.internalTlsSecret" . }}
+            # Never through subPath: the kubelet only rewrites a whole volume,
+            # and a renewal is what this mount is for.
+            - name: internal-tls
+              mountPath: /etc/meerkat/tls/internal
+              readOnly: true
+            {{- end }}
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        {{- with include "meerkat.internalTlsSecret" . }}
+        - name: internal-tls
+          secret:
+            secretName: {{ . }}
+            # Optional: the service CA writes it after the Service exists, and
+            # the pod must not wait for it to start.
+            optional: true
+        {{- end }}
         - name: data
           {{- if and .Values.persistence.enabled (not (include "meerkat.clustered" .)) }}
           persistentVolumeClaim:

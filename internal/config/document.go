@@ -141,6 +141,11 @@ var ExportedSettings = []string{
 	// external-account secret rides as a $name (VAULT-05), so even the
 	// authority's credentials stay behind.
 	store.SettingTLS,
+	// The issuer of the identity JWT (AUTH-06): what every service behind the
+	// gateway compares the "iss" of its tokens with. It travels for the same
+	// reason the routes do - a configuration landing elsewhere must sign what
+	// those services expect.
+	store.SettingJWTIssuer,
 }
 
 // stampedKeys are written by the store on every save. They say WHEN an object

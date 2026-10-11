@@ -40,6 +40,8 @@ const trafficSeconds = Number(trafficOnly ? flag('--traffic-only', '600') : flag
 // only in Chromium's resolver.
 const ADMIN = instance.loopback?.admin ?? instance.admin;
 const DATA = instance.loopback?.data ?? instance.data;
+// The internal plane, where a service writes its schedules.
+const INTERNAL = instance.loopback?.internal ?? instance.internal;
 const [ROOT_USER, ROOT_PASSWORD] = instance.signIn.split(' / ');
 // The accounts' own password, once they have replaced the one-time one. A
 // throwaway instance on loopback, like the root one in screenshots.json.
@@ -414,6 +416,10 @@ async function seed() {
   // Scheduled calls: a cadence, a cron line and one date. They call as
   // "meerkat" with a role, which is what the route's sign-in rule reads.
   const v = { 'X-Acme-Api-Version': '2025-06' };
+  // Written the way a service writes them: with its own token, on the
+  // internal plane. The console creates none.
+  const minted = await ok(await api.post('/api/admin-tokens', { data: { name: 'orders-api', scope: 'schedules' } }), 'orders-api token');
+  const svc = await request.newContext({ baseURL: INTERNAL, extraHTTPHeaders: { Authorization: `Bearer ${minted.token}` } });
   // From the next full hour: a first turn NOW would run before the picture is
   // taken, and a scheduled call is refused on a route carrying endpoint rules
   // (requireSession does not read the scheduled caller - reported, not fixed
@@ -424,8 +430,9 @@ async function seed() {
     { name: 'Nightly carrier sync', routeId: 'orders-api', method: 'POST', path: '/api/shipments', cron: '0 3 * * *', timezone: 'Europe/Paris', role: 'orders-manager', headers: v, body: { carrier: 'dhl' }, metadata: { carrier: 'dhl' } },
     { name: 'Close the year-end order', routeId: 'orders-api', method: 'PUT', path: '/api/orders/ORD-8819', at: '2026-12-31T18:00:00+01:00', role: 'orders-manager', headers: v, body: { status: 'closed' }, metadata: { order: 'ORD-8819' } },
   ]) {
-    await ok(await api.post('/api/schedules', { data: { overlap: 'skip', ...sc } }), `schedule ${sc.name}`);
+    await ok(await svc.post('/api/schedules', { data: { overlap: 'skip', ...sc } }), `schedule ${sc.name}`);
   }
+  await svc.dispose();
   log('3 schedules');
 
   // Control-plane tokens, each with its own perimeter.

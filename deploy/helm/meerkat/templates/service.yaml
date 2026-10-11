@@ -1,5 +1,6 @@
-# Two planes, two Services, on purpose: an Ingress put in front of the
-# application plane must not be able to reach the console by accident.
+# Three planes, three Services, on purpose: an Ingress put in front of the
+# application plane must not be able to reach the console by accident, and
+# publishing the console must not publish what the backends call.
 apiVersion: v1
 kind: Service
 metadata:
@@ -49,6 +50,32 @@ spec:
       port: {{ . }}
       targetPort: admin-tls
     {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meerkat.fullname" . }}-internal
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+  {{- if and .Values.internalTls.openshiftServingCert (not .Values.internalTls.secretName) }}
+  annotations:
+    # OpenShift's service CA issues a certificate for this Service's names
+    # into this Secret, and renews it.
+    service.beta.openshift.io/serving-cert-secret-name: {{ include "meerkat.fullname" . }}-internal-tls
+  {{- end }}
+spec:
+  # ClusterIP, and no setting: the services of this cluster call it - the
+  # JWKS, the scheduler's API - and nothing else has a reason to. A
+  # NetworkPolicy can then keep the backends away from the console without
+  # keeping them away from this.
+  type: ClusterIP
+  selector: {{- include "meerkat.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: internal
+      port: {{ .Values.service.internalPort | default 7070 }}
+      targetPort: internal
+    - name: internal-tls
+      port: {{ .Values.service.internalTlsPort | default 7443 }}
+      targetPort: internal-tls
 {{- if .Values.plug.enabled }}
 ---
 # The developer tunnel. How your developers reach it is a network decision, so

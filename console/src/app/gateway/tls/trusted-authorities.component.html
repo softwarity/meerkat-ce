@@ -1,0 +1,36 @@
+<section class="card">
+  <div class="plane-head">
+    <h2 i18n="@@Trusted_authorities">Trusted authorities</h2>
+    <span class="grow"></span>
+    <button matButton="tonal" (click)="add()">
+      <mat-icon>add</mat-icon>
+      <ng-container i18n="@@Add_authority">Add authority</ng-container>
+    </button>
+  </div>
+  <p class="note" i18n="@@Trusted_authorities_note2">
+    Accepted when the gateway calls an upstream in HTTPS, on top of the public authorities.
+  </p>
+
+  @for (a of list(); track a.id) {
+    <div class="row">
+      <mat-icon class="kind">verified</mat-icon>
+      <div class="what">
+        <span class="name">{{ a.name }}</span>
+        @for (c of a.certificates; track c.fingerprint) {
+          <span class="cert">
+            {{ c.subject }}
+            <span class="until" i18n="@@Trust_until">until {{ expiry(c.notAfter) | date: 'mediumDate' }}</span>
+            @if (!c.isCa) {
+              <span class="leaf" i18n-matTooltip="@@Trust_leaf_tip" matTooltip="Not an authority: this certificate is trusted as it stands, for the upstream that presents it." i18n="@@Trust_leaf">certificate</span>
+            }
+          </span>
+        }
+      </div>
+      <button matIconButton (click)="remove(a)" i18n-matTooltip="@@Remove" matTooltip="Remove" i18n-aria-label="@@Remove" aria-label="Remove">
+        <mat-icon>delete</mat-icon>
+      </button>
+    </div>
+  } @empty {
+    <p class="none" i18n="@@Trust_none">No authority beyond the public ones.</p>
+  }
+</section>

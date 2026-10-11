@@ -15,11 +15,12 @@ import (
 
 // The scheduled calls (SCHED-01), and this is the WHOLE API for them.
 //
-// They live on the control plane, and that placement is the design. A schedule
-// is a service the gateway provides - like the agent endpoint - not
-// something an application exposes to its users: a browser never talks to it.
-// A backend does, with a token, and hands its own users whatever it decides to
-// show them.
+// They live on the internal plane (internalplane.go), and that placement is
+// the design. A schedule is a service the gateway provides to the backends
+// behind it, not something an application exposes to its users: a browser
+// never talks to it. A backend does, with a token, and hands its own users
+// whatever it decides to show them. The control plane keeps the half the
+// console needs - read, pause, resume, run now, delete - and writes none.
 //
 // WHO THE CALLS RUN AS is in the schedule, and it is not an account: a
 // scheduled call is made as "meerkat" carrying the ROLES the schedule asks
@@ -41,25 +42,28 @@ import (
 // The token's perimeter (MCP-02, ScopeSchedules) is what keeps that safe to
 // hand out: it opens this API and nothing else on this port.
 //
-// The CONSOLE reads the same endpoints and creates nothing: pause it, run it
-// now, remove it - the three things wanted at two in the morning.
+// The CONSOLE reads the same rows and creates nothing: pause it, run it now,
+// remove it - the three things wanted at two in the morning.
 const schedulesPath = "/api/schedules"
 
 func (a *API) registerSchedules(mux Mux) {
-	mux.Handle("GET /api/schedules", a.schedules(a.listSchedules))
-	mux.Handle("POST /api/schedules", a.schedules(a.createSchedule))
-	mux.Handle("GET /api/schedules/{id}", a.schedules(a.getSchedule))
-	mux.Handle("PUT /api/schedules/{id}", a.schedules(a.putSchedule))
-	mux.Handle("POST /api/schedules/{id}/pause", a.schedules(a.pauseSchedule))
-	mux.Handle("POST /api/schedules/{id}/resume", a.schedules(a.resumeSchedule))
-	mux.Handle("POST /api/schedules/{id}/run", a.schedules(a.runSchedule))
+	// What the console does: read, and act on what exists. The service's own
+	// door is the internal plane (internalplane.go), which carries all of it.
+	mux.Handle("GET /api/schedules", a.schedules(a.consoleSide(a.listSchedules)))
+	mux.Handle("GET /api/schedules/{id}", a.schedules(a.consoleSide(a.getSchedule)))
+	mux.Handle("POST /api/schedules/{id}/pause", a.schedules(a.consoleSide(a.pauseSchedule)))
+	mux.Handle("POST /api/schedules/{id}/resume", a.schedules(a.consoleSide(a.resumeSchedule)))
+	mux.Handle("POST /api/schedules/{id}/run", a.schedules(a.consoleSide(a.runSchedule)))
 	// What each turn did (SCHED-03): the row keeps the last result, this
 	// keeps them all - including the turns that never went out.
-	mux.Handle("GET /api/schedules/{id}/runs", a.schedules(a.listScheduleRuns))
-	// What a service reports on a run it answered 202 to: how far it has got,
-	// and that it is done. Same door as the rest, same token.
-	mux.Handle("PATCH /api/schedules/{id}/run", a.schedules(a.reportRun))
-	mux.Handle("DELETE /api/schedules/{id}", a.schedules(a.deleteSchedule))
+	mux.Handle("GET /api/schedules/{id}/runs", a.schedules(a.consoleSide(a.listScheduleRuns)))
+	mux.Handle("DELETE /api/schedules/{id}", a.schedules(a.consoleSide(a.deleteSchedule)))
+	// What only a service writes: the schedule, and the report on a run it
+	// answered 202 to. Kept here for the service tokens of a backend that
+	// has not moved to the internal plane yet, and for nobody else.
+	mux.Handle("POST /api/schedules", a.serviceTokens(a.createSchedule))
+	mux.Handle("PUT /api/schedules/{id}", a.serviceTokens(a.putSchedule))
+	mux.Handle("PATCH /api/schedules/{id}/run", a.serviceTokens(a.reportRun))
 	// How long a finished delayed action is kept before the sweep (SCHED-02).
 	// Beside the trail's own retention, root's alone for the same reason: it
 	// decides how long the gateway remembers what it did.

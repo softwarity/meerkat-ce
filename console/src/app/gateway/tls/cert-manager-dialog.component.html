@@ -1,0 +1,28 @@
+<h2 mat-dialog-title i18n="@@Ask_cert_manager">Ask cert-manager</h2>
+
+<mat-dialog-content class="body">
+  <p class="note" i18n="@@Cert_manager_note2">The gateway creates the Certificate {{ view.secret }} in its namespace.</p>
+  <mat-radio-group class="list" [value]="picked()" (change)="picked.set($event.value)">
+    @for (i of view.issuers; track i.kind + i.name) {
+      <mat-radio-button [value]="i" [disabled]="!i.ready">
+        <span class="issuer">
+          <code>{{ i.name }}</code>
+          <span class="meta">
+            {{ i.kind }}@if (i.type) { - {{ i.type }} }
+            @if (!i.ready) {
+              - <span class="bad">@if (i.why) {{{ i.why }}} @else {<ng-container i18n="@@Not_ready">not ready</ng-container>}</span>
+            }
+          </span>
+        </span>
+      </mat-radio-button>
+    }
+  </mat-radio-group>
+  @if (error(); as e) {
+    <p class="problem"><mat-icon>error</mat-icon><span>{{ e }}</span></p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton mat-dialog-close i18n="@@Cancel">Cancel</button>
+  <button matButton="filled" [disabled]="!picked() || saving()" (click)="submit()" i18n="@@Ask">Ask</button>
+</mat-dialog-actions>

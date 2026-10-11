@@ -52,3 +52,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-state" (include "meerkat.fullname" .) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+The Secret holding the internal plane's certificate, if any: the one named,
+or the one OpenShift's service CA writes for the internal Service.
+*/}}
+{{- define "meerkat.internalTlsSecret" -}}
+{{- if .Values.internalTls.secretName -}}
+{{ .Values.internalTls.secretName }}
+{{- else if .Values.internalTls.openshiftServingCert -}}
+{{ include "meerkat.fullname" . }}-internal-tls
+{{- end -}}
+{{- end }}
+
+{{/*
+The Certificate, and its Secret, the gateway asks cert-manager for itself
+(internalTls.certManager, SSL-13); empty when it may not.
+*/}}
+{{- define "meerkat.issuedSecret" -}}
+{{- if ((.Values.internalTls | default dict).certManager) -}}
+{{ include "meerkat.fullname" . }}-internal-issued
+{{- end -}}
+{{- end }}

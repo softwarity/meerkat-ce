@@ -49,6 +49,12 @@ type Router struct {
 
 	// loaded is false until the first Reload has finished. See Ready.
 	loaded atomic.Bool
+	// trust is what the trusted authorities' last read found (trust.go).
+	trust trustState
+	// issuer is the "iss" of the identity JWT (store.SettingJWTIssuer), as
+	// the last reload read it. Saving it reloads the router, so every node
+	// signs with the new one from its next request.
+	issuer atomic.Value
 
 	// metrics counts what passes through (OBS-01). Each compiled route holds a
 	// pointer into it, so the request path never looks anything up.
@@ -207,6 +213,9 @@ func New(st *store.Store, sm *session.Manager) *Router {
 // aborts the reload with a precise error - the previous snapshot keeps
 // serving.
 func (rt *Router) Reload(ctx context.Context) error {
+	// The authorities first (SSL-09): the routes compiled below take their
+	// transports from the pool this installs.
+	rt.applyTrust(ctx)
 	stored, err := rt.st.ListRoutes(ctx)
 	if err != nil {
 		return err
@@ -220,6 +229,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 	// setting reloads the router, exactly as changing the branding does - both
 	// are compiled into the routes below.
 	portalOn := rt.st.Portal(ctx).Mode == store.PortalModePortal
+	rt.issuer.Store(rt.st.JWTIssuer(ctx))
 	// The tracing setting (OBS-04), read here for the same reason: it is baked
 	// into the injection of every route that asked for one, so changing the
 	// setting reloads the router exactly as changing the branding does. WHICH
@@ -549,9 +559,11 @@ func (rt *Router) currentSigning() *signing.Set {
 	return rt.signing
 }
 
-// serveJWKS publishes the public halves of the signing keys. Empty (but valid)
-// when no key exists yet, so a backend can always fetch and cache it.
-func (rt *Router) serveJWKS(w http.ResponseWriter) {
+// ServeJWKS publishes the public halves of the signing keys. Empty (but valid)
+// when no key exists yet, so a backend can always fetch and cache it. The
+// internal plane mounts it, and only that plane: nothing outside the cluster
+// has a reason to read these keys.
+func (rt *Router) ServeJWKS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	set := rt.currentSigning()
@@ -679,7 +691,8 @@ func restoreLiteralArgs(original store.Route, resolved *store.Route, missing []s
 }
 
 // JWKSPath is the well-known location where the gateway publishes the public
-// halves of its identity signing keys, for upstreams verifying signed-jwt.
+// halves of its identity signing keys, for upstreams verifying signed-jwt, on
+// the internal plane. On this plane it is an ordinary path.
 const JWKSPath = "/.well-known/jwks.json"
 
 // ServeHTTP dispatches to the first route whose predicates all match; nothing
@@ -704,12 +717,6 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// into a search, landing on the line - and it costs one header. Not a
 	// secret: it is the name of a journey the caller is already on.
 	w.Header().Set(tracing.HeaderOut, tracing.ID(req.Context()))
-	// The JWKS is a gateway-internal endpoint: it wins over any route (a
-	// catch-all trap must never swallow it).
-	if req.Method == http.MethodGet && req.URL.Path == JWKSPath {
-		rt.serveJWKS(w)
-		return
-	}
 	// So are the files a route's custom code links (injections.go): the
 	// route's own path belongs to the application behind it.
 	if (req.Method == http.MethodGet || req.Method == http.MethodHead) && strings.HasPrefix(req.URL.Path, store.RouteAssetPath) {
@@ -2433,10 +2440,14 @@ func stripPrefixCount(filters []routing.Spec) int {
 	return n
 }
 
-// gatewayIssuer is the "iss" claim of identity tokens: this gateway is the
-// authority the upstream trusts. A configurable issuer arrives with the signing
-// identity (signed-jwt, Lot 2).
-const gatewayIssuer = "meerkat"
+// Issuer is the "iss" this gateway signs with, as the last reload read it -
+// what the internal plane's discovery document names.
+func (rt *Router) Issuer() string {
+	if v, ok := rt.issuer.Load().(string); ok && v != "" {
+		return v
+	}
+	return store.DefaultJWTIssuer
+}
 
 // identityForwardFilter sends the signed-in caller upstream, per the mechanism.
 // Only the SELECTED attributes travel, each optionally renamed. Inbound values
@@ -2468,7 +2479,7 @@ func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName str
 			if !ok {
 				return
 			}
-			claims := identityClaims(cfg, routeName, d)
+			claims := identityClaims(cfg, routeName, rt.Issuer(), d)
 			var tok string
 			if signed {
 				set := rt.currentSigning()
@@ -2619,9 +2630,10 @@ func PreviewHeaders(cfg store.IdentityForward) []IdentityHeader {
 	return identityHeaderPairs(cfg, sampleIdentity)
 }
 
-// PreviewClaims builds the JWT payload cfg would send for the sample caller.
-func PreviewClaims(cfg store.IdentityForward, routeName string) map[string]any {
-	return identityClaims(cfg, routeName, sampleIdentity)
+// PreviewClaims builds the JWT payload cfg would send for the sample caller,
+// under issuer.
+func PreviewClaims(cfg store.IdentityForward, routeName, issuer string) map[string]any {
+	return identityClaims(cfg, routeName, issuer, sampleIdentity)
 }
 
 // MintUnsignedJWT encodes an unsigned (alg:none) token, the "jwt" mechanism's
@@ -2632,7 +2644,7 @@ func MintUnsignedJWT(claims map[string]any) (string, error) {
 
 // identityClaims builds the JWT payload: the registered claims (iss/sub/aud/
 // iat/exp) plus one custom claim per selected attribute, under its mapped name.
-func identityClaims(cfg store.IdentityForward, routeName string, d identityData) map[string]any {
+func identityClaims(cfg store.IdentityForward, routeName, issuer string, d identityData) map[string]any {
 	now := time.Now()
 	ttl := 2 * time.Minute
 	if cfg.TTL != "" {
@@ -2641,7 +2653,7 @@ func identityClaims(cfg store.IdentityForward, routeName string, d identityData)
 		}
 	}
 	claims := map[string]any{
-		"iss": gatewayIssuer,
+		"iss": issuer,
 		"iat": now.Unix(),
 		"exp": now.Add(ttl).Unix(),
 	}
@@ -3021,8 +3033,10 @@ func transportFor(connect, response time.Duration) http.RoundTripper {
 		return t
 	}
 	t := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           (&net.Dialer{Timeout: connect}).DialContext,
+		Proxy:       http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{Timeout: connect}).DialContext,
+		// The system's authorities plus the trusted ones (SSL-09).
+		TLSClientConfig:       upstreamTLS(),
 		TLSHandshakeTimeout:   connect,
 		ResponseHeaderTimeout: response,
 		ForceAttemptHTTP2:     true,

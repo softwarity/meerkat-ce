@@ -36,13 +36,18 @@ export class SchedulerApiComponent {
   protected readonly dataOrigin = computed(
     () => this.editionRes.value()?.dataOrigin || "https://apps.example.com",
   );
-  // The control plane, by the name a service reaches it under from INSIDE the
+  // The internal plane, by the name a service reaches it under from INSIDE the
   // cluster - not the address this browser is at, which is an operator's way
-  // in and often not routable from a pod.
-  protected readonly origin = "http://meerkat:9090";
+  // in and often not routable from a pod. The runtime's own name for it when
+  // it gave one (a Service's FQDN, a Swarm or compose service), else the one
+  // our deployment files give the gateway.
+  protected readonly origin = computed(() => {
+    const e = this.editionRes.value();
+    return e?.internalOrigin || `http://meerkat:${e?.internalPort || "7070"}`;
+  });
 
-  protected readonly mintCmd = `# Perimeter "schedules" - it opens this API and nothing else on this
-# port. The clear value is shown once.
+  protected readonly mintCmd = `# Perimeter "schedules" - it opens this API and nothing else. Minted on
+# the console, used on the internal plane. The clear value is shown once.
 #
 # The same thing over the API, as root:
 curl -X POST http://meerkat:9090/api/admin-tokens \\
@@ -50,20 +55,22 @@ curl -X POST http://meerkat:9090/api/admin-tokens \\
   -H "Content-Type: application/json" \\
   -d '{"name":"stations","scope":"schedules","days":365}'`;
 
-  protected readonly writeCmd = `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
+  protected readonly writeCmd = computed(
+    () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
 
 # Create: the gateway hands back the id.
-curl -X POST http://meerkat:9090/api/schedules -H "$AUTH" \\
+curl -X POST ${this.origin()}/api/schedules -H "$AUTH" \\
   -H "Content-Type: application/json" --data @schedule.json   # without the comments
 # {"id":"sch_9f2c...","name":"station 42, hourly poll","nextAt":1789999188, ...}
 
 # Change it, on that id. Remove it: 204.
-curl -X PUT    http://meerkat:9090/api/schedules/sch_9f2c -H "$AUTH" \\
+curl -X PUT    ${this.origin()}/api/schedules/sch_9f2c -H "$AUTH" \\
   -H "Content-Type: application/json" --data @schedule.json
-curl -X DELETE http://meerkat:9090/api/schedules/sch_9f2c -H "$AUTH"
+curl -X DELETE ${this.origin()}/api/schedules/sch_9f2c -H "$AUTH"
 
 # Did not keep the id? Ask for it back by what you filed it under.
-curl "http://meerkat:9090/api/schedules?meta.station=42" -H "$AUTH"`;
+curl "${this.origin()}/api/schedules?meta.station=42" -H "$AUTH"`,
+  );
 
   // Annotated, and named .jsonc for it: the values a field takes belong beside
   // the field, not three paragraphs below.
@@ -132,35 +139,39 @@ curl "http://meerkat:9090/api/schedules?meta.station=42" -H "$AUTH"`;
   "metadata": { "kind": "report" }
 }`;
 
-  protected readonly readCmd = `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
+  protected readonly readCmd = computed(
+    () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
 
 # Everything on this gateway, narrowed by what you ask for.
-curl http://meerkat:9090/api/schedules -H "$AUTH"
+curl ${this.origin()}/api/schedules -H "$AUTH"
 
 # The service's own filing system, asked for in its own terms.
-curl "http://meerkat:9090/api/schedules?meta.station=42" -H "$AUTH"
-curl "http://meerkat:9090/api/schedules?meta.kind=poll&meta.region=west" -H "$AUTH"
+curl "${this.origin()}/api/schedules?meta.station=42" -H "$AUTH"
+curl "${this.origin()}/api/schedules?meta.kind=poll&meta.region=west" -H "$AUTH"
 
 # An expression, for a fleet: every station numbered under a hundred.
-curl "http://meerkat:9090/api/schedules?meta.station=~^[0-9]{1,2}$" -H "$AUTH"
+curl "${this.origin()}/api/schedules?meta.station=~^[0-9]{1,2}$" -H "$AUTH"
 
 # Pause one, let it fire again, owe a turn now.
-curl -X POST http://meerkat:9090/api/schedules/sch_9f2c/pause  -H "$AUTH"
-curl -X POST http://meerkat:9090/api/schedules/sch_9f2c/resume -H "$AUTH"
-curl -X POST http://meerkat:9090/api/schedules/sch_9f2c/run    -H "$AUTH"`;
+curl -X POST ${this.origin()}/api/schedules/sch_9f2c/pause  -H "$AUTH"
+curl -X POST ${this.origin()}/api/schedules/sch_9f2c/resume -H "$AUTH"
+curl -X POST ${this.origin()}/api/schedules/sch_9f2c/run    -H "$AUTH"`,
+  );
 
-  protected readonly runsCmd = `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
+  protected readonly runsCmd = computed(
+    () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
 
 # What each turn did, newest first.
-curl "http://meerkat:9090/api/schedules/sch_9f2c/runs" -H "$AUTH"
+curl "${this.origin()}/api/schedules/sch_9f2c/runs" -H "$AUTH"
 # [{"id":"run-17906f3c9d2a4e10-9f2c11","runId":"GvbDqbNG__YTOY00","attempt":1,
 #   "node":"meerkat-7d9c","endedAt":1790770191,"state":"done","status":200, ...}]
 
 # One of them again: a NEW run, today's payload, and the history says
 # which one it replays. Without a body, the same call is "run now".
-curl -X POST http://meerkat:9090/api/schedules/sch_9f2c/run -H "$AUTH" \\
+curl -X POST ${this.origin()}/api/schedules/sch_9f2c/run -H "$AUTH" \\
   -H "Content-Type: application/json" \\
-  -d '{"replayOf":"run-17906f3c9d2a4e10-9f2c11"}'`;
+  -d '{"replayOf":"run-17906f3c9d2a4e10-9f2c11"}'`,
+  );
 
   protected readonly incoming = computed(
     () => `POST /stations/42/poll HTTP/1.1
@@ -181,15 +192,16 @@ Retry-After: 600                      # seconds, or an HTTP date
 the daily extract is not published yet   # kept on this run, and read
                                          # from the history afterwards`;
 
-  protected readonly reportCmd = `# You answered 202, so the run is yours until you close it - reported with
+  protected readonly reportCmd = computed(
+    () => `# You answered 202, so the run is yours until you close it - reported with
 # your OWN token, on the same API as everything else.
-curl -X PATCH http://meerkat:9090/api/schedules/sch_9f2c/run \\
+curl -X PATCH ${this.origin()}/api/schedules/sch_9f2c/run \\
   -H "Authorization: Bearer $MEERKAT_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"run":"GvbDqbNG__YTOY00","state":"running","progress":60}'
 
 # ... and when the work is over.
-curl -X PATCH http://meerkat:9090/api/schedules/sch_9f2c/run \\
+curl -X PATCH ${this.origin()}/api/schedules/sch_9f2c/run \\
   -H "Authorization: Bearer $MEERKAT_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"run":"GvbDqbNG__YTOY00","state":"done","detail":"12000 rows"}'
@@ -199,5 +211,6 @@ curl -X PATCH http://meerkat:9090/api/schedules/sch_9f2c/run \\
 #
 # The 202 already told us the work is YOURS: from then on the call is never
 # sent again, whatever happens to the gateway. Report at least every five
-# minutes, or the lease lapses and the run is closed as lost.`;
+# minutes, or the lease lapses and the run is closed as lost.`,
+  );
 }

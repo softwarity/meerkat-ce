@@ -1,0 +1,100 @@
+<div class="drawer-head">
+  <h2 i18n="@@Internal_help_title2">A certificate inside the platform</h2>
+  <button matIconButton (click)="closed.emit()" i18n-aria-label="@@Close" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+<div class="drawer-body">
+  <p class="lead" i18n="@@Internal_help_lead2">
+    Every service of the platform serves HTTPS the same way: a certificate from the platform's PKI
+    for the names it is called by, mounted in its pod, and its authority trusted by the others.
+  </p>
+  <div class="bar">
+    <mat-button-toggle-group class="os" [value]="platform()" (change)="platform.set($event.value)" hideSingleSelectionIndicator>
+      <mat-button-toggle value="kubernetes">Kubernetes</mat-button-toggle>
+      <mat-button-toggle value="openshift">OpenShift</mat-button-toggle>
+      <mat-button-toggle value="own-ca" i18n="@@Internal_help_own_ca">Own CA</mat-button-toggle>
+      <mat-button-toggle value="swarm">Swarm</mat-button-toggle>
+      <mat-button-toggle value="compose">Compose</mat-button-toggle>
+    </mat-button-toggle-group>
+    <mat-slide-toggle [checked]="only()" (change)="only.set($event.checked)" i18n="@@Only_meerkat">Only Meerkat</mat-slide-toggle>
+  </div>
+
+  <ol class="steps">
+    <li>
+      @switch (platform()) {
+        @case ('kubernetes') {
+          <p i18n="@@Internal_help_cm_1"><b>Have cert-manager issue it</b>, from your cluster's issuer, then mount it.</p>
+          <app-snippet filename="certificate.yaml" [content]="certManager()" />
+          @if (only()) {
+            <app-snippet filename="mount.sh" [downloadable]="false" [content]="certManagerApply()" />
+            <p class="spare" i18n="@@Internal_help_cm_spare">
+              Nobody to write it? With <code>internalTls.certManager=true</code>, <b>Ask cert-manager</b>
+              has the gateway request it itself.
+            </p>
+          } @else {
+            <app-snippet filename="deployment.yaml" [downloadable]="false" [content]="k8sMount()" />
+          }
+        }
+        @case ('openshift') {
+          <p i18n="@@Internal_help_os_1"><b>Delegate it to OpenShift</b>: its service CA issues it for the Service, and renews it.</p>
+          @if (only()) {
+            <app-snippet filename="mount.sh" [downloadable]="false" [content]="openshift()" />
+          } @else {
+            <app-snippet filename="annotate.sh" [downloadable]="false" [content]="openshiftAnnotate()" />
+            <app-snippet filename="deployment.yaml" [downloadable]="false" [content]="k8sMount()" />
+          }
+        }
+        @case ('own-ca') {
+          <p i18n="@@Internal_help_own_1"><b>Sign it with an authority of your own</b>, then mount it as a Secret.</p>
+          <app-snippet filename="certificate.sh" [downloadable]="false" [content]="ownCa()" />
+          @if (!only()) {
+            <app-snippet filename="deployment.yaml" [downloadable]="false" [content]="k8sMount()" />
+          }
+        }
+        @case ('swarm') {
+          <p i18n="@@Internal_help_swarm_1"><b>Sign it, then hand it to the service</b> as two Swarm secrets.</p>
+          <app-snippet filename="certificate.sh" [downloadable]="false" [content]="swarm()" />
+        }
+        @case ('compose') {
+          <p i18n="@@Internal_help_compose_1"><b>Sign it, then mount its folder</b> in the service's container.</p>
+          <app-snippet filename="certificate.sh" [downloadable]="false" [content]="compose()" />
+        }
+      }
+    </li>
+    @if (only()) {
+      <li>
+        <p i18n="@@Internal_help_2">
+          <b>Place it here</b>: Add certificate, From the file system, pick <code>tls.crt</code>, then
+          click its Internal tag. Only the paths are kept; a renewal is served on its own.
+        </p>
+      </li>
+    } @else {
+      <li>
+        <p i18n="@@Internal_help_meerkat_trust">
+          <b>Let Meerkat call it over HTTPS</b>: add the authority's <code>ca.crt</code> to Trusted
+          authorities, once - every service it signed is then verified.
+        </p>
+      </li>
+    }
+    <li>
+      @switch (platform()) {
+        @case ('kubernetes') {
+          <p i18n="@@Internal_help_cm_3"><b>Let the services trust it</b>: trust-manager distributes the issuer's authority.</p>
+          <app-snippet filename="bundle.yaml" [content]="trustManager()" />
+        }
+        @case ('openshift') {
+          <p i18n="@@Internal_help_os_3"><b>Let the services trust it</b>: OpenShift injects its service CA into a ConfigMap.</p>
+          <app-snippet filename="service-ca.yaml" [content]="openshiftTrust()" />
+        }
+        @case ('own-ca') {
+          <p i18n="@@Internal_help_own_3"><b>Let the services trust it</b>: give them <code>ca.crt</code>, never <code>ca.key</code>.</p>
+          <app-snippet filename="trust.sh" [downloadable]="false" [content]="ownCaTrust()" />
+        }
+        @default {
+          <p i18n="@@Internal_help_docker_3"><b>Let the services trust it</b>: give them <code>ca.crt</code>, never <code>ca.key</code>.</p>
+        }
+      }
+    </li>
+  </ol>
+</div>

@@ -70,3 +70,23 @@ textarea.pem {
   font-size: 0.75rem;
   min-height: 96px;
 }
+// What the pasted certificate answers for, and whether the internal plane
+// takes it.
+.carries {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.carries.fits mat-icon {
+  color: var(--mat-sys-primary);
+}
+.carries mat-icon {
+  flex-shrink: 0;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}

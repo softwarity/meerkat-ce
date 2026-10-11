@@ -44,6 +44,21 @@ type editionInfo struct {
 	// ever sees the admin one. It is the same answer the auth authorities are
 	// given for their callbacks, from the same place.
 	DataOrigin string `json:"dataOrigin"`
+	// InternalPort is the internal plane's (:7070): where the services behind
+	// the gateway reach the JWKS and the scheduler's API. A port and not an
+	// address - the gateway's name inside a cluster is the deployment's.
+	InternalPort string `json:"internalPort"`
+	// InternalOrigin is the internal plane as the runtime names it -
+	// http://<release>-internal.<namespace>.svc.cluster.local:7070, a Swarm
+	// or compose service - empty when no runtime could be asked.
+	InternalOrigin string `json:"internalOrigin,omitempty"`
+	// InternalNames are every name the runtime resolves to that plane, the
+	// advertised one first: what the TLS screen checks a certificate against
+	// before it is placed there.
+	InternalNames []string `json:"internalNames,omitempty"`
+	// InternalSource is which runtime named it: kubernetes, openshift, swarm,
+	// compose, docker - what the TLS screen's how-to opens on.
+	InternalSource string `json:"internalSource,omitempty"`
 	// ConfigurationCap is how many saved configurations this image keeps at
 	// once, 0 for no limit (CFG-01). Said up front - "2 of 3" - because a cap
 	// discovered by being refused is a trap, and a cap announced is a price.
@@ -70,13 +85,16 @@ type EditionFeature struct {
 func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 	ctx := r.Context()
 	info := editionInfo{
-		Enterprise: edition.Enterprise,
-		Edition:    edition.Name,
-		Tenancy:    a.st.Tenancy(ctx),
-		DataOrigin: a.dataOrigin(r),
-		Features:   a.EnterpriseFeatures,
-		Notice:     evalmark.MailNote,
+		Enterprise:   edition.Enterprise,
+		Edition:      edition.Name,
+		Tenancy:      a.st.Tenancy(ctx),
+		DataOrigin:   a.dataOrigin(r),
+		InternalPort: portOf(a.InternalAddr),
+		Features:     a.EnterpriseFeatures,
+		Notice:       evalmark.MailNote,
 	}
+	in := a.internalOf(ctx)
+	info.InternalOrigin, info.InternalNames, info.InternalSource = in.Origin, in.Names, in.Source
 	if info.Features == nil {
 		info.Features = []EditionFeature{}
 	}

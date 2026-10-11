@@ -33,7 +33,7 @@ Creating one asks four things:
 | Field | What it decides |
 |---|---|
 | **Token name** | What you will recognise in the list and in the audit trail |
-| **Perimeter** | *Scheduled calls only* opens `/api/schedules` and nothing else; *Read only* reads and runs the testers; *Full access* is everything you can do |
+| **Perimeter** | *Scheduled calls only* opens `/api/schedules` and nothing else, on the internal plane; *Read only* reads and runs the testers; *Full access* is everything you can do |
 | **Used from** | Comma-separated addresses or CIDR ranges. Judged on the connecting address, never on a forwarded header |
 | **Expiry** | Never, 30 days, 90 days, or 1 year |
 

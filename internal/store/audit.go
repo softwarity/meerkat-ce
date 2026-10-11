@@ -199,6 +199,8 @@ var auditTargets = map[string]AuditTarget{
 	"certificate":  {Domains: []string{AuditDomainInfra}},
 	// An ACME authority: the account certificates are asked of.
 	"acme-authority": {Domains: []string{AuditDomainInfra}},
+	// An authority the gateway trusts when it calls an upstream (SSL-09).
+	"trusted-authority": {Domains: []string{AuditDomainInfra}},
 	// The application's identity and appearance: what an app-admin runs.
 	"theme":    {Domains: []string{AuditDomainApp}},
 	"locale":   {Domains: []string{AuditDomainApp}},

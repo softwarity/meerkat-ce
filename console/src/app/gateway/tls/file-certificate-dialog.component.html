@@ -1,0 +1,51 @@
+<h2 mat-dialog-title i18n="@@From_the_file_system">From the file system</h2>
+
+<mat-dialog-content class="body">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  } @else if (why(); as w) {
+    <p class="note">{{ w }}</p>
+  } @else {
+    <p class="note" i18n="@@Mounted_note">
+      What is mounted in this container. Only the paths are kept: a renewal written over the files is served on its own.
+    </p>
+    <mat-radio-group class="list" [value]="picked()" (change)="picked.set($event.value)">
+      @for (m of mounts(); track m.mount) {
+        <p class="mount"><mat-icon>folder</mat-icon><code>{{ m.mount }}</code></p>
+        @for (c of m.certificates; track c.path) {
+          <mat-radio-button [value]="c" [disabled]="!c.keyPath || inPool(c)">
+            <span class="cert">
+              <code>{{ c.names.join(', ') }}</code>
+              <span class="meta">
+                {{ c.path }}
+                @if (inPool(c)) {
+                  <span class="taken" i18n="@@Mounted_in_pool">already in the pool</span>
+                } @else if (c.keyPath) {
+                  <ng-container i18n="@@Mounted_with_key">with {{ c.keyPath }}</ng-container>
+                } @else {
+                  <span class="nokey" i18n="@@Mounted_no_key">no private key beside it</span>
+                }
+                - <ng-container i18n="@@Mounted_until">until {{ until(c.notAfter) | date: 'mediumDate' }}</ng-container>
+                @if (internalNames.length) {
+                  @if (fitsInternal(c)) {
+                    - <span class="fits" i18n="@@Fits_the_internal_plane">fits the internal plane</span>
+                  } @else {
+                    - <ng-container i18n="@@Not_the_internal_names">not the internal plane's names</ng-container>
+                  }
+                }
+              </span>
+            </span>
+          </mat-radio-button>
+        }
+      }
+    </mat-radio-group>
+  }
+  @if (error(); as e) {
+    <p class="problem"><mat-icon>error</mat-icon><span>{{ e }}</span></p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton mat-dialog-close i18n="@@Cancel">Cancel</button>
+  <button matButton="filled" [disabled]="!picked()?.keyPath || saving()" (click)="submit()" i18n="@@Add">Add</button>
+</mat-dialog-actions>

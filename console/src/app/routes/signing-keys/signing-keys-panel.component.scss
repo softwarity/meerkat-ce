@@ -181,3 +181,14 @@ pre.pem {
   font-size: 0.82rem;
   margin-right: auto;
 }
+/* The issuer and its Save, on one line under the two addresses. */
+.issuer {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+/* Level with the field's box, whether or not an error shows under it. */
+.issuer > button {
+  margin-top: 8px;
+}

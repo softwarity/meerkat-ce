@@ -36,7 +36,7 @@ La création d'un jeton demande quatre informations :
 | Champ | Ce qu'il détermine |
 |---|---|
 | **Token name** | Le nom sous lequel vous le retrouverez dans la liste et dans le journal d'audit |
-| **Perimeter** | *Scheduled calls only* donne accès à `/api/schedules` et à rien d'autre ; *Read only* lit et lance les testeurs ; *Full access* couvre tout ce que vous pouvez faire |
+| **Perimeter** | *Scheduled calls only* donne accès à `/api/schedules` et à rien d'autre, sur le plan interne ; *Read only* lit et lance les testeurs ; *Full access* couvre tout ce que vous pouvez faire |
 | **Used from** | Des adresses ou des plages CIDR séparées par des virgules. La vérification porte sur l'adresse qui se connecte, jamais sur un en-tête transmis |
 | **Expiry** | Jamais, 30 jours, 90 jours ou 1 an |
 

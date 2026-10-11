@@ -7,11 +7,15 @@ summary: Docker Compose et Helm pour une gateway unique sur son propre volume, e
 
 # Une gateway
 
-Un binaire, deux ports. **8080 est le plan applicatif** - celui qu'atteignent
+Un binaire, trois ports. **8080 est le plan applicatif** - celui qu'atteignent
 vos utilisateurs. **9090 est le plan de contrôle** - la console
-d'administration. Seul le premier a sa place sur Internet, et c'est exactement
-pour cette raison que le chart en fait deux Services : un Ingress placé devant
-vos applications ne doit pas pouvoir atteindre la console par accident.
+d'administration. **7070 est le plan interne** - ce qu'appellent vos services :
+le JWKS, l'API du scheduler. Seul le premier a sa place sur Internet, et c'est
+exactement pour cette raison que le chart en fait trois Services : un Ingress
+placé devant vos applications ne doit pas pouvoir atteindre la console par
+accident, et publier la console ne doit pas publier ce qu'appellent les
+backends. Le plan interne n'est publié nulle part : les services du même réseau
+l'atteignent par son nom.
 
 Tout ce que sait la gateway - les routes, les comptes, le coffre scellé, les
 certificats - se trouve dans un seul répertoire. Donnez-lui un volume, et la
@@ -222,7 +226,8 @@ absent doit pouvoir comprendre pourquoi.
 | --- | --- | --- |
 | `MEERKAT_ADMIN_PASSWORD` | - | Le premier compte admin, au PREMIER démarrage uniquement. Elle n'est plus jamais lue ensuite. |
 | `MEERKAT_DATA` | `data` | L'endroit où la gateway conserve tout ce qu'elle sait. |
-| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | Les deux plans. |
+| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | Le plan applicatif et le plan de contrôle. |
+| `MEERKAT_INTERNAL_ADDR` / `MEERKAT_INTERNAL_TLS_ADDR` | `:7070` / `:7443` | Le plan interne : le JWKS et l'API du scheduler, pour les services placés derrière la gateway. Jamais publié ; sa porte HTTPS s'ouvre quand un certificat y est placé. |
 | `MEERKAT_TLS_ADDR` / `MEERKAT_ADMIN_TLS_ADDR` | `:8443` / `:9443` | Les accès HTTPS, ouverts dès qu'un certificat existe pour un nom. En posséder un, c'est cela l'activation - aucun interrupteur ne peut dire "activé" alors que rien n'est servi. |
 | `MEERKAT_DATABASE_URL` | - | Un PostgreSQL externe à la place du stockage embarqué. Édition Enterprise, et condition préalable à un [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | un fichier dans le répertoire de données | La clé maîtresse du coffre. Elle doit être fournie, et identique, sur chaque nœud d'un cluster. |

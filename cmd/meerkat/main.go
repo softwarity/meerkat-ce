@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -67,6 +68,14 @@ func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	addr := flag.String("addr", envOr("MEERKAT_ADDR", ":8080"), "application (data plane) listen address")
 	adminAddr := flag.String("admin-addr", envOr("MEERKAT_ADMIN_ADDR", ":9090"), "administration (control plane) listen address")
+	// The third audience: the services behind the gateway (the JWKS, the
+	// scheduler's API). Plain HTTP on purpose - it is reached by a name inside
+	// the cluster that no certificate carries, which is exactly what broke the
+	// JWKS fetch the day HTTPS was forced on the application port.
+	internalAddr := flag.String("internal-addr", envOr("MEERKAT_INTERNAL_ADDR", ":7070"),
+		"internal plane listen address: what the services behind the gateway call (JWKS, scheduler API); keep it inside the cluster")
+	internalTLSAddr := flag.String("internal-tls-addr", envOr("MEERKAT_INTERNAL_TLS_ADDR", ":7443"),
+		"internal plane HTTPS listen address, opened when a certificate is placed on the internal plane")
 	consoleURL := flag.String("console-url", envOr("MEERKAT_CONSOLE_URL", ""), "dev only: proxy the console UI to a front dev server (e.g. http://localhost:4200)")
 	dataDir := flag.String("data", envOr("MEERKAT_DATA", "data"), "data directory (embedded storage)")
 	// An external database, for several gateways serving one installation.
@@ -168,7 +177,8 @@ func main() {
 	slog.Info("logs", "threshold", *logLevel, "format", string(format), "access_log", *accessLog)
 
 	if err := run(options{
-		addr: *addr, adminAddr: *adminAddr, tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
+		addr: *addr, adminAddr: *adminAddr, internalAddr: *internalAddr, internalTLSAddr: *internalTLSAddr,
+		tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
 		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr, databaseURL: *databaseURL,
 		production: *production,
@@ -183,6 +193,8 @@ func main() {
 // that made the argument list unreadable.
 type options struct {
 	addr, adminAddr       string
+	internalAddr          string
+	internalTLSAddr       string
 	tlsAddr, adminTLSAddr string
 	consoleURL, dataDir   string
 	configFile, vaultFile string
@@ -355,6 +367,11 @@ func run(o options) error {
 	adminAPI := admin.New(st, adminSessions, router)
 	adminAPI.Mailer = mailer
 	adminAPI.DataAddr = addr
+	adminAPI.InternalAddr = o.internalAddr
+	if abs, err := filepath.Abs(dataDir); err == nil {
+		adminAPI.DataDir = abs
+	}
+	adminAPI.InternalTLSAddr = o.internalTLSAddr
 	adminAPI.ReleaseNotes = meerkat.ReleaseNotes
 	// The Enterprise rows of the contract, for the License screen (CONSOLE-14).
 	for _, f := range meerkat.EnterpriseFeatures() {
@@ -687,6 +704,17 @@ func run(o options) error {
 		Handler:           whilePaused(st, refusesWhilePaused, refusePaused, adminSessions.Sliding(afterWrites(adminMux, "", identityChanged))),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	// Internal plane (:7070): the services behind the gateway, by token. No
+	// session slides here and no write changes an identity, so neither
+	// wrapper the control plane carries has anything to do.
+	internalMux := http.NewServeMux()
+	internalMux.HandleFunc("GET /healthz", healthz)
+	adminAPI.RegisterInternal(internalMux)
+	internalSrv := &http.Server{
+		Addr:              o.internalAddr,
+		Handler:           whilePaused(st, refusesWhilePaused, refusePaused, internalMux),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 
 	// TLS (SSL-01/02): one HTTPS door per plane, opened and closed while the
 	// gateway runs. The certificate a handshake receives comes from a
@@ -717,8 +745,11 @@ func run(o options) error {
 		certs.NewListener("data", o.tlsAddr, srv.Handler, nil),
 		certs.NewListener("admin", o.adminTLSAddr, certs.ForgetHSTS(adminSrv.Handler), nil),
 		dataRedirect,
+		// The internal plane's HTTPS door (SSL-12): no redirect and no HSTS,
+		// its callers are programs reaching it by a name inside the cluster.
+		certs.NewListener("internal", o.internalTLSAddr, internalSrv.Handler, nil),
 	)
-	tlsSup.Ports(addr, adminAddr)
+	tlsSup.Ports(addr, adminAddr, o.internalAddr)
 	// One gateway orders a certificate, the others wait and find it in the
 	// shared cache (PERF-03). A no-op on the embedded database.
 	tlsSup.SerialiseIssuance(st.WithLock)
@@ -728,6 +759,58 @@ func run(o options) error {
 		bus.Signal(context.Background(), store.TopicIssue, "")
 	})
 	bus.Register(store.TopicCertificates, tlsSup.Reload)
+	// The certificates the file system provides (SSL-11): a renewal by the
+	// cluster rewrites the files and nobody saves anything, so each node
+	// watches its own mounts and reloads its doors when what they hold moved.
+	go func() {
+		last := st.FileCertificatesSum(ctx)
+		for range time.Tick(30 * time.Second) {
+			sum := st.FileCertificatesSum(ctx)
+			if sum == last {
+				continue
+			}
+			last = sum
+			if _, err := st.RefreshFileCertificates(ctx); err != nil {
+				slog.Error("certificates from the file system not refreshed", "err", err)
+			}
+			if err := tlsSup.Reload(ctx); err != nil {
+				slog.Error("tls reload after a file changed", "err", err)
+			}
+			slog.Info("a certificate from the file system changed, its doors were reloaded")
+		}
+	}()
+	// The internal plane's certificate asked of cert-manager (SSL-13): each
+	// node watches the Secret through the API and holds the pair in memory, so
+	// a renewal - cert-manager rewriting the Secret - reaches every door when
+	// it happens, the key never entering the database.
+	if cm, why := discovery.NewCertManager(); cm != nil {
+		adminAPI.CertManager = cm
+		st.OnIssuedPair(func(secret string) (string, string, bool) {
+			if secret != cm.SecretName() {
+				return "", "", false
+			}
+			return cm.Pair()
+		})
+		go cm.Watch(ctx, func() {
+			c, k, ok := cm.Pair()
+			if ok {
+				if _, err := st.RefreshIssuedCertificate(ctx, cm.SecretName(), c, k); err != nil {
+					slog.Error("the certificate cert-manager issued is not stored", "err", err)
+				}
+			}
+			if err := tlsSup.Reload(ctx); err != nil {
+				slog.Error("tls reload after cert-manager's Secret moved", "err", err)
+			}
+			if ok {
+				slog.Info("cert-manager wrote the internal certificate's Secret, its doors were reloaded", "secret", cm.SecretName())
+			} else {
+				slog.Info("the internal certificate's Secret is gone, its doors were reloaded", "secret", cm.SecretName())
+			}
+			issues.Moved()
+		}, issues.Moved)
+	} else {
+		adminAPI.CertManagerWhy = why
+	}
 	// Where the spans and the pushed counters go (OBS-04, OBS-06), from the
 	// STORED setting: an operator who switched it on in the console must find
 	// it on again after a restart - and on every node when it changes. Only
@@ -784,7 +867,7 @@ func run(o options) error {
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	errc := make(chan error, 2)
+	errc := make(chan error, 3)
 	go func() {
 		// The address, and nothing else: which product this is and which version
 		// it runs were said thirteen milliseconds earlier, and a line that
@@ -795,6 +878,10 @@ func run(o options) error {
 	go func() {
 		slog.Info("meerkat control plane listening", "addr", adminAddr)
 		errc <- adminSrv.ListenAndServe()
+	}()
+	go func() {
+		slog.Info("meerkat internal plane listening", "addr", o.internalAddr)
+		errc <- internalSrv.ListenAndServe()
 	}()
 
 	select {
@@ -820,6 +907,9 @@ func run(o options) error {
 		err := srv.Shutdown(shutdownCtx)
 		if aerr := adminSrv.Shutdown(shutdownCtx); err == nil {
 			err = aerr
+		}
+		if ierr := internalSrv.Shutdown(shutdownCtx); err == nil {
+			err = ierr
 		}
 		if terr := tlsSup.Stop(shutdownCtx); err == nil {
 			err = terr

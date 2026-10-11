@@ -140,6 +140,8 @@ l'option qui l'emporte. `./bin/meerkat --help` en affiche la liste ; la voici.
 |---|---|---|---|
 | `-addr` | `MEERKAT_ADDR` | `:8080` | plan de données, HTTP en clair |
 | `-admin-addr` | `MEERKAT_ADMIN_ADDR` | `:9090` | plan de contrôle, HTTP en clair |
+| `-internal-addr` | `MEERKAT_INTERNAL_ADDR` | `:7070` | plan interne, HTTP en clair : ce qu'appellent les services placés derrière la gateway, jamais publié |
+| `-internal-tls-addr` | `MEERKAT_INTERNAL_TLS_ADDR` | `:7443` | HTTPS du plan interne, ouvert quand un certificat y est placé |
 | `-tls-addr` | `MEERKAT_TLS_ADDR` | `:8443` | HTTPS du plan de données, ouvert quand TLS est activé |
 | `-admin-tls-addr` | `MEERKAT_ADMIN_TLS_ADDR` | `:9443` | HTTPS du plan de contrôle, de même |
 
@@ -226,7 +228,7 @@ prochain démarrage. Voir [Traces](/docs/operations/tracing).
 
 ## Health checks
 
-Les deux plans répondent aux deux health checks.
+Le plan de données et le plan de contrôle répondent aux deux health checks ; le plan interne répond à `/healthz`.
 
 | Chemin | Réponse |
 |---|---|

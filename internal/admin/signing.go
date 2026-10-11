@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -17,6 +18,9 @@ import (
 func (a *API) registerSigning(mux Mux) {
 	mux.Handle("GET /api/identity/signing-keys", a.gw(a.getSigningKeys))
 	mux.Handle("POST /api/identity/signing-keys/renew", a.infraAdmin(a.renewSigningKeys))
+	// The "iss" of every identity JWT (AUTH-06), and the issuer the discovery
+	// document names (SAUTH-04). The router reloads on it.
+	mux.Handle("PUT /api/identity/issuer", a.infraAdmin(a.putIssuer))
 	mux.Handle("POST /api/identity/preview", a.infraAdmin(a.previewIdentity))
 }
 
@@ -73,7 +77,7 @@ func (a *API) previewIdentity(w http.ResponseWriter, r *http.Request, _ store.Us
 	case "headers":
 		res.Headers = gateway.PreviewHeaders(cfg)
 	case "jwt", "signed-jwt":
-		claims := gateway.PreviewClaims(cfg, req.RouteName)
+		claims := gateway.PreviewClaims(cfg, req.RouteName, a.st.JWTIssuer(r.Context()))
 		res.Claims = claims
 		if cfg.Mechanism == "jwt" {
 			tok, err := gateway.MintUnsignedJWT(claims)
@@ -121,9 +125,21 @@ type signingKey struct {
 
 // signingKeysView is the whole picture: where the JWKS is served, and the public
 // key per algorithm to paste into a backend that prefers static keys.
+//
+// WHERE is a port and a path, not an address: the gateway's name inside a
+// cluster is the deployment's (a Service, a compose service), and this
+// console is reached under yet another one. InternalPort is the internal
+// plane's, the only one that serves it - and its discovery document, which
+// names Issuer.
 type signingKeysView struct {
-	JwksPath string       `json:"jwksPath"`
-	Keys     []signingKey `json:"keys"`
+	JwksPath      string `json:"jwksPath"`
+	DiscoveryPath string `json:"discoveryPath"`
+	InternalPort  string `json:"internalPort"`
+	// InternalOrigin is the internal plane as the runtime names it, "" when
+	// none could be asked (see discovery.InternalOrigin).
+	InternalOrigin string       `json:"internalOrigin,omitempty"`
+	Issuer         string       `json:"issuer"`
+	Keys           []signingKey `json:"keys"`
 }
 
 func (a *API) signingView(ctx context.Context) (signingKeysView, error) {
@@ -131,7 +147,8 @@ func (a *API) signingView(ctx context.Context) (signingKeysView, error) {
 	if err != nil {
 		return signingKeysView{}, err
 	}
-	view := signingKeysView{JwksPath: gateway.JWKSPath}
+	view := signingKeysView{JwksPath: gateway.JWKSPath, DiscoveryPath: DiscoveryPath,
+		InternalPort: portOf(a.InternalAddr), InternalOrigin: a.internalOriginOf(ctx), Issuer: a.st.JWTIssuer(ctx)}
 	for _, alg := range signing.Algorithms {
 		pemStr, err := set.PublicPEM(alg)
 		if err != nil {
@@ -170,4 +187,43 @@ func (a *API) renewSigningKeys(w http.ResponseWriter, r *http.Request, actor sto
 		return
 	}
 	writeJSON(w, http.StatusOK, view)
+}
+
+// issuerChange is the issuer as the console sends it.
+type issuerChange struct {
+	Issuer string `json:"issuer"`
+}
+
+func (a *API) putIssuer(w http.ResponseWriter, r *http.Request, actor store.User) {
+	var p issuerChange
+	if err := decodeStrict(r, &p); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed issuer: "+err.Error())
+		return
+	}
+	before := a.st.JWTIssuer(r.Context())
+	if err := a.st.SetJWTIssuer(r.Context(), p.Issuer); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	// The router signs with what it read at reload, on every node.
+	if err := a.reloadRouting(r.Context()); err != nil {
+		a.internal(w, fmt.Errorf("stored, but reload failed: %w", err))
+		return
+	}
+	a.auditUpdate(r.Context(), actor, "identity.issuer", "settings", "", "", "",
+		issuerChange{Issuer: before}, p)
+	view, err := a.signingView(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+// portOf is the port of a listen address, ":7070" or "0.0.0.0:7070" alike.
+func portOf(addr string) string {
+	if i := strings.LastIndexByte(addr, ':'); i >= 0 {
+		return addr[i+1:]
+	}
+	return addr
 }

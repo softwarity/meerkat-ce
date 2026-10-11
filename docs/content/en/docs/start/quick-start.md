@@ -26,6 +26,10 @@ The two published ports are two different jobs:
 | 8080 | data plane | your users - this is the one that faces the network |
 | 9090 | control plane | the administration console - keep it internal |
 
+A third port, **7070**, is the internal plane: what your services call (the
+JWKS, the scheduler's API). It is not published, and a service on the same
+network reaches it by name.
+
 `/data` holds everything the gateway knows: routes, accounts, the vault, the
 certificates. Back up that volume and you have backed up the gateway.
 

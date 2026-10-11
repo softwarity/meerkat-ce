@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { FileButtonComponent, FileDropDirective } from '../../shared/file-pick';
+import { coversOne, pemNames } from './cert-names';
 
 // The four doors an operator opens by hand, in one dialog. Each makes ONE
 // certificate for the pool; where it is served is decided afterwards, by
@@ -18,6 +19,9 @@ export interface CertificateDialogData {
   // What the name field starts with: the name this console is reached by,
   // which is the name a first certificate is most often for.
   names?: string;
+  // The names the runtime resolves to the internal plane: a pasted
+  // certificate is told at once whether it can be served there.
+  internalNames?: string[];
   // The authority is a public one (Let's Encrypt): it has to reach a name
   // from the internet to prove it, so a name that only exists here is flagged.
   publicAuthority?: boolean;
@@ -74,6 +78,12 @@ export class CertificateDialogComponent {
   protected readonly password = model('');
 
   protected readonly dropError = signal('');
+
+  // What the pasted certificate answers for, read in the browser as it is
+  // typed, and whether that is one of the internal plane's names.
+  protected readonly carried = computed(() => (this.door === 'pem' ? pemNames(this.certPem()) : []));
+  protected readonly internalNames = this.data.internalNames ?? [];
+  protected readonly fitsInternal = computed(() => coversOne(this.carried(), this.internalNames));
 
   protected readonly title = computed(() => {
     switch (this.door) {

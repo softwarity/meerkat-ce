@@ -2,9 +2,12 @@
 #
 #   MEERKAT_ADMIN_PASSWORD='choose-one' docker compose up -d
 #
-# Two ports, and they are two different jobs: 8080 is the APPLICATION plane
-# (what your users reach), 9090 is the CONTROL plane (the admin console). Only
-# the application plane belongs on the internet.
+# Three ports, and they are three different jobs: 8080 is the APPLICATION
+# plane (what your users reach), 9090 is the CONTROL plane (the admin console),
+# 7070 is the INTERNAL plane (what your services call: the JWKS, the
+# scheduler's API). Only the application plane belongs on the internet, and
+# the internal one is published nowhere: a service on this compose network
+# reaches it as http://meerkat:7070.
 #
 # For the Enterprise image and the developer tunnel, see docker-compose.ee.yml.
 services:
@@ -15,6 +18,8 @@ services:
     ports:
       - "8080:8080" # application plane
       - "9090:9090" # control plane (admin console) - keep this one internal
+      # 7070, the internal plane, is left unpublished on purpose: the services
+      # on this network call it by name (http://meerkat:7070).
     environment:
       # Read once, on the FIRST start, to create the admin account. Leave it
       # set afterwards or remove it; it is never used again.

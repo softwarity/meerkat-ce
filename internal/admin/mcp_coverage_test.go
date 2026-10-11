@@ -71,20 +71,21 @@ var agentCovers = map[string][]string{
 // has to be a reason - "not yet" is one, as long as it names what would change
 // it.
 var agentIgnores = map[string]string{
-	"me":             "who the caller is, for the console's own chrome; an agent is told by describe_gateway",
-	"release-notes":  "what the running release brought, prose for a person under the console's account button",
-	"data-tokens":    "every account's application tokens: an agent holding one token has no business listing or revoking other people's",
-	"sessions":       "who is signed in where, and ending a person's session: a decision about a human in front of a screen, taken by a human in front of the console",
-	"apidocs":        "the developer documentation pages, served to a browser",
-	"backup":         "a snapshot is a file to download; export_configuration is the readable half an agent can reason about",
-	"certificates":   "certificates and private keys, one of the two places this product refuses to be clever",
-	"acme":           "the ACME accounts certificates are asked of: an account binding is a credential, and opening one is accepting an authority's terms - a legal act",
-	"vault":          "secrets: the vault answers references, never values, and an agent has no business asking",
-	"admin-tokens":   "minting a control-plane token from an agent that holds one is how a perimeter stops meaning anything",
-	"auth-providers": "external identity providers carry client secrets; the check endpoint reaches a third party under our credentials",
-	"identity":       "JWT signing keys",
-	"issues":         "user-filed reports, with screenshots",
-	"mcp":            "the agent endpoint itself",
+	"me":                  "who the caller is, for the console's own chrome; an agent is told by describe_gateway",
+	"release-notes":       "what the running release brought, prose for a person under the console's account button",
+	"data-tokens":         "every account's application tokens: an agent holding one token has no business listing or revoking other people's",
+	"sessions":            "who is signed in where, and ending a person's session: a decision about a human in front of a screen, taken by a human in front of the console",
+	"apidocs":             "the developer documentation pages, served to a browser",
+	"backup":              "a snapshot is a file to download; export_configuration is the readable half an agent can reason about",
+	"certificates":        "certificates and private keys, one of the two places this product refuses to be clever",
+	"acme":                "the ACME accounts certificates are asked of: an account binding is a credential, and opening one is accepting an authority's terms - a legal act",
+	"trusted-authorities": "which authorities the gateway trusts when it calls: the other half of TLS, decided on the screen that holds the certificates, by the person who knows which PKI signs what",
+	"vault":               "secrets: the vault answers references, never values, and an agent has no business asking",
+	"admin-tokens":        "minting a control-plane token from an agent that holds one is how a perimeter stops meaning anything",
+	"auth-providers":      "external identity providers carry client secrets; the check endpoint reaches a third party under our credentials",
+	"identity":            "JWT signing keys",
+	"issues":              "user-filed reports, with screenshots",
+	"mcp":                 "the agent endpoint itself",
 	"model": "the shape of an account, not its contents: a field added or removed changes " +
 		"what every route may forward and what every form asks for, which is a decision " +
 		"about this installation rather than a task. An agent that fills the values it " +
@@ -194,8 +195,15 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"POST /api/certificates/signing-request": true, "POST /api/certificates/{id}/adopt": true,
 		"DELETE /api/certificates/{id}": true, "PUT /api/certificates/{id}/placement": true,
 		"POST /api/certificates/acme": true,
-		"POST /api/acme/authorities":  true, "PUT /api/acme/authorities/{id}": true,
-		"DELETE /api/acme/authorities/{id}": true, "POST /api/certificates/{id}/retry": true,
+		// A certificate taken into the pool by the paths of mounted files.
+		"POST /api/certificates/file": true,
+		// The internal plane's certificate asked of cert-manager: a
+		// Certificate created in the cluster.
+		"POST /api/certificates/cert-manager": true,
+		"POST /api/acme/authorities":          true, "PUT /api/acme/authorities/{id}": true,
+		"POST /api/trusted-authorities": true, "PUT /api/trusted-authorities/{id}": true,
+		"DELETE /api/trusted-authorities/{id}": true,
+		"DELETE /api/acme/authorities/{id}":    true, "POST /api/certificates/{id}/retry": true,
 		"POST /api/config/import": true, "POST /api/config/history/{id}/restore": true,
 		"POST /api/config/history/{id}/save": true,
 		// The scheduled calls: pausing one stops it firing, running one brings
@@ -222,7 +230,9 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"PUT /api/configurations/{id}/document": true, "DELETE /api/configurations/{id}": true,
 		"PUT /api/auth-providers/{id}": true, "DELETE /api/auth-providers/{id}": true,
 		"POST /api/identity/signing-keys/renew": true,
-		"POST /api/issues/{id}/comments":        true, "PUT /api/issues/{id}/status": true,
+		// A stored issuer, and the router reloads on it: a write.
+		"PUT /api/identity/issuer":       true,
+		"POST /api/issues/{id}/comments": true, "PUT /api/issues/{id}/status": true,
 		"DELETE /api/issues/{id}": true,
 		"POST /api/roles":         true, "PUT /api/roles/{name}": true, "DELETE /api/roles/{name}": true,
 		"POST /api/routes/reorder": true, "PUT /api/routes/{id}": true,

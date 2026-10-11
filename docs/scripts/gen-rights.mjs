@@ -34,6 +34,13 @@ const GUARDS = {
     admits: ['app-admin', 'root'],
     note: { en: 'or a token scoped to schedules', fr: 'ou un jeton limité au périmètre schedules' },
   },
+  serviceTokens: {
+    admits: [],
+    note: {
+      en: "a token scoped to schedules only, while its service moves to the internal plane (port 7070), which is this endpoint's home",
+      fr: "un jeton limité au périmètre schedules seulement, le temps que son service passe au plan interne (port 7070), qui est la place de cet endpoint",
+    },
+  },
   tenantCreator: { admits: ['tenant-creator', 'root'] },
   devOrInfra: { admits: ['dev', 'infra-admin', 'root'] },
   authed: {

@@ -7,11 +7,14 @@ summary: Docker Compose and Helm for a single gateway on its own volume, and wha
 
 # One gateway
 
-One binary, two ports. **8080 is the application plane** - what your users
-reach. **9090 is the control plane** - the admin console. Only the first one
-belongs on the internet, and they are two Services in the chart for exactly
-that reason: an Ingress in front of your applications must not be able to
-reach the console by accident.
+One binary, three ports. **8080 is the application plane** - what your users
+reach. **9090 is the control plane** - the admin console. **7070 is the
+internal plane** - what your services call: the JWKS, the scheduler's API.
+Only the first one belongs on the internet, and they are three Services in the
+chart for exactly that reason: an Ingress in front of your applications must
+not be able to reach the console by accident, and publishing the console must
+not publish what the backends call. The internal plane is published nowhere:
+the services on the same network reach it by name.
 
 Everything the gateway knows - routes, accounts, the sealed vault, the
 certificates - lives in one directory. Give it a volume and you have made the
@@ -212,7 +215,8 @@ why.
 | --- | --- | --- |
 | `MEERKAT_ADMIN_PASSWORD` | - | The first admin account, on the FIRST start only. Never read again. |
 | `MEERKAT_DATA` | `data` | Where the gateway keeps everything it knows. |
-| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | The two planes. |
+| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | The application and control planes. |
+| `MEERKAT_INTERNAL_ADDR` / `MEERKAT_INTERNAL_TLS_ADDR` | `:7070` / `:7443` | The internal plane: the JWKS and the scheduler's API, for the services behind the gateway. Never published; its HTTPS door opens when a certificate is placed on it. |
 | `MEERKAT_TLS_ADDR` / `MEERKAT_ADMIN_TLS_ADDR` | `:8443` / `:9443` | The HTTPS doors, opened when a certificate exists for a name. Having one IS the activation - there is no switch that could say "on" while nothing is served. |
 | `MEERKAT_DATABASE_URL` | - | An external PostgreSQL instead of the embedded store. Enterprise, and the prerequisite of a [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | a file under the data directory | The vault master key. It has to be supplied, and identical, on every node of a cluster. |

@@ -1,7 +1,7 @@
 import { expect, request, test, type APIRequestContext } from '@playwright/test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ADMIN_URL, DATA_URL } from '../playwright.config';
+import { ADMIN_URL, DATA_URL, INTERNAL_URL } from '../playwright.config';
 import { authDataFile, authFile, seeded } from '../lib/fixtures';
 
 // The captcha left the global settings on 2026-08-14: it guards a public FORM,
@@ -397,19 +397,35 @@ test.describe.serial('flow-scheduler', () => {
     expect(target, 'the seeded gateway must have a route to point at').toBeTruthy();
 
     // The credential a backend holds, and its whole perimeter: it writes
-    // schedules on this port, and nothing else.
+    // schedules, on the internal plane, and nothing else.
     const minted = await root.post('/api/admin-tokens', {
       data: { name: 'e2e stations', scope: 'schedules' },
     });
     expect(minted.status(), await minted.text()).toBe(201);
     const { token } = (await minted.json()) as { token: string };
     const svc = await request.newContext({
-      baseURL: ADMIN_URL,
+      baseURL: INTERNAL_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${token}` },
     });
 
-    // It opens the schedules and nothing else on this port.
-    expect((await svc.get('/api/me')).status()).toBe(403);
+    // It opens the schedules and nothing else, on the control plane as here.
+    const onConsole = await request.newContext({
+      baseURL: ADMIN_URL,
+      extraHTTPHeaders: { Authorization: `Bearer ${token}` },
+    });
+    expect((await onConsole.get('/api/me')).status()).toBe(403);
+    await onConsole.dispose();
+    // And the console creates none: root's own session is sent to the
+    // internal plane.
+    expect((await root.post('/api/schedules', { data: {} })).status()).toBe(403);
+    // The JWKS is there too, for anybody: public keys give no power.
+    const jwks = await request.newContext({ baseURL: INTERNAL_URL });
+    expect(await (await jwks.get('/.well-known/jwks.json')).text()).toContain('"keys"');
+    // And the discovery document beside it: the issuer, and where its keys are.
+    const discovery = await (await jwks.get('/.well-known/openid-configuration')).json();
+    expect(discovery.issuer).toBe('meerkat');
+    expect(discovery.jwks_uri).toBe(`${INTERNAL_URL}/.well-known/jwks.json`);
+    await jwks.dispose();
 
     // An ordinary create: the gateway hands back the id.
     const body = {

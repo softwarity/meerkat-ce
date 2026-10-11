@@ -26,6 +26,8 @@ services:
     ports:
       - "8080:8080" # application plane
       - "9090:9090" # control plane (admin console) - keep this one internal
+      # 7070, the internal plane, is left unpublished on purpose: the services
+      # on this network call it by name (http://meerkat:7070).
       # The developer tunnel. Which port you publish is yours to choose; the
       # gateway listens on 22222 inside. Publish it where your developers can
       # reach it, and nowhere else.

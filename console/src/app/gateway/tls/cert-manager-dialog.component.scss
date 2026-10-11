@@ -1,0 +1,34 @@
+.body {
+  display: grid;
+  gap: 4px;
+  min-width: 480px;
+}
+.note {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.issuer {
+  display: flex;
+  flex-direction: column;
+}
+.meta {
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.bad {
+  color: var(--mat-sys-error);
+}
+.problem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}

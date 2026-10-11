@@ -2,6 +2,50 @@
 
 ## NEXT RELEASE
 
+- **A third port for what your services call.** The internal plane (`:7070`,
+  `MEERKAT_INTERNAL_ADDR`) serves the JWKS your services verify the identity JWT
+  with, and the scheduler's API, inside the cluster only: the chart gives it its own
+  ClusterIP Service that nothing publishes. Publishing the console no longer
+  publishes the API services write their schedules with, and a NetworkPolicy can now
+  keep the console away from the backends.
+- **The console reads schedules and writes none.** It pauses, resumes, runs, replays
+  and deletes them; creating or changing one is the service's, with its token, on
+  the internal plane. A service token still writing on the console's port keeps
+  working while its backend moves, and the log says once which token it is.
+- **Breaking: the JWKS left the application port.** It is served on the internal
+  plane only, `http://<gateway>:7070/.well-known/jwks.json`, and the JWT drawer gives
+  the address. A service still reading it on 8080 can no longer verify its tokens:
+  point it at the new address before or with the upgrade. Same keys, same tokens.
+- **The issuer is yours to set, and the internal plane says it.** The `iss` of the
+  identity JWT is `meerkat` until you change it, in the JWT drawer. Beside the JWKS,
+  the internal plane now serves `/.well-known/openid-configuration` with the issuer
+  and the keys' address, and it is the recommended way to verify the tokens: one
+  address, from which a library learns both. Set the issuer to
+  `http://<gateway>:7070`, and a library that starts from the issuer, such as
+  Spring's `issuer-uri`, needs one line.
+- **Upstreams in HTTPS signed by your own authority.** Infra, TLS, has a new section,
+  Trusted authorities: what the gateway accepts when it calls, apart from the
+  certificates it presents. Add authority opens one dialog: a name, and the
+  authority's certificate chosen, dropped or pasted. Added to the public authorities,
+  never instead of them.
+- **Certificates from the file system, and HTTPS inside the cluster.** Add certificate,
+  From the file system lists what the runtime mounted in the container - a Kubernetes
+  Secret, a Swarm secret, a compose volume - with the key beside each certificate.
+  Only the paths are kept, the key never enters the database, and a renewal by
+  cert-manager or OpenShift is served without a restart. A third door, Internal, takes
+  such a certificate and opens HTTPS on port 7443 for the services behind the gateway;
+  the chart mounts the Secret with `internalTls.secretName` or
+  `internalTls.openshiftServingCert`.
+  The Internal door lists the names the runtime resolves to it and refuses a
+  certificate that carries none of them; the import dialog says so as soon as a PEM
+  is pasted.
+- **The internal certificate, asked of cert-manager.** A spare way on Kubernetes, the usual
+  one staying a Certificate declared with the deployment: with
+  `internalTls.certManager=true`, Add certificate, Ask cert-manager has the gateway create
+  its own Certificate for its internal names, signed by the issuer picked there. Its
+  Secret is read through the API and watched, so there is no mount and no restart, and a
+  renewal is served on every node when cert-manager writes it.
+
 ---
 
 ## 1.4.0

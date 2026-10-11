@@ -18,6 +18,7 @@ export type ChangeKind =
   | 'locale'
   | 'authprovider'
   | 'certificate'
+  | 'trusted-authority'
   | 'vault'
   | 'token'
   | 'settings'

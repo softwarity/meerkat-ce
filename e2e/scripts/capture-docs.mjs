@@ -27,6 +27,7 @@ const bin = `${tmp}/meerkat`;
 const DATA_DIR = '/tmp/meerkat-docs/data';
 const DATA = 'http://localhost:18084';
 const ADMIN = 'http://localhost:19094';
+const INTERNAL = 'http://localhost:17074';
 const PASSWORD = 'Capture-Root-Password-1';
 
 // The frame every published image already has. Changing it would reflow every
@@ -77,6 +78,7 @@ function startGateway() {
     [
       '-addr', ':18084',
       '-admin-addr', ':19094',
+      '-internal-addr', ':17074',
       '-data', DATA_DIR,
       '-tenancy', 'multi',
     ],
@@ -404,14 +406,19 @@ async function seedEverythingElse(api) {
   ] } }));
 
   // Three calls through the orders API: a cadence, a cron line and one date.
+  // Written the way a service writes them: its own token, on the internal
+  // plane - the console creates none.
+  const minted = await api.post('/api/admin-tokens', { data: { name: 'orders-api', scope: 'schedules' } });
+  const svc = await request.newContext({ baseURL: INTERNAL, extraHTTPHeaders: { Authorization: `Bearer ${(await minted.json()).token}` } });
   for (const sc of [
     { name: 'Nightly reindex', path: '/api/orders/admin/reindex', method: 'POST', roles: ['OPS'], cron: '0 2 * * *', timezone: 'Europe/Paris' },
     { name: 'Sync shipments', path: '/api/shipments', method: 'POST', roles: ['OPS'], every: 'PT15M' },
     { name: 'Close the quarter', path: '/api/orders', method: 'POST', roles: ['BILLING'], at: '2026-12-31T23:00:00Z' },
   ]) {
-    await soft(`schedule ${sc.name}`, () => api.post('/api/schedules', {
+    await soft(`schedule ${sc.name}`, () => svc.post('/api/schedules', {
       data: { routeId: 'orders-api', overlap: 'skip', catchUp: 3600, ...sc } }));
   }
+  await svc.dispose();
   // Two saved configurations under the current one.
   for (const c of [
     { name: 'Before the SAML switch', description: 'Kept to come back to' },

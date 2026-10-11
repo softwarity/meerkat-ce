@@ -155,8 +155,28 @@
     "guard": "infraAdmin"
   },
   {
+    "method": "GET",
+    "path": "/api/certificates/cert-manager",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/certificates/cert-manager",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/certificates/file",
+    "guard": "infraAdmin"
+  },
+  {
     "method": "POST",
     "path": "/api/certificates/import",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/certificates/mounted",
     "guard": "infraAdmin"
   },
   {
@@ -388,6 +408,11 @@
     "method": "GET",
     "path": "/api/edition",
     "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/identity/issuer",
+    "guard": "infraAdmin"
   },
   {
     "method": "POST",
@@ -622,7 +647,7 @@
   {
     "method": "POST",
     "path": "/api/schedules",
-    "guard": "schedules"
+    "guard": "serviceTokens"
   },
   {
     "method": "DELETE",
@@ -637,7 +662,7 @@
   {
     "method": "PUT",
     "path": "/api/schedules/{id}",
-    "guard": "schedules"
+    "guard": "serviceTokens"
   },
   {
     "method": "POST",
@@ -652,7 +677,7 @@
   {
     "method": "PATCH",
     "path": "/api/schedules/{id}/run",
-    "guard": "schedules"
+    "guard": "serviceTokens"
   },
   {
     "method": "POST",
@@ -958,6 +983,26 @@
     "method": "GET",
     "path": "/api/themes/{id}/preview",
     "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trusted-authorities",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trusted-authorities",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/trusted-authorities/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/trusted-authorities/{id}",
+    "guard": "infraAdmin"
   },
   {
     "method": "GET",

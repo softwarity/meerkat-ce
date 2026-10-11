@@ -16,10 +16,11 @@ import (
 	"github.com/softwarity/meerkat/internal/edition"
 )
 
-// Planes, matching store.PlaneConsole / store.PlaneApp.
+// Planes, matching store.PlaneConsole / store.PlaneApp / store.PlaneInternal.
 const (
-	PlaneConsole = "console"
-	PlaneApp     = "app"
+	PlaneConsole  = "console"
+	PlaneApp      = "app"
+	PlaneInternal = "internal"
 )
 
 // Settings is the TLS configuration as an operator sets it.
@@ -247,7 +248,9 @@ type State struct {
 	// from the certificates, never from a switch.
 	Console bool `json:"console"`
 	App     bool `json:"app"`
-	ACME    bool `json:"acme"`
+	// Internal is the internal plane's HTTPS door (SSL-12).
+	Internal bool `json:"internal"`
+	ACME     bool `json:"acme"`
 	// Problems are the certificates that could not be loaded and the authority
 	// that could not be built, each named. They are shown rather than logged
 	// and forgotten: a certificate silently dropped at boot is found months
@@ -258,6 +261,9 @@ type State struct {
 	ConsolePlainAddr string `json:"consolePlainAddr"`
 	AppAddr          string `json:"appAddr"`
 	AppPlainAddr     string `json:"appPlainAddr"`
+	// The internal plane's two: what the services behind the gateway call.
+	InternalAddr      string `json:"internalAddr"`
+	InternalPlainAddr string `json:"internalPlainAddr"`
 	// Redirecting says the application's plain port is currently sending
 	// callers to its HTTPS one. It can be false while the setting is true -
 	// nothing valid to present stands it down.
@@ -270,14 +276,16 @@ type State struct {
 // console's door never presents an application certificate, and the two can
 // hold the same material without sharing an object.
 type Supervisor struct {
-	Console *Manager
-	App     *Manager
+	Console  *Manager
+	App      *Manager
+	Internal *Manager
 
-	src      Source
-	cache    autocert.Cache
-	appLn    *Listener
-	adminLn  *Listener
-	redirect *Redirect
+	src        Source
+	cache      autocert.Cache
+	appLn      *Listener
+	adminLn    *Listener
+	internalLn *Listener
+	redirect   *Redirect
 
 	mu    sync.Mutex
 	state State
@@ -286,18 +294,24 @@ type Supervisor struct {
 	issues issueBook
 }
 
-// NewSupervisor wires the two managers to the two HTTPS doors and to the
+// NewSupervisor wires the three managers to the three HTTPS doors and to the
 // application's redirector. missing recognises the store's "no such row", so
-// an ACME cache miss can be told from a real fault.
-func NewSupervisor(src Source, missing func(error) bool, appLn, adminLn *Listener, redirect *Redirect) *Supervisor {
+// an ACME cache miss can be told from a real fault. internalLn may be nil: a
+// build or a test with no internal door.
+func NewSupervisor(src Source, missing func(error) bool, appLn, adminLn *Listener, redirect *Redirect, internalLn ...*Listener) *Supervisor {
 	s := &Supervisor{
 		Console:  New(),
 		App:      New(),
+		Internal: New(),
 		src:      src,
 		cache:    StoreCache{S: src, Missing: missing},
 		appLn:    appLn,
 		adminLn:  adminLn,
 		redirect: redirect,
+	}
+	if len(internalLn) > 0 {
+		s.internalLn = internalLn[0]
+		s.state.InternalAddr = s.internalLn.Addr
 	}
 	s.state.AppAddr, s.state.ConsoleAddr = appLn.Addr, adminLn.Addr
 	return s
@@ -311,13 +325,16 @@ func (s *Supervisor) SerialiseIssuance(fn Serialiser) {
 	s.App.SerialiseIssuance(fn)
 }
 
-// Ports records where the two PLAIN doors listen. They are not the
-// supervisor's to manage - main owns them - but they belong on the same screen
-// as the HTTPS ones.
-func (s *Supervisor) Ports(appPlain, consolePlain string) {
+// Ports records where the PLAIN doors listen. They are not the supervisor's
+// to manage - main owns them - but they belong on the same screen as the HTTPS
+// ones.
+func (s *Supervisor) Ports(appPlain, consolePlain string, internalPlain ...string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state.AppPlainAddr, s.state.ConsolePlainAddr = appPlain, consolePlain
+	if len(internalPlain) > 0 {
+		s.state.InternalPlainAddr = internalPlain[0]
+	}
 }
 
 // State reports the last reconciled state.
@@ -343,6 +360,13 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 		return err
 	}
 	problems = append(problems, appProblems...)
+	// The internal plane presents what is placed on it and asks no authority:
+	// its names are the cluster's, which no public authority can see.
+	internalList, internalFallback, internalProblems, err := s.src.CertificateMaterials(ctx, PlaneInternal)
+	if err != nil {
+		return err
+	}
+	problems = append(problems, internalProblems...)
 
 	// One client per authority, each with its own account and its own corner
 	// of the cache; each door maps a name to the client that asks for it. An
@@ -407,6 +431,7 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 	armed := len(clients) > 0
 	s.Console.Set(consoleList, consoleFallback)
 	s.App.Set(appList, appFallback)
+	s.Internal.Set(internalList, internalFallback)
 
 	// A door opens because there is something to present. There is no switch
 	// to disagree with, so there is no "switched on but nothing installed"
@@ -423,6 +448,15 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 		problems = append(problems, err.Error())
 		if failed == nil {
 			failed = err
+		}
+	}
+	if s.internalLn != nil {
+		s.internalLn.SetConfig(s.Internal.TLSConfig())
+		if err := s.internalLn.Sync(ctx, s.Internal.Serves()); err != nil {
+			problems = append(problems, err.Error())
+			if failed == nil {
+				failed = err
+			}
 		}
 	}
 
@@ -445,6 +479,7 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 
 	s.mu.Lock()
 	s.state.Console, s.state.App = s.adminLn.Running(), s.appLn.Running()
+	s.state.Internal = s.internalLn != nil && s.internalLn.Running()
 	s.state.ACME = armed
 	s.state.Redirecting = redirect
 	s.state.Problems = problems
@@ -463,11 +498,16 @@ func orName(a Authority) string {
 	return a.ID
 }
 
-// Stop closes both HTTPS doors, for a graceful shutdown.
+// Stop closes the HTTPS doors, for a graceful shutdown.
 func (s *Supervisor) Stop(ctx context.Context) error {
 	err := s.appLn.Stop(ctx)
 	if aerr := s.adminLn.Stop(ctx); err == nil {
 		err = aerr
+	}
+	if s.internalLn != nil {
+		if ierr := s.internalLn.Stop(ctx); err == nil {
+			err = ierr
+		}
 	}
 	return err
 }

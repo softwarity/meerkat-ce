@@ -41,7 +41,7 @@ type right struct {
 // in the matrix, and somebody has to say what it admits.
 var knownGuards = map[string]bool{
 	"rootOnly": true, "infraAdmin": true, "gw": true, "appAdmin": true,
-	"domainAdmin": true, "tenantScoped": true, "schedules": true,
+	"domainAdmin": true, "tenantScoped": true, "schedules": true, "serviceTokens": true,
 	"tenantCreator": true, "devOrInfra": true,
 	"authed": true, "agentDoor": true,
 }

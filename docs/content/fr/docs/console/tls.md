@@ -32,10 +32,12 @@ noms, un joker (`*.acme.example`) ou une adresse IP, et il les sert tous.
 
 - **Certificates** - la réserve : tous les certificats que détient cette
   gateway, qu'ils soient servis ou non. Chaque ligne donne les noms du
-  certificat, sa provenance (*Imported*, *Self-signed*, *Signed on request*), sa
-  durée de validité, son type de clé et l'endroit où il est servi.
-- **Console** et **Application** - les deux portes. **Faites glisser un certificat
-  sur l'une d'elles**, ou sur les deux : il y est servi aussitôt. Faites-le glisser
+  certificat, sa provenance (*Imported*, *Self-signed*, *Signed on request*,
+  *File system*), sa durée de validité, son type de clé et l'endroit où il est
+  servi.
+- **Console**, **Application** et **Internal** - les trois portes, la dernière
+  étant ce qu'appellent les services placés derrière la gateway. **Faites glisser
+  un certificat sur l'une d'elles**, ou sur plusieurs : il y est servi aussitôt. Faites-le glisser
   d'une porte à l'autre pour le déplacer ; ramenez-le dans la réserve, ou cliquez
   sur sa croix, pour le retirer. Les entrées **Serve on** du menu d'un certificat
   font la même chose sans souris.
@@ -46,7 +48,36 @@ certificat est placé sur la porte, et rouge quand le déploiement ne le publie 
 Sous la porte figurent les liens HTTPS des noms qu'elle sert. Lorsque la console
 est servie en HTTPS et qu'aucun de ses certificats ne porte le nom par lequel vous
 l'avez jointe, la porte le signale : le navigateur recevrait un certificat établi
-pour un autre nom, et le refuserait.
+pour un autre nom, et le refuserait. La porte Internal va plus loin : sous
+**Called as**, elle liste tous les noms que le runtime résout vers elle - les
+quatre formes d'un Service Kubernetes ou OpenShift, un service Swarm et son nom
+court dans la stack, un service compose et son conteneur - et coche ceux que porte
+un certificat placé. Un certificat qui n'en porte aucun est refusé : sa ligne
+n'affiche pas d'étiquette Internal. À l'inverse, les portes Console et Application refusent
+un certificat qui ne porte que ces noms - ils mènent aux ports du plan interne, jamais
+aux leurs -, et sa ligne n'affiche que l'étiquette Internal. Le dialogue d'import le dit dès qu'un PEM est
+collé, et celui du système de fichiers à côté de chaque certificat monté. En
+HTTPS, l'adresse donnée aux services est le premier de ces noms que porte le
+certificat. Son
+bouton **Where does its certificate come from?** ouvre un guide pour la
+plateforme où elle tourne - Kubernetes (cert-manager), OpenShift, une autorité à vous, Swarm,
+compose. Ses modèles valent pour n'importe quel service de la plateforme,
+puisque tous servent du HTTPS de la même façon, avec `<service>` et
+`<namespace>` à remplir, et disent d'ajouter l'autorité aux Trusted authorities
+pour que la gateway les appelle en HTTPS. **Only Meerkat** les remplit avec les
+noms de cette gateway, et ajoute ce qui lui est propre : la valeur du chart qui
+le monte, et son étiquette Internal.
+
+**Add certificate, Ask cert-manager**, sur Kubernetes seulement, fait demander à la
+gateway son certificat interne à cert-manager : vous choisissez l'émetteur, la gateway
+décide le reste. L'entrée est grisée ailleurs, avec sa raison. Voir
+[Demandé à cert-manager](/docs/operations/tls#demand-cert-manager).
+
+**Add certificate, From the file system** liste ce que le runtime a monté dans le
+conteneur - un Secret Kubernetes, un secret Swarm, un volume compose -, avec la
+clé trouvée à côté de chaque certificat. Seuls les chemins sont gardés, et un
+renouvellement écrit dans les fichiers est servi tout seul. Voir
+[Un certificat depuis le système de fichiers](/docs/operations/tls#un-certificat-depuis-le-systme-de-fichiers).
 
 La ligne affichée sous un certificat répond à la question *est-ce que cela va
 fonctionner*, jamais à *voici un code d'état* :
@@ -194,6 +225,16 @@ Encrypt a cessé d'en envoyer en 2025 : le
 [récapitulatif quotidien](/docs/console/mail-relay) cite tout certificat
 automatique qui entre dans sa fenêtre de renouvellement, signe que ce
 renouvellement échoue.
+
+## Autorités de confiance
+
+Sous les deux portes, **Trusted authorities** liste ce que la gateway accepte
+quand elle appelle un upstream en HTTPS, au-delà des autorités publiques. **Add
+authority** ouvre une fenêtre : un nom, et le certificat de l'autorité -
+choisissez son fichier, déposez-le sur la fenêtre, ou collez-le.
+
+Chaque entrée montre les certificats qu'elle contient et jusqu'à quand. Voir
+[Appeler des upstreams en HTTPS](/docs/operations/tls#appeler-des-upstreams-en-https).
 
 ## Pièges
 

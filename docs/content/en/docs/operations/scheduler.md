@@ -101,8 +101,8 @@ PATCH /api/schedules/{id}/run
 and at the end `{"state": "done", "detail": "12000 rows"}`. That is what makes
 a three-hour job expressible without a three-hour HTTP request.
 
-**With which token?** Yours, the one that created the schedule, on the same API
-as everything else. The scheduled call brought no token with it: its identity
+**With which token?** Yours, the one that created the schedule, on the internal
+plane like everything else. The scheduled call brought no token with it: its identity
 was posed inside the gateway, and never travelled on a wire.
 
 Every report renews the **lease**. Say nothing for five minutes and the run is
@@ -197,14 +197,19 @@ own cadence takes over, and the screen says why.
 
 ## The API, and where it lives
 
-On the **control plane**, not on the one your applications answer. A scheduled
-call is a service the gateway provides, like the agent endpoint: no browser
-calls it. A **backend** does, from inside the cluster, by the gateway's internal
-name.
+On the **internal plane**, port 7070: neither the port your applications
+answer on, nor the console's. A scheduled call is a service the gateway
+provides to the backends behind it: no browser calls it. A **backend** does,
+from inside the cluster, by the gateway's internal name.
 
 ```
-http://meerkat:9090/api/schedules
+http://meerkat:7070/api/schedules
 ```
+
+That port is never put behind an ingress, and it answers **tokens only**: a
+browser session is refused there. Inside the cluster is a place, not a
+credential - any pod can reach a ClusterIP - so nothing on this port gives any
+power without a token.
 
 | | |
 |---|---|
@@ -218,11 +223,27 @@ http://meerkat:9090/api/schedules
 | `GET /api/schedules/{id}/runs` | what each turn did, newest first |
 | `PATCH /api/schedules/{id}/run` | report on the run in flight |
 
+### What the console does, and does not
+
+The console reads the same schedules, on its own plane, and acts on those that
+exist: **pause, resume, run now, replay a turn, delete**. It **creates and
+changes none**. There is no button for it, and the control plane refuses
+`POST`, `PUT` and the run report from a console session or an operator's
+token, naming the internal plane in its answer. A schedule is written by the
+service that needs it.
+
+> [!NOTE]
+> Before the internal plane, this API lived on the control plane (`:9090`). A
+> service token still calling there keeps working, for the time it takes to
+> move its backend, and the gateway writes once in its log which token did and
+> where its door is now. Only the address changes: same token, same paths.
+
 ### The token
 
-A control-plane token whose **perimeter is `schedules`**: it opens this API and
-nothing else on this port - not the configuration, not the accounts, not the
-routes. Narrow on purpose: it lives in a deployment manifest, often in another
+A token whose **perimeter is `schedules`**, minted on the console (Infra,
+Access tokens) and used on the internal plane. It opens this API and nothing
+else - not the configuration, not the accounts, not the routes, and nothing at
+all on the console's port. Narrow on purpose: it lives in a deployment manifest, often in another
 team's repository, and it is the one nobody remembers to rotate.
 
 **What the calls may reach** is not decided here: it is the schedule's own
@@ -510,9 +531,10 @@ thing, you need a broker.
 **Data plane, Scheduler** lists everything scheduled, filtered by
 organisation and service, updated live: a run starting, advancing and finishing
 appears without refreshing anything. Three actions live there, and they are the
-ones wanted at two in the morning: pause, bring the next turn forward, remove.
-There is no button to create one, by decision: a schedule belongs to the
-service that needs it, which creates it through the API from its own screens.
+ones wanted at two in the morning: pause (and resume), bring the next turn
+forward, remove. There is no button to create or change one, by decision: a
+schedule belongs to the service that needs it, which writes it through the API,
+on the internal plane, from its own screens.
 
 ![The Scheduler screen: a cadence, a cron line and one date, each with its next run and its last](img/console/scheduler.webp)
 
@@ -548,5 +570,5 @@ for it by what the service wrote on it.
 
 Creating a schedule is not among them, deliberately: a schedule runs as an
 account, and the administrators reading that screen are not the accounts it
-should run as. The API refuses it too, in as many words: creation belongs to
-the service, with its own token.
+should run as. The console's plane refuses it too, in as many words: writing a
+schedule belongs to the service, with its own token, on the internal plane.

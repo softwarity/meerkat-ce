@@ -33,7 +33,7 @@ What changed in each release is in [RELEASE_NOTES.md](./RELEASE_NOTES.md).
 
 | Path | What |
 |---|---|
-| `cmd/meerkat/` | the single binary: data plane on :8080, control plane on :9090 |
+| `cmd/meerkat/` | the single binary: data plane on :8080, control plane on :9090, internal plane on :7070 |
 | `internal/` | the Go core - routing, gateway, store, sessions, sign-in, admin API |
 | `ee/` | the Enterprise code, under a commercial license; absent from the community mirror |
 | `console/` | the Angular admin console, served through the admin port |
@@ -58,6 +58,7 @@ cd console && npm install && npm start
 # terminal 2 - the gateway, rebuilt on every .go save
 MEERKAT_ADDR=:8082 \
 MEERKAT_ADMIN_ADDR=:9092 \
+MEERKAT_INTERNAL_ADDR=:7072 \
 MEERKAT_CONSOLE_URL=http://localhost:4200 \
 MEERKAT_ADMIN_PASSWORD=test1234 \
 make dev               # needs air: go install github.com/air-verse/air@latest
@@ -75,7 +76,7 @@ The tag lives in `.air.toml`, so `air` typed by hand builds the same binary as
 
 ### Flags and environment
 
-The binary takes `-addr`, `-admin-addr`, `-console-url`, `-data` and `-version`.
+The binary takes `-addr`, `-admin-addr`, `-internal-addr`, `-console-url`, `-data` and `-version`.
 Each `MEERKAT_*` variable is the default of its flag, and the flag wins. The
 admin password has no flag, on purpose: an argument shows in `ps` and in the
 shell history, so it stays in `MEERKAT_ADMIN_PASSWORD`.
@@ -84,7 +85,7 @@ To pass flags under hot reload, call `air` directly - everything after `--` goes
 to the **binary**, never to the build:
 
 ```bash
-MEERKAT_ADMIN_PASSWORD=test1234 air -- -addr :8082 -admin-addr :9092 -console-url http://localhost:4200
+MEERKAT_ADMIN_PASSWORD=test1234 air -- -addr :8082 -admin-addr :9092 -internal-addr :7072 -console-url http://localhost:4200
 ```
 
 ### Other ways to run it
@@ -93,7 +94,7 @@ MEERKAT_ADMIN_PASSWORD=test1234 air -- -addr :8082 -admin-addr :9092 -console-ur
 # A throwaway instance: other ports, its database in a temporary directory.
 go build -o bin/meerkat ./cmd/meerkat && \
 MEERKAT_ADMIN_PASSWORD=test1234 ./bin/meerkat \
-  -addr :18082 -admin-addr :19092 \
+  -addr :18082 -admin-addr :19092 -internal-addr :17072 \
   -console-url http://localhost:4200 -data "$(mktemp -d)"
 
 # Demo content (routes, organisations, users) in the current database.
@@ -121,7 +122,8 @@ docker run -d --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one
   start again.
 - **If one port cannot be bound, the whole process exits.** `bind :8082 in use`
   means a Meerkat is already running; pass `MEERKAT_ADMIN_ADDR` when :9090 is
-  taken by something else.
+  taken by something else, and `MEERKAT_INTERNAL_ADDR` for :7070 - a second
+  gateway on the same machine needs all three ports of its own.
 - The console is **English only**. The pages of the data plane (sign-in, second
   factor, user button) are the translated ones: `internal/auth/i18n.go`.
 

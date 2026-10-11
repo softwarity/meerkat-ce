@@ -603,8 +603,37 @@ export interface SigningKey {
 
 // The gateway's identity signing keys: where the JWKS is served and the public
 // key per algorithm for backends that prefer a static key.
+// One certificate of a trusted authority's bundle.
+export interface AuthorityCert {
+  subject: string;
+  issuer: string;
+  notAfter: number;
+  isCa: boolean;
+  fingerprint: string;
+}
+
+// An authority the gateway trusts when it calls an upstream in HTTPS: its
+// PEM, and what that PEM holds.
+export interface TrustedAuthority {
+  id: string;
+  name: string;
+  pem: string;
+  createdAt: number;
+  updatedAt: number;
+  certificates: AuthorityCert[];
+}
+
 export interface SigningKeys {
   jwksPath: string;
+  // The discovery document beside it, which names the issuer and the JWKS.
+  discoveryPath: string;
+  // The internal plane's port, where both live.
+  internalPort: string;
+  // The internal plane as the runtime names it (a Kubernetes Service's FQDN,
+  // a Swarm or compose service); absent when no runtime could be asked.
+  internalOrigin?: string;
+  // The "iss" of every identity JWT: "meerkat" until somebody sets one.
+  issuer: string;
   keys: SigningKey[];
 }
 
@@ -1124,6 +1153,15 @@ export interface Edition {
   enterprise: boolean;
   // Where the applications answer - never the console's own origin.
   dataOrigin: string;
+  // The internal plane's port: where the services behind the gateway reach
+  // the JWKS and the scheduler's API, inside the cluster.
+  internalPort: string;
+  // The same plane as the runtime names it; absent when it could not tell.
+  internalOrigin?: string;
+  // Every name the runtime resolves to it, the advertised one first.
+  internalNames?: string[];
+  // Which runtime named it: kubernetes, openshift, swarm, compose, docker.
+  internalSource?: string;
   tenancy: 'single' | 'multi';
   primaryTenant: string;
   hiddenTenants: number;
@@ -1373,8 +1411,17 @@ export interface Certificate {
   id: string;
   console: boolean;
   app: boolean;
-  // 'import' | 'self-signed' | 'csr'
+  // The internal plane's HTTPS door.
+  internal: boolean;
+  // 'import' | 'self-signed' | 'csr' | 'acme' | 'file' | 'cert-manager'
   source: string;
+  // A certificate read from the file system: the files it is read from.
+  certPath?: string;
+  keyPath?: string;
+  // One cert-manager issued at the gateway's request: its Secret, and when
+  // cert-manager renews it.
+  secretName?: string;
+  renewsAt?: number;
   info: CertInfo;
   createdAt: number;
   updatedAt: number;
@@ -1397,13 +1444,50 @@ export interface Certificate {
 export interface CertPlacement {
   console?: boolean;
   app?: boolean;
+  internal?: boolean;
   replace?: boolean;
+}
+
+// An issuer cert-manager offers this gateway's namespace.
+export interface CertManagerIssuer {
+  kind: 'ClusterIssuer' | 'Issuer';
+  name: string;
+  // What signs: ca, acme, selfSigned, vault, venafi.
+  type?: string;
+  ready: boolean;
+  why?: string;
+}
+
+// Whether the gateway can ask cert-manager for its internal certificate, for
+// which names, and of whom; why not when it cannot.
+export interface CertManagerView {
+  available: boolean;
+  why?: string;
+  issuers: CertManagerIssuer[];
+  names: string[];
+  secret?: string;
+}
+
+// A certificate a runtime mounted in this container, as the file system door
+// offers it: what it is, never what it holds.
+export interface MountedCert {
+  path: string;
+  keyPath?: string;
+  names: string[];
+  subject: string;
+  issuer: string;
+  notAfter: number;
+}
+
+export interface MountedPki {
+  mount: string;
+  certificates: MountedCert[];
 }
 
 // A placement refused: who is in the way, on which door, for which names.
 export interface CertConflict {
   id: string;
-  plane: 'console' | 'app';
+  plane: 'console' | 'app' | 'internal';
   names: string[];
 }
 
@@ -1458,6 +1542,10 @@ export interface TlsState {
   consolePlainAddr: string;
   appAddr: string;
   appPlainAddr: string;
+  // The internal plane's doors: what the services behind the gateway call.
+  internal: boolean;
+  internalAddr: string;
+  internalPlainAddr: string;
   // The redirect can be off while the setting is on: nothing valid to present
   // stands it down.
   redirecting: boolean;
@@ -2162,6 +2250,11 @@ export class ApiService {
   // grace window so in-flight tokens keep verifying.
   renewSigningKeys(): Observable<SigningKeys> {
     return this.http.post<SigningKeys>('/api/identity/signing-keys/renew', null);
+  }
+
+  // The issuer the gateway signs with, and the discovery document names.
+  setIssuer(issuer: string): Observable<SigningKeys> {
+    return this.http.put<SigningKeys>('/api/identity/issuer', { issuer });
   }
 
   // ── mail relay (infra plane) ───────────────────────────────────────────────
@@ -3130,6 +3223,20 @@ export class ApiService {
     return this.http.get<Certificate[]>('/api/certificates');
   }
 
+  // ── trusted authorities, for the upstreams in HTTPS (SSL-09) ──────────────
+
+  listTrustedAuthorities(): Observable<TrustedAuthority[]> {
+    return this.http.get<TrustedAuthority[]>('/api/trusted-authorities');
+  }
+
+  createTrustedAuthority(body: { name: string; pem: string }): Observable<TrustedAuthority> {
+    return this.http.post<TrustedAuthority>('/api/trusted-authorities', body);
+  }
+
+  deleteTrustedAuthority(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/trusted-authorities/${encodeURIComponent(id)}`);
+  }
+
   // Import: a PEM pair, or a PKCS#12 keystore as base64. One endpoint, because
   // to an operator it is one gesture - "here is what I already have".
   importCertificate(
@@ -3141,6 +3248,20 @@ export class ApiService {
     },
   ): Observable<Certificate> {
     return this.http.post<Certificate>('/api/certificates/import', body);
+  }
+
+  // What the runtime mounted in this container, and one of its certificates
+  // taken into the pool by its paths.
+  mountedCertificates(): Observable<{ mounts: MountedPki[]; why?: string }> {
+    return this.http.get<{ mounts: MountedPki[]; why?: string }>('/api/certificates/mounted');
+  }
+
+  createFileCertificate(body: { certPath: string; keyPath: string }): Observable<Certificate> {
+    return this.http.post<Certificate>('/api/certificates/file', body);
+  }
+
+  askCertManager(body: { kind: string; name: string }): Observable<Certificate> {
+    return this.http.post<Certificate>('/api/certificates/cert-manager', body);
   }
 
   createSelfSigned(req: CertRequest): Observable<Certificate> {

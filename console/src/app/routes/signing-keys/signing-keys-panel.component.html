@@ -24,12 +24,23 @@
          installation gives it, and none of them is this console's. So the line
          below says which address to put in front, in the reader's terms rather
          than in ours. -->
+    <!-- The discovery document first, and the recommended one: from one
+         address a library learns both things it checks - the issuer and the
+         keys. The JWKS under it is for a library that only takes keys. -->
+    <div class="jwks">
+      <span class="lbl" i18n="@@Discovery_endpoint">Discovery</span>
+      <span class="badge" i18n="@@Recommended">Recommended</span>
+      <code class="path">{{ discoveryUrl() }}</code>
+      <span class="spacer"></span>
+      <button matIconButton (click)="copy(discoveryUrl())" i18n-matTooltip="@@Copy" matTooltip="Copy">
+        <mat-icon>content_copy</mat-icon>
+      </button>
+    </div>
     <div class="jwks">
       <span class="lbl" i18n="@@JWKS_endpoint">JWKS</span>
-      <span class="badge" i18n="@@Recommended">Recommended</span>
-      <code class="path">{{ d.jwksPath }}</code>
+      <code class="path">{{ jwksUrl() }}</code>
       <span class="spacer"></span>
-      <button matIconButton (click)="copy(d.jwksPath)" i18n-matTooltip="@@Copy" matTooltip="Copy">
+      <button matIconButton (click)="copy(jwksUrl())" i18n-matTooltip="@@Copy" matTooltip="Copy">
         <mat-icon>content_copy</mat-icon>
       </button>
     </div>
@@ -39,11 +50,34 @@
     <!-- The choice and its consequence, rather than the mechanism: what a
          reader has to leave with is that one path costs nothing forever and
          the other is theirs to maintain forever. -->
-    <p class="fallback" i18n="@@Static_fallback2">
-      Served by the gateway on the address your services use to reach it, not this console's. A
-      service fetching it follows rotations on its own; one holding a PEM from below must be updated
-      at every rotation.
+    <p class="fallback" i18n="@@Static_fallback5">
+      Both served on the internal plane (port {{ d.internalPort }}), under the gateway's name inside your
+      cluster: no ingress reaches them. A service reading either follows rotations on its own; one
+      holding a PEM from below must be updated at every rotation.
     </p>
+    <!-- The "iss" every token carries. "meerkat" by default; a library that
+         starts from the issuer needs it to be this plane's URL, since it
+         reads {issuer}/.well-known/openid-configuration. -->
+    <div class="issuer">
+      <app-form-field
+        class="grow"
+        subscriptSizing="dynamic"
+        i18n-label="@@Issuer"
+        label="Issuer"
+        i18n-info="@@Issuer_info"
+        info="The iss of every identity JWT, and the issuer of the discovery document. A library that starts from the issuer reads {issuer}/.well-known/openid-configuration: give it the internal plane's URL, such as http://meerkat:7070."
+        [error]="issuerMessage()"
+        [clearable]="false"
+      >
+        <input matInput [formField]="issuerForm.issuer" />
+      </app-form-field>
+      <button
+        matButton="tonal"
+        [disabled]="!issuerChanged() || issuerForm().invalid() || savingIssuer()"
+        (click)="saveIssuer()"
+        i18n="@@Save"
+      >Save</button>
+    </div>
 
     @for (k of d.keys; track k.algorithm) {
       <mat-expansion-panel class="key">

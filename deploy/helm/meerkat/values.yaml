@@ -105,6 +105,38 @@ service:
   # open. On Docker Desktop, LoadBalancer publishes it on localhost.
   adminType: ClusterIP
   adminNodePort: ""
+  # The INTERNAL plane: what the services behind the gateway call - the JWKS
+  # their JWT verifies against, the scheduler's API. Always a ClusterIP, with
+  # no setting to change it: nothing outside the cluster has a reason to reach
+  # it, and publishing the console must never publish it along.
+  internalPort: 7070
+  # Its HTTPS door, which opens once a certificate is placed on the internal
+  # plane (console: Infra, TLS). Same Service, never published.
+  internalTlsPort: 7443
+
+# The certificate of the internal plane's HTTPS (SSL-12), mounted in the pod
+# at /etc/meerkat/tls/internal. The console finds it there by itself - Add
+# certificate, From the file system - and it is placed on the Internal plane
+# like any other. Only the paths are kept: a renewal written into the Secret
+# is served on its own, the key never enters the database.
+internalTls:
+  # An existing kubernetes.io/tls Secret - one cert-manager writes for a
+  # Certificate whose dnsNames are <release>-internal.<namespace>.svc and
+  # <release>-internal.<namespace>.svc.cluster.local, for instance.
+  secretName: ""
+  # OpenShift: have the service CA issue it for the internal Service, and
+  # renew it. The Secret is then <release>-internal-tls, and secretName is not
+  # needed.
+  openshiftServingCert: false
+  # A spare way, for a cluster with cert-manager and nobody to write the
+  # Certificate above (SSL-13): the console's Add certificate, From
+  # cert-manager, has the gateway create it in its own namespace, for the
+  # names the services call it by, signed by the issuer picked there. The
+  # Secret, <release>-meerkat-internal-issued, is read through the API and
+  # watched - no mount, no restart, a renewal served when it is written. It
+  # grants the gateway the right to create Certificates in its namespace, to
+  # read and remove that one Secret, and to list the issuers.
+  certManager: false
 
 persistence:
   # Everything the gateway knows lives here: routes, accounts, the sealed

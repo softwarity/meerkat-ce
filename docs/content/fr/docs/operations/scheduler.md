@@ -105,8 +105,8 @@ PATCH /api/schedules/{id}/run
 puis, à la fin, `{"state": "done", "detail": "12000 rows"}`. C'est ce qui permet
 d'exprimer un traitement de trois heures sans requête HTTP de trois heures.
 
-**Avec quel jeton ?** Le vôtre, celui qui a créé la planification, sur la même API
-que tout le reste. L'appel planifié n'a apporté aucun jeton : son identité a été
+**Avec quel jeton ?** Le vôtre, celui qui a créé la planification, sur le plan
+interne comme tout le reste. L'appel planifié n'a apporté aucun jeton : son identité a été
 établie à l'intérieur de la gateway, et n'a jamais circulé sur le réseau.
 
 Chaque compte rendu renouvelle le **bail**. Restez silencieux cinq minutes, et
@@ -205,14 +205,20 @@ pourquoi.
 
 ## L'API, et où elle se trouve
 
-Sur le **plan de contrôle**, pas sur celui où répondent vos applications. Un appel
-planifié est un service rendu par la gateway, comme l'endpoint destiné aux
-agents : aucun navigateur ne l'appelle. C'est un **backend** qui le fait, depuis
-l'intérieur du cluster, par le nom interne de la gateway.
+Sur le **plan interne**, le port 7070 : ni celui où répondent vos applications,
+ni celui de la console. Un appel planifié est un service que la gateway rend aux
+backends placés derrière elle : aucun navigateur ne l'appelle. C'est un
+**backend** qui le fait, depuis l'intérieur du cluster, par le nom interne de la
+gateway.
 
 ```
-http://meerkat:9090/api/schedules
+http://meerkat:7070/api/schedules
 ```
+
+Ce port n'est jamais placé derrière un ingress, et il ne répond **qu'aux
+jetons** : une session de navigateur y est refusée. L'intérieur du cluster est un
+lieu, pas un titre d'accès - n'importe quel pod atteint un ClusterIP -, donc rien
+sur ce port ne donne de pouvoir sans jeton.
 
 | | |
 |---|---|
@@ -226,11 +232,29 @@ http://meerkat:9090/api/schedules
 | `GET /api/schedules/{id}/runs` | ce qu'a fait chaque tour, du plus récent au plus ancien |
 | `PATCH /api/schedules/{id}/run` | rendre compte de l'exécution en cours |
 
+### Ce que fait la console, et ce qu'elle ne fait pas
+
+La console lit les mêmes planifications, sur son propre plan, et agit sur celles
+qui existent : **suspendre, reprendre, lancer maintenant, rejouer un tour,
+supprimer**. Elle n'en **crée et n'en modifie aucune**. Aucun bouton ne le
+permet, et le plan de contrôle refuse `POST`, `PUT` et le compte rendu
+d'exécution venant d'une session de console ou du jeton d'un exploitant, en
+nommant le plan interne dans sa réponse. Une planification s'écrit par le
+service qui en a besoin.
+
+> [!NOTE]
+> Avant le plan interne, cette API se trouvait sur le plan de contrôle
+> (`:9090`). Un jeton de service qui l'appelle encore là continue de
+> fonctionner, le temps de déplacer son backend, et la gateway écrit une fois
+> dans son journal quel jeton l'a fait et où se trouve désormais sa porte. Seule
+> l'adresse change : même jeton, mêmes chemins.
+
 ### Le jeton
 
-Un jeton du plan de contrôle dont le **périmètre est `schedules`** : il ouvre cette
-API et rien d'autre sur ce port - ni la configuration, ni les comptes, ni les
-routes. Il est étroit à dessein : il vit dans un manifeste de déploiement, souvent
+Un jeton dont le **périmètre est `schedules`**, créé dans la console (Infra,
+Access tokens) et utilisé sur le plan interne. Il ouvre cette API et rien
+d'autre - ni la configuration, ni les comptes, ni les routes, et rien du tout
+sur le port de la console. Il est étroit à dessein : il vit dans un manifeste de déploiement, souvent
 dans le dépôt d'une autre équipe, et c'est celui que personne ne pense à
 renouveler.
 
@@ -530,10 +554,11 @@ moins une fois. Si vous avez besoin du reste, il vous faut un broker.
 **Data plane, Scheduler** liste tout ce qui est planifié, avec un filtre par
 organisation et par service, et se met à jour en direct : une exécution qui
 démarre, progresse et se termine apparaît sans rien rafraîchir. Trois actions s'y
-trouvent, celles dont on a besoin à deux heures du matin : mettre en pause, avancer
-le prochain tour, supprimer. Il n'y a volontairement aucun bouton de création : une
-planification appartient au service qui en a besoin, et c'est lui qui la crée par
-l'API, depuis ses propres écrans.
+trouvent, celles dont on a besoin à deux heures du matin : mettre en pause (et
+reprendre), avancer le prochain tour, supprimer. Il n'y a volontairement aucun
+bouton pour en créer ou en modifier une : une planification appartient au service
+qui en a besoin, et c'est lui qui l'écrit par l'API, sur le plan interne, depuis
+ses propres écrans.
 
 ![L'écran Scheduler : une cadence, une ligne cron et une date unique, chacune avec sa prochaine exécution et sa dernière](img/console/scheduler.webp)
 
@@ -572,6 +597,6 @@ flotte la cherche d'après ce que le service a écrit dessus.
 
 La création d'une planification n'en fait pas partie, à dessein : une planification
 s'exécute sous l'identité d'un compte, et les administrateurs qui lisent cet écran
-ne sont pas les comptes sous lesquels elle doit s'exécuter. L'API la refuse
-également, en toutes lettres : la création revient au service, avec son propre
-jeton.
+ne sont pas les comptes sous lesquels elle doit s'exécuter. Le plan de la console
+la refuse également, en toutes lettres : écrire une planification revient au
+service, avec son propre jeton, sur le plan interne.

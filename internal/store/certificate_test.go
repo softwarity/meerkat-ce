@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -219,13 +221,13 @@ func TestOnePieceOfMaterialServesBothPlanes(t *testing.T) {
 		}
 	}
 	// Taking it off a plane closes that door and only that one.
-	if err := st.PlaceCertificate(ctx, "both", false, true); err != nil {
+	if err := st.PlaceCertificate(ctx, "both", false, true, false); err != nil {
 		t.Fatal(err)
 	}
 	if list, _, _, _ := st.CertificateMaterials(ctx, PlaneConsole); len(list) != 0 {
 		t.Fatal("off the console, the console presents nothing")
 	}
-	if err := st.PlaceCertificate(ctx, "nobody", true, true); !errors.Is(err, sql.ErrNoRows) {
+	if err := st.PlaceCertificate(ctx, "nobody", true, true, false); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("placing what is not there must say so: %v", err)
 	}
 }
@@ -344,5 +346,89 @@ func TestCertificatesOfANameBecomePlacedMaterial(t *testing.T) {
 	var marker int
 	if err := st.db.QueryRow(`SELECT COUNT(*) FROM settings WHERE key = 'tls_seeded'`).Scan(&marker); err != nil || marker != 0 {
 		t.Fatalf("the seed marker has nothing left to mark: %d %v", marker, err)
+	}
+}
+
+// TestACertificateFromTheFileSystemIsReadFromItsFiles: only the paths and the
+// certificate are stored, never the key; the plane reads the files; a renewal
+// written over them is seen, and stored for the screen.
+func TestACertificateFromTheFileSystemIsReadFromItsFiles(t *testing.T) {
+	st := certStore(t)
+	ctx := context.Background()
+	dir := t.TempDir()
+	certPath, keyPath := filepath.Join(dir, "tls.crt"), filepath.Join(dir, "tls.key")
+	first := material(t, "meerkat-internal.shop.svc.cluster.local")
+	if err := os.WriteFile(certPath, []byte(first.CertPEM), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyPath, []byte(first.KeyPEM), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c := Certificate{ID: "f1", Source: CertSourceFile, CertPath: certPath, KeyPath: keyPath,
+		CertPEM: first.CertPEM, Info: first.Info, Internal: true}
+	if err := st.SaveCertificate(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	var sealed string
+	if err := st.db.QueryRowContext(ctx, `SELECT key_sealed FROM certificates WHERE id = ?`, "f1").Scan(&sealed); err != nil || sealed != "" {
+		t.Fatalf("the key went into the database: %q %v", sealed, err)
+	}
+	list, _, problems, err := st.CertificateMaterials(ctx, PlaneInternal)
+	if err != nil || len(list) != 1 || len(problems) != 0 {
+		t.Fatalf("the internal plane: %d %v %v", len(list), problems, err)
+	}
+	before := st.FileCertificatesSum(ctx)
+	renewed := material(t, "meerkat-internal.shop.svc.cluster.local")
+	_ = os.WriteFile(certPath, []byte(renewed.CertPEM), 0o600)
+	_ = os.WriteFile(keyPath, []byte(renewed.KeyPEM), 0o600)
+	if st.FileCertificatesSum(ctx) == before {
+		t.Fatal("the renewal did not move the fingerprint")
+	}
+	if moved, err := st.RefreshFileCertificates(ctx); err != nil || !moved {
+		t.Fatalf("refresh: %v %v", moved, err)
+	}
+	got, err := st.FindCertificate(ctx, "f1")
+	if err != nil || got.CertPEM != renewed.CertPEM {
+		t.Fatalf("the renewal was not stored: %v", err)
+	}
+	_ = os.Remove(keyPath)
+	if _, _, problems, _ := st.CertificateMaterials(ctx, PlaneInternal); len(problems) != 1 {
+		t.Fatalf("a missing key file says nothing: %v", problems)
+	}
+}
+
+// TestACertificateCertManagerIssuedIsReadFromItsSecret: the row keeps the
+// Secret's name and nothing of the key; what the doors present is the pair
+// this node's watch holds, and a renewal written to the Secret is stored once,
+// for the screen and the expiry digest.
+func TestACertificateCertManagerIssuedIsReadFromItsSecret(t *testing.T) {
+	st := certStore(t)
+	ctx := context.Background()
+	row := Certificate{ID: "cm", Source: CertSourceCertManager, SecretName: "gw-internal-issued", Internal: true}
+	row.Info.DNSNames = []string{"gw-internal.shop.svc.cluster.local"}
+	if err := st.SaveCertificate(ctx, row); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, problems, _ := st.CertificateMaterials(ctx, PlaneInternal); len(problems) != 1 || !strings.Contains(problems[0], "has not written the Secret gw-internal-issued") {
+		t.Fatalf("before the Secret: %v", problems)
+	}
+	m := material(t, "gw-internal.shop.svc.cluster.local")
+	certPEM, keyPEM := m.CertPEM, m.KeyPEM
+	st.OnIssuedPair(func(secret string) (string, string, bool) {
+		return certPEM, keyPEM, secret == "gw-internal-issued"
+	})
+	if list, _, problems, _ := st.CertificateMaterials(ctx, PlaneInternal); len(list) != 1 || len(problems) != 0 {
+		t.Fatalf("from the Secret: %d %v", len(list), problems)
+	}
+	// The first node writes it, the next finds it there.
+	for i, want := range []bool{true, false} {
+		moved, err := st.RefreshIssuedCertificate(ctx, "gw-internal-issued", certPEM, keyPEM)
+		if err != nil || moved != want {
+			t.Fatalf("refresh %d: moved %v %v", i, moved, err)
+		}
+	}
+	got, err := st.FindCertificate(ctx, "cm")
+	if err != nil || got.CertPEM != certPEM || got.KeyPEM != "" || got.Info.NotAfter == 0 {
+		t.Fatalf("stored: %+v %v", got.Info, err)
 	}
 }

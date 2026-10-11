@@ -2,20 +2,20 @@
 title: Architecture
 section: Concepts
 order: 20
-summary: One binary listening on two planes - the applications on one port, their administration on another - and why that line is not negotiable.
+summary: One binary listening on three planes - the applications on one port, their administration on another, the services behind them on a third - and why those lines are not negotiable.
 ---
 
 # Architecture
 
-Meerkat is one process. It listens on **two planes**, and they are two
-different jobs served by two different ports.
+Meerkat is one process. It listens on **three planes**, and they are three
+different jobs, for three different audiences, on three different ports.
 
-| | Data plane | Control plane |
-|---|---|---|
-| Default port | `:8080` | `:9090` |
-| HTTPS port | `:8443` | `:9443` |
-| Serves | your applications, and the pages the gateway serves itself | the admin API and the console |
-| Belongs on | the network your users reach | an internal network, never the public one |
+| | Data plane | Control plane | Internal plane |
+|---|---|---|---|
+| Default port | `:8080` | `:9090` | `:7070` |
+| HTTPS port | `:8443` | `:9443` | `:7443`, once a certificate is placed on it |
+| Serves | your users: your applications, and the pages the gateway serves itself | your operators and their agents: the admin API and the console | the services behind the gateway: the JWKS, the scheduler's API |
+| Belongs on | the network your users reach | an internal network, never the public one | inside the cluster, never behind an ingress |
 
 ## Where it sits
 
@@ -49,6 +49,8 @@ Because a mistake on one must not be a mistake on the other.
 - The console is **never** reachable on the data plane. No route can expose it, because it is not mounted there at all.
 - Each plane has its own session cookie - `MEERKAT_SESSION` and `MEERKAT_ADMIN_SESSION` - and every stored session is stamped with the plane it belongs to. A token copied from one cookie into the other is refused: the two ports never share a browser session.
 - API tokens carry a plane too. A data-plane token never opens the admin port, and the other way round.
+- The internal plane answers **tokens only**. A browser session is refused there, and "inside the cluster" is never taken as a credential: any pod reaches a ClusterIP, so nothing on that port gives any power without a token. The JWKS is the one exception, because public keys give none.
+- Publishing the console does not publish the internal plane. An operator who opens the console on the company network has not opened, along with it, the API services write their schedules with.
 - One consequence is worth knowing before you need it: the control plane's plain HTTP port stays plain, for good. It is what a broken certificate gets repaired from. Only the data plane's plain port redirects to HTTPS.
 
 ## What lives on the data plane
@@ -76,6 +78,22 @@ Your routes, and the pages the gateway serves in its own name:
 - `/login`, `/logout` - the console's own sign-in, so that origin is self-sufficient.
 - `/mcp` - the endpoint an agent connects to.
 - `/healthz`, `/readyz`.
+
+The console reads the schedules and acts on them - pause, resume, run now,
+replay, delete - and writes none: creating or changing one is the service's,
+on the internal plane.
+
+## What lives on the internal plane
+
+- `/.well-known/jwks.json` - the public keys the [identity JWT](/docs/auth/service-jwt) verifies against. No token needed.
+- `/.well-known/openid-configuration` - the discovery document: the issuer, and where those keys are. No token needed.
+- `/api/schedules/...` - the [scheduled calls](/docs/operations/scheduler), written by the service that needs them, with a token whose perimeter is `schedules`.
+- `/healthz`.
+
+Plain HTTP by default, since a service reaches it by a name inside the cluster
+that no public certificate carries; HTTPS on `:7443` once a certificate from
+the cluster's own PKI is placed on it ([TLS](/docs/operations/tls#a-certificate-from-the-file-system)).
+The data plane does not serve the JWKS: there, the path is an ordinary one.
 
 ## One binary, no dependency
 

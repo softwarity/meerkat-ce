@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/session"
@@ -71,6 +72,9 @@ func setupBare(t *testing.T) fixture {
 	}
 
 	api := New(st, adminSM, router)
+	// The runtime is not asked from a test: no cluster, and the developer's
+	// own Docker is not this gateway's runtime.
+	api.LookupInternal = func(context.Context, int) discovery.Internal { return discovery.Internal{} }
 	adminMux := http.NewServeMux()
 	api.Register(adminMux)
 

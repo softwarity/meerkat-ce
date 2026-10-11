@@ -77,12 +77,15 @@ the list follows without a reload.
   filter may hold in memory. The button itself turns amber and reads
   *Unavailable* while the switch is on, so nobody has to open it to find out.
 - **JWT** holds the keys that sign the identity JWT your services verify: the
-  JWKS to hand a backend, each algorithm's public half, the rotation, and which
-  routes sign with what.
-  Point a service at the JWKS and it needs nothing else: the token's `kid`
-  names the key, and the key carries its algorithm, so the algorithm is chosen
-  once, in Auth forward. The service takes it from the key, never from the
-  token's header.
+  discovery document to hand a backend - the recommended address - and the
+  JWKS beside it, the issuer every token carries (`meerkat` until set), each
+  algorithm's public half, the rotation, and which routes sign with what.
+  Point a service at the discovery document and it needs nothing else: it
+  learns the issuer and the keys from it. The token's `kid` names the key, and
+  the key carries its algorithm, so the algorithm is chosen once, in Auth
+  forward; the service takes it from the key, never from the token's header.
+  Both addresses are on the internal plane, port 7070, and only there. See
+  [The identity JWT](/docs/auth/service-jwt).
 
 ## The editor
 

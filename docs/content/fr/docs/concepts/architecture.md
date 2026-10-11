@@ -2,20 +2,21 @@
 title: Architecture
 section: Concepts
 order: 20
-summary: Un seul binaire à l'écoute sur deux plans - les applications sur un port, leur administration sur un autre - et pourquoi cette frontière n'est pas négociable.
+summary: Un seul binaire à l'écoute sur trois plans - les applications sur un port, leur administration sur un autre, les services placés derrière elles sur un troisième - et pourquoi ces frontières ne sont pas négociables.
 ---
 
 # Architecture
 
-Meerkat est un processus unique. Il écoute sur **deux plans**, qui remplissent
-deux fonctions distinctes sur deux ports distincts.
+Meerkat est un processus unique. Il écoute sur **trois plans**, qui remplissent
+trois fonctions distinctes, pour trois publics distincts, sur trois ports
+distincts.
 
-| | Plan de données | Plan de contrôle |
-|---|---|---|
-| Port par défaut | `:8080` | `:9090` |
-| Port HTTPS | `:8443` | `:9443` |
-| Ce qu'il sert | vos applications, et les pages que la gateway sert elle-même | l'API d'administration et la console |
-| Sa place | le réseau auquel vos utilisateurs accèdent | un réseau interne, jamais le réseau public |
+| | Plan de données | Plan de contrôle | Plan interne |
+|---|---|---|---|
+| Port par défaut | `:8080` | `:9090` | `:7070` |
+| Port HTTPS | `:8443` | `:9443` | `:7443`, dès qu'un certificat y est placé |
+| Ce qu'il sert | vos utilisateurs : vos applications, et les pages que la gateway sert elle-même | vos exploitants et leurs agents : l'API d'administration et la console | les services placés derrière la gateway : le JWKS, l'API du scheduler |
+| Sa place | le réseau auquel vos utilisateurs accèdent | un réseau interne, jamais le réseau public | l'intérieur du cluster, jamais derrière un ingress |
 
 ## Où elle se place
 
@@ -50,6 +51,8 @@ Parce qu'une erreur commise sur l'un ne doit pas en devenir une sur l'autre.
 - La console n'est **jamais** accessible sur le plan de données. Aucune route ne peut l'exposer, puisqu'elle n'y est tout simplement pas montée.
 - Chaque plan a son propre cookie de session - `MEERKAT_SESSION` et `MEERKAT_ADMIN_SESSION` - et chaque session stockée porte la marque du plan auquel elle appartient. Un jeton copié d'un cookie dans l'autre est refusé : les deux ports ne partagent jamais une session de navigateur.
 - Les jetons d'API portent eux aussi un plan. Un jeton du plan de données n'ouvre jamais le port d'administration, et inversement.
+- Le plan interne ne répond **qu'aux jetons**. Une session de navigateur y est refusée, et « l'intérieur du cluster » n'est jamais pris pour un titre d'accès : n'importe quel pod atteint un ClusterIP, donc rien sur ce port ne donne de pouvoir sans jeton. Le JWKS est la seule exception, parce que des clés publiques n'en donnent aucun.
+- Publier la console ne publie pas le plan interne. Un exploitant qui ouvre la console sur le réseau de l'entreprise n'ouvre pas avec elle l'API par laquelle les services écrivent leurs planifications.
 - Une conséquence mérite d'être connue avant d'en avoir besoin : le port HTTP en clair du plan de contrôle reste en clair, définitivement. C'est par lui que l'on répare un certificat cassé. Seul le port en clair du plan de données redirige vers HTTPS.
 
 ## Ce qui vit sur le plan de données
@@ -78,6 +81,23 @@ Vos routes, et les pages que la gateway sert en son nom propre :
 - `/login`, `/logout` - la page de connexion propre à la console, pour que cette origine se suffise à elle-même.
 - `/mcp` - l'endpoint auquel un agent se connecte.
 - `/healthz`, `/readyz`.
+
+La console lit les planifications et agit sur elles - suspendre, reprendre,
+lancer maintenant, rejouer, supprimer - et n'en écrit aucune : en créer ou en
+modifier une revient au service, sur le plan interne.
+
+## Ce qui vit sur le plan interne
+
+- `/.well-known/jwks.json` - les clés publiques avec lesquelles se vérifie le [JWT d'identité](/docs/auth/service-jwt). Aucun jeton n'est demandé.
+- `/.well-known/openid-configuration` - le document de découverte : l'émetteur, et l'endroit où se trouvent ces clés. Aucun jeton n'est demandé.
+- `/api/schedules/...` - les [appels planifiés](/docs/operations/scheduler), écrits par le service qui en a besoin, avec un jeton dont le périmètre est `schedules`.
+- `/healthz`.
+
+En HTTP simple par défaut, puisqu'un service l'atteint par un nom interne au
+cluster qu'aucun certificat public ne porte ; en HTTPS sur `:7443` dès qu'un
+certificat de la PKI du cluster y est placé ([TLS](/docs/operations/tls#un-certificat-depuis-le-systme-de-fichiers)).
+Le plan de données ne sert pas le JWKS : sur ce plan, le chemin est un chemin
+ordinaire.
 
 ## Un binaire, aucune dépendance
 

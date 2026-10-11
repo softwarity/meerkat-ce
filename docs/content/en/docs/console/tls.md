@@ -31,9 +31,11 @@ typed beside it. One certificate can carry several names, a wildcard
 
 - **Certificates** - the pool: every certificate this gateway holds, served or
   not. Each line gives its names, where it came from (*Imported*, *Self-signed*,
-  *Signed on request*), how long it lasts, its key type, and where it is served.
-- **Console** and **Application** - the two doors. **Drag a certificate onto
-  one**, or onto both: it is served there at once. Drag it from one door to the
+  *Signed on request*, *File system*), how long it lasts, its key type, and
+  where it is served.
+- **Console**, **Application** and **Internal** - the three doors, the last one
+  being what the services behind the gateway call. **Drag a certificate onto
+  one**, or onto several: it is served there at once. Drag it from one door to the
   other to move it; drag it back onto the pool, or click its cross, to take it
   off. The
   **Serve on** entries of a certificate's menu do the same without a mouse.
@@ -43,7 +45,35 @@ Each door's title gives its two ports as the world reaches them -
 red when the deployment does not publish it. Under the door, the HTTPS links of
 the names it serves. When the console is served over HTTPS and none of its
 certificates carries the name it was reached by, the door says so: the browser
-would get a certificate for another name, and refuse it.
+would get a certificate for another name, and refuse it. The Internal door goes
+further: it lists, under **Called as**, every name the runtime resolves to it -
+the four forms of a Kubernetes or OpenShift Service, a Swarm service and its
+short name in the stack, a compose service and its container - and ticks those a
+placed certificate carries. A certificate that carries none of them is refused:
+its row shows no Internal tag. The other way round, the Console and Application
+doors refuse a certificate that carries only those names - they reach the internal
+plane's ports, never theirs - and its row shows only the Internal tag. The import dialog says it as soon as a PEM is
+pasted, and the file system dialog beside each mounted certificate. Over HTTPS
+the address given to the services is the first of these names the certificate
+carries.
+Its **Where does its certificate come from?** button opens a how-to for the
+platform it runs on - Kubernetes (cert-manager), OpenShift, an authority of your own, Swarm,
+compose. Its templates are written for any service of the platform, since all
+of them serve HTTPS the same way, with `<service>` and `<namespace>` to fill
+in, and say to add the authority to Trusted authorities so the gateway calls
+them over HTTPS. **Only Meerkat** fills them with this gateway's own names, and
+adds what is its own: the chart value that mounts it, and its Internal tag.
+
+**Add certificate, Ask cert-manager**, on Kubernetes only, has the gateway ask
+cert-manager for its internal certificate: pick the issuer, the rest is decided by
+the gateway. It is greyed elsewhere, with the reason. See
+[Asked of cert-manager](/docs/operations/tls#asked-of-cert-manager).
+
+**Add certificate, From the file system** lists what the runtime mounted in the
+container - a Kubernetes Secret, a Swarm secret, a compose volume - with the key
+found beside each certificate. Only the paths are kept, and a renewal written
+into the files is served on its own. See
+[A certificate from the file system](/docs/operations/tls#a-certificate-from-the-file-system).
 
 The line under a certificate answers *will this work*, never *here is a status
 code*:
@@ -173,6 +203,16 @@ another authority, the rate limit is reached.
 Expiry does not rely on the authority's e-mails - Let's Encrypt stopped sending
 them in 2025: the [daily digest](/docs/console/mail-relay) names an automatic
 certificate that enters its window, which means its renewal is failing.
+
+## Trusted authorities
+
+Below the two doors, **Trusted authorities** lists what the gateway accepts when
+it calls an upstream in HTTPS, beyond the public authorities. **Add authority**
+opens a dialog: a name, and the authority's certificate - choose its file, drop
+it on the dialog, or paste it.
+
+Each entry shows the certificates it holds and until when. See
+[Calling upstreams in HTTPS](/docs/operations/tls#calling-upstreams-in-https).
 
 ## Traps
 

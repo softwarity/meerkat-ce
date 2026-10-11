@@ -113,6 +113,10 @@ spec:
               containerPort: 8080
             - name: admin
               containerPort: 9090
+            - name: internal
+              containerPort: 7070
+            - name: internal-tls
+              containerPort: 7443
           env:
             # The shared database. This one line is what makes three pods one
             # gateway instead of three gateways.
@@ -189,11 +193,11 @@ spec:
 ```
 :::
 
-## Two Services, because there are two planes
+## Three Services, because there are three planes
 
-Port 8080 is the data plane - your applications, the sign-in pages, the live channel. Port 9090 is the control plane - the admin console, the admin API and the MCP endpoint an agent talks to. Only the first belongs on the internet, and they are two Services for exactly that reason: an Ingress in front of your applications must not be able to reach the console by accident, and a single Service with two ports is one annotation away from doing so.
+Port 8080 is the data plane - your applications, the sign-in pages, the live channel. Port 9090 is the control plane - the admin console, the admin API and the MCP endpoint an agent talks to. Port 7070 is the internal plane - what the services behind the gateway call. Only the first belongs on the internet, and they are three Services for exactly that reason: an Ingress in front of your applications must not be able to reach the console by accident, publishing the console must not publish what the backends call, and a single Service with several ports is one annotation away from doing so.
 
-::: details Both Services
+::: details The three Services
 ```yaml
 # The data plane: what your users reach.
 apiVersion: v1
@@ -224,10 +228,69 @@ spec:
     - name: admin
       port: 9090
       targetPort: admin
+---
+# The internal plane: the JWKS and the scheduler's API, for the services of
+# this cluster. A THIRD Service, never behind an Ingress: publishing the
+# console must not publish what the backends call.
+apiVersion: v1
+kind: Service
+metadata:
+  name: meerkat-internal
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: meerkat
+  ports:
+    - name: internal
+      port: 7070
+      targetPort: internal
+    - name: internal-tls
+      port: 7443
+      targetPort: internal-tls
 ```
 :::
 
 How an operator reaches the console then, in order of preference: kubectl port-forward service/meerkat-admin 9090:9090 for occasional work; a second Ingress on an internal-only controller, or on the same one restricted by source address and client certificate, when a team needs it daily. What you should not do is put it on the same public host as the applications.
+
+The internal plane is what your services call: `http://meerkat-internal:7070/.well-known/jwks.json` to verify the [identity JWT](/docs/auth/service-jwt), `http://meerkat-internal:7070/api/schedules` for the [scheduled calls](/docs/operations/scheduler). It answers tokens only - the JWKS aside, which gives no power - because "inside the cluster" is not a credential: without a NetworkPolicy, every pod of every namespace reaches a ClusterIP.
+
+In HTTPS too, on `:7443`, once a certificate is placed on it: the chart mounts a TLS Secret at `/etc/meerkat/tls/internal` (`internalTls.secretName`, or `internalTls.openshiftServingCert` on OpenShift), and the console takes it from the file system - see [A certificate from the file system](/docs/operations/tls#a-certificate-from-the-file-system). Without anybody to write that Certificate, `internalTls.certManager: true` lets the gateway ask cert-manager itself - see [Asked of cert-manager](/docs/operations/tls#asked-of-cert-manager).
+
+That is also what a NetworkPolicy can now separate. Before the third port, a backend that needed the scheduler had to reach the console's port; now the console can be kept to the operators while the backends keep what they need.
+
+::: details A NetworkPolicy for the three planes
+```yaml
+# Once a policy selects the gateway's pods, every port it does not list is
+# closed to them: list the HTTPS ports once TLS is on, and the plug port if
+# the developer tunnel is used.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: meerkat
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: meerkat
+  policyTypes: [Ingress]
+  ingress:
+    # The data plane, from wherever your ingress controller runs.
+    - ports: [{ port: 8080 }]
+    # The internal plane, from the backends that call it - here, the pods
+    # labelled meerkat-client in any namespace.
+    - ports: [{ port: 7070 }]
+      from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              meerkat-client: "true"
+    # The console, from the operators' namespace only.
+    - ports: [{ port: 9090 }]
+      from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ops
+```
+:::
 
 ## The Ingress
 

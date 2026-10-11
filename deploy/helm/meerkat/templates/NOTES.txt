@@ -2,6 +2,8 @@ Meerkat is starting.
 
   Application plane (your users):  {{ include "meerkat.fullname" . }}:{{ .Values.service.appPort }}
   Control plane (admin console):   {{ include "meerkat.fullname" . }}-admin:{{ .Values.service.adminPort }}
+  Internal plane (your services):  {{ include "meerkat.fullname" . }}-internal:{{ .Values.service.internalPort | default 7070 }}
+    the JWKS: http://{{ include "meerkat.fullname" . }}-internal:{{ .Values.service.internalPort | default 7070 }}/.well-known/jwks.json
 
 {{- if eq (.Values.service.adminType | default "ClusterIP") "ClusterIP" }}
 The console is NOT published. Reach it through a tunnel:

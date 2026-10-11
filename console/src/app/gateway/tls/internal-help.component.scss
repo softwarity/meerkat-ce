@@ -1,0 +1,45 @@
+.drawer-head {
+  display: flex;
+  align-items: center;
+  padding: 8px 8px 8px 24px;
+}
+.drawer-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+.drawer-body {
+  padding: 0 24px 24px;
+}
+.lead {
+  margin: 0 0 12px;
+  line-height: 1.5;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 12px;
+}
+.os {
+  flex-wrap: wrap;
+}
+.steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.steps li {
+  margin-bottom: 12px;
+}
+.steps p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+  font-size: 0.9em;
+}
+.spare {
+  color: var(--mat-sys-on-surface-variant);
+}

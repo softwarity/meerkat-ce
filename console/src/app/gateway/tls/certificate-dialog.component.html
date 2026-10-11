@@ -36,6 +36,21 @@
           placeholder="-----BEGIN CERTIFICATE-----"
         ></textarea>
       </app-form-field>
+      @if (carried().length) {
+        <p class="carries" [class.fits]="fitsInternal()">
+          <mat-icon>{{ fitsInternal() ? 'check_circle' : 'info' }}</mat-icon>
+          <span>
+            <ng-container i18n="@@Carries_names">Carries {{ carried().join(', ') }}.</ng-container>
+            @if (internalNames.length) {
+              @if (fitsInternal()) {
+                <ng-container i18n="@@Fits_internal"> Fits the internal plane.</ng-container>
+              } @else {
+                <ng-container i18n="@@Not_internal_names"> None of the internal plane's names.</ng-container>
+              }
+            }
+          </span>
+        </p>
+      }
       <app-form-field i18n-label="@@Private_key_PEM" label="Private key (PEM)">
         <textarea
           matInput
