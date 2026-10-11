@@ -64,6 +64,20 @@ Lorsque le port en clair redirige vers HTTPS, ces deux chemins en sont exemptés
 des health checks interprètent un `308` comme "pas prêt", et une gateway serait retirée de la
 rotation précisément parce qu'elle est bien configurée.
 
+## Depuis l'intérieur du conteneur
+
+L'image n'a ni shell ni `wget` (elle est distroless) : un healthcheck Docker,
+compose ou Swarm interroge le binaire de la gateway, qui sort en 0 sur une réponse
+2xx et en 1 sinon.
+
+```yaml
+healthcheck:
+  test: ["CMD", "/meerkat", "health", "http://127.0.0.1:8080/readyz"]
+```
+
+Sans adresse, il sonde `http://127.0.0.1:8080/readyz`. Kubernetes n'en a pas
+besoin : ses sondes sont des `httpGet`, posées depuis l'extérieur du conteneur.
+
 ## En cluster
 
 Le load balancer sonde `/readyz` et **jamais** `/healthz`. Il n'a aucune affinité de

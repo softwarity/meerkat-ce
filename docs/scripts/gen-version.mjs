@@ -38,3 +38,13 @@ const version = latestTag();
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify({ version }) + '\n');
 console.log(`[gen-version] ${out} ← ${version}`);
+
+// The plug release the image hands out (docker/plug.json, the one source the
+// Dockerfile, go.mod and plug_test.go agree on), published beside version.json:
+// the README's badge reads it from the site, so nothing about it sits at the
+// root of the repository.
+const plugSrc = resolve(dirname(fileURLToPath(import.meta.url)), '../../docker/plug.json');
+const plugOut = resolve(dirname(out), 'plug.json');
+const plug = JSON.parse(readFileSync(plugSrc, 'utf8'));
+writeFileSync(plugOut, JSON.stringify({ version: plug.version, commit: plug.commit }) + '\n');
+console.log(`[gen-version] ${plugOut} <- plug ${plug.version}`);

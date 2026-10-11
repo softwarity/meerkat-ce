@@ -2,6 +2,13 @@
 
 ## NEXT RELEASE
 
+- **The image has no shell any more.** It is distroless, like plug's: no shell, no package
+  manager, smaller, and nothing for a command to reach but the gateway itself. plug's
+  download account, the last reason for a shell, is answered by the gateway's own binary.
+  A healthcheck that ran `wget` inside the container now runs
+  `["CMD", "/meerkat", "health", "http://127.0.0.1:8080/readyz"]`, as the Swarm stack does;
+  `docker exec ... sh` has nothing to open - debug from a sidecar or `kubectl debug`.
+
 ---
 
 ## 1.5.0

@@ -18,7 +18,8 @@ plusieurs clusters à la fois, les volumes, les environnements - se trouve dans
 [la documentation de plug](https://softwarity.github.io/plug/).
 
 > [!NOTE] Édition Enterprise
-> Le tunnel est intégré à l'image Enterprise, de même que le client plug qu'il distribue.
+> Le tunnel est intégré à l'image Enterprise, de même que le client plug qu'il distribue :
+> plug **{{plug.version}}**.
 
 ## Deux conditions, deux responsables
 

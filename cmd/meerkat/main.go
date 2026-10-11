@@ -64,6 +64,11 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "db" {
 		os.Exit(runDB(os.Args[2:]))
 	}
+	// The probe a container runtime runs inside the container (probe.go): the
+	// image has no shell and no wget to run one with.
+	if len(os.Args) > 1 && os.Args[1] == "health" {
+		os.Exit(runHealth(os.Args[2:], os.Stdout, os.Stderr))
+	}
 
 	showVersion := flag.Bool("version", false, "print version and exit")
 	addr := flag.String("addr", envOr("MEERKAT_ADDR", ":8080"), "application (data plane) listen address")

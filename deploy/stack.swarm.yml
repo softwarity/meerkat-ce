@@ -80,7 +80,8 @@ services:
       # table is compiled. A task that accepted connections before compiling
       # its table answers 404 to everything, and a rolling update would read
       # that as a healthy instance.
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      # The image has no shell and no wget: the gateway asks itself.
+      test: ["CMD", "/meerkat", "health", "http://127.0.0.1:8080/readyz"]
       interval: 10s
       timeout: 3s
       retries: 3

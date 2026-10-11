@@ -504,12 +504,16 @@ jobs:
       - name: The Enterprise image carries a client, the community one does not
         run: |
           set -e
-          version=$(docker run --rm --entrypoint sh meerkat:ee -c 'cat /opt/plug/VERSION')
+          # The images have no shell (distroless): their files are read from a
+          # container created and never started.
+          ee=$(docker create meerkat:ee) && ce=$(docker create meerkat:ce)
+          trap 'docker rm -f "$ee" "$ce" >/dev/null' EXIT
+          version=$(docker cp "$ee:/opt/plug/VERSION" - | tar -xO)
           echo "the payload says: $version"
           test -n "$version"
-          docker run --rm --entrypoint sh meerkat:ee -c 'ls /opt/plug' | grep -q . \
+          docker cp "$ee:/opt/plug/bin" - | tar -t | grep -q '/.' \
             || { echo "the Enterprise image carries no client"; exit 1; }
-          if docker run --rm --entrypoint sh meerkat:ce -c 'ls /opt/plug 2>/dev/null' | grep -q .; then
+          if docker cp "$ce:/opt/plug" - | tar -t | grep -q '^plug/.'; then
             echo "the community image carries a payload it has nobody to serve"; exit 1
           fi
           echo "PLUG_VERSION=$version" >> "$GITHUB_ENV"

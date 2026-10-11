@@ -2,6 +2,8 @@
 
 > The sentinel at your application's door.
 
+[![plug](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.softwarity.io%2Fassets%2Fplug.json&query=%24.version&label=plug&color=7c3aed)](https://softwarity.github.io/plug/)
+
 **Meerkat** is an **app-gateway**: one door in front of the applications your
 teams build, which takes charge of everything that is not their core business -
 authentication, access rules, organisations, routing, quotas, audit, and the

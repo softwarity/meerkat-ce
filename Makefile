@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build build-ee ui telemetry dev dev-ce test test-ee test-pg bench lint fmt vet clean ldap-up ldap-down ldap-test pg-up pg-down capture-docs
+.PHONY: plug build build-ee ui telemetry dev dev-ce test test-ee test-pg bench lint fmt vet clean ldap-up ldap-down ldap-test pg-up pg-down capture-docs
 
 # Hot-reload dev loop: rebuilds and restarts the gateway on every .go save.
 # Requires air (once): go install github.com/air-verse/air@latest
@@ -82,6 +82,10 @@ test-ee:
 # main, on the community mirror, and the doc site's Performance page reads it.
 bench:
 	tools/bench/run.sh
+
+# Hand out another plug release: make plug V=2.25.0 (docker/plug.json, go.mod, Dockerfile).
+plug:
+	tools/plug/bump.sh $(V)
 
 lint:
 	golangci-lint run

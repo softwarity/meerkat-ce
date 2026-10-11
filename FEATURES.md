@@ -379,7 +379,7 @@ forme du produit.
 
 | Fait | ID | Mot-clé | Description | Ce qui manque | Éd. |
 |:---:|---|---|---|---|:---:|
-| [x] | DEPLOY-01 | **Image unique** | Distribution en image de conteneur unique (publiée sur registres publics), déployable en Docker/Swarm/Kubernetes ; variante « tout-en-un » | - | CE |
+| [x] | DEPLOY-01 | **Image unique** | Distribution en image de conteneur unique (publiée sur registres publics), déployable en Docker/Swarm/Kubernetes ; variante « tout-en-un ». Image **distroless** (ni shell ni gestionnaire de paquets, uid 65532, `/data` inscriptible par le groupe 0 pour OpenShift) ; un healthcheck dans le conteneur passe par `meerkat health [URL]` | - | CE |
 | [x] | DEPLOY-02 | **Variables d'environnement** | L'environnement couvre **ce qu'il faut pour démarrer** : ports, base, clé du coffre, mot de passe administrateur, mode production, niveau et format des journaux, export OTLP, fichier de configuration et fichier de coffre d'amorçage (LIFE-02). **Tout le reste vit en base, par choix** : une variable qui écraserait un réglage de la console ferait afficher à l'écran une valeur que la passerelle n'applique pas, et deux nœuds d'un cluster pourraient diverger. La configuration versionnée (export, import, fichier au démarrage) est la voie du GitOps | - | CE |
 | [x] | DEPLOY-03 | **Zéro dépendance** | Zéro dépendance obligatoire : stockage embarqué par défaut (STORE-01) ; base externe uniquement pour le cluster (STORE-03) ; broker et SMTP | - | CE |
 | [x] | DEPLOY-04 | **CI/CD** | Build, tests, publication d'images versionnées + latest, releases taguées | - | CE |

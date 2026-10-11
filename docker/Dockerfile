@@ -53,10 +53,14 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -tags
       -X github.com/softwarity/meerkat/internal/version.Date=${BUILD_DATE}" \
       -o /meerkat ./cmd/meerkat
 
-# An empty /data owned by the runtime user. Distroless has no shell, so the
-# directory is built here and copied in — and Docker gives a fresh volume
+# An empty /data, built here because the image that ships has no shell to run
+# a mkdir, and copied in with its owner - and Docker gives a fresh volume
 # mounted over it the SAME ownership, which is what lets a nonroot process
-# write to it.
+# write to it. The root GROUP may write too: OpenShift draws an arbitrary uid
+# from the namespace range and adds group 0, so 65532:65532 mode 755 is
+# read-only there and the store fails on its first write. A mounted volume
+# hides that - the kubelet's fsGroup rewrites the ownership - so it only bites
+# where /data is a plain directory.
 FROM --platform=$BUILDPLATFORM busybox:stable AS datadir
 RUN mkdir -p /seed/data
 
@@ -64,38 +68,35 @@ RUN mkdir -p /seed/data
 # is the first thing a developer types, before they have a client at all.
 #
 # It comes from plug's OWN image rather than being rebuilt or transcribed here.
-# What answers that account is a 201-line shell script (agent/serve-binary) that
-# emits an installer which reads the ssh command out of the process table to
-# pre-create a profile, grants capabilities on Linux, installs a setuid helper on
-# macOS, and carries wintun for Git Bash. Copying it is the only way that stays
-# true to plug's; transcribing it would fork somebody else's installer and let it
-# rot quietly at their next release.
+# What it hands out is /opt/plug: the client binaries, the version they answer
+# to, the installers and the WinTUN DLLs. What ANSWERS the account is the agent
+# linked into this binary: plug re-executes the gateway for it (its
+# DownloadCommand defaults to the verbs' command), so there is no script to
+# copy and no shell to run one. /usr/local/bin brings plug-agent, which the
+# live mount's helper runs.
 #
 # EE-only, selected by EDITION: an image with no agent has nobody to serve it,
 # and the community one resolves to scratch - nothing copied, nothing carried.
 FROM docker.io/softwarity/plug:${PLUG_VERSION} AS payload-ee
 # Empty, but a real filesystem: a COPY from scratch has nothing to match. Two
 # empty directories have no architecture either, hence the build platform.
-FROM --platform=$BUILDPLATFORM alpine:3.24 AS payload-ce
+FROM --platform=$BUILDPLATFORM busybox:stable AS payload-ce
 RUN mkdir -p /opt/plug /usr/local/bin
 FROM payload-${EDITION} AS payload
 
-# Alpine, like plug's own image, and for the same reason: what answers the
-# anonymous download account is a shell script. distroless has no shell, so the
-# script could not run there - and carrying a static busybox into a distroless
-# image to make it run was building a contraption around a base that had
-# already said no.
-FROM alpine:3.24
-# /data belongs to the root GROUP, not to the user, and the group may write:
-# OpenShift draws an arbitrary uid from the namespace range and adds group 0,
-# so 65532:65532 mode 755 is read-only there and the store fails on its first
-# write. A mounted volume hides that - the kubelet's fsGroup rewrites the
-# ownership - so it only bites where /data is a plain directory. Everywhere
-# else the process is still 65532 and still the owner: nothing changes.
-RUN adduser -D -u 65532 nonroot && mkdir -p /data && chown 65532:0 /data && chmod g+rwX /data
+# Distroless, like plug's own image: no shell, no package manager, no libc.
+# The gateway is a static Go binary and runs nothing of the system's; what the
+# base brings is what Go reads - the root certificates, and a nonroot user. The
+# last reason for a shell here was plug's download account, a /bin/sh script
+# until plug answered it in Go. A container healthcheck runs `meerkat health`,
+# since there is no wget either.
+FROM gcr.io/distroless/static-debian13:nonroot
+# --chmod as well: a COPY keeps the owner it is told, not the mode the stage
+# gave the directory, and 755 is the read-only /data OpenShift's uid trips on.
+COPY --from=datadir --chown=65532:0 --chmod=775 /seed/data /data
 COPY --from=build /meerkat /meerkat
-# The plug client and the script that hands it out, from plug's own image.
-# Empty in the community one, where nothing runs an agent.
+# What plug's download account hands out, and plug-agent, from plug's own
+# image. Empty in the community one, where nothing runs an agent.
 COPY --from=payload /opt/plug /opt/plug
 COPY --from=payload /usr/local/bin/ /usr/local/bin/
 # The mount helper. When a developer mounts a volume, the agent starts a
@@ -106,8 +107,8 @@ COPY --from=payload /usr/local/bin/ /usr/local/bin/
 # NUMERIC, and the number is the point: Pod Security Standards `restricted`
 # set runAsNonRoot without allocating a uid, and the kubelet then refuses an
 # image whose USER is a name - "image has non-numeric user (nonroot), cannot
-# verify user is non-root". It is the uid adduser created above, so nothing
-# else moves.
+# verify user is non-root". It is the distroless base's nonroot uid, the owner
+# of /data above.
 USER 65532
 # ABSOLUTE, and that is the whole point. The flag's default is the RELATIVE
 # path "data", which resolves against the working directory. The database

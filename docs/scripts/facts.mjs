@@ -39,8 +39,15 @@ async function features() {
   return { built: count.x, partial: count['~'], todo: count[' '] };
 }
 
+// The plug release the Enterprise image hands out, from the file the
+// Dockerfile and go.mod are held to (plug_test.go).
+async function plug() {
+  const pin = JSON.parse(await readFile(join(ROOT, 'docker', 'plug.json'), 'utf8'));
+  return { version: pin.version };
+}
+
 export async function loadFacts() {
-  const facts = { memory: await memory(), features: await features() };
+  const facts = { memory: await memory(), features: await features(), plug: await plug() };
   const flat = {};
   for (const [group, values] of Object.entries(facts)) {
     for (const [k, v] of Object.entries(values)) flat[`${group}.${k}`] = String(v);

@@ -18,7 +18,7 @@ environments - is in [plug's documentation](https://softwarity.github.io/plug/).
 
 > [!NOTE] Enterprise edition
 > The tunnel is built into the Enterprise image, and so is the plug client it
-> hands out.
+> hands out: plug **{{plug.version}}**.
 
 ## Two conditions, two owners
 

@@ -64,6 +64,20 @@ Where the plain port redirects to HTTPS, these two paths are exempt: a `308` rea
 as "not ready" to most probes, and a gateway would be taken out of rotation for
 being correctly configured.
 
+## From inside the container
+
+The image has no shell and no `wget` (it is distroless): a Docker, compose or
+Swarm healthcheck asks the gateway's own binary, which exits 0 on a 2xx and 1
+otherwise.
+
+```yaml
+healthcheck:
+  test: ["CMD", "/meerkat", "health", "http://127.0.0.1:8080/readyz"]
+```
+
+Without an address it probes `http://127.0.0.1:8080/readyz`. Kubernetes needs none
+of this: its probes are `httpGet`, asked from outside the container.
+
 ## In a cluster
 
 The load balancer probes `/readyz` and **never** `/healthz`. There is no session
