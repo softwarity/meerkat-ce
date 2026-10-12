@@ -189,3 +189,12 @@ jobs:
           digest=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{.Manifest.Digest}}')
           echo "signing ${IMAGE}@${digest}" | tee -a "$GITHUB_STEP_SUMMARY"
           cosign sign --yes --recursive "${IMAGE}@${digest}"
+          # And checked, index and platform images, against the identity the
+          # install page gives: a signature nobody verified is how every
+          # release up to 1.6.0 shipped without one.
+          id='^https://github\.com/softwarity/meerkat-ce/\.github/workflows/_docker\.yml@refs/heads/main$'
+          for d in "$digest" $(docker buildx imagetools inspect --raw "${IMAGE}@${digest}" | jq -r '.manifests[] | select(.platform.os != "unknown") | .digest'); do
+            cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              --certificate-identity-regexp "$id" "${IMAGE}@${d}" >/dev/null
+            echo "verified ${IMAGE}@${d}" | tee -a "$GITHUB_STEP_SUMMARY"
+          done

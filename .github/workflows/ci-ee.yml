@@ -716,11 +716,11 @@ jobs:
             EDITION=ee
       - run: echo "published ghcr.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: sigstore/cosign-installer@v4.1.2
-      # Signed BY DIGEST, which is why this belongs here and not in the release
-      # job: the release re-tags this very digest under its semver without
-      # rebuilding, so the signature made now is still the signature of what
-      # ships. A signature attached to a tag would have had to be redone, and
-      # would have drifted the day somebody moved the tag.
+      # Signed BY DIGEST: a signature attached to a tag would drift the day
+      # somebody moved the tag. This signs `latest`, and what a release stamps
+      # it into is a NEW manifest, which the release job signs in turn. The
+      # opposite belief - that a release only re-tags this digest - is how
+      # every version up to 1.6.0 shipped unsigned.
       #
       # --recursive signs the two per-architecture manifests the index points
       # at, not only the index. Without it a client that pulled the amd64 image
@@ -733,7 +733,9 @@ jobs:
       - name: Sign the image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes --recursive "ghcr.io/softwarity/meerkat@${DIGEST}"
+        run: |
+          cosign sign --yes --recursive "ghcr.io/softwarity/meerkat@${DIGEST}"
+          .github/scripts/signatures.sh verify "ghcr.io/softwarity/meerkat@${DIGEST}"
 
       # THE EVALUATION IMAGE (EVAL-01). The Enterprise build plus ee/eval, and
       # nothing else: every feature, no time limit, no counter, no switch that
@@ -782,7 +784,9 @@ jobs:
       - name: Sign the evaluation image
         env:
           DIGEST: ${{ steps.build-eval.outputs.digest }}
-        run: cosign sign --yes --recursive "docker.io/softwarity/meerkat@${DIGEST}"
+        run: |
+          cosign sign --yes --recursive "docker.io/softwarity/meerkat@${DIGEST}"
+          .github/scripts/signatures.sh verify "docker.io/softwarity/meerkat@${DIGEST}"
 
   # THE RELEASE. This job waits on the `release` environment - a reviewer is
   # required there - and does nothing until somebody approves it. Approving
@@ -804,7 +808,8 @@ jobs:
   # tested image - FROM its digest, ENV MEERKAT_VERSION - which the binary
   # reads at start (internal/version). Same layers, same bytes; the manifest
   # alone is new, and what separates `latest` from `1.2.3` is a label and an
-  # environment variable.
+  # environment variable. A new manifest is also an UNSIGNED one: the job
+  # signs each stamp itself, then verifies every tag it pushed.
   #
   # The community image is the mirror's (ci.yml, Docker Hub, from the public
   # tree). Its `latest` is stamped the same way when its revision label names
@@ -822,6 +827,10 @@ jobs:
       contents: read
       # The approvals of this very run, where the bump is written.
       actions: read
+      # Signing what this job pushes. The stamp below makes NEW manifests, so
+      # the signatures the image job made do not reach a single version tag:
+      # until 1.6.0 no release was signed, on either registry.
+      id-token: write
     steps:
       - name: Read the approval
         id: bump
@@ -916,6 +925,7 @@ jobs:
       # The digest names an index, and the stamp is built for each platform in
       # it from that platform's own image.
       - name: Stamp and tag the Enterprise image
+        id: ee
         uses: docker/build-push-action@v7
         with:
           context: docker
@@ -935,6 +945,7 @@ jobs:
       # already points at this digest - it was pushed as `eval` - so there is
       # nothing to move here.
       - name: Stamp and tag the evaluation image
+        id: eval
         uses: docker/build-push-action@v7
         with:
           context: docker
@@ -960,8 +971,13 @@ jobs:
         run: |
           set -e
           mirrored=$(git -C mirror log --format=%H -n1 --grep="meerkat@${SHA::7}" origin/main || true)
+          # ONE platform's config: on a multi-architecture index `.Image` is a
+          # map by platform, and `.Image.Config` an error. That error, sent to
+          # /dev/null, read as "not this commit" on every release up to 1.6.0:
+          # each one rebuilt the community image instead of stamping the one
+          # the mirror had tested. Both platforms carry the same labels.
           built=$(docker buildx imagetools inspect docker.io/softwarity/meerkat:latest \
-            --format '{{index .Image.Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || true)
+            --format '{{index (index .Image "linux/amd64").Config.Labels "org.opencontainers.image.revision"}}')
           if [ -n "$mirrored" ] && [ "$mirrored" = "$built" ]; then
             digest=$(docker buildx imagetools inspect docker.io/softwarity/meerkat:latest --format '{{.Manifest.Digest}}')
             echo "stamp=true" >> "$GITHUB_OUTPUT"
@@ -972,6 +988,7 @@ jobs:
             echo "Docker Hub's latest is built from '${built:-?}' and this commit mirrors as '${mirrored:-nothing yet}': building the community image here"
           fi
       - name: Stamp and tag the community image
+        id: ce-stamp
         if: steps.community.outputs.stamp == 'true'
         uses: docker/build-push-action@v7
         with:
@@ -990,6 +1007,7 @@ jobs:
       # linked in since it is known here. No layer cache, for the reason the
       # image job gives: the build stage holds the whole private tree.
       - name: Build and tag the community image
+        id: ce-build
         if: steps.community.outputs.stamp != 'true'
         uses: docker/build-push-action@v7
         with:
@@ -1011,6 +1029,35 @@ jobs:
             BUILD_DATE=${{ steps.next.outputs.date }}
             GO_TAGS=
             EDITION=ce
+
+      # SIGNED HERE, by the digest each push above returned, and recursively
+      # for the reason the image job gives. The stamp is a new manifest: what
+      # the image job signed is its base, not it. Then every tag pushed is
+      # VERIFIED, index and platform images, against the identity the install
+      # page tells a client to check. A release that ships an unsigned tag
+      # fails here, before release-flow cuts the version.
+      - uses: sigstore/cosign-installer@v4.1.2
+      - name: Sign what was pushed
+        env:
+          EE: ${{ steps.ee.outputs.digest }}
+          EVAL: ${{ steps.eval.outputs.digest }}
+          CE: ${{ steps.ce-stamp.outputs.digest || steps.ce-build.outputs.digest }}
+        run: |
+          set -e
+          cosign sign --yes --recursive "ghcr.io/softwarity/meerkat@${EE}"
+          cosign sign --yes --recursive "docker.io/softwarity/meerkat@${EVAL}"
+          cosign sign --yes --recursive "docker.io/softwarity/meerkat@${CE}"
+      - name: Every tag pushed is signed
+        env:
+          V: ${{ steps.next.outputs.version }}
+          MINOR: ${{ steps.next.outputs.minor }}
+          MAJOR: ${{ steps.next.outputs.major }}
+        run: |
+          .github/scripts/signatures.sh verify \
+            "ghcr.io/softwarity/meerkat:${V}" "ghcr.io/softwarity/meerkat:${MINOR}" "ghcr.io/softwarity/meerkat:${MAJOR}" \
+            "docker.io/softwarity/meerkat:${V}-eval" \
+            "docker.io/softwarity/meerkat:${V}" "docker.io/softwarity/meerkat:${MINOR}" "docker.io/softwarity/meerkat:${MAJOR}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Last, because its push starts the next run: the notes, the commit, the
       # tag and the GitHub Release, on the private repository. gh resolves the

@@ -41,7 +41,9 @@ volumes:
 
 The image sets `MEERKAT_DATA=/data` and declares that volume. It runs as a
 non-root user (uid 65532), and the entry point is the binary itself, so
-anything after the image name is a flag.
+anything after the image name is a flag. It is distroless: no shell, no `wget`,
+so `docker exec ... sh` has nothing to open, and a healthcheck runs
+`/meerkat health` ([Health](/docs/operations/health#from-inside-the-container)).
 
 ## Verify the signature
 
@@ -53,7 +55,7 @@ that produced the image, and that identity is what you check.
 ```bash
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github\.com/softwarity/meerkat-ce/\.github/workflows/' \
+  --certificate-identity-regexp '^https://github\.com/softwarity/meerkat-ce/\.github/workflows/(ci-ee|_docker)\.yml@refs/heads/main$' \
   docker.io/softwarity/meerkat:latest
 ```
 
@@ -62,15 +64,19 @@ and the Enterprise image at `ghcr.io/softwarity/meerkat` once you are logged in
 to that registry. All three are built by workflows living in
 the public mirror, `softwarity/meerkat-ce`, which is the repository the
 identity names - the Enterprise sources are private, the pipeline that builds
-them is not. The command prints the exact identity it accepted, so a policy
-that wants to pin one file rather than a directory can read it there.
+them is not. The identity names two files of that repository, on `main` and
+nowhere else: `_docker.yml` builds the community `latest`, `ci-ee.yml` the
+Enterprise and evaluation images and every release tag. A workflow on another
+branch, or another file, does not pass. Versions up to 1.6.0 carry no
+signature: only `latest` and `eval` were signed then.
 
 What is signed is the **digest**, and recursively: the manifest list plus each
 per-architecture image under it. Two consequences worth knowing. A client that
 pulled the arm64 image verifies what it is actually running, not its sibling.
-And a release, which re-tags an already tested digest under its version number
-without rebuilding anything, carries the signature with it: nothing is
-re-signed because nothing is rebuilt.
+And a release, which puts its version on an already tested image without
+rebuilding it - an environment variable and a label over the very same
+layers - makes a new manifest, so it signs that one in turn, and fails if any
+tag it pushed does not verify.
 
 To refuse an unsigned image across a cluster rather than check one by hand, the
 same two values go into a Kyverno policy:
@@ -96,7 +102,7 @@ spec:
             - entries:
                 - keyless:
                     issuer: https://token.actions.githubusercontent.com
-                    subject: "https://github.com/softwarity/meerkat-ce/.github/workflows/*"
+                    subjectRegExp: '^https://github\.com/softwarity/meerkat-ce/\.github/workflows/(ci-ee|_docker)\.yml@refs/heads/main$'
 ```
 
 Check `validationFailureAction` against your own Kyverno version: recent ones

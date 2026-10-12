@@ -42,7 +42,9 @@ volumes:
 L'image définit `MEERKAT_DATA=/data` et déclare ce volume. Elle s'exécute sous
 un utilisateur non root (uid 65532), et son point d'entrée est le binaire
 lui-même : tout ce qui suit le nom de l'image est donc une option de ligne de
-commande.
+commande. Elle est distroless : ni shell ni `wget`, donc `docker exec ... sh` n'a
+rien à ouvrir, et un healthcheck lance `/meerkat health`
+([Health checks](/docs/operations/health#depuis-lintrieur-du-conteneur)).
 
 ## Vérifier la signature
 
@@ -54,7 +56,7 @@ qui a produit l'image, et c'est cette identité que vous vérifiez.
 ```bash
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github\.com/softwarity/meerkat-ce/\.github/workflows/' \
+  --certificate-identity-regexp '^https://github\.com/softwarity/meerkat-ce/\.github/workflows/(ci-ee|_docker)\.yml@refs/heads/main$' \
   docker.io/softwarity/meerkat:latest
 ```
 
@@ -63,17 +65,21 @@ La même commande vérifie l'image d'évaluation,
 `ghcr.io/softwarity/meerkat` une fois que vous êtes authentifié auprès de ce
 registre. Les trois sont construites par des workflows hébergés dans le miroir
 public, `softwarity/meerkat-ce`, et c'est ce dépôt que nomme l'identité : les
-sources Enterprise sont privées, la chaîne qui les construit ne l'est pas. La
-commande affiche l'identité exacte qu'elle a acceptée ; une politique qui veut
-épingler un fichier précis plutôt qu'un répertoire peut la reprendre de là.
+sources Enterprise sont privées, la chaîne qui les construit ne l'est pas.
+L'identité nomme deux fichiers de ce dépôt, sur `main` et nulle part ailleurs :
+`_docker.yml` construit le `latest` communautaire, `ci-ee.yml` les images
+Enterprise et d'évaluation ainsi que chaque tag de version. Un workflow d'une
+autre branche, ou un autre fichier, ne passe pas. Les versions jusqu'à 1.6.0
+ne portent pas de signature : seuls `latest` et `eval` étaient signés alors.
 
 Ce qui est signé, c'est le **digest**, et de façon récursive : la liste de
 manifestes et chacune des images par architecture qu'elle référence. Deux
 conséquences à connaître. Un client qui a récupéré l'image arm64 vérifie ce
 qu'il exécute réellement, et non l'image voisine. Et une version publiée, qui
-se contente de poser son numéro de version sur un digest déjà testé, sans rien
-reconstruire, emporte la signature avec elle : rien n'est signé à nouveau,
-puisque rien n'est reconstruit.
+pose son numéro sur une image déjà testée sans la reconstruire (une variable
+d'environnement et un label sur les mêmes couches), produit un nouveau
+manifeste : elle le signe à son tour, et échoue si l'un des tags qu'elle a
+poussés ne se vérifie pas.
 
 Pour refuser les images non signées à l'échelle d'un cluster, plutôt que de les
 vérifier une par une à la main, reportez ces deux mêmes valeurs dans une
@@ -100,7 +106,7 @@ spec:
             - entries:
                 - keyless:
                     issuer: https://token.actions.githubusercontent.com
-                    subject: "https://github.com/softwarity/meerkat-ce/.github/workflows/*"
+                    subjectRegExp: '^https://github\.com/softwarity/meerkat-ce/\.github/workflows/(ci-ee|_docker)\.yml@refs/heads/main$'
 ```
 
 Vérifiez `validationFailureAction` au regard de votre version de Kyverno : les

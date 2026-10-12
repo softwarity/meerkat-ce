@@ -2,6 +2,16 @@
 
 ## NEXT RELEASE
 
+- **Released versions are signed.** Until now only `latest` and `eval` carried a
+  signature: a release stamps the tested image with its version, which makes a new
+  manifest, and nothing signed that one. Every tag a release pushes is now signed and
+  verified before the version is cut; versions up to 1.6.0 stay unsigned. The identity
+  to check is narrower too - two workflow files on `main` of `softwarity/meerkat-ce`,
+  given on the install page with its Kyverno policy.
+- **The community release is the image the mirror tested.** A release was meant to
+  stamp it with its version and, through a misread label, rebuilt it every time.
+  It now stamps it when the mirror's build of the same commit is there.
+
 ---
 
 ## 1.6.0
