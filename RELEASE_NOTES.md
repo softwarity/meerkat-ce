@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.6.0
+
 - **plug 2.25.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The image has no shell any more.** It is distroless, like plug's: no shell, no package
   manager, smaller, and nothing for a command to reach but the gateway itself. plug's
