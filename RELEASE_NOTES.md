@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.7.0
+
 - **plug 2.25.1 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The OpenTelemetry export can be turned on from the console again.** The collector
   address only appeared once the export was on, and an export with no address is
