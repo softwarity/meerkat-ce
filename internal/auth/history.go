@@ -45,9 +45,10 @@ func browserTokenOf(r *http.Request) string {
 	return ""
 }
 
-// clientIP is the peer as seen from the gateway. The rule lives in
-// internal/filters because the rate limiter reads it too, and who gets counted
-// and what a history shows must not drift apart.
+// clientIP is the caller as the gateway is entitled to believe it: the TCP
+// peer, or what a TRUSTED proxy's X-Forwarded-For says (filters.ClientIP). The
+// rule lives in internal/filters because the rate limiter reads it too, and who
+// gets counted and what a history shows must not drift apart.
 func clientIP(r *http.Request) string { return filters.ClientIP(r) }
 
 // countryOf captures the viewer country a fronting CDN/LB resolved, when one
@@ -81,11 +82,17 @@ func (h *Handler) recordLogin(w http.ResponseWriter, r *http.Request, userID, te
 			})
 		}
 	}
+	// The peer beside the address when they differ: the record says on whose
+	// word the address was believed. The person's own history page shows the
+	// address alone - an Ingress's pod address means nothing to them - and the
+	// console, where an administrator reads it, shows both.
+	ip, peer := filters.ClientAndPeer(r)
 	e := store.LoginEvent{
 		ID:      randomID(),
 		Method:  method,
 		Label:   browserLabel(r),
-		IP:      clientIP(r),
+		IP:      ip,
+		Peer:    peer,
 		Country: countryOf(r),
 		At:      time.Now().Unix(),
 	}

@@ -15,21 +15,22 @@ import "net/http"
 // redirect to https looped forever (terminate, forward plain, redirect,
 // terminate, forward plain...).
 //
-// X-Forwarded-Proto is trusted, which is a decision and not an oversight. A
-// caller can send it, and what they buy is a cookie their own browser will
-// then refuse to send back over http - they lock themselves out and nobody
-// else. The alternative, a list of trusted proxies, is a setting to get wrong
-// in exchange for stopping an attack on oneself. The rule is the one the
-// product already applied in five places: a proxy that forwards a header a
-// client sent is a proxy that has to be fixed.
+// X-Forwarded-Proto is believed only from a TRUSTED PROXY - the same rule as
+// X-Forwarded-For, in forwarded.go. It used to be believed from anybody, on
+// the argument that a caller who lies about the scheme only locks themselves
+// out. That holds for a cookie and not for everything else the answer decides:
+// the plain port's redirect to https is skipped on the strength of it, and an
+// origin built from it is what a callback URL or a WebAuthn ceremony is bound
+// to. A proxy we trust says what the browser's hop was; a stranger's header
+// says what the stranger wanted it to be.
 //
-// Note the asymmetry with ClientIP, which does NOT believe the leftmost
-// X-Forwarded-For: there, believing the caller lets them invent an address per
-// request and walk through a rate limit. The scheme has no such leverage.
+// Behind a load balancer whose addresses are PUBLIC (a CDN, some cloud load
+// balancers), the default does not trust it, and the gateway sees plain http:
+// that installation names its proxies in MEERKAT_TRUSTED_PROXIES.
 
 // Secure reports whether the browser's hop was TLS.
 func Secure(r *http.Request) bool {
-	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	return r.TLS != nil || (r.Header.Get("X-Forwarded-Proto") == "https" && FromTrustedProxy(r))
 }
 
 // Scheme is "https" or "http".

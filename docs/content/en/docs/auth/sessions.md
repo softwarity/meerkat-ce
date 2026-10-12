@@ -46,7 +46,7 @@ cookie was set over HTTPS, by this host, for the whole site.
 The session cookies are `HttpOnly`, `SameSite=Lax`, `Path=/`, with a `Max-Age`
 equal to the session's lifetime. `Secure` is set when the request arrived over
 HTTPS - either TLS terminated by the gateway, or `X-Forwarded-Proto: https` from
-the proxy in front of it.
+the proxy in front of it, provided that proxy is a [trusted one](/docs/deploy/one-gateway#behind-a-proxy-or-a-load-balancer).
 
 The two `..._UNTIL` cookies are deliberately **not** `HttpOnly`: a page reads
 them to notice that the session ended, or came back in another tab, without

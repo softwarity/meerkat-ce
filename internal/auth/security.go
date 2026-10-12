@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -79,6 +80,9 @@ const (
 	refusedHours       = "outside-hours"
 	refusedCode        = "bad-code"
 	refusedThrottled   = "throttled"
+	// The account's own counter tripped (AUTH-11): failures on one name, from
+	// any address. Its sign-in now asks for the picture code - never a lock.
+	refusedAccountThrottled = "account-throttled"
 )
 
 // security writes one event about an account. u may be a bare account carrying
@@ -103,9 +107,10 @@ func (h *Handler) securityIn(r *http.Request, action string, u store.User, tenan
 		// whatever somebody pastes into it.
 		name = name[:100]
 	}
+	ip, peer := filters.ClientAndPeer(r)
 	ev := store.AuditEvent{
 		ActorID: u.ID, Action: action, Target: target,
-		TargetID: u.ID, TargetName: name, TenantID: tenantID, Detail: detail, IP: clientIP(r),
+		TargetID: u.ID, TargetName: name, TenantID: tenantID, Detail: detail, IP: ip, Peer: peer,
 	}
 	if err := h.st.AddAuditEvent(r.Context(), ev); err != nil {
 		slog.Error("security trail write failed", "action", action, "user", name, "err", err)

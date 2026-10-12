@@ -12,10 +12,13 @@ import (
 // a fronting CDN/LB geo header when one exists (the gateway is offline-first
 // and never calls a GeoIP service itself).
 type LoginEvent struct {
-	ID          string `json:"id"`
-	Method      string `json:"method"` // password | totp | passkey
-	Label       string `json:"label"`  // "Chrome - macOS"
-	IP          string `json:"ip"`
+	ID     string `json:"id"`
+	Method string `json:"method"` // password | totp | passkey
+	Label  string `json:"label"`  // "Chrome - macOS"
+	IP     string `json:"ip"`
+	// Peer is the proxy the address above was believed from, when it is not
+	// the address itself: "203.0.113.5 via 10.42.0.15".
+	Peer        string `json:"peer,omitempty"`
 	Country     string `json:"country"` // ISO 3166-1 alpha-2, "" when unknown
 	BrowserHash string `json:"-"`
 	At          int64  `json:"at"`
@@ -29,9 +32,9 @@ const loginHistoryKeep = 50
 // the retention depth.
 func (s *Store) AddLoginEvent(ctx context.Context, e LoginEvent, userID string) error {
 	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO login_events (id, user_id, method, label, ip, country, browser_hash, at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		e.ID, userID, e.Method, e.Label, e.IP, e.Country, e.BrowserHash, e.At); err != nil {
+		`INSERT INTO login_events (id, user_id, method, label, ip, peer, country, browser_hash, at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.ID, userID, e.Method, e.Label, e.IP, e.Peer, e.Country, e.BrowserHash, e.At); err != nil {
 		return fmt.Errorf("store: add login event for %q: %w", userID, err)
 	}
 	if _, err := s.db.ExecContext(ctx,
@@ -46,7 +49,7 @@ func (s *Store) AddLoginEvent(ctx context.Context, e LoginEvent, userID string) 
 // ListLoginEvents returns the user's sign-in history, newest first.
 func (s *Store) ListLoginEvents(ctx context.Context, userID string) ([]LoginEvent, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, method, label, ip, country, browser_hash, at FROM login_events
+		`SELECT id, method, label, ip, peer, country, browser_hash, at FROM login_events
 		 WHERE user_id = ? ORDER BY at DESC, id DESC`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list login events for %q: %w", userID, err)
@@ -55,7 +58,7 @@ func (s *Store) ListLoginEvents(ctx context.Context, userID string) ([]LoginEven
 	var out []LoginEvent
 	for rows.Next() {
 		var e LoginEvent
-		if err := rows.Scan(&e.ID, &e.Method, &e.Label, &e.IP, &e.Country, &e.BrowserHash, &e.At); err != nil {
+		if err := rows.Scan(&e.ID, &e.Method, &e.Label, &e.IP, &e.Peer, &e.Country, &e.BrowserHash, &e.At); err != nil {
 			return nil, fmt.Errorf("store: scan login event: %w", err)
 		}
 		out = append(out, e)

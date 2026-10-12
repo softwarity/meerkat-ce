@@ -887,6 +887,9 @@ export interface LoginEvent {
   method: string;
   label: string;
   ip: string;
+  // The proxy the address was believed from, when it is not the address
+  // itself ("203.0.113.5 via 10.42.0.15").
+  peer?: string;
   country: string;
   at: number;
 }
@@ -1208,6 +1211,8 @@ export interface AuditEvent {
   // The address the gateway resolved, on the security half (a sign-in, a
   // refusal, a factor added). Absent on a change.
   ip?: string;
+  // The TCP peer when it is not ip: the proxy whose X-Forwarded-For named it.
+  peer?: string;
   // On an audited call of the data plane (target 'endpoint', AUD-04).
   data?: EndpointCall;
 }
@@ -1565,6 +1570,10 @@ export interface TlsSettings {
   // Where the runtime publishes this gateway's ports, inside -> outside
   // (JSON keys are strings). Absent ports are not published.
   published?: { ports?: Record<string, number>; source?: string; why?: string };
+  // Per door, the names also reached through a proxy that terminates TLS in
+  // front of the gateway: what a mailed link may point at (AUTH-22). Never a
+  // certificate, a redirect or HSTS.
+  proxied: { console: string[]; app: string[] };
 }
 
 // Trusted-browser policy (MFA-03): whether a user may skip the TOTP challenge
@@ -1826,6 +1835,9 @@ export interface Settings {
     // Password-reset requests per address and window, a counter of its own;
     // never off (0 reads as the default, 5).
     resetAttempts?: number;
+    // Failed sign-ins on one account, from any address, before the sign-in
+    // page asks for the picture code too; 0 disables. Never a lockout.
+    accountAttempts?: number;
   };
   // What a NEW password must satisfy (AUTH-10). Zero means the rule is not
   // asked for, and a rule that is not asked for is not shown either: the
@@ -3338,6 +3350,12 @@ export class ApiService {
 
   saveTls(body: { redirect: boolean; hstsMaxAge: number }): Observable<TlsSettings> {
     return this.http.put<TlsSettings>('/api/settings/tls', body);
+  }
+
+  // One door's list, replaced; the answer is the whole TLS view, the names
+  // as the gateway keeps them (lowercased, each once).
+  saveProxiedNames(plane: 'console' | 'app', names: string[]): Observable<TlsSettings> {
+    return this.http.put<TlsSettings>(`/api/settings/tls/proxied/${plane}`, { names });
   }
 
   revokeAdminToken(id: string): Observable<void> {

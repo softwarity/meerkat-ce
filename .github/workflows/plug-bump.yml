@@ -2,7 +2,7 @@
 #
 # plug's release job tells this repository (a repository_dispatch, with the
 # version, sent with the org's release App that plug already uses). This runs
-# `make plug V=...` - docker/plug.json, the agent module in go.mod, the
+# tools/plug/bump.sh - docker/plug.json, the agent module in go.mod, the
 # Dockerfile's payload, a line of release notes - checks they agree, and pushes
 # the commit to main. Nothing is released here: the commit goes through the CI
 # like any other (on meerkat-ce, through the mirror), the e2e of the download
@@ -42,7 +42,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # No credential left in .git/config: what runs below - the bump, go
+      # test, go build - is code from outside this repository, and the token
+      # may push to main. The push step hands it to git itself.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Which release, and is it already the one handed out
         id: which
@@ -56,10 +61,11 @@ jobs:
             v=$(gh release view -R softwarity/plug --json tagName -q .tagName)
             v="${v#v}"
           fi
-          case "$v" in
-            [0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "::error::'$v' is not a plug release (x.y.z)"; exit 1 ;;
-          esac
+          # The WHOLE string, digits and dots: a glob like [0-9]*.[0-9]*.[0-9]*
+          # lets `1.2.3;curl ...|sh` through, and this job may push to main.
+          if [[ ! "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$v' is not a plug release (x.y.z)"; exit 1
+          fi
           current=$(jq -r .version docker/plug.json)
           echo "version=$v" >> "$GITHUB_OUTPUT"
           if [ "$v" = "$current" ]; then
@@ -80,7 +86,9 @@ jobs:
           V: ${{ steps.which.outputs.version }}
         run: |
           set -e
-          make plug V="$V"
+          # The script, not `make plug`: make evaluates a `$(shell ...)` in a
+          # command-line variable by itself. The script checks the version too.
+          tools/plug/bump.sh "$V"
           # The same check the CI makes, before anything is pushed.
           go test -run TestThePlugReleaseIsTheOneOfPlugJSON .
           go build -tags ee ./...
@@ -97,7 +105,8 @@ jobs:
           git add docker/plug.json go.mod go.sum docker/Dockerfile RELEASE_NOTES.md
           git commit -m "Hand out plug $V"
           # main may have moved while this ran: on top of it, or not at all.
-          git pull --rebase origin main
-          git push origin HEAD:main
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git pull --rebase "$remote" main
+          git push "$remote" HEAD:main
           gh workflow run mirror-ce.yml --ref main
           echo "plug $V handed out: $(git rev-parse --short HEAD), mirror started" >> "$GITHUB_STEP_SUMMARY"

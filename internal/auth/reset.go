@@ -25,6 +25,7 @@ const resetPurpose = "reset"
 var (
 	forgotPage     = flowPage("forgot-password", forgotBody)
 	forgotSentPage = flowPage("forgot-sent", forgotSentBody)
+	forgotCodePage = flowPage("forgot-code", forgotCodeBody)
 	resetPage      = flowPage("reset-password", resetBody)
 	resetDonePage  = flowPage("reset-done", resetDoneBody)
 )
@@ -53,6 +54,27 @@ const forgotSentBody = `    <form onsubmit="return false">
     </form>
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
+
+// The same outcome when the mail carries a code rather than a link
+// (mailcode.go): the page waits for it, in this browser.
+const forgotCodeBody = `    <form method="post" action="/reset-password/code">
+      <p class="lead">{{.T.registerSentLead}}</p>
+      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <p class="hint">{{.Hint}}</p>
+      <label class="field">
+        <span>{{.T.authCode}}</span>
+        <input name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
+      </label>
+      <button type="submit">{{.T.mailResetCta}}</button>
+    </form>
+    <p class="back"><a href="/forgot-password">{{.T.signinCodeAgain}}</a></p>
+`
+
+type codeData struct {
+	flowChrome
+	Hint  string
+	Error string
+}
 
 type resetData struct {
 	flowChrome
@@ -121,6 +143,17 @@ func (h *Handler) doForgot(w http.ResponseWriter, r *http.Request) {
 		}, http.StatusTooManyRequests)
 		return
 	}
+	// A link only where the gateway can vouch for its address; a code
+	// otherwise, bound to this browser - bound BEFORE the address is looked
+	// up, so the answer is the same whether an account matched.
+	origin, reqID := h.linkOrigin(r), ""
+	if origin == "" {
+		var err error
+		if reqID, err = h.bindBrowser(w, r); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
 	// Whatever happens next, the SAME outcome page: no address enumeration.
 	if userID, err := h.st.UserIDByEmail(r.Context(), email); err == nil {
 		// An account born at an authority (OIDC, LDAP, GitHub) has no local
@@ -130,16 +163,48 @@ func (h *Handler) doForgot(w http.ResponseWriter, r *http.Request) {
 		if u, err := h.st.GetUserByID(r.Context(), userID); err == nil &&
 			u.Enabled && (!u.SelfRegistered || u.EmailVerified) && u.PasswordHash != "" &&
 			h.localPasswordAllowed(r.Context()) {
-			if err := h.sendReset(r, u.ID, u.Email, u.Locale); err != nil {
+			if err := h.sendReset(r, u.ID, u.Email, u.Locale, origin, reqID); err != nil {
 				slog.Error("reset e-mail failed", "user", u.Username, "err", err)
 			}
 			h.security(r, secPasswordForgot, u, "")
 		}
 	}
+	if origin == "" {
+		h.renderForgotCode(w, r, "", http.StatusOK)
+		return
+	}
 	writeFlow(w, forgotSentPage, struct{ flowChrome }{h.flowData(r, "titleForgot")}, http.StatusOK)
 }
 
-func (h *Handler) sendReset(r *http.Request, userID, email, locale string) error {
+func (h *Handler) renderForgotCode(w http.ResponseWriter, r *http.Request, errMsg string, status int) {
+	data := codeData{flowChrome: h.flowData(r, "titleForgot"), Error: errMsg}
+	data.Hint = fmt.Sprintf(data.T["signinCodeSentHint"], minutesLabel(data.T, signinCodeTTL))
+	writeFlow(w, forgotCodePage, data, status)
+}
+
+// sendReset mails a link rooted at origin, or - origin empty - a code bound
+// to the browser reqID names.
+func (h *Handler) sendReset(r *http.Request, userID, email, locale, origin, reqID string) error {
+	if locale == "" {
+		locale = prefsOf(r, h.offeredLanguages()).Lang
+	}
+	t := messagesFor(locale)
+	_, brand, _ := h.chrome()
+	if origin == "" {
+		code, err := h.putMailCode(r, reqID, userID, resetCodePurpose, "")
+		if err != nil {
+			return err
+		}
+		return h.sendMail(r.Context(), h.buildMail(r.Context(), email, mail.Spec{
+			Subject:   fmt.Sprintf(t["mailResetSubject"], brand.AppName),
+			Preheader: t["mailResetHeading"],
+			Heading:   t["mailResetHeading"],
+			Intro:     []string{fmt.Sprintf(t["mailResetCodeIntro"], brand.AppName)},
+			Code:      code,
+			CodeNote:  fmt.Sprintf(t["mailOtpNote"], minutesLabel(t, signinCodeTTL)),
+			Outro:     []string{t["mailResetOutro"]},
+		}))
+	}
 	token, err := randToken()
 	if err != nil {
 		return err
@@ -148,12 +213,7 @@ func (h *Handler) sendReset(r *http.Request, userID, email, locale string) error
 		time.Now().Add(time.Hour).Unix()); err != nil {
 		return err
 	}
-	link := h.externalURL(r) + "/reset-password?token=" + token
-	if locale == "" {
-		locale = prefsOf(r, h.offeredLanguages()).Lang
-	}
-	t := messagesFor(locale)
-	_, brand, _ := h.chrome()
+	link := origin + "/reset-password?token=" + token
 	return h.sendMail(r.Context(), h.buildMail(r.Context(), email, mail.Spec{
 		Subject:   fmt.Sprintf(t["mailResetSubject"], brand.AppName),
 		Preheader: t["mailResetHeading"],
@@ -162,6 +222,45 @@ func (h *Handler) sendReset(r *http.Request, userID, email, locale string) error
 		Button:    &mail.Button{Label: t["mailResetCta"], URL: link},
 		Outro:     []string{t["mailResetOutro"]},
 	}))
+}
+
+// doResetCode takes the code typed in the browser that asked, and opens the
+// new-password form exactly as the link would: with a reset token, short-lived,
+// that the form's POST spends.
+func (h *Handler) doResetCode(w http.ResponseWriter, r *http.Request) {
+	if !h.forgotOpen(r) {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	userID, _, out := h.takeMailCode(w, r, resetCodePurpose)
+	switch out {
+	case codeNoBinding:
+		http.Redirect(w, r, "/forgot-password", http.StatusSeeOther)
+		return
+	case codeTooMany:
+		h.renderForgotCode(w, r, h.tr(r, "errTooManyAttempts"), http.StatusTooManyRequests)
+		return
+	case codeWrong:
+		h.renderForgotCode(w, r, h.tr(r, "errSigninCode"), http.StatusUnauthorized)
+		return
+	}
+	token, err := randToken()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := h.st.PutEmailToken(r.Context(), hashTrust(token), userID, resetPurpose,
+		time.Now().Add(signinCodeTTL).Unix()); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeFlow(w, resetPage, resetData{
+		flowChrome: h.withPasswordRules(r.Context(), h.flowData(r, "titleReset")), Token: token,
+	}, http.StatusOK)
 }
 
 // showReset displays the new-password form. The token is only PEEKED here:

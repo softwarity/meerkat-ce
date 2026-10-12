@@ -19,7 +19,7 @@ var confirmEmailLink = regexp.MustCompile(`/confirm-email\?token=[A-Za-z0-9_-]+`
 // (AUTH-22); the old address is told at once. Until then the account keeps
 // the address its recovery goes to.
 func TestANewAddressIsConfirmedBeforeItCounts(t *testing.T) {
-	mux, _, st, box := registerSetup(t)
+	mux, _, st, box := registerSetupTLS(t)
 	ctx := context.Background()
 	hash, _ := bcrypt.GenerateFromPassword([]byte("pass-1234-x"), bcrypt.MinCost)
 	if err := st.CreateUser(ctx, store.User{ID: "alice", Username: "alice", PasswordHash: string(hash),

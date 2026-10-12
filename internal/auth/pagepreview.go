@@ -121,7 +121,9 @@ var previewErrors = map[string][]string{
 	"login": {"errInvalidCreds", "errPasskey", "errTooManyAttempts", "errOutsideHours",
 		"errNotInvited", "errSignInExpired", "errSignInUnavailable",
 		// The access window closes on the sign-in page too, date and all.
-		"errAccessEnded", "errAccessNotOpen", "errTemporaryExpired"},
+		"errAccessEnded", "errAccessNotOpen", "errTemporaryExpired",
+		// The picture code, once an account collected too many failures.
+		"errCaptchaNeeded", "errCaptcha"},
 	"totp":            {"errBadCode", "errTooManyAttempts"},
 	"totp-enroll":     {"errBadCodeRetry"},
 	"signin-code":     {"errBadEmail", "errTooManyAttempts"},
@@ -131,8 +133,12 @@ var previewErrors = map[string][]string{
 	"update-password": {"errPwPolicy", "errPwMismatch", "errPwReused"},
 	// The same three, given through a helper that takes the key - which is why
 	// the scan reads literals rather than h.tr call sites.
-	"reset-password":      {"errPwPolicy", "errPwMismatch", "errPwReused"},
-	"forgot-password":     {"errBadEmail", "errTooManyAttempts"},
+	"reset-password":  {"errPwPolicy", "errPwMismatch", "errPwReused"},
+	"forgot-password": {"errBadEmail", "errTooManyAttempts"},
+	// The three pages that wait for a mailed code (mailcode.go).
+	"forgot-code":         {"errSigninCode", "errTooManyAttempts"},
+	"register-code":       {"errSigninCode", "errTooManyAttempts"},
+	"email-change-code":   {"errSigninCode", "errTooManyAttempts"},
 	"register":            {"errRegisterMissing", "errPwMismatch", "errBadEmail", "errTooManyAttempts", "errCaptcha"},
 	"profile":             {"errBadEmail", "errEmailTaken", "errBadTimezone", "errAvatarSize", "errAvatarType"},
 	"profile-password":    {"errPwCurrentWrong", "errPwPolicy", "errPwMismatch", "errPwReused"},
@@ -240,6 +246,14 @@ var PreviewPages = []PreviewPage{
 	{"forgot-sent", cSignIn, "Reset link sent", "titleForgot", func(c flowChrome) (*template.Template, any) {
 		return forgotSentPage, struct{ flowChrome }{c}
 	}},
+	// Where the mail carries a code rather than a link: no certificate on this
+	// door vouches for the address a link would point at (mailcode.go).
+	{"forgot-code", cSignIn, "Reset code sent", "titleForgot", func(c flowChrome) (*template.Template, any) {
+		return forgotCodePage, codeData{
+			flowChrome: c, Error: c.PreviewErrors,
+			Hint: fmt.Sprintf(c.T["signinCodeSentHint"], minutesLabel(c.T, signinCodeTTL)),
+		}
+	}},
 	{"reset-password", cSignIn, "Choose a new password", "titleReset", func(c flowChrome) (*template.Template, any) {
 		d := resetData{flowChrome: c, Token: "SAMPLE", Error: c.PreviewErrors}
 		// The served page calls withPasswordRules like the other two that ask
@@ -269,6 +283,12 @@ var PreviewPages = []PreviewPage{
 	{"register-sent", cSignIn, "Confirmation sent", "titleRegister", func(c flowChrome) (*template.Template, any) {
 		return registerSentPage, struct{ flowChrome }{c}
 	}},
+	{"register-code", cSignIn, "Confirmation code sent", "titleRegister", func(c flowChrome) (*template.Template, any) {
+		return registerCodePage, codeData{
+			flowChrome: c, Error: c.PreviewErrors,
+			Hint: fmt.Sprintf(c.T["registerCodeHint"], minutesLabel(c.T, signinCodeTTL)),
+		}
+	}},
 	{"confirmed", cSignIn, "Account confirmed", "titleConfirmed", func(c flowChrome) (*template.Template, any) {
 		return confirmedPage, struct{ flowChrome }{c}
 	}},
@@ -289,6 +309,12 @@ var PreviewPages = []PreviewPage{
 			Passkeys:       samplePasskeys(),
 			Authorities:    sampleAuthorities(),
 			ConnectedCount: 1,
+		}
+	}},
+	{"email-change-code", cAccount, "Address change code sent", "titleProfile", func(c flowChrome) (*template.Template, any) {
+		return emailChangeCodePage, codeData{
+			flowChrome: c, Error: c.PreviewErrors,
+			Hint: fmt.Sprintf(c.T["emailChangeCodeHint"], minutesLabel(c.T, signinCodeTTL)),
 		}
 	}},
 	{"profile-password", cAccount, "Change password", "titleChangePassword", func(c flowChrome) (*template.Template, any) {
@@ -487,23 +513,40 @@ var PreviewPages = []PreviewPage{
 	}},
 }
 
-// loginView is the login page's data under a name. The handler declares it
-// anonymously, which is fine where it is built once - but a preview has to
-// fill the same shape, and an anonymous struct cannot be named twice. The two
-// must stay in step: a field added there and missed here renders a login page
-// with a missing half, which is precisely what a preview exists to reveal.
+// loginView is the login page's data, under a name the handler and the
+// preview both fill: a field added to one and missed by the other renders a
+// login page with a missing half, which is precisely what a preview exists to
+// reveal - so there is one type, not two copies kept in step.
 type loginView struct {
 	flowChrome
-	Next        string
-	Error       string
-	Public      []publicLink
-	Passkeys    bool
-	Register    bool
-	Forgot      bool
-	SigninCode  bool
-	Providers   []externalProvider
+	Next   string
+	Error  string
+	Public []publicLink
+	// Passkeys: the gateway-wide policy shows/hides the passkey sign-in.
+	Passkeys bool
+	// Register: self-registration open (policy on + SMTP ready).
+	Register bool
+	// Forgot: password reset available (SMTP ready).
+	Forgot bool
+	// SigninCode offers the mailed code instead of a password (AUTH-16).
+	SigninCode bool
+	// Providers are the redirect authorities (AUTH-19), one button each.
+	// A directory needs no button: it answers the ordinary form.
+	Providers []externalProvider
+	// Credentials shows the username/password form. It serves TWO
+	// mechanisms, which is why closing the local password does not always
+	// close the form: a directory is asked through this very field.
 	Credentials bool
-	Shut        bool
+	// Shut: nothing on this page can let anyone in. Said plainly and
+	// WITHOUT saying why - which door is closed is nobody's business but
+	// the administrator's.
+	Shut bool
+	// Username, CaptchaID and CaptchaImg are set on a refusal for a name that
+	// collected too many failures (accountguard.go): the name is kept, and
+	// the picture code is asked for.
+	Username   string
+	CaptchaID  string
+	CaptchaImg template.URL
 }
 
 // sampleLogin is the sign-in page with everything a gateway can offer turned
@@ -522,6 +565,11 @@ func sampleLogin(c flowChrome, errMsg string) loginView {
 			{ID: "github", Name: "GitHub", Kind: "github"},
 		},
 		Credentials: true,
+		// The picture code an account's sign-in asks for once it collected
+		// too many failures: a branch, and its wordings need a screen.
+		Username:   "alice",
+		CaptchaID:  "sample",
+		CaptchaImg: sampleCaptcha(),
 	}
 }
 

@@ -89,7 +89,7 @@ export class AuditPageComponent {
     const q = this.search().trim().toLowerCase();
     if (!q) return this.events();
     return this.events().filter((e) =>
-      [e.action, e.actorName, e.actorId, e.actorToken, e.target, e.targetName, e.detail, e.ip,
+      [e.action, e.actorName, e.actorId, e.actorToken, e.target, e.targetName, e.detail, e.ip, e.peer,
         e.data?.path, e.data?.route, ...Object.values(e.data?.fields ?? {})]
         .some((v) => (v ?? '').toLowerCase().includes(q)),
     );

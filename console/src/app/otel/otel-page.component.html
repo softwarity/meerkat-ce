@@ -51,13 +51,17 @@
 
 <!-- The switch first, because it is what somebody came for, and it APPLIES ON
      CLICK. A toggle that needs a second
-     button is a toggle somebody leaves half-set. When the gateway refuses (no
-     address yet) it springs back: a switch that stays where the click left it
-     after a refusal is a switch that lies about the state of the product. -->
+     button is a toggle somebody leaves half-set. When the gateway refuses it
+     springs back: a switch that stays where the click left it after a refusal
+     is a switch that lies about the state of the product.
+     It turns ON only once there is an address to send to. The address field
+     used to appear only once the export was on, and the gateway refuses an
+     export with no address: the switch sprang back, the field never showed,
+     and the screen could not be turned on at all. -->
 <div class="row">
   <mat-slide-toggle
     [checked]="enabled()"
-    [disabled]="!enterprise() || saving()"
+    [disabled]="!enterprise() || saving() || (!enabled() && !endpoint().trim())"
     (change)="toggleExport($event.checked)"
   >
     <ng-container i18n="@@Tracing_export_any">Export to an OpenTelemetry collector</ng-container>
@@ -69,17 +73,21 @@
   />
 </div>
 
-<p class="hint" i18n="@@Tracing_ce_note_signals">
-  A <code>traceparent</code> reaches your services in both editions.
-</p>
 @if (!enterprise()) {
   <p class="hint" i18n="@@Tracing_ce_nothing_leaves">
     Nothing leaves this community image: traces, metrics, audit and pushed logs are sent from the
     Enterprise image only. Logs written for an agent work here.
   </p>
+  <!-- Said HERE only: on the image that sends nothing it is the good news,
+       on the one that exports it read as a doubt about the switch above. -->
+  <p class="hint" i18n="@@Tracing_ce_note_signals">
+    Your services still receive a <code>traceparent</code>, so their own traces join up.
+  </p>
+} @else if (!enabled() && !endpoint().trim()) {
+  <p class="hint" i18n="@@Tracing_address_first">Give the collector's address below to turn the export on.</p>
 }
 
-@if (enabled()) {
+@if (enterprise()) {
   <!-- Where. We speak a protocol, not a product, so this is one address and no
        choice of backend. -->
   <app-form-field
@@ -93,7 +101,8 @@
     <input
       matInput
       [value]="endpoint()"
-      (change)="endpoint.set($any($event.target).value); touched()"
+      (input)="endpoint.set($any($event.target).value)"
+      (change)="touched()"
       placeholder="http://otel-collector:4318"
     />
   </app-form-field>

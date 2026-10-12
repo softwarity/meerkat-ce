@@ -191,6 +191,65 @@ installation that wants the developer surface without the tunnel.
 
 On OpenShift or OKD the chart installs as it is, under the default SCC - see [OpenShift and OKD](/docs/deploy/kubernetes#openshift-and-okd) before overriding its security context.
 
+## Behind a proxy or a load balancer
+
+Most gateways are not reached directly: an Ingress controller, nginx, Traefik, a
+cloud load balancer or a CDN stands in front. Then the connection the gateway
+accepts comes from that proxy, and who the caller really is travels in two
+headers the proxy writes: `X-Forwarded-For` (the caller's address) and
+`X-Forwarded-Proto` (whether the browser used https).
+
+Those are headers, and anybody can write a header. So the gateway believes them
+**only from a proxy it trusts**, and that decides a lot: every per-address
+counter (failed sign-ins, password resets, a route's rate limit per IP), the
+address the sign-in history and the audit show, whether a session cookie is
+`Secure`, and whether the plain port redirects to https.
+
+**What it deduces by default.** With nothing configured, the gateway looks at
+the address of the connection's other end - the TCP peer:
+
+- a **loopback or private** peer (`127.0.0.0/8`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) is a proxy: its headers are believed. That is the Ingress in a Kubernetes cluster, the Docker bridge, a compose network, nginx on the same host;
+- any **other** peer is a stranger: its `X-Forwarded-*` headers are ignored, and its own address is the caller's.
+
+Behind several proxies, `X-Forwarded-For` is read from the right: each trusted
+hop is skipped, and the first address that is not one of them is the caller.
+Whatever the caller wrote further left is never read. The carrier-grade NAT
+range (`100.64.0.0/10`) is not trusted - it is where subscribers' devices live,
+a Tailscale network for one, not proxies - nor is link-local.
+
+**When to set `MEERKAT_TRUSTED_PROXIES`.** When whatever stands in front reaches
+the gateway from **public** addresses: a CDN, or a cloud load balancer that does
+not come through a private network (Google Cloud's reach the backends from
+`130.211.0.0/22` and `35.191.0.0/16`, for example). Name its ranges, as published
+by the provider:
+
+```yaml
+environment:
+  MEERKAT_TRUSTED_PROXIES: "130.211.0.0/22, 35.191.0.0/16"
+```
+
+The value is a comma-separated list of CIDR ranges or single addresses, and it
+**replaces** the default rather than adding to it: list the private proxy too if
+there is one between the load balancer and the gateway. In the chart it is
+`trustedProxies: ["130.211.0.0/22", "35.191.0.0/16"]`.
+
+`none` trusts nobody: every address is the TCP peer, and no forwarded header is
+ever read. That is the value for a gateway reached **directly** from the
+internet, and for a LAN where people reach the gateway from private addresses
+without a proxy - the default would trust each of them as one.
+
+A value that does not parse stops the gateway at startup with the reason,
+rather than falling back to a default nobody chose. The startup log says which
+set is in force (`forwarded headers ... trusted_proxies=`).
+
+**What goes wrong when it is wrong.**
+
+- **Too narrow** (the load balancer is not trusted): every caller is counted as the load balancer. One person's failed sign-ins throttle everybody, the history and the audit show the balancer's address for everyone, and behind a TLS-terminating balancer the gateway believes the browser is on plain http - cookies lose `Secure` and the redirect to https loops.
+- **Too wide** (a caller's address is trusted): that caller can name any address they like in `X-Forwarded-For`, mint a fresh budget per request and walk through every counter, and write the address the audit records.
+
+The audit never shows only what a header claimed: when the address came from a
+proxy, the line keeps both - `203.0.113.5 via 10.42.0.15`.
+
 ## Declaring a gateway production
 
 `MEERKAT_PRODUCTION` (`production: true` in the chart) closes the whole
@@ -222,4 +281,5 @@ why.
 | `MEERKAT_VAULT_KEY` | a file under the data directory | The vault master key. It has to be supplied, and identical, on every node of a cluster. |
 | `MEERKAT_PLUG_ADDR` | `:22222` | Moves the developer tunnel's port. It does not turn it off: the **Infra, Plug** switch does, and so does closing the developer surface. |
 | `MEERKAT_PRODUCTION` | unset | Declares this gateway production and closes the developer surface for good. |
+| `MEERKAT_TRUSTED_PROXIES` | loopback and private ranges | Whose `X-Forwarded-For` and `X-Forwarded-Proto` are believed: CIDR ranges or addresses, comma-separated, replacing the default; `none` trusts nobody. See [Behind a proxy or a load balancer](#behind-a-proxy-or-a-load-balancer). |
 | `MEERKAT_TENANCY` | `single` | One implicit organisation, or several (Enterprise). Chosen once, at the first start; the console owns it afterwards. |

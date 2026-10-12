@@ -126,10 +126,17 @@
       <p class="hint text-muted" i18n="@@Rate_limiting_hint_reset">
         Attempts allowed within the window. Zero disables a limit, except for reset requests.
       </p>
+      <p class="hint text-muted" i18n="@@Rate_limiting_hint_account">
+        Past the failed sign-ins on one account, from any address, its sign-in asks for a picture code and its owner gets a mail. The account is never locked.
+      </p>
       <div class="rl-row">
         <mat-form-field class="rl-num">
-          <mat-label i18n="@@Failed_sign_ins">Failed sign-ins</mat-label>
+          <mat-label i18n="@@Failed_sign_ins_one_address">Failed sign-ins from one address</mat-label>
           <input matInput type="number" min="0" max="1000" [value]="rlLogin()" (input)="rlLogin.set(+$any($event.target).value)" />
+        </mat-form-field>
+        <mat-form-field class="rl-num">
+          <mat-label i18n="@@Failed_sign_ins_one_account">Failed sign-ins on one account</mat-label>
+          <input matInput type="number" min="0" max="1000" [value]="rlAccount()" (input)="rlAccount.set(+$any($event.target).value)" />
         </mat-form-field>
         <mat-form-field class="rl-num">
           <mat-label i18n="@@Wrong_codes">Wrong 2FA codes</mat-label>

@@ -16,7 +16,7 @@ There is no "switch HTTPS on": **a certificate placed on a plane is what opens i
 and taking it off is what closes it. A switch that can be on with nothing behind it is a
 switch that lies.
 
-![The TLS screen](img/console/tls.webp)
+![The Domains & TLS screen](img/console/tls.webp)
 
 ## The ways in
 
@@ -55,7 +55,7 @@ public authority can see those names, so ACME is not offered there.
 **Those are the ports inside.** Between them and a browser there is usually a
 mapping: a Kubernetes Service publishing `9443` as `19443`, a Docker `-p`, a Swarm
 ingress. The gateway asks its runtime - its own pod and the Services that select it,
-or its container through the Docker socket - and the links on the TLS screen carry
+or its container through the Docker socket - and the links on the Domains & TLS screen carry
 the port the world reaches. When the runtime does not publish an HTTPS door, the
 screen says so instead of offering a link that reaches nothing. The Helm chart
 publishes both HTTPS doors by default (`service.appTlsPort`, `service.adminTlsPort`)
@@ -74,7 +74,7 @@ an operator with no HTTPS at all.
 ## On a local machine
 
 A laptop or a lab has no public name and no public authority, and a self-signed certificate
-makes every browser complain. The **On a local machine** button of the TLS screen opens the
+makes every browser complain. The **On a local machine** button of the Domains & TLS screen opens the
 steps, per system (macOS, Linux, Windows), with the names you type - the one the console is
 reached by to start with - already in the commands:
 
@@ -154,12 +154,47 @@ without `includeSubDomains`.
 > are taken away, and no longer offers to continue past a bad certificate. Start
 > at a day; lengthen once HTTPS is settled.
 
+## Behind a proxy that terminates TLS
+
+Often the HTTPS a browser sees is not the gateway's: nginx, an ingress
+controller or a cloud load balancer holds the certificate, and forwards plain
+HTTP to the gateway. Nothing then arrives on the gateway's own TLS door, and the
+mails that prove a mailbox - a sign-up's confirmation, a new address, a reset -
+carry a code instead of a link, since a link is only mailed to a name the
+gateway can vouch for (see
+[A link, or a code](/docs/auth/local-accounts#a-link-or-a-code)).
+
+On the Console and Application doors, **Also reached through a proxy that
+terminates TLS** lists the names the operator vouches for instead: exact names
+(`shop.example.com`) or a wildcard standing for one label (`*.example.com`
+covers `eu.example.com`, not `example.com` nor `a.eu.example.com`). A mail asked
+under one of them carries a link back to it, always in `https://`, with the port
+the request carried. Each door has its own list: a name declared on the
+application says nothing about the console.
+
+| A declared name does | It does not |
+|---|---|
+| let a mailed link point at it, though the request came in plain HTTP | open an HTTPS door, choose a certificate, ask an authority, trigger Force HTTPS, send HSTS |
+
+The gateway holds no certificate for these names, so it makes no HTTPS promise
+on them: the redirect and HSTS still follow only the names a placed certificate
+carries. A name is a host name only - no scheme, no port, no path - and never an
+IP address, which nobody can vouch for by name. A wildcard over a top-level
+domain (`*.com`) is refused. The names travel with a configuration export, with
+the rest of the TLS settings, and a change reaches every node through the change
+bus (`PUT /api/settings/tls/proxied/{console|app}`, audited as `tls.proxied`).
+
+> [!WARNING]
+> Declare only names that really reach this gateway through that proxy. A link
+> is mailed to whatever name the request carried, as long as it matches: the
+> declaration is what stands between a forged `Host` and the mail.
+
 ## ACME is not Let's Encrypt
 
 ACME is part of the **Enterprise** edition. A configuration imported on the
 community image leaves its authorities and orders out, and its plan names them. A
 gateway moved from the Enterprise image to the community one keeps what its
-database holds but asks no authority, and the TLS screen says so: those
+database holds but asks no authority, and the Domains & TLS screen says so: those
 certificates will not be renewed.
 
 An installation sets up as many **authorities** as it deals with - Let's Encrypt for
@@ -296,7 +331,7 @@ The certificates above are what the gateway **presents**. When the gateway is
 the one calling - a route whose target is `https://...` - it **checks** the
 certificate the upstream presents, and that takes the other half: the
 authorities it trusts. They have a store of their own, **Trusted authorities**
-on the TLS screen, apart from the pool: public certificates only, never a key.
+on the Domains & TLS screen, apart from the pool: public certificates only, never a key.
 
 By default the gateway trusts the public authorities its image carries. An
 upstream inside a cluster is usually signed by the cluster's own authority or

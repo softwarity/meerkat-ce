@@ -1561,8 +1561,8 @@
         "fr": "Les connexions par force brute sont freinées"
       },
       "description": {
-        "en": "Failed sign-ins are counted per address and account within a configurable window (Security page): past the budget the endpoint answers 429 without even checking, and a success forgives the counter. Wrong two-factor codes are throttled per account the same way.",
-        "fr": "Les échecs de connexion sont comptés par adresse et par compte, dans une fenêtre configurable (page Security) : une fois le budget dépassé, l'endpoint répond 429 sans même vérifier, et un succès remet le compteur à zéro. Les codes de second facteur erronés sont freinés de la même façon, par compte."
+        "en": "Failed sign-ins are counted per address and account within a configurable window (Security page): past the budget the endpoint answers 429 without even checking, and a success forgives the counter. Failures on one account from any address are counted too: past five the page asks for the picture code as well, an unknown name exactly like a real one, and never locks anything. Wrong two-factor codes are throttled per account the same way.",
+        "fr": "Les échecs de connexion sont comptés par adresse et par compte, dans une fenêtre configurable (page Security) : une fois le budget dépassé, l'endpoint répond 429 sans même vérifier, et un succès remet le compteur à zéro. Les échecs sur un compte depuis n'importe quelle adresse sont comptés aussi : au-delà de cinq, la page demande en plus le code en image, pour un nom inconnu exactement comme pour un vrai, et ne verrouille jamais rien. Les codes de second facteur erronés sont freinés de la même façon, par compte."
       }
     },
     {

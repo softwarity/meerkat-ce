@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -84,9 +85,11 @@ func TestARouteWithNoBoundIsNotLimited(t *testing.T) {
 }
 
 // Per address, each caller gets their own budget - and the address is read the
-// way the whole product reads it: the RIGHTMOST forwarded entry, the only one
-// the hop we are talking to wrote. Trusting the leftmost would let a caller
-// name their own address and mint a fresh budget per request.
+// way the whole product reads it (filters.ClientIP): this test server's peer is
+// the loopback, a trusted proxy, so its X-Forwarded-For is walked from the
+// right to the first address that is not a proxy of ours. The callers are
+// PUBLIC addresses on purpose: a private one would itself count as a trusted
+// hop, and the walk would go past it.
 func TestPerAddressCountsCallersApart(t *testing.T) {
 	rt := newRouter(t, limitedRoute(echoUpstream(t).URL,
 		store.RateLimit{Per: store.PerIP, Requests: 2, Window: "PT1M"}))
@@ -104,21 +107,42 @@ func TestPerAddressCountsCallersApart(t *testing.T) {
 		return res.StatusCode
 	}
 	for i := 0; i < 2; i++ {
-		if got := get("10.0.0.1"); got != http.StatusOK {
-			t.Fatalf("10.0.0.1 request %d answered %d", i, got)
+		if got := get("203.0.113.1"); got != http.StatusOK {
+			t.Fatalf("203.0.113.1 request %d answered %d", i, got)
 		}
 	}
-	if got := get("10.0.0.1"); got != http.StatusTooManyRequests {
-		t.Fatalf("10.0.0.1 went over budget and answered %d", got)
+	if got := get("203.0.113.1"); got != http.StatusTooManyRequests {
+		t.Fatalf("203.0.113.1 went over budget and answered %d", got)
 	}
 	// A different address has its own.
-	if got := get("10.0.0.2"); got != http.StatusOK {
-		t.Fatalf("10.0.0.2 answered %d, want its own budget", got)
+	if got := get("203.0.113.2"); got != http.StatusOK {
+		t.Fatalf("203.0.113.2 answered %d, want its own budget", got)
 	}
 	// And a caller PREPENDING a forged address does not get a fresh one: what
 	// counts is the entry our own hop appended, which is the last.
-	if got := get("1.2.3.4, 10.0.0.1"); got != http.StatusTooManyRequests {
+	if got := get("1.2.3.4, 203.0.113.1"); got != http.StatusTooManyRequests {
 		t.Errorf("a prepended address minted a fresh budget: answered %d", got)
+	}
+}
+
+// The bypass the audit reproduced (P0-02): a caller reaching the gateway
+// DIRECTLY wrote X-Forwarded-For and a new address per request was a new
+// budget per request. From a public peer the header is not read at all, so the
+// rotation buys nothing and the third request is refused.
+func TestARotatingForwardedForFromAPublicPeerIsStillCounted(t *testing.T) {
+	rt := newRouter(t, limitedRoute(echoUpstream(t).URL,
+		store.RateLimit{Per: store.PerIP, Requests: 2, Window: "PT1M"}))
+	codes := []int{}
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "http://gw.example/x", nil)
+		req.RemoteAddr = "198.51.100.7:40000"
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("203.0.113.%d", i+10))
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+		codes = append(codes, rec.Code)
+	}
+	if codes[0] != http.StatusOK || codes[1] != http.StatusOK || codes[2] != http.StatusTooManyRequests {
+		t.Fatalf("answers %v, want 200 200 429: the forged addresses minted fresh budgets", codes)
 	}
 }
 

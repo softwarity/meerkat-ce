@@ -3,6 +3,24 @@
 ## NEXT RELEASE
 
 - **plug 2.25.1 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
+- **The OpenTelemetry export can be turned on from the console again.** The collector
+  address only appeared once the export was on, and an export with no address is
+  refused: the switch sprang back and the field never showed. The address is now
+  always there on the Enterprise and evaluation images, and the switch turns on once
+  it is filled in.
+- **A mailed link only points at a name the gateway can vouch for.** A reset, a
+  sign-up's confirmation and an address change used to mail a link built from the
+  request's `Host` - which the caller writes: a reset asked for someone else's address
+  with `Host: attacker.example` mailed them a genuine token to that host. A link is now
+  mailed only when the request reached Meerkat's own TLS door and a placed certificate
+  covers the name. Anywhere else - plain HTTP, TLS terminated by a proxy in front - the
+  mail carries a six-digit code and the page waits for it, in the browser that asked.
+- **Behind a proxy that terminates TLS, links again.** The TLS screen is now
+  **Domains & TLS**, and on its Console and Application doors you can declare the
+  names a proxy in front - nginx, an ingress, a load balancer - serves over HTTPS
+  (`shop.example.com`, `*.example.com`). A reset or a confirmation asked under one of
+  them mails an `https://` link back to it, though the request reached Meerkat in
+  plain HTTP. They are only that: no certificate, no Force HTTPS redirect, no HSTS.
 - **Released versions are signed.** Until now only `latest` and `eval` carried a
   signature: a release stamps the tested image with its version, which makes a new
   manifest, and nothing signed that one. Every tag a release pushes is now signed and
@@ -12,6 +30,22 @@
 - **The community release is the image the mirror tested.** A release was meant to
   stamp it with its version and, through a misread label, rebuilt it every time.
   It now stamps it when the mirror's build of the same commit is there.
+- **A caller can no longer choose its own address.** `X-Forwarded-For` was believed
+  from anybody, so a caller reaching the gateway directly wrote a new address per
+  request and walked through every counter keyed on it: fifty wrong passwords against
+  a budget of three gave fifty refusals and not one `429`. It is now believed only from
+  a trusted proxy - by default the loopback and the private ranges, which is where an
+  Ingress, the Docker bridge or a local nginx lives - and `X-Forwarded-Proto` follows
+  the same rule. **If a CDN or a cloud load balancer reaches your gateway from public
+  addresses**, name its ranges in `MEERKAT_TRUSTED_PROXIES` (`trustedProxies` in the
+  chart), or every caller is counted as that balancer and, behind TLS it terminates,
+  the redirect to https loops. `none` trusts nobody. The history and the audit keep the
+  proxy beside the address: `203.0.113.5 via 10.42.0.15`.
+- **Failed sign-ins are counted per account too, from any address.** Past five in the
+  window (Application, Security, Rate limiting: "Failed sign-ins on one account"), the
+  sign-in for that name also asks for the picture code - never a lockout, an unknown
+  name is treated exactly the same, and the owner gets one mail per window saying how
+  many failures came from how many addresses.
 
 ---
 

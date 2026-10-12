@@ -37,6 +37,7 @@ var MailSampleKinds = []MailSampleKind{
 	{"confirm", "Account confirmation", false},
 	{"reset", "Password reset", false},
 	{"password-changed", "Password changed", false},
+	{"signin-attempts", "Failed sign-ins", false},
 	{"email-change", "New address confirmation", false},
 	{"email-changing", "Address change notice", false},
 	{"otp", "Sign-in code", false},
@@ -141,6 +142,8 @@ func sampleSpec(kind string, t map[string]string, app, base string) (mail.Spec, 
 			Heading:   fmt.Sprintf(t["mailPwChangedSubject"], app),
 			Intro:     []string{fmt.Sprintf(t["mailPwChangedBody"], app)},
 		}, true
+	case "signin-attempts":
+		return signinAttemptsSpec(t, app, 5, 3, "15 "+t["minutes"]), true
 	case "otp":
 		return mail.Spec{
 			Subject:   fmt.Sprintf(t["mailOtpSubject"], app),

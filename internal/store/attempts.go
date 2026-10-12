@@ -62,3 +62,28 @@ func (s *Store) PurgeAttemptsBefore(ctx context.Context, cutoff time.Time) (int6
 	n, _ := res.RowsAffected()
 	return n, nil
 }
+
+// CountAttemptKeys is how many DIFFERENT keys under prefix collected a failure
+// since a moment - the addresses an account was tried from, when each one is
+// recorded under prefix+address. A prefix compare and not LIKE: what follows
+// the prefix is whatever an address looks like, and LIKE would read its own
+// wildcards in it.
+func (s *Store) CountAttemptKeys(ctx context.Context, prefix string, since time.Time) (int, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT key) FROM login_attempts WHERE substr(key, 1, ?) = ? AND at > ?`,
+		len(prefix), prefix, since.UnixMilli()).Scan(&n); err != nil {
+		return 0, fmt.Errorf("store: count attempt keys: %w", err)
+	}
+	return n, nil
+}
+
+// ClearAttemptsPrefix forgives every key under prefix at once: a sign-in that
+// succeeds clears the account's addresses with its counter.
+func (s *Store) ClearAttemptsPrefix(ctx context.Context, prefix string) error {
+	if _, err := s.db.ExecContext(ctx,
+		`DELETE FROM login_attempts WHERE substr(key, 1, ?) = ?`, len(prefix), prefix); err != nil {
+		return fmt.Errorf("store: clear attempts: %w", err)
+	}
+	return nil
+}

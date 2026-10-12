@@ -70,16 +70,18 @@ connu en clair.
 
 ## Une limitation, jamais un verrouillage
 
-Les échecs de connexion sont comptés par **adresse du client et par compte**, sur une
-fenêtre glissante. Le réglage se trouve dans **Application > Security > Rate limiting**.
+Les échecs de connexion sont comptés deux fois, sur une fenêtre glissante, dans
+**Application > Security > Rate limiting** : par **adresse du client et par compte**, et
+par **compte** quelle que soit l'adresse.
 
 | Champ | Ce qu'il compte | Par défaut |
 |---|---|---|
-| Failed sign-ins | les échecs tolérés avant que le formulaire de connexion réponde `429` | `10` |
+| Failed sign-ins from one address | les échecs d'une adresse sur un compte, avant que le formulaire de connexion réponde `429` | `10` |
+| Failed sign-ins on one account | les échecs sur un compte depuis n'importe quelle adresse, avant que sa connexion demande aussi un code en image | `5` |
 | Wrong 2FA codes | les codes de second facteur erronés tolérés, sur la même fenêtre | `5` |
 | Within | la fenêtre, sous forme de durée ISO-8601 | `PT15M` |
 
-Une connexion réussie remet le compteur à zéro. Le refus intervient **avant** la
+Une connexion réussie remet les deux compteurs à zéro. Le refus intervient **avant** la
 comparaison des empreintes : un attaquant bloqué ne peut donc même pas consommer du temps
 de processeur. Mettre un nombre à zéro désactive la limite correspondante.
 
@@ -94,6 +96,49 @@ doit pas se transformer en blocage général.
 
 **Aucun compte n'est jamais verrouillé.** Rien de ce que fait un tiers ne peut priver de
 son compte la personne à qui il appartient.
+
+### Beaucoup d'adresses, un seul compte
+
+Le compteur par adresse arrête une machine qui devine. Il ne voit pas mille machines qui
+devinent chacune un peu - un botnet, un lot de proxys qui tournent - puisque chaque adresse
+reste indéfiniment sous son propre budget. Ce qu'elles ont toutes en commun, c'est le nom
+qu'elles essaient : c'est ce que compte le second compteur.
+
+Au-delà de **Failed sign-ins on one account**, la page de connexion de ce nom demande le
+même code en image que le [formulaire d'inscription](#laisser-les-gens-crer-leur-compte),
+avec le nom déjà rempli :
+
+- sans le bon code, aucun mot de passe n'est même vérifié, et la page dit que le code manque plutôt que "mauvais mot de passe" - celui qui a saisi le bon ne doit pas s'entendre dire qu'il est faux ;
+- le code est consommé quelle que soit la réponse, et chaque page en porte un nouveau ;
+- le bon mot de passe **et** le bon code connectent, et remettent le compteur à zéro.
+
+Trois secondes pour une personne, toute l'économie d'un script - et le compte reste
+ouvert à son titulaire pendant tout ce temps. Zéro désactive ce compteur.
+
+Un **nom inconnu est traité de la même façon** : même compteur, même code, mêmes phrases.
+Faire autrement répondrait à la seule question que la page refuse partout ailleurs - ce
+compte existe-t-il.
+
+**Le titulaire est prévenu.** Quand un compte franchit le seuil et que SMTP est configuré,
+son titulaire reçoit un e-mail - combien d'échecs dans la fenêtre, depuis combien
+d'adresses, et de changer son mot de passe si ce n'était pas lui. Un seul par fenêtre,
+aussi longtemps que dure l'assaut, et aucun pour un nom qui n'existe pas, un compte
+désactivé ou une adresse qu'un compte auto-inscrit n'a jamais confirmée. L'e-mail part
+après la réponse, jamais avant : un refus qui attendrait le relais prendrait sensiblement
+plus de temps sur un vrai compte que sur un nom inventé. L'écran du relais sait en envoyer
+un exemple (**Failed sign-ins**).
+
+### Quelle adresse est comptée
+
+L'adresse est celle du **pair TCP** - l'autre bout de la connexion que la gateway a
+acceptée -, sauf si ce pair est un proxy de confiance : c'est alors ce que ce proxy a
+écrit dans `X-Forwarded-For`. Un appelant qui joint la gateway directement et écrit
+l'en-tête lui-même est ignoré : sinon, inventer une adresse par requête suffirait à
+traverser tous les compteurs de cette page. Les proxys de confiance sont déduits de leur
+adresse par défaut, et se règlent avec `MEERKAT_TRUSTED_PROXIES` - voir
+[Derrière un proxy ou un load balancer](/docs/deploy/one-gateway#derrire-un-proxy-ou-un-load-balancer).
+Le journal de sécurité garde les deux, "203.0.113.5 via 10.42.0.15", pour ne jamais
+montrer seulement ce qu'un en-tête prétendait.
 
 Un identifiant inconnu, un mot de passe erroné et un compte désactivé reçoivent tous la
 même réponse, dans le même temps : pour un identifiant inconnu, une empreinte factice est
@@ -155,6 +200,39 @@ sur une session ne suffit donc plus à détourner la récupération du compte ve
 boîte aux lettres. Sans relais, rien ne peut acheminer de confirmation : l'adresse change
 alors immédiatement, comme auparavant.
 
+## Un lien, ou un code
+
+Chacun de ces mails prouve une boîte : la confirmation d'une inscription, une
+nouvelle adresse, une réinitialisation. Un **lien** n'est envoyé que lorsque la
+gateway peut se porter garante du nom qu'il contient, de l'une de deux façons :
+
+- la requête est arrivée sur **sa propre porte TLS**, et un certificat placé sur
+  cette porte (**Infra > Domains & TLS**, sur Console ou Application) couvre le
+  nom demandé par le navigateur ;
+- ou le nom est l'un de ceux que l'opérateur a déclarés sur cette porte comme
+  **joints par un proxy qui termine le TLS** - nginx, un ingress, un load
+  balancer placé devant. La requête arrive alors en HTTP simple, et le lien reste
+  en `https://`.
+
+Le lien pointe alors vers ce nom : une réinitialisation demandée sur
+`shop.example.com` revient sur `shop.example.com`. Voir
+[Derrière un proxy qui termine le TLS](/docs/operations/tls#derrire-un-proxy-qui-termine-le-tls).
+
+Partout ailleurs - HTTP simple, un proxy devant dont personne n'a déclaré les noms,
+un nom qu'aucun certificat placé ne porte - le mail contient un **code à six
+chiffres** et aucun lien, et la page qui a fait la demande l'attend. C'est le
+code de la connexion par e-mail : valable dix minutes, et seulement dans le
+navigateur qui l'a demandé. Une nouvelle adresse se confirme par le code, dans
+la session qui a demandé le changement.
+
+C'est ce qui empêche un inconnu de retourner ces mails contre leur
+destinataire. Le nom d'une requête est ce que l'appelant a écrit : une
+réinitialisation demandée pour l'adresse de quelqu'un d'autre avec
+`Host: attacker.example` envoyait à cette personne un vrai lien, avec un vrai
+jeton, vers le serveur de l'attaquant. Un code envoyé à la victime ne sert à
+rien à celui qui l'a demandé : il ne le voit jamais, et il n'ouvre rien dans un
+autre navigateur.
+
 ## Un mot de passe oublié
 
 `/forgot-password` existe dès qu'un relais de messagerie est configuré et que les mots de
@@ -163,7 +241,7 @@ affichée ensuite est la même, que l'adresse soit connue ou non. Un compte cré
 autorité (OIDC, LDAP, GitHub) n'a pas de mot de passe local et ne reçoit aucun lien : cela
 ouvrirait une seconde porte dont l'autorité ne saurait rien.
 
-Le lien est valable une heure et ne sert qu'une fois. Le nouveau mot de passe est contrôlé
+Le lien est valable une heure et ne sert qu'une fois (un code, dix minutes). Le nouveau mot de passe est contrôlé
 selon la politique, règle de non-réutilisation comprise, et le changement **détruit toutes
 les sessions en cours de ce compte**, sur toutes les gateways : quiconque en détenait
 une, intrus compris, doit se reconnecter ou reste dehors. Le titulaire est prévenu par

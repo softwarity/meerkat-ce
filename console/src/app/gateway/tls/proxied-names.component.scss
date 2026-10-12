@@ -1,0 +1,41 @@
+:host {
+  display: block;
+}
+/* The field and its info marker on one line - app-form-field's layout, which
+   cannot host a chip grid (it projects a matInput). */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.row mat-form-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+mat-chip-row {
+  --mat-chip-container-height: 26px;
+  --mat-chip-label-text-size: 0.78rem;
+}
+.field-info {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  margin-top: 8px;
+}
+.field-info:hover,
+.field-info:focus-visible {
+  opacity: 1;
+}
+.field-info:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: -4px;
+}

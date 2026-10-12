@@ -60,6 +60,7 @@ export class SecurityPageComponent {
   protected readonly rlLogin = signal(10);
   protected readonly rlTotp = signal(5);
   protected readonly rlReset = signal(5);
+  protected readonly rlAccount = signal(5);
   protected readonly rlWindow = signal('PT15M');
   protected readonly rlWindows = ['PT5M', 'PT15M', 'PT1H'];
   protected readonly passkeysAllowed = signal(true);
@@ -134,6 +135,7 @@ export class SecurityPageComponent {
         this.rlLogin.set(s.rateLimit?.loginAttempts ?? 10);
         this.rlTotp.set(s.rateLimit?.totpAttempts ?? 5);
         this.rlReset.set(s.rateLimit?.resetAttempts || 5);
+        this.rlAccount.set(s.rateLimit?.accountAttempts ?? 5);
         this.rlWindow.set(s.rateLimit?.loginWindow || 'PT15M');
         this.passkeysAllowed.set(s.passkeysAllowed);
         this.apiTokens.set(s.apiTokens);
@@ -196,6 +198,7 @@ export class SecurityPageComponent {
           loginWindow: this.rlWindow(),
           totpAttempts: this.rlTotp(),
           resetAttempts: this.rlReset(),
+          accountAttempts: this.rlAccount(),
         },
         passkeysAllowed: this.passkeysAllowed(),
         apiTokens: this.apiTokens(),

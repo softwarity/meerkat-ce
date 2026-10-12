@@ -3,6 +3,7 @@ package meerkat
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -40,5 +41,49 @@ func TestThePlugReleaseIsTheOneOfPlugJSON(t *testing.T) {
 	}
 	if !strings.Contains(read("README.md"), "www.softwarity.io%2Fassets%2Fplug.json") {
 		t.Error("README.md has lost the badge that reads the site's assets/plug.json")
+	}
+}
+
+// The version reaches the bump from outside - plug's dispatch, or the tag of
+// its latest release - and the bump runs with the right to push to main. So
+// it is a VERSION or it is nothing: every attempt below must be refused before
+// a single command runs - by the script, and through make, which pastes a
+// $(V) into the recipe's text before the shell ever reads it.
+//
+// Not through make with a `$` in it: make expands `$(shell ...)` in a
+// variable given on its command line by itself, before any recipe, and no
+// Makefile can refuse that. Which is why the workflow calls the script, not
+// make, and checks the version before either.
+func TestThePlugBumpRunsNothingButAVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs make and the bump script")
+	}
+	for _, v := range []string{
+		`1.2.3;touch PWNED`,
+		`1.2.3$(touch PWNED)`,
+		"1.2.3`touch PWNED`",
+		`1.2.3" ; touch PWNED ; echo "`,
+		`1.2.3' ; touch PWNED ; echo '`,
+		`1.2.3 PWNED`,
+		`v1.2`,
+		``,
+	} {
+		cmds := map[string]*exec.Cmd{"script": exec.Command("sh", "tools/plug/bump.sh", v)}
+		if !strings.Contains(v, "$") {
+			cmds["make"] = exec.Command("make", "--no-print-directory", "plug", "V="+v)
+		}
+		for name, cmd := range cmds {
+			out, err := cmd.CombinedOutput()
+			if _, statErr := os.Stat("PWNED"); statErr == nil {
+				_ = os.Remove("PWNED")
+				t.Fatalf("%s ran a command out of the version %q:\n%s", name, v, out)
+			}
+			if err == nil {
+				t.Fatalf("%s accepted %q as a plug release:\n%s", name, v, out)
+			}
+			if !strings.Contains(string(out), "is not a plug release") {
+				t.Fatalf("%s refused %q for another reason than the version itself:\n%s", name, v, out)
+			}
+		}
 	}
 }

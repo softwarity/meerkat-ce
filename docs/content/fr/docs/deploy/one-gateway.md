@@ -201,6 +201,64 @@ la surface développeur sans le tunnel.
 
 Sur OpenShift ou OKD, le chart s'installe tel quel, sous la SCC par défaut - voir [OpenShift et OKD](/docs/deploy/kubernetes#openshift-et-okd) avant de surcharger son contexte de sécurité.
 
+## Derrière un proxy ou un load balancer
+
+La plupart des gateways ne sont pas jointes directement : un contrôleur Ingress, nginx,
+Traefik, un load balancer de cloud ou un CDN se tient devant. La connexion que la gateway
+accepte vient alors de ce proxy, et l'identité réelle de l'appelant voyage dans deux
+en-têtes que le proxy écrit : `X-Forwarded-For` (l'adresse de l'appelant) et
+`X-Forwarded-Proto` (le navigateur était-il en https).
+
+Ce sont des en-têtes, et n'importe qui peut écrire un en-tête. La gateway ne les croit donc
+**que venant d'un proxy de confiance**, et cela décide de beaucoup de choses : chaque
+compteur par adresse (échecs de connexion, réinitialisations de mot de passe, limite de
+débit par IP d'une route), l'adresse que montrent l'historique des connexions et l'audit,
+l'attribut `Secure` d'un cookie de session, et la redirection du port en clair vers https.
+
+**Ce qu'elle déduit par défaut.** Sans réglage, la gateway regarde l'adresse de l'autre bout
+de la connexion - le pair TCP :
+
+- un pair **de boucle locale ou privé** (`127.0.0.0/8`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) est un proxy : ses en-têtes sont crus. C'est l'Ingress d'un cluster Kubernetes, le pont Docker, un réseau compose, un nginx sur la même machine ;
+- tout **autre** pair est un inconnu : ses en-têtes `X-Forwarded-*` sont ignorés, et sa propre adresse est celle de l'appelant.
+
+Derrière plusieurs proxys, `X-Forwarded-For` se lit de droite à gauche : chaque saut de
+confiance est sauté, et la première adresse qui n'en est pas un est l'appelant. Ce que
+l'appelant a écrit plus à gauche n'est jamais lu. La plage du NAT des opérateurs
+(`100.64.0.0/10`) n'est pas de confiance - c'est là que vivent les appareils des abonnés,
+un réseau Tailscale par exemple, pas des proxys -, pas plus que le lien local.
+
+**Quand régler `MEERKAT_TRUSTED_PROXIES`.** Quand ce qui se tient devant joint la gateway
+depuis des adresses **publiques** : un CDN, ou un load balancer de cloud qui ne passe pas
+par un réseau privé (ceux de Google Cloud joignent les backends depuis `130.211.0.0/22` et
+`35.191.0.0/16`, par exemple). Nommez ses plages, telles que le fournisseur les publie :
+
+```yaml
+environment:
+  MEERKAT_TRUSTED_PROXIES: "130.211.0.0/22, 35.191.0.0/16"
+```
+
+La valeur est une liste de plages CIDR ou d'adresses séparées par des virgules, et elle
+**remplace** le défaut au lieu de s'y ajouter : listez aussi le proxy privé s'il y en a un
+entre le load balancer et la gateway. Dans le chart, c'est
+`trustedProxies: ["130.211.0.0/22", "35.191.0.0/16"]`.
+
+`none` ne fait confiance à personne : chaque adresse est celle du pair TCP, et aucun en-tête
+transmis n'est jamais lu. C'est la valeur d'une gateway jointe **directement** depuis
+internet, et d'un réseau local où l'on joint la gateway depuis des adresses privées sans
+proxy - le défaut ferait confiance à chacun comme à un proxy.
+
+Une valeur illisible arrête la gateway au démarrage en donnant la raison, plutôt que de
+retomber sur un défaut que personne n'a choisi. Le journal de démarrage dit quel ensemble
+est en vigueur (`forwarded headers ... trusted_proxies=`).
+
+**Ce qui se passe quand c'est faux.**
+
+- **Trop étroit** (le load balancer n'est pas de confiance) : chaque appelant est compté comme le load balancer. Les échecs de connexion d'une personne freinent tout le monde, l'historique et l'audit montrent l'adresse du load balancer pour tous, et derrière un load balancer qui termine TLS la gateway croit le navigateur en http - les cookies perdent `Secure` et la redirection vers https boucle.
+- **Trop large** (l'adresse d'un appelant est de confiance) : cet appelant peut écrire l'adresse de son choix dans `X-Forwarded-For`, s'offrir un budget neuf à chaque requête et traverser tous les compteurs, et choisir l'adresse que l'audit enregistre.
+
+L'audit ne montre jamais seulement ce qu'un en-tête prétendait : quand l'adresse vient d'un
+proxy, la ligne garde les deux - `203.0.113.5 via 10.42.0.15`.
+
 ## Déclarer une gateway de production
 
 `MEERKAT_PRODUCTION` (`production: true` dans le chart) ferme ici toute la
@@ -233,4 +291,5 @@ absent doit pouvoir comprendre pourquoi.
 | `MEERKAT_VAULT_KEY` | un fichier dans le répertoire de données | La clé maîtresse du coffre. Elle doit être fournie, et identique, sur chaque nœud d'un cluster. |
 | `MEERKAT_PLUG_ADDR` | `:22222` | Change le port du tunnel développeur. Elle ne le désactive pas : c'est le rôle de l'interrupteur **Infra, Plug**, ou de la fermeture de la surface développeur. |
 | `MEERKAT_PRODUCTION` | non définie | Déclare cette gateway comme étant de production et ferme définitivement la surface développeur. |
+| `MEERKAT_TRUSTED_PROXIES` | boucle locale et plages privées | Les proxys dont `X-Forwarded-For` et `X-Forwarded-Proto` sont crus : plages CIDR ou adresses séparées par des virgules, qui remplacent le défaut ; `none` ne fait confiance à personne. Voir [Derrière un proxy ou un load balancer](#derrire-un-proxy-ou-un-load-balancer). |
 | `MEERKAT_TENANCY` | `single` | Une seule organisation implicite, ou plusieurs (Enterprise). Se choisit une fois, au premier démarrage ; c'est ensuite la console qui en décide. |

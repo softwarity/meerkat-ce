@@ -46,7 +46,8 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
         icon: 'passkey',
       },
       { path: 'mail-relay', label: $localize`:@@Mail_relay:Mail relay`, icon: 'outgoing_mail' },
-      { path: 'tls', label: $localize`:@@TLS:TLS`, icon: 'lock' },
+      // The path stays tls: bookmarks and the docs' links point at it.
+      { path: 'tls', label: $localize`:@@Domains_and_TLS:Domains & TLS`, icon: 'lock' },
       // Everybody who administers a domain mints their OWN tokens, and a token
       // is never more than its owner - so this is on both planes, not root's.
       { path: 'access-tokens', label: $localize`:@@Access_tokens:Access tokens`, icon: 'key' },

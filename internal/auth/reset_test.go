@@ -19,7 +19,7 @@ var resetLink = regexp.MustCompile(`/reset-password\?token=[A-Za-z0-9_-]+`)
 // consume on POST) -> new password works, old one dies, every session is
 // revoked, the owner is notified, the link never replays.
 func TestForgotPasswordFullFlow(t *testing.T) {
-	mux, sm, st, box := registerSetup(t) // SMTP configured + recording mailbox
+	mux, sm, st, box := registerSetupTLS(t) // SMTP configured + recording mailbox
 	ctx := context.Background()
 
 	// The login page offers the link once SMTP is configured.
@@ -112,7 +112,7 @@ func TestForgotPasswordFullFlow(t *testing.T) {
 // An account born at an authority is sent no link at all, and the requests
 // have a counter of their own, no longer the registration's.
 func TestAResetClosesTheOtherDoorsToo(t *testing.T) {
-	mux, _, st, box := registerSetup(t)
+	mux, _, st, box := registerSetupTLS(t)
 	ctx := context.Background()
 	hash, _ := bcrypt.GenerateFromPassword([]byte("old-pass-1234"), bcrypt.MinCost)
 	if err := st.CreateUser(ctx, store.User{ID: "alice", Username: "alice", PasswordHash: string(hash),

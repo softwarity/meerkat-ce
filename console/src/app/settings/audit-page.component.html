@@ -195,7 +195,12 @@
                 <div class="org"><mat-icon>domain</mat-icon>{{ e.tenantName || e.tenantId }}</div>
               }
               @if (e.ip) {
-                <div class="ip">{{ e.ip }}</div>
+                <div class="ip">
+                  {{ e.ip }}
+                  @if (e.peer) {
+                    <ng-container i18n="@@Ip_via_peer">via</ng-container> {{ e.peer }}
+                  }
+                </div>
               }
             } @else if (e.targetName || e.targetId) {
               <div class="target">

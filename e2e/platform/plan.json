@@ -207,8 +207,8 @@
     "CE",
     "EE"
    ],
-   "en": "Repeated failures answer 429, and the counter is shared: failing on node A then B still trips it.",
-   "fr": "Des échecs répétés reçoivent un 429, et le compteur est partagé : échouer sur le nœud A puis sur le nœud B le déclenche quand même."
+   "en": "Repeated failures answer 429, and the counter is shared: failing on node A then B still trips it. Failures on one account from many addresses ask for the picture code (an unknown name exactly the same), never lock it, and mail the owner once per window.",
+   "fr": "Des échecs répétés reçoivent un 429, et le compteur est partagé : échouer sur le nœud A puis sur le nœud B le déclenche quand même. Des échecs sur un compte depuis beaucoup d'adresses font demander le code en image (exactement pareil pour un nom inconnu), ne le verrouillent jamais, et préviennent le titulaire par e-mail une fois par fenêtre."
   },
   {
    "id": "AUTH-12",
@@ -360,8 +360,8 @@
     "CE",
     "EE"
    ],
-   "en": "E-mail verification mail received and honoured.",
-   "fr": "L'e-mail de vérification d'adresse est reçu et pris en compte."
+   "en": "E-mail verification mail received and honoured: a link on a name a placed certificate covers, reached over the gateway's own TLS, or on a name declared reached through a proxy that terminates TLS (in plain HTTP behind it, the link still https); a code, and no link, anywhere else - a foreign Host never lands in a mail, and a declared name triggers neither the redirect nor HSTS.",
+   "fr": "L'e-mail de vérification d'adresse est reçu et pris en compte : un lien vers un nom couvert par un certificat placé, atteint par le TLS de la gateway, ou vers un nom déclaré joint par un proxy qui termine le TLS (en HTTP derrière lui, le lien reste en https) ; un code, et aucun lien, partout ailleurs - un Host étranger n'arrive jamais dans un mail, et un nom déclaré ne déclenche ni la redirection ni HSTS."
   },
   {
    "id": "AUTH-23",
@@ -374,8 +374,8 @@
     "CE",
     "EE"
    ],
-   "en": "Security alerts sent for the events covered.",
-   "fr": "Les alertes de sécurité sont envoyées pour les événements couverts."
+   "en": "Security alerts sent for the events covered: password changed, address changing, too many failed sign-ins on the account (once per window, never for an unknown name).",
+   "fr": "Les alertes de sécurité sont envoyées pour les événements couverts : mot de passe changé, adresse qui change, trop d'échecs de connexion sur le compte (une fois par fenêtre, jamais pour un nom inconnu)."
   },
   {
    "id": "AUTH-24",
@@ -3060,6 +3060,20 @@
    ],
    "en": "No personal page cached (Cache-Control: no-store).",
    "fr": "Aucune page personnelle n'est mise en cache (Cache-Control: no-store)."
+  },
+  {
+   "id": "SEC-11",
+   "priority": "P1",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A caller reaching the gateway directly cannot choose its address: a rotating X-Forwarded-For from a public peer still ends in 429, the same header from the Ingress is believed, MEERKAT_TRUSTED_PROXIES=none ignores it, and a public peer's X-Forwarded-Proto does not skip the https redirect.",
+   "fr": "Un appelant qui joint la gateway directement ne choisit pas son adresse : un X-Forwarded-For qui change à chaque requête depuis un pair public finit quand même en 429, le même en-tête venant de l'Ingress est cru, MEERKAT_TRUSTED_PROXIES=none l'ignore, et le X-Forwarded-Proto d'un pair public ne fait pas sauter la redirection vers https."
   },
   {
    "id": "PERF-01",

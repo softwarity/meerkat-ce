@@ -68,16 +68,18 @@ its owner's next sign-in, the only moment the password is known in clear.
 
 ## Throttling, never a lockout
 
-Failed sign-ins are counted per **client address and account**, over a sliding
-window, in **Application > Security > Rate limiting**.
+Failed sign-ins are counted twice, over a sliding window, in **Application >
+Security > Rate limiting**: per **client address and account**, and per
+**account** whatever the address.
 
 | Field | What it counts | Ships as |
 |---|---|---|
-| Failed sign-ins | failures tolerated before the sign-in form answers `429` | `10` |
+| Failed sign-ins from one address | failures from one address on one account, before the sign-in form answers `429` | `10` |
+| Failed sign-ins on one account | failures on one account from any address, before its sign-in also asks for a picture code | `5` |
 | Wrong 2FA codes | wrong second-factor codes tolerated, same window | `5` |
 | Within | the window, as an ISO-8601 duration | `PT15M` |
 
-A successful sign-in clears the counter. The refusal happens **before** the
+A successful sign-in clears both counters. The refusal happens **before** the
 hash comparison, so a blocked attacker does not get to burn processor time
 either. Setting a count to zero turns that limiter off.
 
@@ -92,6 +94,49 @@ a blip must not become a lockout.
 
 **No account is ever locked.** Nothing an outsider does can take an account
 away from the person who owns it.
+
+### Many addresses, one account
+
+The counter per address stops one machine guessing. It cannot see a thousand
+machines guessing a little each - a botnet, a pool of rotating proxies - since
+each address stays under its own budget for ever. What they all share is the
+name they are trying, so the second counter counts that.
+
+Past **Failed sign-ins on one account**, the sign-in page for that name asks for
+the same picture code as the [registration form](#letting-people-create-their-own-account),
+with the name already filled in:
+
+- without the right code, no password is even checked, and the page says the code is missing rather than "wrong password" - someone who typed the right one must not be told it was wrong;
+- the code is spent whatever the answer, and every page carries a fresh one;
+- the right password **and** the right code sign in, and clear the counter.
+
+Three seconds for a person, the whole economy of a script - and the account
+stays open to its owner throughout. Zero turns this counter off.
+
+An **unknown name gets the same treatment**: the same counter, the same code, the
+same sentences. Doing otherwise would answer the one question the page refuses
+to answer everywhere else - does this account exist.
+
+**The owner is told.** When an account crosses the threshold and SMTP is
+configured, its owner gets one mail - how many failures in the window, from how
+many addresses, and to change the password if it was not them. One per window,
+however long the hammering lasts, and none for a name that does not exist, a
+disabled account or an address a self-registered account never confirmed. The
+mail leaves after the answer, never before it: a refusal that waited for the
+relay would take measurably longer on a real account than on an invented one.
+The relay screen can send a sample of it (**Failed sign-ins**).
+
+### Which address is counted
+
+The address is the **TCP peer** - the end of the connection the gateway
+accepted - unless that peer is a proxy the gateway trusts, in which case it is
+what that proxy wrote in `X-Forwarded-For`. A caller who reaches the gateway
+directly and writes the header themselves is ignored: otherwise inventing an
+address per request would walk through every counter on this page. Which
+proxies are trusted is deduced from their address by default, and set by
+`MEERKAT_TRUSTED_PROXIES` - see [Behind a proxy or a load balancer](/docs/deploy/one-gateway#behind-a-proxy-or-a-load-balancer).
+The security trail keeps both, "203.0.113.5 via 10.42.0.15", so it never shows
+only what a header claimed.
 
 An unknown username, a wrong password and a disabled account all answer the
 same sentence, and cost the same time - an unknown username still gets a hash
@@ -149,6 +194,36 @@ session somebody else got hold of is therefore no longer enough to point the
 account's recovery at their own mailbox. Without a relay nothing could carry a
 confirmation, and the address changes at once, as before.
 
+## A link, or a code
+
+Every one of these mails proves a mailbox: a sign-up's confirmation, a new
+address, a reset. A **link** is mailed only when the gateway can vouch for the
+name in it, in one of two ways:
+
+- the request reached **its own TLS door**, and a certificate placed on that
+  door (**Infra > Domains & TLS**, on Console or Application) covers the name
+  the browser asked for;
+- or the name is one the operator declared on that door as **reached through a
+  proxy that terminates TLS** - nginx, an ingress, a load balancer in front. The
+  request then arrives in plain HTTP, and the link is still `https://`.
+
+The link then points at that name, so a reset asked on `shop.example.com` comes
+back to `shop.example.com`. See
+[Behind a proxy that terminates TLS](/docs/operations/tls#behind-a-proxy-that-terminates-tls).
+
+Anywhere else - plain HTTP, a proxy in front whose names nobody declared, a name no
+placed certificate carries - the mail holds a **six-digit code** and no link,
+and the page that asked waits for it. The code is the e-mail sign-in's: valid
+ten minutes, and only in the browser that asked. A new address is confirmed by
+the code in the session that asked for the change.
+
+This is what keeps a stranger from using the mails against their recipient. The
+name in a request is whatever the caller wrote: a reset asked for someone else's
+address with `Host: attacker.example` used to mail that person a genuine link,
+with a genuine token, to the attacker's server. A code mailed to the victim is
+worthless to whoever asked: they never see it, and it opens nothing in another
+browser.
+
 ## A forgotten password
 
 `/forgot-password` exists as soon as a mail relay is configured and local
@@ -157,7 +232,7 @@ outcome page is the same whether the address is known or not. An account born at
 an authority (OIDC, LDAP, GitHub) has no local password and is sent no link: one
 would open a second door the authority knows nothing about.
 
-The link is valid for one hour and is spent on use. The new password is checked
+The link is valid for one hour and is spent on use (a code, ten minutes). The new password is checked
 against the policy, including the no-reuse rule, and the change **destroys
 every live session of that account** on every gateway - whoever held one,
 including an intruder, signs in again or is out. The owner is told by e-mail

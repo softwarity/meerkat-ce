@@ -1251,6 +1251,11 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 	// Snapshot the current settings for the audit before-image (best-effort).
 	before, _ := a.loadSettingsPayload(r.Context())
 	var p settingsPayload
+	// The account counter keeps what is stored when the body does not name
+	// it: a client written before the field existed - a script, an agent, an
+	// older console tab - would otherwise switch the protection off by
+	// saving a screen it never showed. Zero said out loud still disables it.
+	p.RateLimit.AccountAttempts = a.st.GetRateLimitPolicy(r.Context()).AccountAttempts
 	if err := decodeStrict(r, &p); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed settings: "+err.Error())
 		return
@@ -1361,8 +1366,10 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 	}
 	// Rate limiting (SEC-10): sane bounds; 0 attempts disables a limiter.
 	if p.RateLimit.LoginAttempts < 0 || p.RateLimit.LoginAttempts > 1000 ||
-		p.RateLimit.TotpAttempts < 0 || p.RateLimit.TotpAttempts > 100 {
-		writeErr(w, http.StatusUnprocessableEntity, "rate limit attempts out of range (login 0-1000, totp 0-100; 0 disables)")
+		p.RateLimit.TotpAttempts < 0 || p.RateLimit.TotpAttempts > 100 ||
+		p.RateLimit.AccountAttempts < 0 || p.RateLimit.AccountAttempts > 1000 {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"rate limit attempts out of range (login 0-1000, totp 0-100, account 0-1000; 0 disables)")
 		return
 	}
 	if p.RateLimit.LoginWindow == "" {

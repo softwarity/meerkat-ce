@@ -830,6 +830,11 @@
     "guard": "infraAdmin"
   },
   {
+    "method": "PUT",
+    "path": "/api/settings/tls/proxied/{plane}",
+    "guard": "infraAdmin"
+  },
+  {
     "method": "GET",
     "path": "/api/tenants",
     "guard": "authed"

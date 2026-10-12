@@ -42,7 +42,7 @@ HSTS n'est envoyé **que sur TLS**, quelle que soit la valeur de `hstsMaxAge`. U
 navigateur le retient pendant des mois et refuserait ensuite le HTTP simple :
 c'est ainsi qu'une gateway de développement devient injoignable. Il est envoyé
 avec `includeSubDomains`. Pour toutes les routes à la fois, HSTS suit **Force
-HTTPS**, sur l'écran TLS ; une valeur fixée ici l'emporte.
+HTTPS**, sur l'écran Domains & TLS ; une valeur fixée ici l'emporte.
 
 `X-XSS-Protection` et les deux autres en-têtes de l'époque d'Internet Explorer ne
 sont pas envoyés du tout : les navigateurs actuels les ignorent.

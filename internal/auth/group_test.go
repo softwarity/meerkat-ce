@@ -70,7 +70,8 @@ func groupSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store) {
 // deadline - and every page it was then sent to would redirect to the login.
 func sessionCookieOf(rec *httptest.ResponseRecorder) *http.Cookie {
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == session.CookieName {
+		// Either scheme's name: over TLS the cookie is __Host- prefixed.
+		if strings.TrimPrefix(c.Name, session.SecurePrefix) == session.CookieName {
 			return c
 		}
 	}

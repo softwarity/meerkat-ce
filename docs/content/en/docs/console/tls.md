@@ -1,21 +1,22 @@
 ---
-title: TLS
+title: Domains & TLS
 section: The console
 order: 158
-summary: A pool of certificates placed on the console and the application - generating, importing, and letting an authority issue them.
+summary: A pool of certificates placed on the console and the application - generating, importing, and letting an authority issue them - and the names a proxy in front serves.
 ---
 
-# TLS
+# Domains & TLS
 
-**Infra > TLS.** The certificates this gateway holds, and where each one is
-served. It sits in the Infra plane for the same reason the relay does: it is a
-property of the installation, not of the application it serves.
+**Infra > Domains & TLS.** The certificates this gateway holds, where each one
+is served, and the names a proxy in front of it serves over HTTPS. It sits in
+the Infra plane for the same reason the relay does: it is a property of the
+installation, not of the application it serves.
 
 There is no *switch HTTPS on*. **A certificate placed on a plane is what opens
 its door**, and taking it off is what closes it. A switch that can be on with
 nothing behind it is a switch that lies.
 
-![The TLS screen: the pool of certificates, the Console and Application drop zones with their links, Force HTTPS with its HSTS duration](img/console/tls.webp)
+![The Domains & TLS screen: the pool of certificates, the Console and Application drop zones with their links, Force HTTPS with its HSTS duration](img/console/tls.webp)
 
 Here the pool holds four lines: a certificate for `gateway.acme.example` served on
 the console, one for `apps.acme.example` and `docs.acme.example` served on the
@@ -149,6 +150,26 @@ sends HSTS, so browsers stop sending even the first request in clear - the one a
 redirect cannot protect. A day by default, up to two years. Never sent to
 localhost or an IP address; a route or a service that sets its own value keeps
 it. See [TLS](/docs/operations/tls).
+
+## Behind a proxy that terminates TLS
+
+In the Console and Application doors, **Also reached through a proxy that
+terminates TLS** holds the names a proxy in front of the gateway - nginx, an
+ingress, a load balancer - serves over HTTPS. Type a name and press Enter, a
+space or a comma; a list pasted in one go becomes one chip per name. The cross
+of a chip takes it away. Each change is saved at once, and a name refused says
+why: a scheme, a port, a path or an IP address has no place there, and a
+wildcard stands for one label (`*.example.com`).
+
+What it is for: behind such a proxy no request reaches the gateway's own TLS,
+so a password reset or an address confirmation would mail a code. Asked under a
+declared name, it mails a **link** back to that name instead, in `https://`.
+What it is not for: these names open no HTTPS door, choose no certificate, are
+never redirected by Force HTTPS and are never sent HSTS - the gateway has no
+certificate to keep those promises with. When the console itself is reached by
+one of its declared names, the warning about a certificate that does not carry
+its name stays quiet: the browser was shown the proxy's. See
+[Behind a proxy that terminates TLS](/docs/operations/tls#behind-a-proxy-that-terminates-tls).
 
 ## ACME authorities
 

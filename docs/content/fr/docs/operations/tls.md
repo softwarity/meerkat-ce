@@ -17,7 +17,7 @@ Il n'existe pas d'interrupteur "activer HTTPS" : **c'est le certificat placé su
 qui ouvre sa porte**, et c'est son retrait qui la ferme. Un interrupteur qui peut être
 activé sans rien derrière est un interrupteur qui ment.
 
-![L'écran TLS](img/console/tls.webp)
+![L'écran Domains & TLS](img/console/tls.webp)
 
 ## Les façons d'entrer
 
@@ -58,7 +58,7 @@ voit ces noms : ACME n'y est donc pas proposé.
 une correspondance de ports : un Service Kubernetes qui publie `9443` sur `19443`, un
 `-p` de Docker, un ingress Swarm. La gateway interroge son environnement d'exécution -
 son propre pod et les Services qui le sélectionnent, ou son conteneur via le socket
-Docker - et les liens de l'écran TLS portent le port réellement joignable de
+Docker - et les liens de l'écran Domains & TLS portent le port réellement joignable de
 l'extérieur. Quand l'environnement ne publie pas de porte HTTPS, l'écran le dit au lieu
 de proposer un lien qui ne mène nulle part. Le chart Helm publie par défaut les deux
 portes HTTPS (`service.appTlsPort`, `service.adminTlsPort`) et accorde le droit de
@@ -80,7 +80,7 @@ déjà pris ne doit pas laisser un exploitant sans HTTPS du tout.
 
 Un portable ou un labo n'a ni nom public ni autorité publique, et un certificat
 auto-signé fait protester tous les navigateurs. Le bouton **On a local machine** de
-l'écran TLS ouvre la marche à suivre, système par système (macOS, Linux, Windows). Les
+l'écran Domains & TLS ouvre la marche à suivre, système par système (macOS, Linux, Windows). Les
 noms que vous saisissez - à commencer par celui qui sert à joindre la console - figurent
 déjà dans les commandes :
 
@@ -167,12 +167,48 @@ définie par un service ou par le filtre
 > retirés, et ne propose plus de passer outre un certificat invalide. Commencez par un
 > jour ; allongez la durée une fois HTTPS bien en place.
 
+## Derrière un proxy qui termine le TLS
+
+Souvent, le HTTPS que voit un navigateur n'est pas celui de la gateway : nginx, un
+ingress controller ou un load balancer cloud détient le certificat et transmet du HTTP
+en clair à la gateway. Rien n'arrive alors sur la porte TLS de la gateway, et les mails
+qui prouvent une boîte - la confirmation d'une inscription, une nouvelle adresse, une
+réinitialisation - portent un code au lieu d'un lien, puisqu'un lien n'est envoyé que
+vers un nom dont la gateway peut se porter garante (voir
+[Un lien, ou un code](/docs/auth/local-accounts#un-lien-ou-un-code)).
+
+Sur les portes Console et Application, **Also reached through a proxy that terminates
+TLS** liste les noms dont l'opérateur se porte garant à sa place : des noms exacts
+(`shop.example.com`) ou un joker qui vaut pour une étiquette (`*.example.com` couvre
+`eu.example.com`, ni `example.com` ni `a.eu.example.com`). Un mail demandé sous l'un
+d'eux porte un lien qui y revient, toujours en `https://`, avec le port qu'avait la
+requête. Chaque porte a sa liste : un nom déclaré sur l'application ne dit rien de la
+console.
+
+| Un nom déclaré permet | Il ne fait pas |
+|---|---|
+| qu'un lien envoyé par mail pointe vers lui, bien que la requête soit arrivée en HTTP | ouvrir une porte HTTPS, choisir un certificat, solliciter une autorité, déclencher Force HTTPS, envoyer HSTS |
+
+La gateway ne détient aucun certificat pour ces noms, donc elle ne fait sur eux aucune
+promesse HTTPS : la redirection et HSTS ne suivent toujours que les noms que porte un
+certificat placé. Un nom est un nom d'hôte seulement - ni schéma, ni port, ni chemin -
+et jamais une adresse IP, dont personne ne peut se porter garant par un nom. Un joker
+sur un domaine de premier niveau (`*.com`) est refusé. Les noms voyagent avec un export
+de configuration, avec le reste des réglages TLS, et un changement atteint chaque nœud
+par le bus de changement (`PUT /api/settings/tls/proxied/{console|app}`, audité sous
+`tls.proxied`).
+
+> [!WARNING]
+> Ne déclarez que des noms qui atteignent vraiment cette gateway par ce proxy. Un lien
+> part vers le nom que portait la requête, dès qu'il correspond : la déclaration est ce
+> qui se tient entre un `Host` forgé et le mail.
+
 ## ACME n'est pas Let's Encrypt
 
 ACME fait partie de l'édition **Enterprise**. Une configuration importée sur l'image
 Community laisse de côté ses autorités et ses commandes, et son plan d'import les cite.
 Une gateway passée de l'image Enterprise à l'image Community conserve ce que contient
-sa base de données, mais ne sollicite plus aucune autorité, et l'écran TLS le signale :
+sa base de données, mais ne sollicite plus aucune autorité, et l'écran Domains & TLS le signale :
 ces certificats ne seront pas renouvelés.
 
 Une installation déclare autant d'**autorités** qu'elle en utilise - Let's Encrypt pour
@@ -316,7 +352,7 @@ Les certificats ci-dessus sont ce que la gateway **présente**. Quand c'est la
 gateway qui appelle - une route dont la cible est `https://...` -, elle
 **vérifie** le certificat que présente l'upstream, et il lui faut pour cela
 l'autre moitié : les autorités en qui elle a confiance. Elles ont leur propre
-dépôt, **Trusted authorities** sur l'écran TLS, à part de la réserve : des
+dépôt, **Trusted authorities** sur l'écran Domains & TLS, à part de la réserve : des
 certificats publics uniquement, jamais une clé.
 
 Par défaut, la gateway fait confiance aux autorités publiques que porte son

@@ -49,6 +49,9 @@ func (a *API) registerCertificates(mux Mux) {
 	mux.Handle("DELETE /api/certificates/{id}", a.infraAdmin(a.deleteCertificate))
 	mux.Handle("GET /api/settings/tls", a.infraAdmin(a.getTLS))
 	mux.Handle("PUT /api/settings/tls", a.infraAdmin(a.putTLS))
+	// The names a door is also reached by through a proxy that terminates
+	// TLS in front of it: what a mailed link may point at (AUTH-22).
+	mux.Handle("PUT /api/settings/tls/proxied/{plane}", a.infraAdmin(a.putProxied))
 }
 
 // certView is one entry as the console sees it. The embedded row already drops
@@ -838,11 +841,22 @@ type tlsPayload struct {
 	// port to outside one: the links are written with what the world reaches
 	// (19443), not with what the container listens on (9443).
 	Published discovery.Published `json:"published"`
+	// Proxied is, per door, the names declared reached through a proxy that
+	// terminates TLS in front of it (certs.Settings.ProxiedApp).
+	Proxied proxiedView `json:"proxied"`
+}
+
+// proxiedView is the names of the two doors a browser reaches. Never null,
+// so the screen reads a list either way.
+type proxiedView struct {
+	Console []string `json:"console"`
+	App     []string `json:"app"`
 }
 
 func (a *API) tlsView(ctx context.Context) tlsPayload {
 	cfg := a.st.RawTLS(ctx)
 	v := tlsPayload{Redirect: cfg.Redirect, HSTSMaxAge: cfg.HSTSMaxAge}
+	v.Proxied = proxiedView{Console: orEmpty(cfg.ProxiedConsole), App: orEmpty(cfg.ProxiedApp)}
 	if a.TLS != nil {
 		v.State = a.TLS.State()
 	}
@@ -879,6 +893,113 @@ func (a *API) putTLS(w http.ResponseWriter, r *http.Request, actor store.User) {
 	after := a.tlsView(r.Context())
 	a.auditUpdate(r.Context(), actor, "tls.update", "settings", "", "", "", before, after)
 	writeJSON(w, http.StatusOK, after)
+}
+
+// The names a door is also reached by through a proxy that terminates TLS in
+// front of it (AUTH-22): nginx, an ingress, a cloud balancer. Behind one, no
+// request ever arrives on the gateway's own TLS, so without them every mail
+// that proves a mailbox carries a code. Declaring a name is the operator
+// vouching for it - it is ours, served over HTTPS by somebody - and the one
+// thing it changes is that a mailed link may point at it. Not the redirect,
+// not HSTS, not a listener, not an authority: nothing here has a certificate
+// for it (certs.Settings.ProxiedApp).
+//
+// One door per call, the list replaced: each door's section on the screen
+// saves its own, and two people editing two doors do not overwrite each
+// other. The internal plane has no such names - its callers are programs in
+// the cluster, and nobody follows a mailed link there.
+func (a *API) putProxied(w http.ResponseWriter, r *http.Request, actor store.User) {
+	plane := r.PathValue("plane")
+	if plane != store.PlaneConsole && plane != store.PlaneApp {
+		writeErr(w, http.StatusNotFound, fmt.Sprintf(
+			"door %q: expected %s or %s - the internal plane is called by services, never through a browser's proxy",
+			plane, store.PlaneConsole, store.PlaneApp))
+		return
+	}
+	var p struct {
+		Names []string `json:"names"`
+	}
+	if err := decodeStrict(r, &p); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed proxied names: "+err.Error())
+		return
+	}
+	names, err := proxiedNames(p.Names)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	cfg := a.st.RawTLS(r.Context())
+	before := orEmpty(cfg.ProxiedOn(plane))
+	if plane == store.PlaneConsole {
+		cfg.ProxiedConsole = names
+	} else {
+		cfg.ProxiedApp = names
+	}
+	if err := a.st.SetSetting(r.Context(), store.SettingTLS, cfg); err != nil {
+		a.internal(w, err)
+		return
+	}
+	// Through the supervisor, which every node reloads on the change bus:
+	// the sign-in pages read the names it last loaded.
+	a.applyTLS(r.Context())
+	type audited struct {
+		Proxied []string `json:"proxied"`
+	}
+	a.auditUpdate(r.Context(), actor, "tls.proxied", "settings", plane, planeWord(plane), "",
+		audited{before}, audited{orEmpty(names)})
+	writeJSON(w, http.StatusOK, a.tlsView(r.Context()))
+}
+
+// maxProxied bounds one door's list: a handful in practice, and a list of
+// thousands is a script gone wrong rather than an installation.
+const maxProxied = 100
+
+// proxiedNames checks the names one door is declared reached by through a
+// proxy, and returns them lowercased, without a trailing dot, each once.
+// Host names only, an optional leading *. standing for one label: no scheme,
+// no port, no path - the link's scheme is always https and its port the one
+// the request carried - and no IP address, which nobody can vouch for by
+// name. A wildcard over a single label (*.com) is refused: it would vouch
+// for every name under a top-level domain, an attacker's included.
+func proxiedNames(raw []string) ([]string, error) {
+	out := []string{}
+	for _, r := range raw {
+		n := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(r), "."))
+		if n == "" || slices.Contains(out, n) {
+			continue
+		}
+		switch {
+		case strings.Contains(n, "://"):
+			return nil, fmt.Errorf("%q: a host name only, without its scheme - the link is always https", r)
+		case strings.ContainsAny(n, "/?#"):
+			return nil, fmt.Errorf("%q: a host name only, without a path", r)
+		case net.ParseIP(strings.Trim(n, "[]")) != nil:
+			return nil, fmt.Errorf("%q is an IP address: only a name can be vouched for", r)
+		case strings.Contains(n, ":"):
+			if h, _, err := net.SplitHostPort(n); err == nil && net.ParseIP(strings.Trim(h, "[]")) != nil {
+				return nil, fmt.Errorf("%q is an IP address: only a name can be vouched for", r)
+			}
+			return nil, fmt.Errorf("%q: a host name only, without a port - the link keeps the port the request carried", r)
+		case !validHostname(n):
+			return nil, fmt.Errorf("%q is not a host name: letters, digits and hyphens between dots, "+
+				"and a leading *. for a wildcard", r)
+		case strings.HasPrefix(n, "*.") && !strings.Contains(strings.TrimPrefix(n, "*."), "."):
+			return nil, fmt.Errorf("%q: a wildcard needs a domain under it, not a top-level one", r)
+		}
+		out = append(out, n)
+	}
+	if len(out) > maxProxied {
+		return nil, fmt.Errorf("%d names: a door takes at most %d", len(out), maxProxied)
+	}
+	return out, nil
+}
+
+// orEmpty is a list that encodes as [] rather than null.
+func orEmpty(in []string) []string {
+	if in == nil {
+		return []string{}
+	}
+	return in
 }
 
 // applyTLS re-reads everything and makes the running gateway match. A failure

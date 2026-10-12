@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -47,6 +49,20 @@ func (f *fakeMailbox) forRecipient(to string) []mail.Message {
 // recording mailbox.
 func registerSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store, *fakeMailbox) {
 	t.Helper()
+	return registerSetupOn(t, false)
+}
+
+// registerSetupTLS is registerSetup reached the way a mailed LINK is allowed:
+// every request arrives on the gateway's own TLS door, for example.com, which a
+// placed certificate covers (mailcode.go). Plain registerSetup is plain HTTP,
+// where the same mails carry a code.
+func registerSetupTLS(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store, *fakeMailbox) {
+	t.Helper()
+	return registerSetupOn(t, true)
+}
+
+func registerSetupOn(t *testing.T, overTLS bool) (*http.ServeMux, *session.Manager, *store.Store, *fakeMailbox) {
+	t.Helper()
 	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
@@ -76,14 +92,28 @@ func registerSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store
 	h := New(st, sm)
 	box := &fakeMailbox{}
 	h.Mailer = box.send
+	h.Covers = func(host string) bool { return host == "example.com" }
+	// Two names declared reached through a proxy that terminates TLS in
+	// front, matched by the rule a certificate's names follow.
+	h.Proxied = func(host string) bool {
+		return certs.Covers([]string{"shop.example.org", "*.apps.example.org"}, host)
+	}
 	h.Register(mux)
-	return mux, sm, st, box
+	if !overTLS {
+		return mux, sm, st, box
+	}
+	front := http.NewServeMux()
+	front.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.TLS = &tls.ConnectionState{ServerName: "example.com"}
+		mux.ServeHTTP(w, r)
+	}))
+	return front, sm, st, box
 }
 
 var confirmLink = regexp.MustCompile(`/confirm\?token=[A-Za-z0-9_-]+`)
 
 func TestSelfRegistrationFullFlow(t *testing.T) {
-	mux, _, st, box := registerSetup(t)
+	mux, _, st, box := registerSetupTLS(t)
 
 	// The register page is served while the policy is on.
 	if rec := do(t, mux, "GET", "/register", nil, nil); rec.Code != http.StatusOK {
@@ -141,7 +171,7 @@ func TestSelfRegistrationFullFlow(t *testing.T) {
 	// whichever came last.
 	var sessionCookie *http.Cookie
 	for _, c := range login.Result().Cookies() {
-		if c.Name == session.CookieName {
+		if strings.TrimPrefix(c.Name, session.SecurePrefix) == session.CookieName {
 			sessionCookie = c
 		}
 	}

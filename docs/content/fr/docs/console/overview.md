@@ -96,7 +96,7 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
 - **[Endpoint audit](/docs/operations/audit#auditer-les-oprations-dune-route)** - les opérations consignées dans le journal d'audit.
 - **[Authentication](/docs/console/authentication)** - les autorités auprès desquelles on peut se connecter.
 - **[Mail relay](/docs/console/mail-relay)** - le serveur SMTP et le récapitulatif quotidien.
-- **[TLS](/docs/console/tls)** - un nom, un certificat, et ACME.
+- **[Domains & TLS](/docs/console/tls)** - les certificats, ACME, et les noms que sert un proxy placé devant.
 - **[OpenTelemetry](/docs/operations/tracing)** - les traces, les métriques, l'audit et les journaux envoyés à votre collecteur.
 - **[Plug](/docs/operations/plug)** - le tunnel développeur.
 - **[Access tokens, MCP et API](/docs/console/access-and-agents)** - piloter Meerkat sans navigateur.

@@ -115,6 +115,10 @@ spec:
             - name: MEERKAT_PRODUCTION
               value: "1"
             {{- end }}
+            {{- with .Values.trustedProxies }}
+            - name: MEERKAT_TRUSTED_PROXIES
+              value: {{ join "," . | quote }}
+            {{- end }}
             {{- if .Values.plug.enabled }}
             - name: MEERKAT_PLUG_ADDR
               value: ":{{ .Values.plug.port }}"

@@ -116,6 +116,10 @@ type AuditEvent struct {
 	// of an account's own security (a sign-in, a refusal, a new factor). A
 	// refused sign-in with no address is a line nobody can act on.
 	IP string `json:"ip,omitempty"`
+	// Peer is the TCP peer when it is not IP: the proxy whose X-Forwarded-For
+	// named that address. Kept beside it so the trail says on whose word the
+	// address was believed, and never only what a header claimed.
+	Peer string `json:"peer,omitempty"`
 	// Data is what an audited call carries (AUD-04): see EndpointCall.
 	Data *EndpointCall `json:"data,omitempty"`
 }
@@ -362,9 +366,9 @@ func (s *Store) AddAuditEvent(ctx context.Context, ev AuditEvent) error {
 		changes = string(b)
 	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO audit_events (id, at, actor_id, actor_token, action, target, target_id, target_name, tenant_id, changes, detail, ip)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		ev.ID, ev.At, ev.ActorID, ev.ActorToken, ev.Action, ev.Target, ev.TargetID, ev.TargetName, ev.TenantID, changes, ev.Detail, ev.IP)
+		`INSERT INTO audit_events (id, at, actor_id, actor_token, action, target, target_id, target_name, tenant_id, changes, detail, ip, peer)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		ev.ID, ev.At, ev.ActorID, ev.ActorToken, ev.Action, ev.Target, ev.TargetID, ev.TargetName, ev.TenantID, changes, ev.Detail, ev.IP, ev.Peer)
 	if err != nil {
 		return fmt.Errorf("store: add audit event %q: %w", ev.Action, err)
 	}
@@ -393,6 +397,10 @@ func (s *Store) auditRecord(ctx context.Context, ev AuditEvent, changes string, 
 		tracing.String("meerkat.token", ev.ActorToken),
 		tracing.String("meerkat.tenant.id", ev.TenantID),
 		tracing.String("client.address", ev.IP),
+	}
+	if ev.Peer != "" {
+		// OpenTelemetry's name for the other end of the connection.
+		attrs = append(attrs, tracing.String("network.peer.address", ev.Peer))
 	}
 	if changes != "[]" {
 		attrs = append(attrs, tracing.String("audit.changes", changes))
@@ -499,7 +507,7 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 		limit = 200
 	}
 	q := `SELECT e.id, e.at, e.actor_id, COALESCE(u.username, ''), e.actor_token, e.action, e.target,
-	             e.target_id, e.target_name, e.tenant_id, COALESCE(t.name, ''), e.changes, e.detail, e.ip, e.data
+	             e.target_id, e.target_name, e.tenant_id, COALESCE(t.name, ''), e.changes, e.detail, e.ip, e.peer, e.data
 	      FROM audit_events e
 	      LEFT JOIN users u ON u.id = e.actor_id
 	      LEFT JOIN tenants t ON t.id = e.tenant_id`
@@ -523,7 +531,7 @@ func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]AuditEven
 		var ev AuditEvent
 		var changes, data string
 		if err := rows.Scan(&ev.ID, &ev.At, &ev.ActorID, &ev.ActorName, &ev.ActorToken, &ev.Action, &ev.Target,
-			&ev.TargetID, &ev.TargetName, &ev.TenantID, &ev.TenantName, &changes, &ev.Detail, &ev.IP, &data); err != nil {
+			&ev.TargetID, &ev.TargetName, &ev.TenantID, &ev.TenantName, &changes, &ev.Detail, &ev.IP, &ev.Peer, &data); err != nil {
 			return nil, fmt.Errorf("store: scan audit event: %w", err)
 		}
 		if data != "" {

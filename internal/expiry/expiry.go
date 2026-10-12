@@ -277,7 +277,7 @@ func (d *Digest) message(ctx context.Context, cfg store.ExpiryDigest, n notice) 
 		Heading:   "Daily digest",
 		Groups:    groups,
 		Outro: []string{
-			"An expired certificate is refused by every browser: renew or replace it under Infra, TLS. " +
+			"An expired certificate is refused by every browser: renew or replace it under Infra, Domains & TLS. " +
 				"An account outside its window is refused at the next sign-in, with the date - nobody " +
 				"is signed out mid-work. A vault entry's date is a REMINDER only: it never stops a " +
 				"reference from resolving, since the gateway cannot know the secret was rotated at its " +

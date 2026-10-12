@@ -138,8 +138,9 @@ func (s *Store) GetRegistrationPolicy(ctx context.Context) RegistrationPolicy {
 // closing that door is disabling it - see ProviderLocal and LocalSignInEnabled.
 
 // RateLimitPolicy throttles the unauthenticated credential endpoints
-// (SEC-10): failed sign-ins per IP+account, wrong TOTP codes per account.
-// Zero attempts disables a limiter (debug); missing fields take the defaults.
+// (SEC-10, AUTH-11): failed sign-ins per IP+account and per account, wrong
+// TOTP codes per account. Zero attempts disables a limiter (debug); missing
+// fields take the defaults.
 type RateLimitPolicy struct {
 	// LoginAttempts: FAILED sign-ins tolerated per IP+username within
 	// LoginWindow before /login answers 429. A success clears the counter.
@@ -154,16 +155,37 @@ type RateLimitPolicy struct {
 	// round. 0 is not "off" - a form that mails a link always has a limit - and
 	// reads as the default.
 	ResetAttempts int `json:"resetAttempts,omitempty"`
+	// AccountAttempts: FAILED sign-ins tolerated on one ACCOUNT, from any
+	// address, within LoginWindow - past it the sign-in page asks for the
+	// picture code as well, and the account's owner is told by mail. Never a
+	// lockout: the right password and the right code still come in.
+	//
+	// The per-address counter above cannot see an attacker who spreads
+	// guesses over many addresses (a botnet, a rotating proxy pool): each
+	// address stays under its own budget forever. This one counts what they
+	// all have in common, the name they are trying.
+	//
+	// Not omitempty, and 0 really is "off": a policy saved before the field
+	// existed has no key at all, and GetRateLimitPolicy gives it the default.
+	AccountAttempts int `json:"accountAttempts"`
 }
 
 // DefaultResetAttempts is the reset requests allowed per address and window
 // when nobody chose.
 const DefaultResetAttempts = 5
 
+// DefaultAccountAttempts is the failures one account takes, from anywhere,
+// before its sign-in asks for the picture code.
+const DefaultAccountAttempts = 5
+
 // GetRateLimitPolicy reads the policy, filling defaults for missing pieces.
 func (s *Store) GetRateLimitPolicy(ctx context.Context) RateLimitPolicy {
-	p := RateLimitPolicy{LoginAttempts: 10, LoginWindow: "PT15M", TotpAttempts: 5, ResetAttempts: DefaultResetAttempts}
-	var stored RateLimitPolicy
+	p := RateLimitPolicy{LoginAttempts: 10, LoginWindow: "PT15M", TotpAttempts: 5,
+		ResetAttempts: DefaultResetAttempts, AccountAttempts: DefaultAccountAttempts}
+	// Decoded OVER the default for the account counter: a policy stored
+	// before it existed carries no key for it, and must get the protection
+	// rather than a zero that reads as "off".
+	stored := RateLimitPolicy{AccountAttempts: DefaultAccountAttempts}
 	if err := s.GetSetting(ctx, SettingRateLimit, &stored); err == nil {
 		p = stored
 		if p.LoginWindow == "" {

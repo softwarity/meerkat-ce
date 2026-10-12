@@ -612,7 +612,10 @@ CREATE TABLE IF NOT EXISTS login_events (
   ip           TEXT NOT NULL DEFAULT '',
   country      TEXT NOT NULL DEFAULT '',
   browser_hash TEXT NOT NULL DEFAULT '',
-  at           BIGINT NOT NULL
+  at           BIGINT NOT NULL,
+  -- The TCP peer, when it is not the address above (v82, SEC-10): the proxy
+  -- whose X-Forwarded-For named the client. Empty when the client was the peer.
+  peer         TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS login_events_user ON login_events(user_id, at);
 
@@ -763,6 +766,10 @@ CREATE TABLE IF NOT EXISTS audit_events (
   -- The address the gateway resolved, on an account's security events
   -- (v66, AUD-01): a sign-in, a refusal, a factor added. Empty on a change.
   ip          TEXT NOT NULL DEFAULT '',
+  -- The TCP peer when it is not ip (v82, SEC-10): the proxy on whose word the
+  -- address above was believed. A trail that showed only what a header said
+  -- would be a trail the caller wrote.
+  peer        TEXT NOT NULL DEFAULT '',
   -- What an audited call of the data plane carries (v74, AUD-04): the route,
   -- the operation, the status, the fields the operation names, its body. JSON,
   -- empty on every other event.
@@ -1142,7 +1149,9 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // 81 carries no step. A build of 2026-10-09 that never shipped stamped the
 // databases it ran on with it (a switch that kept the JWKS on the application
 // port, removed the same day); the number stays so those databases still open.
-const schemaVersion = 81
+// 82 carries no step either: the peer columns of login_events and
+// audit_events are additive, filled in by the additive pass.
+const schemaVersion = 82
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

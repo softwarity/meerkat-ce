@@ -4,6 +4,28 @@ import { join } from 'node:path';
 import { ADMIN_URL, DATA_URL, INTERNAL_URL } from '../playwright.config';
 import { authDataFile, authFile, seeded } from '../lib/fixtures';
 
+// The mails the SMTP sink stored for an address, oldest first (the sink names
+// each file after the time it arrived).
+const mailsTo = (rcpt: string): string[] => {
+  const dir = join(__dirname, '..', '.tmp', 'mail');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10) || a.localeCompare(b))
+    .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')) as { to: string[]; data: string })
+    .filter((m) => m.to.some((t) => t.includes(rcpt)))
+    .map((m) => m.data);
+};
+
+// The six-digit code of the latest mail to an address. The platform is plain
+// HTTP, so a confirmation or a reset mails a code, never a link: a link only
+// points at a name a certificate placed on the gateway's own TLS door covers.
+const latestCode = (rcpt: string): string => {
+  const all = mailsTo(rcpt);
+  const code = all[all.length - 1]?.match(/^\s{4}(\d{6})\s*$/m)?.[1];
+  expect(code, 'a code in the latest mail to ' + rcpt).toBeTruthy();
+  return code!;
+};
+
 // The captcha left the global settings on 2026-08-14: it guards a public FORM,
 // so it belongs to the authority that serves one - the local accounts. Opening
 // self-registration is still a global switch; whether a robot has to copy
@@ -63,14 +85,20 @@ test('flow-profile-history: a fresh sign-in shows with its method', async ({ bro
 
 test('flow-rate-limit: repeated failed sign-ins answer 429', async () => {
   const anon = await request.newContext({ baseURL: DATA_URL });
-  // Default policy: 10 failed attempts per IP+account per 15 minutes. A
-  // throwaway username keeps the other suites' accounts unaffected.
+  // Default policy: 10 failed attempts per IP+account per 15 minutes, and 5 on
+  // one account from anywhere. A throwaway username keeps the other suites'
+  // accounts unaffected.
   for (let i = 0; i < 10; i++) {
     const res = await anon.post('/login', {
       form: { username: 'brute-ghost', password: 'nope-' + i },
       maxRedirects: 0,
     });
     expect(res.status(), `attempt ${i + 1}`).toBe(401);
+    // Past the account's five, the page asks for the picture code - and an
+    // unknown name is asked exactly like a real one. Never a lockout: the
+    // answer is still the form, not a refusal to serve it.
+    const body = await res.text();
+    expect(body.includes('name="captcha_id"'), `captcha after attempt ${i + 1}`).toBe(i >= 4);
   }
   const blocked = await anon.post('/login', {
     form: { username: 'brute-ghost', password: 'nope-final' },
@@ -177,21 +205,23 @@ test('flow-self-register: end to end through the mailed confirmation', async ({ 
   await page.fill('input[name=confirm]', 'brand-new-pass-1');
   await page.click('button[type=submit]');
   await expect(page.locator('p.lead').first()).toContainText(/inbox|boîte/i);
+  await expect(page.locator('input[name=code]')).toBeVisible();
 
-  // The confirmation mail lands in the sink; before opening it, the correct
-  // password still cannot sign in.
-  await expect.poll(() => findMail('newcomer@e2e.test', '/confirm?token='), { timeout: 10_000 }).toBeTruthy();
-  const anon = await request.newContext({ baseURL: DATA_URL });
-  const early = await anon.post('/login', {
-    form: { username: 'newcomer', password: 'brand-new-pass-1' },
-    maxRedirects: 0,
-  });
-  expect(early.status()).toBe(200); // "check your inbox", no 303, no session
-  await anon.dispose();
+  // The confirmation mail lands in the sink, a code and no link; before it is
+  // typed, the correct password still cannot sign in - it lands on the same
+  // page, and a fresh code is mailed for this browser.
+  await expect.poll(() => mailsTo('newcomer@e2e.test').length, { timeout: 10_000 }).toBe(1);
+  expect(mailsTo('newcomer@e2e.test')[0]).not.toContain('token=');
+  await page.goto(DATA_URL + '/login');
+  await page.fill('input[name=username]', 'newcomer');
+  await page.fill('input[name=password]', 'brand-new-pass-1');
+  await page.click('button[type=submit]');
+  await expect(page).not.toHaveURL(/account-pending/);
+  await expect(page.locator('input[name=code]')).toBeVisible();
+  await expect.poll(() => mailsTo('newcomer@e2e.test').length, { timeout: 10_000 }).toBe(2);
 
-  const raw = findMail('newcomer@e2e.test', '/confirm?token=')!;
-  const link = raw.match(/http:\/\/[^\s"<]+\/confirm\?token=[A-Za-z0-9_-]+/)![0];
-  await page.goto(link);
+  await page.fill('input[name=code]', latestCode('newcomer@e2e.test'));
+  await page.click('button[type=submit]');
   await expect(page.locator('p.lead').first()).toContainText(/confirmed|confirmé/i);
 
   // Admins got their notification.
@@ -209,30 +239,20 @@ test('flow-self-register: end to end through the mailed confirmation', async ({ 
 
 // flow-forgot-password: the reset loop through the SMTP sink, on the account
 // the self-registration test just created (runs after it, same serial file).
-test('flow-forgot-password: mailed link resets the password', async ({ page, browser }) => {
-  const mailDir = join(__dirname, '..', '.tmp', 'mail');
-  const findMail = (rcpt: string, needle: string): string | null => {
-    if (!existsSync(mailDir)) return null;
-    for (const f of readdirSync(mailDir)) {
-      const m = JSON.parse(readFileSync(join(mailDir, f), 'utf8')) as { to: string[]; data: string };
-      if (m.to.some((t) => t.includes(rcpt)) && m.data.includes(needle)) return m.data;
-    }
-    return null;
-  };
-
-  await page.goto(DATA_URL + '/login');
-  await page.click('a[href="/forgot-password"]');
-  await page.fill('input[name=email]', 'newcomer@e2e.test');
-  await page.click('button[type=submit]');
-  await expect(page.locator('p.lead').first()).toContainText(/inbox|boîte/i);
-
-  await expect.poll(() => findMail('newcomer@e2e.test', '/reset-password?token='), { timeout: 10_000 }).toBeTruthy();
-  const raw = findMail('newcomer@e2e.test', '/reset-password?token=')!;
-  const link = raw.match(/http:\/\/[^\s"<]+\/reset-password\?token=[A-Za-z0-9_-]+/)![0];
-
+test('flow-forgot-password: a mailed code resets the password', async ({ browser }) => {
+  // A browser of its own: the code is bound to the one that asked.
   const context = await browser.newContext();
   const fresh = await context.newPage();
-  await fresh.goto(link);
+  const before = mailsTo('newcomer@e2e.test').length;
+  await fresh.goto(DATA_URL + '/login');
+  await fresh.click('a[href="/forgot-password"]');
+  await fresh.fill('input[name=email]', 'newcomer@e2e.test');
+  await fresh.click('button[type=submit]');
+  await expect(fresh.locator('p.lead').first()).toContainText(/inbox|boîte/i);
+
+  await expect.poll(() => mailsTo('newcomer@e2e.test').length, { timeout: 10_000 }).toBe(before + 1);
+  await fresh.fill('input[name=code]', latestCode('newcomer@e2e.test'));
+  await fresh.click('button[type=submit]');
   await fresh.fill('input[name=password]', 'reset-ted-pass-1');
   await fresh.fill('input[name=confirm]', 'reset-ted-pass-1');
   await fresh.click('button[type=submit]');

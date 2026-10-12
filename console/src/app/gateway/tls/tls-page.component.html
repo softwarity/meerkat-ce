@@ -109,7 +109,7 @@
 <mat-drawer-content>
 
 <div class="banner">
-  <h1 i18n="@@TLS">TLS</h1>
+  <h1 i18n="@@Domains_and_TLS">Domains &amp; TLS</h1>
   <button matButton="tonal" (click)="openDrawer('local')">
     <mat-icon>laptop</mat-icon>
     <ng-container i18n="@@Tls_local_button">On a local machine</ng-container>
@@ -437,6 +437,13 @@
                 </a>
               }
             </span>
+          }
+          @if (plane !== 'internal') {
+            <!-- The names a proxy in front serves over HTTPS (AUTH-22): what
+                 a mailed link may point at, and nothing else - no door, no
+                 redirect, no HSTS. Not on the internal plane: nobody follows
+                 a mailed link there. -->
+            <app-proxied-names [plane]="plane" [names]="proxiedOn(plane)" (saved)="apply($event)" />
           }
           @if (plane === 'app') {
             <!-- Always drawn, greyed until it can act: a setting that appears

@@ -470,6 +470,102 @@ func TestHSTSIsKeptAndBounded(t *testing.T) {
 	}
 }
 
+// The names a door is reached by through a proxy that terminates TLS
+// (AUTH-22): stored per door, cleaned, refused when they are not a name the
+// operator can vouch for, audited with what changed, and loaded by the
+// supervisor for the sign-in pages to ask - without touching the redirect.
+func TestProxiedNamesAreDeclaredPerDoor(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	f.api.TLS = certs.NewSupervisor(f.api.st, isNoRows,
+		certs.NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
+		certs.NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil),
+		certs.NewRedirect(),
+	)
+	t.Cleanup(func() { _ = f.api.TLS.Stop(ctx) })
+
+	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":["shop.example.org"]}`, f.plainC); code != http.StatusForbidden {
+		t.Fatalf("a plain account: %d %s", code, out)
+	}
+	for _, bad := range []struct{ name, says string }{
+		{"https://shop.example.org", "scheme"},
+		{"shop.example.org:443", "port"},
+		{"10.0.0.7", "IP address"},
+		{"[::1]", "IP address"},
+		{"10.0.0.7:8443", "IP address"},
+		{"shop.example.org/reset", "path"},
+		{"shop_example.org", "not a host name"},
+		{"*.com", "top-level"},
+		{"a.*.example.org", "not a host name"},
+	} {
+		code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":["`+bad.name+`"]}`, f.rootC)
+		if code != http.StatusUnprocessableEntity || !strings.Contains(out, bad.says) {
+			t.Errorf("%s: %d %s, want 422 naming the %s", bad.name, code, out, bad.says)
+		}
+	}
+	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/internal", `{"names":["meerkat.example.org"]}`, f.rootC); code != http.StatusNotFound || !strings.Contains(out, "console or app") {
+		t.Fatalf("the internal plane has none: %d %s", code, out)
+	}
+
+	code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app",
+		`{"names":["Shop.Example.org.", "shop.example.org", " *.apps.example.org ", ""]}`, f.rootC)
+	if code != http.StatusOK {
+		t.Fatalf("save: %d %s", code, out)
+	}
+	var view tlsPayload
+	if err := json.Unmarshal([]byte(out), &view); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(view.Proxied.App, " ") != "shop.example.org *.apps.example.org" || len(view.Proxied.Console) != 0 {
+		t.Fatalf("lowercased, without the dot, once each, on the application only: %+v", view.Proxied)
+	}
+	if got := f.api.st.RawTLS(ctx).ProxiedApp; len(got) != 2 {
+		t.Fatalf("stored with the TLS settings: %v", got)
+	}
+	if !f.api.TLS.Proxied(certs.PlaneApp)("eu.apps.example.org") || f.api.TLS.Proxied(certs.PlaneConsole)("shop.example.org") {
+		t.Fatal("saving is applying: the supervisor answers for the application's names, and only there")
+	}
+
+	// The trail says which door and what the list became.
+	events, err := f.api.st.ListAuditEvents(ctx, store.AuditFilter{Target: "settings"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, e := range events {
+		if e.Action == "tls.proxied" && e.TargetID == store.PlaneApp {
+			for _, c := range e.Changes {
+				if c.Field == "proxied" && strings.Contains(jsonOf(t, c.To), "shop.example.org") && strings.TrimSpace(jsonOf(t, c.From)) == "[]" {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no tls.proxied event with the list before and after: %+v", events)
+	}
+
+	// The other settings keep the names, and the names leave the redirect
+	// alone: nothing is placed, so nothing is redirected.
+	if code, out := f.call(t, "PUT", "/api/settings/tls", `{"redirect":true}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("redirect: %d %s", code, out)
+	}
+	if len(f.api.st.RawTLS(ctx).ProxiedApp) != 2 {
+		t.Fatal("saving the redirect dropped the proxied names")
+	}
+	if f.api.TLS.State().Redirecting || f.api.TLS.State().App {
+		t.Fatalf("a proxied name opened a door or a redirect: %+v", f.api.TLS.State())
+	}
+
+	// An empty list takes them all away.
+	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":[]}`, f.rootC); code != http.StatusOK || !strings.Contains(out, `"app":[]`) {
+		t.Fatalf("clear: %d %s", code, out)
+	}
+	if f.api.TLS.Proxied(certs.PlaneApp)("shop.example.org") {
+		t.Fatal("a name taken away is still vouched for")
+	}
+}
+
 // TestAnOrderToTheAuthorityLivesInThePool: asked like a certificate is made,
 // placed like one, in conflict like one, deleted like one. An authority
 // still asked cannot be deleted.

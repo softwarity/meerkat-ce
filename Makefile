@@ -84,8 +84,11 @@ bench:
 	tools/bench/run.sh
 
 # Hand out another plug release: make plug V=2.25.0 (docker/plug.json, go.mod, Dockerfile).
+# V is read from the environment ($$V), never pasted as $(V): make writes a
+# $(V) into the recipe's text before the shell parses it, so a `;` in it would
+# be a second command. A variable given on the command line is exported.
 plug:
-	tools/plug/bump.sh $(V)
+	tools/plug/bump.sh "$$V"
 
 lint:
 	golangci-lint run

@@ -44,6 +44,8 @@ func TestFeaturesBelongToTheirCapability(t *testing.T) {
 		// The agent door: infrastructure, read by the gateway scope.
 		{"GET", "/api/settings/agent", "", []string{"root", "infra-admin"}},
 		{"PUT", "/api/settings/agent", `{"enabled":false}`, []string{"root", "infra-admin"}},
+		// The names a door is reached by through a proxy: the TLS screen's.
+		{"PUT", "/api/settings/tls/proxied/app", `{"names":[]}`, []string{"root", "infra-admin"}},
 		// Identity: the bulk password change and the shape of the organisations.
 		{"POST", "/api/users/must-change-password", "", []string{"root", "app-admin"}},
 		{"PUT", "/api/settings/tenancy", `{"tenancy":"single"}`, []string{"root", "app-admin"}},

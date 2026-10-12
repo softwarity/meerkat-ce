@@ -42,6 +42,22 @@ type Settings struct {
 	HSTSMaxAge int          `json:"hstsMaxAge,omitempty"`
 	ACME       ACMESettings `json:"acme"`
 
+	// ProxiedConsole and ProxiedApp are the names a door is ALSO reached by
+	// through a proxy that terminates TLS in front of it: nginx, an ingress,
+	// a cloud load balancer. They are not the list of names the paragraph
+	// above refuses - a certificate still carries its own, and these are
+	// precisely the names this gateway has NO certificate for. What they say
+	// is narrower: the name is ours, and somebody in front serves it over
+	// HTTPS. One thing reads them, the address of a mailed link
+	// (auth/mailcode.go), which otherwise only trusts a name reached on the
+	// gateway's own TLS door. Never the listeners, the redirect, HSTS, an
+	// authority or a placement: a promise of HTTPS made on a name the gateway
+	// cannot present a certificate for is a promise somebody else keeps.
+	// Lowercase, deduplicated, exact names or a leading *. standing for one
+	// label - the rule of a certificate's names (Covers).
+	ProxiedConsole []string `json:"proxiedConsole,omitempty"`
+	ProxiedApp     []string `json:"proxiedApp,omitempty"`
+
 	// The names each plane was declared under, before certificates carried
 	// their own (v73). Read once, to sort the authority's names by plane, and
 	// never written again: see Normalized.
@@ -154,6 +170,19 @@ type ACMEOrder struct {
 func OrderID(authority string, names []string) string {
 	h := sha256.Sum256([]byte(authority + " " + strings.Join(lower(names), " ")))
 	return "acme-" + hex.EncodeToString(h[:6])
+}
+
+// ProxiedOn is the names declared reached through a TLS-terminating proxy in
+// front of one door. The internal plane has none: its callers are programs
+// inside the cluster, and no browser follows a mailed link there.
+func (s Settings) ProxiedOn(plane string) []string {
+	switch plane {
+	case PlaneConsole:
+		return s.ProxiedConsole
+	case PlaneApp:
+		return s.ProxiedApp
+	}
+	return nil
 }
 
 // MaxHSTS is the longest HSTS promise the console lets an installation make:
@@ -289,6 +318,10 @@ type Supervisor struct {
 
 	mu    sync.Mutex
 	state State
+	// proxied is each door's names reached through a proxy in front, as last
+	// read: kept beside the managers rather than in them, so nothing that
+	// decides a handshake, a redirect or HSTS can ever be handed one.
+	proxied map[string][]string
 
 	// issues is what happened to each name asked of an authority (request.go).
 	issues issueBook
@@ -478,6 +511,10 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 	s.redirect.SetHSTS(cfg.HSTS(redirect))
 
 	s.mu.Lock()
+	s.proxied = map[string][]string{
+		PlaneConsole: lower(cfg.ProxiedConsole),
+		PlaneApp:     lower(cfg.ProxiedApp),
+	}
 	s.state.Console, s.state.App = s.adminLn.Running(), s.appLn.Running()
 	s.state.Internal = s.internalLn != nil && s.internalLn.Running()
 	s.state.ACME = armed
@@ -489,6 +526,19 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 	}
 	s.request(cfg)
 	return failed
+}
+
+// Proxied is what one door's sign-in pages ask before mailing a link: is host
+// a name declared reached through a proxy that terminates TLS in front of
+// that door. It reads the names of the last Reload, so a change saved on any
+// node is seen here as soon as the change bus has reloaded this one.
+func (s *Supervisor) Proxied(plane string) func(host string) bool {
+	return func(host string) bool {
+		s.mu.Lock()
+		names := s.proxied[plane]
+		s.mu.Unlock()
+		return Covers(names, host)
+	}
 }
 
 func orName(a Authority) string {

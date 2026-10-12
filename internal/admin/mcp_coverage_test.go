@@ -40,6 +40,10 @@ var agentCovers = map[string][]string{
 	"config":   {"export_configuration", "import_configuration"},
 	"branding": {"get_branding", "save_branding"},
 	"themes":   {"list_themes"},
+	// The TLS settings live under this section too - the redirect, HSTS, the
+	// names reached through a proxy in front - and no tool writes them: like
+	// the certificates beside them, which names this gateway vouches for in
+	// a mailed link is decided on the screen that holds the certificates.
 	"settings": {"get_settings", "save_portal"},
 	// Correcting ONE wording is a judgement about a sentence, made against the
 	// screen it appears on - which is what the console's editor is for, and why
@@ -277,6 +281,9 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"POST /api/vault/export":                    true, "POST /api/vault/import": true,
 		"POST /api/vault/stash": true, "PUT /api/vault/{scope}/{name}": true,
 		"DELETE /api/vault/{scope}/{name}": true,
+		// The names a door is reached by through a proxy in front: stored,
+		// and what a mailed link may point at from then on.
+		"PUT /api/settings/tls/proxied/{plane}": true,
 	}
 
 	registered := map[string]bool{}

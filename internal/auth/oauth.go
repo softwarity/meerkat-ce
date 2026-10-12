@@ -78,10 +78,10 @@ func (h *Handler) agentEndpointOpen(r *http.Request) bool {
 // and serves that answer to somebody else. Hence no-store on both documents:
 // they are cheap to compute and they must never be shared.
 //
-// X-Forwarded-Proto is trusted for the same reason: without it a control plane
+// X-Forwarded-Proto is read for the same reason - without it a control plane
 // behind a TLS-terminating proxy would advertise http urls and no agent would
-// connect. A proxy that forwards a header a client sent is a proxy that has to
-// be fixed, here as everywhere else.
+// connect - and only from a trusted proxy (filters.Secure): a stranger's header
+// does not get to choose the scheme these documents are written in.
 func origin(r *http.Request) string { return filters.Origin(r) }
 
 func (h *Handler) protectedResource(w http.ResponseWriter, r *http.Request) {

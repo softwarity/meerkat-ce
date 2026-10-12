@@ -612,6 +612,75 @@ func TestAnExpiredCertificateStandsTheRedirectDown(t *testing.T) {
 	}
 }
 
+// TestAProxiedNameOnlyVouchesForALink: a name declared reached through a
+// proxy that terminates TLS in front of a door is ours, and that is all it
+// says. The mailed link may point at it; the door does not present anything
+// for it, the redirect does not send it to HTTPS, HSTS is not promised on it -
+// the gateway has no certificate to keep those promises with.
+func TestAProxiedNameOnlyVouchesForALink(t *testing.T) {
+	app := mustSelfSigned(t, Request{DNSNames: []string{"app.example.com"}})
+	src := &fakeSource{
+		app: []*Material{app}, appFallback: app,
+		settings: Settings{
+			Redirect: true, HSTSMaxAge: 86400,
+			ProxiedApp:     []string{"Shop.Example.org", "*.apps.example.org"},
+			ProxiedConsole: []string{"admin.example.org"},
+		},
+	}
+	d := NewRedirect()
+	sup := NewSupervisor(src, func(error) bool { return true },
+		NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
+		NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil), d)
+	if err := sup.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sup.Stop(context.Background()) })
+
+	appProxied, consoleProxied := sup.Proxied(PlaneApp), sup.Proxied(PlaneConsole)
+	for host, want := range map[string]bool{
+		"shop.example.org":      true,
+		"SHOP.example.org":      true,
+		"eu.apps.example.org":   true,
+		"a.eu.apps.example.org": false,
+		"apps.example.org":      false,
+		"admin.example.org":     false, // the console's, not the application's
+		"app.example.com":       false, // a certificate's: the other rule
+	} {
+		if got := appProxied(host); got != want {
+			t.Errorf("application, %s: %v, want %v", host, got, want)
+		}
+	}
+	if !consoleProxied("admin.example.org") || consoleProxied("shop.example.org") {
+		t.Fatal("each door has its own names")
+	}
+	if sup.App.Answers("shop.example.org") {
+		t.Fatal("a proxied name is not one the door presents a certificate for")
+	}
+
+	h := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }))
+	for host, redirected := range map[string]bool{"app.example.com:8080": true, "shop.example.org": false, "eu.apps.example.org": false} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://"+host+"/x", nil))
+		if got := rec.Code == http.StatusMovedPermanently; got != redirected {
+			t.Errorf("%s: redirected=%v (%d), want %v", host, got, rec.Code, redirected)
+		}
+		if !redirected && (rec.Code != http.StatusTeapot || rec.Header().Get("Strict-Transport-Security") != "") {
+			t.Errorf("%s: served in the clear with no promise, got %d %q", host, rec.Code,
+				rec.Header().Get("Strict-Transport-Security"))
+		}
+	}
+
+	// Taken away and reloaded - what the change bus does on every node - and
+	// the name is nobody's again.
+	src.settings.ProxiedApp = nil
+	if err := sup.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if appProxied("shop.example.org") {
+		t.Fatal("a name removed is still vouched for after a reload")
+	}
+}
+
 // fakeSource stands in for the store.
 type fakeSource struct {
 	console     []*Material

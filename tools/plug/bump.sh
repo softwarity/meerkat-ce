@@ -3,8 +3,14 @@
 # this moves everything that must agree with it (plug_test.go checks they do):
 # the agent module linked into the binary, and the image's payload.
 set -eu
-v="${1:?usage: make plug V=x.y.z}"
+v="${1-}"
 v="${v#v}"
+# A version, or nothing runs: it comes from outside (plug's dispatch, the tag
+# of its latest release) and this runs with the right to push to main.
+if ! printf '%s' "$v" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+'; then
+  echo "'$v' is not a plug release (x.y.z): make plug V=x.y.z" >&2
+  exit 1
+fi
 commit=$(git ls-remote https://github.com/softwarity/plug.git "refs/tags/v$v^{}" "refs/tags/v$v" | head -1 | cut -f1)
 [ -n "$commit" ] || { echo "plug has no tag v$v" >&2; exit 1; }
 printf '{\n  "version": "%s",\n  "commit": "%s"\n}\n' "$v" "$commit" > docker/plug.json

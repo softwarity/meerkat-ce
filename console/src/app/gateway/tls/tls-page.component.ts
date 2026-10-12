@@ -38,6 +38,7 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
 import { TrustedAuthoritiesComponent } from './trusted-authorities.component';
 import { InternalHelpComponent } from './internal-help.component';
+import { ProxiedNamesComponent } from './proxied-names.component';
 import { SnippetComponent } from '../../shared/snippet.component';
 import { AuthoritiesPanelComponent } from './authorities-panel.component';
 import { MeService } from '../../me.service';
@@ -77,6 +78,7 @@ type Os = 'macos' | 'linux' | 'windows';
   selector: 'app-tls-page',
   imports: [
     InternalHelpComponent,
+    ProxiedNamesComponent,
     MatExpansionModule,
     TrustedAuthoritiesComponent,
     CdkDrag,
@@ -253,7 +255,7 @@ export class TlsPageComponent {
     this.api.getTls().subscribe({ next: (t) => this.tls.set(t) });
   }
 
-  private apply(t: TlsSettings): void {
+  protected apply(t: TlsSettings): void {
     this.tls.set(t);
   }
 
@@ -461,7 +463,7 @@ export class TlsPageComponent {
   // The plain address to go to when c leaves the console (stays: whether it
   // stays there, for a move), or '' when this page is not cut off by it.
   private cutsThisPage(c: Certificate, stays: boolean): string {
-    if (location.protocol !== 'https:' || !c.console || stays) return '';
+    if (location.protocol !== 'https:' || !c.console || stays || this.throughProxy()) return '';
     const left = this.onConsole().filter((o) => o.id !== c.id && !o.pending);
     if (left.some((o) => covers(this.namesOf(o), this.here))) return '';
     const port = this.outsidePort('console', 'http');
@@ -621,9 +623,20 @@ export class TlsPageComponent {
   // the address bar's.
   protected readonly uncovered = computed(() => {
     const list = this.onConsole().filter((c) => !c.pending);
-    if (!list.length) return false;
+    if (!list.length || this.throughProxy()) return false;
     return !list.some((c) => covers(this.namesOf(c), this.here));
   });
+
+  // The names each door is also reached by through a proxy that terminates
+  // TLS in front of the gateway (AUTH-22).
+  protected proxiedOn(plane: 'console' | 'app'): string[] {
+    return this.tls()?.proxied?.[plane] ?? [];
+  }
+
+  // This console reached by one of them: its HTTPS is the proxy's, so no
+  // certificate placed here is what the browser was shown, and taking one
+  // off cuts nothing.
+  private readonly throughProxy = computed(() => covers(this.proxiedOn('console'), this.here));
 
   protected link(plane: Plane, host: string, scheme: 'http' | 'https'): string {
     const st = this.state();

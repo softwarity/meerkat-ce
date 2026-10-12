@@ -58,6 +58,26 @@ admin:
 # configuration export, and this does not.
 production: false
 
+# Whose X-Forwarded-For and X-Forwarded-Proto the gateway believes
+# (MEERKAT_TRUSTED_PROXIES). Every per-address counter - failed sign-ins,
+# password resets, a route's rate limit per IP - and every address the sign-in
+# history and the audit show depend on it.
+#
+# Empty, the gateway deduces it from the peer address: loopback and the
+# private ranges (10/8, 172.16/12, 192.168/16, fc00::/7) are proxies, anything
+# else is a stranger whose headers are ignored. That is right for an Ingress
+# controller inside the cluster, which reaches the pod from a private address.
+#
+# Set it when whatever stands in front reaches the pod from PUBLIC addresses -
+# a CDN, or a cloud load balancer that does not NAT through the node - with
+# that provider's published ranges, for example:
+#   trustedProxies: ["130.211.0.0/22", "35.191.0.0/16"]
+# A list REPLACES the default; ["none"] trusts nobody (the gateway is reached
+# directly). Too narrow, everybody is counted as the load balancer and one
+# person's failures throttle everyone; too wide, a caller can name any address
+# it likes and walk past every counter.
+trustedProxies: []
+
 # The developer tunnel (Enterprise only): plug, compiled into the gateway.
 #
 # On, the chart grants what the agent needs in THIS namespace: Services and

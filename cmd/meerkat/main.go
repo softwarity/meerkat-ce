@@ -34,6 +34,7 @@ import (
 	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/expiry"
+	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/live"
@@ -140,6 +141,14 @@ func main() {
 		"collector to export traces to, such as http://otel-collector:4318 (Enterprise)")
 	otlpSample := flag.String("otlp-sample", envOr("MEERKAT_OTLP_SAMPLE", "0.1"),
 		"share of the journeys this gateway opens that get recorded, 0 to 1; a caller's own decision is always respected")
+	// Whose X-Forwarded-For and X-Forwarded-Proto are believed (filters,
+	// forwarded.go). Empty is the deduction from the peer - loopback and the
+	// private ranges are proxies, a public address is a stranger - which is
+	// right behind every proxy this product ships with. A CDN or a cloud load
+	// balancer that reaches the gateway from PUBLIC addresses has to be named
+	// here, or every caller is counted as that load balancer.
+	trustedProxies := flag.String("trusted-proxies", envOr("MEERKAT_TRUSTED_PROXIES", ""),
+		"proxies whose X-Forwarded-For / X-Forwarded-Proto are believed: CIDR ranges or addresses, comma-separated, replacing the default (loopback and private ranges); none trusts nobody")
 	flag.Parse()
 
 	if *showVersion {
@@ -186,7 +195,7 @@ func main() {
 		tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
 		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr, databaseURL: *databaseURL,
-		production: *production,
+		production: *production, trustedProxies: *trustedProxies,
 	}); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
@@ -207,6 +216,7 @@ type options struct {
 	plugAddr              string
 	databaseURL           string
 	production            bool
+	trustedProxies        string
 }
 
 func run(o options) error {
@@ -220,6 +230,15 @@ func run(o options) error {
 	if o.production {
 		slog.Info("production gateway: the developer surface is closed here", "why", "MEERKAT_PRODUCTION")
 	}
+	// Before any handler reads an address. Refused outright when it does not
+	// parse: a typo that fell back to the default would trust exactly the
+	// addresses the operator was trying to stop trusting, without a word.
+	proxies, err := filters.ParseTrustedProxies(o.trustedProxies)
+	if err != nil {
+		return fmt.Errorf("MEERKAT_TRUSTED_PROXIES: %w", err)
+	}
+	filters.SetTrustedProxies(proxies)
+	slog.Info("forwarded headers", "trusted_proxies", trustedProxiesLine(o.trustedProxies))
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
@@ -755,6 +774,16 @@ func run(o options) error {
 		certs.NewListener("internal", o.internalTLSAddr, internalSrv.Handler, nil),
 	)
 	tlsSup.Ports(addr, adminAddr, o.internalAddr)
+	// A mailed link may point only at a name a certificate placed on the
+	// plane covers (P0-01): anything else mails a code. The sign-in pages of
+	// each plane ask their own door.
+	authHandler.Covers = tlsSup.App.Answers
+	adminAuth.Covers = tlsSup.Console.Answers
+	// Or a name the operator declared reached through a proxy that
+	// terminates TLS in front of that door: the request arrives in clear,
+	// and the name is still ours.
+	authHandler.Proxied = tlsSup.Proxied(certs.PlaneApp)
+	adminAuth.Proxied = tlsSup.Proxied(certs.PlaneConsole)
 	// One gateway orders a certificate, the others wait and find it in the
 	// shared cache (PERF-03). A no-op on the embedded database.
 	tlsSup.SerialiseIssuance(st.WithLock)
@@ -1104,6 +1133,24 @@ func reportHiddenTenants(ctx context.Context, st *store.Store, mode string) {
 	}
 	slog.Warn("single-tenant mode is serving one organisation and holding back the others",
 		"hidden", n-1, "nothing_deleted", true)
+}
+
+// trustedProxiesLine is what the startup line says about whose forwarded
+// headers are believed: the list in force, and whether it was deduced.
+func trustedProxiesLine(raw string) string {
+	set := filters.TrustedProxies()
+	if len(set) == 0 {
+		return "none (every address is the TCP peer)"
+	}
+	parts := make([]string, len(set))
+	for i, p := range set {
+		parts[i] = p.String()
+	}
+	line := strings.Join(parts, ",")
+	if strings.TrimSpace(raw) == "" {
+		line += " (default: loopback and private ranges)"
+	}
+	return line
 }
 
 func envOr(key, fallback string) string {

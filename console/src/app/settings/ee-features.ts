@@ -136,7 +136,7 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     label: $localize`:@@EE_SSL_05:ACME certificates`,
     what: $localize`:@@EE_SSL_05_what:Have Let's Encrypt, ZeroSSL or your own authority issue and renew certificates on their own.`,
     where: '/infra/tls',
-    whereLabel: $localize`:@@TLS:TLS`,
+    whereLabel: $localize`:@@Domains_and_TLS:Domains & TLS`,
   },
   'AUD-04': {
     label: $localize`:@@EE_AUD_04:Endpoint audit`,

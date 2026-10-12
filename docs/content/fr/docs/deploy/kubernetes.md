@@ -399,7 +399,11 @@ X-Forwarded-Proto : la gateway y lit le schéma autant que sur la connexion, et 
 en-tête trois choses se dérèglent en même temps - les cookies de session perdent leur
 attribut Secure, la console annonce des URL en http://, et la redirection vers HTTPS boucle
 indéfiniment. nginx et Traefik le posent tous deux par défaut ; tout ce qui est fait maison
-en amont doit être vérifié.
+en amont doit être vérifié. L'en-tête n'est cru que venant d'un proxy de confiance : un
+contrôleur Ingress du cluster joint le pod depuis une adresse privée, de confiance par
+défaut, donc rien n'est à régler. Un load balancer ou un CDN qui joint les pods depuis des
+adresses publiques doit être nommé dans `trustedProxies` - voir
+[Derrière un proxy ou un load balancer](/docs/deploy/one-gateway#derrire-un-proxy-ou-un-load-balancer).
 
 ::: details L'Ingress complet
 ```yaml

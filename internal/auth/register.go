@@ -152,6 +152,7 @@ func (h *Handler) registerAllow(ctx context.Context, ip string) bool {
 var (
 	registerPage     = flowPage("register", registerBody)
 	registerSentPage = flowPage("register-sent", registerSentBody)
+	registerCodePage = flowPage("register-code", registerCodeBody)
 	confirmedPage    = flowPage("confirmed", confirmedBody)
 	pendingPage      = flowPage("account-pending", pendingBody)
 )
@@ -167,7 +168,13 @@ type registerData struct {
 	CaptchaImg template.URL
 }
 
-const registerBody = `    <style>
+// captchaField is the picture code as a form shows it, for /register and - once
+// an account has collected too many failures - /login. One block, so the two
+// pages draw the same thing; refresh is the endpoint its button asks for a new
+// image, which is the one difference between them.
+func captchaField(refresh string) string {
+	return `      {{if .CaptchaID}}
+      <style>
       .captcha-row { display: flex; align-items: center; gap: 10px; }
       .captcha-row img {
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
@@ -186,8 +193,34 @@ const registerBody = `    <style>
         background: var(--mk-surface-container); filter: none; box-shadow: none;
       }
       .captcha-new:active { transform: none; }
-    </style>
-    <form method="post" action="/register">
+      </style>
+      <label class="field">
+        <span>{{.T.captchaLabel}}</span>
+        <div class="captcha-row">
+          <img id="cap-img" src="{{.CaptchaImg}}" alt="{{.T.captchaAlt}}">
+          <button type="button" class="captcha-new" id="cap-new" title="{{.T.captchaNew}}" aria-label="{{.T.captchaNew}}">&#8635;</button>
+        </div>
+        <input name="captcha" inputmode="numeric" autocomplete="off" required>
+        <input type="hidden" name="captcha_id" id="cap-id" value="{{.CaptchaID}}">
+      </label>
+      <script>
+      (() => {
+        const btn = document.getElementById('cap-new');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+          try {
+            const c = await fetch('` + refresh + `', { method: 'POST' }).then((r) => r.json());
+            document.getElementById('cap-img').src = c.img;
+            document.getElementById('cap-id').value = c.id;
+          } catch (e) { /* keep the current image */ }
+        });
+      })();
+      </script>
+      {{end}}
+`
+}
+
+var registerBody = `    <form method="post" action="/register">
       <p class="lead">{{.T.registerLead}}</p>
       {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
       <label class="field">
@@ -210,31 +243,7 @@ const registerBody = `    <style>
         <span>{{.T.confirmPassword}}</span>
         <input name="confirm" type="password" autocomplete="new-password" required>
       </label>
-      {{if .CaptchaID}}
-      <label class="field">
-        <span>{{.T.captchaLabel}}</span>
-        <div class="captcha-row">
-          <img id="cap-img" src="{{.CaptchaImg}}" alt="{{.T.captchaAlt}}">
-          <button type="button" class="captcha-new" id="cap-new" title="{{.T.captchaNew}}" aria-label="{{.T.captchaNew}}">&#8635;</button>
-        </div>
-        <input name="captcha" inputmode="numeric" autocomplete="off" required>
-        <input type="hidden" name="captcha_id" id="cap-id" value="{{.CaptchaID}}">
-      </label>
-      <script>
-      (() => {
-        const btn = document.getElementById('cap-new');
-        if (!btn) return;
-        btn.addEventListener('click', async () => {
-          try {
-            const c = await fetch('/register/captcha', { method: 'POST' }).then((r) => r.json());
-            document.getElementById('cap-img').src = c.img;
-            document.getElementById('cap-id').value = c.id;
-          } catch (e) { /* keep the current image */ }
-        });
-      })();
-      </script>
-      {{end}}
-      <button type="submit">{{.T.registerCta}}</button>
+` + captchaField("/register/captcha") + `      <button type="submit">{{.T.registerCta}}</button>
     </form>
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
@@ -242,6 +251,21 @@ const registerBody = `    <style>
 const registerSentBody = `    <form onsubmit="return false">
       <p class="lead">{{.T.registerSentLead}}</p>
       <p class="hint">{{.T.registerSentHint}}</p>
+    </form>
+    <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
+`
+
+// The same outcome when the mail carries a code rather than a link
+// (mailcode.go).
+const registerCodeBody = `    <form method="post" action="/confirm/code">
+      <p class="lead">{{.T.registerSentLead}}</p>
+      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <p class="hint">{{.Hint}}</p>
+      <label class="field">
+        <span>{{.T.authCode}}</span>
+        <input name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
+      </label>
+      <button type="submit">{{.T.mailConfirmCta}}</button>
     </form>
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
@@ -303,12 +327,18 @@ func (h *Handler) doRegisterCaptcha(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	h.writeCaptcha(w, r)
+}
+
+// writeCaptcha answers a refresh button with a fresh challenge, as JSON.
+func (h *Handler) writeCaptcha(w http.ResponseWriter, r *http.Request) {
 	id, img, err := h.newCaptcha(r.Context())
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(map[string]string{"id": id, "img": string(img)})
 }
 
@@ -356,6 +386,7 @@ func (h *Handler) doRegister(w http.ResponseWriter, r *http.Request) {
 
 	// Taken username or address: SAME outcome page, nothing created, nothing
 	// revealed (SEC-09 spirit).
+	var created *store.User
 	taken := false
 	if _, err := h.st.GetUserByUsername(ctx, data.Username); err == nil {
 		taken = true
@@ -381,19 +412,66 @@ func (h *Handler) doRegister(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("self-registration create failed", "err", err)
 		} else {
 			h.security(r, secRegister, u, "")
-			if err := h.sendConfirmation(r, u); err != nil {
-				slog.Error("confirmation e-mail failed", "user", u.Username, "err", err)
-			}
+			created = &u
 		}
+	}
+	h.mailConfirmation(w, r, created)
+}
+
+// mailConfirmation mails u the confirmation of its address, and answers the
+// page that says so. u is nil when nothing was created: the page is the same,
+// and the browser is bound all the same - nothing tells a taken address from
+// a free one.
+func (h *Handler) mailConfirmation(w http.ResponseWriter, r *http.Request, u *store.User) {
+	origin, reqID := h.linkOrigin(r), ""
+	if origin == "" {
+		var err error
+		if reqID, err = h.bindBrowser(w, r); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+	if u != nil {
+		if err := h.sendConfirmation(r, *u, origin, reqID); err != nil {
+			slog.Error("confirmation e-mail failed", "user", u.Username, "err", err)
+		}
+	}
+	if origin == "" {
+		h.renderRegisterCode(w, r, "", http.StatusOK)
+		return
 	}
 	writeFlow(w, registerSentPage, struct{ flowChrome }{h.flowData(r, "titleRegister")}, http.StatusOK)
 }
 
+func (h *Handler) renderRegisterCode(w http.ResponseWriter, r *http.Request, errMsg string, status int) {
+	data := codeData{flowChrome: h.flowData(r, "titleRegister"), Error: errMsg}
+	data.Hint = fmt.Sprintf(data.T["registerCodeHint"], minutesLabel(data.T, signinCodeTTL))
+	writeFlow(w, registerCodePage, data, status)
+}
+
 func withErr(d registerData, msg string) registerData { d.Error = msg; return d }
 
-// sendConfirmation mints the one-shot token and mails the /confirm link, in
-// the user's language.
-func (h *Handler) sendConfirmation(r *http.Request, u store.User) error {
+// sendConfirmation mints the one-shot token and mails the /confirm link
+// rooted at origin, in the user's language - or, origin empty, a code bound to
+// the browser reqID names.
+func (h *Handler) sendConfirmation(r *http.Request, u store.User, origin, reqID string) error {
+	t := messagesFor(u.Locale)
+	_, brand, _ := h.chrome()
+	if origin == "" {
+		code, err := h.putMailCode(r, reqID, u.ID, confirmCodePurpose, "")
+		if err != nil {
+			return err
+		}
+		return h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mail.Spec{
+			Subject:   fmt.Sprintf(t["mailConfirmSubject"], brand.AppName),
+			Preheader: fmt.Sprintf(t["mailConfirmHeading"], brand.AppName),
+			Heading:   fmt.Sprintf(t["mailConfirmHeading"], brand.AppName),
+			Intro:     []string{t["mailConfirmCodeIntro"]},
+			Code:      code,
+			CodeNote:  fmt.Sprintf(t["mailOtpNote"], minutesLabel(t, signinCodeTTL)),
+			Outro:     []string{t["mailConfirmOutro"]},
+		}))
+	}
 	token, err := randToken()
 	if err != nil {
 		return err
@@ -403,9 +481,7 @@ func (h *Handler) sendConfirmation(r *http.Request, u store.User) error {
 		time.Now().Add(time.Duration(hours)*time.Hour).Unix()); err != nil {
 		return err
 	}
-	link := h.externalURL(r) + "/confirm?token=" + token
-	t := messagesFor(u.Locale)
-	_, brand, _ := h.chrome()
+	link := origin + "/confirm?token=" + token
 	return h.sendMail(r.Context(), h.buildMail(r.Context(), u.Email, mail.Spec{
 		Subject:   fmt.Sprintf(t["mailConfirmSubject"], brand.AppName),
 		Preheader: fmt.Sprintf(t["mailConfirmHeading"], brand.AppName),
@@ -416,8 +492,10 @@ func (h *Handler) sendConfirmation(r *http.Request, u store.User) error {
 	}))
 }
 
-// externalURL rebuilds the address this request was reached on - the only
-// base a mailed link can use (the gateway fronts arbitrary domains).
+// externalURL rebuilds the address this request was reached on. NOT for a
+// mailed link: the Host is the caller's to write (see linkOrigin). Only for
+// an address handed straight back to the browser or to an authority that
+// checks it against what it registered (the external callback).
 func (h *Handler) externalURL(r *http.Request) string {
 	scheme := "http"
 	if filters.Secure(r) {
@@ -437,6 +515,33 @@ func (h *Handler) doConfirm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, h.tr(r, "errConfirmExpired"), http.StatusUnprocessableEntity)
 		return
 	}
+	h.confirmed(w, r, userID)
+}
+
+// doConfirmCode is the link's twin for a mail that carried a code: typed in
+// the browser that registered.
+func (h *Handler) doConfirmCode(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	userID, _, out := h.takeMailCode(w, r, confirmCodePurpose)
+	switch out {
+	case codeNoBinding:
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	case codeTooMany:
+		h.renderRegisterCode(w, r, h.tr(r, "errTooManyAttempts"), http.StatusTooManyRequests)
+		return
+	case codeWrong:
+		h.renderRegisterCode(w, r, h.tr(r, "errSigninCode"), http.StatusUnauthorized)
+		return
+	}
+	h.confirmed(w, r, userID)
+}
+
+// confirmed makes an address proved, whichever way the proof came back.
+func (h *Handler) confirmed(w http.ResponseWriter, r *http.Request, userID string) {
 	if err := h.st.MarkEmailVerified(r.Context(), userID); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

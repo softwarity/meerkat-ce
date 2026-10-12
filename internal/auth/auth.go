@@ -1040,20 +1040,25 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
 </body>
 </html>`
 
-const loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
+// The username comes back filled in when the page answers a refusal that
+// asks for the picture code (accountguard.go): the code is for THAT name, and
+// making somebody type it again under an image they were told to copy is how
+// they end up submitting a different one. The focus then goes where the work
+// is left - the password.
+var loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
     {{end}}
     {{if .Credentials}}<form method="post" action="login">
       {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
       <label class="field">
         <span>{{.T.username}}</span>
-        <input name="username" autocomplete="username" autofocus required>
+        <input name="username" autocomplete="username" value="{{.Username}}"{{if not .Username}} autofocus{{end}} required>
       </label>
       <label class="field">
         <span>{{.T.password}}</span>
-        <input name="password" type="password" autocomplete="current-password" required>
+        <input name="password" type="password" autocomplete="current-password"{{if .Username}} autofocus{{end}} required>
       </label>
-      <input type="hidden" name="next" value="{{.Next}}">
+` + captchaField("/login/captcha") + `      <input type="hidden" name="next" value="{{.Next}}">
       <button type="submit">{{.T.signIn}}</button>
     </form>
     {{else if and .Error (not .Shut)}}<p class="error">{{.Error}}</p>{{end}}
@@ -1848,8 +1853,25 @@ type Handler struct {
 	// recording fake.
 	Mailer func(ctx context.Context, msg mail.Message) error
 
+	// Covers says whether a certificate placed on this handler's plane
+	// carries a host name: the one test a mailed link's address has to pass
+	// (mailcode.go). Nil: none does, and every such mail carries a code.
+	Covers func(host string) bool
+	// Proxied says whether a host name was declared, on this handler's
+	// plane, as reached through a proxy that terminates TLS in front of the
+	// gateway: the operator vouching for a name no certificate here carries.
+	// A mailed link may point at it without the request having come over
+	// the gateway's own TLS (mailcode.go). Nil: no name is.
+	Proxied func(host string) bool
+
 	// regLimit throttles the unauthenticated registration writes per IP.
 	regLimit *rateLimiter
+
+	// pending is the work a request starts and does not wait for - the
+	// failed sign-ins notice (accountguard.go), sent off the request so its
+	// relay's latency cannot tell a real account from an unknown name. Tests
+	// wait on it; nothing else needs to.
+	pending sync.WaitGroup
 
 	themeMu     sync.Mutex
 	themeCache  template.CSS
@@ -2146,6 +2168,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		mux.HandleFunc("POST /register", h.doRegister)
 		mux.HandleFunc("POST /register/captcha", h.doRegisterCaptcha)
 		mux.HandleFunc("GET /confirm", h.doConfirm)
+		mux.HandleFunc("POST /confirm/code", h.doConfirmCode)
 		mux.HandleFunc("GET /account-pending", h.showAccountPending)
 		// Signed in and refused anyway (RBAC-06), the third of the three
 		// refusals that has something to say.
@@ -2183,6 +2206,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /profile/avatar", h.doProfileAvatar)
 	mux.HandleFunc("POST /profile/timezone", h.doProfileTimezone)
 	mux.HandleFunc("POST /profile/email", h.doProfileEmail)
+	mux.HandleFunc("POST /profile/email/code", h.doEmailChangeCode)
 	mux.HandleFunc("GET /profile/password", h.showProfilePassword)
 	mux.HandleFunc("POST /profile/password", h.doProfilePassword)
 	mux.HandleFunc("GET /profile/security", h.showProfileSecurity)
@@ -2240,6 +2264,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /forgot-password", h.doForgot)
 	mux.HandleFunc("GET /reset-password", h.showReset)
 	mux.HandleFunc("POST /reset-password", h.doReset)
+	mux.HandleFunc("POST /reset-password/code", h.doResetCode)
 	// The MFA login-flow steps live on both planes (like /update-password): a
 	// challenge for the enrolled, forced enrolment when MFA is mandatory.
 	mux.HandleFunc("GET /totp", h.showTOTP)
@@ -2258,6 +2283,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+backgroundDarkPath, h.backgroundDark)
 	mux.HandleFunc("GET /login", h.showLogin)
 	mux.HandleFunc("POST /login", h.doLogin)
+	// The picture code's refresh, once an account's sign-in asks for it
+	// (accountguard.go).
+	mux.HandleFunc("POST /login/captcha", h.doLoginCaptcha)
 	mux.HandleFunc("POST /logout", h.doLogout)
 }
 
@@ -2319,36 +2347,77 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 	if d, err := store.ParseISODuration(pol.LoginWindow); err == nil && d > 0 {
 		window = d
 	}
-	loginKey := "login|" + clientIP(r) + "|" + strings.ToLower(username)
+	name := strings.ToLower(username)
+	loginKey := "login|" + clientIP(r) + "|" + name
 	if pol.LoginAttempts > 0 && h.regLimit.count(r.Context(), loginKey, window) >= pol.LoginAttempts {
 		h.render(w, r, next, h.tr(r, "errTooManyAttempts"), http.StatusTooManyRequests)
 		return
+	}
+	user, err := h.st.GetUserByUsername(r.Context(), username)
+	found := err == nil
+	typed := store.User{Username: username}
+	if !found {
+		user = typed
 	}
 	// Every refusal is a line of the security trail (AUD-01), with its real
 	// reason - and the attempt that trips the throttle is one more, so the
 	// trail says when an account started being hammered. The attempts refused
 	// AFTER it write nothing: an attacker at a thousand tries a second must
 	// not become a thousand rows a second.
+	//
+	// A failure counts twice: against this address and name, and against the
+	// name alone from anywhere (accountguard.go). Past the second, the page
+	// that answers asks for the picture code, with the name kept.
 	fail := func(u store.User, reason string) {
 		h.regLimit.hit(r.Context(), loginKey)
 		h.security(r, secSigninRefused, u, reason)
 		if pol.LoginAttempts > 0 && h.regLimit.count(r.Context(), loginKey, window) == pol.LoginAttempts {
 			h.security(r, secSigninLocked, u, refusedThrottled)
 		}
+		if h.accountFailed(r, pol, window, name, user, found) {
+			h.renderChallenged(w, r, next, h.tr(r, "errInvalidCreds"), username, http.StatusUnauthorized)
+			return
+		}
 		h.render(w, r, next, h.tr(r, "errInvalidCreds"), http.StatusUnauthorized)
 	}
-	typed := store.User{Username: username}
+	// success forgives both counters.
+	success := func() {
+		h.regLimit.reset(r.Context(), loginKey)
+		h.accountForgive(r.Context(), name)
+	}
+	// The name collected too many failures: no password is even looked at
+	// without the picture code, right or wrong, and the code is spent either
+	// way. Before the hash, like the throttle above - for the processor, and
+	// so a known name and an unknown one take the same path to the same
+	// answer. The refusal says what is missing rather than "wrong password":
+	// it is the same sentence for every name, so it tells nothing about the
+	// account, and someone who typed the right password must not be told it
+	// was wrong. Counted like a failure - which keeps the code asked for while
+	// the hammering lasts - but not written to the trail: the crossing was,
+	// and the bots that follow are not news.
+	if h.accountChallenged(r.Context(), pol, window, name) {
+		id := r.PostFormValue("captcha_id")
+		if !h.checkCaptcha(r.Context(), id, r.PostFormValue("captcha")) {
+			h.regLimit.hit(r.Context(), loginKey)
+			h.accountFailed(r, pol, window, name, user, found)
+			msg := h.tr(r, "errCaptchaNeeded")
+			if id != "" {
+				msg = h.tr(r, "errCaptcha")
+			}
+			h.renderChallenged(w, r, next, msg, username, http.StatusUnauthorized)
+			return
+		}
+	}
 
-	user, err := h.st.GetUserByUsername(r.Context(), username)
 	// Same code path and same message whether the user is unknown or the
 	// password is wrong (SEC-09: no account enumeration). A directory may
 	// still know this pair, so it gets asked before the refusal - and an
 	// account that exists here only as an external identity carries no local
 	// hash, which never matches.
-	if err != nil {
+	if !found {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password)) // equalize timing
 		if h.tryCredentialProviders(w, r, username, password, next) {
-			h.regLimit.reset(r.Context(), loginKey)
+			success()
 			return
 		}
 		fail(typed, refusedCredentials)
@@ -2362,7 +2431,7 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil ||
 		!h.localPasswordAllowed(r.Context()) {
 		if h.tryCredentialProviders(w, r, username, password, next) {
-			h.regLimit.reset(r.Context(), loginKey)
+			success()
 			return
 		}
 		fail(user, refusedCredentials)
@@ -2400,7 +2469,7 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 		h.render(w, r, next, h.tr(r, "errTemporaryExpired"), http.StatusForbidden)
 		return
 	}
-	h.regLimit.reset(r.Context(), loginKey)
+	success()
 	// The password is proved: the one moment a weak hash can be made strong.
 	h.rehashIfWeak(r, user, password)
 	// A self-registered account stays unusable until its address is confirmed
@@ -2408,12 +2477,16 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 	// the confirmation is re-sent (rate-limited) - the usual lost-mail rescue.
 	if user.SelfRegistered && !user.EmailVerified {
 		h.security(r, secSigninRefused, user, refusedUnconfirmed)
-		if h.registerAllow(r.Context(), clientIP(r)) {
-			if err := h.sendConfirmation(r, user); err != nil {
-				slog.Warn("confirmation re-send failed", "user", user.Username, "err", err)
-			}
+		switch {
+		case h.registerAllow(r.Context(), clientIP(r)):
+			h.mailConfirmation(w, r, &user)
+		case h.linkOrigin(r) == "":
+			// Throttled: nothing new is mailed, so the browser keeps the
+			// binding the last code was mailed for.
+			h.renderRegisterCode(w, r, "", http.StatusOK)
+		default:
+			writeFlow(w, registerSentPage, struct{ flowChrome }{h.flowData(r, "titleRegister")}, http.StatusOK)
 		}
-		writeFlow(w, registerSentPage, struct{ flowChrome }{h.flowData(r, "titleRegister")}, http.StatusOK)
 		return
 	}
 
@@ -3015,12 +3088,24 @@ func (h *Handler) doProfileEmail(w http.ResponseWriter, r *http.Request) {
 	// when that link comes back (AUTH-22). Otherwise a session somebody else
 	// got hold of was enough to point the account's recovery at their own box.
 	if h.st.GetSMTP(r.Context()).Configured() {
-		if err := h.requestEmailChange(r, sess.UserID, email); err != nil {
+		origin, reqID := h.linkOrigin(r), ""
+		if origin == "" {
+			var err error
+			if reqID, err = h.bindBrowser(w, r); err != nil {
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+		}
+		if err := h.requestEmailChange(r, sess.UserID, email, origin, reqID); err != nil {
 			slog.Error("address change mail failed", "user", sess.UserID, "err", err)
 			h.renderProfile(w, r, sess, h.tr(r, "errBadEmail"), http.StatusBadGateway)
 			return
 		}
 		h.securityOf(r, secEmailChangeAsked, sess.UserID, email)
+		if origin == "" {
+			h.renderEmailChangeCode(w, r, "", http.StatusOK)
+			return
+		}
 		h.renderProfileNotice(w, r, sess, fmt.Sprintf(h.tr(r, "emailChangeSent"), email))
 		return
 	}
@@ -3589,28 +3674,27 @@ func (h *Handler) doLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) render(w http.ResponseWriter, r *http.Request, next, errMsg string, status int) {
-	writeFlow(w, loginPage, struct {
-		flowChrome
-		Next     string
-		Error    string
-		Public   []publicLink
-		Passkeys bool // the gateway-wide policy shows/hides the passkey sign-in
-		Register bool // self-registration open (policy on + SMTP ready)
-		Forgot   bool // password reset available (SMTP ready)
-		// SigninCode offers the mailed code instead of a password (AUTH-16).
-		SigninCode bool
-		// Providers are the redirect authorities (AUTH-19), one button each.
-		// A directory needs no button: it answers the ordinary form.
-		Providers []externalProvider
-		// Credentials shows the username/password form. It serves TWO
-		// mechanisms, which is why closing the local password does not always
-		// close the form: a directory is asked through this very field.
-		Credentials bool
-		// Shut: nothing on this page can let anyone in. Said plainly and
-		// WITHOUT saying why - which door is closed is nobody's business but
-		// the administrator's.
-		Shut bool
-	}{flowChrome: h.flowData(r, "titleSignIn"), Next: next, Error: errMsg,
+	writeFlow(w, loginPage, h.loginView(r, next, errMsg), status)
+}
+
+// renderChallenged is the login page answering a sign-in for a name that
+// collected too many failures (accountguard.go): the same page, the name kept,
+// and a FRESH picture code - the one just answered, right or wrong, is spent.
+func (h *Handler) renderChallenged(w http.ResponseWriter, r *http.Request, next, errMsg, username string, status int) {
+	v := h.loginView(r, next, errMsg)
+	v.Username = username
+	id, img, err := h.newCaptcha(r.Context())
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	v.CaptchaID, v.CaptchaImg = id, img
+	writeFlow(w, loginPage, v, status)
+}
+
+// loginView is the login page as the request's gateway offers it.
+func (h *Handler) loginView(r *http.Request, next, errMsg string) loginView {
+	return loginView{flowChrome: h.flowData(r, "titleSignIn"), Next: next, Error: errMsg,
 		Public: h.publicLinks(r.Context()),
 		// A passkey is a shortcut to an authority: with every one of them off,
 		// it opens nothing, so it is not offered.
@@ -3619,7 +3703,7 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, next, errMsg st
 		SigninCode:  h.emailSigninOpen(r),
 		Providers:   h.redirectProviders(r.Context()),
 		Credentials: h.credentialFormOpen(r.Context()),
-		Shut:        !h.anyWayIn(r.Context())}, status)
+		Shut:        !h.anyWayIn(r.Context())}
 }
 
 // publicLink is one UI route reachable without signing in, offered on the

@@ -70,7 +70,7 @@ import { ApiService, LoginEvent } from '../api.service';
           <div class="lines">
             <span class="label">{{ e.label }}</span>
             @if (e.ip || e.country) {
-              <span class="meta">{{ e.ip }}{{ e.country ? ' - ' + e.country : '' }}</span>
+              <span class="meta">{{ e.ip }}@if (e.peer) { <ng-container i18n="@@Ip_via_peer">via</ng-container> {{ e.peer }}}{{ e.country ? ' - ' + e.country : '' }}</span>
             }
           </div>
           <span class="method">{{ methodLabel(e.method) }}</span>

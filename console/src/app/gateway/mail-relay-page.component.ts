@@ -82,6 +82,7 @@ export class MailRelayPageComponent {
     { key: 'confirm', label: $localize`:@@Mail_kind_confirm:Account confirmation` },
     { key: 'reset', label: $localize`:@@Mail_kind_reset:Password reset` },
     { key: 'password-changed', label: $localize`:@@Mail_kind_pwchanged:Password changed` },
+    { key: 'signin-attempts', label: $localize`:@@Mail_kind_signin_attempts:Failed sign-ins` },
     { key: 'otp', label: $localize`:@@Mail_kind_otp:Sign-in code` },
     { key: 'digest', label: $localize`:@@Mail_kind_digest:Daily digest (English)` },
   ];

@@ -26,7 +26,11 @@ func TestTerminatedTLSIsStillTLS(t *testing.T) {
 	}
 
 	// The terminated case: no TLS on this hop, the header says there was one.
+	// From a PRIVATE peer, which is where the load balancer lives: httptest's
+	// own default, 192.0.2.1, is a public (documentation) address, and a
+	// public peer's header is not believed any more (forwarded.go).
 	fronted := httptest.NewRequest(http.MethodGet, "http://gw.example/x", nil)
+	fronted.RemoteAddr = "10.0.0.2:5000"
 	fronted.Header.Set("X-Forwarded-Proto", "https")
 	if !Secure(fronted) {
 		t.Error("a TLS-terminated request was called plain")

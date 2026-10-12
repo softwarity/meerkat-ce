@@ -91,7 +91,7 @@ Learn these five and the console stops surprising you.
 - **[Endpoint audit](/docs/operations/audit#auditing-a-routes-operations)** - which operations are recorded in the audit trail.
 - **[Authentication](/docs/console/authentication)** - the authorities people may sign in through.
 - **[Mail relay](/docs/console/mail-relay)** - the SMTP server, and the daily digest.
-- **[TLS](/docs/console/tls)** - one name, one certificate, and ACME.
+- **[Domains & TLS](/docs/console/tls)** - the certificates, ACME, and the names a proxy in front serves.
 - **[OpenTelemetry](/docs/operations/tracing)** - traces, metrics, audit and logs sent to your collector.
 - **[Plug](/docs/operations/plug)** - the developer tunnel.
 - **[Access tokens, MCP and API](/docs/console/access-and-agents)** - driving Meerkat without a browser.

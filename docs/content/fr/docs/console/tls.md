@@ -1,14 +1,14 @@
 ---
-title: TLS
+title: Domains & TLS
 section: La console
 order: 158
-summary: Une réserve de certificats que vous placez sur la console et sur l'application - en générer, en importer, ou laisser une autorité les émettre.
+summary: Une réserve de certificats que vous placez sur la console et sur l'application - en générer, en importer, ou laisser une autorité les émettre - et les noms que sert un proxy placé devant.
 ---
 
-# TLS
+# Domains & TLS
 
-**Infra > TLS.** Les certificats que détient cette gateway, et l'endroit où
-chacun est servi. L'écran se trouve dans le plan Infra pour la même raison que le
+**Infra > Domains & TLS.** Les certificats que détient cette gateway, l'endroit où
+chacun est servi, et les noms qu'un proxy placé devant elle sert en HTTPS. L'écran se trouve dans le plan Infra pour la même raison que le
 relais de messagerie : c'est une propriété de l'installation, pas de l'application
 qu'elle sert.
 
@@ -16,7 +16,7 @@ Il n'existe pas d'interrupteur *activer HTTPS*. **C'est un certificat placé sur
 plan qui ouvre sa porte**, et c'est son retrait qui la referme. Un interrupteur
 que l'on peut activer sans rien derrière est un interrupteur qui ment.
 
-![L'écran TLS : la réserve de certificats, les zones de dépôt Console et Application avec leurs liens, Force HTTPS et sa durée HSTS](img/console/tls.webp)
+![L'écran Domains & TLS : la réserve de certificats, les zones de dépôt Console et Application avec leurs liens, Force HTTPS et sa durée HSTS](img/console/tls.webp)
 
 Ici, la réserve contient quatre lignes : un certificat pour `gateway.acme.example`,
 servi sur la console ; un autre pour `apps.acme.example` et `docs.acme.example`,
@@ -164,6 +164,27 @@ celle qu'une redirection ne peut pas protéger. La durée par défaut est d'un j
 et va jusqu'à deux ans. HSTS n'est jamais envoyé à localhost ni à une adresse IP ;
 une route ou un service qui fixe sa propre valeur la conserve. Voir
 [TLS](/docs/operations/tls).
+
+## Derrière un proxy qui termine le TLS
+
+Dans les portes Console et Application, **Also reached through a proxy that
+terminates TLS** réunit les noms qu'un proxy placé devant la gateway - nginx, un
+ingress, un load balancer - sert en HTTPS. Tapez un nom puis Entrée, une espace ou
+une virgule ; une liste collée d'un coup donne une puce par nom. La croix d'une puce
+la retire. Chaque changement est enregistré aussitôt, et un nom refusé dit pourquoi :
+un schéma, un port, un chemin ou une adresse IP n'y ont pas leur place, et un joker
+vaut pour une étiquette (`*.example.com`).
+
+À quoi cela sert : derrière un tel proxy, aucune requête n'atteint la porte TLS de la
+gateway, donc une réinitialisation de mot de passe ou une confirmation d'adresse
+enverrait un code. Demandée sous un nom déclaré, elle envoie à la place un **lien** qui
+revient vers ce nom, en `https://`. À quoi cela ne sert pas : ces noms n'ouvrent
+aucune porte HTTPS, ne choisissent aucun certificat, ne sont jamais redirigés par
+Force HTTPS et ne reçoivent jamais HSTS - la gateway n'a aucun certificat pour tenir
+ces promesses. Quand la console elle-même est jointe par l'un de ses noms déclarés,
+l'avertissement sur un certificat qui ne porte pas son nom se tait : le navigateur a
+reçu celui du proxy. Voir
+[Derrière un proxy qui termine le TLS](/docs/operations/tls#derrire-un-proxy-qui-termine-le-tls).
 
 ## Autorités ACME
 
