@@ -2,6 +2,7 @@
 
 ## NEXT RELEASE
 
+- **plug 2.25.1 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **Released versions are signed.** Until now only `latest` and `eval` carried a
   signature: a release stamps the tested image with its version, which makes a new
   manifest, and nothing signed that one. Every tag a release pushes is now signed and
