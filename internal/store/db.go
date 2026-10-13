@@ -318,7 +318,7 @@ func openPostgres(dataDir, url string) (*Store, error) {
 		_ = raw.Close()
 		return nil, fmt.Errorf("store: the database named by MEERKAT_DATABASE_URL does not answer: %w", err)
 	}
-	s := &Store{db: &database{DB: raw, dialect: dialectPostgres}, dataDir: dataDir}
+	s := &Store{db: &database{DB: raw, dialect: dialectPostgres}, dataDir: dataDir, location: postgresLocation(url)}
 	if err := s.migrate(); err != nil {
 		_ = raw.Close()
 		return nil, err

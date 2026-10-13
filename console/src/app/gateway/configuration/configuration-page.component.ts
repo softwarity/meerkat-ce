@@ -21,9 +21,10 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
 //                  the dialogs that say what leaves and what would change.
 //   History        a restore point per change, to go back to any moment of
 //                  this gateway's configuration (CFG-06).
-//   Snapshot       a copy of the whole DATABASE, accounts and sessions and
-//                  audit included. A different artifact for a different day:
-//                  a configuration reproduces this gateway elsewhere, a
+//   Database       the whole DATABASE, accounts and sessions and audit
+//                  included: backed up, restored, moved to PostgreSQL and
+//                  back. A different artifact for a different day: a
+//                  configuration reproduces this gateway elsewhere, a
 //                  snapshot restores this one.
 //
 // There WAS an Import/export tab. Everything it held has a better place: the
@@ -32,7 +33,7 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
 // of three destinations. A tab holding nothing of its own is a tab.
 //
 // Routed tabs (mat-tab-nav-bar), like the built-in pages: a bookmark on the
-// snapshot procedure must come back to the snapshot procedure.
+// database procedure must come back to the database procedure.
 @Component({
   selector: 'app-configuration-page',
   imports: [
@@ -155,12 +156,12 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
       >
       <a
         mat-tab-link
-        routerLink="snapshot"
+        routerLink="database"
         routerLinkActive
-        #tSnap="routerLinkActive"
-        [active]="tSnap.isActive"
-        i18n="@@Snapshot"
-        >Snapshot</a
+        #tDb="routerLinkActive"
+        [active]="tDb.isActive"
+        i18n="@@Database_tab"
+        >Database</a
       >
     </nav>
     <mat-tab-nav-panel #panel>

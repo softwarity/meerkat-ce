@@ -1,10 +1,14 @@
 package admin
 
 import (
+	"context"
 	"maps"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/idp"
@@ -389,8 +393,20 @@ func (a *API) callbackBase(r *http.Request) string {
 // dataOrigin is where a sign-in actually happens, scheme and host. The admin
 // plane and the data plane are different origins, and every address a vendor
 // has to be given (GitHub asks for a homepage AND a callback) is rooted here,
-// never in the console's own address.
+// never in the console's own address. It is also where the console opens a
+// route ("Open this route in the data plane").
+//
+// A name the gateway can vouch for first, the console's own address last: a
+// name declared on the Application door as reached through a proxy that
+// terminates TLS (the proxy serves it on 443), else a name a certificate
+// placed on that door carries, on the HTTPS port the runtime publishes. Only
+// when neither exists is it the console's host with the data plane's port -
+// which behind an ingress or a proxy was the one address nobody outside can
+// reach.
 func (a *API) dataOrigin(r *http.Request) string {
+	if o := a.vouchedDataOrigin(r.Context()); o != "" {
+		return o
+	}
 	scheme := filters.Scheme(r)
 	host := a.DataAddr
 	if host == "" || strings.HasPrefix(host, ":") {
@@ -413,4 +429,52 @@ func requiredFeatureFor(kind string) error {
 		return edition.Require("SAML")
 	}
 	return nil
+}
+
+// vouchedDataOrigin is the data plane's address by a name the gateway can
+// vouch for (see dataOrigin), or "" when it has none.
+func (a *API) vouchedDataOrigin(ctx context.Context) string {
+	cfg := a.st.RawTLS(ctx)
+	if len(cfg.ProxiedApp) > 0 {
+		return "https://" + cfg.ProxiedApp[0]
+	}
+	rows, err := a.st.ListCertificates(ctx)
+	if err != nil {
+		return ""
+	}
+	for _, c := range rows {
+		if !c.App {
+			continue
+		}
+		for _, n := range c.Names() {
+			if strings.Contains(n, "*") || net.ParseIP(n) != nil || n == "localhost" {
+				continue
+			}
+			return "https://" + withPort(n, a.publishedAppTLSPort(ctx))
+		}
+	}
+	return ""
+}
+
+// publishedAppTLSPort is the port the world reaches the application's HTTPS
+// door on: the runtime's publication of the inside one, or the inside one.
+func (a *API) publishedAppTLSPort(ctx context.Context) string {
+	if a.TLS == nil {
+		return "443"
+	}
+	inside := portOf(a.TLS.State().AppAddr)
+	if n, err := strconv.Atoi(inside); err == nil {
+		if out, ok := discovery.Self(ctx).Ports[n]; ok && out > 0 {
+			return strconv.Itoa(out)
+		}
+	}
+	return inside
+}
+
+// withPort writes host:port, leaving out the port HTTPS implies.
+func withPort(host, port string) string {
+	if port == "" || port == "443" {
+		return host
+	}
+	return net.JoinHostPort(host, port)
 }

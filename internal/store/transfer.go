@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-// Moving a database whole (Configuration > Snapshot): into another database
+// Moving a database whole (Configuration > Database): into another database
 // of either kind, or into a file of either kind.
 //
 // GENERIC, and that is what keeps it true: the tables and their columns are

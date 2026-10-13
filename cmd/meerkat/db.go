@@ -13,7 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// meerkat db: the database moves of Configuration > Snapshot, for a script or
+// meerkat db: the database moves of Configuration > Database, for a script or
 // a Kubernetes Job run before a helm upgrade. The same engine as the console
 // (store/transfer.go); run it with the gateway stopped, or paused from the
 // console, so nothing is written while it copies.

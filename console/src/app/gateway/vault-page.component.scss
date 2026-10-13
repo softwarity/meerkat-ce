@@ -143,3 +143,21 @@ mat-row:last-of-type {
 }
 
 @include table.banded-rows;
+
+/* A secret the master key cannot open, and the line that counts them. */
+.unreadable {
+  color: var(--mat-sys-error);
+}
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+.problem mat-icon {
+  flex: none;
+}

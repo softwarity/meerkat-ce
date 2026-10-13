@@ -537,7 +537,9 @@ func (s *Supervisor) Proxied(plane string) func(host string) bool {
 		s.mu.Lock()
 		names := s.proxied[plane]
 		s.mu.Unlock()
-		return Covers(names, host)
+		// The name itself and nothing under it: one full name each.
+		host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+		return host != "" && slices.Contains(names, host)
 	}
 }
 

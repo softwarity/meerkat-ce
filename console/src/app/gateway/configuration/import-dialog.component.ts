@@ -18,10 +18,12 @@ import { PlanTableComponent } from './plan-table.component';
 // not a switch. The old screen expressed that as a "remove what the file does
 // not mention" checkbox; a choice between three sentences says the same thing
 // without asking anyone to reason about pruning.
+// keep: the lines of the plan kept out ("kind:id"), what the gateway holds
+// staying for them.
 export type ImportOutcome =
   | { where: 'name'; name: string }
-  | { where: 'replace' }
-  | { where: 'merge' };
+  | { where: 'replace'; keep?: string[] }
+  | { where: 'merge'; keep?: string[] };
 
 @Component({
   selector: 'app-import-dialog',
@@ -90,8 +92,12 @@ export type ImportOutcome =
         </p>
       </mat-radio-group>
 
+      <!-- Applied to the gateway: each line can be kept out, what the
+           gateway holds staying for it. -->
       <app-plan-table
         [plan]="plan()"
+        [selectable]="where() !== 'name'"
+        [(kept)]="kept"
         i18n-nothing="@@Nothing_would_change"
         nothing="This file matches what is already configured. Nothing would change."
       />
@@ -123,6 +129,7 @@ export class ImportDialogComponent {
   protected readonly where = signal<'name' | 'replace' | 'merge'>('name');
   protected readonly name = signal('');
   protected readonly plan = signal<ConfigPlan | null>(null);
+  protected readonly kept = signal<string[]>([]);
 
   constructor() {
     this.name.set(this.data.suggested);
@@ -133,6 +140,7 @@ export class ImportDialogComponent {
   protected pick(where: 'name' | 'replace' | 'merge'): void {
     this.where.set(where);
     this.plan.set(null);
+    this.kept.set([]);
     if (where === 'name') return;
     this.api.previewConfig(this.data.file, where === 'replace').subscribe({
       next: (p) => this.plan.set(p),
@@ -142,7 +150,7 @@ export class ImportDialogComponent {
 
   protected confirm(): void {
     const where = this.where();
-    this.ref.close(where === 'name' ? { where, name: this.name().trim() } : { where });
+    this.ref.close(where === 'name' ? { where, name: this.name().trim() } : { where, keep: this.kept() });
   }
 
 

@@ -44,6 +44,7 @@ export class VaultPageComponent {
 
   protected readonly loading = signal(true);
   protected readonly entries = computed(() => this.vault.entries());
+  protected readonly unreadable = computed(() => this.entries().filter((e) => e.unreadable).length);
   protected readonly columns = ['name', 'kind', 'value', 'usedBy'];
 
   // The editor lives in a right drawer here (the routes/users pattern), holding

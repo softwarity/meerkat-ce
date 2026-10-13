@@ -410,18 +410,18 @@ type Row = SavedConfiguration & { current?: boolean };
                   >
                     <mat-icon>content_copy</mat-icon>
                   </button>
-                  @if (saved().length > 1) {
-                    <button
-                      matIconButton
-                      (click)="$event.stopPropagation(); compare(c)"
-                      i18n-matTooltip="@@Compare_with"
-                      matTooltip="Compare with another saved configuration"
-                      i18n-aria-label="@@Compare_with"
-                      aria-label="Compare with another saved configuration"
-                    >
-                      <mat-icon>compare_arrows</mat-icon>
-                    </button>
-                  }
+                  <!-- On every saved row: what runs is always there to compare
+                       with, named or not. -->
+                  <button
+                    matIconButton
+                    (click)="$event.stopPropagation(); compare(c)"
+                    i18n-matTooltip="@@Compare_with_running"
+                    matTooltip="Compare with what runs, or another saved configuration"
+                    i18n-aria-label="@@Compare_with_running"
+                    aria-label="Compare with what runs, or another saved configuration"
+                  >
+                    <mat-icon>compare_arrows</mat-icon>
+                  </button>
                   <button
                     matIconButton
                     (click)="$event.stopPropagation(); download(c)"
@@ -747,15 +747,14 @@ export class ConfigurationManagementComponent {
     this.api.previewConfig(file, true).subscribe({
       next: async (plan) => {
         this.busy.set(false);
-        const ok = await this.dialogs.confirm({
-          title: $localize`:@@Apply_this_document:Apply this document?`,
-          message: this.planMessage(plan),
-          confirmLabel: $localize`:@@Save_and_apply:Save and apply`,
-          danger: this.removes(plan) > 0,
-        });
-        if (!ok) return;
+        const keep = await this.pickPlan(
+          $localize`:@@Apply_this_document:Apply this document?`,
+          $localize`:@@Save_and_apply:Save and apply`,
+          plan,
+        );
+        if (!keep) return;
         this.run(
-          this.api.importConfig(file, true),
+          this.api.importConfig(file, true, keep),
           $localize`:@@Configuration_imported:Configuration imported`,
         );
       },
@@ -863,7 +862,7 @@ export class ConfigurationManagementComponent {
     // the act itself. What it reserves empty in the vault is asked for
     // straight away - the one moment anyone still knows what a $name was.
     this.busy.set(true);
-    this.api.importConfig(file, outcome.where === 'replace').subscribe({
+    this.api.importConfig(file, outcome.where === 'replace', outcome.keep ?? []).subscribe({
       next: (plan) => {
         this.busy.set(false);
         this.reload();
@@ -884,38 +883,41 @@ export class ConfigurationManagementComponent {
     });
   }
 
+  // Before serving another configuration: is there anything to lose? The
+  // question is not "is there a mark" but "does anything hold what is
+  // running": a gateway that drifted from the configuration it was saved as
+  // has just as much to lose as one that was never saved.
+  private async nothingToLose(): Promise<boolean> {
+    if (this.state() === 'saved') return true;
+    return this.dialogs.confirm({
+      title: $localize`:@@Nothing_saved_first:What is running is not saved`,
+      message:
+        this.state() === 'drifted'
+          ? $localize`:@@Drifted_first_message:This gateway has changed since ${this.current()?.active?.name}:name: was saved. Switching loses those changes.`
+          : $localize`:@@Nothing_saved_first_message:No saved configuration matches what this gateway serves. Save it under a name first if you may want it again.`,
+      confirmLabel: $localize`:@@Continue:Continue`,
+      danger: true,
+    });
+  }
+
   // The one act that touches what is served. Two questions, in the order they
   // matter: is there anything to lose (a running state nobody saved), and what
   // exactly would change.
   protected async setAsCurrent(c: SavedConfiguration): Promise<void> {
-    // The question is not "is there a mark" but "does anything hold what is
-    // running": a gateway that drifted from the configuration it was saved as
-    // has just as much to lose as one that was never saved.
-    if (this.state() !== 'saved') {
-      const ok = await this.dialogs.confirm({
-        title: $localize`:@@Nothing_saved_first:What is running is not saved`,
-        message:
-          this.state() === 'drifted'
-            ? $localize`:@@Drifted_first_message:This gateway has changed since ${this.current()?.active?.name}:name: was saved. Switching loses those changes.`
-            : $localize`:@@Nothing_saved_first_message:No saved configuration matches what this gateway serves. Save it under a name first if you may want it again.`,
-        confirmLabel: $localize`:@@Continue:Continue`,
-        danger: true,
-      });
-      if (!ok) return;
-    }
+    if (!(await this.nothingToLose())) return;
     this.busy.set(true);
     this.api.configurationPlan(c.id).subscribe({
       next: async (plan) => {
         this.busy.set(false);
-        const ok = await this.dialogs.confirm({
-          title: $localize`:@@Set_as_current_WHAT:Serve ${c.name}:name:?`,
-          message: this.planMessage(plan),
-          confirmLabel: $localize`:@@Set_as_current:Set as current`,
-          danger: this.removes(plan) > 0,
-        });
-        if (!ok) return;
+        const keep = await this.pickPlan(
+          $localize`:@@Set_as_current_WHAT:Serve ${c.name}:name:?`,
+          // Not "Set as current": with lines unticked, it is part of it.
+          $localize`:@@Apply_to_current:Apply to current`,
+          plan,
+        );
+        if (!keep) return;
         this.run(
-          this.api.activateConfiguration(c.id),
+          this.api.activateConfiguration(c.id, keep),
           $localize`:@@Configuration_activated:Configuration activated`,
         );
       },
@@ -926,11 +928,14 @@ export class ConfigurationManagementComponent {
     });
   }
 
-  // Two saved configurations against each other, what runs left out (CFG-04).
+  // A saved configuration against what runs, or against another saved one
+  // (CFG-04). Opens on what runs: the comparison an unsaved state can only
+  // be part of, and the one asked most.
   protected compare(c: SavedConfiguration): void {
     this.dialog.open(CompareDialogComponent, {
       data: { from: c, others: this.saved().filter((o) => o.id !== c.id) },
-      width: '680px',
+      width: '760px',
+      maxWidth: '92vw',
     });
   }
 
@@ -1008,7 +1013,7 @@ export class ConfigurationManagementComponent {
         this.busy.set(false);
         this.workingId.set('');
         this.reload();
-        this.showPull(result, choice.remoteId);
+        void this.showPull(result, choice.remoteId);
       },
       error: (err: unknown) => {
         this.busy.set(false);
@@ -1030,7 +1035,7 @@ export class ConfigurationManagementComponent {
         this.busy.set(false);
         this.workingId.set('');
         this.reload();
-        this.showPull(result, c.remoteId ?? '');
+        void this.showPull(result, c.remoteId ?? '');
       },
       error: (err: unknown) => {
         this.busy.set(false);
@@ -1040,15 +1045,26 @@ export class ConfigurationManagementComponent {
     });
   }
 
-  private showPull(result: { configuration: SavedConfiguration }, remoteId: string): void {
+  // What a pull brought, with its plan tickable line by line: Set as current
+  // there serves it straight away, the unticked lines kept as they are.
+  private async showPull(result: { configuration: SavedConfiguration }, remoteId: string): Promise<void> {
     const r = this.remotes().find((o) => o.id === remoteId);
-    this.dialog.open(PullResultDialogComponent, {
-      data: { result, location: r?.name ?? '' },
-      // Wider than Material's 560px, set on the dialog and not on its
-      // content: content wider than its dialog scrolls sideways.
-      width: '680px',
-      maxWidth: '92vw',
-    });
+    const answer = await firstValueFrom(
+      this.dialog
+        .open(PullResultDialogComponent, {
+          data: { result, location: r?.name ?? '' },
+          // Wider than Material's 560px, set on the dialog and not on its
+          // content: content wider than its dialog scrolls sideways.
+          width: '760px',
+          maxWidth: '92vw',
+        })
+        .afterClosed(),
+    );
+    if (!answer || !(await this.nothingToLose())) return;
+    this.run(
+      this.api.activateConfiguration(result.configuration.id, answer.keep),
+      $localize`:@@Configuration_activated:Configuration activated`,
+    );
   }
 
   // Pushing WHAT IS RUNNING. A repository holds named configurations, not a
@@ -1183,24 +1199,16 @@ export class ConfigurationManagementComponent {
   // "3 added, 2 updated, 1 removed" - and the removals spelled out, because
   // they are the ones nobody expects. Setting a configuration as current
   // prunes: that is what makes it a switch and not a merge.
-  private planMessage(plan: ConfigPlan): string {
-    const count = (action: string) => plan.changes.filter((c) => c.action === action).length;
-    const added = count('add');
-    const updated = count('update');
-    const removed = this.removes(plan);
-    if (!added && !updated && !removed) {
-      return $localize`:@@Activate_no_change:This gateway already matches this configuration. Nothing changes.`;
-    }
-    const gone = plan.changes
-      .filter((c) => c.action === 'remove')
-      .map((c) => c.label)
-      .join(', ');
-    const head = $localize`:@@Activate_counts:${added}:added: added, ${updated}:updated: updated, ${removed}:removed: removed.`;
-    return removed ? head + ' ' + $localize`:@@Activate_removed_list:What goes: ${gone}:gone:.` : head;
-  }
-
-  private removes(plan: ConfigPlan): number {
-    return plan.changes.filter((c) => c.action === 'remove').length;
+  // The plan before it is applied, each line tickable (apply-plan-dialog):
+  // the lines kept out, or null when cancelled. Loaded when opened.
+  private async pickPlan(title: string, confirmLabel: string, plan: ConfigPlan): Promise<string[] | null> {
+    const { ApplyPlanDialogComponent } = await import('./apply-plan-dialog.component');
+    const ref = this.dialog.open(ApplyPlanDialogComponent, {
+      data: { title, confirmLabel, plan },
+      width: '760px',
+      maxWidth: '760px',
+    });
+    return (await firstValueFrom(ref.afterClosed())) ?? null;
   }
 
   // Every mutation ends the same way: unlock, reload the list, say so. The list

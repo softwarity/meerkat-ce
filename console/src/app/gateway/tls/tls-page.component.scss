@@ -521,3 +521,19 @@ textarea.pem {
   font-size: 0.75rem;
   color: var(--mat-sys-on-surface-variant);
 }
+
+/* One or the other, at the top of a door: who presents its names. */
+.mode {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.mode-label {
+  font: var(--mat-sys-label-large);
+  color: var(--mat-sys-on-surface-variant);
+}
+.mode-note {
+  margin: 0 0 12px;
+}

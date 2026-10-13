@@ -2,7 +2,7 @@
 title: Configuration
 section: La console
 order: 162
-summary: Transporter la configuration d'une gateway - configurations nommées, points de reprise et snapshot complet de la base de données.
+summary: Transporter la configuration d'une gateway - configurations nommées, points de reprise, et la base de données entière sauvegardée, restaurée et déplacée.
 ---
 
 # Configuration
@@ -19,7 +19,7 @@ configuration, c'est ce avec quoi vit cette gateway.
 |---|---|
 | **Management** | Ce qui tourne, ce qui est en réserve, et l'entrée et la sortie des fichiers |
 | **History** | Revenir à n'importe quel moment de la configuration de cette gateway |
-| **Snapshot** | Sauvegarder et restaurer la base de données entière |
+| **Database** | Sauvegarder, restaurer et déplacer la base de données entière |
 
 Chaque onglet est une route à part entière : un favori y ramène donc directement.
 
@@ -58,6 +58,20 @@ c'est donc la seule action qui demande confirmation - et elle le fait en présen
 **la liste de ce qu'elle modifierait**, précédée d'un avertissement quand ce qui tourne
 n'a jamais été enregistré : c'est la seule opération qui ne laisse rien à quoi revenir.
 
+Chaque ligne de cette liste peut être **décochée**, et une ligne décochée garde ce que
+la gateway détient pour elle, quoi que dise la ligne : une route que la configuration
+supprimerait reste, un objet qu'elle modifierait garde sa version actuelle, un objet
+qu'elle ajouterait n'est pas créé. La case au-dessus des lignes les coche ou les
+décoche toutes ; **Apply to current** est inactif tant qu'aucune n'est cochée, et ne
+passe au rouge que tant qu'une suppression reste à faire. Le même choix est offert à l'import d'un fichier sur la gateway et à la
+modification du document en cours. Ensuite, la gateway n'est plus exactement la
+configuration enregistrée, et l'écran le dit : elle a changé depuis l'enregistrement de
+cette configuration, et l'enregistrer à nouveau garde ce que vous avez choisi. Une
+ligne dont le reste de la configuration ne peut pas se passer est refusée, avec ce qui
+bloque, et rien n'est appliqué à moitié.
+
+![Set as current, une route que la configuration supprimerait gardée en décochant sa ligne](img/console/configuration-keep.webp)
+
 ### Exporter
 
 La boîte de dialogue indique ce que le fichier contient et ce qu'il ne contient pas,
@@ -91,15 +105,20 @@ aussitôt.
 > le plafond soit atteint ; l'édition Enterprise en conserve autant que vous le
 > souhaitez.
 
-### Comparer deux configurations enregistrées
+### Comparer une configuration
 
-Dès que la réserve en contient au moins deux, une ligne enregistrée propose **Compare
-with another saved configuration** : choisissez la seconde, et la boîte de dialogue
-liste ce qui change quand on passe de la première à la seconde - ajouts, mises à jour,
-suppressions, objet par objet, avec les champs qui ont changé à l'intérieur d'une mise
-à jour. Ce qui tourne n'entre pas en ligne de compte : c'est la question que l'on pose
-à propos de la configuration d'un client et du modèle dont elle est issue, avant de
-toucher à l'une ou à l'autre. `GET /api/configurations/{id}/compare/{other}`.
+Chaque ligne enregistrée propose **Compare**, et la boîte de dialogue s'ouvre sur **ce
+que la gateway sert maintenant** : ce que servir cette configuration changerait ici -
+ajouts, mises à jour, suppressions, objet par objet, avec les champs qui ont changé à
+l'intérieur d'une mise à jour - le même plan que *Set as current*, lu sans rien
+appliquer. Ce qui tourne n'a pas besoin d'un nom pour être comparé.
+`GET /api/configurations/{id}/plan`.
+
+La liste propose aussi les autres configurations enregistrées : la boîte de dialogue
+liste alors ce qui change quand on passe de la première à la seconde, sans tenir compte
+de ce qui tourne - la question que l'on pose à propos de la configuration d'un client et
+du modèle dont elle est issue, avant de toucher à l'une ou à l'autre.
+`GET /api/configurations/{id}/compare/{other}`.
 
 ## Dépôt git
 
@@ -142,9 +161,10 @@ choisir, ni aucune convention à établir.
 et **n'applique rien**. La gateway continue de servir ce qu'elle servait ; ce que
 vous obtenez en retour, c'est le plan - ce que l'activation ajouterait, modifierait et
 supprimerait, ainsi que les entrées du coffre que la configuration attend et que cette
-installation n'a pas. Vous lisez ce plan, puis vous cliquez sur **Set as current**
-quand il annonce ce que vous attendiez, et vous le relisez une dernière fois au
-passage.
+installation n'a pas, chaque ligne pouvant être cochée ou non. Vous lisez ce plan, et
+**Apply to current** dans cette même fenêtre sert la configuration, les lignes décochées
+restant telles que la gateway les détient ; **Close** la garde enregistrée, à servir
+plus tard depuis sa ligne.
 
 Ce fonctionnement est voulu et n'est pas négociable : quiconque peut écrire sur cette
 branche ne doit pas pouvoir reconfigurer une gateway. Il n'y a pas de réconciliation
@@ -224,14 +244,15 @@ Une configuration enregistrée et un point de reprise sont volontairement deux o
 distincts : la première est intentionnelle et nommée (*la configuration d'Acme*), le
 second automatique et horodaté (*l'état à 14 h 32*).
 
-## Snapshot
+## Database
 
-![L'onglet Snapshot : la pause, la base sur laquelle tourne la gateway, le téléchargement et les étapes de restauration](img/console/database.webp)
+![L'onglet Database : la pause, la base sur laquelle tourne la gateway et la plateforme qui la déploie, le téléchargement et les étapes de restauration](img/console/database.webp)
 
 Une copie cohérente de **toute la base de données**, prise pendant que la gateway
 tourne : les routes et le coffre, mais aussi les utilisateurs, les organisations, les
 sessions et le journal d'audit. C'est ce que restaure une sauvegarde ; un export de
-configuration, lui, est ce que reproduit une seconde gateway.
+configuration, lui, est ce que reproduit une seconde gateway. L'onglet s'appelait
+*Snapshot* tant qu'il ne faisait que sauvegarder ; l'ancienne adresse mène toujours ici.
 
 Meerkat prend lui-même le snapshot, car copier avec `cp` une base de données en cours
 d'utilisation peut la saisir en pleine écriture, et rien ne le signale avant le jour de
@@ -240,8 +261,11 @@ de votre outil de sauvegarde.
 
 **Il n'y a pas de bouton de restauration, et c'est voulu.** Une base de données ne se
 remplace pas sous le processus qui la tient ouverte. À la place, l'onglet affiche les
-commandes exactes, avec les chemins propres à cette installation, et vous rappelle de
-conserver l'ancien fichier jusqu'à ce que le nouveau ait fait ses preuves.
+commandes exactes, avec les chemins propres à cette installation, **pour la plateforme
+sur laquelle elle tourne** - le runtime le dit : un Deployment Kubernetes ou OpenShift
+et sa release Helm, un service Swarm, un projet compose, un conteneur. *Written for* en choisit une autre, pour un runtime que la gateway n'a pas
+pu interroger. L'ancien fichier est mis de côté jusqu'à ce que le nouveau ait fait ses
+preuves.
 
 > [!WARNING]
 > Si la clé maîtresse se trouve à côté de la base de données, les sauvegarder ensemble
@@ -250,10 +274,20 @@ conserver l'ancien fichier jusqu'à ce que le nouveau ait fait ses preuves.
 > ou fournissez-la par `MEERKAT_VAULT_KEY` ; l'onglet indique laquelle des deux
 > solutions utilise cette gateway.
 
-
 Le même onglet **déplace** la base, entre la base embarquée et PostgreSQL, vers un
-fichier ou directement vers un serveur, avec l'interrupteur **Pause** qui rend la
-copie complète : voir [déplacer la base](/docs/operations/backup-restore#dplacer-la-base--embarque-et-postgresql).
+fichier ou directement vers un serveur. Un déplacement est **une seule procédure
+numérotée**, affichée dès le départ : créer la base et son utilisateur (le SQL que
+lance un administrateur de bases de données), tester le serveur, mettre en pause,
+copier, basculer le déploiement, vérifier une route et une connexion, et le chemin du
+retour - chaque étape cochée quand elle est faite.
+
+![Le passage à PostgreSQL avant la copie : la cible, le SQL qui la crée, les étapes qui restent](img/console/database-migrate.webp)
+
+La gateway se souvient de la copie - où elle est allée et ce qu'elle a emporté, jamais
+le mot de passe - si bien qu'un rechargement au milieu d'une migration, sur n'importe
+quel nœud, ramène à la même procédure. **Dismiss** l'oublie ; elle s'efface d'elle-même
+quand la gateway tourne sur cette base. Voir
+[déplacer la base](/docs/operations/backup-restore#dplacer-la-base--embarque-et-postgresql).
 
 ## Pièges
 
@@ -263,7 +297,7 @@ copie complète : voir [déplacer la base](/docs/operations/backup-restore#dplac
 - **Replace supprime ce qui manque, Add non.** Lisez le plan ; c'est toute la
   différence entre une fusion et un écrasement.
 - **Une configuration n'est pas une sauvegarde.** Les utilisateurs et les sessions n'en
-  font pas partie. C'est à cela que sert l'onglet Snapshot.
+  font pas partie. C'est à cela que sert l'onglet Database.
 - **L'image Community écarte les parties Enterprise.** Une configuration exportée d'une
   gateway Enterprise s'importe dans une gateway Community sans ses heures
   ouvrées, sa disposition, sa mention masquée, son export OpenTelemetry, ses annuaires,

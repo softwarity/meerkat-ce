@@ -1,8 +1,9 @@
 :host {
   display: block;
-  /* Clear of the drop zone above: the floating label sits on the field's top
-     edge, and the zone's dashed border ran right through it. */
-  margin-top: 16px;
+  /* Room on both sides: clear of the drop zone above, whose dashed border ran
+     through the floating label, and apart from Force HTTPS below - three
+     settings of one door, not one block. */
+  margin: 24px 0 20px;
 }
 /* The field and its info marker on one line - app-form-field's layout, which
    cannot host a chip grid (it projects a matInput). */

@@ -1,4 +1,5 @@
-import { Component, computed, input } from '@angular/core';
+import { booleanAttribute, Component, computed, input, model } from '@angular/core';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { ConfigPlan } from '../../api.service';
 
@@ -16,21 +17,39 @@ import { ConfigPlan } from '../../api.service';
 // download both and diff them by hand.
 @Component({
   selector: 'app-plan-table',
-  imports: [MatIconModule],
+  imports: [MatCheckboxModule, MatIconModule],
   styles: [
     `
       :host {
         display: block;
       }
+      .lines {
+        max-height: 50vh;
+        overflow-y: auto;
+        margin: 12px 0;
+      }
       table {
         width: 100%;
         border-collapse: collapse;
-        margin: 12px 0;
         font-size: 0.85rem;
       }
       td {
         padding: 4px 8px 4px 0;
+        line-height: 20px;
         vertical-align: top;
+      }
+      /* The checkbox sits in a 40px touch target, its box centred in it: the
+         text of a selectable row starts 10px lower, so its first line is
+         centred on the box and a second line hangs below. */
+      table.selectable td {
+        padding-top: 10px;
+      }
+      table.selectable td.pick {
+        padding: 0;
+      }
+      /* And its box flush with the hint above, not 11px in. */
+      td.pick mat-checkbox {
+        margin-left: -11px;
       }
       .act {
         width: 90px;
@@ -50,6 +69,25 @@ import { ConfigPlan } from '../../api.service';
         font-family: var(--mk-mono, monospace);
         font-size: 0.75rem;
         color: var(--mat-sys-on-surface-variant);
+      }
+      .pick {
+        width: 48px;
+      }
+      tr.kept td:not(.pick) {
+        opacity: 0.55;
+      }
+      tr.kept .act {
+        text-decoration: line-through;
+      }
+      /* The box that ticks them all stays in sight while the lines scroll,
+         on the dialog's own surface so they pass under it. */
+      tr.all td {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--mat-sys-surface);
+        color: var(--mat-sys-on-surface-variant);
+        border-bottom: 1px solid var(--mat-sys-outline-variant);
       }
       .note {
         display: flex;
@@ -81,20 +119,53 @@ import { ConfigPlan } from '../../api.service';
           <span>{{ nothingLabel() }}</span>
         </div>
       } @else {
-        <table>
-          @for (c of changes(); track c.kind + c.id + c.label) {
-            <tr>
-              <td class="act" [class]="c.action">{{ label(c.action) }}</td>
-              <td class="kind">{{ kindLabel(c.kind) }}</td>
-              <td>
-                {{ c.label || c.id }}
-                @if (c.fields?.length) {
-                  <div class="fields">{{ c.fields!.join(', ') }}</div>
+        <!-- A long plan scrolls here, beside its lines, rather than taking
+             the notes below and the dialog's buttons with it. -->
+        <div class="lines">
+          <table [class.selectable]="selectable()">
+            @if (selectable()) {
+              <!-- Each line can be kept out: what the gateway holds now stays as
+                   it is (internal/config/keep.go). Unticked is kept; the box
+                   above ticks or unticks them all. -->
+              <tr class="all">
+                <td class="pick">
+                  <mat-checkbox
+                    [checked]="kept().length === 0"
+                    [indeterminate]="kept().length > 0 && kept().length < keepableCount()"
+                    (change)="$event.checked ? kept.set([]) : keepAll()"
+                    i18n-aria-label="@@Apply_every_line"
+                    aria-label="Apply every line"
+                  />
+                </td>
+                <td colspan="3" i18n="@@Plan_pick_hint">Untick a line to keep what this gateway holds for it.</td>
+              </tr>
+            }
+            @for (c of changes(); track c.kind + c.id + c.label) {
+              <tr [class.kept]="isKept(c)">
+                @if (selectable()) {
+                  <td class="pick">
+                    @if (keepable(c)) {
+                      <mat-checkbox
+                        [checked]="!isKept(c)"
+                        (change)="toggle(c, $event.checked)"
+                        i18n-aria-label="@@Apply_this_line"
+                        aria-label="Apply this line"
+                      />
+                    }
+                  </td>
                 }
-              </td>
-            </tr>
-          }
-        </table>
+                <td class="act" [class]="c.action">{{ label(c.action) }}</td>
+                <td class="kind">{{ kindLabel(c.kind) }}</td>
+                <td>
+                  {{ c.label || c.id }}
+                  @if (c.fields?.length) {
+                    <div class="fields">{{ c.fields!.join(', ') }}</div>
+                  }
+                </td>
+              </tr>
+            }
+          </table>
+        </div>
       }
       @if (p.missing.length) {
         <div class="note warn">
@@ -126,6 +197,42 @@ export class PlanTableComponent {
   // What to say when nothing moves. It is not the same sentence everywhere: a
   // file that matches is reassuring, two identical configurations are a fact.
   readonly nothing = input('');
+  // Lines can be kept out (activation, import): what the gateway holds now
+  // stays for them. Off for a comparison, which applies nothing.
+  readonly selectable = input(false, { transform: booleanAttribute });
+  // The lines kept out, as the API takes them: "kind:id".
+  readonly kept = model<string[]>([]);
+
+  // A deposited spec or file follows its route: keeping the route keeps them.
+  private static readonly keepableKinds = ['route', 'role', 'group', 'authProvider', 'theme', 'tenant', 'mailRelay', 'setting'];
+
+  protected keepable(c: { kind: string }): boolean {
+    return PlanTableComponent.keepableKinds.includes(c.kind);
+  }
+
+  private ref(c: { kind: string; id?: string }): string {
+    return `${c.kind}:${c.id ?? ''}`;
+  }
+
+  // A route's spec and files go with their route.
+  protected isKept(c: { kind: string; id?: string }): boolean {
+    const kind = c.kind === 'route.spec' || c.kind === 'route.file' ? 'route' : c.kind;
+    return this.kept().includes(this.ref({ kind, id: c.id }));
+  }
+
+  protected toggle(c: { kind: string; id?: string }, apply: boolean): void {
+    const r = this.ref(c);
+    this.kept.update((k) => (apply ? k.filter((x) => x !== r) : [...new Set([...k, r])]));
+  }
+
+  private readonly allRefs = computed(() => [
+    ...new Set(this.changes().filter((c) => this.keepable(c)).map((c) => this.ref(c))),
+  ]);
+  protected readonly keepableCount = computed(() => this.allRefs().length);
+
+  protected keepAll(): void {
+    this.kept.set(this.allRefs());
+  }
 
   protected readonly nothingLabel = computed(
     () => this.nothing() || $localize`:@@Nothing_would_change_here:Nothing would change.`,

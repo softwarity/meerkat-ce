@@ -755,6 +755,54 @@
         "docs/operations/vault",
         "showcase/index"
       ]
+    },
+    {
+      "file": "img/console/configuration-keep.webp",
+      "plane": "admin",
+      "path": "/system/configuration",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/configuration"
+      ]
+    },
+    {
+      "file": "img/console/database.webp",
+      "plane": "admin",
+      "path": "/system/configuration/database",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/configuration"
+      ]
+    },
+    {
+      "file": "img/console/database-migrate.webp",
+      "plane": "admin",
+      "path": "/system/configuration/database",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/configuration"
+      ]
+    },
+    {
+      "file": "img/console/tls-proxied.webp",
+      "plane": "admin",
+      "path": "/infra/tls",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "docs/console/tls"
+      ]
     }
   ],
   "instances": {
@@ -766,7 +814,7 @@
       "data": "http://gateway.acme.example:8087",
       "loopback": {
         "admin": "http://127.0.0.1:9097",
-      "internal": "http://127.0.0.1:7097",
+        "internal": "http://127.0.0.1:7097",
         "data": "http://127.0.0.1:8087"
       }
     }

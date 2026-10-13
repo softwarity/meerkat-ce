@@ -623,7 +623,7 @@ func TestAProxiedNameOnlyVouchesForALink(t *testing.T) {
 		app: []*Material{app}, appFallback: app,
 		settings: Settings{
 			Redirect: true, HSTSMaxAge: 86400,
-			ProxiedApp:     []string{"Shop.Example.org", "*.apps.example.org"},
+			ProxiedApp:     []string{"Shop.Example.org"},
 			ProxiedConsole: []string{"admin.example.org"},
 		},
 	}
@@ -638,13 +638,11 @@ func TestAProxiedNameOnlyVouchesForALink(t *testing.T) {
 
 	appProxied, consoleProxied := sup.Proxied(PlaneApp), sup.Proxied(PlaneConsole)
 	for host, want := range map[string]bool{
-		"shop.example.org":      true,
-		"SHOP.example.org":      true,
-		"eu.apps.example.org":   true,
-		"a.eu.apps.example.org": false,
-		"apps.example.org":      false,
-		"admin.example.org":     false, // the console's, not the application's
-		"app.example.com":       false, // a certificate's: the other rule
+		"shop.example.org":    true,
+		"SHOP.example.org":    true,
+		"eu.shop.example.org": false, // the name itself, nothing under it
+		"admin.example.org":   false, // the console's, not the application's
+		"app.example.com":     false, // a certificate's: the other rule
 	} {
 		if got := appProxied(host); got != want {
 			t.Errorf("application, %s: %v, want %v", host, got, want)
@@ -658,7 +656,7 @@ func TestAProxiedNameOnlyVouchesForALink(t *testing.T) {
 	}
 
 	h := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }))
-	for host, redirected := range map[string]bool{"app.example.com:8080": true, "shop.example.org": false, "eu.apps.example.org": false} {
+	for host, redirected := range map[string]bool{"app.example.com:8080": true, "shop.example.org": false} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://"+host+"/x", nil))
 		if got := rec.Code == http.StatusMovedPermanently; got != redirected {

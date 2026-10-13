@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -589,6 +590,33 @@ func TestACertificateNeverTravels(t *testing.T) {
 	for _, forbidden := range []string{"PRIVATE KEY", "BEGIN CERTIFICATE", "certPem", "keyPem", "literal-hmac-key"} {
 		if strings.Contains(out, forbidden) {
 			t.Fatalf("an export carried %q - a document that calls itself public must never hold key material", forbidden)
+		}
+	}
+}
+
+// A plan's lists are lists in JSON, never null: the console reads them as
+// such, and a null missing emptied the whole activation dialog.
+func TestPlanListsAreNeverNull(t *testing.T) {
+	// A fresh store: nothing references the vault, so nothing is missing.
+	st := openTemp(t)
+	ctx := context.Background()
+	doc, _, err := Export(ctx, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, preview := range map[string]func() (*Plan, error){
+		"preview":        func() (*Plan, error) { return Preview(ctx, st, doc, false) },
+		"preview switch": func() (*Plan, error) { return PreviewSwitch(ctx, st, doc) },
+	} {
+		plan, err := preview()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		b, _ := json.Marshal(plan)
+		for _, key := range []string{`"changes":null`, `"missing":null`, `"missingFiles":null`} {
+			if strings.Contains(string(b), key) {
+				t.Errorf("%s answers %s: %s", name, key, b)
+			}
 		}
 	}
 }

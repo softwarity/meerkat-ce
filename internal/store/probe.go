@@ -10,7 +10,7 @@ import (
 )
 
 // Probe is what a PostgreSQL server says about itself to a gateway about to
-// copy into it (Configuration > Snapshot, Test).
+// copy into it (Configuration > Database, Test).
 type Probe struct {
 	// Version is the server's own version string, short.
 	Version string `json:"version"`

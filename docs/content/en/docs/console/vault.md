@@ -29,11 +29,20 @@ Name and description, kind, value (or *encrypted, never shown*), and **Used by**
 the column that tells a live entry from a leftover. Clicking a row opens the
 editor; the + creates an entry.
 
+A secret this gateway's master key cannot open reads *cannot be decrypted with
+this master key*, and a line above the list counts them. It is what a migration
+under another key leaves: every name is listed and none of the values resolves. The
+gateway checks each secret by opening it, and sends a yes or a no - never the
+value. Start it with the key the secrets were sealed with (`MEERKAT_VAULT_KEY`, or
+`MEERKAT_VAULT_KEY_PREVIOUS` while rotating), or type each value again.
+
 An entry carries:
 
 - **Name** - what `$name` will say.
 - **Kind** - value or secret, chosen on a toggle.
-- **Value** - typed once for a secret.
+- **Value** - typed once for a secret. A stored secret's box stays closed, since
+  the value never comes back to the console; its **pencil** opens it to type a new
+  one, and cancelling keeps the stored secret.
 - **Description** - for whoever finds it in six months.
 - **Reminder date** - the day the secret expires at its source. **It is purely a
   reminder**: the gateway cannot know a token was renewed at the provider, so

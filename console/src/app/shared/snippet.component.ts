@@ -2,6 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, effect, inject, input,
 import { json } from '@codemirror/lang-json';
 import { StreamLanguage } from '@codemirror/language';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { pgSQL } from '@codemirror/legacy-modes/mode/sql';
 import { yaml } from '@codemirror/lang-yaml';
 import { Compartment, EditorState, RangeSetBuilder } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
@@ -180,6 +181,7 @@ export class SnippetComponent implements AfterViewInit, OnDestroy {
     if (/\.ya?ml$/.test(name)) return [yaml()];
     if (/\.jsonc?$/.test(name)) return [json()];
     if (/\.sh$/.test(name)) return [shellLanguage];
+    if (/\.sql$/.test(name)) return [sqlLanguage];
     return [hashComments];
   }
 
@@ -212,6 +214,8 @@ const comment = Decoration.mark({ class: 'cm-comment' });
 // CodeMirror's own shell mode, from its legacy-modes package: a stream
 // tokenizer rather than a grammar, which is all a command line needs.
 const shellLanguage = StreamLanguage.define(shell);
+// And its SQL mode, in PostgreSQL's dialect: the statements a DBA is handed.
+const sqlLanguage = StreamLanguage.define(pgSQL);
 
 const hashComments = ViewPlugin.fromClass(
   class {

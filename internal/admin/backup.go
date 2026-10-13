@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -34,12 +35,18 @@ func (a *API) registerBackup(mux Mux) {
 	mux.Handle("GET /api/backup/info", a.rootOnly(a.backupInfo))
 	mux.Handle("POST /api/backup/copy", a.rootOnly(a.copyDatabase))
 	mux.Handle("POST /api/backup/check", a.rootOnly(a.checkDatabase))
+	mux.Handle("DELETE /api/backup/last-copy", a.rootOnly(a.forgetCopy))
 }
 
 // backupInfo tells the console where this installation keeps its state, so the
-// restore procedure it prints carries the REAL paths and can be pasted as is.
-func (a *API) backupInfo(w http.ResponseWriter, _ *http.Request, _ store.User) {
+// restore procedure it prints carries the REAL paths and can be pasted as is -
+// and what it runs on, so the switch it prints is the one for THIS platform.
+func (a *API) backupInfo(w http.ResponseWriter, r *http.Request, _ store.User) {
 	layout := a.st.Where()
+	lookup := a.LookupPlatform
+	if lookup == nil {
+		lookup = discovery.Runtime
+	}
 	out := map[string]any{
 		"dataDir":    layout.DataDir,
 		"dbFile":     layout.DBFile,
@@ -47,12 +54,28 @@ func (a *API) backupInfo(w http.ResponseWriter, _ *http.Request, _ store.User) {
 		"keyFromEnv": layout.KeyFromEnv,
 		// What this gateway runs on, so the screen can tell a restore from a
 		// migration.
-		"dialect": a.st.Dialect(),
+		"dialect":  a.st.Dialect(),
+		"platform": lookup(r.Context()),
 	}
 	if info, err := os.Stat(layout.DBFile); err == nil {
 		out["size"] = info.Size()
 	}
+	// The copy a migration is in the middle of, so a reload - on this node or
+	// another - comes back to the same procedure.
+	if c, err := a.st.LastCopy(r.Context()); err == nil && c != nil {
+		out["lastCopy"] = c
+	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// forgetCopy dismisses the remembered copy: an operator who went another way,
+// or who is done with it.
+func (a *API) forgetCopy(w http.ResponseWriter, r *http.Request, _ store.User) {
+	if err := a.st.ForgetCopy(r.Context()); err != nil {
+		a.internal(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // downloadSnapshot serves a coherent copy of the database.
@@ -299,6 +322,15 @@ func (a *API) copyDatabase(w http.ResponseWriter, r *http.Request, actor store.U
 		ActorID: actor.ID, Action: "backup.migrate", Target: "backup", TargetName: target,
 		Detail: fmt.Sprintf("copied from %s: %d tables, %d rows", a.st.Dialect(), len(tables), rows),
 	})
+	// Remembered in THIS database - the one being left - so the procedure
+	// survives a reload. Host, database, user and SSL mode: the URL it is read
+	// from carries the password, the record has no field for it.
+	if c, err := store.LastCopyOf(p.URL); err == nil {
+		c.Tables, c.Rows, c.By = len(tables), rows, actor.Username
+		if err := a.st.RememberCopy(r.Context(), c); err != nil {
+			slog.Warn("the copy is done, but this gateway could not remember it", "err", err)
+		}
+	}
 	writeJSON(w, http.StatusOK, copyAnswer{Target: target, Tables: tables, Rows: rows})
 }
 

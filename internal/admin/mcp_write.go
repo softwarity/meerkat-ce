@@ -466,7 +466,7 @@ func (a *API) toolImportConfiguration(ctx context.Context, args json.RawMessage)
 			"note": "Nothing was changed. Call again without dryRun to apply this.",
 		}, nil
 	}
-	plan, err := a.applyDocument(ctx, doc, in.Prune, mcpActor(ctx))
+	plan, err := a.applyDocument(ctx, doc, in.Prune, mcpActor(ctx), nil)
 	if err != nil {
 		return nil, err
 	}

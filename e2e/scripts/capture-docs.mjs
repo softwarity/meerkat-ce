@@ -22,7 +22,7 @@ const tmp = fileURLToPath(new URL('../.capture', import.meta.url));
 const out = `${repo}/docs/public/img/console`;
 const bin = `${tmp}/meerkat`;
 // The data directory sits at a path that says nothing about the machine: the
-// snapshot screen prints it in its restore script, and a home directory in a
+// database screen prints it in its restore script, and a home directory in a
 // published image is somebody's name.
 const DATA_DIR = '/tmp/meerkat-docs/data';
 const DATA = 'http://localhost:18084';
@@ -521,8 +521,10 @@ const SHOTS = [
     act: async (page) => {
       await page.locator('mat-expansion-panel-header', { hasText: 'Application' }).first().click();
       await page.waitForTimeout(600);
+      await page.locator('mat-expansion-panel.mat-expanded mat-button-toggle', { hasText: 'A proxy in front' }).locator('button').click();
+      await page.waitForTimeout(400);
       const input = page.locator('app-proxied-names input').last();
-      for (const name of ['shop.example.com', '*.apps.example.com']) {
+      for (const name of ['shop.example.com', 'apps.example.com']) {
         await input.fill(name);
         await input.press('Enter');
         await page.waitForTimeout(700);
@@ -580,7 +582,47 @@ const SHOTS = [
     },
   },
   { file: 'configuration', path: '/system/configuration' },
-  { file: 'database', path: '/system/configuration/snapshot' },
+  // Making a saved configuration current, one line kept out: a route added
+  // since it was saved, which the switch would remove, unticked.
+  {
+    file: 'configuration-keep',
+    path: '/system/configuration',
+    act: async (page) => {
+      await page.request.put(`${ADMIN}/api/routes/legacy`, {
+        data: {
+          id: 'legacy', name: 'Legacy portal', order: 20, enabled: true,
+          upstream: 'http://legacy.svc.acme.internal:80',
+          predicates: [{ type: 'path', args: { patterns: ['/legacy/**'] } }],
+        },
+      });
+      await page.reload();
+      await page.waitForTimeout(1200);
+      const row = page.getByRole('row', { name: /Before the SAML switch/ }).first();
+      await row.hover();
+      await page.locator('button[aria-label="Set as current"]:visible').first().click();
+      const go = page.getByRole('button', { name: 'Continue' });
+      // "What is running is not saved" comes first when it has drifted.
+      await go.waitFor({ timeout: 4000 }).then(() => go.click(), () => {});
+      const dialog = page.locator('app-apply-plan-dialog');
+      await dialog.waitFor();
+      await dialog.locator('tr', { hasText: 'Legacy portal' }).locator('mat-checkbox input').uncheck();
+      await page.waitForTimeout(500);
+    },
+  },
+  { file: 'database', path: '/system/configuration/database' },
+  {
+    // The move to PostgreSQL, as the procedure reads before the copy: the
+    // target filled in, the SQL that creates it, the steps still to do.
+    file: 'database-migrate', path: '/system/configuration/database',
+    act: async (page) => {
+      await page.locator('mat-button-toggle', { hasText: 'PostgreSQL' }).locator('button').click();
+      await page.locator('mat-button-toggle', { hasText: 'A server' }).locator('button').click();
+      await page.getByLabel('Host').fill('canopydb-primary.db.svc');
+      await page.getByText('How to migrate').scrollIntoViewIfNeeded();
+      await page.mouse.wheel(0, 320);
+      await page.waitForTimeout(600);
+    },
+  },
   { file: 'api-reference', path: '/system/api', settle: 2500 },
   { file: 'release-notes', path: '/system/release-notes' },
   { file: 'license', path: '/system/license' },
@@ -623,7 +665,7 @@ async function shoot(storageState) {
     }
     // Nothing of the machine the capture ran on: its name (the logs screen
     // says which node answered) and the path of the disposable data
-    // directory (the snapshot screen prints it) are a stranger's details in
+    // directory (the database screen prints it) are a stranger's details in
     // a public image. Replaced in the page, in the text people would read.
     await page.evaluate(([host, data]) => {
       const clean = (v) => v.split(data).join('/data').split(host).join('gateway-1');

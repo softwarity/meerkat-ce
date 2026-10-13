@@ -1,11 +1,16 @@
 <div class="row">
-  <mat-form-field [subscriptSizing]="subscriptSizing()" [floatLabel]="floatLabel()">
+  <!-- A text prefix shows only with the label floated: kept up whenever the
+       field has one, or the fixed part would vanish exactly when the field is
+       empty - when it is needed to know what to type. -->
+  <mat-form-field [subscriptSizing]="subscriptSizing()" [floatLabel]="prefix() || suffix() ? 'always' : floatLabel()">
   @if (label()) {<mat-label>{{ label() }}</mat-label>}
   @if (icon()) {<mat-icon matPrefix>{{ icon() }}</mat-icon>}
+  @if (prefix()) {<span matTextPrefix class="affix">{{ prefix() }}</span>}
+  @if (suffix()) {<span matTextSuffix class="affix">{{ suffix() }}</span>}
   <ng-content />
   @if (error()) {<mat-error>{{ error() }}</mat-error>}
   @else if (hint()) {<mat-hint align="end">{{ hint() }}</mat-hint>}
-  @if (actionIcon() && writable()) {<button
+  @if (actionIcon() && (writable() || unlocks())) {<button
       matSuffix
       matIconButton
       type="button"

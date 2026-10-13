@@ -1,6 +1,6 @@
 <div class="row">
   <mat-form-field subscriptSizing="dynamic">
-    <mat-label i18n="@@Proxied_names_label">Also reached through a proxy that terminates TLS</mat-label>
+    <mat-label i18n="@@Proxied_names_label">Names the proxy presents</mat-label>
     <!-- The input lives INSIDE the grid so it flows on the chips' line. -->
     <mat-chip-grid #grid>
       @for (n of names(); track n) {
@@ -16,7 +16,7 @@
         [matChipInputSeparatorKeyCodes]="separators"
         matChipInputAddOnBlur
         (matChipInputTokenEnd)="add($event)"
-        [placeholder]="names().length ? '' : 'shop.example.com, *.example.com'"
+        [placeholder]="names().length ? '' : 'shop.example.com'"
       />
     </mat-chip-grid>
   </mat-form-field>

@@ -185,6 +185,28 @@ func TestSeveralConfigurations(t *testing.T) {
 		}
 	})
 
+	t.Run("a line kept out stays as the gateway holds it", func(t *testing.T) {
+		// Running Empty (no route), activating Acme adds r1 - unless that
+		// line is kept out. The plan says which lines were, before and after.
+		code, plan := f.call(t, "GET", "/api/configurations/"+acme+"/plan?keep=route:r1", "", f.rootC)
+		if code != http.StatusOK || !strings.Contains(plan, `"kept":[{"kind":"route","id":"r1"`) || strings.Contains(plan, `"action":"add"`) {
+			t.Fatalf("plan keeping r1 out: %d %s", code, plan)
+		}
+		if code, out := f.call(t, "POST", "/api/configurations/"+acme+"/activate?keep=route:r1", "", f.rootC); code != http.StatusOK {
+			t.Fatalf("activate keeping r1 out: %d %s", code, out)
+		}
+		if s := serves("/api/x"); s != http.StatusNotFound {
+			t.Fatalf("a route kept out of the switch was created: %d", s)
+		}
+		if code, out := f.call(t, "POST", "/api/configurations/"+acme+"/activate?keep=user:alice", "", f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "kind:id") {
+			t.Fatalf("not a line: %d %s", code, out)
+		}
+		// Back to Empty for the steps that follow.
+		if code, out := f.call(t, "POST", "/api/configurations/"+empty+"/activate", "", f.rootC); code != http.StatusOK {
+			t.Fatalf("activate back: %d %s", code, out)
+		}
+	})
+
 	t.Run("duplicating, renaming, exporting", func(t *testing.T) {
 		code, body := f.call(t, "POST", "/api/configurations/"+acme+"/duplicate", `{"name":"Acme staging"}`, f.rootC)
 		if code != http.StatusCreated {

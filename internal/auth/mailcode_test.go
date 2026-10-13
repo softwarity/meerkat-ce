@@ -97,9 +97,8 @@ func TestAMailedLinkNeverPointsAtTheCallersHost(t *testing.T) {
 		{"plain http, a declared proxy name", false, "shop.example.org", "https://shop.example.org/reset-password?token="},
 		{"plain http, a declared proxy name in capitals", false, "SHOP.example.org", "https://SHOP.example.org/reset-password?token="},
 		{"plain http, a declared proxy name and its port", false, "shop.example.org:8443", "https://shop.example.org:8443/reset-password?token="},
-		{"plain http, one label under a declared wildcard", false, "eu.apps.example.org", "https://eu.apps.example.org/reset-password?token="},
-		{"plain http, two labels under a declared wildcard", false, "a.eu.apps.example.org", ""},
-		{"plain http, the wildcard's own domain", false, "apps.example.org", ""},
+		// The name itself, nothing under it: no wildcard is ever a guarantee.
+		{"plain http, a name under a declared one", false, "eu.shop.example.org", ""},
 		{"plain http, a name beside a declared one", false, "example.org", ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {

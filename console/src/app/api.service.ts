@@ -437,6 +437,9 @@ export interface VaultEntry {
   scope: string;
   value?: string;
   hasValue: boolean;
+  // A secret this gateway's master key cannot open: after a migration under
+  // another key every name is listed and none resolves. Never the value.
+  unreadable?: boolean;
   description?: string;
   tags?: string[];
   createdAt: number;
@@ -498,6 +501,48 @@ export interface BackupInfo {
   // What this gateway runs on: a copy of the same kind is a backup, of the
   // other kind a migration.
   dialect: DatabaseKind;
+  // What the runtime says this gateway is deployed with: the procedures are
+  // written for it, with its names.
+  platform: Platform;
+  // The copy a migration is in the middle of, remembered by the database it
+  // left: where it went, never its password.
+  lastCopy?: LastCopy;
+}
+
+export type PlatformName = 'kubernetes' | 'openshift' | 'swarm' | 'compose' | 'docker' | 'binary';
+
+// This gateway's deployment, as its runtime describes it.
+export interface Platform {
+  name: PlatformName;
+  // A Helm release manages it - seen on the pod, or assumed when the pod
+  // could not be read.
+  helm?: boolean;
+  helmAssumed?: boolean;
+  release?: string;
+  namespace?: string;
+  // The Deployment, the Swarm service, the compose service, the container.
+  workload?: string;
+  // The Swarm stack, or the compose project.
+  stack?: string;
+  // A compose project's files and directory, and its container.
+  files?: string[];
+  dir?: string;
+  container?: string;
+  why?: string;
+}
+
+// The last copy into a PostgreSQL server.
+export interface LastCopy {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  sslmode?: string;
+  // Unix seconds.
+  at: number;
+  tables: number;
+  rows: number;
+  by?: string;
 }
 
 export type DatabaseKind = 'sqlite' | 'postgres';
@@ -579,6 +624,8 @@ export interface ConfigPlan {
   prune: boolean;
   // What the community image leaves out of the document: its Enterprise parts.
   notApplied?: string[];
+  // The lines kept out of an apply: what the gateway held stayed for them.
+  kept?: ConfigChange[];
 }
 
 // What an encrypted vault import did. Names only: this answers about secrets,
@@ -2445,8 +2492,10 @@ export class ApiService {
     return this.http.post<ConfigPlan>(`/api/config/preview?prune=${prune}`, file);
   }
 
-  importConfig(file: Blob, prune: boolean): Observable<ConfigPlan> {
-    return this.http.post<ConfigPlan>(`/api/config/import?prune=${prune}`, file);
+  // keep: the lines of the plan kept out ("kind:id"), what the gateway holds
+  // now staying for them.
+  importConfig(file: Blob, prune: boolean, keep: string[] = []): Observable<ConfigPlan> {
+    return this.http.post<ConfigPlan>(`/api/config/import`, file, { params: { prune, keep } });
   }
 
   // ── several configurations, one active (CFG-01/02) ─────────────────────────
@@ -2539,8 +2588,8 @@ export class ApiService {
 
   // The switch itself. Unlike an import, it PRUNES: afterwards the gateway is
   // that configuration, so what it does not carry goes.
-  activateConfiguration(id: string): Observable<ConfigPlan> {
-    return this.http.post<ConfigPlan>(`/api/configurations/${id}/activate`, {});
+  activateConfiguration(id: string, keep: string[] = []): Observable<ConfigPlan> {
+    return this.http.post<ConfigPlan>(`/api/configurations/${id}/activate`, {}, { params: { keep } });
   }
 
   // Takes a file into the collection without applying it - the difference with
@@ -2667,6 +2716,11 @@ export class ApiService {
 
   copyDatabase(target: DatabaseTarget): Observable<DatabaseCopy> {
     return this.http.post<DatabaseCopy>('/api/backup/copy', target);
+  }
+
+  // Dismisses the remembered copy.
+  forgetCopy(): Observable<void> {
+    return this.http.delete<void>('/api/backup/last-copy');
   }
 
   // ── vault ──────────────────────────────────────────────────────────────────

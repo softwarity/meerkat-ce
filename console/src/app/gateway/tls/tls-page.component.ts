@@ -1,7 +1,7 @@
 import { CdkDrag, CdkDragDrop, CdkDragPlaceholder, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse, httpResource } from '@angular/common/http';
-import { Component, computed, DestroyRef, inject, LOCALE_ID, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, linkedSignal, LOCALE_ID, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -633,6 +633,29 @@ export class TlsPageComponent {
     return this.tls()?.proxied?.[plane] ?? [];
   }
 
+  // Who presents a door's names over HTTPS: this gateway, with the
+  // certificates placed on it, or a proxy in front, with the names declared.
+  // One or the other - the gateway refuses both. What the door holds decides;
+  // an empty door is the operator's choice, kept here until something is
+  // placed or declared.
+  private readonly chosen = signal<Record<'console' | 'app', 'gateway' | 'proxy'>>({ console: 'gateway', app: 'gateway' });
+
+  protected modeOf(plane: Plane): 'gateway' | 'proxy' {
+    if (plane === 'internal') return 'gateway';
+    if (this.proxiedOn(plane).length) return 'proxy';
+    if (this.on(plane).length) return 'gateway';
+    return this.chosen()[plane];
+  }
+
+  // A door that holds something is in its mode until that is taken off.
+  protected locked(plane: Plane): boolean {
+    return plane !== 'internal' && (this.proxiedOn(plane).length > 0 || this.on(plane).length > 0);
+  }
+
+  protected setMode(plane: Plane, mode: 'gateway' | 'proxy'): void {
+    if (plane !== 'internal') this.chosen.update((m) => ({ ...m, [plane]: mode }));
+  }
+
   // This console reached by one of them: its HTTPS is the proxy's, so no
   // certificate placed here is what the browser was shown, and taking one
   // off cuts nothing.
@@ -822,9 +845,15 @@ export class TlsPageComponent {
     this.helpOpen.set(true);
   }
   protected readonly os = signal<Os>(guessOs());
-  // The names the commands are written for, starting with the one this
-  // console is reached by. Only changes the commands; nothing is saved.
-  protected readonly localNames = signal(isAddress(location.hostname) ? 'console.local.test' : location.hostname);
+  // The names the commands are written for: the ones the doors are declared
+  // reached by, when there are some - they are the names this installation
+  // answers to - else the one this console is reached by. Follows the doors
+  // until somebody types; only changes the commands, nothing is saved.
+  protected readonly localNames = linkedSignal(() => {
+    const declared = [...new Set([...this.proxiedOn('console'), ...this.proxiedOn('app')])];
+    if (declared.length) return declared.join(', ');
+    return isAddress(location.hostname) ? 'console.local.test' : location.hostname;
+  });
   // Where the names should lead: the address this console was reached by when
   // it is one - the gateway is in a VM or on another machine - and this
   // machine otherwise.

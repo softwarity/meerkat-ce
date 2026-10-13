@@ -303,6 +303,8 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
             icon="link"
             i18n-label="@@Git_repository"
             label="Repository"
+            [prefix]="'https://' + (host() || provider().host) + '/'"
+            suffix=".git"
             [info]="urlPreview()"
           >
             <input

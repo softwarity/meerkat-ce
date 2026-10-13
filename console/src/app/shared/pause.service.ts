@@ -3,9 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LivewireClient, LiveTopic } from '@softwarity/livewire';
 import { ApiService } from '../api.service';
 
-// Whether the gateway is paused for a database move (Configuration > Snapshot).
+// Whether the gateway is paused for a database move (Configuration > Database).
 // One state for the whole console: the shell shows it to everybody, since it
-// explains every change the gateway now refuses, and the Snapshot tab turns it
+// explains every change the gateway now refuses, and the Database tab turns it
 // on and off. Live: the pause topic says it moved, and it is read again.
 @Injectable({ providedIn: 'root' })
 export class PauseService {

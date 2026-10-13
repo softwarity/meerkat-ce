@@ -44,6 +44,42 @@ func (s *Store) ListVaultEntries(ctx context.Context, scopes []string) ([]vault.
 	return out, rows.Err()
 }
 
+// UnreadableVaultSecrets names the secrets of these scopes that this
+// gateway's master key cannot open, keyed scope + "/" + name. The plain value
+// is decrypted and dropped at once: what leaves is a yes or a no.
+//
+// It is the question a migration leaves open. The names travel with the
+// database, the values are sealed with the master key, and a gateway started
+// with another key lists every name and opens none of them - which nothing
+// used to say until a route, a relay or an authority failed on its secret.
+func (s *Store) UnreadableVaultSecrets(ctx context.Context, scopes []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(scopes) == 0 {
+		return out, nil
+	}
+	args := make([]any, 0, len(scopes)+1)
+	args = append(args, vault.KindSecret)
+	for _, sc := range scopes {
+		args = append(args, sc)
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT scope, name, value FROM vault_entries WHERE kind = ? AND scope IN (`+placeholders(len(scopes))+`)`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("store: read the vault's secrets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var scope, name, sealed string
+		if err := rows.Scan(&scope, &name, &sealed); err != nil {
+			return nil, fmt.Errorf("store: read the vault's secrets: %w", err)
+		}
+		if _, err := s.vaultCipher.Open(sealed); err != nil {
+			out[scope+"/"+name] = true
+		}
+	}
+	return out, rows.Err()
+}
+
 // VaultValues resolves the entries OF ONE SCOPE to their plain value, secrets
 // decrypted. This is the lookup used when expanding $name while loading the
 // configuration - it never leaves the process. Scoping the resolution is what

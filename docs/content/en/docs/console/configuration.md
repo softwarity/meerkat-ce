@@ -2,7 +2,7 @@
 title: Configuration
 section: The console
 order: 162
-summary: Moving a gateway's setup around: named configurations, restore points, and a full database snapshot.
+summary: Moving a gateway's setup around: named configurations, restore points, and the whole database backed up, restored and moved.
 ---
 
 # Configuration
@@ -18,7 +18,7 @@ the vault** - they are not configuration, they are what this gateway lives with.
 |---|---|
 | **Management** | What is running, what is on the shelf, and moving files in and out |
 | **History** | Going back to any moment of this gateway's configuration |
-| **Snapshot** | Backing up and restoring the whole database |
+| **Database** | Backing up, restoring and moving the whole database |
 
 Each tab is a route of its own, so a bookmark comes back to it.
 
@@ -56,6 +56,21 @@ action that asks - and it asks with **the list of what it would change**, plus a
 warning first when what is running was never saved: that is the one move with
 nothing to come back to.
 
+Each line of that list can be **unticked**, and an unticked line keeps what the
+gateway holds for it, whatever the line said: a route the configuration would
+remove stays, an object it would change keeps its current version, an object it
+would add is not created. The box above the lines ticks or unticks them all;
+**Apply to current** is off while none is ticked, and turns red only while something
+would still be removed.
+The same choice is offered when a file is imported onto the gateway and when the
+running document is edited. Afterwards the gateway is no longer exactly the saved
+configuration, and the screen says so: it has changed since that configuration was
+saved, and saving it again records what you chose. A line the rest of the
+configuration cannot live without is refused with what is in the way, and nothing
+is applied half.
+
+![Set as current, one route the configuration would remove kept by unticking its line](img/console/configuration-keep.webp)
+
 ### Exporting
 
 The dialog says what the file carries and what it does not, then offers two
@@ -87,12 +102,16 @@ them so you can fill them in straight away.
 > the Import button (*2 of 3 saved*), before the cap is reached; Enterprise keeps
 > as many as you like.
 
-### Comparing two saved configurations
+### Comparing a configuration
 
-With two or more on the shelf, a saved row offers **Compare with another saved
-configuration**: choose the other one, and the dialog lists what changes going
-from the first to the second - added, updated, removed, object by object, with
-the fields that moved inside an update. What runs is left out: it is the question
+Every saved row offers **Compare**, and the dialog opens on **what this gateway
+runs now**: what serving that configuration would change here - added, updated,
+removed, object by object, with the fields that moved inside an update - the same
+plan as *Set as current*, read without applying anything. What runs needs no name
+to be compared. `GET /api/configurations/{id}/plan`.
+
+The list also offers the other saved configurations: the dialog then lists what
+changes going from the first to the second, what runs left out - the question
 asked of a customer's configuration and the template it was made from, before
 touching either. `GET /api/configurations/{id}/compare/{other}`.
 
@@ -133,8 +152,9 @@ and nothing to agree on.
 **Import from git** reads a location into a saved configuration and **applies
 nothing**. The gateway goes on serving what it served; the answer is the plan -
 what activating it would add, change and remove, plus the vault entries it
-expects and this installation has not got. You read that, then **Set as current**
-when it says what you expected, and read the plan again on the way.
+expects and this installation has not got, each line tickable. You read that,
+and **Apply to current** in that same window serves it, the unticked lines kept as
+the gateway holds them; **Close** keeps it saved to serve later, from its row.
 
 This is deliberate and it is not negotiable: whoever can write to that branch
 must not be able to reconfigure a gateway. There is no continuous
@@ -207,14 +227,15 @@ A saved configuration and a restore point are different objects on purpose: one
 is intentional and named (*the Acme setup*), the other automatic and timestamped
 (*what it looked like at 14:32*).
 
-## Snapshot
+## Database
 
-![The Snapshot tab: the pause, the database this gateway runs on, the download and the steps to restore](img/console/database.webp)
+![The Database tab: the pause, the database this gateway runs on and the platform it is deployed with, the download and the steps to restore](img/console/database.webp)
 
 A coherent copy of the **whole database**, taken while the gateway runs: routes
 and vault, but also users, organisations, sessions and the audit trail. This is
 what a backup restores; a configuration export is what a second gateway
-reproduces.
+reproduces. The tab was called *Snapshot* until it also moved the database; the
+old address still leads here.
 
 Meerkat takes the snapshot itself, because copying a live database with `cp` can
 catch it mid-write and nothing says so until the day you restore it. Scheduling,
@@ -222,8 +243,11 @@ retention and shipping it off the host belong to your backup tool.
 
 **There is no restore button, deliberately.** A database cannot be swapped under
 the process holding it open. The tab prints the exact commands instead, with this
-installation's own paths, and reminds you to keep the old file until the new one
-has proven itself.
+installation's own paths, **for the platform it runs on** - the runtime says
+which: a Kubernetes or OpenShift Deployment and its Helm release, a Swarm
+service, a compose project, a container. *Written for*
+switches to another, for a runtime the gateway could not ask. The old file is
+kept aside until the new one has proven itself.
 
 > [!WARNING]
 > If the master key sits next to the database, backing them up together undoes
@@ -232,8 +256,18 @@ has proven itself.
 > `MEERKAT_VAULT_KEY`; the tab says which of the two this gateway does.
 
 The same tab **moves** the database, between the embedded one and PostgreSQL,
-into a file or straight into a server, with the **Pause** switch that makes the
-copy whole: see [moving the database](/docs/operations/backup-restore#moving-the-database-embedded-and-postgresql).
+into a file or straight into a server. A move is **one numbered procedure**,
+shown from the start: create the database and its user (the SQL a database
+administrator runs), test the server, pause, copy, switch the deployment, check
+a route and a sign-in, and the way back - each step ticked as it is done.
+
+![The move to PostgreSQL before the copy: the target, the SQL that creates it, the steps still to do](img/console/database-migrate.webp)
+
+The gateway remembers the copy - where it went and how much it carried, never
+the password - so a reload in the middle of a migration, on any node, comes back
+to the same procedure. **Dismiss** forgets it; it goes by itself once the
+gateway runs on that database. See
+[moving the database](/docs/operations/backup-restore#moving-the-database-embedded-and-postgresql).
 
 ## Traps
 
@@ -243,7 +277,7 @@ copy whole: see [moving the database](/docs/operations/backup-restore#moving-the
 - **Replace prunes, Add does not.** Read the plan; it is the difference between a
   merge and a wipe.
 - **A configuration is not a backup.** Users and sessions are not in it. That is
-  what the Snapshot tab is for.
+  what the Database tab is for.
 - **The community image leaves the Enterprise parts out.** A configuration
   exported from an Enterprise gateway imports into a community one without its
   working hours, layout, hidden mark, OpenTelemetry export, directories and ACME

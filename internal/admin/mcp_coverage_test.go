@@ -250,7 +250,9 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		// Nothing is stored, but every write on every node stops: a write.
 		"PUT /api/backup/pause": true,
 		// Writes a whole other database: never this one, but a write.
-		"POST /api/backup/copy":        true,
+		"POST /api/backup/copy": true,
+		// Forgets the copy a migration was in the middle of: a write.
+		"DELETE /api/backup/last-copy": true,
 		"DELETE /api/sessions/{id}":    true,
 		"DELETE /api/data-tokens/{id}": true,
 		"PUT /api/settings/proxy":      true,

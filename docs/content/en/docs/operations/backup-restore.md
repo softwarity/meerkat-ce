@@ -51,8 +51,8 @@ it depends on - and accepting an arbitrary database as trusted state would turn 
 borrowed admin session into permanent control of the gateway.
 
 Restoring therefore happens with the service stopped, and the console prints the
-exact commands with **this** installation's paths, so the procedure is a paste and
-not a puzzle:
+exact commands with **this** installation's paths, for the platform it runs on, so
+the procedure is a paste and not a puzzle. On a host:
 
 ```bash
 # 1. stop meerkat
@@ -63,7 +63,11 @@ cp meerkat-YYYY-MM-DD.db /data/meerkat.db
 # 4. start meerkat, then check a route and a sign-in
 ```
 
-The old file is kept: a restore one regrets must have a way back.
+The old file is kept: a restore one regrets must have a way back. On Kubernetes
+the same steps scale the Deployment to zero and use a helper pod on the claim; on
+Swarm, compose or a container, a helper container on the volume. Either way the
+file is given the directory's owner: a file copied in as root is one the gateway
+cannot write.
 
 > [!WARNING]
 > The master key sits next to the database unless it comes from
@@ -95,6 +99,35 @@ sessions, the audit trail, the audited calls. The pause is never stored: a
 restart ends it, and the gateway that starts on the new database works at once.
 While it lasts, the console stays open for reading, and refuses changes.
 
+**One procedure, from the start.** A move is a numbered list the tab shows before
+anything is copied, each step ticked when it is done: create the database and its
+user, test the server, pause, copy, switch the deployment, check a route and a
+sign-in, and the way back. The gateway remembers the copy - host, port, database,
+user, SSL mode, when, how many tables and rows, never the password - in the
+database it is leaving, so a reload in the middle of a migration, on any node,
+comes back to the same procedure with a sample password to type again. Dismiss it
+when you went another way; it goes by itself once the gateway runs on that
+database.
+
+**Create the database first.** The first step is the SQL a database administrator
+runs, filled with the database, the user and the password typed in the form - the
+form starts on sample values, and the SQL and every command below follow what is
+typed:
+
+```sql
+-- as an administrator: psql -h canopydb-primary -p 5432 -U postgres
+CREATE ROLE meerkat LOGIN PASSWORD 'change-me-now';
+CREATE DATABASE meerkat OWNER meerkat;
+
+-- or, into a database that already exists and belongs to another role:
+-- \c meerkat
+-- GRANT CONNECT, CREATE ON DATABASE meerkat TO meerkat;
+-- GRANT USAGE, CREATE ON SCHEMA public TO meerkat;
+```
+
+Those are exactly the rights **Test** checks: `CREATE` on the database and on the
+schema the tables go into.
+
 **Into a server**, the tab takes the target one field at a time - host, port,
 database, user, password, SSL mode - for an empty database. In Kubernetes it
 offers the PostgreSQL services it finds beside the gateway, the operator's
@@ -102,25 +135,54 @@ primary first (CrunchyData's `-primary`, CloudNativePG's `-rw`); a pooler such
 as pgbouncer and a replica are listed and refused, since the cluster needs
 `LISTEN/NOTIFY` and advisory locks, which a transaction pooler breaks and a
 replica cannot take. **Test** asks the server before anything moves, and writes
-nothing there: its version, the SSL mode that connects (tried encrypted first,
+nothing there - before the pause or during it: its version, the SSL mode that connects (tried encrypted first,
 and kept for the copy), whether the database is empty, and whether the user may
 create tables - which PostgreSQL 15 and later no longer grant on `public` by
 default. A target that fails one of these is not offered the copy. It copies
 every table in one transaction, counting each on both sides before it
 commits. A target that already holds accounts or routes is refused: a copy
-never lands over a gateway. The URL is used for the copy and kept nowhere; the
-trail records its host, in the new database, which starts its history by saying
-where it came from.
+never lands over a gateway. The password is used for the copy and kept nowhere;
+the trail records the host, in the new database, which starts its history by
+saying where it came from.
 
 **Into a file**, the dump loads with `psql -v ON_ERROR_STOP=1 -f meerkat.sql`
 into an empty database. It is one transaction: a dump cut short is refused whole.
 
-**The switch is the deployment's.** The gateway cannot change its own
-`MEERKAT_DATABASE_URL`, so once the copy is done the tab prints what to change,
-filled with the target it was given: a Secret with the
-database URL and the vault key, then `helm upgrade` with
-`database.existingSecret`, `vault.existingSecret` and the number of replicas - or
-the same two variables for Compose and Swarm.
+**The switch is the deployment's.** The gateway picks its database when it
+starts, and the deployment files stay the one truth about it: the tab keeps no
+pointer of its own. It prints the change for the platform the runtime describes,
+with its names - *Written for* picks another:
+
+| Platform | The switch |
+|---|---|
+| Kubernetes, OpenShift, with Helm | a Secret with the database URL (and the vault key when it is a file), then `helm upgrade <release> --reuse-values --set database.existingSecret=...`; `replicaCount` is optional |
+| Kubernetes without Helm | the same Secret, and the `env` entries to add to the Deployment |
+| Swarm | `docker service update --env-add MEERKAT_DATABASE_URL=... <service>`, and the stack file line so the next `docker stack deploy` keeps it |
+| Compose | the `environment:` lines for the compose file, their values in `.env`, then `docker compose up -d` |
+| A container | the same `docker run` with `-e MEERKAT_DATABASE_URL=...` |
+
+**The way back** is that switch undone, command for command, on the same platform,
+while the database left behind is still there: on Helm, the release back with
+`database.existingSecret=""` (and `vault.existingSecret=""` when the key came along)
+and one pod, then `kubectl delete secret` of the Secret the switch created; on
+Swarm, `docker service update --env-rm` of each variable it added, and the same lines
+out of the stack file; on Compose, the lines out of the file and of `.env`, then
+`docker compose up -d`; for a container, the `docker run` it had before.
+
+On a Helm release, with sample names:
+
+```bash
+# the new database, as a Secret (the vault key is already in the deployment, unchanged)
+kubectl -n shop create secret generic meerkat-database \
+  --from-literal=database-url='postgres://meerkat:PASSWORD@canopydb-primary:5432/meerkat?sslmode=require'
+
+# point the release at it: the pods restart on PostgreSQL, unpaused
+helm upgrade edge meerkat/meerkat -n shop --reuse-values \
+  --set database.existingSecret=meerkat-database
+
+# optional - PostgreSQL lets several pods serve as ONE gateway; one is fine too
+# helm upgrade edge meerkat/meerkat -n shop --reuse-values --set replicaCount=2
+```
 
 > [!WARNING]
 > The vault key never travels in the copy. Without the same key, every secret of

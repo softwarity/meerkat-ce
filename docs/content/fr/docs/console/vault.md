@@ -30,11 +30,21 @@ Le nom et la description, le type, la valeur (ou *encrypted, never shown*) et **
 by**, la colonne qui permet de distinguer une entrée utilisée d'un reliquat. Un clic sur
 une ligne ouvre l'éditeur ; le + crée une entrée.
 
+Un secret que la clé maîtresse de cette gateway ne sait pas ouvrir affiche *cannot be
+decrypted with this master key*, et une ligne au-dessus de la liste les compte. C'est ce
+que laisse une migration faite sous une autre clé : tous les noms sont listés et aucune
+valeur ne se résout. La gateway vérifie chaque secret en l'ouvrant, et ne renvoie qu'un
+oui ou un non - jamais la valeur. Démarrez-la avec la clé sous laquelle les secrets ont
+été scellés (`MEERKAT_VAULT_KEY`, ou `MEERKAT_VAULT_KEY_PREVIOUS` pendant une rotation),
+ou saisissez à nouveau chaque valeur.
+
 Une entrée comprend :
 
 - **Name** - ce que désignera `$name`.
 - **Kind** - valeur ou secret, à choisir avec un bouton à bascule.
-- **Value** - saisie une seule fois dans le cas d'un secret.
+- **Value** - saisie une seule fois dans le cas d'un secret. Le champ d'un secret
+  enregistré reste fermé, puisque la valeur ne revient jamais vers la console ; son
+  **crayon** l'ouvre pour en saisir une nouvelle, et annuler garde le secret enregistré.
 - **Description** - pour la personne qui retrouvera l'entrée dans six mois.
 - **Reminder date** - le jour où le secret expire chez celui qui l'a émis. **Ce n'est
   qu'un rappel** : la gateway ne peut pas savoir qu'un jeton a été renouvelé chez le

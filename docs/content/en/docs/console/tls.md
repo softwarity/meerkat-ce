@@ -131,6 +131,9 @@ On a laptop or in a lab, the **On a local machine** button opens the steps to a
 certificate browsers trust without warning: the hosts file, a local authority
 (mkcert), one certificate for every name, then Import - see
 [TLS and certificates](/docs/operations/tls#on-a-local-machine).
+The drawer ends on where the certificate goes, one or the other: imported and placed
+on a door, this gateway presents it; set on a proxy in front, the names are declared
+on the door in **A proxy in front** mode.
 
 ## Force HTTPS
 
@@ -155,13 +158,18 @@ it. See [TLS](/docs/operations/tls).
 
 ![The Application door open: its drop zone, then two names declared as reached through a proxy that terminates TLS, then Force HTTPS](img/console/tls-proxied.webp)
 
-In the Console and Application doors, **Also reached through a proxy that
-terminates TLS** holds the names a proxy in front of the gateway - nginx, an
+Each of the Console and Application doors says first who presents its names
+over HTTPS: **This gateway**, with the certificates placed on it, or **A proxy in
+front**, with the names declared. It is one or the other: a door holding a
+certificate takes no proxy's names, and a door holding names takes no
+certificate - the other choice greys out until the door is emptied.
+
+In proxy mode, **Names the proxy presents** holds the names a proxy in front of the gateway - nginx, an
 ingress, a load balancer - serves over HTTPS. Type a name and press Enter, a
 space or a comma; a list pasted in one go becomes one chip per name. The cross
 of a chip takes it away. Each change is saved at once, and a name refused says
-why: a scheme, a port, a path or an IP address has no place there, and a
-wildcard stands for one label (`*.example.com`).
+why: a scheme, a port, a path, an IP address or a wildcard has no place there
+- one full name each.
 
 What it is for: behind such a proxy no request reaches the gateway's own TLS,
 so a password reset or an address confirmation would mail a code. Asked under a

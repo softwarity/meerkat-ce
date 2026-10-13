@@ -41,6 +41,9 @@ type Store struct {
 	// dataDir is kept so a snapshot can be written next to the database and
 	// the console can name the real paths in its restore procedure (STORE-05).
 	dataDir string
+	// location names the PostgreSQL database this store runs on (lastcopy.go),
+	// read from its URL: "" on the embedded one, and when the URL does not say.
+	location string
 	// sessionsMoved is told that somebody signed in, out, finished a sign-in
 	// step or changed organisation (OnSessionsMoved). Nil until wired.
 	sessionsMoved atomic.Pointer[func()]

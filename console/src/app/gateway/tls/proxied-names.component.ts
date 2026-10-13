@@ -41,7 +41,7 @@ export class ProxiedNamesComponent {
   // comma ends one, so a list typed or pasted in one go is several chips.
   protected readonly separators = [ENTER, COMMA, SPACE];
 
-  protected readonly info = $localize`:@@Proxied_names_info:Names a proxy in front of this gateway (nginx, an ingress, a load balancer) serves over HTTPS. A password reset or an address confirmation asked under one of them mails a link back to it instead of a code. The gateway has no certificate for them: they open no HTTPS door here, and are never redirected or sent HSTS. A leading *. stands for one label.`;
+  protected readonly info = $localize`:@@Proxied_names_info:Names a proxy in front of this gateway (nginx, an ingress, a load balancer) serves over HTTPS. A password reset or an address confirmation asked under one of them mails a link back to it instead of a code. The gateway has no certificate for them: they open no HTTPS door here, and are never redirected or sent HSTS. One full name each, no wildcard: a wildcard would vouch for names that may no longer be yours.`;
 
   // Not while a save is out: Enter then the blur that follows would send the
   // same name twice. The grid is not disabled for it - that takes the focus

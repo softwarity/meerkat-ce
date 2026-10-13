@@ -49,7 +49,9 @@
             i18n-label="@@Tls_local_names"
             label="Names"
             i18n-info="@@Tls_local_names_info"
-            info="The names the console and the applications will be reached by, separated by spaces. Only changes the commands on this page; nothing is saved."
+            info="The names the console and the applications will be reached by. Only changes the commands on this page; nothing is saved."
+            i18n-hint="@@Separated_by_commas"
+            hint="Separated by commas"
           >
             <input matInput [value]="localNames()" (input)="localNames.set($any($event.target).value)" />
           </app-form-field>
@@ -102,6 +104,12 @@
     <p class="hint" i18n="@@Tls_local_ports">
       Browsers keep the port: the HTTPS address is the one the links on this screen show, not
       443, unless the gateway is published there.
+    </p>
+    <!-- Where the certificate goes, one or the other: the choice each door
+         shows at its top, HTTPS presented by. -->
+    <p class="hint" i18n="@@Tls_local_present_either">
+      With a proxy in front (nginx, an ingress), skip step 4: set the certificate on the proxy,
+      and set the door to A proxy in front with these names. One or the other, never both.
     </p>
   </div>
   }
@@ -317,7 +325,15 @@
                 @for (c of on(plane); track c.id) {
                   <code class="chip {{ level(c) }}" [matTooltip]="namesOf(c).join(', ')">{{ namesOf(c)[0] }}@if (namesOf(c).length > 1) {<span class="more"> +{{ namesOf(c).length - 1 }}</span>}</code>
                 } @empty {
-                  <span class="nothing" i18n="@@Nothing_placed">No certificate</span>
+                  @if (plane !== 'internal' && proxiedOn(plane).length) {
+                    <!-- A proxy's door says so: "No certificate" read as
+                         something missing on a door that needs none. -->
+                    @for (n of proxiedOn(plane); track n) {
+                      <code class="chip" i18n-matTooltip="@@Presented_by_proxy" matTooltip="Presented by a proxy in front">{{ n }}</code>
+                    }
+                  } @else {
+                    <span class="nothing" i18n="@@Nothing_placed">No certificate</span>
+                  }
                 }
               </span>
             <!-- The two doors of the plane, by the ports the world reaches:
@@ -346,6 +362,44 @@
                closed panel measures its label at zero width, and the outline then runs
                through the label once the panel opens. -->
           <ng-template matExpansionPanelContent>
+          @if (plane !== 'internal') {
+            <!-- ONE OR THE OTHER, said before anything else: who presents
+                 this door's names to a browser. This gateway, with the
+                 certificates placed here, or a proxy in front, with the names
+                 declared - the gateway refuses both at once. What the door
+                 holds decides; an empty door is the operator's to choose. -->
+            <div class="mode">
+              <span class="mode-label" i18n="@@Https_presented_by">HTTPS presented by</span>
+              <!-- Only the OTHER choice greys out when the door holds
+                   something: the one in force stays readable. -->
+              <mat-button-toggle-group
+                [value]="modeOf(plane)"
+                (change)="setMode(plane, $event.value)"
+                hideSingleSelectionIndicator
+              >
+                <mat-button-toggle value="gateway" [disabled]="locked(plane) && modeOf(plane) !== 'gateway'" i18n="@@Https_by_gateway"
+                  >This gateway</mat-button-toggle
+                >
+                <mat-button-toggle value="proxy" [disabled]="locked(plane) && modeOf(plane) !== 'proxy'" i18n="@@Https_by_proxy"
+                  >A proxy in front</mat-button-toggle
+                >
+              </mat-button-toggle-group>
+            </div>
+            <p class="note mode-note">
+              @if (modeOf(plane) === 'gateway') {
+                <span i18n="@@Https_by_gateway_note">This gateway presents the certificates placed here, and their names are the door's.</span>
+                @if (locked(plane)) {
+                  <span i18n="@@Https_by_gateway_locked"> Take them off to hand the door to a proxy.</span>
+                }
+              } @else {
+                <span i18n="@@Https_by_proxy_note">A proxy in front presents these names over HTTPS: mailed links and the console's links point at them, and this gateway places no certificate here.</span>
+                @if (locked(plane)) {
+                  <span i18n="@@Https_by_proxy_locked"> Take the names off to place a certificate.</span>
+                }
+              }
+            </p>
+          }
+          @if (modeOf(plane) === 'gateway') {
           <div
             class="zone"
             cdkDropList
@@ -394,6 +448,7 @@
               >
             </p>
           }
+          }
           @if (plane === 'internal') {
             <!-- Where its certificate comes from, for this platform: the
                  question anybody in front of an empty internal door has. -->
@@ -433,7 +488,7 @@
           }
           <!-- Not for the internal plane: its names are the cluster's, which a
                browser outside cannot resolve. -->
-          @if (plane !== 'internal' && secure(plane) && !unpublished(plane) && namesOn(plane).length) {
+          @if (plane !== 'internal' && modeOf(plane) === 'gateway' && secure(plane) && !unpublished(plane) && namesOn(plane).length) {
             <span class="links">
               @for (n of namesOn(plane); track n) {
                 <a [href]="link(plane, n, 'https')" target="_blank" rel="noopener">
@@ -442,14 +497,14 @@
               }
             </span>
           }
-          @if (plane !== 'internal') {
+          @if (plane !== 'internal' && modeOf(plane) === 'proxy') {
             <!-- The names a proxy in front serves over HTTPS (AUTH-22): what
                  a mailed link may point at, and nothing else - no door, no
                  redirect, no HSTS. Not on the internal plane: nobody follows
                  a mailed link there. -->
             <app-proxied-names [plane]="plane" [names]="proxiedOn(plane)" (saved)="apply($event)" />
           }
-          @if (plane === 'app') {
+          @if (plane === 'app' && modeOf(plane) === 'gateway') {
             <!-- Always drawn, greyed until it can act: a setting that appears
                  only once a certificate exists is a setting people go looking
                  for. Its place never moves, and when it cannot act it says why. -->

@@ -177,10 +177,10 @@ réinitialisation - portent un code au lieu d'un lien, puisqu'un lien n'est envo
 vers un nom dont la gateway peut se porter garante (voir
 [Un lien, ou un code](/docs/auth/local-accounts#un-lien-ou-un-code)).
 
-Sur les portes Console et Application, **Also reached through a proxy that terminates
-TLS** liste les noms dont l'opérateur se porte garant à sa place : des noms exacts
-(`shop.example.com`) ou un joker qui vaut pour une étiquette (`*.example.com` couvre
-`eu.example.com`, ni `example.com` ni `a.eu.example.com`). Un mail demandé sous l'un
+Une porte Console ou Application réglée sur **A proxy in front** (plutôt que **This
+gateway** : l'un ou l'autre, jamais les deux) liste, sous **Names the proxy presents**,
+les noms dont l'opérateur se porte garant à sa place, un nom complet à chaque fois
+(`shop.example.com`). Un mail demandé sous l'un
 d'eux porte un lien qui y revient, toujours en `https://`, avec le port qu'avait la
 requête. Chaque porte a sa liste : un nom déclaré sur l'application ne dit rien de la
 console.
@@ -188,12 +188,15 @@ console.
 | Un nom déclaré permet | Il ne fait pas |
 |---|---|
 | qu'un lien envoyé par mail pointe vers lui, bien que la requête soit arrivée en HTTP | ouvrir une porte HTTPS, choisir un certificat, solliciter une autorité, déclencher Force HTTPS, envoyer HSTS |
+| d'être l'adresse par laquelle la console ouvre une route, et le callback qu'elle donne à une autorité (le premier nom de la porte Application ; sinon un nom que porte un certificat placé sur cette porte) | |
 
 La gateway ne détient aucun certificat pour ces noms, donc elle ne fait sur eux aucune
 promesse HTTPS : la redirection et HSTS ne suivent toujours que les noms que porte un
 certificat placé. Un nom est un nom d'hôte seulement - ni schéma, ni port, ni chemin -
-et jamais une adresse IP, dont personne ne peut se porter garant par un nom. Un joker
-sur un domaine de premier niveau (`*.com`) est refusé. Les noms voyagent avec un export
+jamais une adresse IP, dont personne ne peut se porter garant par un nom, et jamais un
+joker : `*.example.com` se porterait garant de tous les noms en dessous, y compris
+celui qui pointe encore vers un service que plus personne n'exploite, et une
+réinitialisation demandée sous ce nom y enverrait son jeton. Les noms voyagent avec un export
 de configuration, avec le reste des réglages TLS, et un changement atteint chaque nœud
 par le bus de changement (`PUT /api/settings/tls/proxied/{console|app}`, audité sous
 `tls.proxied`).

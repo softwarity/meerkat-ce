@@ -121,8 +121,8 @@ export interface ExportChoice {
               Not a backup: no users, organisations, sessions, vault, audit trail, personal tokens
               or signing keys.
             </p>
-            <p class="aside" i18n="@@Backup_is_the_snapshot">
-              For a backup, use the Snapshot tab.
+            <p class="aside" i18n="@@Backup_is_the_database_tab">
+              For a backup, use the Database tab.
             </p>
           </div>
         </div>

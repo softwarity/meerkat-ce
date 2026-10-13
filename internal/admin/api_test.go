@@ -75,6 +75,7 @@ func setupBare(t *testing.T) fixture {
 	// The runtime is not asked from a test: no cluster, and the developer's
 	// own Docker is not this gateway's runtime.
 	api.LookupInternal = func(context.Context, int) discovery.Internal { return discovery.Internal{} }
+	api.LookupPlatform = func(context.Context) discovery.Platform { return discovery.Platform{Name: "binary"} }
 	adminMux := http.NewServeMux()
 	api.Register(adminMux)
 

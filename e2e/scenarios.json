@@ -617,6 +617,49 @@
       }
     },
     {
+      "id": "api-root-backup-info",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/backup/info"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Read where the database lives and what the gateway runs on",
+        "fr": "Lire où vit la base et sur quoi tourne la gateway"
+      },
+      "description": {
+        "en": "The Database tab prints its backup, restore and migration procedures from this answer: the real paths, the platform the runtime describes (Kubernetes and its Helm release, a Swarm service, a compose project) and the copy a migration is in the middle of, never its password. Root only: it names the installation's insides.",
+        "fr": "L'onglet Database écrit ses procédures de sauvegarde, de restauration et de migration à partir de cette réponse : les vrais chemins, la plateforme que décrit le runtime (Kubernetes et sa release Helm, un service Swarm, un projet compose) et la copie qu'une migration est en train de faire, jamais son mot de passe. Root uniquement : elle nomme l'intérieur de l'installation."
+      }
+    },
+    {
+      "id": "api-root-backup-forget-copy",
+      "domain": "gateway",
+      "kind": "api",
+      "probe": {
+        "method": "DELETE",
+        "path": "/api/backup/last-copy",
+        "allowedStatus": [
+          204
+        ]
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Dismiss the remembered copy",
+        "fr": "Écarter la copie mémorisée"
+      },
+      "description": {
+        "en": "The gateway remembers the last copy into a PostgreSQL server, so the migration procedure survives a reload; an operator who went another way dismisses it. Root only, like the copy itself.",
+        "fr": "La gateway se souvient de la dernière copie vers un serveur PostgreSQL, pour que la procédure de migration survive à un rechargement ; un opérateur qui a pris un autre chemin l'écarte. Root uniquement, comme la copie elle-même."
+      }
+    },
+    {
       "id": "api-app-session-revoke",
       "domain": "application",
       "kind": "api",

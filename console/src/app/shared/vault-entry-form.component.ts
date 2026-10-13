@@ -145,6 +145,7 @@ export interface VaultEntryFormData {
           [clearable]="false"
           [actionIcon]="secretHeld() ? (valueEditing() ? 'close' : 'edit') : ''"
           [actionLabel]="valueEditing() ? cancelEditLabel : editLabel"
+          unlocks
           (action)="toggleValueEdit()"
           [hint]="valueHint()"
         >

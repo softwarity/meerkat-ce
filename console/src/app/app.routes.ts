@@ -504,11 +504,14 @@ export const routes: Routes = [
           // as a redirect - the bookmarks people already have must land
           // somewhere that makes sense, not on a 404.
           { path: 'import-export', redirectTo: 'management' },
+          // The tab was Snapshot until it also restored and moved the
+          // database: the old path stays, for the bookmarks that name it.
+          { path: 'snapshot', redirectTo: 'database' },
           {
-            path: 'snapshot',
+            path: 'database',
             loadComponent: () =>
-              import('./gateway/configuration/snapshot-tab.component').then(
-                (m) => m.ConfigurationSnapshotComponent,
+              import('./gateway/configuration/database-tab.component').then(
+                (m) => m.ConfigurationDatabaseComponent,
               ),
           },
           {

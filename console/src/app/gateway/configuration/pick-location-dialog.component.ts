@@ -233,8 +233,12 @@ export class PickLocationDialogComponent {
         <p class="from" i18n="@@What_activating_would_change">
           What serving it would change:
         </p>
+        <!-- Each line tickable: serving it straight from here keeps the
+             unticked ones as the gateway holds them (keep.go). -->
         <app-plan-table
           [plan]="plan"
+          selectable
+          [(kept)]="kept"
           i18n-nothing="@@Pull_no_change"
           nothing="This gateway already matches what the repository holds."
         />
@@ -248,17 +252,38 @@ export class PickLocationDialogComponent {
       }
       <div class="note">
         <mat-icon>info</mat-icon>
-        <p i18n="@@Pull_applied_nothing">
-          Nothing was applied. This gateway still serves what it served - use Set as current
-          when the list above says what you expected.
+        <p i18n="@@Pull_applied_nothing_yet">
+          Nothing is applied yet. Apply to current serves the lines ticked above now; Close keeps
+          it saved, to serve later.
         </p>
       </div>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button matButton="filled" mat-dialog-close cdkFocusInitial i18n="@@Close">Close</button>
+      <button matButton mat-dialog-close cdkFocusInitial i18n="@@Close">Close</button>
+      @if (data.result.plan && !data.result.planError) {
+        <button
+          matButton="filled"
+          [disabled]="nothingTicked()"
+          (click)="ref.close({ keep: kept() })"
+          i18n="@@Apply_to_current"
+        >
+          Apply to current
+        </button>
+      }
     </mat-dialog-actions>
   `,
 })
 export class PullResultDialogComponent {
   protected readonly data = inject<{ result: ConfigPullResult; location: string }>(MAT_DIALOG_DATA);
+  protected readonly ref = inject(MatDialogRef<PullResultDialogComponent, { keep: string[] }>);
+  protected readonly kept = signal<string[]>([]);
+  // Every line unticked: nothing left to apply.
+  protected readonly nothingTicked = computed(() => {
+    const moving = (this.data.result.plan?.changes ?? []).filter((c) => c.action !== 'same');
+    return moving.length > 0 && moving.every((c) => {
+      const k: string = c.kind;
+      const kind = k === 'route.spec' || k === 'route.file' ? 'route' : k;
+      return this.kept().includes(`${kind}:${c.id ?? ''}`);
+    });
+  });
 }

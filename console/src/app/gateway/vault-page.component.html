@@ -30,6 +30,19 @@
 </div>
 
 <div class="content">
+  @if (!loading() && unreadable() > 0) {
+    <!-- What a migration under another master key leaves: every name
+         listed, none of the secrets opening. Said here, before a route, a
+         relay or an authority fails on one. -->
+    <p class="problem">
+      <mat-icon>key_off</mat-icon>
+      <span i18n="@@Vault_unreadable_banner"
+        >{{ unreadable() }} secret(s) cannot be decrypted with this gateway's master key: it is not the
+        key they were sealed with. Start the gateway with that key (MEERKAT_VAULT_KEY, or
+        MEERKAT_VAULT_KEY_PREVIOUS while rotating), or type each value again.</span
+      >
+    </p>
+  }
   @if (loading()) {
     <loading-indicator withContainer />
   } @else if (entries().length === 0) {
@@ -66,7 +79,9 @@
         <ng-container matColumnDef="value">
           <mat-header-cell *matHeaderCellDef i18n="@@Value">Value</mat-header-cell>
           <mat-cell *matCellDef="let e">
-            @if (e.kind === 'secret') {
+            @if (e.kind === 'secret' && e.unreadable) {
+              <span class="unreadable" i18n="@@secret_unreadable">cannot be decrypted with this master key</span>
+            } @else if (e.kind === 'secret') {
               <span class="hidden-val" i18n="@@secret_hidden">encrypted, never shown</span>
             } @else {
               <span class="val">{{ e.value }}</span>

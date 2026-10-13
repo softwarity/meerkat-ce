@@ -84,6 +84,10 @@ type vaultEntryView struct {
 	// UsedBy names the objects referencing this entry ("route: api"), so an
 	// admin can tell a live entry from a leftover before deleting it.
 	UsedBy []string `json:"usedBy,omitempty"`
+	// Unreadable marks a secret this gateway's master key cannot open: after a
+	// migration under another key, every name is listed and none resolves.
+	// The value is never sent; this is the only thing said about it.
+	Unreadable bool `json:"unreadable,omitempty"`
 }
 
 func (a *API) listVault(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -102,6 +106,11 @@ func (a *API) listVault(w http.ResponseWriter, r *http.Request, actor store.User
 		a.internal(w, err)
 		return
 	}
+	unreadable, err := a.st.UnreadableVaultSecrets(r.Context(), a.vaultVisibleScopes(r.Context(), actor))
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
 	out := make([]vaultEntryView, 0, len(entries))
 	for _, e := range entries {
 		out = append(out, vaultEntryView{
@@ -111,8 +120,9 @@ func (a *API) listVault(w http.ResponseWriter, r *http.Request, actor store.User
 			HasValue:    e.Kind == vault.KindSecret || e.Value != "",
 			Description: e.Description, Tags: e.Tags,
 			CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt, ExpiresAt: e.ExpiresAt,
-			ReadOnly: !slices.Contains(writable, e.Scope),
-			UsedBy:   usage[e.Name],
+			ReadOnly:   !slices.Contains(writable, e.Scope),
+			UsedBy:     usage[e.Name],
+			Unreadable: unreadable[e.Scope+"/"+e.Name],
 		})
 	}
 	writeJSON(w, http.StatusOK, out)

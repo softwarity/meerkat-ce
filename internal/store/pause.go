@@ -4,7 +4,7 @@ import "errors"
 
 // The pause: the gateway stops writing, everywhere at once.
 //
-// What it is for is moving the database (Configuration > Snapshot): a copy
+// What it is for is moving the database (Configuration > Database): a copy
 // taken while writes go on loses whatever is written between the copy and the
 // switch - sessions, the audit trail, the calls of audited operations. Paused,
 // the source holds still, and the copy is the whole of it.

@@ -77,6 +77,9 @@ type Plan struct {
 	// NotApplied names the Enterprise parts the community image took out of
 	// the document before applying it (edition.go).
 	NotApplied []string `json:"notApplied,omitempty"`
+	// Kept names the lines the operator kept out (keep.go): the gateway's
+	// current objects stayed in their place.
+	Kept []Change `json:"kept,omitempty"`
 }
 
 // Touches reports whether the plan changes anything at all.
@@ -244,6 +247,17 @@ func run(ctx context.Context, st *store.Store, doc *Document, prune, commit, who
 			return nil, err
 		}
 		plan.Missing = missing
+	}
+	// Lists, never null, whatever filled them: the console reads them as
+	// lists, and a null there emptied the whole activation dialog.
+	if plan.Changes == nil {
+		plan.Changes = []Change{}
+	}
+	if plan.Missing == nil {
+		plan.Missing = []MissingRef{}
+	}
+	if plan.MissingFiles == nil {
+		plan.MissingFiles = []MissingFile{}
 	}
 	return plan, nil
 }

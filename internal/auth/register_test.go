@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -93,11 +92,9 @@ func registerSetupOn(t *testing.T, overTLS bool) (*http.ServeMux, *session.Manag
 	box := &fakeMailbox{}
 	h.Mailer = box.send
 	h.Covers = func(host string) bool { return host == "example.com" }
-	// Two names declared reached through a proxy that terminates TLS in
-	// front, matched by the rule a certificate's names follow.
-	h.Proxied = func(host string) bool {
-		return certs.Covers([]string{"shop.example.org", "*.apps.example.org"}, host)
-	}
+	// A name declared reached through a proxy that terminates TLS in front:
+	// the name itself, as the supervisor matches it.
+	h.Proxied = func(host string) bool { return host == "shop.example.org" }
 	h.Register(mux)
 	if !overTLS {
 		return mux, sm, st, box

@@ -120,6 +120,11 @@
     "guard": "rootOnly"
   },
   {
+    "method": "DELETE",
+    "path": "/api/backup/last-copy",
+    "guard": "rootOnly"
+  },
+  {
     "method": "GET",
     "path": "/api/backup/pause",
     "guard": "authed"

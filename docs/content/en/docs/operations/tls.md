@@ -164,10 +164,10 @@ carry a code instead of a link, since a link is only mailed to a name the
 gateway can vouch for (see
 [A link, or a code](/docs/auth/local-accounts#a-link-or-a-code)).
 
-On the Console and Application doors, **Also reached through a proxy that
-terminates TLS** lists the names the operator vouches for instead: exact names
-(`shop.example.com`) or a wildcard standing for one label (`*.example.com`
-covers `eu.example.com`, not `example.com` nor `a.eu.example.com`). A mail asked
+A Console or Application door set to **A proxy in front** (rather than **This
+gateway**: one or the other, never both) lists, under **Names the proxy
+presents**, the names the operator vouches for instead, one full name each
+(`shop.example.com`). A mail asked
 under one of them carries a link back to it, always in `https://`, with the port
 the request carried. Each door has its own list: a name declared on the
 application says nothing about the console.
@@ -175,12 +175,15 @@ application says nothing about the console.
 | A declared name does | It does not |
 |---|---|
 | let a mailed link point at it, though the request came in plain HTTP | open an HTTPS door, choose a certificate, ask an authority, trigger Force HTTPS, send HSTS |
+| be the address the console opens a route with, and the callback it gives an authority (the first name of the Application door; else a name a certificate placed there carries) | |
 
 The gateway holds no certificate for these names, so it makes no HTTPS promise
 on them: the redirect and HSTS still follow only the names a placed certificate
 carries. A name is a host name only - no scheme, no port, no path - and never an
-IP address, which nobody can vouch for by name. A wildcard over a top-level
-domain (`*.com`) is refused. The names travel with a configuration export, with
+IP address, which nobody can vouch for by name, and never a wildcard:
+`*.example.com` would vouch for every name under it, including one left pointing at
+a service nobody runs any more, and a reset asked under that name would mail its
+token there. The names travel with a configuration export, with
 the rest of the TLS settings, and a change reaches every node through the change
 bus (`PUT /api/settings/tls/proxied/{console|app}`, audited as `tls.proxied`).
 

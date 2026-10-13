@@ -142,6 +142,9 @@ local machine** détaille les étapes pour obtenir un certificat que les navigat
 acceptent sans avertissement : le fichier hosts, une autorité locale (mkcert), un
 seul certificat pour tous les noms, puis l'import - voir
 [TLS et certificats](/docs/operations/tls#sur-une-machine-locale).
+Le tiroir se termine sur la destination du certificat, l'une ou l'autre : importé
+et placé sur une porte, cette gateway le présente elle-même ; posé sur un proxy
+devant, les noms se déclarent sur la porte en mode **A proxy in front**.
 
 ## Force HTTPS
 
@@ -169,13 +172,18 @@ une route ou un service qui fixe sa propre valeur la conserve. Voir
 
 ![La porte Application ouverte : sa zone de dépôt, puis deux noms déclarés comme joints par un proxy qui termine le TLS, puis Force HTTPS](img/console/tls-proxied.webp)
 
-Dans les portes Console et Application, **Also reached through a proxy that
-terminates TLS** réunit les noms qu'un proxy placé devant la gateway - nginx, un
+Chacune des portes Console et Application dit d'abord qui présente ses noms en
+HTTPS : **This gateway**, avec les certificats placés sur elle, ou **A proxy in
+front**, avec les noms déclarés. C'est l'un ou l'autre : une porte qui porte un
+certificat ne prend pas de noms de proxy, et une porte qui a des noms ne prend pas
+de certificat - l'autre choix reste grisé tant que la porte n'est pas vidée.
+
+En mode proxy, **Names the proxy presents** réunit les noms qu'un proxy placé devant la gateway - nginx, un
 ingress, un load balancer - sert en HTTPS. Tapez un nom puis Entrée, une espace ou
 une virgule ; une liste collée d'un coup donne une puce par nom. La croix d'une puce
 la retire. Chaque changement est enregistré aussitôt, et un nom refusé dit pourquoi :
-un schéma, un port, un chemin ou une adresse IP n'y ont pas leur place, et un joker
-vaut pour une étiquette (`*.example.com`).
+un schéma, un port, un chemin, une adresse IP ou un joker n'y ont pas leur place - un
+nom complet à chaque fois.
 
 À quoi cela sert : derrière un tel proxy, aucune requête n'atteint la porte TLS de la
 gateway, donc une réinitialisation de mot de passe ou une confirmation d'adresse

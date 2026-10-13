@@ -136,12 +136,43 @@ func (a *API) previewConfig(w http.ResponseWriter, r *http.Request, _ store.User
 	if !ok {
 		return
 	}
+	doc, keep, ok := a.keepOut(w, r, doc)
+	if !ok {
+		return
+	}
 	plan, err := config.Preview(r.Context(), a.st, doc, prune(r))
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	markKept(plan, keep)
 	writeJSON(w, http.StatusOK, plan)
+}
+
+// keepOut reads the lines of the plan the operator keeps out
+// (?keep=kind:id, repeated) and returns the document with the gateway's
+// current objects in their place (config.Keep). A line that is not one
+// answers 422 naming what is accepted.
+func (a *API) keepOut(w http.ResponseWriter, r *http.Request, doc *config.Document) (*config.Document, []config.Ref, bool) {
+	keep, err := config.ParseRefs(r.URL.Query()["keep"])
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return nil, nil, false
+	}
+	out, err := config.Keep(r.Context(), a.st, doc, keep)
+	if err != nil {
+		a.internal(w, err)
+		return nil, nil, false
+	}
+	return out, keep, true
+}
+
+// markKept says on the plan which lines were kept out, so the answer reads
+// the same before and after, and the trail records them.
+func markKept(plan *config.Plan, keep []config.Ref) {
+	for _, k := range keep {
+		plan.Kept = append(plan.Kept, config.Change{Kind: k.Kind, ID: k.ID, Label: k.ID})
+	}
 }
 
 // importConfig applies the posted file and reports what it did.
@@ -150,7 +181,11 @@ func (a *API) importConfig(w http.ResponseWriter, r *http.Request, actor store.U
 	if !ok {
 		return
 	}
-	plan, err := a.applyDocument(r.Context(), doc, prune(r), actor)
+	doc, keep, ok := a.keepOut(w, r, doc)
+	if !ok {
+		return
+	}
+	plan, err := a.applyDocument(r.Context(), doc, prune(r), actor, keep)
 	if err != nil {
 		if errors.Is(err, errReload) {
 			a.internal(w, err)
@@ -175,11 +210,12 @@ var errReload = errors.New("applied, but the routing table could not be reloaded
 // again; the trail records it; and saving IS applying, so the table is
 // recompiled and a document that no longer compiles says so rather than
 // reporting a clean import - the previous plan keeps serving in the meantime.
-func (a *API) applyDocument(ctx context.Context, doc *config.Document, prune bool, actor store.User) (*config.Plan, error) {
+func (a *API) applyDocument(ctx context.Context, doc *config.Document, prune bool, actor store.User, keep []config.Ref) (*config.Plan, error) {
 	plan, err := config.Apply(ctx, a.st, doc, prune)
 	if err != nil {
 		return nil, err
 	}
+	markKept(plan, keep)
 	a.sm.TokenChanged("*")
 	a.auditEvent(ctx, actor, "config.import", "config", "", "", "", summarise(plan))
 	if err := a.reloadRouting(ctx); err != nil {
@@ -243,6 +279,13 @@ func summarise(plan *config.Plan) string {
 		counts[config.ActionRemove], counts[config.ActionSame])
 	if n := len(plan.Missing); n > 0 {
 		line += fmt.Sprintf("; %d vault entries reserved empty", n)
+	}
+	if len(plan.Kept) > 0 {
+		kept := make([]string, 0, len(plan.Kept))
+		for _, k := range plan.Kept {
+			kept = append(kept, strings.TrimSpace(k.Kind+" "+k.ID))
+		}
+		line += "; kept as it was: " + strings.Join(kept, ", ")
 	}
 	// Bounded: a whole installation imported onto an empty gateway is
 	// hundreds of objects, and the trail is a record, not a dump.

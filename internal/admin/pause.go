@@ -6,7 +6,7 @@ import (
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// The pause (Configuration > Snapshot): every write stops, on every node, so
+// The pause (Configuration > Database): every write stops, on every node, so
 // the database can be copied whole and the gateway restarted on the copy.
 //
 // Read by any console session - the console shows the paused state to whoever

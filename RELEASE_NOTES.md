@@ -2,6 +2,49 @@
 
 ## NEXT RELEASE
 
+- **Apply a configuration line by line.** Making a saved configuration current,
+  importing a file onto the gateway or saving the running document now shows the plan
+  with a tick on every line: untick one and the gateway keeps what it holds for it - a
+  route the configuration would remove stays, an object it would change keeps its
+  version, an object it would add is not created. The trail records what was kept.
+  A pull from git offers it too, and serves the configuration from the same window.
+- **Compare a saved configuration with what runs.** *Compare* is on every saved row and
+  opens on what serving it would change here, without applying anything: the running
+  state needed a name, and a second saved configuration, before it could be compared.
+- **The Snapshot tab is now Database, and its procedures follow your platform.** It
+  backs up, restores and moves the database, and the old address still leads to it.
+  The switch to PostgreSQL is written for what the gateway runs on, with its names: a
+  Secret and `helm upgrade` on the real release, `docker service update` on the real
+  Swarm service and the line for the stack file, the `environment:` lines for the
+  compose file, `-e` on `docker run`. *Written for* picks another.
+- **A migration is one numbered procedure, from the start, and survives a reload.** The
+  SQL that creates the role and the database with the rights the test checks, the
+  test, the pause, the copy, the switch, the checks and the way back, each ticked when
+  done. The gateway remembers the last copy (where it went and how much it carried,
+  never the password), so a reload or another node comes back to the same step;
+  *Dismiss* forgets it, and it goes by itself once the gateway runs on that database.
+- **A stored secret can be changed again.** Its value box is closed, since the value
+  never comes back, and a pencil opens it: hiding the tools of a disabled field had
+  taken the pencil too, so no stored secret could be retyped from the console.
+- **The vault says which secrets the master key cannot open.** After a migration under
+  another key every name is listed and no value resolves, which nothing said until a
+  route, a relay or an authority failed. Each such secret now reads *cannot be decrypted
+  with this master key*, and the vault counts them; the value is never sent.
+- **A forge's repository is typed between its fixed parts.** In a git location, the
+  repository field shows `https://github.com/` before what is typed and `.git` after it
+  (each forge with its own host), so it reads at once that only `owner/repo` is asked.
+- **The console opens routes, and names callbacks, by the gateway's public name.** The
+  address of *Open this route* and of the callback an authority is given came from the
+  console's own address, which behind an ingress is one nobody outside reaches. It is
+  now the first name of the Application door declared behind a proxy, else a name a
+  certificate placed on that door carries, on its published HTTPS port.
+- **A door is served over HTTPS by the gateway or by a proxy, one or the other.** Each of
+  the Console and Application doors now says who presents its names: *This gateway*,
+  with the certificates placed on it, or *A proxy in front*, with the names declared.
+  A door holding one refuses the other. The names a proxy presents are one full name
+  each, no wildcard: a wildcard would vouch for every name under it, including one left
+  pointing at a service nobody runs any more, and a reset asked under that name would
+  mail its token there.
 - **The sign-in pages, the profile and the agent consent refuse another site's page.**
   The console's API already checked that a write came from the console; these pages,
   on the same cookie, did not. A page on the data plane of the same host could submit

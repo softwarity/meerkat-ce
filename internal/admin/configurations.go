@@ -406,11 +406,16 @@ func (a *API) configurationPlan(w http.ResponseWriter, r *http.Request, _ store.
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	doc, keep, ok := a.keepOut(w, r, doc)
+	if !ok {
+		return
+	}
 	plan, err := config.PreviewSwitch(r.Context(), a.st, doc)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	markKept(plan, keep)
 	writeJSON(w, http.StatusOK, plan)
 }
 
@@ -466,11 +471,16 @@ func (a *API) activateConfiguration(w http.ResponseWriter, r *http.Request, acto
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	doc, keep, ok := a.keepOut(w, r, doc)
+	if !ok {
+		return
+	}
 	plan, err := config.Switch(r.Context(), a.st, doc)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	markKept(plan, keep)
 	// A configuration carries the gateway-wide token policy: every cached
 	// token decision is read again.
 	a.sm.TokenChanged("*")

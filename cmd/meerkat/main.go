@@ -1009,16 +1009,17 @@ func whilePaused(st *store.Store, refuses func(*http.Request) bool, refuse http.
 }
 
 // refusesWhilePaused says what the control plane turns away during a pause:
-// every write but the ones the move is made of - resuming, and copying the
-// database out. Reading goes on: the console stays open on what it shows, and
-// root keeps the screen that ends the pause.
+// every write but the ones the move is made of - resuming, testing the target
+// (a POST that reads only), copying the database out, and dismissing the copy
+// it remembers (which the store writes past the pause, store/lastcopy.go). Reading goes on: the console stays open
+// on what it shows, and root keeps the screen that ends the pause.
 func refusesWhilePaused(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
 		return false
 	}
 	switch r.URL.Path {
-	case "/api/backup/pause", "/api/backup/copy":
+	case "/api/backup/pause", "/api/backup/check", "/api/backup/copy", "/api/backup/last-copy":
 		return false
 	}
 	return true

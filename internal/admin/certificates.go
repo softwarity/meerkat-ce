@@ -295,6 +295,21 @@ func (a *API) place(w http.ResponseWriter, r *http.Request, c *store.Certificate
 			"%s is a signing request: it serves nothing until the signed certificate is adopted", c.Name()))
 		return false
 	}
+	// A door is served over HTTPS either by this gateway, with the
+	// certificates placed on it, or by a proxy in front, with the names
+	// declared - never both: the two would say different things about who
+	// presents the name to the browser (see proxiedOrPlaced).
+	for _, plane := range []string{store.PlaneConsole, store.PlaneApp} {
+		if p.on(plane) && !c.On(plane) {
+			if names := a.st.RawTLS(r.Context()).ProxiedOn(plane); len(names) > 0 {
+				writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+					"the %s is reached through a proxy that terminates TLS (%s): a proxy in front presents its names, "+
+						"so this gateway places no certificate there - take the names off first",
+					planeWord(plane), strings.Join(names, ", ")))
+				return false
+			}
+		}
+	}
 	all, cfg, err := a.pool(r.Context())
 	if err != nil {
 		a.internal(w, err)
@@ -928,6 +943,25 @@ func (a *API) putProxied(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// proxiedOrPlaced: names declared only where this gateway presents no
+	// certificate. Where it does, the names are the certificates' own, and a
+	// proxy's beside them would be a second answer to "who presents this
+	// name".
+	if len(names) > 0 {
+		rows, err := a.st.ListCertificates(r.Context())
+		if err != nil {
+			a.internal(w, err)
+			return
+		}
+		for _, c := range rows {
+			if c.On(plane) {
+				writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+					"the %s presents %s itself: its names are that certificate's - take it off the door to declare a proxy's names",
+					planeWord(plane), c.Name()))
+				return
+			}
+		}
+	}
 	cfg := a.st.RawTLS(r.Context())
 	before := orEmpty(cfg.ProxiedOn(plane))
 	if plane == store.PlaneConsole {
@@ -956,11 +990,12 @@ const maxProxied = 100
 
 // proxiedNames checks the names one door is declared reached by through a
 // proxy, and returns them lowercased, without a trailing dot, each once.
-// Host names only, an optional leading *. standing for one label: no scheme,
-// no port, no path - the link's scheme is always https and its port the one
-// the request carried - and no IP address, which nobody can vouch for by
-// name. A wildcard over a single label (*.com) is refused: it would vouch
-// for every name under a top-level domain, an attacker's included.
+// One FULL host name each: no scheme, no port, no path - the link's scheme is
+// always https and its port the one the request carried - no IP address,
+// which nobody can vouch for by name, and no wildcard: *.example.com would
+// vouch for every name under it, including one left pointing at a service
+// nobody runs any more, and a reset asked under that name would mail its
+// token there. A name vouches for itself, and declaring each costs a line.
 func proxiedNames(raw []string) ([]string, error) {
 	out := []string{}
 	for _, r := range raw {
@@ -980,11 +1015,11 @@ func proxiedNames(raw []string) ([]string, error) {
 				return nil, fmt.Errorf("%q is an IP address: only a name can be vouched for", r)
 			}
 			return nil, fmt.Errorf("%q: a host name only, without a port - the link keeps the port the request carried", r)
+		case strings.Contains(n, "*"):
+			return nil, fmt.Errorf("%q: one full host name, no wildcard - a wildcard would vouch for "+
+				"every name under it, including one that is no longer yours", r)
 		case !validHostname(n):
-			return nil, fmt.Errorf("%q is not a host name: letters, digits and hyphens between dots, "+
-				"and a leading *. for a wildcard", r)
-		case strings.HasPrefix(n, "*.") && !strings.Contains(strings.TrimPrefix(n, "*."), "."):
-			return nil, fmt.Errorf("%q: a wildcard needs a domain under it, not a top-level one", r)
+			return nil, fmt.Errorf("%q is not a host name: letters, digits and hyphens between dots", r)
 		}
 		out = append(out, n)
 	}

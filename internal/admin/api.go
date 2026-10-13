@@ -123,6 +123,10 @@ type API struct {
 	// LookupInternal asks the runtime; nil is discovery.InternalOrigin. A test
 	// replaces it rather than reach a cluster.
 	LookupInternal func(ctx context.Context, port int) discovery.Internal
+	// LookupPlatform asks the runtime what this gateway runs on, for the
+	// procedures of the Database tab; nil is discovery.Runtime. A test
+	// replaces it rather than reach a cluster.
+	LookupPlatform func(ctx context.Context) discovery.Platform
 	// CertManager asks cert-manager for the internal plane's certificate
 	// (SSL-13); nil when it cannot, and CertManagerWhy says why - another
 	// runtime, or a chart that did not grant it.

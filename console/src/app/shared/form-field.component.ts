@@ -71,6 +71,11 @@ export class FormFieldComponent {
   readonly floatLabel = input<'auto' | 'always'>('auto');
   // Optional leading icon (a Material symbol name, e.g. "search").
   readonly icon = input('');
+  // The fixed part of the value, shown in the field around what is typed: a
+  // forge's https://github.com/ before the repository and .git after it, so it
+  // reads at once that only owner/repo is asked for.
+  readonly prefix = input('');
+  readonly suffix = input('');
   // Hint under the field. An input, not projected content: a <mat-hint align="end"> passed
   // through ng-content is invisible to mat-form-field's content queries (same
   // reason the label is an input).
@@ -91,6 +96,11 @@ export class FormFieldComponent {
   // invisible to mat-form-field's content queries.
   readonly actionIcon = input('');
   readonly actionLabel = input('');
+  // The action is what UNLOCKS a disabled field - the pencil on a stored
+  // secret - so it stays while the field is disabled. Every other tool that
+  // writes still goes with the field's writability: without this, hiding them
+  // took the pencil too, and a stored secret could no longer be changed.
+  readonly unlocks = input(false, { transform: booleanAttribute });
   readonly action = output<void>();
   readonly clearable = input(true, { transform: booleanAttribute });
   readonly copyable = input(false, { transform: booleanAttribute });
