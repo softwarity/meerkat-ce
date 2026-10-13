@@ -66,14 +66,18 @@ the cheapest to the most faithful:
    serves and hands out the snapshot, it will run on OpenShift. Plus a static check of
    the rendered chart on every push: no pinned uid, nothing privileged, no port below
    1024.
-2. **`OK`, MicroShift, every night**: OpenShift's small distribution, built from OKD,
+2. **`OK`, MicroShift, on every pipeline**: OpenShift's small distribution, built from OKD,
    one node in a privileged container - it fits a standard GitHub runner. It is what
    kind cannot imitate: the `restricted-v2` SCC that ADMITS the pod and hands it its
    uid, and the router behind Routes. `e2e/platform/okd/run.sh <image> <ce|ee>`
    installs the published chart there, checks the SCC, the uid, the write to `/data`,
    both planes behind their Routes, and - on Enterprise - a mount helper as plug
    creates it, with a real SMB client. The `okd.yml` workflow plays it for both
-   images. One thing is turned off: the volume claim, because MicroShift's storage
+   images, called by each pipeline and a gate of the image it publishes. It ran
+   once a night on its own before, and the night the image lost its shell it went
+   red with nothing that publishes noticing. Nothing is asked of the container
+   itself - the image has no shell: the uid, the group and the files are read
+   from the node, through `/proc`. One thing is turned off: the volume claim, because MicroShift's storage
    driver wants an LVM volume group on the host.
 
 ## The test services

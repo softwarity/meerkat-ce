@@ -336,13 +336,23 @@ jobs:
   # this tree has no tags.
   #
   # THE GATE: everything it needs has PASSED, on main or by hand.
+  # The image on a real OpenShift (okd.yml): the restricted SCC, an uid the
+  # cluster chose, the Routes. A gate of the image below, like the e2e.
+  okd:
+    name: OpenShift
+    needs: gate
+    uses: ./.github/workflows/okd.yml
+    with:
+      edition: ce
+
   image:
     name: Build & publish image
-    needs: [gate, lint, unit, directory, e2e, console]
+    needs: [gate, lint, unit, directory, e2e, console, okd]
     if: >-
       !cancelled()
       && needs.lint.result == 'success' && needs.unit.result == 'success'
       && needs.directory.result == 'success' && needs.e2e.result == 'success'
+      && needs.okd.result == 'success'
       && ((github.event_name == 'push' && github.ref_name == 'main') || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read

@@ -2,6 +2,16 @@
 
 ## NEXT RELEASE
 
+- **The sign-in pages, the profile and the agent consent refuse another site's page.**
+  The console's API already checked that a write came from the console; these pages,
+  on the same cookie, did not. A page on the data plane of the same host could submit
+  the agent consent and obtain a root token, or turn the second factor off. Every
+  write they take now refuses a request another origin's page sent, and they can only
+  be framed by their own origin (the consent by nobody). The consent names the host
+  the code is sent to. Replacing the authenticator, new backup codes or turning the
+  second factor off now ask for a current code (or a backup code), and changing the
+  address asks for the current password.
+
 ---
 
 ## 1.7.0

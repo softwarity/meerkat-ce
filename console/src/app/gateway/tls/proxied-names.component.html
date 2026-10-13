@@ -16,7 +16,7 @@
         [matChipInputSeparatorKeyCodes]="separators"
         matChipInputAddOnBlur
         (matChipInputTokenEnd)="add($event)"
-        placeholder="shop.example.com, *.example.com"
+        [placeholder]="names().length ? '' : 'shop.example.com, *.example.com'"
       />
     </mat-chip-grid>
   </mat-form-field>

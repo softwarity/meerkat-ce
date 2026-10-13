@@ -71,7 +71,7 @@ Il y a deux façons de le prouver, de la moins coûteuse à la plus fidèle :
    `/data`, migre, sert le trafic et fournit le snapshot, elle tournera sur
    OpenShift. S'y ajoute, à chaque push, un contrôle statique du chart rendu : aucun
    uid imposé, rien de privilégié, aucun port inférieur à 1024.
-2. **`OK`, MicroShift, chaque nuit** : la petite distribution d'OpenShift,
+2. **`OK`, MicroShift, à chaque pipeline** : la petite distribution d'OpenShift,
    construite à partir d'OKD, un seul nœud dans un conteneur privilégié - elle tient
    sur un runner GitHub standard. Elle apporte ce que kind ne sait pas imiter : la
    SCC `restricted-v2` qui ADMET le pod et lui attribue son uid, et le routeur
@@ -79,7 +79,11 @@ Il y a deux façons de le prouver, de la moins coûteuse à la plus fidèle :
    chart publié, puis vérifie la SCC, l'uid, l'écriture dans `/data`, les deux plans
    derrière leurs Routes et - en édition Enterprise - un assistant de montage tel
    que plug le crée, avec un vrai client SMB. Le workflow `okd.yml` le joue pour les
-   deux images. Une seule chose est désactivée : la demande de volume, parce que le
+   deux images, appelé par chaque pipeline, et il conditionne l'image publiée. Avant,
+   il tournait seul une fois par nuit, et la nuit où l'image a perdu son shell il est
+   passé au rouge sans que rien de ce qui publie ne s'en aperçoive. Rien n'est demandé
+   au conteneur lui-même, puisque l'image n'a pas de shell : l'uid, le groupe et les
+   fichiers sont lus depuis le nœud, par `/proc`. Une seule chose est désactivée : la demande de volume, parce que le
    pilote de stockage de MicroShift exige un groupe de volumes LVM sur l'hôte.
 
 ## Les services de test

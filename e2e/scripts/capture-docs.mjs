@@ -513,6 +513,24 @@ const SHOTS = [
   { file: 'tls', path: '/infra/tls' },
   { file: 'tls-authorities', path: '/infra/tls', act: click('ACME') },
   { file: 'tls-local', path: '/infra/tls', act: click('On a local machine') },
+  // The Application door open, with two names declared as served by a proxy
+  // in front: the field is inside the door, and a closed door shows nothing.
+  {
+    file: 'tls-proxied',
+    path: '/infra/tls',
+    act: async (page) => {
+      await page.locator('mat-expansion-panel-header', { hasText: 'Application' }).first().click();
+      await page.waitForTimeout(600);
+      const input = page.locator('app-proxied-names input').last();
+      for (const name of ['shop.example.com', '*.apps.example.com']) {
+        await input.fill(name);
+        await input.press('Enter');
+        await page.waitForTimeout(700);
+      }
+      await input.blur();
+      await page.waitForTimeout(600);
+    },
+  },
   { file: 'access-tokens', path: '/infra/access-tokens' },
   { file: 'mcp', path: '/infra/mcp' },
   { file: 'model', path: '/infra/model' },

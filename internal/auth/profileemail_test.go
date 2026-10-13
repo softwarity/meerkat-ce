@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/store/dbtest"
@@ -24,8 +26,10 @@ func TestProfileEmailIsSelfService(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
+	// jane's password is a real hash: changing the address asks for it.
+	janeHash, _ := bcrypt.GenerateFromPassword([]byte("jane-pass-1"), bcrypt.MinCost)
 	for _, u := range []store.User{
-		{ID: "u1", Username: "jane", Enabled: true, PasswordHash: "x"},
+		{ID: "u1", Username: "jane", Enabled: true, PasswordHash: string(janeHash)},
 		{ID: "u2", Username: "bob", Enabled: true, PasswordHash: "x", Email: "taken@example.test"},
 	} {
 		if err := st.CreateUser(ctx, u); err != nil {
@@ -43,7 +47,7 @@ func TestProfileEmailIsSelfService(t *testing.T) {
 	cookies := rec.Result().Cookies()
 	post := func(email string) int {
 		req := httptest.NewRequest(http.MethodPost, "/profile/email",
-			strings.NewReader(url.Values{"email": {email}}.Encode()))
+			strings.NewReader(url.Values{"email": {email}, "current": {"jane-pass-1"}}.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		for _, c := range cookies {
 			req.AddCookie(c)

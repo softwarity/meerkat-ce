@@ -177,6 +177,7 @@
   "mfaRequiredLead": "La double authentification est requise",
   "mfaRequiredNote": "La double authentification est requise par votre organisation et ne peut pas être désactivée.",
   "mfaStatus": "La double authentification est active. Codes de secours restants : %d sur %d.",
+  "mfaManageCodeHint": "Saisissez un code actuel, ou un code de secours si vous avez perdu le téléphone, pour modifier quoi que ce soit ici.",
   "minutes": "minutes",
   "mustChangeLead": "Votre mot de passe doit être changé",
   "never": "Sans expiration",

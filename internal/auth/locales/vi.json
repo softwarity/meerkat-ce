@@ -177,6 +177,7 @@
   "mfaRequiredLead": "Xác thực hai bước là bắt buộc",
   "mfaRequiredNote": "Tổ chức của bạn yêu cầu xác thực hai bước và không thể tắt.",
   "mfaStatus": "Xác thực hai bước đang bật. Mã dự phòng còn lại: %d trên %d.",
+  "mfaManageCodeHint": "Nhập mã hiện tại, hoặc mã dự phòng nếu bạn mất điện thoại, để thay đổi bất kỳ mục nào ở đây.",
   "minutes": "phút",
   "mustChangeLead": "Bạn phải đổi mật khẩu",
   "never": "Không hết hạn",

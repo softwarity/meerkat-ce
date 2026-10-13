@@ -177,6 +177,7 @@
   "mfaRequiredLead": "二要素認証が必須です",
   "mfaRequiredNote": "組織が二要素認証を必須としているため、無効にできません。",
   "mfaStatus": "二要素認証は有効です。残りのバックアップコード: %d / %d。",
+  "mfaManageCodeHint": "ここで変更するには、現在のコード、または電話をなくした場合はバックアップコードを入力してください。",
   "minutes": "分",
   "mustChangeLead": "パスワードの変更が必要です",
   "never": "無期限",

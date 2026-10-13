@@ -2,7 +2,8 @@ package admin
 
 import (
 	"net/http"
-	"strings"
+
+	"github.com/softwarity/meerkat/internal/filters"
 )
 
 // The cross-site guard on control-plane writes (SEC-01).
@@ -31,21 +32,7 @@ import (
 // cookie, and a Bearer token a browser does not attach cross-site cannot be a
 // CSRF vector. Only cookie sessions are checked.
 func crossSiteWrite(r *http.Request) bool {
-	switch r.Method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
-		return false
-	}
-	switch r.Header.Get("Sec-Fetch-Site") {
-	case "same-origin", "none":
-		return false
-	case "cross-site", "same-site":
-		return true
-	}
-	// No Fetch-Metadata: fall back to Origin. Absent means a non-browser
-	// client (see above); present means it must be us.
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return false
-	}
-	return !strings.EqualFold(origin, originOf(r))
+	// The rule lives in filters, shared with the sign-in pages and the agent
+	// consent of both planes (audit P0-03): one rule, no copy that drifts.
+	return filters.CrossSiteWrite(r)
 }

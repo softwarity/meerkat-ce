@@ -185,6 +185,10 @@ sign-up page used to throttle resets, and a flood of resets closed sign-up.
 
 ## Changing one's address
 
+The current password is asked first, where the account has one: a session
+alone, a borrowed laptop or a stolen cookie, must not be enough to move the
+place a reset lands.
+
 The address is where a password reset lands, so it is a way into the account.
 When a mail relay is configured, changing it from the profile does **not**
 change it yet: a link goes to the **new** address, and the change is made when

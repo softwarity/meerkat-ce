@@ -29,7 +29,7 @@ func TestANewAddressIsConfirmedBeforeItCounts(t *testing.T) {
 	login := do(t, mux, "POST", "/login", url.Values{"username": {"alice"}, "password": {"pass-1234-x"}}, nil)
 	cookie := sessionCookieOf(login)
 
-	res := do(t, mux, "POST", "/profile/email", url.Values{"email": {"alice@new.example"}}, cookie)
+	res := do(t, mux, "POST", "/profile/email", url.Values{"email": {"alice@new.example"}, "current": {"pass-1234-x"}}, cookie)
 	if res.Code != http.StatusOK || !strings.Contains(bodyString(res), "alice@new.example") {
 		t.Fatalf("the request does not say where the link went: %d", res.Code)
 	}

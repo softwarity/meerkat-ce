@@ -21,7 +21,7 @@ import (
 const issueMaxBody = 2 << 20
 
 // registerIssues mounts the submission endpoint next to the user button's.
-func (h *Handler) registerIssues(mux *http.ServeMux) {
+func (h *Handler) registerIssues(mux routes) {
 	mux.HandleFunc("POST /meerkat/issues", h.postIssue)
 }
 

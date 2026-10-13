@@ -63,7 +63,7 @@ logo et la navigation viennent de la console.
 ![Le trafic](img/console/traffic.webp) Le trafic en direct, sans rien installer : requêtes par seconde, latence moyenne et p95, refus distingués des échecs, et les routes classées selon la plus lente, celle qui échoue le plus ou la plus coûteuse.
 ![Le journal d'audit](img/console/audit.webp) Chaque changement d'administration, avec son auteur et les différences champ par champ.
 ![Le coffre](img/console/vault.webp) Des secrets scellés au repos et des valeurs en clair, tous référencés par leur nom.
-![TLS](img/console/tls.webp) Les certificats, leurs noms et leur date d'expiration, qu'ils soient émis ou importés.
+![Domains & TLS](img/console/tls.webp) Les certificats, leurs noms et leur date d'expiration, qu'ils soient émis ou importés.
 ![La configuration](img/console/configuration.webp) Toute l'installation en un seul document, à exporter et à rejouer ailleurs.
 :::
 

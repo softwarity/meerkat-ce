@@ -38,8 +38,8 @@
    "fr": "kind soumis aux règles d'OpenShift : namespace en Pod Security 'restricted', pod lancé sous un uid arbitraire tiré d'une plage du namespace, avec le groupe 0 (ce que fait la SCC restricted), valeurs du chart inchangées"
   },
   "OK": {
-   "en": "MicroShift built from OKD, one node in a container on the runner: the real restricted-v2 SCC and the real router (e2e/platform/okd/run.sh), every night",
-   "fr": "MicroShift construit à partir d'OKD, un nœud dans un conteneur sur le runner : la vraie SCC restricted-v2 et le vrai routeur (e2e/platform/okd/run.sh), chaque nuit"
+   "en": "MicroShift built from OKD, one node in a container on the runner: the real restricted-v2 SCC and the real router (e2e/platform/okd/run.sh), on every pipeline and a gate of the image it publishes",
+   "fr": "MicroShift construit à partir d'OKD, un nœud dans un conteneur sur le runner : la vraie SCC restricted-v2 et le vrai routeur (e2e/platform/okd/run.sh), à chaque pipeline et condition de l'image publiée"
   }
  },
  "features": [

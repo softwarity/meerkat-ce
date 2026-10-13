@@ -225,7 +225,7 @@ func TestAnAddressChangeIsConfirmedByCode(t *testing.T) {
 	aliceWithPassword(t, st, "pass-1234-x")
 	sess := sessionCookieOf(do(t, mux, "POST", "/login", url.Values{"username": {"alice"}, "password": {"pass-1234-x"}}, nil))
 
-	asked := send(t, mux, "POST", "", "/profile/email", url.Values{"email": {"alice@new.example"}}, sess)
+	asked := send(t, mux, "POST", "", "/profile/email", url.Values{"email": {"alice@new.example"}, "current": {"pass-1234-x"}}, sess)
 	if asked.Code != http.StatusOK || !strings.Contains(bodyString(asked), `action="/profile/email/code"`) {
 		t.Fatalf("change: %d", asked.Code)
 	}

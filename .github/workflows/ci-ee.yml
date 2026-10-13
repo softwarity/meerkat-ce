@@ -629,14 +629,27 @@ jobs:
   # the private side (prune-packages.yml), not the push.
   #
   # THE GATE: everything it needs has PASSED.
+  # The Enterprise image on a real OpenShift (okd.yml), at the commit under
+  # test: the restricted SCC, an uid the cluster chose, the Routes, and the
+  # tunnel's mount helper. A gate of the image below.
+  okd:
+    name: OpenShift
+    needs: source
+    uses: ./.github/workflows/okd.yml
+    with:
+      edition: ee
+      ref: ${{ needs.source.outputs.sha }}
+    secrets: inherit
+
   image:
     name: Build & publish the Enterprise image
-    needs: [source, lint, unit, postgres, directories, e2e, tunnel]
+    needs: [source, lint, unit, postgres, directories, e2e, tunnel, okd]
     if: >-
       !cancelled()
       && needs.lint.result == 'success' && needs.unit.result == 'success'
       && needs.postgres.result == 'success' && needs.directories.result == 'success'
       && needs.e2e.result == 'success' && needs.tunnel.result == 'success'
+      && needs.okd.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: enterprise

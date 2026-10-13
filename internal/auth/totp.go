@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/filters"
@@ -355,6 +356,36 @@ func (h *Handler) showProfileMFA(w http.ResponseWriter, r *http.Request) {
 	h.renderEnrollSetup(w, r, sess.UserID, "/profile/mfa", "/profile", required, "", http.StatusOK)
 }
 
+// factorProved checks the code typed on the management page, and answers the
+// page again with the refusal when it is wrong.
+func (h *Handler) factorProved(w http.ResponseWriter, r *http.Request, userID string, required bool) bool {
+	pol := h.st.GetRateLimitPolicy(r.Context())
+	window := 15 * time.Minute
+	if d, err := store.ParseISODuration(pol.LoginWindow); err == nil && d > 0 {
+		window = d
+	}
+	again := func(key string, status int) {
+		totp, _ := h.st.GetUserTOTP(r.Context(), userID)
+		trust, _ := h.st.GetTrustedBrowserPolicy(r.Context())
+		h.renderMFAManage(w, r, profileMFAManageData{
+			Required: required, ScratchLeft: len(totp.Scratch), Error: h.tr(r, key),
+			AllowTrust: trust.Allowed, Trusted: h.trustedViews(r, userID),
+		}, status)
+	}
+	key := "totp|" + userID
+	if pol.TotpAttempts > 0 && h.regLimit.count(r.Context(), key, window) >= pol.TotpAttempts {
+		again("errTooManyAttempts", http.StatusTooManyRequests)
+		return false
+	}
+	if !h.verifySecondFactor(r, userID, strings.TrimSpace(r.PostFormValue("code"))) {
+		h.regLimit.hit(r.Context(), key)
+		again("errBadCode", http.StatusUnprocessableEntity)
+		return false
+	}
+	h.regLimit.reset(r.Context(), key)
+	return true
+}
+
 // trustedViews loads the user's trusted browsers ready for display.
 func (h *Handler) trustedViews(r *http.Request, userID string) []trustedView {
 	list, err := h.st.ListTrustedBrowsers(r.Context(), userID)
@@ -398,6 +429,18 @@ func (h *Handler) doProfileMFA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	required, _ := h.st.MFARequiredForUser(r.Context(), sess.UserID)
+	// Replacing the authenticator, minting new backup codes and turning the
+	// factor off each TAKE the second factor, so each asks for it first: a
+	// current code, or a backup code for whoever lost the phone (audit P0-03).
+	// A session alone - a borrowed laptop, a stolen cookie - used to be enough
+	// to point the factor at the thief's own phone. Bounded like the
+	// challenge: the same per-account counter.
+	switch r.PostFormValue("step") {
+	case "renew", "regen", "disable":
+		if !h.factorProved(w, r, sess.UserID, required) {
+			return
+		}
+	}
 	switch r.PostFormValue("step") {
 	case "renew":
 		// Start a fresh enrolment; the current secret stays active until a new
@@ -764,6 +807,11 @@ const profileMFAManageBody = `    <style>
       <p class="lead">{{.T.twoFactor}}</p>
       {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
       <p class="status">{{.StatusLine}}</p>
+      <p class="hint">{{.T.mfaManageCodeHint}}</p>
+      <label class="field">
+        <span>{{.T.authCode}}</span>
+        <input name="code" inputmode="numeric" autocomplete="one-time-code" required>
+      </label>
       <button class="choice" type="submit" name="step" value="renew">{{.T.replaceAuth}}</button>
       <button class="choice" type="submit" name="step" value="regen">{{.T.regenCodes}}</button>
       {{if not .Required}}<button class="choice danger" type="submit" name="step" value="disable">{{.T.turnOffMfa}}</button>{{end}}

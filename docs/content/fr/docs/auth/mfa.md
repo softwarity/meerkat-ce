@@ -36,6 +36,12 @@ faciles à confondre. Seules leurs empreintes sont conservées : une feuille per
 donc pas être retrouvée, seulement remplacée, depuis la même page, qui génère dix nouveaux
 codes et retire les anciens. La page indique combien il en reste.
 
+**Changer le facteur le demande.** Remplacer l'application d'authentification, générer de
+nouveaux codes de secours ou désactiver le second facteur demandent d'abord un code actuel -
+ou un code de secours, pour qui a perdu le téléphone - sous le même compteur par compte que
+la vérification. Une session seule, un portable emprunté ou un cookie volé, ne suffit pas à
+faire pointer le facteur vers le téléphone de quelqu'un d'autre.
+
 Refaire l'enrôlement, ou désactiver le second facteur, **efface tous les navigateurs de
 confiance** du compte. C'est voulu : l'ancienne vérification n'existe plus, et tout ce qui
 permettait de s'en dispenser disparaît avec elle.

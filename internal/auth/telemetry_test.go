@@ -20,7 +20,7 @@ import (
 
 func telemetryMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	h.registerTelemetry(mux)
+	h.registerTelemetry(routes{mux: mux})
 	return mux
 }
 

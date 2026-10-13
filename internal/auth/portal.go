@@ -31,7 +31,7 @@ var portalAssetVersion = func() string {
 // Everything is same-origin and offline-first.
 
 // registerPortal mounts the component's endpoints on the DATA plane.
-func (h *Handler) registerPortal(mux *http.ServeMux) {
+func (h *Handler) registerPortal(mux routes) {
 	mux.HandleFunc("GET /meerkat/portal.js", h.portalJS)
 	mux.HandleFunc("GET /meerkat/portal.json", h.portalJSON)
 }
@@ -53,7 +53,7 @@ func (h *Handler) portalJS(w http.ResponseWriter, _ *http.Request) {
 // portal editor needs same-origin: the component itself and a host page that
 // runs it in edit mode, driven over postMessage. The served DATA-plane portal
 // still comes from registerPortal on the data plane; this is the editor's mirror.
-func (h *Handler) registerPortalPreview(mux *http.ServeMux) {
+func (h *Handler) registerPortalPreview(mux routes) {
 	mux.HandleFunc("GET /meerkat/portal.js", h.portalJS)
 	mux.HandleFunc("GET /meerkat/portal-preview", h.portalPreviewPage)
 }

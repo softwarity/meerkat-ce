@@ -177,6 +177,7 @@
   "mfaRequiredLead": "La doble autenticación es obligatoria",
   "mfaRequiredNote": "Tu organización exige la doble autenticación y no se puede desactivar.",
   "mfaStatus": "La doble autenticación está activa. Códigos de respaldo restantes: %d de %d.",
+  "mfaManageCodeHint": "Introduzca un código actual, o un código de respaldo si perdió el teléfono, para cambiar cualquiera de estas opciones.",
   "minutes": "minutos",
   "mustChangeLead": "Debes cambiar tu contraseña",
   "never": "Sin caducidad",

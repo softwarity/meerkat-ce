@@ -190,6 +190,10 @@ l'inscription.
 
 ## Changer d'adresse
 
+Le mot de passe actuel est demandé d'abord, quand le compte en a un : une session
+seule, un portable emprunté ou un cookie volé, ne doit pas suffire à déplacer
+l'endroit où arrive une réinitialisation.
+
 L'adresse est l'endroit où arrive une réinitialisation de mot de passe : c'est donc un
 moyen d'entrer dans le compte. Quand un relais de messagerie est configuré, la modifier
 depuis le profil ne la change **pas** tout de suite : un lien part vers la **nouvelle**

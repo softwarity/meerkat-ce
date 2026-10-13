@@ -177,6 +177,7 @@
   "mfaRequiredLead": "A autenticação em dois passos é obrigatória",
   "mfaRequiredNote": "A sua organização exige a autenticação em dois passos e esta não pode ser desativada.",
   "mfaStatus": "A autenticação em dois passos está ativa. Códigos de recuperação restantes: %d de %d.",
+  "mfaManageCodeHint": "Introduza um código atual, ou um código de recuperação se perdeu o telemóvel, para alterar qualquer uma destas opções.",
   "minutes": "minutos",
   "mustChangeLead": "A sua palavra-passe tem de ser alterada",
   "never": "Sem validade",

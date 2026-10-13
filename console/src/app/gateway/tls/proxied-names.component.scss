@@ -1,5 +1,8 @@
 :host {
   display: block;
+  /* Clear of the drop zone above: the floating label sits on the field's top
+     edge, and the zone's dashed border ran right through it. */
+  margin-top: 16px;
 }
 /* The field and its info marker on one line - app-form-field's layout, which
    cannot host a chip grid (it projects a matInput). */

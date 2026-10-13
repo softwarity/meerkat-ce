@@ -342,7 +342,7 @@ forme du produit.
 
 | Fait | ID | Mot-clé | Description | Ce qui manque | Éd. |
 |:---:|---|---|---|---|:---:|
-| [~] | SEC-01 | **CSRF** | Toute écriture du plan de contrôle en session cookie doit prouver qu'elle vient de la console : `Sec-Fetch-Site` (que la page ne peut pas forger) doit être `same-origin` ou `none`, sinon l'en-tête `Origin` doit être celui du plan. Ni l'un ni l'autre = un client non-navigateur (curl, sonde), qui n'est pas un vecteur CSRF et passe. Un appel par jeton n'y arrive jamais : un Bearer qu'un navigateur n'attache pas en cross-site ne peut pas être forgé. `SameSite=Lax` reste la première barrière | un jeton anti-rejeu par formulaire, si on veut la ceinture ET les bretelles ; et la même garde sur les écritures du plan de données servies en cookie | CE |
+| [~] | SEC-01 | **CSRF** | Toute écriture en session cookie doit prouver qu'elle vient d'une page de la même origine : `Sec-Fetch-Site` (que la page ne peut pas forger) doit être `same-origin` ou `none`, sinon l'**hôte** de l'en-tête `Origin` doit être celui de la requête (l'hôte et pas le schéma : derrière un proxy qui termine le TLS, le schéma vu d'ici n'est pas celui du navigateur). Ni l'un ni l'autre = un client non-navigateur (curl, sonde), qui n'est pas un vecteur CSRF et passe. **Une seule règle** (`filters.CrossSiteWrite`) pour l'API du plan de contrôle ET, depuis l'audit P0-03, pour **toutes** les écritures des pages de connexion, du profil et du consentement OAuth, sur les deux plans : montées par un mux qui garde chaque POST (`internal/auth/guard.go`), si bien qu'un POST ajouté plus tard est gardé par construction. Restent ouverts ce qu'une page étrangère envoie légitimement et qu'une forgerie ne peut pas exploiter : les appels machine de l'agent (`/oauth/register`, `/oauth/token`, `/oauth/revoke`) et la réponse SAML (`POST /login/{id}/callback`). Avant, une page du plan de données du même hôte (same-site pour la console) soumettait le consentement et obtenait un jeton root. Chaque page dit qui peut l'encadrer (`frame-ancestors 'self'`, l'intégrateur et les aperçus de la console), le consentement **aucun** cadre et affiche l'**hôte** où part le code. **Réauthentification** : remplacer l'authentificateur, régénérer les codes de secours ou couper la MFA demandent un code actuel (ou de secours) ; changer d'adresse demande le mot de passe actuel quand le compte en a un - une session volée ne suffit plus. `SameSite=Lax` reste la première barrière | un jeton anti-rejeu par formulaire, si on veut la ceinture ET les bretelles | CE |
 | [~] | SEC-02 | **CORS** | Politique explicite et configurable (désactivé dans la V1) | la politique CORS n'est pas configurable, une seule origine est câblée | CE |
 | [x] | SEC-03 | **En-têtes de sécurité** | En-têtes de sécurité modernes configurables : HSTS, CSP, X-Frame-Options, Referrer-Policy | - | CE |
 | [x] | SEC-04 | **Aucun secret en clair** | Aucun secret en clair dans le dépôt ni dans les exports (la V1 committait des mots de passe dans config/ et docker-compose.yml) | - | CE |
@@ -548,11 +548,11 @@ audit lit, il cherche un contrôle explicite. **Fait** : toute écriture du plan
 passe par un seul entonnoir (`authed`), et c'est là qu'on vérifie, pour une session cookie
 seulement, le signal que le navigateur pose et que la page ne peut pas forger - `Sec-Fetch-Site`
 d'abord, `Origin` en repli. Un jeton (Bearer) n'y arrive pas : un navigateur ne l'attache pas
-en cross-site, donc il n'est pas un vecteur. **Reste** : le jeton anti-rejeu dans les
-formulaires servis par la gateway (ceinture ET bretelles), et la même garde sur les écritures
-du plan de données faites en cookie - aujourd'hui les pages du flux sont en `no-store` et ne
-portent pas de formulaire d'écriture d'état côté gateway, mais la règle mérite d'être posée
-une fois.
+en cross-site, donc il n'est pas un vecteur. **Fait aussi** (audit P0-03) : la même règle sur
+toutes les écritures des pages de connexion, du profil et du consentement OAuth, sur les deux
+plans - elles en avaient besoin : le consentement d'un agent se soumettait depuis le plan de
+données du même hôte. **Reste** : le jeton anti-rejeu dans les formulaires servis par la
+gateway (ceinture ET bretelles).
 
 ### gRPC et h2c (ROUTE-20)
 

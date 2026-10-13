@@ -177,6 +177,7 @@
   "mfaRequiredLead": "İki adımlı doğrulama zorunludur",
   "mfaRequiredNote": "Kuruluşunuz iki adımlı doğrulamayı zorunlu kılıyor, kapatılamaz.",
   "mfaStatus": "İki adımlı doğrulama etkin. Kalan yedek kod: %d / %d.",
+  "mfaManageCodeHint": "Burada herhangi bir şeyi değiştirmek için güncel bir kod veya telefonu kaybettiyseniz bir yedek kod girin.",
   "minutes": "dakika",
   "mustChangeLead": "Parolanız değiştirilmeli",
   "never": "Süresiz",

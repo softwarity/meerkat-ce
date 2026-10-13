@@ -177,6 +177,7 @@
   "mfaRequiredLead": "必须启用双重验证",
   "mfaRequiredNote": "您所在的组织要求启用双重验证，无法关闭。",
   "mfaStatus": "双重验证已启用。剩余备用代码：%d / %d。",
+  "mfaManageCodeHint": "如需更改此处任何设置，请输入当前验证码；如果手机丢失，请输入备用码。",
   "minutes": "分钟",
   "mustChangeLead": "您必须修改密码",
   "never": "永不过期",

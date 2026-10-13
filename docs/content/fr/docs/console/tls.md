@@ -16,7 +16,7 @@ Il n'existe pas d'interrupteur *activer HTTPS*. **C'est un certificat placé sur
 plan qui ouvre sa porte**, et c'est son retrait qui la referme. Un interrupteur
 que l'on peut activer sans rien derrière est un interrupteur qui ment.
 
-![L'écran Domains & TLS : la réserve de certificats, les zones de dépôt Console et Application avec leurs liens, Force HTTPS et sa durée HSTS](img/console/tls.webp)
+![L'écran Domains & TLS : la réserve de certificats, puis les portes Console, Application et Internal, chacune avec ses ports, puis les autorités de confiance](img/console/tls.webp)
 
 Ici, la réserve contient quatre lignes : un certificat pour `gateway.acme.example`,
 servi sur la console ; un autre pour `apps.acme.example` et `docs.acme.example`,
@@ -166,6 +166,8 @@ une route ou un service qui fixe sa propre valeur la conserve. Voir
 [TLS](/docs/operations/tls).
 
 ## Derrière un proxy qui termine le TLS
+
+![La porte Application ouverte : sa zone de dépôt, puis deux noms déclarés comme joints par un proxy qui termine le TLS, puis Force HTTPS](img/console/tls-proxied.webp)
 
 Dans les portes Console et Application, **Also reached through a proxy that
 terminates TLS** réunit les noms qu'un proxy placé devant la gateway - nginx, un

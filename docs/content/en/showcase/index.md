@@ -62,7 +62,7 @@ navigation come from the console.
 ![Traffic](img/console/traffic.webp) Live traffic with nothing to install: requests per second, mean and p95 latency, refusals told apart from failures, and the routes ranked by slowest, failing or costliest.
 ![The audit trail](img/console/audit.webp) Every administrative change, with its author and a field-level diff.
 ![The vault](img/console/vault.webp) Secrets sealed at rest and plain values, both referenced by name.
-![TLS](img/console/tls.webp) Certificates, their names and their expiry, issued or uploaded.
+![Domains & TLS](img/console/tls.webp) Certificates, their names and their expiry, issued or uploaded.
 ![Configuration](img/console/configuration.webp) The whole installation as one document, to export and replay elsewhere.
 :::
 

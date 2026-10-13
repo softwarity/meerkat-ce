@@ -43,7 +43,7 @@ const (
 // registerOAuth mounts the authorisation server. Control plane only: the data
 // plane serves applications, and an agent that reached this flow there would
 // be authorising against the wrong door.
-func (h *Handler) registerOAuth(mux *http.ServeMux) {
+func (h *Handler) registerOAuth(mux routes) {
 	// Where a 401 from the agent endpoint sends a client (RFC 9728). Both
 	// shapes are served: the bare one, and the one carrying the resource's
 	// path, which is what a client built for a path-scoped resource asks for.
@@ -157,8 +157,13 @@ func (h *Handler) oauthRegister(w http.ResponseWriter, r *http.Request) {
 type consentData struct {
 	flowChrome
 	ClientName string
-	Query      template.URL // the request, carried through the form untouched
-	Scopes     []consentChoice
+	// RedirectHost is where the code goes once approved. The name above is
+	// whatever the agent registered itself as - "Claude Code" costs nothing
+	// to claim - so the page says where the answer is SENT, which is the one
+	// thing a look-alike cannot borrow.
+	RedirectHost string
+	Query        template.URL // the request, carried through the form untouched
+	Scopes       []consentChoice
 }
 
 type consentChoice struct {
@@ -205,9 +210,10 @@ func (h *Handler) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 	data := consentData{
 		// The wide form: this page is two sets of choices with their
 		// explanations, not a login box.
-		flowChrome: h.flowData(r, ""),
-		ClientName: client.Name,
-		Query:      template.URL(r.URL.RawQuery), //nolint:gosec // re-parsed, never dereferenced
+		flowChrome:   h.flowData(r, ""),
+		ClientName:   client.Name,
+		RedirectHost: redirectHost(redirect),
+		Query:        template.URL(r.URL.RawQuery), //nolint:gosec // re-parsed, never dereferenced
 		Scopes: []consentChoice{
 			{Value: store.ScopeReadOnly, Label: "Read only", Detail: "Look at the gateway and run the testers. Change nothing.", Checked: true},
 			{Value: store.ScopeFull, Label: "Read and change", Detail: "Everything you can do. Each change is recorded and can be undone."},
@@ -216,7 +222,21 @@ func (h *Handler) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 	data.List = true
 	data.Title = "Connect an agent - Meerkat"
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// In NO frame, not even our own: this page hands an agent the approver's
+	// powers, and a frame is how a click on it is stolen.
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+	w.Header().Set("X-Frame-Options", "DENY")
 	_ = consentPage.Execute(w, data)
+}
+
+// redirectHost is the host a redirect URI sends the code to, as the consent
+// shows it: the host and its port, nothing a look-alike path could dress up.
+func redirectHost(redirect string) string {
+	u, err := url.Parse(redirect)
+	if err != nil || u.Host == "" {
+		return redirect
+	}
+	return u.Host
 }
 
 // oauthApprove turns an approval into a code, or a refusal into a redirect
@@ -519,6 +539,7 @@ const consentBody = `
   <input type="hidden" name="request" value="{{.Query}}">
   <h1>Connect an agent</h1>
   <p class="lead">This agent asks to act on the gateway as you: <strong>{{.ClientName}}</strong></p>
+  <p class="lead">Its answer goes to <strong>{{.RedirectHost}}</strong>. Connect only if that is the machine you are connecting from.</p>
 
   <fieldset>
     <legend>What may it do?</legend>

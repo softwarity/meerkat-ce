@@ -287,13 +287,20 @@ func TestProfileShowsMFAState(t *testing.T) {
 		t.Fatal("security page missing the two-factor row")
 	}
 
-	enrol(t, st)
+	_, backup := enrol(t, st)
 	manage := do(t, mux, "GET", "/profile/mfa", nil, cookie)
 	if manage.Code != http.StatusOK || !strings.Contains(bodyString(manage), "Backup codes remaining") {
 		t.Fatalf("manage page: code=%d", manage.Code)
 	}
 	// Disable turns it off and returns to the profile.
-	disable := do(t, mux, "POST", "/profile/mfa", url.Values{"step": {"disable"}}, cookie)
+	// Without a code it is refused: a session alone does not take the factor.
+	if bare := do(t, mux, "POST", "/profile/mfa", url.Values{"step": {"disable"}}, cookie); bare.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("disable without a code: %d", bare.Code)
+	}
+	if s, _ := st.GetUserTOTP(context.Background(), "u1"); !s.Enrolled {
+		t.Fatal("the factor was turned off without a code")
+	}
+	disable := do(t, mux, "POST", "/profile/mfa", url.Values{"step": {"disable"}, "code": {backup}}, cookie)
 	if disable.Code != http.StatusSeeOther || disable.Header().Get("Location") != "/profile" {
 		t.Fatalf("disable: code=%d loc=%q", disable.Code, disable.Header().Get("Location"))
 	}

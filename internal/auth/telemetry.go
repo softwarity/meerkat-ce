@@ -38,7 +38,7 @@ const telemetryBodyLimit = 1 << 20
 // binary, and the page that loads it is served by that binary.
 const telemetryCache = "public, max-age=3600"
 
-func (h *Handler) registerTelemetry(mux *http.ServeMux) {
+func (h *Handler) registerTelemetry(mux routes) {
 	mux.HandleFunc("GET /meerkat/telemetry.js", h.telemetryJS)
 	mux.HandleFunc("POST /meerkat/telemetry", h.telemetryRelay)
 }

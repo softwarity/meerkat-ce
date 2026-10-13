@@ -177,6 +177,7 @@
   "mfaRequiredLead": "Autentikasi dua faktor wajib",
   "mfaRequiredNote": "Organisasi Anda mewajibkan autentikasi dua faktor dan tidak dapat dimatikan.",
   "mfaStatus": "Autentikasi dua faktor aktif. Sisa kode cadangan: %d dari %d.",
+  "mfaManageCodeHint": "Masukkan kode saat ini, atau kode cadangan jika ponsel hilang, untuk mengubah apa pun di sini.",
   "minutes": "menit",
   "mustChangeLead": "Kata sandi Anda harus diubah",
   "never": "Tanpa kedaluwarsa",

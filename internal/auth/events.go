@@ -21,7 +21,7 @@ import (
 // once, at connect time, from the session as it stands. A capability granted
 // while a page is open reaches it at its next load - which is also when its
 // fetched state would have changed anyway.
-func (h *Handler) registerEvents(mux *http.ServeMux) {
+func (h *Handler) registerEvents(mux routes) {
 	mux.HandleFunc("GET /meerkat/events", h.events)
 	mux.HandleFunc("POST /meerkat/events/echo", h.eventsEcho)
 }

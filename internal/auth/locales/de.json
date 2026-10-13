@@ -177,6 +177,7 @@
   "mfaRequiredLead": "Zwei-Faktor-Authentifizierung ist vorgeschrieben",
   "mfaRequiredNote": "Ihre Organisation schreibt die Zwei-Faktor-Authentifizierung vor; sie kann nicht deaktiviert werden.",
   "mfaStatus": "Die Zwei-Faktor-Authentifizierung ist aktiv. Verbleibende Backup-Codes: %d von %d.",
+  "mfaManageCodeHint": "Geben Sie einen aktuellen Code ein, oder einen Sicherungscode, falls Sie das Telefon verloren haben, um hier etwas zu ändern.",
   "minutes": "Minuten",
   "mustChangeLead": "Ihr Passwort muss geändert werden",
   "never": "Kein Ablauf",

@@ -177,6 +177,7 @@
   "mfaRequiredLead": "Uwierzytelnianie dwuskładnikowe jest wymagane",
   "mfaRequiredNote": "Twoja organizacja wymaga uwierzytelniania dwuskładnikowego i nie można go wyłączyć.",
   "mfaStatus": "Uwierzytelnianie dwuskładnikowe jest aktywne. Pozostałe kody zapasowe: %d z %d.",
+  "mfaManageCodeHint": "Wpisz bieżący kod lub kod zapasowy, jeśli zgubiono telefon, aby cokolwiek tu zmienić.",
   "minutes": "minut",
   "mustChangeLead": "Twoje hasło musi zostać zmienione",
   "never": "Bez wygaśnięcia",

@@ -1399,6 +1399,10 @@ const profileBody = `    <style>
           <span>{{.T.email}}</span>
           <input name="email" type="email" value="{{.Email}}" autocomplete="email" required>
         </label>
+        {{if .HasPassword}}<label class="field">
+          <span>{{.T.currentPassword}}</span>
+          <input name="current" type="password" autocomplete="current-password" required>
+        </label>{{end}}
         <p class="em-hint">{{.T.emailHint}}</p>
         <div class="em-actions">
           <button type="button" class="em-cancel" id="em-cancel">{{.T.cancel}}</button>
@@ -2149,7 +2153,10 @@ func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageL
 }
 
 // Register mounts the auth endpoints on mux.
-func (h *Handler) Register(mux *http.ServeMux) {
+func (h *Handler) Register(raw *http.ServeMux) {
+	// Every write behind the cross-site guard, every page framed by its own
+	// origin only (guard.go).
+	mux := routes{mux: raw}
 	if !h.adminPlane {
 		mux.HandleFunc("GET /select-tenant", h.showSelectTenant)
 		mux.HandleFunc("POST /select-tenant", h.doSelectTenant)
@@ -2888,6 +2895,12 @@ type profileData struct {
 	// who came here to add a passkey has finished, and the browser's back
 	// button is not an answer a product gives.
 	Console bool
+	// HasPassword asks for the current password before the address changes:
+	// the address is where a reset lands, so changing it is changing a way
+	// in, and a session alone - a borrowed laptop, a stolen cookie - must not
+	// be enough (audit P0-03). An account born at an authority has no
+	// password here to ask for; its new address is still proved by the mail.
+	HasPassword bool
 }
 
 // profileSecurityData drives the Security page: second factor, password,
@@ -3077,6 +3090,22 @@ func (h *Handler) doProfileEmail(w http.ResponseWriter, r *http.Request) {
 	if _, err := netmail.ParseAddress(email); err != nil {
 		h.renderProfile(w, r, sess, h.tr(r, "errBadEmail"), http.StatusUnprocessableEntity)
 		return
+	}
+	// The current password first, where the account has one (HasPassword).
+	// Bounded like a sign-in: the same per-account counter, so a session
+	// cannot be turned into a password oracle.
+	if u, err := h.st.GetUserByID(r.Context(), sess.UserID); err == nil && u.PasswordHash != "" {
+		key := "pwcheck|" + sess.UserID
+		if h.regLimit.count(r.Context(), key, 15*time.Minute) >= 5 {
+			h.renderProfile(w, r, sess, h.tr(r, "errTooManyAttempts"), http.StatusTooManyRequests)
+			return
+		}
+		if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(r.PostFormValue("current"))) != nil {
+			h.regLimit.hit(r.Context(), key)
+			h.renderProfile(w, r, sess, h.tr(r, "errPwCurrentWrong"), http.StatusUnprocessableEntity)
+			return
+		}
+		h.regLimit.reset(r.Context(), key)
 	}
 	if id, err := h.st.UserIDByEmail(r.Context(), email); err == nil && id != sess.UserID {
 		h.renderProfile(w, r, sess, h.tr(r, "errEmailTaken"), http.StatusConflict)
@@ -3319,6 +3348,7 @@ func (h *Handler) renderProfileWith(w http.ResponseWriter, r *http.Request, sess
 		data.Username = u.Username
 		data.Fullname = u.Fullname
 		data.Email = u.Email
+		data.HasPassword = u.PasswordHash != ""
 		data.Initials = initials(u)
 		data.Timezone = u.Timezone
 		// The developer tooling is about the APPLICATIONS: a certificate the

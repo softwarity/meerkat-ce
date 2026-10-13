@@ -3,30 +3,42 @@
 # restricted-v2 SCC admitting the pod under a uid it chose, the Routes, and the
 # developer tunnel's mount helper.
 #
-# Every night and on demand, not on every push: the cluster takes minutes to
-# come up and tests the image and the chart, which most commits do not touch.
-# A change to docker/ or deploy/helm is the moment to dispatch it by hand.
+# ON EVERY PIPELINE, called by ci.yml (the community leg) and ci-ee.yml (the
+# Enterprise one), and a gate of the image each publishes. It used to run once
+# a night on its own: the night the image went distroless, `oc exec ... id`
+# found no `id`, every run went red, and nothing that publishes noticed. On
+# the public mirror the minutes cost nothing, and a cluster the image no
+# longer starts on is exactly what must stop a publication.
 #
 # Runs on the community mirror, like everything else. The Enterprise leg clones
-# the private tree with the App's token, as ci-ee.yml does.
+# the private tree at the commit under test with the App's token, as ci-ee.yml
+# does. By hand too (both legs), for a look at main.
+#
+# No concurrency group of its own: two callers run it at once, and a group
+# here would have each cancel the other.
 name: OKD
 
 on:
-  schedule:
-    - cron: "23 2 * * *"
+  workflow_call:
+    inputs:
+      edition:
+        description: ce or ee
+        type: string
+        required: true
+      ref:
+        description: the private commit the Enterprise leg builds (empty is main)
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: okd
-  cancel-in-progress: true
-
 jobs:
   community:
     name: MicroShift (community image)
-    if: github.repository == 'softwarity/meerkat-ce'
+    if: github.repository == 'softwarity/meerkat-ce' && (github.event_name == 'workflow_dispatch' || inputs.edition == 'ce')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -49,7 +61,7 @@ jobs:
 
   enterprise:
     name: MicroShift (Enterprise image)
-    if: github.repository == 'softwarity/meerkat-ce'
+    if: github.repository == 'softwarity/meerkat-ce' && (github.event_name == 'workflow_dispatch' || inputs.edition == 'ee')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: enterprise
@@ -64,6 +76,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: softwarity/meerkat
+          ref: ${{ inputs.ref }}
           token: ${{ steps.token.outputs.token }}
           persist-credentials: false
       - uses: docker/setup-buildx-action@v4

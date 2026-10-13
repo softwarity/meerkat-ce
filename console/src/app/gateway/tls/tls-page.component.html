@@ -342,6 +342,10 @@
             </span>
             </mat-panel-description>
           </mat-expansion-panel-header>
+          <!-- Created when the door opens, not before: a form field laid out inside a
+               closed panel measures its label at zero width, and the outline then runs
+               through the label once the panel opens. -->
+          <ng-template matExpansionPanelContent>
           <div
             class="zone"
             cdkDropList
@@ -490,6 +494,7 @@
               Browsers then refuse plain HTTP for this long: start short. Sent on port 443 only.
             </p>
           }
+          </ng-template>
         </mat-expansion-panel>
       }
     </mat-accordion>

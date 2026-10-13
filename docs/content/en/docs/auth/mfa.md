@@ -36,6 +36,12 @@ characters. Only their hashes are kept, so a lost sheet cannot be recovered -
 it can only be replaced, from the same page, which mints ten new ones and
 retires the old. The page says how many are left.
 
+**Changing the factor asks for it.** Replacing the authenticator, minting new
+backup codes and turning the second factor off each take a current code first -
+or a backup code, for whoever lost the phone - under the same per-account counter
+as the challenge. A session alone, a borrowed laptop or a stolen cookie, is not
+enough to point the factor at somebody else's phone.
+
 Enrolling again, or turning the second factor off, **forgets every trusted
 browser** of that account. That is deliberate: the old challenge is gone, and
 so is anything that was allowed to skip it.

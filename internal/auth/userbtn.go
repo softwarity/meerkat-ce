@@ -17,7 +17,7 @@ import (
 // color-scheme cookies, logout. Everything is same-origin and offline-first.
 
 // registerUserButton mounts the component's endpoints on the DATA plane.
-func (h *Handler) registerUserButton(mux *http.ServeMux) {
+func (h *Handler) registerUserButton(mux routes) {
 	mux.HandleFunc("GET /meerkat/user-button.js", h.userButtonJS)
 	mux.HandleFunc("GET /meerkat/user-button.json", h.userButtonJSON)
 	mux.HandleFunc("GET /meerkat/page.js", h.pageJS)

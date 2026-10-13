@@ -177,6 +177,7 @@
   "mfaRequiredLead": "L'autenticazione a due fattori è obbligatoria",
   "mfaRequiredNote": "La tua organizzazione richiede l'autenticazione a due fattori e non può essere disattivata.",
   "mfaStatus": "L'autenticazione a due fattori è attiva. Codici di riserva rimasti: %d di %d.",
+  "mfaManageCodeHint": "Inserisci un codice attuale, o un codice di backup se hai perso il telefono, per modificare qualsiasi cosa qui.",
   "minutes": "minuti",
   "mustChangeLead": "La tua password deve essere cambiata",
   "never": "Nessuna scadenza",

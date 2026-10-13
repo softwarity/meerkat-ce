@@ -41,6 +41,19 @@ die() { printf '  FAIL  %s\n' "$*" >&2; exit 1; }
 # In the node, as the cluster's admin.
 node() { docker exec -i "$NODE" env KUBECONFIG=$KC "$@"; }
 oc() { node oc "$@"; }
+# The image is distroless: no shell, no id, no stat, no test in it, so nothing
+# is asked of the container. What it runs as and what it wrote are read from
+# the NODE, which sees its process as it is: /proc/<pid>/status for the ids,
+# /proc/<pid>/root for its files. `oc exec ... id -u` is what broke the night
+# the image lost its shell.
+pid_of() {
+  # By /proc/*/comm rather than pgrep: the node image is not promised to ship
+  # procps, and a shell and cat it has.
+  p=$(node sh -c 'for d in /proc/[0-9]*; do [ "$(cat "$d/comm" 2>/dev/null)" = "$1" ] && { echo "${d#/proc/}"; exit; }; done' _ "$1")
+  [ -n "$p" ] || die "no $1 process on the node"
+  echo "$p"
+}
+proc_id() { node awk -v k="$2:" '$1 == k {print $2}' "/proc/$1/status"; }
 # expect <what> <wanted> <got>
 expect() { [ "$2" = "$3" ] && ok "$1: $3" || die "$1: wanted $2, got $3"; }
 # until_ok <seconds> <what> <command...>: a wait that says what it waited for.
@@ -103,12 +116,13 @@ say "admitted by the SCC, as the uid the cluster chose"
 pod=$(oc -n $NS get pod -l app.kubernetes.io/name=meerkat -o name | head -1)
 [ -n "$pod" ] || pod=$(oc -n $NS get pod -o name | head -1)
 expect "SCC" restricted-v2 "$(oc -n $NS get "$pod" -o jsonpath='{.metadata.annotations.openshift\.io/scc}')"
-uid=$(oc -n $NS exec "$pod" -- id -u)
-gid=$(oc -n $NS exec "$pod" -- id -g)
+pid=$(pid_of meerkat)
+uid=$(proc_id "$pid" Uid)
+gid=$(proc_id "$pid" Gid)
 [ "$uid" -ge 1000000000 ] || die "the pod runs as uid $uid: the SCC did not allocate it"
 ok "runs as uid $uid, which is not the image's 65532"
 expect "group" 0 "$gid"
-oc -n $NS exec "$pod" -- test -s /data/meerkat.db || die "no database in /data: the store could not write"
+node test -s "/proc/$pid/root/data/meerkat.db" || die "no database in /data: the store could not write"
 ok "the store wrote /data/meerkat.db"
 want=$([ "$EDITION" = ee ] && echo "Enterprise edition" || echo "Community edition")
 oc -n $NS logs "$pod" | grep -q "$want" || die "the log does not say '$want'"
@@ -185,7 +199,8 @@ HELPER
   node podman run -q --rm --network host docker.io/library/alpine sh -c \
     "for i in 1 2 3 4 5; do timeout 90 apk add -q --no-cache samba-client && break; sleep 3; done >/dev/null 2>&1; echo from-the-developer > /tmp/f && timeout 60 smbclient //$share/vol -p 445 -U 'dev%$password' -c 'put /tmp/f saved.txt'" >/dev/null 2>&1 ||
     die "the SMB client could not write through the helper"
-  expect "a file the developer saved belongs to the workload's uid" "$uid" "$(oc -n $NS exec plug-mnt-test -- stat -c %u /mnt/vol/saved.txt)"
+  helper=$(pid_of plug-agent)
+  expect "a file the developer saved belongs to the workload's uid" "$uid" "$(node stat -c %u "/proc/$helper/root/mnt/vol/saved.txt")"
 fi
 
 say "$passed checks passed, $skipped skipped ($EDITION)"

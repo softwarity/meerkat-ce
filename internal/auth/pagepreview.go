@@ -140,12 +140,12 @@ var previewErrors = map[string][]string{
 	"register-code":       {"errSigninCode", "errTooManyAttempts"},
 	"email-change-code":   {"errSigninCode", "errTooManyAttempts"},
 	"register":            {"errRegisterMissing", "errPwMismatch", "errBadEmail", "errTooManyAttempts", "errCaptcha"},
-	"profile":             {"errBadEmail", "errEmailTaken", "errBadTimezone", "errAvatarSize", "errAvatarType"},
+	"profile":             {"errBadEmail", "errEmailTaken", "errBadTimezone", "errAvatarSize", "errAvatarType", "errPwCurrentWrong", "errTooManyAttempts"},
 	"profile-password":    {"errPwCurrentWrong", "errPwPolicy", "errPwMismatch", "errPwReused"},
 	"profile-authorities": {"errSignInUnavailable", "errIdentityTaken", "errLastWayIn"},
 	"profile-tokens":      {"errTokenName"},
 	"profile-dev-key":     {"errBadKey"},
-	"profile-mfa":         {"errMfaRequiredOff"},
+	"profile-mfa":         {"errMfaRequiredOff", "errBadCode", "errTooManyAttempts"},
 }
 
 // errorsWithNoPage are refusals answered as PLAIN TEXT, not as a page: a
@@ -300,7 +300,10 @@ var PreviewPages = []PreviewPage{
 			flowChrome: c, Error: c.PreviewErrors, Initials: "AM", Username: "alice",
 			Fullname: "Alice Martin", Email: "alice@acme.example",
 			TenantName: "Acme Corporation", Timezone: "Europe/Paris",
-			IsDev: true, Console: true, Apps: samplePublicLinks(),
+			// The address dialog asks for the current password: shown, so
+			// its label has a screen to be read and translated on.
+			HasPassword: true,
+			IsDev:       true, Console: true, Apps: samplePublicLinks(),
 		}
 	}},
 	{"profile-security", cAccount, "Security", "titleSecurity", func(c flowChrome) (*template.Template, any) {

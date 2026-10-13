@@ -177,6 +177,7 @@
   "mfaRequiredLead": "Tweestapsverificatie is verplicht",
   "mfaRequiredNote": "Uw organisatie vereist tweestapsverificatie; deze kan niet worden uitgeschakeld.",
   "mfaStatus": "Tweestapsverificatie is actief. Resterende reservecodes: %d van %d.",
+  "mfaManageCodeHint": "Voer een actuele code in, of een back-upcode als u de telefoon kwijt bent, om hier iets te wijzigen.",
   "minutes": "minuten",
   "mustChangeLead": "Uw wachtwoord moet worden gewijzigd",
   "never": "Geen vervaldatum",

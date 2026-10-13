@@ -16,7 +16,7 @@ There is no *switch HTTPS on*. **A certificate placed on a plane is what opens
 its door**, and taking it off is what closes it. A switch that can be on with
 nothing behind it is a switch that lies.
 
-![The Domains & TLS screen: the pool of certificates, the Console and Application drop zones with their links, Force HTTPS with its HSTS duration](img/console/tls.webp)
+![The Domains & TLS screen: the pool of certificates, then the Console, Application and Internal doors, each with its ports, then the trusted authorities](img/console/tls.webp)
 
 Here the pool holds four lines: a certificate for `gateway.acme.example` served on
 the console, one for `apps.acme.example` and `docs.acme.example` served on the
@@ -152,6 +152,8 @@ localhost or an IP address; a route or a service that sets its own value keeps
 it. See [TLS](/docs/operations/tls).
 
 ## Behind a proxy that terminates TLS
+
+![The Application door open: its drop zone, then two names declared as reached through a proxy that terminates TLS, then Force HTTPS](img/console/tls-proxied.webp)
 
 In the Console and Application doors, **Also reached through a proxy that
 terminates TLS** holds the names a proxy in front of the gateway - nginx, an

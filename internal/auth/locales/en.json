@@ -177,6 +177,7 @@
   "mfaRequiredLead": "Two-factor is required",
   "mfaRequiredNote": "Two-factor is required by your organization and can't be turned off.",
   "mfaStatus": "Two-factor is active. Backup codes remaining: %d of %d.",
+  "mfaManageCodeHint": "Type a current code, or a backup code if you lost the phone, to change any of this.",
   "minutes": "minutes",
   "mustChangeLead": "Your password must be changed",
   "never": "No expiration",
