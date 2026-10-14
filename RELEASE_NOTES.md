@@ -2,6 +2,7 @@
 
 ## NEXT RELEASE
 
+- **plug 2.26.1 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **A service behind a TLS-terminating proxy is told https.** Behind an Ingress or a
   load balancer that ends TLS, the gateway passed `X-Forwarded-Proto: http` on to the
   service - the scheme of its own connection - and the service built `http://` links
@@ -27,7 +28,6 @@
   `agent.yaml` and `gateway.yaml` (Swarm), `agent-values.yaml` and
   `gateway-values.yaml` (Kubernetes); the old collector, logs agent and Service files
   are gone.
-- **plug 2.26.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The MCP screen connects an assistant to all your projects.** The command for
   Claude Code and Gemini CLI now carries their user scope (`-s user`, `--scope user`),
   so the gateway is there in every folder rather than only where the command ran. And
