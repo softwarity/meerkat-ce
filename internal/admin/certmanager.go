@@ -28,23 +28,65 @@ type certManagerView struct {
 	Secret    string             `json:"secret,omitempty"`
 }
 
-func (a *API) certManagerView(r *http.Request) (certManagerView, []discovery.Issuer) {
+// certManagerOn is the client of one plane's Certificate: the internal
+// plane's is CertManager, the console's and the application's are in
+// CertManagers (SSL-14). Nil when there is none.
+func (a *API) certManagerOn(plane string) CertManager {
+	if m := a.CertManagers[plane]; m != nil {
+		return m
+	}
+	if plane == store.PlaneInternal {
+		return a.CertManager
+	}
+	return nil
+}
+
+// certManagerBySecret is the client following one Secret, nil when none does.
+func (a *API) certManagerBySecret(secret string) CertManager {
+	for _, plane := range store.CertPlanes {
+		if m := a.certManagerOn(plane); m != nil && m.SecretName() == secret {
+			return m
+		}
+	}
+	return nil
+}
+
+// requestedPlane reads ?plane= (or the body's), the internal plane when none.
+func requestedPlane(raw string) (string, error) {
+	switch raw {
+	case "", store.PlaneInternal:
+		return store.PlaneInternal, nil
+	case store.PlaneConsole, store.PlaneApp:
+		return raw, nil
+	}
+	return "", fmt.Errorf("plane %q: expected %s, %s or %s", raw, store.PlaneInternal, store.PlaneConsole, store.PlaneApp)
+}
+
+func (a *API) certManagerView(r *http.Request, plane string) (certManagerView, []discovery.Issuer) {
 	v := certManagerView{Issuers: []discovery.Issuer{}, Names: []string{}}
-	if a.CertManager == nil {
+	m := a.certManagerOn(plane)
+	if m == nil {
 		v.Why = a.CertManagerWhy
 		if v.Why == "" {
 			v.Why = "this gateway does not run on Kubernetes"
 		}
 		return v, nil
 	}
-	v.Secret = a.CertManager.SecretName()
-	if names := a.internalNames(r.Context()); len(names) > 0 {
-		v.Names = names
-	} else {
-		v.Why = "the runtime does not say what the internal plane is called, so there is no name to ask a certificate for"
+	// The console's and the application's public names are a public
+	// authority's business; what cert-manager signs here is the hop from a
+	// proxy in front, which reaches the plane by its runtime names.
+	if plane != store.PlaneInternal && !a.st.RawTLS(r.Context()).DoorOn(plane).Proxied {
+		v.Why = "the " + planeWord(plane) + " serves its public names itself: a certificate for them comes from an authority (ACME), an import or the file system. cert-manager signs the hop from a proxy in front, once one is declared"
 		return v, nil
 	}
-	issuers, err := a.CertManager.Issuers(r.Context())
+	v.Secret = m.SecretName()
+	if names := a.PlaneNames(r.Context(), plane); len(names) > 0 {
+		v.Names = names
+	} else {
+		v.Why = "the runtime does not say what the " + planeWord(plane) + " is called, so there is no name to ask a certificate for"
+		return v, nil
+	}
+	issuers, err := m.Issuers(r.Context())
 	if err != nil {
 		v.Why = err.Error()
 		return v, nil
@@ -62,13 +104,21 @@ func (a *API) certManagerView(r *http.Request) (certManagerView, []discovery.Iss
 }
 
 func (a *API) getCertManager(w http.ResponseWriter, r *http.Request, _ store.User) {
-	v, _ := a.certManagerView(r)
+	plane, err := requestedPlane(r.URL.Query().Get("plane"))
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	v, _ := a.certManagerView(r, plane)
 	writeJSON(w, http.StatusOK, v)
 }
 
 type certManagerPayload struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
+	// Plane is whose Certificate: the internal plane when absent, the console
+	// or the application behind a proxy (SSL-14).
+	Plane string `json:"plane,omitempty"`
 }
 
 // askCertManager creates (or re-aims) the Certificate, and the pool row that
@@ -80,7 +130,12 @@ func (a *API) askCertManager(w http.ResponseWriter, r *http.Request, actor store
 		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())
 		return
 	}
-	v, issuers := a.certManagerView(r)
+	plane, err := requestedPlane(p.Plane)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	v, issuers := a.certManagerView(r, plane)
 	if !v.Available {
 		writeErr(w, http.StatusUnprocessableEntity, "cert-manager cannot be asked: "+v.Why)
 		return
@@ -102,7 +157,7 @@ func (a *API) askCertManager(w http.ResponseWriter, r *http.Request, actor store
 			"%s/%s is not a ready issuer of this cluster (allowed: %s)", p.Kind, p.Name, strings.Join(offered, ", ")))
 		return
 	}
-	if err := a.CertManager.Ensure(r.Context(), p.Kind, p.Name, v.Names); err != nil {
+	if err := a.certManagerOn(plane).Ensure(r.Context(), p.Kind, p.Name, v.Names); err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -114,8 +169,20 @@ func (a *API) askCertManager(w http.ResponseWriter, r *http.Request, actor store
 	internalTaken := false
 	for _, c := range all {
 		if c.Source == store.CertSourceCertManager && c.SecretName == v.Secret {
-			// Asked again - another issuer: the same row follows the same
-			// Secret, which cert-manager rewrites.
+			// Asked again - another issuer, or after it was taken off: the
+			// same row follows the same Secret, which cert-manager rewrites,
+			// and it goes back on the plane it was asked for. Taken off and
+			// asked again used to answer the row and leave it off, so the
+			// screen showed nothing happening.
+			if !c.On(plane) {
+				c.Console, c.App, c.Internal = c.Console || plane == store.PlaneConsole,
+					c.App || plane == store.PlaneApp, c.Internal || plane == store.PlaneInternal
+				if err := a.st.PlaceCertificate(r.Context(), c.ID, c.Console, c.App, c.Internal); err != nil {
+					a.internal(w, err)
+					return
+				}
+				a.applyTLS(r.Context())
+			}
 			a.auditEvent(r.Context(), actor, "certificate.cert-manager", "certificate", c.ID, c.Name(), p.Kind+"/"+p.Name, where(c))
 			writeJSON(w, http.StatusOK, a.issuedView(r, c))
 			return
@@ -126,7 +193,10 @@ func (a *API) askCertManager(w http.ResponseWriter, r *http.Request, actor store
 	}
 	row := store.Certificate{
 		ID: newID(), Source: store.CertSourceCertManager, SecretName: v.Secret,
-		Internal: !internalTaken,
+		Internal: plane == store.PlaneInternal && !internalTaken,
+		// Asked for the hop from the proxy in front: it is that plane's.
+		Console: plane == store.PlaneConsole,
+		App:     plane == store.PlaneApp,
 	}
 	// The names asked for, until the Secret says what was issued.
 	row.Info.DNSNames = v.Names
@@ -145,16 +215,20 @@ func (a *API) askCertManager(w http.ResponseWriter, r *http.Request, actor store
 func (a *API) issuedView(r *http.Request, c store.Certificate) certView {
 	v := viewOf(c)
 	v.Waiting = c.CertPEM == ""
-	if a.CertManager == nil {
+	m := a.certManagerBySecret(c.SecretName)
+	if m == nil {
 		v.Error = a.CertManagerWhy
+		if v.Error == "" {
+			v.Error = "nothing follows the Certificate " + c.SecretName + " on this gateway"
+		}
 		return v
 	}
-	st, err := a.CertManager.Status(r.Context())
+	st, err := m.Status(r.Context())
 	switch {
 	case err != nil:
 		v.Error = err.Error()
 	case !st.Exists:
-		v.Error = "the Certificate " + a.CertManager.SecretName() + " is gone from the cluster: ask cert-manager again"
+		v.Error = "the Certificate " + m.SecretName() + " is gone from the cluster: ask cert-manager again"
 	default:
 		v.AuthorityName = st.IssuerName
 		v.RenewsAt = st.RenewalTime

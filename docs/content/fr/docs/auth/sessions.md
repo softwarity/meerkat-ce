@@ -47,8 +47,9 @@ cookie a été posé en HTTPS, par cet hôte, pour tout le site.
 
 Les cookies de session sont `HttpOnly`, `SameSite=Lax`, `Path=/`, avec un `Max-Age` égal à
 la durée de vie de la session. `Secure` est ajouté quand la requête est arrivée en HTTPS -
-soit que la gateway termine elle-même TLS, soit que le proxy placé devant elle envoie
-`X-Forwarded-Proto: https`, à condition que ce proxy soit
+soit que la gateway termine elle-même TLS, soit que la requête nomme un nom public que
+le plan déclare servi par un proxy placé devant (Domains & TLS), soit que ce proxy envoie
+`X-Forwarded-Proto: https`, à condition qu'il soit
 [de confiance](/docs/deploy/one-gateway#derrire-un-proxy-ou-un-load-balancer).
 
 Les deux cookies `..._UNTIL` ne sont volontairement **pas** `HttpOnly` : une page les lit

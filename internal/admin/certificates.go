@@ -49,9 +49,12 @@ func (a *API) registerCertificates(mux Mux) {
 	mux.Handle("DELETE /api/certificates/{id}", a.infraAdmin(a.deleteCertificate))
 	mux.Handle("GET /api/settings/tls", a.infraAdmin(a.getTLS))
 	mux.Handle("PUT /api/settings/tls", a.infraAdmin(a.putTLS))
-	// The names a door is also reached by through a proxy that terminates
-	// TLS in front of it: what a mailed link may point at (AUTH-22).
-	mux.Handle("PUT /api/settings/tls/proxied/{plane}", a.infraAdmin(a.putProxied))
+	// What the console's and the application's door say (SSL-14): who
+	// serves their public names, which they are, and where a proxy in front
+	// reaches the gateway from.
+	mux.Handle("PUT /api/settings/tls/doors/{plane}", a.infraAdmin(a.putDoor))
+	// Which of a plane's two doors are switched on (SSL-15).
+	mux.Handle("PUT /api/settings/tls/ports/{plane}", a.infraAdmin(a.putPorts))
 }
 
 // certView is one entry as the console sees it. The embedded row already drops
@@ -74,6 +77,10 @@ type certView struct {
 	Error  string `json:"error,omitempty"`
 	// RenewsAt is when cert-manager renews a certificate it issued (SSL-13).
 	RenewsAt int64 `json:"renewsAt,omitempty"`
+	// Unused are the planes it is placed on and not served with, the door's
+	// mode wanting other names (SSL-14): a public certificate behind a proxy,
+	// a cluster one where the gateway serves the public names.
+	Unused []string `json:"unused,omitempty"`
 }
 
 func viewOf(c store.Certificate) certView {
@@ -163,6 +170,20 @@ func (a *API) listCertificates(w http.ResponseWriter, r *http.Request, _ store.U
 		out = append(out, viewOf(c))
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt < out[j].CreatedAt })
+	cfg := a.st.RawTLS(r.Context())
+	runtime := map[string][]string{}
+	for _, plane := range []string{store.PlaneConsole, store.PlaneApp} {
+		if cfg.DoorOn(plane).Said() {
+			runtime[plane] = a.PlaneNames(r.Context(), plane)
+		}
+	}
+	for i := range out {
+		for _, plane := range []string{store.PlaneConsole, store.PlaneApp} {
+			if out[i].On(plane) && !out[i].Certificate.Pending() && !cfg.DoorOn(plane).Active(out[i].Names(), runtime[plane]) {
+				out[i].Unused = append(out[i].Unused, plane)
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -283,11 +304,17 @@ func (a *API) place(w http.ResponseWriter, r *http.Request, c *store.Certificate
 	// The mirror: the internal plane's names reach its own Service, which
 	// publishes 7070 and 7443 and nothing else. A certificate carrying only
 	// them would answer for names by which nobody reaches the console or the
-	// application.
-	if ((p.Console && !c.Console) || (p.App && !c.App)) && !c.Pending() {
+	// application - where the gateway serves the public names itself. Behind
+	// a proxy the hop is reached by the runtime's names, which on Swarm and
+	// compose are the internal plane's too (one service, every port).
+	cfg := a.st.RawTLS(r.Context())
+	for _, plane := range []string{store.PlaneConsole, store.PlaneApp} {
+		if !p.on(plane) || c.On(plane) || c.Pending() || cfg.DoorOn(plane).Proxied {
+			continue
+		}
 		if names := a.internalNames(r.Context()); len(names) > 0 && onlyInternal(c.Names(), names) {
 			writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
-				"%s carries only the internal plane's names (%s): they reach its ports, never the console's or the application's - it belongs on Internal",
+				"%s carries only the internal plane's names (%s): they reach its ports, never the console's or the application's - it belongs on Internal, or on a plane a proxy in front re-encrypts to",
 				c.Name(), strings.Join(c.Names(), ", ")))
 			return false
 		}
@@ -297,21 +324,9 @@ func (a *API) place(w http.ResponseWriter, r *http.Request, c *store.Certificate
 			"%s is a signing request: it serves nothing until the signed certificate is adopted", c.Name()))
 		return false
 	}
-	// A door is served over HTTPS either by this gateway, with the
-	// certificates placed on it, or by a proxy in front, with the names
-	// declared - never both: the two would say different things about who
-	// presents the name to the browser (see proxiedOrPlaced).
-	for _, plane := range []string{store.PlaneConsole, store.PlaneApp} {
-		if p.on(plane) && !c.On(plane) {
-			if names := a.st.RawTLS(r.Context()).ProxiedOn(plane); len(names) > 0 {
-				writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
-					"the %s is reached through a proxy that terminates TLS (%s): a proxy in front presents its names, "+
-						"so this gateway places no certificate there - take the names off first",
-					planeWord(plane), strings.Join(names, ", ")))
-				return false
-			}
-		}
-	}
+	// A certificate that does not fit the door's mode is placed all the same
+	// (SSL-14): it is shown as not used in that mode, and serves again the
+	// moment the door switches back (certs.Door.Active).
 	all, cfg, err := a.pool(r.Context())
 	if err != nil {
 		a.internal(w, err)
@@ -432,6 +447,16 @@ func (a *API) placeCertificate(w http.ResponseWriter, r *http.Request, actor sto
 	var p placement
 	if err := decodeStrict(r, &p); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed placement: "+err.Error())
+		return
+	}
+	var leaving []string
+	for plane, on := range map[string]bool{store.PlaneConsole: p.Console, store.PlaneApp: p.App, store.PlaneInternal: p.Internal} {
+		if row.On(plane) && !on {
+			leaving = append(leaving, plane)
+		}
+	}
+	if why := a.lastCertificateRefusal(r, row, leaving); why != "" {
+		writeErr(w, http.StatusConflict, why)
 		return
 	}
 	before := where(row)
@@ -762,6 +787,16 @@ func (a *API) deleteCertificate(w http.ResponseWriter, r *http.Request, actor st
 		writeErr(w, http.StatusNotFound, "certificate not found")
 		return
 	}
+	var leaving []string
+	for _, plane := range store.CertPlanes {
+		if row.On(plane) {
+			leaving = append(leaving, plane)
+		}
+	}
+	if why := a.lastCertificateRefusal(r, row, leaving); why != "" {
+		writeErr(w, http.StatusConflict, why)
+		return
+	}
 	// An order leaves the settings: the authority is no longer asked for its
 	// names. What it issued stays in the cache, unserved, and is replaced by
 	// a fresh issue if the same names are ever ordered again.
@@ -785,8 +820,8 @@ func (a *API) deleteCertificate(w http.ResponseWriter, r *http.Request, actor st
 	}
 	// What cert-manager issued goes with it: the Certificate, so nothing
 	// renews it for nobody, and the Secret it wrote.
-	if row.Source == store.CertSourceCertManager && a.CertManager != nil {
-		if err := a.CertManager.Delete(r.Context()); err != nil {
+	if m := a.certManagerBySecret(row.SecretName); row.Source == store.CertSourceCertManager && m != nil {
+		if err := m.Delete(r.Context()); err != nil {
 			writeErr(w, http.StatusBadGateway, err.Error()+": the certificate stays in the pool until it can be removed from the cluster")
 			return
 		}
@@ -858,27 +893,36 @@ type tlsPayload struct {
 	// port to outside one: the links are written with what the world reaches
 	// (19443), not with what the container listens on (9443).
 	Published discovery.Published `json:"published"`
-	// Proxied is, per door, the names declared reached through a proxy that
-	// terminates TLS in front of it (certs.Settings.ProxiedApp).
-	Proxied proxiedView `json:"proxied"`
-}
-
-// proxiedView is the names of the two doors a browser reaches. Never null,
-// so the screen reads a list either way.
-type proxiedView struct {
-	Console []string `json:"console"`
-	App     []string `json:"app"`
+	// Doors is each plane as the runtime names it, and what the operator
+	// said about the console's and the application's (SSL-14).
+	Doors doorsView `json:"doors"`
+	// Closed is, per plane, the doors switched off (SSL-15).
+	Closed map[string][]string `json:"closed"`
+	// ConsoleTraffic is which of the console's doors received requests in
+	// the last certs.TrafficWindow, cluster-wide, and from whom last.
+	ConsoleTraffic []certs.Seen `json:"consoleTraffic"`
+	// TrafficWindow is that window, in seconds.
+	TrafficWindow int `json:"trafficWindow"`
 }
 
 func (a *API) tlsView(ctx context.Context) tlsPayload {
 	cfg := a.st.RawTLS(ctx)
 	v := tlsPayload{Redirect: cfg.Redirect, HSTSMaxAge: cfg.HSTSMaxAge}
-	v.Proxied = proxiedView{Console: orEmpty(cfg.ProxiedConsole), App: orEmpty(cfg.ProxiedApp)}
+	v.Doors = a.doorsView(ctx, cfg)
 	if a.TLS != nil {
 		v.State = a.TLS.State()
 	}
 	v.State.Problems = orEmpty(v.State.Problems)
 	v.Published = discovery.Self(ctx)
+	v.Closed = cfg.Closed
+	if v.Closed == nil {
+		v.Closed = map[string][]string{}
+	}
+	v.ConsoleTraffic = []certs.Seen{}
+	if a.DoorTraffic != nil {
+		v.ConsoleTraffic = a.DoorTraffic.Recent()
+	}
+	v.TrafficWindow = int(certs.TrafficWindow / time.Second)
 	return v
 }
 
@@ -911,80 +955,6 @@ func (a *API) putTLS(w http.ResponseWriter, r *http.Request, actor store.User) {
 	after := a.tlsView(r.Context())
 	a.auditUpdate(r.Context(), actor, "tls.update", "settings", "", "", "", before, after)
 	writeJSON(w, http.StatusOK, after)
-}
-
-// The names a door is also reached by through a proxy that terminates TLS in
-// front of it (AUTH-22): nginx, an ingress, a cloud balancer. Behind one, no
-// request ever arrives on the gateway's own TLS, so without them every mail
-// that proves a mailbox carries a code. Declaring a name is the operator
-// vouching for it - it is ours, served over HTTPS by somebody - and the one
-// thing it changes is that a mailed link may point at it. Not the redirect,
-// not HSTS, not a listener, not an authority: nothing here has a certificate
-// for it (certs.Settings.ProxiedApp).
-//
-// One door per call, the list replaced: each door's section on the screen
-// saves its own, and two people editing two doors do not overwrite each
-// other. The internal plane has no such names - its callers are programs in
-// the cluster, and nobody follows a mailed link there.
-func (a *API) putProxied(w http.ResponseWriter, r *http.Request, actor store.User) {
-	plane := r.PathValue("plane")
-	if plane != store.PlaneConsole && plane != store.PlaneApp {
-		writeErr(w, http.StatusNotFound, fmt.Sprintf(
-			"door %q: expected %s or %s - the internal plane is called by services, never through a browser's proxy",
-			plane, store.PlaneConsole, store.PlaneApp))
-		return
-	}
-	var p struct {
-		Names []string `json:"names"`
-	}
-	if err := decodeStrict(r, &p); err != nil {
-		writeErr(w, http.StatusBadRequest, "malformed proxied names: "+err.Error())
-		return
-	}
-	names, err := proxiedNames(p.Names)
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	// proxiedOrPlaced: names declared only where this gateway presents no
-	// certificate. Where it does, the names are the certificates' own, and a
-	// proxy's beside them would be a second answer to "who presents this
-	// name".
-	if len(names) > 0 {
-		rows, err := a.st.ListCertificates(r.Context())
-		if err != nil {
-			a.internal(w, err)
-			return
-		}
-		for _, c := range rows {
-			if c.On(plane) {
-				writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
-					"the %s presents %s itself: its names are that certificate's - take it off the door to declare a proxy's names",
-					planeWord(plane), c.Name()))
-				return
-			}
-		}
-	}
-	cfg := a.st.RawTLS(r.Context())
-	before := orEmpty(cfg.ProxiedOn(plane))
-	if plane == store.PlaneConsole {
-		cfg.ProxiedConsole = names
-	} else {
-		cfg.ProxiedApp = names
-	}
-	if err := a.st.SetSetting(r.Context(), store.SettingTLS, cfg); err != nil {
-		a.internal(w, err)
-		return
-	}
-	// Through the supervisor, which every node reloads on the change bus:
-	// the sign-in pages read the names it last loaded.
-	a.applyTLS(r.Context())
-	type audited struct {
-		Proxied []string `json:"proxied"`
-	}
-	a.auditUpdate(r.Context(), actor, "tls.proxied", "settings", plane, planeWord(plane), "",
-		audited{before}, audited{orEmpty(names)})
-	writeJSON(w, http.StatusOK, a.tlsView(r.Context()))
 }
 
 // maxProxied bounds one door's list: a handful in practice, and a list of

@@ -1,12 +1,11 @@
-import { CdkDrag, CdkDragDrop, CdkDragPlaceholder, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 import { NgTemplateOutlet } from '@angular/common';
-import { HttpErrorResponse, httpResource } from '@angular/common/http';
+import { HttpErrorResponse, httpResource, HttpResourceRef } from '@angular/common/http';
 import { Component, computed, DestroyRef, inject, linkedSignal, LOCALE_ID, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatExpansionModule } from '@angular/material/expansion';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -28,6 +27,7 @@ import {
   Certificate,
   CertPlacement,
   CertManagerView,
+  DoorView,
   Edition,
   TlsSettings,
   TlsState,
@@ -38,7 +38,7 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
 import { TrustedAuthoritiesComponent } from './trusted-authorities.component';
 import { InternalHelpComponent } from './internal-help.component';
-import { ProxiedNamesComponent } from './proxied-names.component';
+import { DoorNamesComponent } from './door-names.component';
 import { SnippetComponent } from '../../shared/snippet.component';
 import { AuthoritiesPanelComponent } from './authorities-panel.component';
 import { MeService } from '../../me.service';
@@ -53,22 +53,22 @@ import { FileButtonComponent, FileDropDirective } from '../../shared/file-pick';
 
 // A pool, then a placement.
 //
-// A certificate is made or imported ONCE, into the pool: its names are its
-// own, read from the material, and a wildcard or a certificate carrying
-// several names serves every one of them. It is then placed on the console,
-// the application, or both - by dragging it there, or from its menu. A
+// Plane by plane (SSL-14): each plane adds its certificates from its own
+// menu and deletes them from its own rows - no pool to drag from. A
+// certificate's names are its own, read from the material, and a wildcard or
+// a certificate carrying several names serves every one of them. A
 // certificate placed on a plane is what opens that plane's HTTPS door, and
 // taking it off is what closes it: there is no switch to disagree with.
 export type Plane = 'console' | 'app' | 'internal';
 
-const OPEN_PLANES_KEY = 'meerkat.tls.openPlanes';
+const TAB_KEY = 'meerkat.tls.tab';
 
-function readOpenPlanes(): Plane[] {
+function readTab(): number {
   try {
-    const v = JSON.parse(localStorage.getItem(OPEN_PLANES_KEY) ?? '[]');
-    return Array.isArray(v) ? v : [];
+    const v = Number(localStorage.getItem(TAB_KEY) ?? '0');
+    return Number.isInteger(v) && v >= 0 && v < 4 ? v : 0;
   } catch {
-    return [];
+    return 0;
   }
 }
 
@@ -78,13 +78,9 @@ type Os = 'macos' | 'linux' | 'windows';
   selector: 'app-tls-page',
   imports: [
     InternalHelpComponent,
-    ProxiedNamesComponent,
-    MatExpansionModule,
+    DoorNamesComponent,
+    MatTabsModule,
     TrustedAuthoritiesComponent,
-    CdkDrag,
-    CdkDragPlaceholder,
-    CdkDropList,
-    CdkDropListGroup,
     NgTemplateOutlet,
     MatButtonModule,
     MatButtonToggleModule,
@@ -136,22 +132,15 @@ export class TlsPageComponent {
   protected readonly onApp = computed(() => this.certificates().filter((c) => c.app));
   protected readonly onInternal = computed(() => this.certificates().filter((c) => c.internal));
 
-  // Which doors are unfolded: this viewer's own, kept in the browser. Folded
-  // by default, the line says what matters.
-  private readonly openPlanes = signal<Plane[]>(readOpenPlanes());
+  // The tab last looked at, kept for the next visit.
+  protected readonly tab = signal(readTab());
 
-  protected isOpen(plane: Plane): boolean {
-    return this.openPlanes().includes(plane);
-  }
-
-  protected setOpen(plane: Plane, open: boolean): void {
-    if (open === this.isOpen(plane)) return;
-    const next = open ? [...this.openPlanes(), plane] : this.openPlanes().filter((p) => p !== plane);
-    this.openPlanes.set(next);
+  protected setTab(i: number): void {
+    this.tab.set(i);
     try {
-      localStorage.setItem(OPEN_PLANES_KEY, JSON.stringify(next));
+      localStorage.setItem(TAB_KEY, String(i));
     } catch {
-      // A private window: folded again next time, nothing else.
+      // A private window: the first tab next time, nothing else.
     }
   }
 
@@ -164,31 +153,49 @@ export class TlsPageComponent {
   // advertised one first: what a certificate on the internal plane must carry
   // one of.
   protected readonly edition = httpResource<Edition>(() => '/api/edition');
-  // Whether the gateway may ask cert-manager for its internal certificate
-  // (SSL-13), and why not: another runtime, a chart that did not grant it.
-  protected readonly certManager = httpResource<CertManagerView>(() => '/api/certificates/cert-manager');
+  // Whether the gateway may ask cert-manager for a plane's certificate - the
+  // internal plane's (SSL-13), the console's or the application's hop from a
+  // proxy in front (SSL-14) - and why not: another runtime, a chart that did
+  // not grant it, a plane serving its public names itself.
+  protected readonly certManager: Record<Plane, HttpResourceRef<CertManagerView | undefined>> = {
+    internal: httpResource<CertManagerView>(() => '/api/certificates/cert-manager?plane=internal'),
+    console: httpResource<CertManagerView>(() => '/api/certificates/cert-manager?plane=console'),
+    app: httpResource<CertManagerView>(() => '/api/certificates/cert-manager?plane=app'),
+  };
   // Why the entry is greyed: the gateway's own reason, or that it is still
   // asked, or that asking failed - never greyed with nothing said.
-  protected readonly certManagerWhy = computed(() => {
-    if (this.certManager.isLoading()) return $localize`:@@Cert_manager_looking:Looking for cert-manager...`;
-    const err = this.certManager.error();
+  protected certManagerReady(plane: Plane): boolean {
+    const r = this.certManager[plane];
+    return !r.isLoading() && !!r.value()?.available;
+  }
+
+  protected reloadCertManager(plane: Plane): void {
+    this.certManager[plane].reload();
+  }
+
+  protected certManagerWhy(plane: Plane): string {
+    const r = this.certManager[plane];
+    if (r.isLoading()) return $localize`:@@Cert_manager_looking:Looking for cert-manager...`;
+    const err = r.error();
     if (err) return $localize`:@@Cert_manager_unknown:Could not ask the gateway: ${message(err)}:error:`;
-    const v = this.certManager.value();
+    const v = r.value();
     return v && !v.available ? (v.why ?? '') : '';
-  });
+  }
   protected readonly internalNames = computed(() => this.edition.value()?.internalNames ?? []);
   // Whether a door takes c. The internal one only a certificate carrying one
   // of its names; the console and the application never one carrying ONLY
   // them - those names reach the internal plane's ports, nothing else.
   // Unknown names, nothing to hold it to.
+  // Behind a proxy, the console and the application take a certificate for
+  // their runtime names, which on Swarm and compose are the internal plane's
+  // too (SSL-14).
   protected fits(c: Certificate, plane: Plane): boolean {
     const names = this.internalNames();
     if (!names.length) return true;
+    if (plane !== 'internal' && this.door(plane).proxied) return true;
     return plane === 'internal' ? coversOne(this.namesOf(c), names) : !onlyAmong(this.namesOf(c), names);
   }
 
-  // Whether a door takes c - the drop lists ask before showing it can land.
-  protected readonly accepts = (plane: Plane) => (drag: CdkDrag<Certificate>) => this.fits(drag.data, plane);
 
   // Whether a certificate served there answers for the name n.
   protected internalCovers(n: string): boolean {
@@ -211,17 +218,31 @@ export class TlsPageComponent {
     // An authority answered - a certificate issued, a request refused - and
     // the pool is read again. Heard on the live channel, not asked for every
     // few seconds while a request is out.
+    //
+    // The doors with them: a certificate cert-manager writes after the click
+    // opens HTTPS on its own, and the lock has to say so (2026-10-15).
     new LiveTopic(inject(LivewireClient), 'certificates')
       .open(null)
       .pipe(takeUntilDestroyed(inject(DestroyRef)))
-      .subscribe(() => this.loadCertificates());
+      .subscribe(() => {
+        this.loadCertificates();
+        this.reloadState();
+      });
     // Somebody else's write (CONSOLE-13), and only the CERTIFICATES: the rest
     // of this screen is a form, and re-applying the settings under somebody
     // typing in it would throw their work away for news they did not ask for.
-    inject(LiveChangesService).on('certificate', () => this.loadCertificates());
+    // Which of the console's doors is called moved (SSL-15).
+    new LiveTopic(inject(LivewireClient), 'door-traffic')
+      .open(null)
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe(() => this.reloadState());
+    inject(LiveChangesService).on('certificate', () => {
+      this.loadCertificates();
+      this.reloadState();
+    });
   }
 
-  private loadCertificates(): void {
+  protected loadCertificates(): void {
     this.api.listCertificates().subscribe({
       next: (list) => {
         this.certificates.set(list);
@@ -251,8 +272,17 @@ export class TlsPageComponent {
 
   // The door state follows the certificates: re-read after a placement, so
   // the links and Force HTTPS say what is open now.
+  // Only what the gateway runs - the doors open, the problems - so a form
+  // being typed in keeps its values.
   private reloadState(): void {
-    this.api.getTls().subscribe({ next: (t) => this.tls.set(t) });
+    this.api.getTls().subscribe({
+      next: (t) =>
+        this.tls.update((cur) =>
+          cur
+            ? { ...cur, state: t.state, doors: t.doors, closed: t.closed, consoleTraffic: t.consoleTraffic, trafficWindow: t.trafficWindow }
+            : t,
+        ),
+    });
   }
 
   protected apply(t: TlsSettings): void {
@@ -306,7 +336,8 @@ export class TlsPageComponent {
 
   // ── the pool ───────────────────────────────────────────────────────────────
 
-  protected async add(door: CertificateDoor, authority?: AcmeAuthority): Promise<void> {
+  // A certificate made or imported from a plane's menu lands on that plane.
+  protected async add(door: CertificateDoor, authority?: AcmeAuthority, plane?: Plane): Promise<void> {
     const res = await firstValueFrom(
       this.dialog
         .open<CertificateDialogComponent, CertificateDialogData, CertificateDialogResult | undefined>(
@@ -326,15 +357,26 @@ export class TlsPageComponent {
     );
     if (!res) return;
     this.create(res, authority).subscribe({
-      next: () => this.loadCertificates(),
+      next: (created) => this.landOn(created, plane),
       error: (err) => this.snack.open(message(err), undefined, { duration: 8000 }),
     });
   }
 
+  // Placed on the plane it was added from, unless it is there already or is
+  // a signing request still waiting for its answer.
+  private landOn(c: Certificate | undefined, plane?: Plane): void {
+    if (!c || !plane || c.pending || c[plane]) {
+      this.loadCertificates();
+      this.reloadState();
+      return;
+    }
+    void this.place(c, { console: c.console, app: c.app, internal: c.internal, [plane]: true });
+  }
+
   // The file system door: what the runtime mounted here, picked in its own
-  // dialog, loaded when it is opened. It lands in the pool, to be dragged onto
+  // dialog, loaded when it is opened. It lands on the plane it was added from,
   // a plane like any other.
-  protected async addFromFiles(): Promise<void> {
+  protected async addFromFiles(plane?: Plane): Promise<void> {
     const { FileCertificateDialogComponent } = await import('./file-certificate-dialog.component');
     // What the pool already reads from the file system is shown, not offered.
     const taken = this.certificates().map((c) => c.certPath).filter((p): p is string => !!p);
@@ -343,18 +385,18 @@ export class TlsPageComponent {
         .open(FileCertificateDialogComponent, { data: { taken, internalNames: this.internalNames() }, restoreFocus: true, width: '680px', maxWidth: '92vw' })
         .afterClosed(),
     );
-    if (created) this.loadCertificates();
+    if (created) this.landOn(created as Certificate, plane);
   }
 
-  // The internal certificate asked of cert-manager, the rest decided by the
+  // A plane's certificate asked of cert-manager, the rest decided by the
   // gateway. One issuer fit for it: asked at once, nothing to choose - and
   // removing it is the way back. Several: picked in a dialog.
-  protected async addFromCertManager(): Promise<void> {
-    const view = this.certManager.value();
+  protected async addFromCertManager(plane: Plane = 'internal'): Promise<void> {
+    const view = this.certManager[plane].value();
     if (!view?.available) return;
     const fit = view.issuers.filter((i) => i.ready);
     if (fit.length === 1) {
-      this.api.askCertManager({ kind: fit[0].kind, name: fit[0].name }).subscribe({
+      this.api.askCertManager({ kind: fit[0].kind, name: fit[0].name, plane }).subscribe({
         next: () => {
           this.snack.open($localize`:@@Asked_issuer:Asked ${fit[0].name}:issuer:`, undefined, { duration: 4000 });
           this.loadCertificates();
@@ -365,7 +407,7 @@ export class TlsPageComponent {
     }
     const { CertManagerDialogComponent } = await import('./cert-manager-dialog.component');
     const created = await firstValueFrom(
-      this.dialog.open(CertManagerDialogComponent, { data: view, restoreFocus: true, width: '560px', maxWidth: '92vw' }).afterClosed(),
+      this.dialog.open(CertManagerDialogComponent, { data: { ...view, plane }, restoreFocus: true, width: '560px', maxWidth: '92vw' }).afterClosed(),
     );
     if (created) this.loadCertificates();
   }
@@ -412,6 +454,30 @@ export class TlsPageComponent {
   // Deleting destroys the key. A certificate still served says which door
   // goes back to the clear, because that is the consequence nobody reads in
   // "delete".
+  // The bin of a plane's row. Served on another plane too, it only leaves
+  // this one; served here alone, the certificate is deleted - one gesture,
+  // where a cross beside a bin asked which of the two was meant.
+  protected async removeFrom(c: Certificate, plane: Plane): Promise<void> {
+    const why = this.lastCertificateWhy(c, plane);
+    if (why) {
+      this.snack.open(why, undefined, { duration: 8000 });
+      return;
+    }
+    const others = this.planes.filter((p) => p !== plane && c[p]);
+    if (!others.length) {
+      await this.remove(c);
+      return;
+    }
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Remove_from_plane:Remove it from ${this.planeLabel(plane)}:plane:?`,
+      message: $localize`:@@Remove_from_plane_message:${this.nameOf(c)}:name: stays on ${others.map((p) => this.planeLabel(p)).join(', ')}:others:.`,
+      confirmLabel: $localize`:@@Remove:Remove`,
+      danger: true,
+    });
+    if (!ok) return;
+    void this.place(c, { console: c.console, app: c.app, internal: c.internal, [plane]: false });
+  }
+
   protected async remove(c: Certificate): Promise<void> {
     const name = this.nameOf(c);
     const doors = this.planes
@@ -498,25 +564,7 @@ export class TlsPageComponent {
 
   // ── placement ──────────────────────────────────────────────────────────────
 
-  // The certificate being dragged out of the pool, if any: its row stays in
-  // the pool while the copy is in the air (see the template).
-  protected readonly lifting = signal<string | null>(null);
-
-  // Dropped somewhere. Into a plane: served there - and taken off the plane it
-  // was dragged from, since a drag is a move. Back into the pool: taken off
-  // the plane it came from.
-  protected dropped<T extends string>(e: CdkDragDrop<T>): void {
-    const c = e.item.data as Certificate;
-    const from = e.previousContainer.data as Plane | 'pool';
-    const to = e.container.data as Plane | 'pool';
-    if (from === to) return;
-    const next: CertPlacement = { console: c.console, app: c.app, internal: c.internal };
-    if (from !== 'pool') next[from] = false;
-    if (to !== 'pool') next[to] = true;
-    void this.place(c, next);
-  }
-
-  // The menu's way to the same thing, for a keyboard or a touch screen.
+  // A plane's tag on an unassigned certificate: served there, or taken off.
   protected toggle(c: Certificate, plane: Plane): void {
     // Said here rather than sent: the gateway would refuse it the same way.
     if (!c[plane] && !this.fits(c, plane)) {
@@ -580,7 +628,7 @@ export class TlsPageComponent {
         const ok = await this.dialogs.confirm({
           title: $localize`:@@Replace_the_certificate:Replace the certificate?`,
           message:
-            $localize`:@@Replace_conflict_message:${who}:who:. Replacing takes it off that door; it stays in the pool.` +
+            $localize`:@@Replace_conflict_message2:${who}:who:. Replacing takes it off that plane; on no other plane, it is listed under Unassigned certificates.` +
             (lost.length
               ? ' ' + $localize`:@@Replace_loses_names:${lost.join(', ')}:names: will no longer be served over HTTPS there.`
               : ''),
@@ -617,6 +665,113 @@ export class TlsPageComponent {
 
   protected readonly closedTip = $localize`:@@Https_closed_tip:Closed: no certificate is placed here.`;
 
+  // ── the plain door switched on or off (SSL-15) ────────────────────────────
+
+  protected portOn(plane: Plane): boolean {
+    return !(this.tls()?.closed?.[plane] ?? []).includes('http');
+  }
+
+  protected plainLoopback(plane: Plane): boolean {
+    return !!this.state()?.plainLoopback?.[plane];
+  }
+
+  // Who last called one of the console's doors within the window, or ''.
+  protected heard(scheme: 'http' | 'https'): string {
+    return this.tls()?.consoleTraffic?.find((s) => s.scheme === scheme)?.peer ?? '';
+  }
+
+  // Whether one of the console's doors is in use: this page came through it,
+  // or something called it within the window.
+  private consoleInUse(scheme: 'http' | 'https'): boolean {
+    return location.protocol === scheme + ':' || !!this.heard(scheme);
+  }
+
+  protected portTip(plane: Plane): string {
+    return this.portOn(plane)
+      ? ''
+      : $localize`:@@Http_off_tip:Off: listens on 127.0.0.1 only, for a port-forward and the health checks.`;
+  }
+
+  protected httpsTip(plane: Plane): string {
+    if (this.unpublished(plane)) {
+      return $localize`:@@Https_port_unpublished_tip:HTTPS listens on this port, which the deployment does not publish.`;
+    }
+    return this.secure(plane)
+      ? $localize`:@@Https_open_by_cert_tip:Open: a certificate is placed here. Removing the last one closes it.`
+      : this.closedTip;
+  }
+
+  // The switch asks first, and on the console the door in use does not move:
+  // the operator reaches the console through the other one first.
+  protected async switchHttp(plane: Plane, on: boolean, toggle: { checked: boolean }): Promise<void> {
+    const back = () => (toggle.checked = !on);
+    if (!on) {
+      if (!this.secure(plane)) {
+        back();
+        this.snack.open(
+          $localize`:@@Http_off_needs_https:Add a certificate first: with HTTP off, HTTPS is the only way in.`,
+          undefined,
+          { duration: 8000 },
+        );
+        return;
+      }
+      if (plane === 'console' && this.consoleInUse('http')) {
+        back();
+        this.snack.open(
+          $localize`:@@Http_in_use:Access the console through HTTPS:${this.outsidePort('console', 'https')}:port: before switching HTTP off.`,
+          undefined,
+          { duration: 8000 },
+        );
+        return;
+      }
+    }
+    const ok = await this.dialogs.confirm(
+      on
+        ? {
+            title: $localize`:@@Http_on_title:Switch HTTP on for ${this.planeLabel(plane)}:plane:?`,
+            message: $localize`:@@Http_on_message:HTTP:${this.outsidePort(plane, 'http')}:port: listens on the network again.`,
+            confirmLabel: $localize`:@@Apply:Apply`,
+          }
+        : {
+            title: $localize`:@@Http_off_title:Switch HTTP off for ${this.planeLabel(plane)}:plane:?`,
+            message: $localize`:@@Http_off_line:HTTP:${this.outsidePort(plane, 'http')}:port: listens on 127.0.0.1 only, for a port-forward and the health checks.`,
+            confirmLabel: $localize`:@@Apply:Apply`,
+            danger: true,
+          },
+    );
+    if (!ok) {
+      back();
+      return;
+    }
+    this.saving.set(true);
+    this.api.saveTlsPorts(plane, { http: on }).subscribe({
+      next: (t) => {
+        this.saving.set(false);
+        this.apply(t);
+      },
+      error: (e) => {
+        this.saving.set(false);
+        back();
+        this.snack.open(message(e), undefined, { duration: 12000 });
+      },
+    });
+  }
+
+  // Why removing c from plane would close a door that must stay, or '': its
+  // last HTTPS certificate, on a plane whose HTTP is off, or on the console
+  // while its HTTPS is in use. The gateway refuses the same.
+  private lastCertificateWhy(c: Certificate, plane: Plane): string {
+    if (!this.secure(plane) || this.unused(c, plane) || this.served(plane).some((o) => o.id !== c.id)) return '';
+    if (!this.portOn(plane)) {
+      return $localize`:@@Last_cert_http_off:Switch HTTP on before removing the last certificate: nothing else would answer.`;
+    }
+    if (plane === 'console' && this.consoleInUse('https')) {
+      return $localize`:@@Last_cert_in_use:Access the console through HTTP:${this.outsidePort('console', 'http')}:port: before removing its last certificate.`;
+    }
+    return '';
+  }
+
+
   // The console is served over HTTPS, and not one of its certificates carries
   // the name it was reached by: the browser gets the fallback, refuses it, and
   // nothing on this screen would otherwise say why. The name is known - it is
@@ -627,34 +782,111 @@ export class TlsPageComponent {
     return !list.some((c) => covers(this.namesOf(c), this.here));
   });
 
-  // The names each door is also reached by through a proxy that terminates
-  // TLS in front of the gateway (AUTH-22).
+  // What a plane's door says (SSL-14), as the gateway answered it last.
+  private readonly noDoor: DoorView = { proxied: false, names: [], proxyAddresses: [], runtime: { names: [] }, uncovered: [] };
+  protected door(plane: Plane): DoorView {
+    return this.tls()?.doors?.[plane] ?? this.noDoor;
+  }
+
+  // The names a proxy in front serves over HTTPS, none when the gateway
+  // serves them itself.
   protected proxiedOn(plane: 'console' | 'app'): string[] {
-    return this.tls()?.proxied?.[plane] ?? [];
+    const d = this.door(plane);
+    return d.proxied ? d.names : [];
   }
 
-  // Who presents a door's names over HTTPS: this gateway, with the
-  // certificates placed on it, or a proxy in front, with the names declared.
-  // One or the other - the gateway refuses both. What the door holds decides;
-  // an empty door is the operator's choice, kept here until something is
-  // placed or declared.
-  private readonly chosen = signal<Record<'console' | 'app', 'gateway' | 'proxy'>>({ console: 'gateway', app: 'gateway' });
-
+  // Who serves a door's public names over HTTPS: this gateway, with the
+  // certificates placed on it, or a proxy in front. Switching keeps the
+  // names and the certificates: what does not fit the new mode stays placed,
+  // marked not used, and serves again on the way back.
   protected modeOf(plane: Plane): 'gateway' | 'proxy' {
-    if (plane === 'internal') return 'gateway';
-    if (this.proxiedOn(plane).length) return 'proxy';
-    if (this.on(plane).length) return 'gateway';
-    return this.chosen()[plane];
+    return plane !== 'internal' && this.door(plane).proxied ? 'proxy' : 'gateway';
   }
 
-  // A door that holds something is in its mode until that is taken off.
-  protected locked(plane: Plane): boolean {
-    return plane !== 'internal' && (this.proxiedOn(plane).length > 0 || this.on(plane).length > 0);
+  // A mode picked on the toggle and not applied yet. Switching who serves a
+  // plane changes whose headers Meerkat believes: on the console, the wrong
+  // choice signs out the operator making it (2026-10-15, on the eval). So the
+  // toggle only proposes; Apply, then a confirmation, saves.
+  protected readonly picked = signal<Partial<Record<Plane, 'gateway' | 'proxy'>>>({});
+
+  protected shownMode(plane: Plane): 'gateway' | 'proxy' {
+    return this.picked()[plane] ?? this.modeOf(plane);
   }
 
-  protected setMode(plane: Plane, mode: 'gateway' | 'proxy'): void {
-    if (plane !== 'internal') this.chosen.update((m) => ({ ...m, [plane]: mode }));
+  protected pick(plane: Plane, mode: 'gateway' | 'proxy'): void {
+    this.picked.update((p) => ({ ...p, [plane]: mode === this.modeOf(plane) ? undefined : mode }));
   }
+
+  protected unpick(plane: Plane): void {
+    this.picked.update((p) => ({ ...p, [plane]: undefined }));
+  }
+
+  protected async applyMode(plane: Plane): Promise<void> {
+    const mode = this.picked()[plane];
+    if (plane === 'internal' || !mode) return;
+    const d = this.door(plane);
+    const names = d.names.length ? d.names.join(', ') : $localize`:@@Its_public_names:its public names`;
+    const ok = await this.dialogs.confirm(
+      mode === 'gateway'
+        ? {
+            title: $localize`:@@Mode_to_meerkat_title:Meerkat serves ${this.planeLabel(plane)}:plane:?`,
+            message:
+              $localize`:@@Mode_to_meerkat_message:Meerkat presents ${names}:names: itself, with the certificates of this plane, and no longer believes the headers of a proxy in front.` +
+              (plane === 'console'
+                ? ' ' + $localize`:@@Mode_to_meerkat_console:If you reach this console through a proxy, this session ends: Meerkat refuses the switch then.`
+                : ''),
+            confirmLabel: $localize`:@@Apply:Apply`,
+            danger: true,
+          }
+        : {
+            title: $localize`:@@Mode_to_proxy_title:A proxy serves ${this.planeLabel(plane)}:plane:?`,
+            message: $localize`:@@Mode_to_proxy_message:A proxy in front presents ${names}:names: over HTTPS and Meerkat believes its X-Forwarded headers. A certificate here then only secures the link from the proxy to Meerkat.`,
+            confirmLabel: $localize`:@@Apply:Apply`,
+          },
+    );
+    if (!ok) return;
+    this.saving.set(true);
+    this.api.saveDoor(plane, { proxied: mode === 'proxy', names: d.names, proxyAddresses: d.proxyAddresses }).subscribe({
+      next: (t) => {
+        this.saving.set(false);
+        this.unpick(plane);
+        this.apply(t);
+        this.loadCertificates();
+        this.certManager[plane].reload();
+      },
+      error: (e) => {
+        this.saving.set(false);
+        this.unpick(plane);
+        this.snack.open(message(e), undefined, { duration: 12000 });
+      },
+    });
+  }
+
+  // How the runtime names a plane: the names a certificate for the hop from a
+  // proxy - or for the internal plane - carries.
+  protected runtimeNames(plane: Plane): string[] {
+    // The runtime's names are left out of the answer when it has none.
+    return plane === 'internal' ? this.internalNames() : (this.door(plane).runtime?.names ?? []);
+  }
+
+  // Whether a certificate served on the plane answers for the name n.
+  protected runtimeCovers(plane: Plane, n: string): boolean {
+    return this.on(plane).some((c) => !c.pending && !this.unused(c, plane) && covers(this.namesOf(c), n));
+  }
+
+  // Placed on the plane and not served there, the door's mode wanting other
+  // names (SSL-14).
+  protected unused(c: Certificate, plane: Plane): boolean {
+    return !!c.unused?.includes(plane);
+  }
+
+  // What a plane actually serves with: placed there, and fitting its mode.
+  protected served(plane: Plane): Certificate[] {
+    return this.on(plane).filter((c) => !this.unused(c, plane));
+  }
+
+  // The certificates placed on no plane, kept to be placed or deleted.
+  protected readonly unplaced = computed(() => this.certificates().filter((c) => !c.console && !c.app && !c.internal));
 
   // This console reached by one of them: its HTTPS is the proxy's, so no
   // certificate placed here is what the browser was shown, and taking one
@@ -695,7 +927,9 @@ export class TlsPageComponent {
     const st = this.state();
     // The internal plane is published nowhere, by design: inside the cluster
     // its port is the one the services call.
-    if (!pub?.source || !st || plane === 'internal') return '';
+    // Behind a proxy neither is the world's business: the proxy reaches the
+    // plane inside the runtime.
+    if (!pub?.source || !st || plane === 'internal' || this.modeOf(plane) === 'proxy') return '';
     const inside = this.port(plane === 'console' ? st.consoleAddr : st.appAddr);
     return inside && !pub.ports?.[inside] ? inside : '';
   }
@@ -780,7 +1014,7 @@ export class TlsPageComponent {
   // The same, in the few words a door's row has room for.
   protected short(c: Certificate): string {
     if (c.source === 'acme' && !c.issued?.length) {
-      if (c.status === 'failed') return $localize`:@@Refused_short:Refused - see the pool`;
+      if (c.status === 'failed') return $localize`:@@Refused_short2:Refused - the reason is on its row`;
       return $localize`:@@Waiting_for_the_authority_short:Waiting for the authority`;
     }
     return this.says(c);

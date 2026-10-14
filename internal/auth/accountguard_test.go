@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"strings"
 	"testing"
@@ -119,15 +120,11 @@ func TestForwardedForFromAPrivateProxyIsBelieved(t *testing.T) {
 	}
 }
 
-// MEERKAT_TRUSTED_PROXIES=none: even a private peer's header is ignored, so
+// A plane that trusts nobody: even a private peer's header is ignored, so
 // the rotation is back to buying nothing.
 func TestTrustingNobodyIgnoresEveryForwardedFor(t *testing.T) {
-	p, err := filters.ParseTrustedProxies("none")
-	if err != nil {
-		t.Fatal(err)
-	}
-	filters.SetTrustedProxies(p)
-	t.Cleanup(func() { filters.SetTrustedProxies(nil) })
+	filters.SetPlane("", []netip.Prefix{}, nil)
+	t.Cleanup(func() { filters.SetPlane("", nil, nil) })
 	_, mux, _, _ := guardSetup(t, store.RateLimitPolicy{LoginAttempts: 2, LoginWindow: "PT15M"})
 	codes := []int{}
 	for i := 0; i < 3; i++ {

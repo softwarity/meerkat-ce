@@ -102,7 +102,7 @@ Les briques que l'on installe d'habitude à côté.
 
 Pour en savoir plus : [Le coffre](/docs/operations/vault).
 
-- **Certificats TLS** dans une seule réserve - générés, importés ou signés sur demande, chacun avec ses noms, un joker ou une IP - placés par glisser-déposer sur la console ou les applications, avec des ports HTTPS ouverts à chaud.
+- **Certificats TLS** plan par plan - générés, importés ou signés sur demande, chacun avec ses noms, un joker ou une IP - ajoutés sur la console, les applications ou le plan interne, avec des ports HTTPS ouverts à chaud.
 - **Certificats automatiques** par ACME : Let's Encrypt, ZeroSSL, Google ou votre propre step-ca les émettent et les renouvellent, avec plusieurs autorités côte à côte. **Enterprise**
 - **Coffre intégré** : secrets chiffrés en AES-256-GCM, référencés par leur nom dans la configuration, export chiffré, rappel avant expiration. La même clé scelle les clés TLS et les secrets TOTP, et se renouvelle par un redémarrage.
 - **Redirection HTTPS et en-têtes de sécurité** : le HTTP en clair renvoyé vers HTTPS, HSTS, CSP, X-Frame-Options, Referrer-Policy, et protection CSRF pour la console.

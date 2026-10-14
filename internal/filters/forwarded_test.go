@@ -4,19 +4,32 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"strings"
 	"testing"
 )
 
-// withTrusted runs a test under a given set and puts the default back: the set
-// is process-wide, as it is in the gateway.
+// withTrusted runs a test under a given set, for requests no plane named, and
+// puts the default back: "" is the default, "none" nobody, otherwise
+// comma-separated addresses or ranges.
 func withTrusted(t *testing.T, raw string) {
 	t.Helper()
-	p, err := ParseTrustedProxies(raw)
-	if err != nil {
-		t.Fatal(err)
+	var p []netip.Prefix
+	switch raw {
+	case "":
+	case "none":
+		p = []netip.Prefix{}
+	default:
+		for _, part := range strings.Split(raw, ",") {
+			part = strings.TrimSpace(part)
+			if !strings.Contains(part, "/") {
+				a := netip.MustParseAddr(part)
+				part = netip.PrefixFrom(a, a.BitLen()).String()
+			}
+			p = append(p, netip.MustParsePrefix(part).Masked())
+		}
 	}
-	SetTrustedProxies(p)
-	t.Cleanup(func() { SetTrustedProxies(nil) })
+	SetPlane("", p, nil)
+	t.Cleanup(func() { SetPlane("", nil, nil) })
 }
 
 func reqFrom(peer string, xff ...string) *http.Request {
@@ -122,36 +135,6 @@ func TestAListReplacesTheDefault(t *testing.T) {
 	}
 }
 
-func TestParseTrustedProxies(t *testing.T) {
-	if p, err := ParseTrustedProxies(""); err != nil || p != nil {
-		t.Fatalf("empty: %v %v, want the default (nil)", p, err)
-	}
-	if p, err := ParseTrustedProxies(" None "); err != nil || p == nil || len(p) != 0 {
-		t.Fatalf("none: %v %v, want an empty set", p, err)
-	}
-	p, err := ParseTrustedProxies("10.1.2.3, 2001:db8::/32,192.168.7.9/16")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []netip.Prefix{
-		netip.MustParsePrefix("10.1.2.3/32"), netip.MustParsePrefix("2001:db8::/32"),
-		netip.MustParsePrefix("192.168.0.0/16"),
-	}
-	if len(p) != len(want) {
-		t.Fatalf("parsed %v", p)
-	}
-	for i := range want {
-		if p[i] != want[i] {
-			t.Errorf("entry %d = %v, want %v", i, p[i], want[i])
-		}
-	}
-	for _, bad := range []string{"proxy.example", "10.0.0.0/33", "none, 10.0.0.1", ","} {
-		if _, err := ParseTrustedProxies(bad); err == nil {
-			t.Errorf("%q was accepted", bad)
-		}
-	}
-}
-
 // X-Forwarded-Proto follows the same rule: a stranger saying "https" does not
 // skip the redirect nor make a cookie Secure for it.
 func TestForwardedProtoNeedsATrustedPeer(t *testing.T) {
@@ -215,5 +198,45 @@ func TestTellUpstream(t *testing.T) {
 				t.Errorf("Forwarded %q, want %q", got, c.wantFwd)
 			}
 		})
+	}
+}
+
+// Each plane believes what its own door says (SSL-14): the console with
+// nothing in front trusts nobody, while the application behind a proxy
+// believes it, and reads https off the names the proxy serves.
+func TestEachPlaneBelievesItsOwnDoor(t *testing.T) {
+	SetPlane("console", []netip.Prefix{}, nil)
+	SetPlane("app", nil, []string{"shop.example.org"})
+	t.Cleanup(func() { SetPlane("console", nil, nil); SetPlane("app", nil, nil) })
+	seen := map[string]string{}
+	var scheme string
+	record := func(plane string) http.Handler {
+		return OnPlane(plane, http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			seen[plane] = ClientIP(r)
+			scheme = Scheme(r)
+		}))
+	}
+	r := reqFrom("10.42.0.15:5000", "203.0.113.5")
+	record("console").ServeHTTP(httptest.NewRecorder(), r)
+	record("app").ServeHTTP(httptest.NewRecorder(), r)
+	if seen["console"] != "10.42.0.15" {
+		t.Errorf("a console nothing stands in front of believed the header: %q", seen["console"])
+	}
+	if seen["app"] != "203.0.113.5" {
+		t.Errorf("the application behind its proxy did not: %q", seen["app"])
+	}
+
+	// No X-Forwarded-Proto at all: the declared name is https on its own.
+	r = httptest.NewRequest(http.MethodGet, "http://Shop.Example.org/x", nil)
+	r.RemoteAddr = "10.42.0.15:5000"
+	record("app").ServeHTTP(httptest.NewRecorder(), r)
+	if scheme != "https" {
+		t.Errorf("a name the proxy serves over HTTPS read as %s", scheme)
+	}
+	r = httptest.NewRequest(http.MethodGet, "http://other.example.org/x", nil)
+	r.RemoteAddr = "10.42.0.15:5000"
+	record("app").ServeHTTP(httptest.NewRecorder(), r)
+	if scheme != "http" {
+		t.Errorf("an undeclared name read as %s", scheme)
 	}
 }

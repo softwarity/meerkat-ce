@@ -139,6 +139,13 @@ jour progressive y verrait une instance saine.
 
 La règle qui en découle : tout ce qui envoie du trafic sonde /readyz, et jamais /healthz.
 
+Les sondes ne sont pas des requêtes HTTP du kubelet mais une commande lancée dans le
+conteneur, `/meerkat health http://127.0.0.1:8080/healthz` (/readyz pour la readiness), qui
+sort en 0 sur une réponse 2xx. Le port en clair d'un plan peut être éteint sur **Infra >
+Domains & TLS**, et il n'écoute alors plus que sur la boucle locale : le kubelet ne le
+joindrait plus, la commande de la gateway le joint toujours, et le pod reste prêt. Le chart
+fait de même - voir [Couper le port en clair](/docs/operations/tls#couper-le-port-en-clair).
+
 ::: details Le Deployment complet
 ```yaml
 apiVersion: apps/v1
@@ -220,33 +227,33 @@ spec:
             # développeur y reste fermée, quoi que dise la base.
             - name: MEERKAT_PRODUCTION
               value: "1"
+          # Les trois sondes tournent DANS le conteneur, sur la boucle locale :
+          # l'image n'a pas de shell, c'est donc le binaire de la gateway qui
+          # interroge. Un port en clair éteint sur Domains & TLS n'écoute plus
+          # que sur 127.0.0.1 - hors de portée du kubelet, jamais de cette
+          # commande.
+          #
           # STARTUP : le stockage est ouvert et migré avant l'ouverture des
           # ports. Jusqu'à deux minutes pour cela, avant que la vivacité ne
           # compte.
           startupProbe:
-            httpGet:
-              path: /healthz
-              port: app
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/healthz"] }
             periodSeconds: 2
             failureThreshold: 60
           # LIVENESS : ce processus sert-il encore ? Elle répond UP sans rien
           # regarder, et c'est la bonne réponse - cette liveness probe décide s'il
           # faut TUER le processus.
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: app
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/healthz"] }
             periodSeconds: 10
           # READINESS : ce nœud peut-il prendre une requête maintenant ? Elle
           # vérifie le stockage et la table de routage compilée, et répond
           # 503 en nommant celui des deux qui a échoué. C'est celle-ci qu'un
           # load balancer doit sonder.
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: app
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/readyz"] }
             periodSeconds: 5
-            timeoutSeconds: 3
+            timeoutSeconds: 5
           volumeMounts:
             - name: data
               mountPath: /data
@@ -337,7 +344,9 @@ spec:
 :::
 
 Comment un exploitant atteint alors la console, par ordre de préférence : kubectl
-port-forward service/meerkat-admin 9090:9090 pour un usage occasionnel ; un second Ingress
+port-forward service/meerkat-admin 9090:9090 pour un usage occasionnel - il arrive sur la
+boucle locale du pod, et répond donc encore une fois le port en clair de la console éteint
+sur Domains & TLS ; un second Ingress
 sur un contrôleur réservé au réseau interne, ou sur le même contrôleur restreint par adresse
 source et par certificat client, quand une équipe en a besoin tous les jours. Ce qu'il ne
 faut pas faire, c'est la placer sur le même hôte public que les applications.
@@ -399,11 +408,26 @@ X-Forwarded-Proto : la gateway y lit le schéma autant que sur la connexion, et 
 en-tête trois choses se dérèglent en même temps - les cookies de session perdent leur
 attribut Secure, la console annonce des URL en http://, et la redirection vers HTTPS boucle
 indéfiniment. nginx et Traefik le posent tous deux par défaut ; tout ce qui est fait maison
-en amont doit être vérifié. L'en-tête n'est cru que venant d'un proxy de confiance : un
-contrôleur Ingress du cluster joint le pod depuis une adresse privée, de confiance par
-défaut, donc rien n'est à régler. Un load balancer ou un CDN qui joint les pods depuis des
-adresses publiques doit être nommé dans `trustedProxies` - voir
+en amont doit être vérifié. Dites-le aussi dans la console : sur **Infra > Domains & TLS**,
+réglez le plan que dessert l'Ingress sur **A proxy in front** et déclarez ses noms publics -
+une requête pour l'un d'eux est alors sue en https sans aucun en-tête. L'en-tête n'est cru
+que venant d'un proxy de confiance : un contrôleur Ingress du cluster joint le pod depuis
+une adresse privée, que le plan croit tant que **Proxy addresses (optional)** reste vide,
+donc rien de plus n'est à régler. Un load balancer ou un CDN qui joint les pods depuis des
+adresses publiques se nomme sur ce même plan, dans **Proxy addresses** - voir
 [Derrière un proxy ou un load balancer](/docs/deploy/one-gateway#derrire-un-proxy-ou-un-load-balancer).
+Il n'y a plus de valeur du chart pour cela : `trustedProxies` a été retirée, et le chart
+refuse le rendu tant qu'elle est posée.
+
+Pour chiffrer aussi le saut de l'Ingress vers la gateway (un backend en HTTPS -
+`nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"` avec ingress-nginx - dirigé vers le
+port `app-tls` ou `admin-tls` du Service), le plan a besoin d'un certificat qui porte les
+noms du Service lui-même, `<release>-meerkat` pour l'application et
+`<release>-meerkat-admin` pour la console, sous leurs quatre formes. Avec
+`internalTls.certManager: true`, **Add certificate, Ask cert-manager** sur ce plan le
+demande (`<release>-meerkat-app-issued`, `<release>-meerkat-console-issued`) ; un Secret que
+vous montez vous-même, choisi **From the file system**, convient aussi - voir
+[Derrière un proxy qui termine le TLS](/docs/operations/tls#derrire-un-proxy-qui-termine-le-tls).
 
 ::: details L'Ingress complet
 ```yaml
@@ -589,9 +613,11 @@ spec:
     targetPort: app
   tls:
     # edge : le routeur détient le certificat et Meerkat voit du HTTP avec
-    # X-Forwarded-Proto: https. Préférez passthrough quand la gateway
-    # détient elle-même le certificat - ce qu'exige ACME, puisque le défi
-    # TLS-ALPN doit parvenir intact à Meerkat.
+    # X-Forwarded-Proto: https. reencrypt pour chiffrer aussi le saut, vers le
+    # port app-tls, le plan détenant un certificat pour les noms du Service.
+    # Préférez passthrough quand la gateway détient elle-même le certificat
+    # public - ce qu'exige ACME, puisque le défi TLS-ALPN doit parvenir
+    # intact à Meerkat.
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
 ```

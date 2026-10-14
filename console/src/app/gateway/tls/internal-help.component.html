@@ -5,9 +5,11 @@
   </button>
 </div>
 <div class="drawer-body">
-  <p class="lead" i18n="@@Internal_help_lead2">
+  <p class="lead" i18n="@@Internal_help_lead3">
     Every service of the platform serves HTTPS the same way: a certificate from the platform's PKI
     for the names it is called by, mounted in its pod, and its authority trusted by the others.
+    For Meerkat that is the Internal plane, and the Console or the Application when a proxy in
+    front re-encrypts to it; on Kubernetes, Add certificate, Ask cert-manager on the plane does it.
   </p>
   <div class="bar">
     <mat-button-toggle-group class="os" [value]="platform()" (change)="platform.set($event.value)" hideSingleSelectionIndicator>

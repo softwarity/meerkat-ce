@@ -1489,6 +1489,10 @@ export interface Certificate {
   issued?: string[];
   status?: string;
   error?: string;
+  // The planes it is placed on and not served with, the door's mode wanting
+  // other names (SSL-14): a public certificate behind a proxy, a cluster one
+  // where the gateway serves the public names.
+  unused?: string[];
 }
 
 // Where a certificate is served. Optional on the creation doors; replace takes
@@ -1601,6 +1605,9 @@ export interface TlsState {
   // The redirect can be off while the setting is on: nothing valid to present
   // stands it down.
   redirecting: boolean;
+  // Per plane, whether its plain door listens on the loopback only,
+  // switched off (SSL-15).
+  plainLoopback?: Record<string, boolean>;
 }
 
 // There is no "switch HTTPS on" here, and the absence is the design: a
@@ -1617,10 +1624,35 @@ export interface TlsSettings {
   // Where the runtime publishes this gateway's ports, inside -> outside
   // (JSON keys are strings). Absent ports are not published.
   published?: { ports?: Record<string, number>; source?: string; why?: string };
-  // Per door, the names also reached through a proxy that terminates TLS in
-  // front of the gateway: what a mailed link may point at (AUTH-22). Never a
-  // certificate, a redirect or HSTS.
-  proxied: { console: string[]; app: string[] };
+  // Each plane as the runtime names it, and what the operator said about the
+  // console's and the application's (SSL-14).
+  doors: { console: DoorView; app: DoorView; internal: DoorView };
+  // Per plane, the doors switched off: 'http' only (SSL-15).
+  closed: Record<string, 'http'[]>;
+  // Which of the console's doors received requests in the last
+  // trafficWindow seconds, cluster-wide, and from whom last.
+  consoleTraffic: { plane: string; scheme: 'http' | 'https'; peer: string; at: number }[];
+  trafficWindow: number;
+}
+
+// One plane on the Domains & TLS screen (SSL-14). Who serves its public
+// names - this gateway, or a proxy in front - and which they are, full names
+// only; where a proxy reaches the gateway from (none: a private network); how
+// the runtime names the plane; and the declared names no certificate covers.
+export interface DoorView {
+  proxied: boolean;
+  names: string[];
+  proxyAddresses: string[];
+  // names is left out when the runtime has none.
+  runtime: { origin?: string; names?: string[]; source?: string; why?: string };
+  uncovered: string[];
+}
+
+// What a door says, as it is saved.
+export interface DoorSettings {
+  proxied: boolean;
+  names: string[];
+  proxyAddresses: string[];
 }
 
 // Trusted-browser policy (MFA-03): whether a user may skip the TOTP challenge
@@ -3326,7 +3358,7 @@ export class ApiService {
     return this.http.post<Certificate>('/api/certificates/file', body);
   }
 
-  askCertManager(body: { kind: string; name: string }): Observable<Certificate> {
+  askCertManager(body: { kind: string; name: string; plane?: string }): Observable<Certificate> {
     return this.http.post<Certificate>('/api/certificates/cert-manager', body);
   }
 
@@ -3408,8 +3440,13 @@ export class ApiService {
 
   // One door's list, replaced; the answer is the whole TLS view, the names
   // as the gateway keeps them (lowercased, each once).
-  saveProxiedNames(plane: 'console' | 'app', names: string[]): Observable<TlsSettings> {
-    return this.http.put<TlsSettings>(`/api/settings/tls/proxied/${plane}`, { names });
+  // Whether a plane's plain door listens on the network (SSL-15).
+  saveTlsPorts(plane: 'console' | 'app' | 'internal', ports: { http: boolean }): Observable<TlsSettings> {
+    return this.http.put<TlsSettings>(`/api/settings/tls/ports/${plane}`, ports);
+  }
+
+  saveDoor(plane: 'console' | 'app', door: DoorSettings): Observable<TlsSettings> {
+    return this.http.put<TlsSettings>(`/api/settings/tls/doors/${plane}`, door);
   }
 
   revokeAdminToken(id: string): Observable<void> {

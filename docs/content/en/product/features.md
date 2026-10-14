@@ -100,7 +100,7 @@ The building blocks usually installed alongside.
 
 Read more: [The vault](/docs/operations/vault).
 
-- **TLS certificates** in one pool - generated, imported or signed on request, each with its names, a wildcard or an IP - placed by drag and drop on the console or the applications, HTTPS ports opened live.
+- **TLS certificates** plane by plane - generated, imported or signed on request, each with its names, a wildcard or an IP - added on the console, the applications or the internal plane, HTTPS ports opened live.
 - **Automatic certificates** through ACME: Let's Encrypt, ZeroSSL, Google or your own step-ca issue and renew them, several authorities side by side. **Enterprise**
 - **Built-in vault**: secrets encrypted with AES-256-GCM, referenced by name from the configuration, encrypted export, reminder before expiry. The same key seals TLS keys and TOTP secrets, and rotates with a restart.
 - **HTTPS redirect and security headers**: plain HTTP sent to HTTPS, HSTS, CSP, X-Frame-Options, Referrer-Policy, and CSRF protection for the console.

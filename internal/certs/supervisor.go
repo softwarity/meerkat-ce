@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"slices"
 	"strings"
 	"sync"
@@ -42,21 +43,22 @@ type Settings struct {
 	HSTSMaxAge int          `json:"hstsMaxAge,omitempty"`
 	ACME       ACMESettings `json:"acme"`
 
-	// ProxiedConsole and ProxiedApp are the names a door is ALSO reached by
-	// through a proxy that terminates TLS in front of it: nginx, an ingress,
-	// a cloud load balancer. They are not the list of names the paragraph
-	// above refuses - a certificate still carries its own, and these are
-	// precisely the names this gateway has NO certificate for. What they say
-	// is narrower: the name is ours, and somebody in front serves it over
-	// HTTPS. One thing reads them, the address of a mailed link
-	// (auth/mailcode.go), which otherwise only trusts a name reached on the
-	// gateway's own TLS door. Never the listeners, the redirect, HSTS, an
-	// authority or a placement: a promise of HTTPS made on a name the gateway
-	// cannot present a certificate for is a promise somebody else keeps.
-	// Lowercase, deduplicated, exact names or a leading *. standing for one
-	// label - the rule of a certificate's names (Covers).
-	ProxiedConsole []string `json:"proxiedConsole,omitempty"`
-	ProxiedApp     []string `json:"proxiedApp,omitempty"`
+	// ConsoleDoor and AppDoor are what the operator says about each external
+	// plane (SSL-14): its public names, and whether the gateway or a proxy in
+	// front serves them over HTTPS. See Door.
+	ConsoleDoor Door `json:"consoleDoor"`
+	AppDoor     Door `json:"appDoor"`
+	// Closed is, per plane, the doors the operator switched off: "http" only
+	// - HTTPS opens with a certificate and closes with the last one (SSL-15).
+	// A plain door switched off listens on the loopback only: out of the
+	// network's reach, still there for a port-forward and for the health
+	// check the image runs inside itself.
+	Closed map[string][]string `json:"closed,omitempty"`
+
+	// The names a proxy in front served, before a door said more than that
+	// (SSL-14). Read once and folded into the doors by Normalized.
+	LegacyProxiedConsole []string `json:"proxiedConsole,omitempty"`
+	LegacyProxiedApp     []string `json:"proxiedApp,omitempty"`
 
 	// The names each plane was declared under, before certificates carried
 	// their own (v73). Read once, to sort the authority's names by plane, and
@@ -73,6 +75,17 @@ type Settings struct {
 // on both. What the authority may be asked for, and on which door, is
 // unchanged; the old fields go.
 func (s Settings) Normalized() Settings {
+	// The names a proxy in front served (AUTH-22) become that door, behind
+	// that proxy: the same promise, said with the rest of the door.
+	for _, d := range []struct {
+		legacy *[]string
+		door   *Door
+	}{{&s.LegacyProxiedConsole, &s.ConsoleDoor}, {&s.LegacyProxiedApp, &s.AppDoor}} {
+		if len(*d.legacy) > 0 && !d.door.Said() {
+			*d.door = Door{Proxied: true, Names: lower(*d.legacy)}
+		}
+		*d.legacy = nil
+	}
 	console := strings.ToLower(strings.TrimSpace(s.LegacyConsoleName))
 	if console != "" || len(s.LegacyAppNames) > 0 {
 		app := map[string]bool{}
@@ -170,19 +183,6 @@ type ACMEOrder struct {
 func OrderID(authority string, names []string) string {
 	h := sha256.Sum256([]byte(authority + " " + strings.Join(lower(names), " ")))
 	return "acme-" + hex.EncodeToString(h[:6])
-}
-
-// ProxiedOn is the names declared reached through a TLS-terminating proxy in
-// front of one door. The internal plane has none: its callers are programs
-// inside the cluster, and no browser follows a mailed link there.
-func (s Settings) ProxiedOn(plane string) []string {
-	switch plane {
-	case PlaneConsole:
-		return s.ProxiedConsole
-	case PlaneApp:
-		return s.ProxiedApp
-	}
-	return nil
 }
 
 // MaxHSTS is the longest HSTS promise the console lets an installation make:
@@ -297,6 +297,9 @@ type State struct {
 	// callers to its HTTPS one. It can be false while the setting is true -
 	// nothing valid to present stands it down.
 	Redirecting bool `json:"redirecting"`
+	// PlainLoopback is, per plane, whether its plain door listens on the
+	// loopback only, switched off (SSL-15).
+	PlainLoopback map[string]bool `json:"plainLoopback"`
 }
 
 // Supervisor keeps the running TLS state equal to the stored one.
@@ -318,6 +321,12 @@ type Supervisor struct {
 
 	mu    sync.Mutex
 	state State
+	// reloading makes reloads take turns, each reading AND applying before
+	// the next reads: three cert-manager watches, the boot and the change bus
+	// all reload, and one that read before a Secret arrived and applied after
+	// a fresher one closed a door nothing reopened (2026-10-15, one pod in
+	// three without its console HTTPS).
+	reloading sync.Mutex
 	// proxied is each door's names reached through a proxy in front, as last
 	// read: kept beside the managers rather than in them, so nothing that
 	// decides a handshake, a redirect or HSTS can ever be handed one.
@@ -325,6 +334,23 @@ type Supervisor struct {
 
 	// issues is what happened to each name asked of an authority (request.go).
 	issues issueBook
+
+	// Plain are the planes' plain-HTTP doors, by plane, set by main: Reload
+	// binds each on every address or, switched off, on the loopback only
+	// (SSL-15). Nil in tests that only exercise HTTPS.
+	Plain map[string]*Plain
+
+	// RuntimeNames are the names the runtime resolves to one plane - the
+	// Service in front of it, the Swarm or compose service - which a
+	// certificate encrypting the hop from a proxy carries (SSL-14). Nil, or
+	// an empty answer, when nothing can be asked: every placed certificate is
+	// then served, the proxy's own check being the only judge.
+	RuntimeNames func(ctx context.Context, plane string) []string
+
+	// Trust is told, at every reload, whose forwarded headers each external
+	// plane believes and which names it is reached by over HTTPS through a
+	// proxy (SSL-14): the doors decide it, the filters apply it. Nil in a test.
+	Trust func(plane string, proxies []netip.Prefix, httpsNames []string)
 }
 
 // NewSupervisor wires the three managers to the three HTTPS doors and to the
@@ -382,6 +408,8 @@ func (s *Supervisor) State() State {
 // Reload reads everything and makes the running gateway match it. It is called
 // at boot and after every mutation - saving IS applying, here as everywhere.
 func (s *Supervisor) Reload(ctx context.Context) error {
+	s.reloading.Lock()
+	defer s.reloading.Unlock()
 	cfg := s.src.TLSSettings(ctx)
 
 	consoleList, consoleFallback, problems, err := s.src.CertificateMaterials(ctx, PlaneConsole)
@@ -393,6 +421,18 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 		return err
 	}
 	problems = append(problems, appProblems...)
+	// What each door serves with, in the mode it is in: the certificates that
+	// do not fit stay placed and are left out here (Door.Active).
+	consoleRuntime, appRuntime := s.runtimeNames(ctx, PlaneConsole), s.runtimeNames(ctx, PlaneApp)
+	consoleList, consoleFallback = activeOnly(cfg.ConsoleDoor, consoleRuntime, consoleList, consoleFallback)
+	appList, appFallback = activeOnly(cfg.AppDoor, appRuntime, appList, appFallback)
+	// An order whose names the door's mode does not serve is not asked: an
+	// authority cannot reach a name a proxy answers for, nor issue a
+	// cluster's names.
+	for i, o := range cfg.ACME.Orders {
+		cfg.ACME.Orders[i].Console = o.Console && cfg.ConsoleDoor.Active(o.Names, consoleRuntime)
+		cfg.ACME.Orders[i].App = o.App && cfg.AppDoor.Active(o.Names, appRuntime)
+	}
 	// The internal plane presents what is placed on it and asks no authority:
 	// its names are the cluster's, which no public authority can see.
 	internalList, internalFallback, internalProblems, err := s.src.CertificateMaterials(ctx, PlaneInternal)
@@ -510,10 +550,33 @@ func (s *Supervisor) Reload(ctx context.Context) error {
 	// HTTPS would be the one thing left locking them out.
 	s.redirect.SetHSTS(cfg.HSTS(redirect))
 
+	for _, plane := range []string{PlaneConsole, PlaneApp} {
+		proxies, err := cfg.DoorOn(plane).Trusted()
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("the %s's proxy addresses: %v", plane, err))
+		}
+		if s.Trust != nil {
+			s.Trust(plane, proxies, lower(cfg.ProxiedOn(plane)))
+		}
+	}
+
+	// The plain doors, on every address or on the loopback only (SSL-15).
+	loopback := map[string]bool{}
+	for plane, p := range s.Plain {
+		if err := p.Switch(!cfg.Opens(plane, "http")); err != nil {
+			problems = append(problems, err.Error())
+			if failed == nil {
+				failed = err
+			}
+		}
+		loopback[plane] = p.Loopback()
+	}
+
 	s.mu.Lock()
+	s.state.PlainLoopback = loopback
 	s.proxied = map[string][]string{
-		PlaneConsole: lower(cfg.ProxiedConsole),
-		PlaneApp:     lower(cfg.ProxiedApp),
+		PlaneConsole: lower(cfg.ProxiedOn(PlaneConsole)),
+		PlaneApp:     lower(cfg.ProxiedOn(PlaneApp)),
 	}
 	s.state.Console, s.state.App = s.adminLn.Running(), s.appLn.Running()
 	s.state.Internal = s.internalLn != nil && s.internalLn.Running()
@@ -541,6 +604,31 @@ func (s *Supervisor) Proxied(plane string) func(host string) bool {
 		host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
 		return host != "" && slices.Contains(names, host)
 	}
+}
+
+func (s *Supervisor) runtimeNames(ctx context.Context, plane string) []string {
+	if s.RuntimeNames == nil {
+		return nil
+	}
+	return s.RuntimeNames(ctx, plane)
+}
+
+// activeOnly keeps the materials a door serves with, and a fallback among
+// them: the oldest placed when it still fits, the first that fits otherwise.
+func activeOnly(d Door, runtime []string, list []*Material, fallback *Material) ([]*Material, *Material) {
+	kept := make([]*Material, 0, len(list))
+	for _, m := range list {
+		if d.Active(m.Names(), runtime) {
+			kept = append(kept, m)
+		}
+	}
+	if fallback != nil && !slices.Contains(kept, fallback) {
+		fallback = nil
+		if len(kept) > 0 {
+			fallback = kept[0]
+		}
+	}
+	return kept, fallback
 }
 
 func orName(a Authority) string {

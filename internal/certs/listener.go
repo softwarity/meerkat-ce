@@ -3,6 +3,7 @@ package certs
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -75,7 +76,8 @@ func (l *Listener) Start() error {
 		// The certificate and key are empty on purpose: they come from
 		// TLSConfig.GetCertificate, one call per handshake, which is what makes
 		// a swap invisible to the port.
-		if err := srv.ServeTLS(ln, "", ""); err != nil && err != http.ErrServerClosed {
+		// A closed listener is Stop doing its job, not an error to report.
+		if err := srv.ServeTLS(ln, "", ""); err != nil && err != http.ErrServerClosed && !errors.Is(err, net.ErrClosed) {
 			slog.Error("https listener stopped", "plane", l.Plane, "addr", l.Addr, "err", err)
 		}
 	}()

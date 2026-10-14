@@ -1829,8 +1829,8 @@
         "fr": "Demander un certificat à l'autorité ACME"
       },
       "description": {
-        "en": "An order sits in the certificate pool like the others and is placed the same way; the authority is asked on the first visit to a name once the order serves a door. Refused while no authority is set up, and for a wildcard or an address.",
-        "fr": "Une commande se range dans la réserve de certificats comme les autres et se place de la même façon ; l'autorité est sollicitée à la première visite d'un nom, une fois la commande placée sur une porte. Refusé tant qu'aucune autorité n'est configurée, et pour un nom générique ou une adresse."
+        "en": "An order is added from a plane's Add certificate menu like the others and sits on that plane; the authority is asked on the first visit to a name once the order serves a door. Refused while no authority is set up, and for a wildcard or an address.",
+        "fr": "Une commande s'ajoute depuis le menu Add certificate d'un plan comme les autres et se pose sur ce plan ; l'autorité est sollicitée à la première visite d'un nom, une fois la commande placée sur une porte. Refusé tant qu'aucune autorité n'est configurée, et pour un nom générique ou une adresse."
       }
     },
     {

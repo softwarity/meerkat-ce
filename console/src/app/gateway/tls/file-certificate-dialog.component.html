@@ -19,7 +19,7 @@
               <span class="meta">
                 {{ c.path }}
                 @if (inPool(c)) {
-                  <span class="taken" i18n="@@Mounted_in_pool">already in the pool</span>
+                  <span class="taken" i18n="@@Mounted_already_added">already added</span>
                 } @else if (c.keyPath) {
                   <ng-container i18n="@@Mounted_with_key">with {{ c.keyPath }}</ng-container>
                 } @else {

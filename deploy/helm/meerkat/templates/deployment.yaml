@@ -1,3 +1,11 @@
+{{- /* trustedProxies was removed (SSL-14): said once, plainly, rather than
+       ignored - a value that silently stopped working would change whose
+       addresses the gateway believes without a word. */ -}}
+{{- if hasKey .Values "trustedProxies" }}
+{{- if .Values.trustedProxies }}
+{{- fail "trustedProxies was removed: declare the proxy in front of each plane, and its addresses, on the console's Domains & TLS screen (Infra), then remove trustedProxies from your values" }}
+{{- end }}
+{{- end }}
 {{- if and (gt (int .Values.replicaCount) 1) (not (include "meerkat.clustered" .)) }}
 {{- fail "replicaCount above 1 needs the shared database: set database.url or database.existingSecret (Enterprise image), or leave replicaCount at 1 on its own volume - several pods on the embedded store are several gateways, not one" }}
 {{- end }}
@@ -115,10 +123,6 @@ spec:
             - name: MEERKAT_PRODUCTION
               value: "1"
             {{- end }}
-            {{- with .Values.trustedProxies }}
-            - name: MEERKAT_TRUSTED_PROXIES
-              value: {{ join "," . | quote }}
-            {{- end }}
             {{- if .Values.plug.enabled }}
             - name: MEERKAT_PLUG_ADDR
               value: ":{{ .Values.plug.port }}"
@@ -126,14 +130,22 @@ spec:
           # The store is opened and migrated BEFORE the ports open, so a long
           # migration answers nothing for a while: up to two minutes before
           # liveness starts counting, rather than a restart in mid-migration.
+          #
+          # Run INSIDE the container, on the loopback (`meerkat health`, the
+          # image has no shell): the application's plain port may be switched
+          # off on the Domains & TLS screen (SSL-15), and then it listens on
+          # the loopback only - out of the kubelet's reach, never of the
+          # gateway's own probe.
           startupProbe:
-            httpGet: { path: /healthz, port: app }
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/healthz"] }
             periodSeconds: 2
             failureThreshold: 60
           livenessProbe:
-            httpGet: { path: /healthz, port: app }
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/healthz"] }
+            timeoutSeconds: 5
           readinessProbe:
-            httpGet: { path: /readyz, port: app }
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/readyz"] }
+            timeoutSeconds: 5
           volumeMounts:
             - name: data
               mountPath: /data

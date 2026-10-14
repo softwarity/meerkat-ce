@@ -285,7 +285,9 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"DELETE /api/vault/{scope}/{name}": true,
 		// The names a door is reached by through a proxy in front: stored,
 		// and what a mailed link may point at from then on.
-		"PUT /api/settings/tls/proxied/{plane}": true,
+		"PUT /api/settings/tls/doors/{plane}": true,
+		// Which of a plane's doors listen on the network (SSL-15).
+		"PUT /api/settings/tls/ports/{plane}": true,
 	}
 
 	registered := map[string]bool{}

@@ -67,6 +67,8 @@ Both probes exist on both ports, and they are not interchangeable. /healthz is L
 
 The rule that follows: whatever sends traffic probes /readyz, and never /healthz.
 
+The probes are not HTTP requests from the kubelet but a command run inside the container, `/meerkat health http://127.0.0.1:8080/healthz` (/readyz for readiness), which exits 0 on a 2xx. The plain port of a plane can be switched off on **Infra > Domains & TLS**, and it then listens on the loopback only: the kubelet would no longer reach it, the gateway's own command still does, and the pod stays ready. The chart does the same - see [Switching the plain port off](/docs/operations/tls#switching-the-plain-port-off).
+
 ::: details The full Deployment
 ```yaml
 apiVersion: apps/v1
@@ -143,31 +145,30 @@ spec:
             # closed here whatever the database says.
             - name: MEERKAT_PRODUCTION
               value: "1"
+          # The three probes run INSIDE the container, on the loopback: the
+          # image has no shell, so the gateway's own binary asks. A plain
+          # port switched off on Domains & TLS listens on 127.0.0.1 only -
+          # out of the kubelet's reach, never of this command.
+          #
           # STARTUP: the store is opened and migrated before the ports
           # open. Up to two minutes for that, before liveness counts.
           startupProbe:
-            httpGet:
-              path: /healthz
-              port: app
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/healthz"] }
             periodSeconds: 2
             failureThreshold: 60
           # LIVENESS: is this process still serving? It answers UP without
           # looking at anything, and that is the right answer - this probe
           # decides whether to KILL the process.
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: app
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/healthz"] }
             periodSeconds: 10
           # READINESS: can this node take a request right now? It checks the
           # store and the compiled routing table, and answers 503 naming which
           # of the two failed. This is the one a load balancer must probe.
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: app
+            exec: { command: ["/meerkat", "health", "http://127.0.0.1:8080/readyz"] }
             periodSeconds: 5
-            timeoutSeconds: 3
+            timeoutSeconds: 5
           volumeMounts:
             - name: data
               mountPath: /data
@@ -250,7 +251,7 @@ spec:
 ```
 :::
 
-How an operator reaches the console then, in order of preference: kubectl port-forward service/meerkat-admin 9090:9090 for occasional work; a second Ingress on an internal-only controller, or on the same one restricted by source address and client certificate, when a team needs it daily. What you should not do is put it on the same public host as the applications.
+How an operator reaches the console then, in order of preference: kubectl port-forward service/meerkat-admin 9090:9090 for occasional work - it lands on the pod's loopback, so it still answers once the console's plain port is switched off on Domains & TLS; a second Ingress on an internal-only controller, or on the same one restricted by source address and client certificate, when a team needs it daily. What you should not do is put it on the same public host as the applications.
 
 The internal plane is what your services call: `http://meerkat-internal:7070/.well-known/jwks.json` to verify the [identity JWT](/docs/auth/service-jwt), `http://meerkat-internal:7070/api/schedules` for the [scheduled calls](/docs/operations/scheduler). It answers tokens only - the JWKS aside, which gives no power - because "inside the cluster" is not a credential: without a NetworkPolicy, every pod of every namespace reaches a ClusterIP.
 
@@ -296,7 +297,9 @@ spec:
 
 Two things a default Ingress gets wrong for this gateway. The gateway proxies WebSockets, and it holds a live channel open on /meerkat/events - both are long-lived responses, so a controller that buffers the body or closes the connection at its default sixty seconds breaks pages that were working, intermittently and only for some users.
 
-And the scheme. Meerkat can terminate TLS itself (-tls-addr, -admin-tls-addr, with ACME issuance serialised by an advisory lock so N nodes ask for one certificate rather than N, the material and the challenge being rows every node can answer from). In Kubernetes you usually terminate at the Ingress instead, and both work. But whatever terminates in front must send X-Forwarded-Proto: the gateway reads the scheme from it as much as from the connection, and without it three things go wrong at once - session cookies lose their Secure attribute, the console announces http:// URLs, and the redirect to HTTPS loops for ever. nginx and Traefik both set it by default; anything hand-rolled in front has to be checked. The header is believed only from a trusted proxy: an Ingress controller in the cluster reaches the pod from a private address, which the gateway trusts by default, so nothing needs setting. A load balancer or a CDN that reaches the pods from public addresses has to be named in `trustedProxies` - see [Behind a proxy or a load balancer](/docs/deploy/one-gateway#behind-a-proxy-or-a-load-balancer).
+And the scheme. Meerkat can terminate TLS itself (-tls-addr, -admin-tls-addr, with ACME issuance serialised by an advisory lock so N nodes ask for one certificate rather than N, the material and the challenge being rows every node can answer from). In Kubernetes you usually terminate at the Ingress instead, and both work. But whatever terminates in front must send X-Forwarded-Proto: the gateway reads the scheme from it as much as from the connection, and without it three things go wrong at once - session cookies lose their Secure attribute, the console announces http:// URLs, and the redirect to HTTPS loops for ever. nginx and Traefik both set it by default; anything hand-rolled in front has to be checked. Say it on the console too: on **Infra > Domains & TLS**, set the plane the Ingress fronts to **A proxy in front** and declare its public names - a request for one of them is then known to be https without any header. The header is believed only from a trusted proxy: an Ingress controller in the cluster reaches the pod from a private address, which the plane trusts while **Proxy addresses (optional)** is left empty, so nothing more needs setting. A load balancer or a CDN that reaches the pods from public addresses is named on the same plane, in **Proxy addresses** - see [Behind a proxy or a load balancer](/docs/deploy/one-gateway#behind-a-proxy-or-a-load-balancer). There is no chart value for it any more: `trustedProxies` was removed, and the chart refuses to render while it is set.
+
+To encrypt the hop from the Ingress to the gateway as well (a backend in HTTPS - `nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"` on ingress-nginx - pointed at the `app-tls` or `admin-tls` port of the Service), the plane needs a certificate carrying the Service's own names, `<release>-meerkat` for the application and `<release>-meerkat-admin` for the console, in their four forms. With `internalTls.certManager: true`, **Add certificate, Ask cert-manager** on that plane asks for it (`<release>-meerkat-app-issued`, `<release>-meerkat-console-issued`); a Secret you mount yourself, picked **From the file system**, does as well - see [Behind a proxy that terminates TLS](/docs/operations/tls#behind-a-proxy-that-terminates-tls).
 
 ::: details The full Ingress
 ```yaml
@@ -450,9 +453,11 @@ spec:
     targetPort: app
   tls:
     # edge: the router holds the certificate and Meerkat sees HTTP with
-    # X-Forwarded-Proto: https. passthrough instead when the gateway holds the
-    # certificate itself - which ACME needs, since the TLS-ALPN challenge must
-    # reach Meerkat untouched.
+    # X-Forwarded-Proto: https. reencrypt to encrypt the hop as well, to the
+    # app-tls port, the plane holding a certificate for the Service's names.
+    # passthrough instead when the gateway holds the public certificate itself
+    # - which ACME needs, since the TLS-ALPN challenge must reach Meerkat
+    # untouched.
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
 ```

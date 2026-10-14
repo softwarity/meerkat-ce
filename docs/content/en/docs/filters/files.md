@@ -75,5 +75,6 @@ any other path under `/fonts` answers 404.
 > [!TIP]
 > A UI that names `fonts.googleapis.com` will not pass through the route by
 > itself. Either point the UI at the gateway, or - offline - resolve that name to
-> the gateway in your DNS and give it a certificate from your own authority in
-> the TLS pool: the route then answers the host the UI asks for.
+> the gateway in your DNS and give it a certificate from your own authority on
+> the Application tab of Domains & TLS: the route then answers the host the UI
+> asks for.

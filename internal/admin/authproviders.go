@@ -434,9 +434,10 @@ func requiredFeatureFor(kind string) error {
 // vouchedDataOrigin is the data plane's address by a name the gateway can
 // vouch for (see dataOrigin), or "" when it has none.
 func (a *API) vouchedDataOrigin(ctx context.Context) string {
-	cfg := a.st.RawTLS(ctx)
-	if len(cfg.ProxiedApp) > 0 {
-		return "https://" + cfg.ProxiedApp[0]
+	// The application's first public name (SSL-14), whoever serves it: a
+	// proxy in front, or this gateway with a certificate that covers it.
+	if names := a.st.RawTLS(ctx).AppDoor.Names; len(names) > 0 {
+		return "https://" + names[0]
 	}
 	rows, err := a.st.ListCertificates(ctx)
 	if err != nil {

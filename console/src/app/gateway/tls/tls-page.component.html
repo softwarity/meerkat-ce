@@ -96,8 +96,8 @@
       </li>
       <li>
         <p i18n="@@Tls_local_step_import">
-          <b>Import it here</b>: Add certificate, Import a PEM pair, and drop the two files on the
-          dialog. Then drag it onto Console and onto Application.
+          <b>Import it here</b>: Add certificate on Console, Import a PEM pair, and drop the two
+          files on the dialog; then the same on Application.
         </p>
       </li>
     </ol>
@@ -107,9 +107,9 @@
     </p>
     <!-- Where the certificate goes, one or the other: the choice each door
          shows at its top, HTTPS presented by. -->
-    <p class="hint" i18n="@@Tls_local_present_either">
+    <p class="hint" i18n="@@Tls_local_present_proxy">
       With a proxy in front (nginx, an ingress), skip step 4: set the certificate on the proxy,
-      and set the door to A proxy in front with these names. One or the other, never both.
+      and set the plane to A proxy in front with these names as its public names.
     </p>
   </div>
   }
@@ -118,6 +118,26 @@
 
 <div class="banner">
   <h1 i18n="@@Domains_and_TLS">Domains &amp; TLS</h1>
+  <!-- The authorities beside the screen they feed: each one set up there is
+       an Ask entry of a plane's Add certificate. -->
+  <span class="acme-door" ee-feature="SSL-05">
+    <button matButton (click)="openDrawer('authorities')" [matTooltip]="acmeTip">
+      <mat-icon>autorenew</mat-icon>
+      <ng-container i18n="@@ACME_button">ACME</ng-container>
+    </button>
+    <app-ee-lock
+      feature="SSL-05"
+      i18n-why="@@Acme_ee_why"
+      why="Have Let's Encrypt, ZeroSSL or your own authority issue and renew certificates on their own."
+    />
+  </span>
+  <!-- How a platform issues a certificate for a service's names - cert-manager,
+       OpenShift, an authority of one's own: the internal plane's, and the
+       console's or the application's behind a proxy that re-encrypts. -->
+  <button matButton="tonal" (click)="openDrawer('internal')">
+    <mat-icon>verified</mat-icon>
+    <ng-container i18n="@@Platform_certificates_button">Platform certificates</ng-container>
+  </button>
   <button matButton="tonal" (click)="openDrawer('local')">
     <mat-icon>laptop</mat-icon>
     <ng-container i18n="@@Tls_local_button">On a local machine</ng-container>
@@ -127,119 +147,87 @@
 @if (loading()) {
   <loading-indicator withContainer />
 } @else {
-  <div class="content" cdkDropListGroup>
-    <!-- The pool: every certificate this gateway holds, served or not. -->
-    <section class="card">
-      <div class="plane-head">
-        <h2 i18n="@@Certificates">Certificates</h2>
-        <!-- The authorities beside the menu they feed: each one set up there
-             is an Ask entry of Add certificate. -->
-        <span class="acme-door" ee-feature="SSL-05">
-          <button matButton (click)="openDrawer('authorities')" [matTooltip]="acmeTip">
-            <mat-icon>autorenew</mat-icon>
-            <ng-container i18n="@@ACME_button">ACME</ng-container>
-          </button>
-          <app-ee-lock
-            feature="SSL-05"
-            i18n-why="@@Acme_ee_why"
-            why="Have Let's Encrypt, ZeroSSL or your own authority issue and renew certificates on their own."
-          />
-        </span>
-        <!-- Opened, the menu asks again whether cert-manager can be asked: a
-             chart value changed since the page loaded is seen at once. -->
-        <button matButton="tonal" [matMenuTriggerFor]="doors" (menuOpened)="certManager.reload()">
-          <mat-icon>add</mat-icon>
-          <ng-container i18n="@@Add_certificate">Add certificate</ng-container>
-        </button>
-        <mat-menu #doors>
-          <button mat-menu-item (click)="add('self-signed')">
+  <div class="content">
+    <!-- One Add certificate menu, opened from each plane with that plane:
+         what is offered follows the plane and its mode (SSL-14). Opened, it
+         asks again whether cert-manager can be asked: a chart value changed
+         since the page loaded is seen at once. -->
+    <mat-menu #addMenu="matMenu">
+      <ng-template matMenuContent let-plane="plane">
+        @if (modeOf(plane) === 'gateway') {
+          <button mat-menu-item (click)="add('self-signed', undefined, plane)">
             <mat-icon>bolt</mat-icon>
             <span i18n="@@Generate_self_signed">Generate a self-signed one</span>
           </button>
-          <button mat-menu-item (click)="add('pem')">
-            <mat-icon>description</mat-icon>
-            <span i18n="@@Import_PEM_pair">Import a PEM pair</span>
-          </button>
-          <button mat-menu-item (click)="addFromFiles()">
-            <mat-icon>folder_open</mat-icon>
-            <span i18n="@@From_the_file_system">From the file system</span>
-          </button>
+        }
+        <button mat-menu-item (click)="add('pem', undefined, plane)">
+          <mat-icon>description</mat-icon>
+          <span i18n="@@Import_PEM_pair">Import a PEM pair</span>
+        </button>
+        <button mat-menu-item (click)="addFromFiles(plane)">
+          <mat-icon>folder_open</mat-icon>
+          <span i18n="@@From_the_file_system">From the file system</span>
+        </button>
+        <button mat-menu-item (click)="add('keystore', undefined, plane)">
+          <mat-icon>inventory_2</mat-icon>
+          <span i18n="@@Import_keystore">Import a keystore</span>
+        </button>
+        @if (plane === 'internal' || modeOf(plane) === 'proxy') {
           <!-- Kubernetes only: greyed elsewhere, with the reason. -->
-          <button mat-menu-item (click)="addFromCertManager()" [disabled]="certManager.isLoading() || !certManager.value()?.available">
+          <button mat-menu-item (click)="addFromCertManager(plane)" [disabled]="!certManagerReady(plane)">
             <mat-icon>verified</mat-icon>
             <span class="way-in">
               <span i18n="@@Ask_cert_manager">Ask cert-manager</span>
-              @if (certManagerWhy(); as w) {
+              @if (certManagerWhy(plane); as w) {
                 <small class="why">{{ w }}</small>
               }
             </span>
           </button>
-          <button mat-menu-item (click)="add('keystore')">
-            <mat-icon>inventory_2</mat-icon>
-            <span i18n="@@Import_keystore">Import a keystore</span>
-          </button>
-          <button mat-menu-item (click)="add('signing-request')">
+        }
+        @if (modeOf(plane) === 'gateway') {
+          <button mat-menu-item (click)="add('signing-request', undefined, plane)">
             <mat-icon>draft</mat-icon>
             <span i18n="@@Create_signing_request">Create a signing request</span>
           </button>
-          <!-- One way in per authority set up in the ACME drawer. -->
-          @for (ca of enterprise() ? authorities() : []; track ca.id) {
-            <button mat-menu-item (click)="add('acme', ca)">
-              <mat-icon>autorenew</mat-icon>
-              <span i18n="@@Ask_authority_menu">Ask {{ ca.name }}</span>
-            </button>
+          <!-- One way in per authority set up in the ACME drawer: a public
+               name only, so never on the internal plane. -->
+          @if (plane !== 'internal') {
+            @for (ca of enterprise() ? authorities() : []; track ca.id) {
+              <button mat-menu-item (click)="add('acme', ca, plane)">
+                <mat-icon>autorenew</mat-icon>
+                <span i18n="@@Ask_authority_menu">Ask {{ ca.name }}</span>
+              </button>
+            }
           }
-        </mat-menu>
+        }
+      </ng-template>
+    </mat-menu>
+
+    <!-- What is placed on no plane: kept, to be placed or deleted. A plane's
+         own menu places what it adds, so this only fills from a certificate
+         taken off every plane. -->
+    @if (unplaced().length) {
+    <section class="card">
+      <div class="plane-head">
+        <h2 i18n="@@Unassigned_certificates">Unassigned certificates</h2>
       </div>
-      <p class="note" i18n="@@Pool_note3">
-        A certificate answers for the names it carries. Drag it onto a door below, or click the door's tag.
+      <p class="note" i18n="@@Unassigned_note">
+        On no plane: click the plane it belongs on, or delete it.
       </p>
-      <div
-        class="pool"
-        cdkDropList
-        [cdkDropListData]="'pool'"
-        [cdkDropListSortingDisabled]="true"
-        (cdkDropListDropped)="dropped($event)"
-      >
-        @for (c of certificates(); track c.id) {
-          <!-- One certificate of the pool. The row itself is written here and
-               not in a template: a cdkDrag finds its list by where it is
-               DECLARED. What it shows is in entryBody, below. -->
-          <div
-            class="entry {{ level(c) }}"
-            cdkDrag
-            [cdkDragData]="c"
-            [cdkDragDisabled]="c.pending"
-            (cdkDragStarted)="lifting.set(c.id)"
-            (cdkDragEnded)="lifting.set(null)"
-          >
+      <div class="pool">
+        @for (c of unplaced(); track c.id) {
+          <div class="entry {{ level(c) }}">
             <ng-container *ngTemplateOutlet="entryBody; context: { $implicit: c }" />
-            <!-- Dragging from the pool PLACES a certificate, it does not move
-                 it: it is still in the pool afterwards, and can be placed
-                 again. So what is left behind is the row itself, not a gap. -->
-            <div *cdkDragPlaceholder class="entry {{ level(c) }} ghost-row">
-              <ng-container *ngTemplateOutlet="entryBody; context: { $implicit: c }" />
-            </div>
           </div>
-          <!-- The placeholder above follows the pointer into a plane, where it
-               marks the landing spot. This row takes its place in the pool the
-               moment it leaves - the stylesheet shows one or the other. -->
-          @if (lifting() === c.id) {
-            <div class="entry {{ level(c) }} standing" aria-hidden="true">
-              <ng-container *ngTemplateOutlet="entryBody; context: { $implicit: c }" />
-            </div>
-          }
-        } @empty {
-          <p class="empty" i18n="@@No_certificate_yet">
-            No certificate yet. Generate one, import one, or ask an authority below.
-          </p>
         }
       </div>
       <!-- What a row of the pool shows: its names, where it came from, how long
            it lasts, and where it is served. -->
       <ng-template #entryBody let-c>
         <span class="host">
-          <mat-icon class="grip" [class.spin]="c.status === 'requesting'">{{ c.pending ? icon(c) : c.status === 'requesting' ? 'progress_activity' : 'drag_indicator' }}</mat-icon>
+          @if (c.pending || c.status === 'requesting') {
+            <mat-icon class="grip" [class.spin]="c.status === 'requesting'">{{ c.pending ? icon(c) : 'progress_activity' }}</mat-icon>
+          }
           <code>{{ namesOf(c).join(', ') }}</code>
         </span>
         @if (c.pending) {
@@ -278,7 +266,7 @@
           }
           <!-- Where it came from, then the doors: each one a switch - lit
                where it is served, a click to serve it there or take it off.
-               The keyboard's way to what a drag does. -->
+               A click serves it on that plane. -->
           <span class="badge" [class.warn]="c.info.selfSigned && !c.pending"
             [matTooltip]="c.info.selfSigned && !c.pending ? selfSignedWarning : ''"
             >{{ sourceLabel(c) }}</span
@@ -304,115 +292,118 @@
         </span>
       </ng-template>
     </section>
+    }
 
-    <!-- The three doors, one per row, each folding to a line: its name,
-         what it presents, its ports. The line is a drop target too, so a
-         certificate is placed on a folded door without opening it. -->
-    <mat-accordion class="planes" multi>
+    <!-- One tab per plane, and the authorities the gateway trusts when it
+         calls an upstream in the last one (SSL-14). A tab is drawn when it
+         is opened: a form field laid out in a hidden tab measures its label
+         at zero width. -->
+    <mat-tab-group class="planes" animationDuration="0ms" mat-stretch-tabs="false"
+      [selectedIndex]="tab()" (selectedIndexChange)="setTab($event)">
       @for (plane of planes; track plane) {
-        <mat-expansion-panel class="plane" [expanded]="isOpen(plane)" (opened)="setOpen(plane, true)" (closed)="setOpen(plane, false)">
-          <mat-expansion-panel-header class="plane-header">
-            <mat-panel-title>{{ planeLabel(plane) }}</mat-panel-title>
-            <mat-panel-description class="plane-line">
-              <span
-                class="summary"
-                cdkDropList
-                [cdkDropListData]="plane"
-                [cdkDropListSortingDisabled]="true"
-                [cdkDropListEnterPredicate]="accepts(plane)"
-                (cdkDropListDropped)="dropped($event)"
-              >
-                @for (c of on(plane); track c.id) {
-                  <code class="chip {{ level(c) }}" [matTooltip]="namesOf(c).join(', ')">{{ namesOf(c)[0] }}@if (namesOf(c).length > 1) {<span class="more"> +{{ namesOf(c).length - 1 }}</span>}</code>
-                } @empty {
-                  @if (plane !== 'internal' && proxiedOn(plane).length) {
-                    <!-- A proxy's door says so: "No certificate" read as
-                         something missing on a door that needs none. -->
-                    @for (n of proxiedOn(plane); track n) {
-                      <code class="chip" i18n-matTooltip="@@Presented_by_proxy" matTooltip="Presented by a proxy in front">{{ n }}</code>
+        <mat-tab>
+          <ng-template mat-tab-label>
+            {{ planeLabel(plane) }}
+            @if (secure(plane)) {
+              <mat-icon class="tab-lock" i18n-matTooltip="@@Https_open_tip" matTooltip="HTTPS open">lock</mat-icon>
+            }
+          </ng-template>
+          <ng-template matTabContent>
+          <div class="plane-tab">
+          <!-- First line of a tab: the names the runtime reaches the plane by
+               (what a certificate for the internal plane, or for the hop from
+               a proxy, carries; ticked when one served here does), and the
+               plane's two doors by the ports the world reaches. -->
+          <div class="plane-line">
+            @if (plane === 'internal' || modeOf(plane) === 'proxy') {
+              @if (runtimeNames(plane); as names) {
+                @if (names.length) {
+                  <p class="called">
+                    <span i18n="@@Internal_names">Internal names</span>
+                    @for (n of names; track n) {
+                      <code [class.covered]="plane === 'internal' ? internalCovers(n) : runtimeCovers(plane, n)">
+                        @if (plane === 'internal' ? internalCovers(n) : runtimeCovers(plane, n)) {
+                          <mat-icon>check</mat-icon>
+                        }
+                        {{ n }}
+                      </code>
                     }
-                  } @else {
-                    <span class="nothing" i18n="@@Nothing_placed">No certificate</span>
-                  }
+                  </p>
+                }
+              }
+            }
+            <!-- The plane's two doors (SSL-15). HTTP has a switch; HTTPS has
+                 none - it opens with a certificate and closes with the last
+                 one. The console also says what calls each door: the one in
+                 use is not switched off, nor its last certificate removed. -->
+            <span class="doors">
+              <span class="port">
+                <mat-slide-toggle
+                  [checked]="portOn(plane)"
+                  [disabled]="saving()"
+                  (change)="switchHttp(plane, $event.checked, $event.source)"
+                  ><span class="door" [class.on]="portOn(plane)" [matTooltip]="portTip(plane)"
+                    >HTTP:{{ outsidePort(plane, 'http') }}</span
+                  ></mat-slide-toggle
+                >
+                @if (plane === 'console') {
+                  <ng-container *ngTemplateOutlet="traffic; context: { $implicit: 'http' }" />
                 }
               </span>
-            <!-- The two doors of the plane, by the ports the world reaches:
-                 what an operator types, not what the container listens on. -->
-            <span class="doors">
-              <span class="way-in">HTTP:{{ outsidePort(plane, 'http') }}</span>
-              @if (unpublished(plane); as port) {
+              <span class="port">
                 <span
-                  class="door bad"
-                  i18n-matTooltip="@@Https_port_unpublished_tip"
-                  matTooltip="HTTPS listens on this port, which the deployment does not publish."
-                  >HTTPS:{{ port }}</span
-                >
-              } @else {
-                <span
-                  class="door"
+                  class="door https"
                   [class.on]="secure(plane)"
-                  [matTooltip]="secure(plane) ? '' : closedTip"
-                  >HTTPS:{{ outsidePort(plane, 'https') }}</span
+                  [class.bad]="!!unpublished(plane)"
+                  [matTooltip]="httpsTip(plane)"
+                  ><mat-icon>{{ secure(plane) ? 'lock' : 'lock_open' }}</mat-icon>HTTPS:{{ outsidePort(plane, 'https') }}</span
                 >
-              }
+                @if (plane === 'console') {
+                  <ng-container *ngTemplateOutlet="traffic; context: { $implicit: 'https' }" />
+                }
+              </span>
             </span>
-            </mat-panel-description>
-          </mat-expansion-panel-header>
-          <!-- Created when the door opens, not before: a form field laid out inside a
-               closed panel measures its label at zero width, and the outline then runs
-               through the label once the panel opens. -->
-          <ng-template matExpansionPanelContent>
+          </div>
           @if (plane !== 'internal') {
-            <!-- ONE OR THE OTHER, said before anything else: who presents
-                 this door's names to a browser. This gateway, with the
-                 certificates placed here, or a proxy in front, with the names
-                 declared - the gateway refuses both at once. What the door
-                 holds decides; an empty door is the operator's to choose. -->
+            <!-- Who serves this plane's public names over HTTPS, said before
+                 anything else (SSL-14). Switching keeps the names and the
+                 certificates: what does not fit the new mode stays placed,
+                 marked not used, and serves again on the way back. -->
             <div class="mode">
-              <span class="mode-label" i18n="@@Https_presented_by">HTTPS presented by</span>
-              <!-- Only the OTHER choice greys out when the door holds
-                   something: the one in force stays readable. -->
+              <span class="mode-label" i18n="@@Https_served_by">HTTPS served by</span>
               <mat-button-toggle-group
-                [value]="modeOf(plane)"
-                (change)="setMode(plane, $event.value)"
+                [value]="shownMode(plane)"
+                [disabled]="saving()"
+                (change)="pick(plane, $event.value)"
                 hideSingleSelectionIndicator
               >
-                <mat-button-toggle value="gateway" [disabled]="locked(plane) && modeOf(plane) !== 'gateway'" i18n="@@Https_by_gateway"
-                  >This gateway</mat-button-toggle
-                >
-                <mat-button-toggle value="proxy" [disabled]="locked(plane) && modeOf(plane) !== 'proxy'" i18n="@@Https_by_proxy"
-                  >A proxy in front</mat-button-toggle
-                >
+                <mat-button-toggle value="gateway" i18n="@@Https_by_meerkat">Meerkat</mat-button-toggle>
+                <mat-button-toggle value="proxy" i18n="@@Https_by_proxy">A proxy in front</mat-button-toggle>
               </mat-button-toggle-group>
+              @if (picked()[plane]) {
+                <button matButton="filled" [disabled]="saving()" (click)="applyMode(plane)" i18n="@@Apply">Apply</button>
+                <button matButton (click)="unpick(plane)" i18n="@@Cancel">Cancel</button>
+              }
             </div>
             <p class="note mode-note">
-              @if (modeOf(plane) === 'gateway') {
-                <span i18n="@@Https_by_gateway_note">This gateway presents the certificates placed here, and their names are the door's.</span>
-                @if (locked(plane)) {
-                  <span i18n="@@Https_by_gateway_locked"> Take them off to hand the door to a proxy.</span>
-                }
+              @if (shownMode(plane) === 'gateway') {
+                <span i18n="@@Https_by_meerkat_note">Meerkat presents these names with the certificates below.</span>
               } @else {
-                <span i18n="@@Https_by_proxy_note">A proxy in front presents these names over HTTPS: mailed links and the console's links point at them, and this gateway places no certificate here.</span>
-                @if (locked(plane)) {
-                  <span i18n="@@Https_by_proxy_locked"> Take the names off to place a certificate.</span>
-                }
+                <span i18n="@@Https_by_proxy_note4">A proxy in front (an Ingress, nginx, a load balancer) presents them. A certificate below, optional, secures the link from the proxy to Meerkat.</span>
               }
             </p>
+            <app-door-names [plane]="plane" [door]="door(plane)" (saved)="apply($event); loadCertificates()" />
           }
-          @if (modeOf(plane) === 'gateway') {
-          <div
-            class="zone"
-            cdkDropList
-            [cdkDropListData]="plane"
-            [cdkDropListSortingDisabled]="true"
-            [cdkDropListEnterPredicate]="accepts(plane)"
-            (cdkDropListDropped)="dropped($event)"
-          >
+          <div class="plane-head certs-head">
+            <h3 i18n="@@Certificates">Certificates</h3>
+            <button matButton="tonal" [matMenuTriggerFor]="addMenu" [matMenuTriggerData]="{ plane: plane }" (menuOpened)="reloadCertManager(plane)">
+              <mat-icon>add</mat-icon>
+              <ng-container i18n="@@Add_certificate">Add certificate</ng-container>
+            </button>
+          </div>
+          <div class="zone">
             @for (c of on(plane); track c.id) {
-              <div class="placed {{ level(c) }}" cdkDrag [cdkDragData]="c">
-                <mat-icon class="grip">drag_indicator</mat-icon>
-                <!-- The first name, and how many more: a certificate for the
-                     four spellings of a Service name would fill the card. -->
+              <div class="placed {{ level(c) }}" [class.unused]="unused(c, plane)">
                 <!-- One line for the name, the state under it: in a door a
                      third of the screen wide, side by side they cut the name
                      a letter at a time. -->
@@ -420,26 +411,39 @@
                   <code [matTooltip]="namesOf(c).length > 1 ? namesOf(c).join(', ') : ''"
                     >{{ namesOf(c)[0] }}@if (namesOf(c).length > 1) {<span class="more"> +{{ namesOf(c).length - 1 }}</span>}</code
                   >
-                  <span class="when">{{ short(c) }}</span>
+                  <span class="when">
+                    @if (unused(c, plane)) {
+                      <span class="not-used" i18n="@@Inactive_in_this_mode">Inactive in this mode</span> -
+                    }
+                    {{ sourceLabel(c) }} - {{ short(c) }}
+                  </span>
                 </span>
-                <button
-                  matIconButton
-                  (click)="toggle(c, plane)"
-                  i18n-matTooltip="@@Take_off_this_door"
-                  matTooltip="Take it off this door"
-                >
-                  <mat-icon>close</mat-icon>
-                </button>
-                <div *cdkDragPlaceholder class="ghost"></div>
+                <span class="actions">
+                  @if (c.pending) {
+                    <button matButton="tonal" (click)="adopt(c)">
+                      <mat-icon>how_to_reg</mat-icon>
+                      <ng-container i18n="@@Adopt">Adopt</ng-container>
+                    </button>
+                  }
+                  @if (c.status === 'failed') {
+                    <button matIconButton (click)="retry(c)" i18n-matTooltip="@@Retry" matTooltip="Retry">
+                      <mat-icon>refresh</mat-icon>
+                    </button>
+                  }
+                  <!-- One way out: off this plane, and gone when no other plane
+                       serves it. -->
+                  <button matIconButton (click)="removeFrom(c, plane)" i18n-matTooltip="@@Delete" matTooltip="Delete" i18n-aria-label="@@Delete" aria-label="Delete">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </span>
               </div>
             } @empty {
               <p class="hint-drop">
-                <mat-icon>move_down</mat-icon>
-                <span i18n="@@Drop_a_certificate_here">Drop a certificate here</span>
+                <span i18n="@@No_certificate_on_plane">No certificate yet: add one.</span>
               </p>
             }
           </div>
-          @if (plane === 'console' && uncovered()) {
+          @if (plane === 'console' && modeOf(plane) === 'gateway' && uncovered()) {
             <p class="problem">
               <mat-icon>warning</mat-icon>
               <span i18n="@@Console_name_uncovered"
@@ -448,35 +452,15 @@
               >
             </p>
           }
-          }
           @if (plane === 'internal') {
             <!-- Where its certificate comes from, for this platform: the
                  question anybody in front of an empty internal door has. -->
             <p class="how">
-              <button matButton (click)="openDrawer('internal')">
-                <mat-icon>help</mat-icon>
-                <ng-container i18n="@@Internal_help_button">Where does its certificate come from?</ng-container>
-              </button>
-              @if (!onInternal().length && certManager.value()?.available) {
-                <button matButton (click)="addFromCertManager()">
+              @if (!onInternal().length && certManager.internal.value()?.available) {
+                <button matButton (click)="addFromCertManager('internal')">
                   <mat-icon>verified</mat-icon>
                   <ng-container i18n="@@Ask_cert_manager">Ask cert-manager</ng-container>
                 </button>
-              }
-            </p>
-          }
-          @if (plane === 'internal' && internalNames().length) {
-            <!-- What the runtime resolves to this door: a certificate carries
-                 one of these names, or it is refused here. -->
-            <p class="called">
-              <span i18n="@@Internal_called_as">Called as</span>
-              @for (n of internalNames(); track n) {
-                <code [class.covered]="internalCovers(n)">
-                  @if (internalCovers(n)) {
-                    <mat-icon>check</mat-icon>
-                  }
-                  {{ n }}
-                </code>
               }
             </p>
           }
@@ -496,13 +480,6 @@
                 </a>
               }
             </span>
-          }
-          @if (plane !== 'internal' && modeOf(plane) === 'proxy') {
-            <!-- The names a proxy in front serves over HTTPS (AUTH-22): what
-                 a mailed link may point at, and nothing else - no door, no
-                 redirect, no HSTS. Not on the internal plane: nobody follows
-                 a mailed link there. -->
-            <app-proxied-names [plane]="plane" [names]="proxiedOn(plane)" (saved)="apply($event)" />
           }
           @if (plane === 'app' && modeOf(plane) === 'gateway') {
             <!-- Always drawn, greyed until it can act: a setting that appears
@@ -549,14 +526,20 @@
               Browsers then refuse plain HTTP for this long: start short. Sent on port 443 only.
             </p>
           }
+          </div>
           </ng-template>
-        </mat-expansion-panel>
+        </mat-tab>
       }
-    </mat-accordion>
-
-    <!-- What the gateway ACCEPTS when it calls an upstream (SSL-09): its own
-         store, apart from the pool of what it presents. -->
-    <app-trusted-authorities />
+      <!-- What the gateway ACCEPTS when it calls an upstream (SSL-09): its
+           own store, apart from what it presents. -->
+      <mat-tab i18n-label="@@Trusted_authorities" label="Trusted authorities">
+        <ng-template matTabContent>
+          <div class="plane-tab">
+            <app-trusted-authorities />
+          </div>
+        </ng-template>
+      </mat-tab>
+    </mat-tab-group>
 
     @for (p of problems(); track p) {
       <p class="problem"><mat-icon>error</mat-icon><span>{{ p }}</span></p>
@@ -568,3 +551,12 @@
 
 </mat-drawer-content>
 </mat-drawer-container>
+
+<!-- What called one of the console's doors within the window (SSL-15). -->
+<ng-template #traffic let-scheme>
+  @if (heard(scheme); as peer) {
+    <span class="traffic live" i18n="@@Door_receiving">Receiving, from {{ peer }}</span>
+  } @else {
+    <span class="traffic" i18n="@@Door_idle">Nothing in the last {{ tls()?.trafficWindow }} s</span>
+  }
+</ng-template>

@@ -183,7 +183,9 @@ subjects:
 {{- with include "meerkat.issuedSecret" . }}
 ---
 # The internal plane's certificate asked of cert-manager by the gateway itself
-# (internalTls.certManager, SSL-13). Creating a Certificate cannot be granted
+# (internalTls.certManager, SSL-13), and the console's and the application's
+# when a proxy in front re-encrypts to them (SSL-14): three names, the same
+# rights. Creating a Certificate cannot be granted
 # on one name - Kubernetes has no such thing for a create - so this namespace's
 # Certificates may be created; everything else is on the one name the gateway
 # uses: its Certificate, and the Secret cert-manager writes for it, read and
@@ -200,14 +202,14 @@ rules:
     verbs: ["create"]
   - apiGroups: ["cert-manager.io"]
     resources: ["certificates"]
-    resourceNames: [{{ . | quote }}]
+    resourceNames: [{{ . | quote }}, {{ printf "%s-console-issued" (include "meerkat.fullname" $) | quote }}, {{ printf "%s-app-issued" (include "meerkat.fullname" $) | quote }}]
     verbs: ["get", "list", "watch", "patch", "delete"]
   - apiGroups: ["cert-manager.io"]
     resources: ["issuers"]
     verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: [{{ . | quote }}]
+    resourceNames: [{{ . | quote }}, {{ printf "%s-console-issued" (include "meerkat.fullname" $) | quote }}, {{ printf "%s-app-issued" (include "meerkat.fullname" $) | quote }}]
     verbs: ["get", "list", "watch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

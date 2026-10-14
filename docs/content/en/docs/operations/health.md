@@ -75,8 +75,13 @@ healthcheck:
   test: ["CMD", "/meerkat", "health", "http://127.0.0.1:8080/readyz"]
 ```
 
-Without an address it probes `http://127.0.0.1:8080/readyz`. Kubernetes needs none
-of this: its probes are `httpGet`, asked from outside the container.
+Without an address it probes `http://127.0.0.1:8080/readyz`. The Helm chart's
+Kubernetes probes are the same command, run with `exec`:
+`/meerkat health http://127.0.0.1:8080/healthz` for startup and liveness, `/readyz`
+for readiness. An `httpGet` would come from the kubelet, outside the container, and a
+plain port switched off on **Infra > Domains & TLS** listens on the loopback only: the
+pod would stop being ready for a setting that works (see
+[Switching the plain port off](/docs/operations/tls#switching-the-plain-port-off)).
 
 ## In a cluster
 

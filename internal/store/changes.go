@@ -116,6 +116,10 @@ const (
 	// issued, refused (SSL-05) - so the TLS screens that node does not hold
 	// read the pool again. No argument.
 	TopicIssue = "issue"
+	// TopicDoorTraffic carries which of the console's doors a node saw
+	// called, and by whom (SSL-15): one node's whole list as JSON, repeated
+	// while its traffic lasts, so the others pool it and let it expire.
+	TopicDoorTraffic = "door-traffic"
 	// TopicPause pauses or resumes every node (store/pause.go): "on" or "off".
 	// A signal, never a row - a pause outlives no restart, by design.
 	TopicPause = "pause"

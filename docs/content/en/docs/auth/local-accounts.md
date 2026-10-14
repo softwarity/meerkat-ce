@@ -133,8 +133,9 @@ accepted - unless that peer is a proxy the gateway trusts, in which case it is
 what that proxy wrote in `X-Forwarded-For`. A caller who reaches the gateway
 directly and writes the header themselves is ignored: otherwise inventing an
 address per request would walk through every counter on this page. Which
-proxies are trusted is deduced from their address by default, and set by
-`MEERKAT_TRUSTED_PROXIES` - see [Behind a proxy or a load balancer](/docs/deploy/one-gateway#behind-a-proxy-or-a-load-balancer).
+proxies are trusted is deduced from their address by default, and said plane by
+plane on **Infra > Domains & TLS** - who serves the public names, and the
+addresses of a proxy in front - see [Behind a proxy or a load balancer](/docs/deploy/one-gateway#behind-a-proxy-or-a-load-balancer).
 The security trail keeps both, "203.0.113.5 via 10.42.0.15", so it never shows
 only what a header claimed.
 

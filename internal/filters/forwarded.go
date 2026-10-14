@@ -1,7 +1,7 @@
 package filters
 
 import (
-	"fmt"
+	"context"
 	"net"
 	"net/http"
 	"net/netip"
@@ -50,14 +50,14 @@ import (
 //     Tailscale network - not of infrastructure. A gateway that sees a peer
 //     there is talking to an end user's device, and trusting it would let that
 //     device name any address it likes. A platform that does put its proxies
-//     there sets MEERKAT_TRUSTED_PROXIES.
+//     there declares their addresses on the Domains & TLS screen.
 //   - link-local (169.254.0.0/16, fe80::/10): no proxy is addressed there, and
 //     a neighbour on the same segment is not a proxy either.
 //
 // The cost of the default, said where it is decided: on a LAN where people
 // reach the gateway DIRECTLY from a private address, each of them is trusted
-// as a proxy and can name an address. That installation sets the variable to
-// its proxy's address, or to "none".
+// as a proxy and can name an address. That installation says on the Domains &
+// TLS screen that the gateway serves its names itself, and nobody is believed.
 var DefaultTrustedProxies = []netip.Prefix{
 	netip.MustParsePrefix("127.0.0.0/8"),
 	netip.MustParsePrefix("::1/128"),
@@ -67,78 +67,106 @@ var DefaultTrustedProxies = []netip.Prefix{
 	netip.MustParsePrefix("fc00::/7"),
 }
 
-// NoTrustedProxies is the value that trusts nobody: every header is ignored and
-// the peer is the client, always. For a gateway reached directly from the
-// internet, where any peer that sends X-Forwarded-For is lying.
-const NoTrustedProxies = "none"
+// Whose word is taken is decided PER PLANE, by what the operator says about
+// that plane on the Domains & TLS screen (SSL-14, certs.Door.Trusted): nothing
+// said keeps the default above; a proxy in front means its declared addresses,
+// or the default when none is declared; the gateway serving its names itself
+// means nobody - nothing stands in front, so a peer writing X-Forwarded-For is
+// a caller choosing its own address. It used to be one set for the whole
+// process, read from MEERKAT_TRUSTED_PROXIES: a parameter nobody finds, for a
+// fact the screen already states.
 
-// trusted holds the set in force. A pointer swapped whole, so a request never
-// reads half a list: it is written once at startup and read on every request.
-var trusted atomic.Pointer[[]netip.Prefix]
-
-func init() { SetTrustedProxies(DefaultTrustedProxies) }
-
-// SetTrustedProxies replaces the set. An empty, non-nil slice trusts nobody;
-// nil goes back to the default.
-func SetTrustedProxies(p []netip.Prefix) {
-	if p == nil {
-		p = DefaultTrustedProxies
-	}
-	cp := append([]netip.Prefix(nil), p...)
-	trusted.Store(&cp)
+// planeRule is what one plane's door says.
+type planeRule struct {
+	// proxies are the peers believed; nil is DefaultTrustedProxies, empty is
+	// nobody.
+	proxies []netip.Prefix
+	// https are the names a proxy in front serves over HTTPS: a request for
+	// one of them reached the browser over TLS, whatever header says or does
+	// not say so.
+	https []string
 }
 
-// TrustedProxies is the set in force, for the startup line that says it.
-func TrustedProxies() []netip.Prefix { return *trusted.Load() }
+// rules holds every plane's, swapped whole so a request never reads half of
+// one. Written at each TLS reload, read on every request.
+var rules atomic.Pointer[map[string]planeRule]
 
-// ParseTrustedProxies reads MEERKAT_TRUSTED_PROXIES: CIDR ranges or single
-// addresses, separated by commas. Empty means the default, "none" means nobody.
-// A value REPLACES the default rather than adding to it: someone who names
-// their proxies is saying which ones they are, and a default still standing
-// beside the list would keep trusting every private address they meant to
-// exclude.
-func ParseTrustedProxies(raw string) ([]netip.Prefix, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil, nil
-	}
-	if strings.EqualFold(raw, NoTrustedProxies) {
-		return []netip.Prefix{}, nil
-	}
-	var out []netip.Prefix
-	for _, part := range strings.Split(raw, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
+func init() { rules.Store(&map[string]planeRule{}) }
+
+// SetPlane installs what one plane's door says. The plane is the one OnPlane
+// names its requests with; "" is a request no plane named (a test, a
+// synthesised request).
+func SetPlane(plane string, proxies []netip.Prefix, httpsNames []string) {
+	for {
+		old := rules.Load()
+		next := make(map[string]planeRule, len(*old)+1)
+		for k, v := range *old {
+			next[k] = v
 		}
-		if strings.EqualFold(part, NoTrustedProxies) {
-			return nil, fmt.Errorf("trusted proxies %q: %q trusts nobody and cannot be combined with addresses", raw, NoTrustedProxies)
+		r := planeRule{https: append([]string(nil), httpsNames...)}
+		if proxies != nil {
+			r.proxies = append([]netip.Prefix{}, proxies...)
 		}
-		if strings.Contains(part, "/") {
-			p, err := netip.ParsePrefix(part)
-			if err != nil {
-				return nil, fmt.Errorf("trusted proxies: %q is not a CIDR range: write e.g. 10.0.0.0/8, 192.168.1.10, 2001:db8::/32 or %s", part, NoTrustedProxies)
-			}
-			out = append(out, p.Masked())
-			continue
+		next[plane] = r
+		if rules.CompareAndSwap(old, &next) {
+			return
 		}
-		a, err := netip.ParseAddr(part)
-		if err != nil {
-			return nil, fmt.Errorf("trusted proxies: %q is not an address: write e.g. 10.0.0.0/8, 192.168.1.10, 2001:db8::/32 or %s", part, NoTrustedProxies)
-		}
-		a = a.Unmap()
-		out = append(out, netip.PrefixFrom(a, a.BitLen()))
 	}
-	if len(out) == 0 {
-		return nil, fmt.Errorf("trusted proxies %q: no address in it; leave it empty for the default or write %s", raw, NoTrustedProxies)
-	}
-	return out, nil
 }
 
-// isTrusted reports whether a is one of the proxies whose word we take.
-func isTrusted(a netip.Addr) bool {
+type planeKey struct{}
+
+// OnPlane names the plane every request of next arrives on, for the rules
+// above to be read by. main wraps each plane's handler once, the plain door
+// and the HTTPS one alike.
+func OnPlane(plane string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), planeKey{}, plane)))
+	})
+}
+
+func ruleOf(r *http.Request) planeRule {
+	plane, _ := r.Context().Value(planeKey{}).(string)
+	return (*rules.Load())[plane]
+}
+
+// trustedFor is the set of proxies believed on the plane r arrived on.
+func trustedFor(r *http.Request) []netip.Prefix {
+	if p := ruleOf(r).proxies; p != nil {
+		return p
+	}
+	return DefaultTrustedProxies
+}
+
+// servedOverHTTPS reports whether r names a host a proxy in front of its
+// plane serves over HTTPS.
+func servedOverHTTPS(r *http.Request) bool {
+	return servedOverHTTPSAs(r, ruleOf(r).https)
+}
+
+// servedOverHTTPSAs reports whether r names one of names.
+func servedOverHTTPSAs(r *http.Request, names []string) bool {
+	if len(names) == 0 {
+		return false
+	}
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	for _, n := range names {
+		if n == host {
+			return true
+		}
+	}
+	return false
+}
+
+// isTrusted reports whether a is one of the proxies whose word we take on the
+// plane r arrived on.
+func isTrusted(r *http.Request, a netip.Addr) bool {
 	a = a.Unmap()
-	for _, p := range *trusted.Load() {
+	for _, p := range trustedFor(r) {
 		if p.Contains(a) {
 			return true
 		}
@@ -177,7 +205,7 @@ func PeerIP(r *http.Request) string {
 // believed.
 func FromTrustedProxy(r *http.Request) bool {
 	a, ok := peerAddr(r)
-	return ok && isTrusted(a)
+	return ok && isTrusted(r, a)
 }
 
 // forwardedEntry reads one X-Forwarded-For entry. Proxies write a bare address,
@@ -210,7 +238,7 @@ func ClientIP(r *http.Request) string {
 	if !ok {
 		return PeerIP(r)
 	}
-	if !isTrusted(peer) {
+	if !isTrusted(r, peer) {
 		return peer.String()
 	}
 	// Every X-Forwarded-For line, in order: a proxy may add a line rather than
@@ -229,7 +257,7 @@ func ClientIP(r *http.Request) string {
 		if !ok {
 			return believed.String()
 		}
-		if !isTrusted(a) {
+		if !isTrusted(r, a) {
 			return a.String()
 		}
 		believed = a

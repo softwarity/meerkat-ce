@@ -3,6 +3,45 @@
 ## NEXT RELEASE
 
 - **plug 2.26.1 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
+- **Domains & TLS, plane by plane, and a proxy that re-encrypts.** One tab per plane -
+  Console, Application, Internal - and the trusted authorities in a fourth. Each plane has
+  its own *Add certificate* and its certificates, and one bin takes a certificate off it
+  (deleted when it was on that plane alone); the shared pool and the drag and drop are
+  gone (a certificate on no plane is listed apart). Console and Application say who
+  serves their **public names**, declared in full (no wildcard): *Meerkat*, each name
+  covered by a certificate placed there, or *A proxy in front*. The switch only
+  proposes: *Apply*, then a confirmation, saves it, and the gateway refuses a console
+  switch that would see your own session as plain http and sign you out. Behind a
+  proxy, a certificate on the plane now encrypts the hop from the proxy to the gateway:
+  it carries the plane's names inside the cluster, shown as *Internal names* at the top
+  of the tab, and *Ask cert-manager* is offered there as on the internal plane.
+  Switching mode keeps the certificates: one that does not fit is marked *Inactive in
+  this mode* and serves again on the way back. The first application name is the one
+  mailed links carry. Where a certificate comes from (cert-manager, OpenShift, your own
+  authority, Swarm, compose) is the *Platform certificates* button of the banner.
+- **Each plane switches its plain HTTP door off and on.** A switch on the ports line
+  of each tab, with a confirmation; HTTPS has none - it opens with a certificate and
+  closes with the last one. HTTP switched off listens on 127.0.0.1 only: out of the
+  network's reach, still there for a `kubectl port-forward` and for the health check
+  the image runs on itself. **The chart's probes now run `meerkat health` inside the
+  container** instead of an HTTP GET, so a plane whose plain port is off stays ready.
+  On the console, each door shows who calls it, live, and the door in use stays: reach
+  the console through HTTPS before switching HTTP off, and through HTTP before
+  removing its last certificate.
+- **A passkey removed from an account is forgotten by the browser too.** Removing one
+  from the profile left it on the device, which kept offering it at sign-in, where it
+  was refused with no reason given. The browser is now told: on the passkeys page, the
+  list the account holds (`signalAllAcceptedCredentials`), and at a refusal, that this
+  one is unknown (`signalUnknownCredential`) - where the browser supports them. And the
+  log now says why a passkey was refused.
+- **Whose forwarded headers are believed is said on that screen, plane by plane.** A plane
+  served by the gateway itself believes no `X-Forwarded-For`; a plane behind a proxy
+  believes it from a private network, or from the proxy addresses declared there (a CDN,
+  a public load balancer). **`MEERKAT_TRUSTED_PROXIES` and the chart value
+  `trustedProxies` are removed**: the gateway warns if the variable is still set, and the
+  chart refuses to render while `trustedProxies` is set - declare the proxy on the
+  screen, then remove it. A plane nobody configured keeps the old behaviour. The API
+  `PUT /api/settings/tls/proxied/{plane}` becomes `PUT /api/settings/tls/doors/{plane}`.
 - **A service behind a TLS-terminating proxy is told https.** Behind an Ingress or a
   load balancer that ends TLS, the gateway passed `X-Forwarded-Proto: http` on to the
   service - the scheme of its own connection - and the service built `http://` links

@@ -141,14 +141,6 @@ func main() {
 		"collector to export traces to, such as http://otel-collector:4318 (Enterprise)")
 	otlpSample := flag.String("otlp-sample", envOr("MEERKAT_OTLP_SAMPLE", "0.1"),
 		"share of the journeys this gateway opens that get recorded, 0 to 1; a caller's own decision is always respected")
-	// Whose X-Forwarded-For and X-Forwarded-Proto are believed (filters,
-	// forwarded.go). Empty is the deduction from the peer - loopback and the
-	// private ranges are proxies, a public address is a stranger - which is
-	// right behind every proxy this product ships with. A CDN or a cloud load
-	// balancer that reaches the gateway from PUBLIC addresses has to be named
-	// here, or every caller is counted as that load balancer.
-	trustedProxies := flag.String("trusted-proxies", envOr("MEERKAT_TRUSTED_PROXIES", ""),
-		"proxies whose X-Forwarded-For / X-Forwarded-Proto are believed: CIDR ranges or addresses, comma-separated, replacing the default (loopback and private ranges); none trusts nobody")
 	flag.Parse()
 
 	if *showVersion {
@@ -195,7 +187,7 @@ func main() {
 		tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
 		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr, databaseURL: *databaseURL,
-		production: *production, trustedProxies: *trustedProxies,
+		production: *production,
 	}); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
@@ -216,7 +208,6 @@ type options struct {
 	plugAddr              string
 	databaseURL           string
 	production            bool
-	trustedProxies        string
 }
 
 func run(o options) error {
@@ -230,15 +221,14 @@ func run(o options) error {
 	if o.production {
 		slog.Info("production gateway: the developer surface is closed here", "why", "MEERKAT_PRODUCTION")
 	}
-	// Before any handler reads an address. Refused outright when it does not
-	// parse: a typo that fell back to the default would trust exactly the
-	// addresses the operator was trying to stop trusting, without a word.
-	proxies, err := filters.ParseTrustedProxies(o.trustedProxies)
-	if err != nil {
-		return fmt.Errorf("MEERKAT_TRUSTED_PROXIES: %w", err)
+	// Whose forwarded headers are believed is said on the Domains & TLS
+	// screen now, plane by plane (SSL-14). The variable that used to say it
+	// is read only to tell whoever still sets it where it went: ignored in
+	// silence, it would look like it still worked.
+	if v := os.Getenv("MEERKAT_TRUSTED_PROXIES"); v != "" {
+		slog.Warn("MEERKAT_TRUSTED_PROXIES is no longer read: declare the proxy in front, and its addresses, on the Domains & TLS screen (Infra)",
+			"ignored", v)
 	}
-	filters.SetTrustedProxies(proxies)
-	slog.Info("forwarded headers", "trusted_proxies", trustedProxiesLine(o.trustedProxies))
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
@@ -587,6 +577,42 @@ func run(o options) error {
 	// supervisor, wired where it is built.
 	issues := live.NewCounter(live.CertificatesTopic)
 	bus.OnSignal(store.TopicIssue, func(string) { issues.Moved() })
+	// Which of the console's doors is called, and by whom (SSL-15): what says
+	// a proxy was pointed at HTTPS, and what keeps the port it still calls
+	// from being switched off. Pooled across the cluster like the served
+	// names; a clock lets a door that stopped receiving turn idle.
+	doorTraffic := certs.NewTraffic()
+	doorMoved := live.NewCounter(live.DoorTrafficTopic)
+	doorTraffic.Moved = doorMoved.Moved
+	doorTraffic.Relay = func(list []certs.Seen) {
+		if msg, err := json.Marshal(list); err == nil {
+			bus.Signal(context.Background(), store.TopicDoorTraffic, string(msg))
+		}
+	}
+	bus.OnSignalFrom(store.TopicDoorTraffic, func(from, arg string) {
+		if from == bus.Node() {
+			return
+		}
+		var list []certs.Seen
+		if err := json.Unmarshal([]byte(arg), &list); err != nil {
+			slog.Debug("a door-traffic message could not be read", "from", from, "err", err)
+			return
+		}
+		doorTraffic.Report(from, list)
+	})
+	go func() {
+		t := time.NewTicker(5 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				doorTraffic.Check()
+			}
+		}
+	}()
+	adminAPI.DoorTraffic = doorTraffic
 
 	// The pause (store/pause.go): every node stops writing at once, and every
 	// console hears it. Told by the API on the node that took it, relayed here
@@ -609,6 +635,7 @@ func run(o options) error {
 			// GET /api/sessions, which scopes it.
 			live.PresenceTopic:     presence,
 			live.CertificatesTopic: issues,
+			live.DoorTrafficTopic:  doorMoved,
 			live.PauseTopic:        paused,
 		}
 		if p.Traffic {
@@ -748,7 +775,12 @@ func run(o options) error {
 	// Only the APPLICATION plane's plain port redirects. The console's stays a
 	// plain port for good: it is what a broken certificate gets repaired from.
 	dataRedirect := certs.NewRedirect()
-	srv.Handler = dataRedirect.Wrap(srv.Handler)
+	// Each plane names its requests, for the forwarded headers to be judged
+	// by what that plane's door says (SSL-14) - outermost, so the redirect
+	// reads it too.
+	srv.Handler = filters.OnPlane(certs.PlaneApp, dataRedirect.Wrap(srv.Handler))
+	adminSrv.Handler = filters.OnPlane(certs.PlaneConsole, doorTraffic.Wrap(certs.PlaneConsole, adminSrv.Handler))
+	internalSrv.Handler = filters.OnPlane(certs.PlaneInternal, internalSrv.Handler)
 	// Where the runtime publishes the HTTPS door, so the plain port sends
 	// callers where they can go (8444) rather than where the container
 	// listens (8443). Read now and again every few minutes: a Service edited
@@ -774,6 +806,23 @@ func run(o options) error {
 		certs.NewListener("internal", o.internalTLSAddr, internalSrv.Handler, nil),
 	)
 	tlsSup.Ports(addr, adminAddr, o.internalAddr)
+	// The plain doors too, so a door switched off listens on the loopback
+	// only (SSL-15). A plain door that stops serving for any other reason
+	// stops the gateway, as ListenAndServe did.
+	errc := make(chan error, 3)
+	plains := map[string]*certs.Plain{
+		certs.PlaneApp:      certs.NewPlain("data", addr, srv.Handler),
+		certs.PlaneConsole:  certs.NewPlain("admin", adminAddr, adminSrv.Handler),
+		certs.PlaneInternal: certs.NewPlain("internal", o.internalAddr, internalSrv.Handler),
+	}
+	for _, p := range plains {
+		p.OnError = func(err error) { errc <- err }
+	}
+	tlsSup.Plain = plains
+	// What each door says becomes what its plane believes (SSL-14), and a
+	// proxied door serves the certificate carrying its runtime names.
+	tlsSup.Trust = filters.SetPlane
+	tlsSup.RuntimeNames = adminAPI.PlaneNames
 	// A mailed link may point only at a name a certificate placed on the
 	// plane covers (P0-01): anything else mails a code. The sign-in pages of
 	// each plane ask their own door.
@@ -818,30 +867,45 @@ func run(o options) error {
 	// a renewal - cert-manager rewriting the Secret - reaches every door when
 	// it happens, the key never entering the database.
 	if cm, why := discovery.NewCertManager(); cm != nil {
+		// One Certificate per plane: the internal plane's, and the console's
+		// and the application's when a proxy in front re-encrypts to them
+		// (SSL-14). Each node follows the three Secrets.
+		managers := map[string]*discovery.CertManager{}
+		for _, plane := range store.CertPlanes {
+			managers[plane] = cm.For(plane)
+		}
 		adminAPI.CertManager = cm
+		adminAPI.CertManagers = map[string]admin.CertManager{
+			store.PlaneConsole: managers[store.PlaneConsole],
+			store.PlaneApp:     managers[store.PlaneApp],
+		}
 		st.OnIssuedPair(func(secret string) (string, string, bool) {
-			if secret != cm.SecretName() {
-				return "", "", false
-			}
-			return cm.Pair()
-		})
-		go cm.Watch(ctx, func() {
-			c, k, ok := cm.Pair()
-			if ok {
-				if _, err := st.RefreshIssuedCertificate(ctx, cm.SecretName(), c, k); err != nil {
-					slog.Error("the certificate cert-manager issued is not stored", "err", err)
+			for _, m := range managers {
+				if m.SecretName() == secret {
+					return m.Pair()
 				}
 			}
-			if err := tlsSup.Reload(ctx); err != nil {
-				slog.Error("tls reload after cert-manager's Secret moved", "err", err)
-			}
-			if ok {
-				slog.Info("cert-manager wrote the internal certificate's Secret, its doors were reloaded", "secret", cm.SecretName())
-			} else {
-				slog.Info("the internal certificate's Secret is gone, its doors were reloaded", "secret", cm.SecretName())
-			}
-			issues.Moved()
-		}, issues.Moved)
+			return "", "", false
+		})
+		for _, m := range managers {
+			go m.Watch(ctx, func() {
+				c, k, ok := m.Pair()
+				if ok {
+					if _, err := st.RefreshIssuedCertificate(ctx, m.SecretName(), c, k); err != nil {
+						slog.Error("the certificate cert-manager issued is not stored", "err", err)
+					}
+				}
+				if err := tlsSup.Reload(ctx); err != nil {
+					slog.Error("tls reload after cert-manager's Secret moved", "err", err)
+				}
+				if ok {
+					slog.Info("cert-manager wrote a certificate's Secret, its doors were reloaded", "secret", m.SecretName())
+				} else {
+					slog.Info("a certificate's Secret from cert-manager is gone, its doors were reloaded", "secret", m.SecretName())
+				}
+				issues.Moved()
+			}, issues.Moved)
+		}
 	} else {
 		adminAPI.CertManagerWhy = why
 	}
@@ -901,22 +965,20 @@ func run(o options) error {
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	errc := make(chan error, 3)
-	go func() {
-		// The address, and nothing else: which product this is and which version
-		// it runs were said thirteen milliseconds earlier, and a line that
-		// repeats the line above it teaches people to stop reading the log.
-		slog.Info("meerkat data plane listening", "addr", addr)
-		errc <- srv.ListenAndServe()
-	}()
-	go func() {
-		slog.Info("meerkat control plane listening", "addr", adminAddr)
-		errc <- adminSrv.ListenAndServe()
-	}()
-	go func() {
-		slog.Info("meerkat internal plane listening", "addr", o.internalAddr)
-		errc <- internalSrv.ListenAndServe()
-	}()
+	// The plain doors, as the stored setting says: opened here, last, once
+	// everything behind them is wired; reloads switch them afterwards.
+	tlsCfg := st.RawTLS(ctx)
+	for plane, p := range plains {
+		if err := p.Open(!tlsCfg.Opens(plane, "http")); err != nil {
+			return err
+		}
+	}
+	// The address, and nothing else: which product this is and which version
+	// it runs were said thirteen milliseconds earlier, and a line that
+	// repeats the line above it teaches people to stop reading the log.
+	slog.Info("meerkat data plane listening", "addr", addr, "loopbackOnly", plains[certs.PlaneApp].Loopback())
+	slog.Info("meerkat control plane listening", "addr", adminAddr, "loopbackOnly", plains[certs.PlaneConsole].Loopback())
+	slog.Info("meerkat internal plane listening", "addr", o.internalAddr, "loopbackOnly", plains[certs.PlaneInternal].Loopback())
 
 	select {
 	case err := <-errc:
@@ -938,11 +1000,11 @@ func run(o options) error {
 			sched.Drain(drainCtx)
 		}()
 		defer func() { <-drained }()
-		err := srv.Shutdown(shutdownCtx)
-		if aerr := adminSrv.Shutdown(shutdownCtx); err == nil {
+		err := plains[certs.PlaneApp].Shutdown(shutdownCtx)
+		if aerr := plains[certs.PlaneConsole].Shutdown(shutdownCtx); err == nil {
 			err = aerr
 		}
-		if ierr := internalSrv.Shutdown(shutdownCtx); err == nil {
+		if ierr := plains[certs.PlaneInternal].Shutdown(shutdownCtx); err == nil {
 			err = ierr
 		}
 		if terr := tlsSup.Stop(shutdownCtx); err == nil {
@@ -1134,24 +1196,6 @@ func reportHiddenTenants(ctx context.Context, st *store.Store, mode string) {
 	}
 	slog.Warn("single-tenant mode is serving one organisation and holding back the others",
 		"hidden", n-1, "nothing_deleted", true)
-}
-
-// trustedProxiesLine is what the startup line says about whose forwarded
-// headers are believed: the list in force, and whether it was deduced.
-func trustedProxiesLine(raw string) string {
-	set := filters.TrustedProxies()
-	if len(set) == 0 {
-		return "none (every address is the TCP peer)"
-	}
-	parts := make([]string, len(set))
-	for i, p := range set {
-		parts[i] = p.String()
-	}
-	line := strings.Join(parts, ",")
-	if strings.TrimSpace(raw) == "" {
-		line += " (default: loopback and private ranges)"
-	}
-	return line
 }
 
 func envOr(key, fallback string) string {

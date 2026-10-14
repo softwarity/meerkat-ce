@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -317,19 +320,41 @@ func (h *Handler) passkeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var matched store.User
+	// unknown: the browser offered a passkey this gateway does not hold - one
+	// removed here and still on the device, or one of an account gone. The
+	// page then tells the browser to forget it (WebAuthn signals), or the
+	// device keeps offering it and every sign-in with it fails (2026-10-15).
+	unknown := false
 	cred, err := wa.ValidateDiscoverableLogin(func(_, userHandle []byte) (webauthn.User, error) {
 		u, err := h.st.GetUserByID(r.Context(), string(userHandle))
-		if err != nil || !u.Enabled || !u.ValidAt(time.Now()) {
-			return nil, fmt.Errorf("unknown or disabled user")
+		if err != nil {
+			unknown = true
+			return nil, fmt.Errorf("no account has this passkey's user handle")
+		}
+		if !u.Enabled || !u.ValidAt(time.Now()) {
+			return nil, fmt.Errorf("account %s is disabled or outside its validity", u.Username)
 		}
 		creds, err := h.passkeyCredentials(r, u.ID)
 		if err != nil {
 			return nil, err
 		}
+		if !slices.ContainsFunc(creds, func(c webauthn.Credential) bool { return bytes.Equal(c.ID, parsed.RawID) }) {
+			unknown = true
+		}
 		matched = u
 		return webauthnUser{u: u, creds: creds}, nil
 	}, session, parsed)
 	if err != nil {
+		why := err.Error()
+		var perr *protocol.Error
+		if errors.As(err, &perr) && perr.DevInfo != "" {
+			why = perr.Details + ": " + perr.DevInfo
+		}
+		if unknown {
+			why = "this passkey is not registered here any more (removed from the account, still on the device)"
+			w.Header().Set("X-Passkey-Unknown", "1")
+		}
+		slog.Info("passkey refused", "user", matched.Username, "origin", filters.Origin(r), "reason", why)
 		h.security(r, secSigninRefused, matched, "passkey")
 		http.Error(w, "the passkey could not be verified", http.StatusUnauthorized)
 		return

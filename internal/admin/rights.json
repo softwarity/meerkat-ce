@@ -836,7 +836,12 @@
   },
   {
     "method": "PUT",
-    "path": "/api/settings/tls/proxied/{plane}",
+    "path": "/api/settings/tls/doors/{plane}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/tls/ports/{plane}",
     "guard": "infraAdmin"
   },
   {

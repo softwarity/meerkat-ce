@@ -1,6 +1,9 @@
 package filters
 
-import "net/http"
+import (
+	"net/http"
+	"net/netip"
+)
 
 // The scheme rule: did this request reach the BROWSER over TLS, and under
 // what address. Secure, Scheme and Origin are the three ways to ask.
@@ -26,11 +29,44 @@ import "net/http"
 //
 // Behind a load balancer whose addresses are PUBLIC (a CDN, some cloud load
 // balancers), the default does not trust it, and the gateway sees plain http:
-// that installation names its proxies in MEERKAT_TRUSTED_PROXIES.
+// that installation declares the proxy's addresses on the Domains & TLS
+// screen, on the plane it stands in front of (SSL-14).
 
 // Secure reports whether the browser's hop was TLS.
+//
+// A name a proxy in front serves over HTTPS (Domains & TLS, SSL-14) is https
+// on the operator's word, with no header to believe: the proxy may not write
+// one, and nobody gains by forging a Host that leads to our own name.
 func Secure(r *http.Request) bool {
-	return r.TLS != nil || (r.Header.Get("X-Forwarded-Proto") == "https" && FromTrustedProxy(r))
+	return r.TLS != nil || servedOverHTTPS(r) ||
+		(r.Header.Get("X-Forwarded-Proto") == "https" && FromTrustedProxy(r))
+}
+
+// SecureUnder is what Secure would answer for r once a plane's door says
+// something else: proxies believed (nil is the default) and the names a proxy
+// in front serves over HTTPS. The Domains & TLS screen asks it before saving
+// the console's door, so an operator never switches the door they are
+// standing in into one that sees their own session as plain http.
+func SecureUnder(r *http.Request, proxies []netip.Prefix, httpsNames []string) bool {
+	if r.TLS != nil || servedOverHTTPSAs(r, httpsNames) {
+		return true
+	}
+	if r.Header.Get("X-Forwarded-Proto") != "https" {
+		return false
+	}
+	if proxies == nil {
+		proxies = DefaultTrustedProxies
+	}
+	a, ok := peerAddr(r)
+	if !ok {
+		return false
+	}
+	for _, p := range proxies {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
 }
 
 // Scheme is "https" or "http".

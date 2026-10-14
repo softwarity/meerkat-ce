@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/softwarity/meerkat/internal/discovery"
+	"github.com/softwarity/meerkat/internal/store"
 )
 
 // fakeCertManager stands for cert-manager: what it was asked, and what it
@@ -16,9 +17,16 @@ type fakeCertManager struct {
 	issuers []discovery.Issuer
 	asked   []string
 	deleted int
+	// secret is its Certificate's name, the internal plane's when empty.
+	secret string
 }
 
-func (f *fakeCertManager) SecretName() string { return "meerkat-internal-issued" }
+func (f *fakeCertManager) SecretName() string {
+	if f.secret != "" {
+		return f.secret
+	}
+	return "meerkat-internal-issued"
+}
 func (f *fakeCertManager) Issuers(context.Context) ([]discovery.Issuer, error) {
 	return f.issuers, nil
 }
@@ -87,5 +95,68 @@ func TestTheInternalCertificateIsAskedOfCertManager(t *testing.T) {
 	}
 	if code, out := f.call(t, "DELETE", "/api/certificates/"+row.ID, "", f.rootC); code != http.StatusNoContent || cm.deleted != 1 {
 		t.Fatalf("removed: %d %s, cluster deletes %d", code, out, cm.deleted)
+	}
+}
+
+// Behind a proxy in front, the console or the application asks cert-manager
+// for the hop it is re-encrypted on (SSL-14): the names are that plane's in
+// the runtime, the Certificate that plane's, and the row lands on that plane.
+// Served by the gateway itself, the plane's public names are an authority's
+// business, and the screen says so instead of offering it.
+func TestAProxiedPlaneAsksCertManagerForItsHop(t *testing.T) {
+	f := setupBare(t)
+	tlsSupervisor(t, f)
+	f.api.TLS.Ports("127.0.0.1:18080", "127.0.0.1:19090", "127.0.0.1:17070")
+	f.api.LookupInternal = func(_ context.Context, port int) discovery.Internal {
+		if port == 18080 {
+			return discovery.Internal{Source: "kubernetes", Names: []string{"meerkat.shop.svc.cluster.local", "meerkat.shop.svc", "meerkat"}}
+		}
+		return discovery.Internal{}
+	}
+	issuers := []discovery.Issuer{{Kind: "ClusterIssuer", Name: "cluster-ca", Type: "ca", Ready: true}}
+	internal, app := &fakeCertManager{issuers: issuers}, &fakeCertManager{issuers: issuers, secret: "meerkat-app-issued"}
+	f.api.CertManager = internal
+	f.api.CertManagers = map[string]CertManager{store.PlaneApp: app}
+
+	_, out := f.call(t, "GET", "/api/certificates/cert-manager?plane=app", "", f.rootC)
+	if !strings.Contains(out, "serves its public names itself") {
+		t.Fatalf("the application serves its own names: %s", out)
+	}
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"proxied":true,"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("proxied: %d %s", code, out)
+	}
+	_, out = f.call(t, "GET", "/api/certificates/cert-manager?plane=app", "", f.rootC)
+	var v certManagerView
+	if err := json.Unmarshal([]byte(out), &v); err != nil {
+		t.Fatal(err)
+	}
+	if !v.Available || v.Secret != "meerkat-app-issued" || v.Names[0] != "meerkat.shop.svc.cluster.local" {
+		t.Fatalf("the application's hop: %s", out)
+	}
+	code, out := f.call(t, "POST", "/api/certificates/cert-manager", `{"kind":"ClusterIssuer","name":"cluster-ca","plane":"app"}`, f.rootC)
+	if code != http.StatusCreated {
+		t.Fatalf("ask: %d %s", code, out)
+	}
+	var row certView
+	if err := json.Unmarshal([]byte(out), &row); err != nil {
+		t.Fatal(err)
+	}
+	if !row.App || row.Internal || row.SecretName != "meerkat-app-issued" {
+		t.Fatalf("the row is the application's, following its own Secret: %s", out)
+	}
+	if len(app.asked) != 1 || !strings.Contains(app.asked[0], "meerkat.shop.svc") || len(internal.asked) != 0 {
+		t.Fatalf("asked of the application's Certificate only: app %v internal %v", app.asked, internal.asked)
+	}
+	// Taken off the plane, then asked again: it goes back on, not a second row.
+	if code, out := f.call(t, "PUT", "/api/certificates/"+row.ID+"/placement", `{"app":false}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("take off: %d %s", code, out)
+	}
+	code, out = f.call(t, "POST", "/api/certificates/cert-manager", `{"kind":"ClusterIssuer","name":"cluster-ca","plane":"app"}`, f.rootC)
+	var again certView
+	if err := json.Unmarshal([]byte(out), &again); err != nil || code != http.StatusOK || again.ID != row.ID || !again.App {
+		t.Fatalf("asked again after taking it off: %d %s", code, out)
+	}
+	if code, out := f.call(t, "DELETE", "/api/certificates/"+row.ID, "", f.rootC); code != http.StatusNoContent || app.deleted != 1 || internal.deleted != 0 {
+		t.Fatalf("delete removes the application's Certificate: %d %s (app %d, internal %d)", code, out, app.deleted, internal.deleted)
 	}
 }

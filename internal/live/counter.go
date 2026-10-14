@@ -70,6 +70,10 @@ func (c *Counter) Read(_ context.Context, _ any) (livewire.Window, error) {
 // authority answered - a certificate issued, a request refused (SSL-05).
 const CertificatesTopic = "certificates"
 
+// DoorTrafficTopic is what the TLS screen subscribes to, to hear that one of
+// the console's doors started or stopped receiving requests (SSL-15).
+const DoorTrafficTopic = "door-traffic"
+
 // PauseTopic is what every console subscribes to, to hear that the gateway was
 // paused or resumed (store/pause.go).
 const PauseTopic = "pause"

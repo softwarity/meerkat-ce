@@ -7,8 +7,9 @@ summary: Les cinq façons de faire entrer un certificat, les trois portes où le
 
 # TLS et certificats
 
-Un certificat entre une seule fois dans une **réserve**, puis il est **placé** sur la
-console, sur l'application, ou sur les deux (SSL-08). Ses noms lui appartiennent - ce
+Un certificat est détenu une seule fois, et **placé** sur la console, sur
+l'application, sur le plan interne, ou sur plusieurs d'entre eux (SSL-08) - ajouté
+depuis le menu d'un plan, il arrive sur ce plan. Ses noms lui appartiennent - ce
 sont ceux pour lesquels le certificat lui-même déclare répondre. Un certificat qui porte
 plusieurs noms, un nom générique ou une adresse IP les sert donc tous, et un certificat
 utilisé par les deux plans est une seule entrée, pas deux copies à garder synchronisées.
@@ -28,7 +29,7 @@ pas (SSL-01) :
 |---|---|
 | **Import** | vous détenez déjà le certificat et sa clé |
 | **Depuis le système de fichiers** | le runtime le monte - un Secret Kubernetes, un secret Swarm, un volume compose - et le renouvelle |
-| **Ask cert-manager** | Kubernetes seulement, pour le plan interne : la gateway demande elle-même à cert-manager, quand personne n'a écrit son Certificate |
+| **Ask cert-manager** | Kubernetes seulement, pour les noms d'un plan à l'intérieur du cluster - le plan interne, ou la console et l'application derrière un proxy qui les joint en rechiffrant : la gateway demande elle-même à cert-manager, quand personne n'a écrit son Certificate |
 | **Auto-signé** | un labo, un nom interne, un premier déploiement |
 | **Demande de signature** | la gateway crée la clé et la CSR, votre autorité signe, vous importez la réponse |
 | **ACME** | une autorité émet et renouvelle toute seule |
@@ -76,6 +77,56 @@ qu'aucune connexion n'est coupée. Pour ouvrir une porte, la gateway réserve
 **d'abord** le port, et signale l'échec avant d'avoir changé quoi que ce soit - un port
 déjà pris ne doit pas laisser un exploitant sans HTTPS du tout.
 
+## Couper le port en clair
+
+HTTPS n'a pas d'interrupteur ; le port en clair en a un (SSL-15). Sur la première ligne de
+l'onglet de chaque plan - Console, Application, Internal -, `HTTP:<port>` s'éteint ou se
+rallume après une confirmation, et le HTTPS d'à côté s'affiche comme un état : un cadenas
+fermé quand un certificat sert HTTPS sur le plan, ouvert sinon.
+
+**Éteint, le port en clair ne s'arrête pas : il n'écoute plus que sur `127.0.0.1`.** Plus
+rien sur le réseau ne le joint, et deux choses le joignent encore :
+
+- **un port-forward**, le chemin du retour quand un certificat casse la porte HTTPS :
+  `kubectl port-forward service/<release>-meerkat-admin 9090:9090` arrive sur la boucle
+  locale du pod, où la console répond toujours en HTTP simple ;
+- **le health check que l'image lance sur elle-même**, `meerkat health`, qui interroge
+  `http://127.0.0.1:8080`. Les sondes startup, liveness et readiness du chart Helm lancent
+  cette commande dans le conteneur (`exec`) au lieu d'une requête HTTP du kubelet : un plan
+  dont le port en clair est éteint reste donc prêt (voir
+  [Cluster Kubernetes](/docs/deploy/kubernetes)). Tout ce qui sonde le port en clair depuis
+  l'extérieur - le health check d'un load balancer de cloud - le perd : dirigez-le vers le
+  port HTTPS, qui répond aussi à `/readyz`.
+
+Deux règles gardent un plan joignable, sur chaque plan. **HTTP ne s'éteint que si un
+certificat y sert HTTPS** - sinon HTTPS serait le seul chemin, et fermé. **Le dernier
+certificat reste tant que HTTP est éteint** - le retirer ne laisserait plus rien pour
+répondre.
+
+**Sur la console, la porte en usage ne se coupe pas.** Chacun de ses deux ports montre qui
+l'a appelé dans les 30 dernières secondes - *Receiving, from 10.42.1.178*, le pair TCP, un
+proxy placé devant ou le navigateur lui-même, ou *Nothing in the last 30 s* -, en direct, et
+mis en commun entre les réplicas par le bus de changement ; les health checks ne comptent
+pas. HTTP ne s'éteint pas tant que la requête elle-même ou quoi que ce soit d'autre dans
+cette fenêtre passe par HTTP, et le dernier certificat de la console ne se retire pas tant
+que quelque chose passe par HTTPS : l'écran demande de joindre d'abord la console par l'autre
+port, et la gateway refuse la même chose (`409`). Pour passer en HTTPS de bout en bout une
+console placée derrière un proxy :
+
+1. placez le certificat sur la console : son HTTPS s'ouvre ;
+2. dirigez le proxy vers le port HTTPS de la console ;
+3. ouvrez la console à travers lui ;
+4. vérifiez que HTTP affiche *Nothing in the last 30 s* ;
+5. éteignez HTTP.
+
+Les plans application et interne n'ont ni affichage du trafic ni cette règle.
+
+L'interrupteur est `PUT /api/settings/tls/ports/{console|app|internal}` avec
+`{"http": false}` ou `{"http": true}`, audité sous `tls.ports`. `GET /api/settings/tls` rend
+trois champs de plus : `closed`, par plan (`["http"]` quand son port en clair est éteint) ;
+`consoleTraffic`, laquelle des portes de la console a été appelée, et d'où ; et
+`trafficWindow`, cette fenêtre en secondes (30).
+
 ## Sur une machine locale
 
 Un portable ou un labo n'a ni nom public ni autorité publique, et un certificat
@@ -93,8 +144,9 @@ déjà dans les commandes :
    via `nss`. Redémarrez ensuite les navigateurs.
 3. **Un seul certificat pour tous les noms**, signé par cette autorité : `meerkat.pem`
    et son `meerkat-key.pem`.
-4. **Importez-le** - Import a PEM pair, en déposant les deux fichiers sur la boîte de
-   dialogue - puis faites-le glisser sur la console et sur l'application.
+4. **Importez-le** - Add certificate dans l'onglet Console, Import a PEM pair, en déposant
+   les deux fichiers sur la boîte de dialogue - puis la même chose dans l'onglet
+   Application.
 
 ![Le tiroir qui détaille les étapes pour HTTPS sur une machine locale : les noms, le fichier hosts, une autorité locale, un certificat, l'import](img/console/tls-local.webp)
 
@@ -106,7 +158,8 @@ déjà dans les commandes :
 ## Quel certificat répond à une négociation TLS
 
 Le choix se fait d'après le nom demandé par le client, parmi les certificats placés sur
-ce plan : celui qui porte ce nom, et si deux le portent, celui dont la validité dure le
+ce plan et utilisés dans son mode (voir
+[Derrière un proxy qui termine le TLS](#derrire-un-proxy-qui-termine-le-tls)) : celui qui porte ce nom, et si deux le portent, celui dont la validité dure le
 plus longtemps. Une négociation qui ne nomme aucun hôte - un client qui joint la
 gateway par son adresse, ou tout ce qui est antérieur à l'extension SNI - reçoit le
 certificat **de repli**, le plus ancien de ceux placés sur le plan. Si rien n'est placé,
@@ -116,7 +169,7 @@ certificat pris au hasard que le client rejetterait de toute façon.
 Placer un certificat là où un autre répond déjà pour l'un de ses noms est refusé tant
 que l'appelant ne demande pas explicitement le **remplacement**
 (`PUT /api/certificates/{id}/placement` avec `"replace": true`) : le certificat remplacé
-quitte cette porte et reste dans la réserve.
+quitte ce plan et est gardé, sous *Unassigned certificates* s'il n'est sur aucun autre.
 
 Activer TLS sans rien avoir à présenter est refusé : un port qui fonctionne deviendrait
 un port qui refuse tous les visiteurs.
@@ -170,36 +223,105 @@ définie par un service ou par le filtre
 ## Derrière un proxy qui termine le TLS
 
 Souvent, le HTTPS que voit un navigateur n'est pas celui de la gateway : nginx, un
-ingress controller ou un load balancer cloud détient le certificat et transmet du HTTP
-en clair à la gateway. Rien n'arrive alors sur la porte TLS de la gateway, et les mails
-qui prouvent une boîte - la confirmation d'une inscription, une nouvelle adresse, une
-réinitialisation - portent un code au lieu d'un lien, puisqu'un lien n'est envoyé que
-vers un nom dont la gateway peut se porter garante (voir
+ingress controller ou un load balancer cloud détient le certificat et transmet à la
+gateway - en HTTP en clair, ou en rechiffrant. La gateway ne peut alors savoir, par sa
+propre connexion, ni que le navigateur était en HTTPS, ni quels noms sont vraiment les
+siens - et les mails qui prouvent une boîte - la confirmation d'une inscription, une
+nouvelle adresse, une réinitialisation - porteraient un code au lieu d'un lien,
+puisqu'un lien n'est envoyé que vers un nom dont la gateway peut se porter garante (voir
 [Un lien, ou un code](/docs/auth/local-accounts#un-lien-ou-un-code)).
 
-Une porte Console ou Application réglée sur **A proxy in front** (plutôt que **This
-gateway** : l'un ou l'autre, jamais les deux) liste, sous **Names the proxy presents**,
-les noms dont l'opérateur se porte garant à sa place, un nom complet à chaque fois
-(`shop.example.com`). Un mail demandé sous l'un
-d'eux porte un lien qui y revient, toujours en `https://`, avec le port qu'avait la
-requête. Chaque porte a sa liste : un nom déclaré sur l'application ne dit rien de la
-console.
+Les plans Console et Application disent donc chacun qui sert leurs noms publics,
+**HTTPS served by** (SSL-14) : **Meerkat**, avec les certificats placés sur le plan, ou
+**A proxy in front**. Les deux déclarent leurs **noms publics**, un nom complet à chaque fois
+(`shop.example.com`) ; un nom n'appartient qu'à un plan, et le premier nom de
+l'Application est l'adresse d'un lien envoyé par mail ou du callback d'un fournisseur
+d'identité quand aucune requête ne dit laquelle. Changer de mode garde les noms et les
+certificats : un certificat qui ne convient pas au nouveau mode reste placé, marqué
+*Inactive in this mode*, et sert de nouveau quand le plan revient en arrière. À l'écran,
+le sélecteur ne fait que proposer ; **Apply**, puis une confirmation, enregistre. Un
+changement du plan Console qui ferait voir en http simple la propre session de
+l'opérateur - jointe par un proxy qui dit HTTPS, que le nouveau réglage ne croirait
+plus - est refusé (`409`), puisqu'il le déconnecterait.
 
-| Un nom déclaré permet | Il ne fait pas |
-|---|---|
-| qu'un lien envoyé par mail pointe vers lui, bien que la requête soit arrivée en HTTP | ouvrir une porte HTTPS, choisir un certificat, solliciter une autorité, déclencher Force HTTPS, envoyer HSTS |
-| d'être l'adresse par laquelle la console ouvre une route, et le callback qu'elle donne à une autorité (le premier nom de la porte Application ; sinon un nom que porte un certificat placé sur cette porte) | |
+| | Meerkat | A proxy in front |
+|---|---|---|
+| Qui présente les noms publics | la gateway, avec un certificat placé sur le plan - un nom ajouté qu'aucun ne couvre est refusé | le proxy |
+| Le HTTPS se sait par | la porte TLS de la gateway | le nom lui-même : une requête pour un nom public est en https, sans en-tête |
+| Un certificat placé sur le plan | porte les noms publics (ACME, import, système de fichiers) | facultatif : il chiffre le saut depuis le proxy, et porte les noms du plan à l'intérieur du runtime |
+| Force HTTPS, HSTS | sur les noms que porte un certificat servi | jamais : c'est l'affaire du proxy |
+| `X-Forwarded-For`, `X-Forwarded-Proto` crus venant de | personne, dès que des noms sont déclarés | les adresses du proxy, ou les plages privées quand aucune n'est déclarée |
 
-La gateway ne détient aucun certificat pour ces noms, donc elle ne fait sur eux aucune
-promesse HTTPS : la redirection et HSTS ne suivent toujours que les noms que porte un
-certificat placé. Un nom est un nom d'hôte seulement - ni schéma, ni port, ni chemin -
-jamais une adresse IP, dont personne ne peut se porter garant par un nom, et jamais un
-joker : `*.example.com` se porterait garant de tous les noms en dessous, y compris
-celui qui pointe encore vers un service que plus personne n'exploite, et une
-réinitialisation demandée sous ce nom y enverrait son jeton. Les noms voyagent avec un export
-de configuration, avec le reste des réglages TLS, et un changement atteint chaque nœud
-par le bus de changement (`PUT /api/settings/tls/proxied/{console|app}`, audité sous
-`tls.proxied`).
+**Le saut depuis le proxy.** Un Ingress dont le backend est en HTTPS, ou une Route
+OpenShift en `reencrypt`, ouvre TLS vers la gateway sous le nom par lequel il la joint :
+le Service placé devant le plan sur Kubernetes - `<release>-meerkat` du chart pour
+l'application, `<release>-meerkat-admin` pour la console, sous leurs quatre formes - ou
+le seul nom de service que partagent tous les ports sous Swarm ou compose. Pour que le
+saut soit chiffré, le proxy lui-même doit être dirigé vers le port HTTPS du plan et lui
+parler en TLS : un Ingress qui vise encore le port HTTP laisse le saut en clair, et le
+certificat inutilisé. Le certificat placé sur un plan derrière un proxy porte ces noms,
+et le plan les liste comme ses *Internal names*, cochés quand un certificat servi les
+couvre. Sur un tel plan, la gateway sert
+les certificats qui portent l'un de ces noms ; quand le runtime ne sait pas les dire,
+tous les certificats placés sauf ceux qui couvrent les noms publics, que c'est au proxy
+de présenter. Sur Kubernetes, le plan peut le demander à cert-manager (**Ask
+cert-manager**), comme le plan interne (plus bas).
+
+**Avec Cilium**, un Ingress classique ne sait pas parler HTTPS à son backend : rechiffrer
+demande la Gateway API - une Gateway et une HTTPRoute dirigées vers le port HTTPS du
+Service, et une **BackendTLSPolicy** qui nomme l'autorité à croire et le nom d'hôte que
+porte le certificat de Meerkat, par exemple le nom du Service dans le cluster.
+
+::: details Le saut vers la console par la Gateway API
+```yaml
+# La HTTPRoute envoie le nom public de la console vers le port HTTPS du Service...
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: meerkat-console
+spec:
+  parentRefs: [{ name: public }]
+  hostnames: ["console.example.com"]
+  rules:
+    - backendRefs: [{ name: <release>-meerkat-admin, port: 9443 }]
+---
+# ...et celle-ci dit comment la Gateway vérifie le certificat qu'elle y trouve.
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: meerkat-console
+spec:
+  targetRefs:
+    - { group: "", kind: Service, name: <release>-meerkat-admin }
+  validation:
+    caCertificateRefs:
+      - { group: "", kind: ConfigMap, name: cluster-ca }
+    hostname: <release>-meerkat-admin.<namespace>.svc
+```
+:::
+
+**D'où vient le proxy.** *Proxy addresses (optional)*, laissé vide, veut dire que le
+proxy tourne dans le cluster ou sur un réseau privé : la boucle locale et les plages
+privées sont crues (un contrôleur Ingress du cluster, un nginx sur la machine). Rempli,
+il nomme les plages CIDR ou les adresses seules du proxy, pour un proxy qui joint Meerkat
+depuis des adresses publiques - un CDN, les load balancers de Google Cloud
+`130.211.0.0/22` et `35.191.0.0/16`. Ce n'est que de là que les en-têtes transmis sont
+crus sur ce plan ; voir
+[Derrière un proxy ou un load balancer](/docs/deploy/one-gateway#derrire-un-proxy-ou-un-load-balancer).
+Un plan dont personne n'a rien dit garde la règle d'avant : les plages privées.
+
+Un nom est un nom d'hôte seulement - ni schéma, ni port, ni chemin -, jamais une adresse
+IP, dont personne ne peut se porter garant par un nom, et jamais un joker :
+`*.example.com` se porterait garant de tous les noms en dessous, y compris celui qui
+pointe encore vers un service que plus personne n'exploite, et une réinitialisation
+demandée sous ce nom y enverrait son jeton. Un certificat peut porter un joker ; un nom
+déclaré, non. Les plans voyagent avec un export de configuration, avec le reste des
+réglages TLS, et un changement atteint chaque nœud par le bus de changement
+(`PUT /api/settings/tls/doors/{console|app}` avec
+`{"proxied": true, "names": [...], "proxyAddresses": [...]}`, audité sous `tls.door`).
+`GET /api/settings/tls` les rend sous `doors` - `console`, `app` et `internal`, chacun
+avec ce qui a été dit, ses noms `runtime`, et les noms déclarés qu'aucun certificat ne
+couvre (`uncovered`).
 
 > [!WARNING]
 > Ne déclarez que des noms qui atteignent vraiment cette gateway par ce proxy. Un lien
@@ -233,7 +355,7 @@ Chaque autorité conserve sa clé de compte et ce qu'elle a émis dans **son pro
 du cache partagé** ; changer son annuaire lui en attribue un nouveau, puisqu'un compte
 enregistré auprès d'une autorité ne vaut rien auprès d'une autre.
 
-Les noms ne sont pas un champ du compte : ce sont des **commandes** dans la réserve de
+Les noms ne sont pas un champ du compte : ce sont des **commandes** parmi les
 certificats (*Ask* suivi du nom de l'autorité), placées chacune sur la console, sur
 l'application ou sur les deux, comme n'importe quel certificat. Une porte ne demande à
 une autorité que les noms des commandes placées sur elle, et la liste est fermée : une
@@ -246,7 +368,7 @@ tout.
 qu'emprunterait une négociation TLS - verrou de cluster compris - au lieu d'attendre que
 le premier visiteur subisse tout l'échange, ou son échec. Le nœud qui a fait la demande
 garde la trace de ce qui s'est passé (demande en cours, ou refus de l'autorité, avec
-son explication) pour que la réserve l'affiche ; le certificat lui-même arrive dans le
+son explication) pour que l'écran l'affiche ; le certificat lui-même arrive dans le
 cache partagé, que tous les nœuds lisent. Les commandes et les autorités voyagent avec
 un export de configuration - la clé HMAC d'un compte sous la forme d'un `$name`, jamais
 d'un littéral ; ce que l'autorité a émis reste dans le cache.
@@ -271,7 +393,7 @@ ses noms, sa fin.
 Seuls les **chemins** sont gardés : la clé reste dans son fichier et n'entre jamais en
 base. Chaque nœud lit ses propres fichiers, toutes les trente secondes, et recharge ses
 portes quand ils ont changé - un renouvellement par cert-manager ou par l'autorité de
-service est servi sans redémarrage et sans que personne n'enregistre rien. La réserve
+service est servi sans redémarrage et sans que personne n'enregistre rien. L'écran
 affiche la nouvelle date de fin.
 
 Un certificat du système de fichiers se place comme les autres. Le plan **Internal**
@@ -319,34 +441,44 @@ certificate, Ask cert-manager** est la voie de secours, pour un cluster qui a ce
 et personne pour écrire ce manifeste. Partout ailleurs, l'entrée est grisée avec sa raison :
 sur Swarm ou compose, sans cert-manager, ou quand le chart ne l'a pas autorisée.
 
+Les plans Console et Application la proposent aussi, **derrière un proxy placé devant**
+qui les joint en rechiffrant : le certificat porte alors les noms du plan à l'intérieur
+du cluster, pour le saut depuis le proxy. Un plan que la gateway sert elle-même ne la
+propose pas : ses noms publics sont l'affaire d'une autorité publique (ACME), d'un import
+ou du système de fichiers.
+
 Avec un seul émetteur de ce genre, le clic le sollicite aussitôt - supprimer le
 certificat est le retour en arrière ; avec plusieurs, la console choisit l'**émetteur**, parmi les ClusterIssuers et les Issuers du
 namespace que la gateway a trouvés prêts et qui signent avec une autorité - `ca`, `vault`,
 `venafi`. Un émetteur `selfSigned` est écarté, son certificat étant sa propre autorité,
 une nouvelle à chaque renouvellement ; un émetteur ACME aussi, une autorité publique ne
 voyant aucun des noms du cluster. Tout le reste est décidé par la gateway : les noms
-sont ceux que le runtime résout vers le plan interne, le Certificate est créé dans son
-propre namespace, sous le seul nom que le chart autorise
-(`<release>-meerkat-internal-issued`), avec une nouvelle clé ECDSA à chaque renouvellement.
+sont ceux que le runtime résout vers le plan, le Certificate est créé dans son propre
+namespace, sous le seul nom que le chart autorise pour ce plan -
+`<release>-meerkat-internal-issued`, `<release>-meerkat-console-issued`,
+`<release>-meerkat-app-issued` - avec une nouvelle clé ECDSA à chaque renouvellement.
+L'API prend le plan en `?plane=` sur `GET /api/certificates/cert-manager` et en `"plane"`
+dans le corps du `POST`, le plan interne quand rien n'est dit.
 
 Le Secret qu'écrit cert-manager est **lu par l'API et surveillé**, pas monté : pas de
 Deployment à modifier, pas de redémarrage. Quand cert-manager renouvelle - il réécrit le
 même Secret avant l'échéance -, le serveur API prévient chaque nœud, qui recharge sa porte.
 Chaque nœud garde la clé en mémoire ; la base garde le nom du Secret et le dernier
-certificat, jamais la clé. La réserve affiche qui signe - `cert-manager: <émetteur>` - et quand il sera renouvelé, ou la
-raison donnée par cert-manager quand il refuse. Il est placé sur la porte Internal quand
-elle est vide ; le supprimer de la réserve supprime le Certificate et son Secret.
+certificat, jamais la clé. Le plan affiche qui signe - `cert-manager: <émetteur>` - et quand il sera renouvelé, ou la
+raison donnée par cert-manager quand il refuse. Demandé depuis le plan Internal, il y est
+placé quand ce plan est vide ; demandé depuis la Console ou l'Application, il est placé sur
+ce plan. Le supprimer supprime le Certificate et son Secret.
 
 ```yaml
 internalTls:
-  # autorise la gateway à créer son Certificate, lire son Secret, lister les émetteurs
+  # autorise la gateway à créer ses Certificates, lire leurs Secrets, lister les émetteurs
   certManager: true
 ```
 
 Le chart accorde alors, dans le namespace de la gateway, la création de Certificates -
-Kubernetes ne sait pas restreindre une création à un nom - et tout le reste sur ce seul
-nom : son Certificate, son Secret. Lister les ClusterIssuers est une lecture à l'échelle du
-cluster. Avec [approver-policy](https://cert-manager.io/docs/policy/approval/approver-policy/),
+Kubernetes ne sait pas restreindre une création à un nom - et tout le reste sur les trois
+seuls noms ci-dessus : leurs Certificates, leurs Secrets. Lister les ClusterIssuers est une
+lecture à l'échelle du cluster. Avec [approver-policy](https://cert-manager.io/docs/policy/approval/approver-policy/),
 les demandes du ServiceAccount de la gateway peuvent être limitées à ses propres noms.
 
 ## Appeler des upstreams en HTTPS
@@ -355,8 +487,8 @@ Les certificats ci-dessus sont ce que la gateway **présente**. Quand c'est la
 gateway qui appelle - une route dont la cible est `https://...` -, elle
 **vérifie** le certificat que présente l'upstream, et il lui faut pour cela
 l'autre moitié : les autorités en qui elle a confiance. Elles ont leur propre
-dépôt, **Trusted authorities** sur l'écran Domains & TLS, à part de la réserve : des
-certificats publics uniquement, jamais une clé.
+dépôt, l'onglet **Trusted authorities** de l'écran Domains & TLS, à part des certificats
+que présente la gateway : des certificats publics uniquement, jamais une clé.
 
 Par défaut, la gateway fait confiance aux autorités publiques que porte son
 image. Un upstream interne à un cluster est le plus souvent signé par
@@ -369,8 +501,8 @@ Une autorité s'ajoute dans une seule fenêtre : un nom, et son certificat - un
 fichier choisi ou déposé sur la fenêtre, ou le PEM collé. Un PEM peut contenir
 plusieurs certificats - une racine et une intermédiaire, ou l'ancienne et la
 nouvelle autorité le temps que l'une remplace l'autre. Une clé privée qu'il
-contiendrait est refusée, avec la raison : ce que la gateway présente va dans la
-réserve.
+contiendrait est refusée, avec la raison : ce que la gateway présente s'ajoute dans
+l'onglet d'un plan.
 
 Vérifier un upstream ne demande que le **certificat** de l'autorité, jamais sa
 clé privée - celle-là signe les certificats des Services, et reste dans la PKI

@@ -5,18 +5,23 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"io"
 	"math/big"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/certs"
+	"github.com/softwarity/meerkat/internal/discovery"
+	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -470,103 +475,6 @@ func TestHSTSIsKeptAndBounded(t *testing.T) {
 	}
 }
 
-// The names a door is reached by through a proxy that terminates TLS
-// (AUTH-22): stored per door, cleaned, refused when they are not a name the
-// operator can vouch for, audited with what changed, and loaded by the
-// supervisor for the sign-in pages to ask - without touching the redirect.
-func TestProxiedNamesAreDeclaredPerDoor(t *testing.T) {
-	f := setup(t)
-	ctx := context.Background()
-	f.api.TLS = certs.NewSupervisor(f.api.st, isNoRows,
-		certs.NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
-		certs.NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil),
-		certs.NewRedirect(),
-	)
-	t.Cleanup(func() { _ = f.api.TLS.Stop(ctx) })
-
-	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":["shop.example.org"]}`, f.plainC); code != http.StatusForbidden {
-		t.Fatalf("a plain account: %d %s", code, out)
-	}
-	for _, bad := range []struct{ name, says string }{
-		{"https://shop.example.org", "scheme"},
-		{"shop.example.org:443", "port"},
-		{"10.0.0.7", "IP address"},
-		{"[::1]", "IP address"},
-		{"10.0.0.7:8443", "IP address"},
-		{"shop.example.org/reset", "path"},
-		{"shop_example.org", "not a host name"},
-		{"*.example.org", "no wildcard"},
-		{"*.com", "no wildcard"},
-		{"a.*.example.org", "no wildcard"},
-	} {
-		code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":["`+bad.name+`"]}`, f.rootC)
-		if code != http.StatusUnprocessableEntity || !strings.Contains(out, bad.says) {
-			t.Errorf("%s: %d %s, want 422 naming the %s", bad.name, code, out, bad.says)
-		}
-	}
-	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/internal", `{"names":["meerkat.example.org"]}`, f.rootC); code != http.StatusNotFound || !strings.Contains(out, "console or app") {
-		t.Fatalf("the internal plane has none: %d %s", code, out)
-	}
-
-	code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app",
-		`{"names":["Shop.Example.org.", "shop.example.org", " EU.Shop.example.org ", ""]}`, f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("save: %d %s", code, out)
-	}
-	var view tlsPayload
-	if err := json.Unmarshal([]byte(out), &view); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(view.Proxied.App, " ") != "shop.example.org eu.shop.example.org" || len(view.Proxied.Console) != 0 {
-		t.Fatalf("lowercased, without the dot, once each, on the application only: %+v", view.Proxied)
-	}
-	if got := f.api.st.RawTLS(ctx).ProxiedApp; len(got) != 2 {
-		t.Fatalf("stored with the TLS settings: %v", got)
-	}
-	if !f.api.TLS.Proxied(certs.PlaneApp)("eu.shop.example.org") || f.api.TLS.Proxied(certs.PlaneConsole)("shop.example.org") {
-		t.Fatal("saving is applying: the supervisor answers for the application's names, and only there")
-	}
-
-	// The trail says which door and what the list became.
-	events, err := f.api.st.ListAuditEvents(ctx, store.AuditFilter{Target: "settings"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var found bool
-	for _, e := range events {
-		if e.Action == "tls.proxied" && e.TargetID == store.PlaneApp {
-			for _, c := range e.Changes {
-				if c.Field == "proxied" && strings.Contains(jsonOf(t, c.To), "shop.example.org") && strings.TrimSpace(jsonOf(t, c.From)) == "[]" {
-					found = true
-				}
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("no tls.proxied event with the list before and after: %+v", events)
-	}
-
-	// The other settings keep the names, and the names leave the redirect
-	// alone: nothing is placed, so nothing is redirected.
-	if code, out := f.call(t, "PUT", "/api/settings/tls", `{"redirect":true}`, f.rootC); code != http.StatusOK {
-		t.Fatalf("redirect: %d %s", code, out)
-	}
-	if len(f.api.st.RawTLS(ctx).ProxiedApp) != 2 {
-		t.Fatal("saving the redirect dropped the proxied names")
-	}
-	if f.api.TLS.State().Redirecting || f.api.TLS.State().App {
-		t.Fatalf("a proxied name opened a door or a redirect: %+v", f.api.TLS.State())
-	}
-
-	// An empty list takes them all away.
-	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":[]}`, f.rootC); code != http.StatusOK || !strings.Contains(out, `"app":[]`) {
-		t.Fatalf("clear: %d %s", code, out)
-	}
-	if f.api.TLS.Proxied(certs.PlaneApp)("shop.example.org") {
-		t.Fatal("a name taken away is still vouched for")
-	}
-}
-
 // TestAnOrderToTheAuthorityLivesInThePool: asked like a certificate is made,
 // placed like one, in conflict like one, deleted like one. An authority
 // still asked cannot be deleted.
@@ -663,14 +571,14 @@ func TestTheDataOriginIsANameTheGatewayVouchesFor(t *testing.T) {
 		t.Fatalf("no name declared yet, and the origin is %q", got)
 	}
 	// Behind a proxy: the first name declared, over HTTPS.
-	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"proxied":true,"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
 		t.Fatalf("proxied: %d %s", code, out)
 	}
 	if got := origin(); got != "https://shop.example.org" {
 		t.Fatalf("a name behind a proxy, and the origin is %q", got)
 	}
 	// The other way: the names off, a certificate placed - its name.
-	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":[]}`, f.rootC); code != http.StatusOK {
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"names":[]}`, f.rootC); code != http.StatusOK {
 		t.Fatalf("clearing: %d %s", code, out)
 	}
 	if code, out := f.call(t, "POST", "/api/certificates/self-signed", `{"names":["*.example.com","www.example.com"],"app":true}`, f.rootC); code != http.StatusCreated {
@@ -681,40 +589,260 @@ func TestTheDataOriginIsANameTheGatewayVouchesFor(t *testing.T) {
 	}
 }
 
-// One door, one answer to "who presents this name to the browser": this
-// gateway with the certificates placed on it, or a proxy in front with the
-// names declared. Each refuses the other, saying what is in the way.
-func TestADoorIsServedByTheGatewayOrByAProxyNeverBoth(t *testing.T) {
-	f := setup(t)
-	ctx := context.Background()
+// tlsSupervisor gives the fixture a supervisor on throwaway ports, as main
+// wires it: the runtime names come from the API.
+func tlsSupervisor(t *testing.T, f fixture) {
+	t.Helper()
 	f.api.TLS = certs.NewSupervisor(f.api.st, isNoRows,
 		certs.NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
 		certs.NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil),
 		certs.NewRedirect(),
 	)
-	t.Cleanup(func() { _ = f.api.TLS.Stop(ctx) })
+	f.api.TLS.RuntimeNames = f.api.PlaneNames
+	t.Cleanup(func() { _ = f.api.TLS.Stop(context.Background()) })
+}
 
-	// Names behind a proxy on the application: no certificate goes there.
-	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/app", `{"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
+// A door's public names (SSL-14): stored per plane, cleaned, refused when
+// they are not a name the operator can vouch for, audited with what changed,
+// and loaded by the supervisor for the sign-in pages to ask.
+func TestADoorIsDeclaredPerPlane(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	tlsSupervisor(t, f)
+
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"proxied":true,"names":["shop.example.org"]}`, f.plainC); code != http.StatusForbidden {
+		t.Fatalf("a plain account: %d %s", code, out)
+	}
+	for _, bad := range []struct{ name, says string }{
+		{"https://shop.example.org", "scheme"},
+		{"shop.example.org:443", "port"},
+		{"10.0.0.7", "IP address"},
+		{"[::1]", "IP address"},
+		{"shop.example.org/reset", "path"},
+		{"shop_example.org", "not a host name"},
+		{"*.example.org", "no wildcard"},
+		{"a.*.example.org", "no wildcard"},
+	} {
+		code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"proxied":true,"names":["`+bad.name+`"]}`, f.rootC)
+		if code != http.StatusUnprocessableEntity || !strings.Contains(out, bad.says) {
+			t.Errorf("%s: %d %s, want 422 naming the %s", bad.name, code, out, bad.says)
+		}
+	}
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/internal", `{"proxied":true,"names":["meerkat.example.org"]}`, f.rootC); code != http.StatusNotFound {
+		t.Fatalf("the internal plane has no public names: %d %s", code, out)
+	}
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"proxied":true,"proxyAddresses":["a proxy"]}`, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "proxy addresses") {
+		t.Fatalf("a bad proxy address: %d %s", code, out)
+	}
+
+	code, out := f.call(t, "PUT", "/api/settings/tls/doors/app",
+		`{"proxied":true,"names":["Shop.Example.org.", "shop.example.org", " EU.Shop.example.org ", ""],"proxyAddresses":["203.0.113.10"]}`, f.rootC)
+	if code != http.StatusOK {
+		t.Fatalf("save: %d %s", code, out)
+	}
+	var view tlsPayload
+	if err := json.Unmarshal([]byte(out), &view); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(view.Doors.App.Names, " ") != "shop.example.org eu.shop.example.org" || !view.Doors.App.Proxied ||
+		len(view.Doors.Console.Names) != 0 || strings.Join(view.Doors.App.ProxyAddresses, " ") != "203.0.113.10/32" {
+		t.Fatalf("lowercased, without the dot, once each, on the application only: %+v", view.Doors)
+	}
+	if !f.api.TLS.Proxied(certs.PlaneApp)("eu.shop.example.org") || f.api.TLS.Proxied(certs.PlaneConsole)("shop.example.org") {
+		t.Fatal("saving is applying: the supervisor answers for the application's names, and only there")
+	}
+	// A name reaches one plane.
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/console", `{"proxied":true,"names":["shop.example.org"]}`, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "application's") {
+		t.Fatalf("a name on both planes: %d %s", code, out)
+	}
+
+	events, err := f.api.st.ListAuditEvents(ctx, store.AuditFilter{Target: "settings"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, e := range events {
+		if e.Action == "tls.door" && e.TargetID == store.PlaneApp {
+			for _, c := range e.Changes {
+				if c.Field == "names" && strings.Contains(jsonOf(t, c.To), "shop.example.org") {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no tls.door event with the names before and after: %+v", events)
+	}
+	// Nothing placed, nothing opened: the names leave the doors and the
+	// redirect alone.
+	if code, out := f.call(t, "PUT", "/api/settings/tls", `{"redirect":true}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("redirect: %d %s", code, out)
+	}
+	if len(f.api.st.RawTLS(ctx).AppDoor.Names) != 2 {
+		t.Fatal("saving the redirect dropped the door")
+	}
+	if f.api.TLS.State().Redirecting || f.api.TLS.State().App {
+		t.Fatalf("a proxied name opened a door or a redirect: %+v", f.api.TLS.State())
+	}
+}
+
+// Served by this gateway, every declared name has a certificate placed on the
+// plane that covers it; behind a proxy, a public certificate stays placed but
+// unused, and a certificate carrying the plane's runtime names serves the hop.
+func TestADoorServesWhatItsModeFits(t *testing.T) {
+	f := setup(t)
+	tlsSupervisor(t, f)
+	f.api.TLS.Ports("127.0.0.1:18080", "127.0.0.1:19090", "127.0.0.1:17070")
+	f.api.LookupInternal = func(_ context.Context, port int) discovery.Internal {
+		if port == 18080 {
+			return discovery.Internal{Names: []string{"meerkat.canopy.svc.cluster.local", "meerkat.canopy.svc", "meerkat"}, Source: "kubernetes"}
+		}
+		return discovery.Internal{}
+	}
+
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"names":["shop.example.org"]}`, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "no certificate placed on the application covers shop.example.org") {
+		t.Fatalf("a name the gateway cannot present: %d %s", code, out)
+	}
+	if code, out := f.call(t, "POST", "/api/certificates/self-signed", `{"names":["*.example.org"],"app":true}`, f.rootC); code != http.StatusCreated {
+		t.Fatalf("public certificate: %d %s", code, out)
+	}
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("covered by the wildcard certificate: %d %s", code, out)
+	}
+	if !f.api.TLS.App.Answers("shop.example.org") {
+		t.Fatal("the gateway serves its public name")
+	}
+
+	// Behind a proxy now: the public certificate stays placed, unused; a
+	// cluster certificate is placed beside it and serves the hop.
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"proxied":true,"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
 		t.Fatalf("proxied: %d %s", code, out)
 	}
-	code, out := f.call(t, "POST", "/api/certificates/self-signed", `{"names":["www.example.com"],"app":true}`, f.rootC)
-	if code != http.StatusUnprocessableEntity || !strings.Contains(out, "reached through a proxy") || !strings.Contains(out, "shop.example.org") {
-		t.Fatalf("a certificate placed beside a proxy's names: %d %s", code, out)
+	if code, out := f.call(t, "POST", "/api/certificates/self-signed", `{"names":["meerkat.canopy.svc"],"app":true}`, f.rootC); code != http.StatusCreated {
+		t.Fatalf("a cluster certificate on a proxied plane: %d %s", code, out)
 	}
-	// The console is another door: a certificate goes there.
-	code, out = f.call(t, "POST", "/api/certificates/self-signed", `{"names":["admin.example.com"],"console":true}`, f.rootC)
+	if !f.api.TLS.App.Answers("meerkat.canopy.svc") || f.api.TLS.App.Answers("shop.example.org") {
+		t.Fatal("behind a proxy the plane serves the cluster certificate, not the public one")
+	}
+	_, out := f.call(t, "GET", "/api/certificates", "", f.rootC)
+	var list []certView
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		t.Fatal(err)
+	}
+	unused := map[string][]string{}
+	for _, c := range list {
+		unused[c.Name()] = c.Unused
+	}
+	if strings.Join(unused["*.example.org"], ",") != store.PlaneApp || len(unused["meerkat.canopy.svc"]) != 0 {
+		t.Fatalf("the public certificate is the unused one: %v", unused)
+	}
+	// And back: the public one serves again, the cluster one waits.
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("back to this gateway: %d %s", code, out)
+	}
+	if !f.api.TLS.App.Answers("shop.example.org") {
+		t.Fatal("switching back brings the public certificate back")
+	}
+}
+
+// The console's door is the one the operator stands in. Reached through a
+// proxy that says the browser's hop is HTTPS, a door that would stop
+// believing it is refused: it would see this very session as plain http and
+// sign the operator out (2026-10-15, on the eval).
+func TestTheConsoleDoorNeverLocksOutWhoChangesIt(t *testing.T) {
+	f := setup(t)
+	tlsSupervisor(t, f)
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/console", `{"proxied":true,"names":["admin.example.org"]}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("behind a proxy: %d %s", code, out)
+	}
+	viaProxy := func(body string) (int, string) {
+		req, err := http.NewRequest("PUT", f.adminSrv.URL+"/api/settings/tls/doors/console", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-Forwarded-Proto", "https")
+		// Over HTTPS the session cookie is the __Host- one.
+		req.AddCookie(&http.Cookie{Name: session.SecurePrefix + f.rootC.Name, Value: f.rootC.Value})
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		return res.StatusCode, string(b)
+	}
+	if code, out := viaProxy(`{"names":["admin.example.org"]}`); code != http.StatusConflict || !strings.Contains(out, "sign you out") {
+		t.Fatalf("served by Meerkat, through the proxy: %d %s", code, out)
+	}
+	if code, out := viaProxy(`{"proxied":true,"names":["admin.example.org"],"proxyAddresses":["203.0.113.0/24"]}`); code != http.StatusConflict {
+		t.Fatalf("a proxy named elsewhere than the one in front: %d %s", code, out)
+	}
+	if code, out := viaProxy(`{"proxied":true,"names":["admin.example.org"],"proxyAddresses":["127.0.0.1"]}`); code != http.StatusOK {
+		t.Fatalf("the proxy in front, named: %d %s", code, out)
+	}
+	// Not over HTTPS, nothing to lose: the switch goes through.
+	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/console", `{"names":["admin.example.org"]}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("plain http: %d %s", code, out)
+	}
+}
+
+// A plane's plain door (SSL-15): HTTP goes off only while HTTPS serves; on
+// the console, never the door in use. And a plane's last HTTPS certificate is
+// not removed while its HTTP is off, nor, on the console, while HTTPS is in
+// use.
+func TestAPlaneKeepsADoorItIsReachedBy(t *testing.T) {
+	f := setup(t)
+	tlsSupervisor(t, f)
+	f.api.DoorTraffic = certs.NewTraffic()
+	put := func(plane, body string) (int, string) {
+		return f.call(t, "PUT", "/api/settings/tls/ports/"+plane, body, f.rootC)
+	}
+	if code, out := put("app", `{"http":false}`); code != http.StatusUnprocessableEntity || !strings.Contains(out, "no certificate serves HTTPS") {
+		t.Fatalf("HTTP off with nothing on HTTPS: %d %s", code, out)
+	}
+	if code, out := put("app", `{"http":true,"https":false}`); code != http.StatusBadRequest {
+		t.Fatalf("HTTPS has no switch: %d %s", code, out)
+	}
+	if code, out := put("plug", `{"http":true}`); code != http.StatusNotFound {
+		t.Fatalf("an unknown plane: %d %s", code, out)
+	}
+	code, out := f.call(t, "POST", "/api/certificates/self-signed", `{"names":["shop.example.org"],"app":true}`, f.rootC)
 	if code != http.StatusCreated {
-		t.Fatalf("console: %d %s", code, out)
+		t.Fatalf("application certificate: %d %s", code, out)
 	}
-	// And that door, presenting a certificate, takes no proxy's names.
-	code, out = f.call(t, "PUT", "/api/settings/tls/proxied/console", `{"names":["gateway.example.org"]}`, f.rootC)
-	if code != http.StatusUnprocessableEntity || !strings.Contains(out, "presents admin.example.com itself") {
-		t.Fatalf("names declared beside a placed certificate: %d %s", code, out)
+	var appCert struct{ ID string }
+	_ = json.Unmarshal([]byte(out), &appCert)
+	if code, out := put("app", `{"http":false}`); code != http.StatusOK || !strings.Contains(out, `"app":["http"]`) {
+		t.Fatalf("the application's HTTP off: %d %s", code, out)
 	}
-	// An empty list is always taken: it is how a door goes back to its
-	// certificates.
-	if code, out := f.call(t, "PUT", "/api/settings/tls/proxied/console", `{"names":[]}`, f.rootC); code != http.StatusOK {
-		t.Fatalf("clearing beside a certificate: %d %s", code, out)
+	if code, out := f.call(t, "DELETE", "/api/certificates/"+appCert.ID, "", f.rootC); code != http.StatusConflict || !strings.Contains(out, "switch HTTP on first") {
+		t.Fatalf("the last certificate with HTTP off: %d %s", code, out)
+	}
+	if code, out := put("app", `{"http":true}`); code != http.StatusOK || !strings.Contains(out, `"closed":{}`) {
+		t.Fatalf("back on: %d %s", code, out)
+	}
+	if code, out := f.call(t, "DELETE", "/api/certificates/"+appCert.ID, "", f.rootC); code != http.StatusNoContent {
+		t.Fatalf("with HTTP on, the last certificate goes: %d %s", code, out)
+	}
+
+	// The console, reached here over plain HTTP: its HTTP is in use.
+	code, out = f.call(t, "POST", "/api/certificates/self-signed", `{"names":["localhost"],"console":true}`, f.rootC)
+	if code != http.StatusCreated {
+		t.Fatalf("console certificate: %d %s", code, out)
+	}
+	var consoleCert struct{ ID string }
+	_ = json.Unmarshal([]byte(out), &consoleCert)
+	if code, out := put("console", `{"http":false}`); code != http.StatusConflict || !strings.Contains(out, "access the console through HTTPS") {
+		t.Fatalf("the door in use: %d %s", code, out)
+	}
+	// A proxy calls the console's HTTPS door: its last certificate stays.
+	seen := httptest.NewRequest("GET", "/api/me", nil)
+	seen.RemoteAddr, seen.TLS = "10.42.1.178:40000", &tls.ConnectionState{}
+	f.api.DoorTraffic.Wrap(store.PlaneConsole, http.NotFoundHandler()).ServeHTTP(httptest.NewRecorder(), seen)
+	if code, out := f.call(t, "DELETE", "/api/certificates/"+consoleCert.ID, "", f.rootC); code != http.StatusConflict || !strings.Contains(out, "from 10.42.1.178") {
+		t.Fatalf("the console's last certificate while HTTPS is in use: %d %s", code, out)
+	}
+	if out := func() string { _, o := f.call(t, "GET", "/api/settings/tls", "", f.rootC); return o }(); !strings.Contains(out, `"peer":"10.42.1.178"`) || !strings.Contains(out, `"trafficWindow":30`) {
+		t.Fatalf("the console's traffic is shown: %s", out)
 	}
 }

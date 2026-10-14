@@ -170,7 +170,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           i18n-label="@@Name"
           label="Name"
           i18n-info="@@Acme_authority_name_info"
-          info="What the Add certificate menu and the pool call it."
+          info="What the Add certificate menu and the certificate lists call it."
         >
           <input matInput [value]="form().name || ''" (input)="set('name', $any($event.target).value)" />
         </app-form-field>

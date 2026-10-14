@@ -19,7 +19,9 @@ import { ApiService, Certificate, CertManagerIssuer, CertManagerView } from '../
 export class CertManagerDialogComponent {
   private readonly api = inject(ApiService);
   private readonly ref = inject(MatDialogRef<CertManagerDialogComponent, Certificate>);
-  protected readonly view = inject<CertManagerView>(MAT_DIALOG_DATA);
+  // The plane rides along with the view: the internal one, or the console or
+  // the application behind a proxy (SSL-14).
+  protected readonly view = inject<CertManagerView & { plane?: string }>(MAT_DIALOG_DATA);
 
   // The only ready one is picked already.
   protected readonly picked = signal<CertManagerIssuer | null>(
@@ -33,7 +35,7 @@ export class CertManagerDialogComponent {
     if (!i) return;
     this.saving.set(true);
     this.error.set('');
-    this.api.askCertManager({ kind: i.kind, name: i.name }).subscribe({
+    this.api.askCertManager({ kind: i.kind, name: i.name, plane: this.view.plane }).subscribe({
       next: (created) => this.ref.close(created),
       error: (e: HttpErrorResponse) => {
         this.saving.set(false);

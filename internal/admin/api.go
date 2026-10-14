@@ -65,6 +65,9 @@ type API struct {
 	// TLS is the live HTTPS state (SSL-01/02). Wired by main; nil in the tests
 	// that have no listener to open, where saving material still has to work.
 	TLS *certs.Supervisor
+	// DoorTraffic is which of the console's doors are called (SSL-15): what
+	// keeps the port a proxy still calls from being switched off.
+	DoorTraffic *certs.Traffic
 	// DiscoverACME asks an authority's directory whether it answers, when an
 	// authority is saved. Nil: Authority.Discover, over the network. A test
 	// replaces it rather than reach Let's Encrypt.
@@ -120,6 +123,9 @@ type API struct {
 	// plane, as the runtime names it (discovery.InternalOrigin), asked when a
 	// screen needs it and kept a minute (internalplane.go).
 	internalOrigin atomic.Pointer[internalOriginAt]
+	// planeOrigins is the same answer for the console's and the application's
+	// ports (SSL-14), by port, kept a minute each.
+	planeOrigins sync.Map
 	// LookupInternal asks the runtime; nil is discovery.InternalOrigin. A test
 	// replaces it rather than reach a cluster.
 	LookupInternal func(ctx context.Context, port int) discovery.Internal
@@ -132,6 +138,9 @@ type API struct {
 	// runtime, or a chart that did not grant it.
 	CertManager    CertManager
 	CertManagerWhy string
+	// CertManagers are the console's and the application's (SSL-14): a
+	// certificate for the hop from a proxy in front, by plane.
+	CertManagers map[string]CertManager
 }
 
 // CertManager is what the API asks of cert-manager (discovery.CertManager): a

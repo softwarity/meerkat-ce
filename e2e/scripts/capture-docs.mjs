@@ -517,17 +517,20 @@ const SHOTS = [
   { file: 'tls', path: '/infra/tls' },
   { file: 'tls-authorities', path: '/infra/tls', act: click('ACME') },
   { file: 'tls-local', path: '/infra/tls', act: click('On a local machine') },
-  // The Application door open, with two names declared as served by a proxy
-  // in front: the field is inside the door, and a closed door shows nothing.
+  // The Application tab, with two public names served by a proxy in front
+  // (SSL-14).
   {
     file: 'tls-proxied',
     path: '/infra/tls',
     act: async (page) => {
-      await page.locator('mat-expansion-panel-header', { hasText: 'Application' }).first().click();
-      await page.waitForTimeout(600);
-      await page.locator('mat-expansion-panel.mat-expanded mat-button-toggle', { hasText: 'A proxy in front' }).locator('button').click();
+      await page.getByRole('tab', { name: /Application/ }).click();
+      const app = page.getByRole('tabpanel', { name: /Application/ });
+      await app.locator('app-door-names').waitFor();
+      await app.locator('mat-button-toggle', { hasText: 'A proxy in front' }).locator('button').click();
+      await app.getByRole('button', { name: 'Apply' }).click();
+      await page.locator('mat-dialog-container').getByRole('button', { name: 'Apply' }).click();
       await page.waitForTimeout(400);
-      const input = page.locator('app-proxied-names input').last();
+      const input = app.locator('app-door-names mat-chip-grid input').first();
       for (const name of ['shop.example.com', 'apps.example.com']) {
         await input.fill(name);
         await input.press('Enter');

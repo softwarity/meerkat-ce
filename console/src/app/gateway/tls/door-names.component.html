@@ -1,0 +1,81 @@
+<div class="row">
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-label i18n="@@Public_names_label">Public names</mat-label>
+    <!-- The input lives INSIDE the grid so it flows on the chips' line. -->
+    <mat-chip-grid #names>
+      @for (n of door().names; track n) {
+        <mat-chip-row (removed)="removeName(n)">
+          {{ n }}
+          <button matChipRemove type="button" [attr.aria-label]="n">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+      }
+      <input
+        [matChipInputFor]="names"
+        [matChipInputSeparatorKeyCodes]="separators"
+        matChipInputAddOnBlur
+        (matChipInputTokenEnd)="addName($event)"
+        [placeholder]="door().names.length ? '' : (plane() === 'app' ? 'shop.example.com' : 'admin.example.com')"
+      />
+    </mat-chip-grid>
+  </mat-form-field>
+  <!-- Beside the field, as app-form-field does it: an explanation, not an
+       action on the value. Focusable, so the tooltip reaches a keyboard. -->
+  <button
+    type="button"
+    class="field-info"
+    [matTooltip]="namesInfo"
+    matTooltipPositionAtOrigin
+    i18n-aria-label="@@More_information"
+    aria-label="More information"
+    (click)="$event.preventDefault()"
+  ><mat-icon>info</mat-icon></button>
+</div>
+@if (plane() === 'app') {
+  <p class="hint" i18n="@@Door_first_name_hint2">The first one is used in links sent by mail.</p>
+}
+@if (!door().proxied && door().uncovered.length) {
+  <p class="problem">
+    <mat-icon>warning</mat-icon>
+    <span i18n="@@Door_names_uncovered">No certificate here covers {{ door().uncovered.join(', ') }}: browsers will refuse its HTTPS.</span>
+  </p>
+}
+
+@if (door().proxied) {
+  <div class="row addresses">
+    <mat-form-field subscriptSizing="dynamic">
+      <mat-label i18n="@@Proxy_addresses_optional">Proxy addresses (optional)</mat-label>
+      <mat-chip-grid #addresses>
+        @for (a of door().proxyAddresses; track a) {
+          <mat-chip-row (removed)="removeAddress(a)">
+            {{ a }}
+            <button matChipRemove type="button" [attr.aria-label]="a">
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip-row>
+        }
+        <input
+          [matChipInputFor]="addresses"
+          [matChipInputSeparatorKeyCodes]="separators"
+          matChipInputAddOnBlur
+          (matChipInputTokenEnd)="addAddress($event)"
+          [placeholder]="door().proxyAddresses.length ? '' : '130.211.0.0/22'"
+        />
+      </mat-chip-grid>
+    </mat-form-field>
+    <button
+      type="button"
+      class="field-info"
+      [matTooltip]="addressesInfo"
+      matTooltipPositionAtOrigin
+      i18n-aria-label="@@More_information"
+      aria-label="More information"
+      (click)="$event.preventDefault()"
+    ><mat-icon>info</mat-icon></button>
+  </div>
+  <p class="hint" i18n="@@Proxy_addresses_hint">
+    Leave empty when the proxy runs in the cluster or on a private network. Name its addresses
+    when it reaches Meerkat from public ones: a CDN, a cloud load balancer.
+  </p>
+}

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/base64"
 	"net/http"
 	"time"
 )
@@ -10,6 +11,14 @@ var profilePasskeysPage = flowPage("profile-passkeys", profilePasskeysBody)
 type profilePasskeysData struct {
 	flowChrome
 	Passkeys []passkeyView
+	// UserHandle and CredentialIDs (base64url) are what the page hands the
+	// browser so it forgets the passkeys of this account that are no longer
+	// here (WebAuthn signalAllAcceptedCredentials).
+	// Signal is false when the list could not be read: an empty list would
+	// make the browser forget every passkey of the account.
+	Signal        bool
+	UserHandle    string
+	CredentialIDs []string
 }
 
 // The passkeys, on their own page. They were a section of Security, under the
@@ -63,6 +72,14 @@ const profilePasskeysBody = `    <style>
       const b64e = (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
       const btn = document.getElementById('pk-add');
       const msg = document.getElementById('pk-msg');
+      // The passkeys this account holds here, told to the browser: one
+      // removed from this list is forgotten by the device too, instead of
+      // being offered at the next sign-in and refused.
+      if ({{.Signal}} && window.PublicKeyCredential && PublicKeyCredential.signalAllAcceptedCredentials) {
+        PublicKeyCredential.signalAllAcceptedCredentials({
+          rpId: location.hostname, userId: {{.UserHandle}}, allAcceptedCredentialIds: {{.CredentialIDs}},
+        }).catch(() => {});
+      }
       if (!btn) return;
       if (!window.PublicKeyCredential) { btn.disabled = true; return; }
       btn.addEventListener('click', async () => {
@@ -124,6 +141,14 @@ func (h *Handler) showPasskeys(w http.ResponseWriter, r *http.Request) {
 				Created: time.Unix(k.CreatedAt, 0).Format("2006-01-02"),
 				Current: k.ID == current,
 			})
+		}
+	}
+	data.UserHandle = base64.RawURLEncoding.EncodeToString([]byte(sess.UserID))
+	data.CredentialIDs = []string{}
+	if creds, err := h.passkeyCredentials(r, sess.UserID); err == nil {
+		data.Signal = true
+		for _, c := range creds {
+			data.CredentialIDs = append(data.CredentialIDs, base64.RawURLEncoding.EncodeToString(c.ID))
 		}
 	}
 	writeFlow(w, profilePasskeysPage, data, http.StatusOK)

@@ -1639,6 +1639,39 @@
    "fr": "Avec internalTls.certManager, la gateway liste les émetteurs prêts, crée son Certificate pour ses noms internes, sert le Secret sur :7443 sans montage ni redémarrage, suit un renouvellement sur chaque nœud, et le supprimer retire le Certificate et le Secret ; sur Swarm ou compose l'entrée est grisée avec sa raison."
   },
   {
+   "id": "SSL-14",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "U",
+    "I",
+    "K1",
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Each plan is listed by its runtime names with its own certificates. This gateway: a declared public name with no covering certificate is refused, a covered one is served. A proxy in front: a certificate on the plan's internal names lets the proxy re-encrypt (an Ingress with backend HTTPS reaches the console and the application), the declared names are served https without trusting a header, and X-Forwarded-For is believed from the declared proxy addresses only. A plan with no proxy ignores every X-Forwarded header. A wildcard name is refused. The first application name is the one mailed links carry.",
+   "fr": "Chaque plan est listé par ses noms dans le runtime, avec ses propres certificats. Meerkat : un nom public déclaré sans certificat qui le couvre est refusé, couvert il est servi. A proxy in front : un certificat aux noms internes du plan permet au proxy de rechiffrer (un Ingress en backend HTTPS joint la console et l'application), les noms déclarés sont servis en https sans croire d'en-tête, et X-Forwarded-For n'est cru que des adresses de proxy déclarées. Un plan sans proxy ignore tout en-tête X-Forwarded. Un nom joker est refusé. Le premier nom de l'application est celui des liens envoyés par mail."
+  },
+  {
+   "id": "SSL-15",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "U",
+    "I",
+    "K1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Each plane switches its HTTP door on or off; HTTPS opens with a certificate and closes with the last one. HTTP off listens on 127.0.0.1 only: unreachable from the network, still answering a port-forward and the in-container health check (the pods stay ready). HTTP goes off only while HTTPS serves, and a plane's last certificate stays while its HTTP is off. On the console the door in use is kept: HTTP off is refused while the session or a proxy uses HTTP, the last certificate while they use HTTPS; with an Ingress moved to the HTTPS port, HTTP goes off and the console stays reachable. The console's traffic per door is shown live, pooled across replicas.",
+   "fr": "Chaque plan allume ou éteint sa porte HTTP ; HTTPS s'ouvre avec un certificat et se ferme avec le dernier. HTTP éteint n'écoute que sur 127.0.0.1 : injoignable du réseau, il répond encore à un port-forward et à la sonde interne au conteneur (les pods restent prêts). HTTP ne s'éteint que si HTTPS sert, et le dernier certificat d'un plan reste tant que son HTTP est éteint. Sur la console la porte en usage est gardée : HTTP éteint refusé tant que la session ou un proxy passe par HTTP, le dernier certificat tant qu'ils passent par HTTPS ; un Ingress passé sur le port HTTPS, HTTP s'éteint et la console reste joignable. Le trafic de la console par porte s'affiche en direct, mis en commun entre réplicas."
+  },
+  {
    "id": "NOTIF-01",
    "priority": "P1",
    "feasibility": "easy",
@@ -3076,8 +3109,8 @@
     "CE",
     "EE"
    ],
-   "en": "A caller reaching the gateway directly cannot choose its address: a rotating X-Forwarded-For from a public peer still ends in 429, the same header from the Ingress is believed, MEERKAT_TRUSTED_PROXIES=none ignores it, and a public peer's X-Forwarded-Proto does not skip the https redirect.",
-   "fr": "Un appelant qui joint la gateway directement ne choisit pas son adresse : un X-Forwarded-For qui change à chaque requête depuis un pair public finit quand même en 429, le même en-tête venant de l'Ingress est cru, MEERKAT_TRUSTED_PROXIES=none l'ignore, et le X-Forwarded-Proto d'un pair public ne fait pas sauter la redirection vers https."
+   "en": "A caller reaching the gateway directly cannot choose its address: a rotating X-Forwarded-For from a public peer still ends in 429, the same header from the Ingress is believed when the plane declares a proxy in front, a plane served by the gateway itself ignores it, and a public peer's X-Forwarded-Proto does not skip the https redirect.",
+   "fr": "Un appelant qui joint la gateway directement ne choisit pas son adresse : un X-Forwarded-For qui change à chaque requête depuis un pair public finit quand même en 429, le même en-tête venant de l'Ingress est cru quand le plan déclare un proxy devant, un plan servi par la gateway elle-même l'ignore, et le X-Forwarded-Proto d'un pair public ne fait pas sauter la redirection vers https."
   },
   {
    "id": "PERF-01",

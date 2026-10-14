@@ -623,8 +623,8 @@ func TestAProxiedNameOnlyVouchesForALink(t *testing.T) {
 		app: []*Material{app}, appFallback: app,
 		settings: Settings{
 			Redirect: true, HSTSMaxAge: 86400,
-			ProxiedApp:     []string{"Shop.Example.org"},
-			ProxiedConsole: []string{"admin.example.org"},
+			AppDoor:     Door{Proxied: true, Names: []string{"Shop.Example.org"}},
+			ConsoleDoor: Door{Proxied: true, Names: []string{"admin.example.org"}},
 		},
 	}
 	d := NewRedirect()
@@ -670,7 +670,7 @@ func TestAProxiedNameOnlyVouchesForALink(t *testing.T) {
 
 	// Taken away and reloaded - what the change bus does on every node - and
 	// the name is nobody's again.
-	src.settings.ProxiedApp = nil
+	src.settings.AppDoor = Door{}
 	if err := sup.Reload(context.Background()); err != nil {
 		t.Fatal(err)
 	}

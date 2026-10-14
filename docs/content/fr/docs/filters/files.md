@@ -80,5 +80,6 @@ tout autre chemin sous `/fonts` répond 404.
 > [!TIP]
 > Une UI qui nomme `fonts.googleapis.com` ne passera pas par la route d'elle-même.
 > Soit on la fait pointer vers la gateway, soit - hors ligne - on résout ce nom
-> vers la gateway dans le DNS et on lui donne, dans la réserve TLS, un certificat
-> de sa propre autorité : la route répond alors à l'hôte que l'UI demande.
+> vers la gateway dans le DNS et on lui donne, dans l'onglet Application de
+> Domains & TLS, un certificat de sa propre autorité : la route répond alors à
+> l'hôte que l'UI demande.

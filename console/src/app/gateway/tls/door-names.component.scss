@@ -43,3 +43,24 @@ mat-chip-row {
   outline: 2px solid var(--mat-sys-primary);
   outline-offset: -4px;
 }
+.hint {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.problem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--mat-sys-error);
+}
+.problem mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+.addresses {
+  margin-top: 16px;
+}

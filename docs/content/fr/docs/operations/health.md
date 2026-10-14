@@ -75,8 +75,13 @@ healthcheck:
   test: ["CMD", "/meerkat", "health", "http://127.0.0.1:8080/readyz"]
 ```
 
-Sans adresse, il sonde `http://127.0.0.1:8080/readyz`. Kubernetes n'en a pas
-besoin : ses sondes sont des `httpGet`, posées depuis l'extérieur du conteneur.
+Sans adresse, il sonde `http://127.0.0.1:8080/readyz`. Les sondes Kubernetes du chart
+Helm sont la même commande, lancée en `exec` :
+`/meerkat health http://127.0.0.1:8080/healthz` pour le démarrage et la vivacité,
+`/readyz` pour la disponibilité. Un `httpGet` viendrait du kubelet, de l'extérieur du
+conteneur, et un port en clair éteint sur **Infra > Domains & TLS** n'écoute plus que sur
+la boucle locale : le pod cesserait d'être prêt pour un réglage qui fonctionne (voir
+[Couper le port en clair](/docs/operations/tls#couper-le-port-en-clair)).
 
 ## En cluster
 

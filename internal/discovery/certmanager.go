@@ -97,6 +97,25 @@ func newCertManager(api *k8sAPI, name string) *CertManager {
 // SecretName is the Certificate's name, and its Secret's.
 func (m *CertManager) SecretName() string { return m.name }
 
+// IssuedSuffix ends the name the chart grants for the internal plane's
+// Certificate ("<release>-meerkat-internal-issued"); the other planes' are
+// the same name with their plane in its place (SSL-14).
+const IssuedSuffix = "-internal-issued"
+
+// For is the client of one plane's Certificate: the internal plane's is this
+// one, the console's and the application's carry their plane in the name the
+// chart grants beside it. Each follows its own Secret.
+func (m *CertManager) For(plane string) *CertManager {
+	if plane == "internal" {
+		return m
+	}
+	base, ok := strings.CutSuffix(m.name, IssuedSuffix)
+	if !ok {
+		return newCertManager(m.api, m.name+"-"+plane)
+	}
+	return newCertManager(m.api, base+"-"+plane+"-issued")
+}
+
 func (m *CertManager) group() string { return m.root + "/apis/cert-manager.io/v1" }
 
 func (m *CertManager) certificate() string {

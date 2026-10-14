@@ -215,8 +215,25 @@ compteur par adresse (échecs de connexion, réinitialisations de mot de passe, 
 débit par IP d'une route), l'adresse que montrent l'historique des connexions et l'audit,
 l'attribut `Secure` d'un cookie de session, et la redirection du port en clair vers https.
 
-**Ce qu'elle déduit par défaut.** Sans réglage, la gateway regarde l'adresse de l'autre bout
-de la connexion - le pair TCP :
+**Qui est cru se dit dans la console, plan par plan.** Sur **Infra > Domains & TLS**,
+les plans Console et Application disent chacun qui sert leurs noms publics
+(**HTTPS served by**) et, derrière un proxy, ses adresses, et cela décide de qui le
+plan croit les en-têtes transmis (voir
+[Qui sert les noms publics](/docs/console/tls#qui-sert-les-noms-publics)) :
+
+| Ce que dit le plan | De qui il croit les `X-Forwarded-*` |
+|---|---|
+| rien encore, ou **Meerkat** sans nom déclaré | le défaut ci-dessous : boucle locale et plages privées |
+| **Meerkat**, avec des noms publics déclarés | **personne** : rien ne se tient devant, donc un pair qui écrit `X-Forwarded-For` est un appelant qui choisit sa propre adresse |
+| **A proxy in front**, **Proxy addresses (optional)** laissé vide | le défaut ci-dessous |
+| **A proxy in front**, avec des **Proxy addresses** nommées | ces adresses seulement - plages CIDR ou adresses seules |
+
+Le plan interne, qu'aucun navigateur ne joint, garde le défaut. Un nom que sert un
+proxy placé devant est aussi su en https sans aucun en-tête : la requête qui le nomme a
+atteint le navigateur en HTTPS, sur la parole de l'opérateur.
+
+**Ce qu'elle déduit par défaut.** Là où rien d'autre n'a été dit, la gateway regarde
+l'adresse de l'autre bout de la connexion - le pair TCP :
 
 - un pair **de boucle locale ou privé** (`127.0.0.0/8`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) est un proxy : ses en-têtes sont crus. C'est l'Ingress d'un cluster Kubernetes, le pont Docker, un réseau compose, un nginx sur la même machine ;
 - tout **autre** pair est un inconnu : ses en-têtes `X-Forwarded-*` sont ignorés, et sa propre adresse est celle de l'appelant.
@@ -228,37 +245,32 @@ l'appelant a écrit plus à gauche n'est jamais lu. La plage du NAT des opérate
 un réseau Tailscale par exemple, pas des proxys -, pas plus que le lien local.
 
 **Ce que reçoit le service derrière** est ce que la gateway croit, jamais plus :
-`X-Forwarded-Proto` vaut `https` quand la porte de la gateway était en TLS ou qu'un proxy
-de confiance a dit que celle du navigateur l'était - un service derrière un Ingress qui
+`X-Forwarded-Proto` vaut `https` quand la porte de la gateway était en TLS, que la
+requête nommait un nom public servi par un proxy placé devant, ou qu'un proxy de
+confiance a dit que celle du navigateur l'était - un service derrière un Ingress qui
 termine le TLS construit donc des liens `https://` ; `X-Forwarded-For` est la chaîne de
 confiance suivie de l'adresse du proxy, ou, venant d'un inconnu, sa seule adresse ;
 `X-Forwarded-Host` est l'hôte par lequel la gateway a été jointe ; et `Forwarded`
 (RFC 7239) dit les trois mêmes choses en un seul élément,
 `for=<appelant>;host=<hôte>;proto=<schéma>`.
 
-**Quand régler `MEERKAT_TRUSTED_PROXIES`.** Quand ce qui se tient devant joint la gateway
+**Quand nommer les adresses du proxy.** Quand ce qui se tient devant joint la gateway
 depuis des adresses **publiques** : un CDN, ou un load balancer de cloud qui ne passe pas
 par un réseau privé (ceux de Google Cloud joignent les backends depuis `130.211.0.0/22` et
-`35.191.0.0/16`, par exemple). Nommez ses plages, telles que le fournisseur les publie :
+`35.191.0.0/16`, par exemple). Sur le plan qu'il dessert, nommez ses plages dans **Proxy
+addresses (optional)**, telles que le fournisseur les publie. La liste **remplace** les plages privées au lieu de s'y ajouter : nommez aussi le
+proxy privé s'il y en a un entre le load balancer et la gateway. Une valeur qui n'est ni
+une adresse ni une plage est refusée à l'enregistrement, avec un exemple de ce qui l'est.
 
-```yaml
-environment:
-  MEERKAT_TRUSTED_PROXIES: "130.211.0.0/22, 35.191.0.0/16"
-```
+**Une gateway jointe directement**, depuis internet ou par des personnes d'un réseau local
+aux adresses privées, le dit : **Meerkat**, avec ses noms publics déclarés. Personne
+n'est alors cru, et chaque adresse est celle du pair TCP - le défaut ferait confiance à
+chaque personne du réseau local comme à un proxy.
 
-La valeur est une liste de plages CIDR ou d'adresses séparées par des virgules, et elle
-**remplace** le défaut au lieu de s'y ajouter : listez aussi le proxy privé s'il y en a un
-entre le load balancer et la gateway. Dans le chart, c'est
-`trustedProxies: ["130.211.0.0/22", "35.191.0.0/16"]`.
-
-`none` ne fait confiance à personne : chaque adresse est celle du pair TCP, et aucun en-tête
-transmis n'est jamais lu. C'est la valeur d'une gateway jointe **directement** depuis
-internet, et d'un réseau local où l'on joint la gateway depuis des adresses privées sans
-proxy - le défaut ferait confiance à chacun comme à un proxy.
-
-Une valeur illisible arrête la gateway au démarrage en donnant la raison, plutôt que de
-retomber sur un défaut que personne n'a choisi. Le journal de démarrage dit quel ensemble
-est en vigueur (`forwarded headers ... trusted_proxies=`).
+`MEERKAT_TRUSTED_PROXIES` et la valeur `trustedProxies` du chart ont disparu. Une gateway
+qui trouve encore la variable l'ignore et journalise un avertissement qui dit où elle est
+partie ; le chart refuse le rendu tant que `trustedProxies` est posée, avec le même renvoi
+vers l'écran.
 
 **Ce qui se passe quand c'est faux.**
 
@@ -293,12 +305,12 @@ absent doit pouvoir comprendre pourquoi.
 | --- | --- | --- |
 | `MEERKAT_ADMIN_PASSWORD` | - | Le premier compte admin, au PREMIER démarrage uniquement. Elle n'est plus jamais lue ensuite. |
 | `MEERKAT_DATA` | `data` | L'endroit où la gateway conserve tout ce qu'elle sait. |
-| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | Le plan applicatif et le plan de contrôle. |
+| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | Le plan applicatif et le plan de contrôle. Un port en clair éteint sur **Infra > Domains & TLS**, celui du plan interne compris, continue d'écouter, sur `127.0.0.1` seulement - voir [Couper le port en clair](/docs/operations/tls#couper-le-port-en-clair). |
 | `MEERKAT_INTERNAL_ADDR` / `MEERKAT_INTERNAL_TLS_ADDR` | `:7070` / `:7443` | Le plan interne : le JWKS et l'API du scheduler, pour les services placés derrière la gateway. Jamais publié ; sa porte HTTPS s'ouvre quand un certificat y est placé. |
 | `MEERKAT_TLS_ADDR` / `MEERKAT_ADMIN_TLS_ADDR` | `:8443` / `:9443` | Les accès HTTPS, ouverts dès qu'un certificat existe pour un nom. En posséder un, c'est cela l'activation - aucun interrupteur ne peut dire "activé" alors que rien n'est servi. |
 | `MEERKAT_DATABASE_URL` | - | Un PostgreSQL externe à la place du stockage embarqué. Édition Enterprise, et condition préalable à un [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | un fichier dans le répertoire de données | La clé maîtresse du coffre. Elle doit être fournie, et identique, sur chaque nœud d'un cluster. |
 | `MEERKAT_PLUG_ADDR` | `:22222` | Change le port du tunnel développeur. Elle ne le désactive pas : c'est le rôle de l'interrupteur **Infra, Plug**, ou de la fermeture de la surface développeur. |
 | `MEERKAT_PRODUCTION` | non définie | Déclare cette gateway comme étant de production et ferme définitivement la surface développeur. |
-| `MEERKAT_TRUSTED_PROXIES` | boucle locale et plages privées | Les proxys dont `X-Forwarded-For` et `X-Forwarded-Proto` sont crus : plages CIDR ou adresses séparées par des virgules, qui remplacent le défaut ; `none` ne fait confiance à personne. Voir [Derrière un proxy ou un load balancer](#derrire-un-proxy-ou-un-load-balancer). |
+| `MEERKAT_TRUSTED_PROXIES` | - | N'est plus lue : posée, elle ne fait que journaliser un avertissement. De qui `X-Forwarded-For` et `X-Forwarded-Proto` sont crus se dit plan par plan dans **Infra > Domains & TLS** - voir [Derrière un proxy ou un load balancer](#derrire-un-proxy-ou-un-load-balancer). |
 | `MEERKAT_TENANCY` | `single` | Une seule organisation implicite, ou plusieurs (Enterprise). Se choisit une fois, au premier démarrage ; c'est ensuite la console qui en décide. |

@@ -1103,6 +1103,13 @@ var loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
           });
           if (fin.redirected) { location.href = fin.url; return; }
           if (fin.ok) { location.href = '/'; return; }
+          // A passkey removed here and still on the device: the browser is
+          // told to forget it, so it stops offering it.
+          if (fin.headers.get('X-Passkey-Unknown') && PublicKeyCredential.signalUnknownCredential) {
+            try {
+              await PublicKeyCredential.signalUnknownCredential({ rpId: pk.rpId || location.hostname, credentialId: body.rawId });
+            } catch (_) {}
+          }
           throw new Error(await fin.text());
         } catch (e) {
           err.textContent = {{.T.errPasskey}};

@@ -205,7 +205,24 @@ counter (failed sign-ins, password resets, a route's rate limit per IP), the
 address the sign-in history and the audit show, whether a session cookie is
 `Secure`, and whether the plain port redirects to https.
 
-**What it deduces by default.** With nothing configured, the gateway looks at
+**Who is trusted is said on the console, plane by plane.** On **Infra > Domains
+& TLS**, the Console and Application planes each say who serves their public
+names (**HTTPS served by**) and, behind a proxy, its addresses, and that decides
+whose forwarded headers the plane believes (see
+[Who serves the public names](/docs/console/tls#who-serves-the-public-names)):
+
+| What the plane says | Whose `X-Forwarded-*` it believes |
+|---|---|
+| nothing yet, or **Meerkat** with no name declared | the default below: loopback and private ranges |
+| **Meerkat**, with public names declared | **nobody**: nothing stands in front, so a peer that writes `X-Forwarded-For` is a caller choosing its own address |
+| **A proxy in front**, **Proxy addresses (optional)** left empty | the default below |
+| **A proxy in front**, with **Proxy addresses** named | those addresses only - CIDR ranges or single addresses |
+
+The internal plane, which no browser reaches, keeps the default. A name a proxy
+in front serves is also known to be https without any header: the request for it
+reached the browser over HTTPS on the operator's word.
+
+**What it deduces by default.** Where nothing else was said, the gateway looks at
 the address of the connection's other end - the TCP peer:
 
 - a **loopback or private** peer (`127.0.0.0/8`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) is a proxy: its headers are believed. That is the Ingress in a Kubernetes cluster, the Docker bridge, a compose network, nginx on the same host;
@@ -218,37 +235,32 @@ range (`100.64.0.0/10`) is not trusted - it is where subscribers' devices live,
 a Tailscale network for one, not proxies - nor is link-local.
 
 **What the service behind receives** is what the gateway believes, never more:
-`X-Forwarded-Proto` is `https` when the gateway's own door was TLS or a trusted
-proxy said the browser's was - so a service behind an Ingress that terminates TLS
+`X-Forwarded-Proto` is `https` when the gateway's own door was TLS, the request
+named a public name a proxy in front serves, or a trusted proxy said the browser's
+was - so a service behind an Ingress that terminates TLS
 builds `https://` links; `X-Forwarded-For` is the trusted chain with the proxy's
 address added, or, from a stranger, its address alone; `X-Forwarded-Host` is the
 host the gateway was reached by; and `Forwarded` (RFC 7239) says the same three
 things in one element, `for=<caller>;host=<host>;proto=<scheme>`.
 
-**When to set `MEERKAT_TRUSTED_PROXIES`.** When whatever stands in front reaches
+**When to name the proxy's addresses.** When whatever stands in front reaches
 the gateway from **public** addresses: a CDN, or a cloud load balancer that does
 not come through a private network (Google Cloud's reach the backends from
-`130.211.0.0/22` and `35.191.0.0/16`, for example). Name its ranges, as published
-by the provider:
+`130.211.0.0/22` and `35.191.0.0/16`, for example). On the plane it fronts, name
+its ranges in **Proxy addresses (optional)**, as published by the provider. The list **replaces** the private ranges
+rather than adding to them: name the private proxy too if there is one between
+the load balancer and the gateway. A value that is not an address or a range is
+refused when saved, with an example of what is.
 
-```yaml
-environment:
-  MEERKAT_TRUSTED_PROXIES: "130.211.0.0/22, 35.191.0.0/16"
-```
+**A gateway reached directly**, from the internet or from people on a LAN with
+private addresses, says so: **Meerkat** with its public names declared. Then
+nobody is believed, and every address is the TCP peer - the default would trust
+each person on the LAN as a proxy.
 
-The value is a comma-separated list of CIDR ranges or single addresses, and it
-**replaces** the default rather than adding to it: list the private proxy too if
-there is one between the load balancer and the gateway. In the chart it is
-`trustedProxies: ["130.211.0.0/22", "35.191.0.0/16"]`.
-
-`none` trusts nobody: every address is the TCP peer, and no forwarded header is
-ever read. That is the value for a gateway reached **directly** from the
-internet, and for a LAN where people reach the gateway from private addresses
-without a proxy - the default would trust each of them as one.
-
-A value that does not parse stops the gateway at startup with the reason,
-rather than falling back to a default nobody chose. The startup log says which
-set is in force (`forwarded headers ... trusted_proxies=`).
+`MEERKAT_TRUSTED_PROXIES` and the chart's `trustedProxies` are gone. A gateway
+that still finds the variable set ignores it and logs a warning saying where it
+went; the chart refuses to render while `trustedProxies` is set, with the same
+pointer to the screen.
 
 **What goes wrong when it is wrong.**
 
@@ -282,12 +294,12 @@ why.
 | --- | --- | --- |
 | `MEERKAT_ADMIN_PASSWORD` | - | The first admin account, on the FIRST start only. Never read again. |
 | `MEERKAT_DATA` | `data` | Where the gateway keeps everything it knows. |
-| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | The application and control planes. |
+| `MEERKAT_ADDR` / `MEERKAT_ADMIN_ADDR` | `:8080` / `:9090` | The application and control planes. A plain port switched off on **Infra > Domains & TLS**, the internal one included, keeps listening, on `127.0.0.1` only - see [Switching the plain port off](/docs/operations/tls#switching-the-plain-port-off). |
 | `MEERKAT_INTERNAL_ADDR` / `MEERKAT_INTERNAL_TLS_ADDR` | `:7070` / `:7443` | The internal plane: the JWKS and the scheduler's API, for the services behind the gateway. Never published; its HTTPS door opens when a certificate is placed on it. |
 | `MEERKAT_TLS_ADDR` / `MEERKAT_ADMIN_TLS_ADDR` | `:8443` / `:9443` | The HTTPS doors, opened when a certificate exists for a name. Having one IS the activation - there is no switch that could say "on" while nothing is served. |
 | `MEERKAT_DATABASE_URL` | - | An external PostgreSQL instead of the embedded store. Enterprise, and the prerequisite of a [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | a file under the data directory | The vault master key. It has to be supplied, and identical, on every node of a cluster. |
 | `MEERKAT_PLUG_ADDR` | `:22222` | Moves the developer tunnel's port. It does not turn it off: the **Infra, Plug** switch does, and so does closing the developer surface. |
 | `MEERKAT_PRODUCTION` | unset | Declares this gateway production and closes the developer surface for good. |
-| `MEERKAT_TRUSTED_PROXIES` | loopback and private ranges | Whose `X-Forwarded-For` and `X-Forwarded-Proto` are believed: CIDR ranges or addresses, comma-separated, replacing the default; `none` trusts nobody. See [Behind a proxy or a load balancer](#behind-a-proxy-or-a-load-balancer). |
+| `MEERKAT_TRUSTED_PROXIES` | - | No longer read: set, it only logs a warning. Whose `X-Forwarded-For` and `X-Forwarded-Proto` are believed is said plane by plane on **Infra > Domains & TLS** - see [Behind a proxy or a load balancer](#behind-a-proxy-or-a-load-balancer). |
 | `MEERKAT_TENANCY` | `single` | One implicit organisation, or several (Enterprise). Chosen once, at the first start; the console owns it afterwards. |

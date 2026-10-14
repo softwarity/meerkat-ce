@@ -135,7 +135,8 @@ acceptée -, sauf si ce pair est un proxy de confiance : c'est alors ce que ce p
 écrit dans `X-Forwarded-For`. Un appelant qui joint la gateway directement et écrit
 l'en-tête lui-même est ignoré : sinon, inventer une adresse par requête suffirait à
 traverser tous les compteurs de cette page. Les proxys de confiance sont déduits de leur
-adresse par défaut, et se règlent avec `MEERKAT_TRUSTED_PROXIES` - voir
+adresse par défaut, et se disent plan par plan dans **Infra > Domains & TLS** - qui sert
+les noms publics, et les adresses d'un proxy placé devant - voir
 [Derrière un proxy ou un load balancer](/docs/deploy/one-gateway#derrire-un-proxy-ou-un-load-balancer).
 Le journal de sécurité garde les deux, "203.0.113.5 via 10.42.0.15", pour ne jamais
 montrer seulement ce qu'un en-tête prétendait.

@@ -115,19 +115,7 @@
 .zone {
   display: grid;
   gap: 8px;
-  min-height: 64px;
-  padding: 10px;
-  border: 1px dashed var(--mat-sys-outline);
-  border-radius: 10px;
   align-content: start;
-  transition: border-color 120ms, background-color 120ms;
-}
-.zone.cdk-drop-list-receiving {
-  border-color: var(--mat-sys-primary);
-}
-.zone.cdk-drop-list-dragging {
-  border-color: var(--mat-sys-primary);
-  background: color-mix(in srgb, var(--mat-sys-primary) 8%, transparent);
 }
 .hint-drop {
   display: flex;
@@ -141,14 +129,13 @@
 }
 .placed {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 4px 4px 4px 10px;
   border-radius: 8px;
   background: var(--mat-sys-surface-container);
   border-left: 3px solid var(--mat-sys-primary);
-  cursor: grab;
 }
 .placed.soon,
 .placed.wait {
@@ -179,51 +166,6 @@
   width: 18px;
   height: 18px;
   color: var(--mat-sys-on-surface-variant);
-}
-.ghost {
-  /* The border is inside the height: the gap is exactly the row it replaces. */
-  box-sizing: border-box;
-  min-height: 42px;
-  border: 1px dashed var(--mat-sys-primary);
-  border-radius: 8px;
-}
-/* The pool never shows a gap. A row dragged out of it leaves itself behind:
-   the drag's placeholder while it is still over the pool, the .standing row
-   once the placeholder has followed the pointer into a plane. One or the
-   other, never both - and never neither, or the pool would shrink and the
-   planes under it would slide away from the pointer aiming at them. */
-.pool .ghost-row,
-.entry.standing {
-  pointer-events: none;
-  opacity: 0.55;
-}
-.pool:has(> .ghost-row) .entry.standing {
-  display: none;
-}
-/* In a plane the same placeholder is the landing spot: a plane's row, empty. */
-.zone .ghost-row {
-  display: block;
-  min-height: 42px;
-  padding: 0;
-  border: 1px dashed var(--mat-sys-primary);
-  border-radius: 8px;
-  background: none;
-  box-sizing: border-box;
-}
-.zone .ghost-row > * {
-  display: none;
-}
-/* A certificate brought back from a plane was in the pool all along. */
-.pool .ghost {
-  display: none;
-}
-.cdk-drag-preview {
-  box-shadow: var(--mat-sys-level3);
-  border-radius: 10px;
-  background: var(--mat-sys-surface-container-high);
-}
-.cdk-drag-animating {
-  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
 }
 /* The addresses a plane is reached by, read together. */
 .links {
@@ -264,10 +206,8 @@
   position: relative;
   overflow: hidden;
   background: var(--mat-sys-surface);
-  cursor: grab;
 }
 .entry.wait {
-  cursor: default;
 }
 .entry::before {
   content: '';
@@ -338,9 +278,34 @@
 }
 .doors {
   display: flex;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 18px;
   font-family: var(--mk-mono);
   font-size: 0.8rem;
+}
+// One door: its switch, and on the console what calls it (SSL-15).
+.port {
+  display: grid;
+  gap: 2px;
+}
+.traffic {
+  font-family: var(--mat-sys-body-small-font);
+  font-size: 0.72rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.traffic.live {
+  color: var(--mat-sys-primary);
+}
+.door.https {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+}
+.door.https mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 .door {
   color: var(--mat-sys-on-surface-variant);
@@ -536,4 +501,55 @@ textarea.pem {
 }
 .mode-note {
   margin: 0 0 12px;
+}
+
+// A plane's own certificates, with its Add certificate menu (SSL-14).
+.certs-head {
+  margin: 24px 0 12px;
+}
+.certs-head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+// Placed and not served: the door's mode wants other names.
+.placed.unused {
+  opacity: 0.6;
+}
+.not-used {
+  color: var(--mat-sys-tertiary);
+  font-weight: 500;
+}
+
+// The row's buttons, together at its right end.
+.placed .actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+// One tab per plane (SSL-14).
+.plane-tab {
+  padding: 16px 4px 8px;
+}
+.plane-tab > .plane-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px 24px;
+  margin: 0 0 12px;
+}
+.plane-tab > .plane-line .called {
+  flex: 1;
+}
+.plane-tab > .plane-line .doors {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.tab-lock {
+  margin-left: 6px;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--mat-sys-primary);
 }
