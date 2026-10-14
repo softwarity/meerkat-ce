@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.8.0
+
 - **Apply a configuration line by line.** Making a saved configuration current,
   importing a file onto the gateway or saving the running document now shows the plan
   with a tick on every line: untick one and the gateway keeps what it holds for it - a
