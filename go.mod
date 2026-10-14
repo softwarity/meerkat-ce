@@ -14,7 +14,7 @@ require (
 	github.com/russellhaering/gosaml2 v0.12.0
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/softwarity/livewire/go v0.4.0
-	github.com/softwarity/plug/agent v0.0.0-20261012152038-f3d3cb5064f6
+	github.com/softwarity/plug/agent v0.0.0-20261014072350-892fe7cb7cee
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.57.0
 	golang.org/x/text v0.42.0
