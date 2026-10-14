@@ -2299,3 +2299,56 @@ func TestTheApplicationPortDoesNotServeTheJWKS(t *testing.T) {
 		t.Fatalf("the path belongs to the routes on this plane: got %q", got)
 	}
 }
+
+// Behind a proxy that terminates TLS (an ingress, trusted by its private
+// address), the service is told https - the scheme the browser used - and so
+// are the redirects the gateway rewrites for it. GeoServer's login posted to
+// http:// under an https page because the gateway told it http (2026-10-14).
+func TestTheUpstreamIsToldTheBrowsersScheme(t *testing.T) {
+	var got http.Header
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		if r.URL.Path == "/login" {
+			// A service writing its redirect under its own address.
+			http.Redirect(w, r, "http://"+r.Host+"/web/", http.StatusFound)
+		}
+	}))
+	t.Cleanup(up.Close)
+	rt := newRouter(t, pathRoute("r1", "app", 1, "/**", up.URL))
+
+	req := httptest.NewRequest("GET", "http://canopy.example.com/x", nil)
+	req.RemoteAddr = "10.0.0.7:5000" // the ingress, on the cluster network
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+	rt.ServeHTTP(httptest.NewRecorder(), req)
+	if p := got.Get("X-Forwarded-Proto"); p != "https" {
+		t.Errorf("behind a trusted proxy ending TLS the service was told %q, want https", p)
+	}
+	if f := got.Get("Forwarded"); f != "for=203.0.113.9;host=canopy.example.com;proto=https" {
+		t.Errorf("Forwarded %q", f)
+	}
+
+	// Its redirect, brought home by the gateway, never says http: to the
+	// browser (relative, it keeps the scheme the browser used).
+	req = httptest.NewRequest("GET", "http://canopy.example.com/login", nil)
+	req.RemoteAddr = "10.0.0.7:5000"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	rt.ServeHTTP(rec, req)
+	if loc := rec.Header().Get("Location"); strings.HasPrefix(loc, "http:") || !strings.HasSuffix(loc, "/web/") {
+		t.Errorf("the service's redirect came back as %q", loc)
+	}
+
+	// A stranger saying https is not believed, and its chain is not passed on.
+	req = httptest.NewRequest("GET", "http://canopy.example.com/x", nil)
+	req.RemoteAddr = "198.51.100.4:5000"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	rt.ServeHTTP(httptest.NewRecorder(), req)
+	if p := got.Get("X-Forwarded-Proto"); p != "http" {
+		t.Errorf("a stranger's https was believed: %q", p)
+	}
+	if f := got.Get("X-Forwarded-For"); f != "198.51.100.4" {
+		t.Errorf("a stranger's chain was passed on: %q", f)
+	}
+}

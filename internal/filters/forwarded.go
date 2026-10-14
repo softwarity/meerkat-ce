@@ -248,3 +248,62 @@ func ClientAndPeer(r *http.Request) (client, peer string) {
 	}
 	return client, peer
 }
+
+// TellUpstream writes, on a request leaving for a service, what the gateway
+// believes about the browser's hop - the same answers it uses for itself, so
+// the service and the gateway never disagree about where the caller is.
+//
+// It runs after httputil's SetXForwarded, which writes what IT sees: the
+// gateway's own connection. Behind a proxy that terminates TLS that is plain
+// http, and the service built http:// links under an https page - GeoServer's
+// login posted to http:// and its own policy refused it (2026-10-14).
+//
+//   - X-Forwarded-Proto: Scheme, https when the gateway's door was TLS or a
+//     trusted proxy said the browser's was.
+//   - X-Forwarded-For: the chain a trusted proxy sent, the peer appended (as
+//     SetXForwarded wrote it); from anybody else, the peer alone - a stranger's
+//     chain names whatever address they liked, and a service reading its first
+//     entry would believe it.
+//   - Forwarded (RFC 7239), which httputil removes and never writes: one
+//     element saying the same three things, for the services that read only
+//     the standard header.
+//
+// X-Forwarded-Host stays the Host the gateway was reached by, which is what
+// the gateway itself takes for its own address (Origin).
+func TellUpstream(in *http.Request, out http.Header) {
+	scheme := Scheme(in)
+	out.Set("X-Forwarded-Proto", scheme)
+	if !FromTrustedProxy(in) {
+		out.Set("X-Forwarded-For", PeerIP(in))
+	}
+	out.Set("Forwarded", "for="+forwardedNode(ClientIP(in))+";host="+forwardedValue(in.Host)+";proto="+scheme)
+}
+
+// forwardedNode writes an address as RFC 7239 wants it: an IPv6 one in
+// brackets and quotes, since its colons are not allowed in a bare token.
+func forwardedNode(ip string) string {
+	if a, err := netip.ParseAddr(ip); err == nil && a.Is6() {
+		return `"[` + a.String() + `]"`
+	}
+	return forwardedValue(ip)
+}
+
+// forwardedValue quotes a value when it is not a plain token (a host with its
+// port, for one: the colon is not a token character).
+func forwardedValue(v string) string {
+	for _, c := range v {
+		if !isTokenChar(c) {
+			return `"` + strings.ReplaceAll(strings.ReplaceAll(v, `\`, `\\`), `"`, `\"`) + `"`
+		}
+	}
+	return v
+}
+
+// isTokenChar is RFC 7230's tchar.
+func isTokenChar(c rune) bool {
+	switch {
+	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		return true
+	}
+	return strings.ContainsRune("!#$%&'*+-.^_`|~", c)
+}

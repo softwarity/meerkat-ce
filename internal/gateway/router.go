@@ -3133,6 +3133,10 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 		Transport:  tracedTransport{cookieStrippingTransport{rt}},
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetXForwarded()
+			// What the gateway believes about the browser's hop, not what
+			// SetXForwarded saw of the gateway's own connection: https behind
+			// a proxy that terminates TLS (see filters.TellUpstream).
+			filtering.TellUpstream(pr.In, pr.Out.Header)
 			// Whatever the caller sent under this name goes: it tells the
 			// service where it is published, so a caller who poses their own
 			// makes the service write its links wherever they asked. Purged

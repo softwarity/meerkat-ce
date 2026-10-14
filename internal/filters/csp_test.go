@@ -109,6 +109,16 @@ func TestAdmitNonce(t *testing.T) {
 		{"elements have their own directive", "script-src 'self'; script-src-elem 'self'", "script-src 'self'; script-src-elem 'self' 'nonce-N'"},
 		{"calls restricted", "script-src 'self' 'unsafe-inline'; connect-src https://api.example.com", "script-src 'self' 'unsafe-inline'; connect-src https://api.example.com 'self'"},
 		{"already told", "script-src 'nonce-N'", "script-src 'nonce-N'"},
+		// Styles, under the same rule: the injected scripts draw with a <style>.
+		{"styles restricted", "style-src 'self'", "style-src 'self' 'nonce-N'"},
+		{"styles inline already", "style-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline'"},
+		{"styles with a nonce", "style-src 'nonce-G'", "style-src 'nonce-G' 'nonce-N'"},
+		{"style elements have their own", "style-src 'self'; style-src-elem 'self'", "style-src 'self'; style-src-elem 'self' 'nonce-N'"},
+		// Only default-src: each kind gets a COPY of it plus the nonce, never
+		// the nonce alone, and default-src itself stays as written.
+		{"default-src alone", "default-src 'self' https://cdn.example.com",
+			"default-src 'self' https://cdn.example.com; script-src 'self' https://cdn.example.com 'nonce-N'; style-src 'self' https://cdn.example.com 'nonce-N'"},
+		{"default-src inline", "default-src 'self' 'unsafe-inline'", "default-src 'self' 'unsafe-inline'"},
 	} {
 		if got := admitNonce(c.in, "N"); got != c.want {
 			t.Errorf("%s: admitNonce(%q) = %q, want %q", c.name, c.in, got, c.want)
@@ -127,5 +137,67 @@ func TestAcceptReadable(t *testing.T) {
 		if got := AcceptReadable(in); got != want {
 			t.Errorf("AcceptReadable(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// GeoServer's policy (2026-10-14): nonce-based for scripts AND styles, two
+// policies in one header. The portal's bar ran and drew itself with a <style>
+// the browser refused, spreading over the whole page. Every policy that
+// restricts styles must be told the nonce; the others stay as written.
+func TestTheNonceReachesStylesUnderEveryPolicy(t *testing.T) {
+	const header = "script-src 'strict-dynamic' 'nonce-G'; style-src 'nonce-G'; frame-src 'self';, form-action 'self'"
+	res := htmlResponse(`<html><head></head><body></body></html>`, http.Header{
+		cspHeader:                             {header},
+		"Content-Security-Policy-Report-Only": {"style-src 'self'"},
+	})
+	if err := InjectAfterHead(agent)(res); err != nil {
+		t.Fatal(err)
+	}
+	m := nonceAttr.FindStringSubmatch(readBody(t, res))
+	if m == nil {
+		t.Fatal("no nonce on the injected script")
+	}
+	ours := "'nonce-" + m[1] + "'"
+	policies := strings.Split(res.Header.Get(cspHeader), ",")
+	if len(policies) != 2 {
+		t.Fatalf("two policies in, %d out: %q", len(policies), res.Header.Get(cspHeader))
+	}
+	if !strings.Contains(policies[0], "style-src 'nonce-G' "+ours) {
+		t.Errorf("the styles must admit our nonce beside GeoServer's: %q", policies[0])
+	}
+	if !strings.Contains(policies[0], "script-src 'strict-dynamic' 'nonce-G' "+ours) {
+		t.Errorf("the scripts must admit our nonce: %q", policies[0])
+	}
+	if strings.TrimSpace(policies[1]) != "form-action 'self'" {
+		t.Errorf("a policy restricting neither must stay as written: %q", policies[1])
+	}
+	if got := res.Header.Get("Content-Security-Policy-Report-Only"); !strings.Contains(got, ours) {
+		t.Errorf("the report-only policy must be told too, or it reports our styles: %q", got)
+	}
+}
+
+// A CSS block a route injects is a <style> of its own: under a policy that
+// restricts styles it carries the nonce, without one it goes in untouched.
+func TestAnInjectedStyleBlockCarriesTheNonce(t *testing.T) {
+	const css = `<style>body{margin:0}</style>`
+	res := htmlResponse(`<html><head></head><body></body></html>`, http.Header{cspHeader: {"style-src 'self'"}})
+	if err := InjectAfterHead(css)(res); err != nil {
+		t.Fatal(err)
+	}
+	out := readBody(t, res)
+	m := nonceAttr.FindStringSubmatch(out)
+	if m == nil || !strings.Contains(out, `<style nonce="`+m[1]+`">`) {
+		t.Fatalf("the injected style block carries no nonce:\n%s", out)
+	}
+	if !strings.Contains(res.Header.Get(cspHeader), "'nonce-"+m[1]+"'") {
+		t.Errorf("the policy was not told the style's nonce: %q", res.Header.Get(cspHeader))
+	}
+
+	plain := htmlResponse(`<html><head></head><body></body></html>`, nil)
+	if err := InjectAfterHead(css)(plain); err != nil {
+		t.Fatal(err)
+	}
+	if out := readBody(t, plain); out != `<html><head>`+css+`</head><body></body></html>` {
+		t.Errorf("without a policy the block goes in byte for byte, got %s", out)
 	}
 }

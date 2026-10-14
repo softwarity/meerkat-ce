@@ -2,6 +2,21 @@
 
 ## NEXT RELEASE
 
+- **A service behind a TLS-terminating proxy is told https.** Behind an Ingress or a
+  load balancer that ends TLS, the gateway passed `X-Forwarded-Proto: http` on to the
+  service - the scheme of its own connection - and the service built `http://` links
+  under an `https://` page (GeoServer's login posted to http:// and its own policy
+  refused it). The service is now told what the gateway believes: `https` when its own
+  door was TLS or a trusted proxy said so. From a caller that is not a trusted proxy,
+  `X-Forwarded-For` is now its address alone, never the chain it wrote. And
+  `Forwarded` (RFC 7239) is written too, saying the same things.
+- **The user button and the portal keep their look behind a strict style policy.** An
+  application whose Content-Security-Policy restricts styles by nonce (GeoServer's does)
+  refused the `<style>` they draw with, and the portal's bar spread unstyled over the
+  whole page. The gateway now tells every policy its nonce for styles as it did for
+  scripts - each policy of a header, the `<meta>` one and the report-only one - its
+  scripts set that nonce on the styles they create, and a CSS block a route injects
+  carries it. A policy that already lets inline styles run is left as written.
 - **The collector files deploy two tiers, so traces can be sorted once complete.** *No
   collector yet?* on the OpenTelemetry page now gives an **agent on every node** (the
   address every service sends to, and the reader of the containers' stdout), which

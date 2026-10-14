@@ -19,6 +19,11 @@ package auth
 const portalNavJS = `(function () {
   'use strict';
   if (window.customElements && customElements.get('meerkat-portal-nav')) return;
+  // The nonce the gateway gave this script, read while it runs (currentScript
+  // is null afterwards). A page whose policy restricts style-src refuses a
+  // <style> without it, and the element then renders with no style at all.
+  var NONCE = (document.currentScript && document.currentScript.nonce) || '';
+  function nonced(st) { if (NONCE) st.nonce = NONCE; return st; }
 
   var SRC = '/meerkat/portal.json';
   var RAIL_W = 72, RAIL_EXP = 280, HEADER_H = 56, STRIP_H = 48;
@@ -59,7 +64,7 @@ const portalNavJS = `(function () {
   function liftFonts(css) {
     var faces = (css || '').match(/@font-face\s*\{[^}]*\}/g);
     if (!faces || document.getElementById('mk-fonts')) return;
-    var st = document.createElement('style');
+    var st = nonced(document.createElement('style'));
     st.id = 'mk-fonts';
     st.textContent = faces.join('\n');
     (document.head || document.documentElement).appendChild(st);
@@ -732,7 +737,7 @@ const portalNavJS = `(function () {
         this.style.colorScheme = this._previewScheme;
         try { document.documentElement.style.colorScheme = this._previewScheme; } catch (e) {}
       }
-      var style = document.createElement('style');
+      var style = nonced(document.createElement('style'));
       liftFonts(d.themeCss);
       style.textContent = '.mk{}' + (d.themeCss || '') + STYLE;
       this._root.appendChild(style);

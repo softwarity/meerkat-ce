@@ -227,6 +227,15 @@ l'appelant a écrit plus à gauche n'est jamais lu. La plage du NAT des opérate
 (`100.64.0.0/10`) n'est pas de confiance - c'est là que vivent les appareils des abonnés,
 un réseau Tailscale par exemple, pas des proxys -, pas plus que le lien local.
 
+**Ce que reçoit le service derrière** est ce que la gateway croit, jamais plus :
+`X-Forwarded-Proto` vaut `https` quand la porte de la gateway était en TLS ou qu'un proxy
+de confiance a dit que celle du navigateur l'était - un service derrière un Ingress qui
+termine le TLS construit donc des liens `https://` ; `X-Forwarded-For` est la chaîne de
+confiance suivie de l'adresse du proxy, ou, venant d'un inconnu, sa seule adresse ;
+`X-Forwarded-Host` est l'hôte par lequel la gateway a été jointe ; et `Forwarded`
+(RFC 7239) dit les trois mêmes choses en un seul élément,
+`for=<appelant>;host=<hôte>;proto=<schéma>`.
+
 **Quand régler `MEERKAT_TRUSTED_PROXIES`.** Quand ce qui se tient devant joint la gateway
 depuis des adresses **publiques** : un CDN, ou un load balancer de cloud qui ne passe pas
 par un réseau privé (ceux de Google Cloud joignent les backends depuis `130.211.0.0/22` et

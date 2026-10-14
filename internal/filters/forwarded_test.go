@@ -167,3 +167,53 @@ func TestForwardedProtoNeedsATrustedPeer(t *testing.T) {
 		t.Fatal("the Ingress's X-Forwarded-Proto was not believed")
 	}
 }
+
+// What a service is told about the browser's hop is what the gateway believes:
+// a trusted proxy's https is passed on, a stranger's is not, a stranger's
+// chain is replaced, and Forwarded says the same three things.
+func TestTellUpstream(t *testing.T) {
+	for _, c := range []struct {
+		name, peer, host, xfp, xff  string
+		wantProto, wantFor, wantFwd string
+	}{
+		{"behind a trusted proxy ending TLS", "10.0.0.7:5000", "canopy.example.com", "https", "203.0.113.9",
+			"https", "203.0.113.9, 10.0.0.7", "for=203.0.113.9;host=canopy.example.com;proto=https"},
+		{"a stranger claiming https", "198.51.100.4:5000", "canopy.example.com", "https", "1.2.3.4",
+			"http", "198.51.100.4", "for=198.51.100.4;host=canopy.example.com;proto=http"},
+		{"plain, nobody in front", "198.51.100.4:5000", "gw.example.com:8080", "", "",
+			"http", "198.51.100.4", `for=198.51.100.4;host="gw.example.com:8080";proto=http`},
+		{"an IPv6 client", "[2001:db8::7]:5000", "gw.example.com", "", "",
+			"http", "2001:db8::7", `for="[2001:db8::7]";host=gw.example.com;proto=http`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			in := httptest.NewRequest("GET", "http://"+c.host+"/", nil)
+			in.RemoteAddr = c.peer
+			if c.xfp != "" {
+				in.Header.Set("X-Forwarded-Proto", c.xfp)
+			}
+			if c.xff != "" {
+				in.Header.Set("X-Forwarded-For", c.xff)
+			}
+			out := http.Header{}
+			// What httputil's SetXForwarded writes before us: the chain plus
+			// the peer, and the scheme of the gateway's own connection.
+			peer := PeerIP(in)
+			if c.xff != "" {
+				out.Set("X-Forwarded-For", c.xff+", "+peer)
+			} else {
+				out.Set("X-Forwarded-For", peer)
+			}
+			out.Set("X-Forwarded-Proto", "http")
+			TellUpstream(in, out)
+			if got := out.Get("X-Forwarded-Proto"); got != c.wantProto {
+				t.Errorf("X-Forwarded-Proto %q, want %q", got, c.wantProto)
+			}
+			if got := out.Get("X-Forwarded-For"); got != c.wantFor {
+				t.Errorf("X-Forwarded-For %q, want %q", got, c.wantFor)
+			}
+			if got := out.Get("Forwarded"); got != c.wantFwd {
+				t.Errorf("Forwarded %q, want %q", got, c.wantFwd)
+			}
+		})
+	}
+}

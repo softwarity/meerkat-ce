@@ -373,12 +373,18 @@ func writeUserButtonJSON(w http.ResponseWriter, payload userButtonPayload) {
 // the page agent's (page.go). The button asks; it no longer acts. That is why
 // it can sit behind a frame guard without taking the page's behaviour with it.
 const userButtonJS = `(() => {
+  // The nonce the gateway gave this script, read while it runs (currentScript
+  // is null afterwards). A page whose policy restricts style-src refuses a
+  // <style> without it, and the element then renders with no style at all.
+  const NONCE = (document.currentScript && document.currentScript.nonce) || '';
+  const nonced = (st) => { if (NONCE) st.nonce = NONCE; return st; };
+  const STYLE_OPEN = NONCE ? '<style nonce="' + NONCE + '">' : '<style>';
   // A face declared inside a shadow root is ignored by browsers: the theme's
   // @font-face rules are lifted into the document once.
   const liftFonts = (css) => {
     const faces = (css || '').match(/@font-face\s*\{[^}]*\}/g);
     if (!faces || document.getElementById('mk-fonts')) return;
-    const st = document.createElement('style');
+    const st = nonced(document.createElement('style'));
     st.id = 'mk-fonts';
     st.textContent = faces.join('\n');
     (document.head || document.documentElement).appendChild(st);
@@ -540,8 +546,8 @@ const userButtonJS = `(() => {
         const ic = Math.round(h * 0.58);
         liftFonts(data.themeCss);
         this.shadowRoot.innerHTML =
-          '<style>' + (data.themeCss || '') + '</style>' +
-          '<style>' +
+          STYLE_OPEN + (data.themeCss || '') + '</style>' +
+          STYLE_OPEN +
           ':host { all: initial; color-scheme: light dark; ' + hostPos + ' }' +
           '* { box-sizing: border-box; }' +
           '.btn { display: inline-flex; align-items: center; gap: .4em; height: ' + h + 'px;' +
@@ -680,8 +686,8 @@ const userButtonJS = `(() => {
 
       liftFonts(data.themeCss);
       this.shadowRoot.innerHTML =
-        '<style>' + (data.themeCss || '') + '</style>' +
-        '<style>' +
+        STYLE_OPEN + (data.themeCss || '') + '</style>' +
+        STYLE_OPEN +
         ':host { all: initial; color-scheme: light dark; ' + hostPos + ' }' +
         '* { box-sizing: border-box; font-family: var(--mk-font, system-ui, sans-serif); }' +
         '.btn { display: flex; align-items: center; gap: .45em; height: ' + h + 'px;' +

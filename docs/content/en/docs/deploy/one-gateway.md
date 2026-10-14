@@ -217,6 +217,14 @@ Whatever the caller wrote further left is never read. The carrier-grade NAT
 range (`100.64.0.0/10`) is not trusted - it is where subscribers' devices live,
 a Tailscale network for one, not proxies - nor is link-local.
 
+**What the service behind receives** is what the gateway believes, never more:
+`X-Forwarded-Proto` is `https` when the gateway's own door was TLS or a trusted
+proxy said the browser's was - so a service behind an Ingress that terminates TLS
+builds `https://` links; `X-Forwarded-For` is the trusted chain with the proxy's
+address added, or, from a stranger, its address alone; `X-Forwarded-Host` is the
+host the gateway was reached by; and `Forwarded` (RFC 7239) says the same three
+things in one element, `for=<caller>;host=<host>;proto=<scheme>`.
+
 **When to set `MEERKAT_TRUSTED_PROXIES`.** When whatever stands in front reaches
 the gateway from **public** addresses: a CDN, or a cloud load balancer that does
 not come through a private network (Google Cloud's reach the backends from

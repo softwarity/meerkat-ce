@@ -96,6 +96,10 @@ func (h *Handler) schemeJS(w http.ResponseWriter, r *http.Request) {
 
 const pageJS = `(() => {
   if (window.meerkatPage) return;
+  // The nonce the gateway gave this script, read while it runs (currentScript
+  // is null afterwards). A page whose policy restricts style-src refuses a
+  // <style> without it, and the element then renders with no style at all.
+  const NONCE = (document.currentScript && document.currentScript.nonce) || '';
 
   const COOKIE_LANG = 'MEERKAT_LANG', COOKIE_SCHEME = 'MEERKAT_SCHEME';
   const setCookie = (k, v) => { document.cookie = k + '=' + v + ';path=/;max-age=31536000;SameSite=Lax'; };
@@ -615,6 +619,7 @@ const pageJS = `(() => {
       stripHost.setAttribute('data-meerkat-plugged', '');
       stripRoot = stripHost.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
+      if (NONCE) style.nonce = NONCE;
       style.textContent = stripCSS;
       stripRoot.appendChild(style);
       stripRoot.appendChild(document.createElement('div'));

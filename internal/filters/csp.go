@@ -23,6 +23,13 @@ import (
 // are, and a script that is neither the application's nor the gateway's is
 // refused exactly as before.
 //
+// The same goes for STYLES: the user button and the portal draw themselves in
+// a shadow root with a <style> of their own, and a route may inject a CSS
+// block. Under a policy restricting style-src (GeoServer's, nonce-based) those
+// were refused and the portal's bar spread over the whole page, unstyled. The
+// nonce goes into the style directive too, the injected <style> blocks carry
+// it, and the scripts set it on the styles they create.
+//
 // A nonce rather than a hash or a host: under 'strict-dynamic' a host source
 // ('self') is ignored, and a hash names one inline script, not a file. A nonce
 // works under every shape of policy, and lets a script it admits load what it
@@ -35,8 +42,14 @@ const nonceHeader = "Meerkat-Csp-Nonce"
 
 const cspHeader = "Content-Security-Policy"
 
+// cspHeaders are the policies a response may carry: the enforced one, and the
+// one only reported - told too, or its reports name the gateway's scripts as
+// violations every time a page loads.
+var cspHeaders = []string{cspHeader, "Content-Security-Policy-Report-Only"}
+
 var (
 	scriptOpen = regexp.MustCompile(`(?i)<script\b`)
+	styleOpen  = regexp.MustCompile(`(?i)<style\b`)
 	// A policy in the document: <meta http-equiv="Content-Security-Policy" content="...">.
 	metaCSP     = regexp.MustCompile(`(?is)<meta\b[^>]*\bhttp-equiv\s*=\s*["']?content-security-policy["']?[^>]*>`)
 	metaContent = regexp.MustCompile(`(?is)(\bcontent\s*=\s*)("([^"]*)"|'([^']*)')`)
@@ -53,10 +66,13 @@ func Sealed(h http.Header) {
 // fragment carries no script or the page no policy - the common case, which
 // must stay byte for byte what it was.
 func admitScripts(res *http.Response, body, frag []byte) ([]byte, []byte) {
-	if !scriptOpen.Match(frag) {
+	if !scriptOpen.Match(frag) && !styleOpen.Match(frag) {
 		return body, frag
 	}
-	inHeader := len(res.Header.Values(cspHeader)) > 0
+	inHeader := false
+	for _, name := range cspHeaders {
+		inHeader = inHeader || len(res.Header.Values(name)) > 0
+	}
 	inBody := metaCSP.Match(body)
 	if !inHeader && !inBody {
 		return body, frag
@@ -72,14 +88,19 @@ func admitScripts(res *http.Response, body, frag []byte) ([]byte, []byte) {
 		nonce = base64.StdEncoding.EncodeToString(raw)
 		res.Header.Set(nonceHeader, nonce)
 	}
-	frag = scriptOpen.ReplaceAllFunc(frag, func(tag []byte) []byte {
+	withNonce := func(tag []byte) []byte {
 		// A new slice: tag is a window on frag, and appending to it would
 		// write over the bytes that follow.
 		return []byte(string(tag) + ` nonce="` + nonce + `"`)
-	})
-	if inHeader {
-		values := res.Header.Values(cspHeader)
-		res.Header.Del(cspHeader)
+	}
+	frag = scriptOpen.ReplaceAllFunc(frag, withNonce)
+	frag = styleOpen.ReplaceAllFunc(frag, withNonce)
+	for _, name := range cspHeaders {
+		values := res.Header.Values(name)
+		if len(values) == 0 {
+			continue
+		}
+		res.Header.Del(name)
 		for _, v := range values {
 			// One header may carry several policies, separated by commas:
 			// each is enforced on its own, so each has to be told.
@@ -87,7 +108,7 @@ func admitScripts(res *http.Response, body, frag []byte) ([]byte, []byte) {
 			for i, p := range policies {
 				policies[i] = admitNonce(p, nonce)
 			}
-			res.Header.Add(cspHeader, strings.Join(policies, ","))
+			res.Header.Add(name, strings.Join(policies, ","))
 		}
 	}
 	if inBody {
@@ -105,8 +126,8 @@ func admitScripts(res *http.Response, body, frag []byte) ([]byte, []byte) {
 	return body, frag
 }
 
-// admitNonce returns policy with nonce admitted for script elements, and the
-// page's own origin admitted for what those scripts fetch. A policy that says
+// admitNonce returns policy with nonce admitted for script and style elements,
+// and the page's own origin admitted for what those scripts fetch. A policy that says
 // nothing about scripts is returned as it is: it refuses none.
 func admitNonce(policy, nonce string) string {
 	source := "'nonce-" + nonce + "'"
@@ -116,35 +137,19 @@ func admitNonce(policy, nonce string) string {
 	changed := false
 	directives := splitPolicy(policy)
 
-	// What governs <script> elements: the most specific directive present.
-	// When only default-src speaks, a script-src is written from it rather
-	// than touching default-src itself - a nonce there would switch off
-	// 'unsafe-inline' for the styles that fall back on it too.
-	if at, from := governing(directives, "script-src-elem", "script-src", "default-src"); at >= 0 {
-		sources := without(directives[at].sources, "'none'")
-		// The nonce goes in unless the policy lets every inline script run:
-		// a browser that sees a nonce or a hash IGNORES 'unsafe-inline', so
-		// adding ours to "script-src 'self' 'unsafe-inline'" would switch off
-		// the application's own inline scripts to admit ours - which already
-		// run there.
-		if !has(sources, "'unsafe-inline'") || namesAScript(sources) {
-			sources = append(sources, source)
-		}
-		// Without 'strict-dynamic', a script from a file is judged by its
-		// host, and so is what an admitted script loads in turn: the
-		// gateway's scripts come from the page's own origin.
-		if !has(sources, "'strict-dynamic'") && !has(sources, "'self'") && !has(sources, "*") {
-			sources = append(sources, "'self'")
-		}
-		// Nothing added: this policy admits them already, and stays as written.
-		if len(sources) != len(directives[at].sources) {
-			if from == "default-src" {
-				directives = append(directives, directive{name: "script-src", sources: sources})
-			} else {
-				directives[at].sources = sources
-			}
-			changed = true
-		}
+	// What governs <script> elements, then <style> elements: the most
+	// specific directive present. When only default-src speaks, a script-src
+	// (a style-src) is written from it rather than touching default-src
+	// itself - a nonce there would switch off 'unsafe-inline' for everything
+	// else that falls back on it.
+	if admit(&directives, source, "script-src", true, "script-src-elem", "script-src", "default-src") {
+		changed = true
+	}
+	// The injected scripts' own <style> elements (the user button, the
+	// portal's bar) and the CSS blocks a route injects. Inline, so no host is
+	// added: a nonce is all they need.
+	if admit(&directives, source, "style-src", false, "style-src-elem", "style-src", "default-src") {
+		changed = true
 	}
 
 	// What the admitted scripts call: the gateway's own endpoints, on the
@@ -179,6 +184,42 @@ func admitNonce(policy, nonce string) string {
 		out = " " + out
 	}
 	return out
+}
+
+// admit puts the nonce into the directive governing one kind of element, and
+// says whether it changed anything. Written from default-src, it becomes a
+// directive of its own named created: a copy of default-src plus the nonce,
+// never the nonce alone, or the page would lose its own sources for it.
+func admit(directives *[]directive, source, created string, scripts bool, names ...string) bool {
+	at, from := governing(*directives, names...)
+	if at < 0 {
+		return false // nothing restricts this kind of element
+	}
+	d := *directives
+	sources := without(d[at].sources, "'none'")
+	// The nonce goes in unless the policy lets everything inline run: a
+	// browser that sees a nonce or a hash IGNORES 'unsafe-inline', so adding
+	// ours to "script-src 'self' 'unsafe-inline'" would switch off the
+	// application's own inline code to admit ours - which already runs there.
+	if !has(sources, "'unsafe-inline'") || namesAScript(sources) {
+		sources = append(sources, source)
+	}
+	// Without 'strict-dynamic', a script from a file is judged by its host,
+	// and so is what an admitted script loads in turn: the gateway's scripts
+	// come from the page's own origin.
+	if scripts && !has(sources, "'strict-dynamic'") && !has(sources, "'self'") && !has(sources, "*") {
+		sources = append(sources, "'self'")
+	}
+	// Nothing added: this policy admits them already, and stays as written.
+	if len(sources) == len(d[at].sources) {
+		return false
+	}
+	if from == "default-src" {
+		*directives = append(d, directive{name: created, sources: sources})
+	} else {
+		d[at].sources = sources
+	}
+	return true
 }
 
 type directive struct {
