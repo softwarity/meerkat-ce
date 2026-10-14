@@ -1,39 +1,52 @@
 # docker stack deploy -c collector-compose.yml telemetry
 #
-# The OpenTelemetry Collector - the one address every producer sends to - and
-# its logs agent on every node. Tempo (or Jaeger), Prometheus and Loki are
-# yours: set their addresses in collector.yaml.
+# Two tiers of OpenTelemetry Collector:
+#
+#   opentelemetry   the agent, ONE PER NODE (agent.yaml): the address every
+#                   producer sends to, and the reader of the node's container
+#                   logs. Metrics to Prometheus, logs to Loki, traces on to...
+#   otel-gateway    the gateway (gateway.yaml): every span of a trace reaches
+#                   the same replica, which keeps the trace or not once it is
+#                   complete (tail sampling) and writes it into Tempo.
+#
+# Tempo (or Jaeger), Prometheus and Loki are yours: set their addresses in
+# agent.yaml and gateway.yaml.
 
 services:
   opentelemetry:
     image: otel/opentelemetry-collector-contrib:0.161.0
     command: ["--config=/etc/otelcol/config.yaml"]
-    configs:
-      - source: collector.yaml
-        target: /etc/otelcol/config.yaml
-    networks: [meerkat]
-    # NO published port: producers reach it as opentelemetry:4318 on this
-    # network.
-
-  logs-agent:
-    image: otel/opentelemetry-collector-contrib:0.161.0
-    command: ["--config=/etc/otelcol/config.yaml"]
-    # One per node: it reads the containers' logs of the node it runs on.
     deploy:
       mode: global
+    # Root to read the containers' log files of the node it runs on.
     user: root
     configs:
-      - source: logs-agent.yaml
+      - source: agent.yaml
         target: /etc/otelcol/config.yaml
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     networks: [meerkat]
+    # NO published port: producers reach it as opentelemetry:4318 on this
+    # network. Swarm's address lands on any agent, which is fine: the trace id,
+    # not the node, decides which gateway sorts a trace.
+
+  otel-gateway:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    deploy:
+      # More replicas when one is not enough: the agents spread the traces
+      # over them by trace id (tasks.otel-gateway).
+      replicas: 1
+    configs:
+      - source: gateway.yaml
+        target: /etc/otelcol/config.yaml
+    networks: [meerkat]
 
 configs:
-  collector.yaml:
-    file: ./collector.yaml
-  logs-agent.yaml:
-    file: ./logs-agent.yaml
+  agent.yaml:
+    file: ./agent.yaml
+  gateway.yaml:
+    file: ./gateway.yaml
 
 networks:
   meerkat:

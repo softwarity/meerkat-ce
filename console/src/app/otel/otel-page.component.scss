@@ -76,6 +76,19 @@ mat-card > :first-child {
   color: var(--mat-sys-on-surface-variant);
 }
 
+// The two tiers of Collector, in the order the telemetry goes through them.
+.tiers {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  line-height: 1.5;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+
+  li + li {
+    margin-top: 6px;
+  }
+}
+
 .row {
   display: flex;
   align-items: center;

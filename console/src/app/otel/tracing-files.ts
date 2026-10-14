@@ -17,8 +17,11 @@ export interface TracingFile {
 }
 
 // The platforms, in the order a reader meets them, and the Collector's files
-// on each. The Grafana files are its companions: a dashboard for the metrics it
-// writes into Prometheus, and the datasources that dashboard reads.
+// on each: the AGENT, one per node (the address producers send to, and the
+// reader of the containers' stdout), and the GATEWAY, which receives the traces
+// alone from every agent and keeps them or not once each is complete. The
+// Grafana files are their companions: a dashboard for the metrics written into
+// Prometheus, and the datasources that dashboard reads.
 export const TRACING_PLATFORMS: readonly {
   key: string;
   label: string;
@@ -29,8 +32,8 @@ export const TRACING_PLATFORMS: readonly {
     label: 'Docker Swarm',
     files: [
       { file: 'swarm/collector-compose.yml', name: 'collector-compose.yml' },
-      { file: 'collector/collector.yaml', name: 'collector.yaml' },
-      { file: 'collector/logs-agent.yaml', name: 'logs-agent.yaml' },
+      { file: 'collector/agent.yaml', name: 'agent.yaml' },
+      { file: 'collector/gateway.yaml', name: 'gateway.yaml' },
       { file: 'collector/grafana-dashboard.json', name: 'grafana-dashboard.json' },
       { file: 'collector/grafana-datasources.yaml', name: 'grafana-datasources.yaml' },
     ],
@@ -39,9 +42,8 @@ export const TRACING_PLATFORMS: readonly {
     key: 'k8s',
     label: 'Kubernetes',
     files: [
-      { file: 'kubernetes/collector-values.yaml', name: 'collector-values.yaml' },
-      { file: 'kubernetes/collector-logs-values.yaml', name: 'collector-logs-values.yaml' },
-      { file: 'kubernetes/opentelemetry-service.yaml', name: 'opentelemetry-service.yaml' },
+      { file: 'kubernetes/agent-values.yaml', name: 'agent-values.yaml' },
+      { file: 'kubernetes/gateway-values.yaml', name: 'gateway-values.yaml' },
       { file: 'collector/grafana-dashboard.json', name: 'grafana-dashboard.json' },
       { file: 'collector/grafana-datasources.yaml', name: 'grafana-datasources.yaml' },
     ],

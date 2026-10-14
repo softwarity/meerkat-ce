@@ -2,6 +2,16 @@
 
 ## NEXT RELEASE
 
+- **The collector files deploy two tiers, so traces can be sorted once complete.** *No
+  collector yet?* on the OpenTelemetry page now gives an **agent on every node** (the
+  address every service sends to, and the reader of the containers' stdout), which
+  writes metrics to Prometheus and logs and audit to Loki, and a **gateway** that
+  receives the traces alone, every span of a trace on the same replica, and keeps them
+  or not by tail sampling before writing them into Tempo. One collector per node could
+  not sort traces whose spans are made on several nodes. The files are new:
+  `agent.yaml` and `gateway.yaml` (Swarm), `agent-values.yaml` and
+  `gateway-values.yaml` (Kubernetes); the old collector, logs agent and Service files
+  are gone.
 - **plug 2.26.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The MCP screen connects an assistant to all your projects.** The command for
   Claude Code and Gemini CLI now carries their user scope (`-s user`, `--scope user`),

@@ -1,0 +1,55 @@
+# The gateway Collector: the ONE place the traces are sorted, once each is
+# complete (tail sampling), then written into Tempo (or Jaeger). It receives
+# traces only, from the agents (agent.yaml); metrics and logs go from the
+# agents straight to Prometheus and Loki and never come here.
+#
+# Why a second tier at all: a trace's spans are made on several nodes, and the
+# decision to keep it needs ALL of them in one process. An agent sees only its
+# node; this sees the whole trace, because every agent routes a trace by its
+# id - so it can run several replicas, each trace still landing on one.
+#
+# Change the address under `exporters` to your Tempo. Image:
+# otel/opentelemetry-collector-contrib (the distribution with tail sampling).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  batch: {}
+  # Producers send 100% of their traces; what is kept is decided here: every
+  # error, every slow one, a share of the rest. A head sampler throws errors
+  # away at random; this one cannot.
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow
+        type: latency
+        latency:
+          threshold_ms: 1000
+      - name: a-share-of-the-rest
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+exporters:
+  otlphttp/traces:
+    endpoint: http://tempo:4318
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, tail_sampling, batch]
+      exporters: [otlphttp/traces]

@@ -128,16 +128,26 @@ queue, and what does not fit is dropped.
 
 ### No collector yet?
 
-**No collector yet?** on the OpenTelemetry page opens the files to deploy an
-OpenTelemetry Collector, for Docker Swarm or Kubernetes:
+**No collector yet?** on the OpenTelemetry page opens the files to deploy the
+OpenTelemetry Collector in **two tiers**, for Docker Swarm or Kubernetes:
 
-- the Collector's configuration;
-- its logs agent on each node (a DaemonSet on Kubernetes), which reads the
-  containers' outputs;
-- on Kubernetes, an `opentelemetry` Service: every producer sends to
-  `opentelemetry:4318`;
+- **an agent on every node** (a DaemonSet on Kubernetes, a global service on
+  Swarm): the one address every service sends to, `opentelemetry:4318`, and the
+  reader of the containers' stdout in OpenTelemetry JSON. It writes the
+  **metrics to Prometheus** and the **logs and audit to Loki**, and passes the
+  **traces only** to the gateway. On Kubernetes its Service keeps each pod on
+  the agent of its own node (`internalTrafficPolicy: Local`);
+- **a gateway**, which receives the traces from every agent, every span of a
+  trace on the same replica (the agents route by trace id, through the
+  load balancing exporter). Once a trace is complete it keeps it or not - **tail
+  sampling**: every error, every slow one, a share of the rest - and writes it
+  into **Tempo**;
 - two Grafana companion files: the datasources (Prometheus, Tempo, Loki) and a
   dashboard for the [metrics](/docs/operations/metrics).
+
+Why two tiers: the spans of one trace are made on several nodes, and an agent
+sees only its own, so it cannot decide which traces to keep. With the gateway
+deciding, record **100%** on this page and let it pick.
 
 ![No collector yet? opens a drawer with the files to deploy one, for Docker Swarm or for Kubernetes](img/console/opentelemetry-collector.webp)
 

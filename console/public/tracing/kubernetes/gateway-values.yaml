@@ -1,0 +1,80 @@
+# helm upgrade --install gateway open-telemetry/opentelemetry-collector -f gateway-values.yaml
+# helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+#
+# The gateway Collector: the ONE place the traces are sorted, once each is
+# complete (tail sampling), then written into Tempo. It receives traces only,
+# from the agents (agent-values.yaml); metrics and logs go from the agents
+# straight to Prometheus and Loki and never come here.
+#
+# Why a second tier at all: a trace's spans are made on several nodes, and the
+# decision to keep it needs ALL of them in one process. An agent sees only its
+# node; this sees the whole trace, because every agent routes a trace by its
+# id over the replicas listed by the headless Service below - so it can run
+# several, each trace still landing on one.
+
+mode: deployment
+replicaCount: 1
+fullnameOverride: otel-gateway
+image:
+  repository: otel/opentelemetry-collector-contrib
+
+# Headless: the agents resolve every replica's address and choose by trace id.
+service:
+  clusterIP: None
+
+ports:
+  otlp-http:
+    enabled: false
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+config:
+  # The chart ships receivers we do not use; null removes them.
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+    otlp:
+      protocols:
+        http: null
+  processors:
+    # Producers send 100%; what is kept is every error, every slow one, and a
+    # share of the rest. A head sampler throws errors away at random; this one
+    # cannot. It holds every span of a trace until the decision: memory.
+    tail_sampling:
+      decision_wait: 10s
+      num_traces: 50000
+      policies:
+        - name: errors
+          type: status_code
+          status_code:
+            status_codes: [ERROR]
+        - name: slow
+          type: latency
+          latency:
+            threshold_ms: 1000
+        - name: a-share-of-the-rest
+          type: probabilistic
+          probabilistic:
+            sampling_percentage: 10
+  exporters:
+    otlphttp/tempo:
+      endpoint: http://tempo:4318
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, tail_sampling, batch]
+        exporters: [otlphttp/tempo]
+      metrics: null
+      logs: null
+
+resources:
+  limits:
+    memory: 512Mi

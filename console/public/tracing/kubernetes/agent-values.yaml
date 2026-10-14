@@ -1,0 +1,153 @@
+# helm upgrade --install agent open-telemetry/opentelemetry-collector -f agent-values.yaml
+# helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+#
+# The agent Collector, ONE PER NODE (a DaemonSet), and the cluster's one
+# address for telemetry: opentelemetry:4318 (OTLP/HTTP) and :4317 (gRPC). The
+# chart's Service sends each pod to the agent of ITS OWN node
+# (internalTrafficPolicy: Local), so telemetry does not cross the cluster to
+# be received. From here:
+#
+#   traces   -> the gateway (gateway-values.yaml), routed by trace id: it sorts
+#               them once complete (tail sampling) and writes them into Tempo
+#   metrics  -> Prometheus (its OTLP receiver)
+#   logs     -> Loki, pushed ones and the containers' stdout alike, labelled
+#               meerkat.stream = "audit" or "logs"
+#
+# A line a container writes in OpenTelemetry's JSON log format is decoded
+# field by field:
+#
+#   {"timestamp": "...", "severity_text": "INFO", "body": "...",
+#    "trace_id": "...", "span_id": "...",
+#    "attributes": {...}, "resource": {"service.name": "..."}}
+#
+# Any other line - plain text, or JSON of another shape - travels as it is,
+# with the pod, the container and the namespace it came from.
+
+mode: daemonset
+fullnameOverride: opentelemetry
+image:
+  # contrib: the distribution with the load balancing exporter, the file
+  # reader and the transform processor.
+  repository: otel/opentelemetry-collector-contrib
+
+# A DaemonSet gets no Service unless asked; this one is the address.
+service:
+  enabled: true
+
+presets:
+  logsCollection:
+    enabled: true
+
+# Only OTLP is received: no port for the protocols this does not speak.
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+    filelog:
+      operators:
+        # The runtime's own wrapping (CRI or Docker): the pod, the container,
+        # the stream, and the line itself in the body.
+        - type: container
+          id: container-parser
+        # An OpenTelemetry JSON line: decode it. Anything else goes on as is.
+        - type: json_parser
+          id: otel-json
+          if: 'body matches "^\\{.*\"severity_text\""'
+          parse_from: body
+          parse_to: attributes["otel"]
+          on_error: send_quiet
+        - type: time_parser
+          if: 'attributes["otel"]?.timestamp != nil'
+          parse_from: attributes["otel"].timestamp
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+          on_error: send_quiet
+        - type: severity_parser
+          if: 'attributes["otel"]?.severity_text != nil'
+          parse_from: attributes["otel"].severity_text
+          on_error: send_quiet
+        - type: trace_parser
+          if: 'attributes["otel"]?.trace_id != nil'
+          trace_id:
+            parse_from: attributes["otel"].trace_id
+          span_id:
+            parse_from: attributes["otel"].span_id
+          on_error: send_quiet
+        - type: move
+          if: 'attributes["otel"]?.body != nil'
+          from: attributes["otel"].body
+          to: body
+        - type: move
+          if: 'attributes["otel"]?.resource != nil and attributes["otel"].resource["service.name"] != nil'
+          from: attributes["otel"].resource["service.name"]
+          to: resource["service.name"]
+        - type: move
+          if: 'attributes["otel"]?.attributes != nil'
+          from: attributes["otel"].attributes
+          to: attributes["log"]
+        - type: flatten
+          if: 'attributes["log"] != nil'
+          field: attributes["log"]
+          on_error: send_quiet
+        - type: remove
+          if: 'attributes["otel"] != nil'
+          field: attributes["otel"]
+  processors:
+    # Meerkat marks its audit records meerkat.stream=audit; anything unmarked
+    # is an application log. Loki tells them apart by this resource attribute.
+    transform/stream:
+      log_statements:
+        - context: resource
+          statements:
+            - set(attributes["meerkat.stream"], "logs") where attributes["meerkat.stream"] == nil
+  exporters:
+    # Every span of one trace to the SAME gateway, whichever node made it: the
+    # trace id picks the gateway among the addresses of its headless Service.
+    loadbalancing:
+      routing_key: traceID
+      protocol:
+        otlp:
+          tls:
+            insecure: true
+      resolver:
+        dns:
+          hostname: otel-gateway
+          port: "4317"
+    otlphttp/prometheus:
+      # Prometheus' native OTLP endpoint (--web.enable-otlp-receiver).
+      endpoint: http://prometheus/api/v1/otlp
+    otlphttp/loki:
+      # Loki's native OTLP endpoint.
+      endpoint: http://loki:3100/otlp
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [loadbalancing]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlphttp/prometheus]
+      logs:
+        receivers: [otlp, filelog]
+        processors: [memory_limiter, transform/stream, batch]
+        exporters: [otlphttp/loki]
+
+resources:
+  limits:
+    memory: 256Mi
+
+# Then, in the console: Infra, OpenTelemetry. Set the collector address to
+# http://opentelemetry.<namespace>:4318 and press Test.

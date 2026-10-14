@@ -137,16 +137,29 @@ d'attente bornée, et ce qui n'y tient pas est abandonné.
 ### Pas encore de collecteur ?
 
 Sur la page OpenTelemetry, **No collector yet?** ouvre les fichiers nécessaires
-pour déployer un OpenTelemetry Collector, sous Docker Swarm ou sous Kubernetes :
+pour déployer l'OpenTelemetry Collector **sur deux niveaux**, sous Docker Swarm
+ou sous Kubernetes :
 
-- la configuration du Collector ;
-- son agent de journaux sur chaque nœud (un DaemonSet sous Kubernetes), qui lit
-  les sorties des conteneurs ;
-- sous Kubernetes, un Service `opentelemetry` : chaque producteur envoie ses
-  données à `opentelemetry:4318` ;
+- **un agent sur chaque nœud** (un DaemonSet sous Kubernetes, un service global
+  sous Swarm) : l'adresse unique à laquelle chaque service envoie,
+  `opentelemetry:4318`, et le lecteur des sorties des conteneurs en JSON
+  OpenTelemetry. Il écrit les **métriques dans Prometheus** et les **journaux et
+  l'audit dans Loki**, et ne transmet que les **traces** à la gateway. Sous
+  Kubernetes, son Service garde chaque pod sur l'agent de son propre nœud
+  (`internalTrafficPolicy: Local`) ;
+- **une gateway**, qui reçoit les traces de tous les agents, chaque span d'une
+  même trace sur la même réplique (les agents répartissent par identifiant de
+  trace, avec l'exporteur de répartition de charge). Une fois la trace complète,
+  elle la garde ou non - le **tail sampling** : chaque erreur, chaque trace lente,
+  une part du reste - et l'écrit dans **Tempo** ;
 - deux fichiers d'accompagnement pour Grafana : les sources de données
   (Prometheus, Tempo, Loki) et un tableau de bord pour les
   [métriques](/docs/operations/metrics).
+
+Pourquoi deux niveaux : les spans d'une même trace naissent sur plusieurs nœuds,
+et un agent ne voit que les siens ; il ne peut donc pas décider quelles traces
+garder. C'est la gateway qui décide : enregistrez **100 %** sur cette page et
+laissez-la choisir.
 
 ![No collector yet? ouvre un tiroir contenant les fichiers pour en déployer un, sous Docker Swarm ou sous Kubernetes](img/console/opentelemetry-collector.webp)
 

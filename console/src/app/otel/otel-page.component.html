@@ -10,11 +10,31 @@
   </div>
   <div class="drawer-body">
     <p class="hint" i18n="@@Tracing_collector_hint">
-      Deploy one, then set its address here. Put its UI behind a <b>route on this gateway</b>.
+      Two tiers of Collector, then set the agent's address here. Put their UIs behind a
+      <b>route on this gateway</b>.
+    </p>
+    <!-- The shape, said before the files: a reader who deploys one collector
+         per node finds out the day they want tail sampling that it cannot be
+         done there, a trace's spans being made on several nodes. -->
+    <ol class="tiers">
+      <li i18n="@@Tracing_tier_agent">
+        <b>An agent on every node</b> (DaemonSet, Swarm global): the one address every service
+        sends to, and the reader of the containers' stdout (OpenTelemetry JSON). It writes the
+        <b>metrics to Prometheus</b> and the <b>logs and audit to Loki</b>.
+      </li>
+      <li i18n="@@Tracing_tier_gateway">
+        <b>A gateway</b>: the agents send it the <b>traces only</b>, every span of a trace to the
+        same replica. Once a trace is complete it keeps it or not (<b>tail sampling</b>: every
+        error, every slow one, a share of the rest) and writes it into <b>Tempo</b>.
+      </li>
+    </ol>
+    <p class="hint" i18n="@@Tracing_tier_why">
+      Why two: a trace's spans are made on several nodes, and an agent sees only its own, so it
+      cannot decide which traces to keep. With the gateway deciding, record 100% here.
     </p>
     <p class="hint" i18n="@@Tracing_collector_backend_hint">
-      One collector address for every signal.
-      Includes Grafana sources and a dashboard.
+      Set your Tempo, Prometheus and Loki addresses in the files. Includes Grafana sources and a
+      dashboard.
     </p>
     <mat-accordion class="how">
       @for (p of platforms; track p.key) {

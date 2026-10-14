@@ -1,0 +1,128 @@
+# The agent Collector, one on every node: the ONE address every producer sends
+# to (OTLP on 4318 and 4317), and the reader of what the node's containers
+# write on stdout. From here:
+#
+#   traces   -> the gateway (gateway.yaml), routed by trace id: it sorts them
+#               once complete (tail sampling) and writes them into Tempo
+#   metrics  -> Prometheus, over its OTLP receiver
+#   logs     -> Loki, pushed ones and read ones alike; the audit is kept apart
+#               by meerkat.stream
+#
+# Change the addresses under `exporters` to yours. Image:
+# otel/opentelemetry-collector-contrib (the distribution with the load
+# balancing exporter, the file reader and the transform processor).
+#
+# On Kubernetes the official chart writes the file reading itself (presets:
+# logsCollection) - see agent-values.yaml. This file is for Docker: it reads
+# /var/lib/docker/containers.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+  # What the containers of THIS node write. A line in OpenTelemetry's JSON log
+  # format - what Meerkat writes with its logs "Written for an agent" - is
+  # decoded field by field; any other line travels as it is.
+  filelog:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    start_at: end
+    operators:
+      # Docker's json-file wrapping: {"log": "...", "stream": "...", "time": "..."}
+      - type: json_parser
+        id: docker
+        timestamp:
+          parse_from: attributes.time
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+      - type: move
+        from: attributes.log
+        to: body
+      - type: json_parser
+        id: otel-json
+        if: 'body matches "^\\{.*\"severity_text\""'
+        parse_from: body
+        parse_to: attributes["otel"]
+        on_error: send_quiet
+      - type: severity_parser
+        if: 'attributes["otel"]?.severity_text != nil'
+        parse_from: attributes["otel"].severity_text
+        on_error: send_quiet
+      - type: trace_parser
+        if: 'attributes["otel"]?.trace_id != nil'
+        trace_id:
+          parse_from: attributes["otel"].trace_id
+        span_id:
+          parse_from: attributes["otel"].span_id
+        on_error: send_quiet
+      - type: move
+        if: 'attributes["otel"]?.body != nil'
+        from: attributes["otel"].body
+        to: body
+      - type: move
+        if: 'attributes["otel"]?.resource != nil and attributes["otel"].resource["service.name"] != nil'
+        from: attributes["otel"].resource["service.name"]
+        to: resource["service.name"]
+      - type: move
+        if: 'attributes["otel"]?.attributes != nil'
+        from: attributes["otel"].attributes
+        to: attributes["log"]
+      - type: flatten
+        if: 'attributes["log"] != nil'
+        field: attributes["log"]
+        on_error: send_quiet
+      - type: remove
+        if: 'attributes["otel"] != nil'
+        field: attributes["otel"]
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  batch: {}
+  # Meerkat marks its audit records meerkat.stream=audit; anything unmarked is
+  # an application log. Loki indexes it: its own query, its own retention.
+  transform/stream:
+    log_statements:
+      - context: resource
+        statements:
+          - set(attributes["meerkat.stream"], "logs") where attributes["meerkat.stream"] == nil
+
+exporters:
+  # Every span of one trace to the SAME gateway, whichever node made it: the
+  # trace id picks the gateway, and tasks.otel-gateway lists every replica of
+  # the gateway service (Swarm's DNS for the tasks of a service).
+  loadbalancing:
+    routing_key: traceID
+    protocol:
+      otlp:
+        tls:
+          insecure: true
+    resolver:
+      dns:
+        hostname: tasks.otel-gateway
+        port: "4317"
+  otlphttp/metrics:
+    # Prometheus 3, started with --web.enable-otlp-receiver.
+    endpoint: http://prometheus:9090/api/v1/otlp
+  otlphttp/logs:
+    # Loki 3's native OTLP endpoint.
+    endpoint: http://loki:3100/otlp
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [loadbalancing]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/metrics]
+    logs:
+      receivers: [otlp, filelog]
+      processors: [memory_limiter, transform/stream, batch]
+      exporters: [otlphttp/logs]
