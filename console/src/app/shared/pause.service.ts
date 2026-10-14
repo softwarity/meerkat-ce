@@ -2,6 +2,7 @@ import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LivewireClient, LiveTopic } from '@softwarity/livewire';
 import { ApiService } from '../api.service';
+import { MeService } from '../me.service';
 
 // Whether the gateway is paused for a database move (Configuration > Database).
 // One state for the whole console: the shell shows it to everybody, since it
@@ -14,6 +15,10 @@ export class PauseService {
 
   constructor() {
     this.read();
+    // The stamp is read at once, so this knows who is watching.
+    const me = inject(MeService);
+    void me.ensureLoaded();
+    if (!me.mayWatch()) return;
     new LiveTopic(inject(LivewireClient), 'pause')
       .open(null)
       .pipe(takeUntilDestroyed(inject(DestroyRef)))

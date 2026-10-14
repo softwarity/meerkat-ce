@@ -92,6 +92,7 @@ func (a *API) readMetrics(w http.ResponseWriter, r *http.Request, _ store.User) 
 		}
 		answer.endpoints(a.registry(), from, 0)
 	}
+	answer.Buckets, answer.Samples = orEmpty(answer.Buckets), orEmpty(answer.Samples)
 	writeJSON(w, http.StatusOK, answer)
 }
 

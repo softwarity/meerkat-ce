@@ -95,7 +95,7 @@ func TestUsersCRUDIsRootScoped(t *testing.T) {
 }
 
 func TestTenantScoping(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 
 	// bob has no tenant-creator superpower.
 	if code, _ := f.call(t, "POST", "/api/tenants", `{"name":"acme"}`, f.plainC); code != http.StatusForbidden {
@@ -181,7 +181,7 @@ func TestTenantScoping(t *testing.T) {
 }
 
 func TestTenantCreatorSuperpower(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	// Grant bob the tenant-creator superpower; his creation makes him the owner
 	// (owner_id) AND an ADMIN member (he works in his tenant).
 	code, body := f.call(t, "PUT", "/api/users/bob",
@@ -207,7 +207,7 @@ func TestTenantCreatorSuperpower(t *testing.T) {
 }
 
 func TestGlobalSettings(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	code, body := f.call(t, "GET", "/api/settings", "", f.plainC)
 	if code != http.StatusOK || !strings.Contains(body, `"sessionTTL":"PT30M"`) {
 		t.Fatalf("settings defaults: %d %s", code, body)

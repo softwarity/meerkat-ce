@@ -1,5 +1,5 @@
 import { expect, request, test } from '@playwright/test';
-import { ADMIN_URL, CONSOLE_PORT, DATA_URL } from '../playwright.config';
+import { ADMIN_URL, DATA_URL, HTTPBIN_URL } from '../playwright.config';
 import { authDataFile, authFile } from '../lib/fixtures';
 
 // The belonging axis, over a real gateway (RBAC-06). This is the bug of
@@ -12,7 +12,7 @@ import { authDataFile, authFile } from '../lib/fixtures';
 // access. What is new is that a route can demand an organisation, and that
 // being refused for the lack of one LEADS SOMEWHERE.
 
-const UPSTREAM = `http://localhost:${CONSOLE_PORT}`;
+const UPSTREAM = HTTPBIN_URL;
 const NEWCOMER_PASSWORD = 'e2e-Newcomer-Pass-1';
 
 test('flow-access-levels: a pending account passes "signed in" and is sent to the waiting room by "in an organisation"', async () => {
@@ -81,11 +81,11 @@ test('flow-access-levels: a pending account passes "signed in" and is sent to th
   expect(settled.status(), 'the one-time password must be spent').toBe(303);
 
   // "Signed in" takes them: deliberate, and the reason the level above exists.
-  const onAuth = await data.get('/e2e-auth/en/', { maxRedirects: 0 });
+  const onAuth = await data.get('/e2e-auth/html', { maxRedirects: 0 });
   expect(onAuth.status(), 'a pending account must still pass a plain authenticated route').toBeLessThan(400);
 
   // "In an organisation" does not - and says where to go rather than 403.
-  const onTenant = await data.get('/e2e-tenant/en/', { maxRedirects: 0 });
+  const onTenant = await data.get('/e2e-tenant/html', { maxRedirects: 0 });
   expect(onTenant.status()).toBe(303);
   expect(onTenant.headers()['location']).toBe('/account-pending');
 

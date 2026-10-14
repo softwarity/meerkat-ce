@@ -60,23 +60,37 @@ func RegisterConsole(mux Mux, target string, st *store.Store, sm *session.Manage
 		}
 		// "/" is the least specific pattern: /api/..., /login, /logout and
 		// /healthz keep winning.
-		mux.Handle("/", proxy)
+		mux.Handle("/", noFraming(proxy))
 		slog.Info("console proxied to dev server", "target", target)
 		return nil
 	}
 	if fsys, ok := ui.Build(); ok {
-		mux.Handle("/", consoleHandler(fsys, st, sm))
+		mux.Handle("/", noFraming(consoleHandler(fsys, st, sm)))
 		slog.Info("embedded console mounted")
 		return nil
 	}
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/", noFraming(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = fmt.Fprintf(w,
 			`{"service":"meerkat control plane","console":"not mounted","hint":"this binary was built without 'make ui'; set --console-url (or MEERKAT_CONSOLE_URL) to a console dev server, e.g. http://localhost:4200","api":"/api","login":"/login","path":%q}`,
 			r.URL.Path)
-	})
+	})))
 	return nil
+}
+
+// noFraming forbids every page, this origin's included, to show the console
+// in a frame. A console in someone else's iframe is a clickjacking surface: an
+// operator signed in, a transparent frame over a decoy button, and the click
+// lands on Delete. The console frames OTHER pages of the admin port (the API
+// reference, the theme and portal previews), never itself, and those keep
+// their own SAMEORIGIN; nothing legitimate frames the shell.
+func noFraming(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // consoleHandler serves the SPA at the root. A path that is not a build file

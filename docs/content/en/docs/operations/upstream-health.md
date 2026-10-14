@@ -27,7 +27,11 @@ Two bounds, each inherited separately, at three levels:
 | Connect | accepting the connection, TLS handshake included | `1s` to `30s` |
 | First answer | the wait for the answer's first line - the service is thinking | `1s` to `10m` |
 
-Past either, the caller gets a `502` instead of waiting.
+Past the connect bound the caller gets a `502`: the service cannot be reached (a
+refused connection gets it at once). Past the first-answer bound it gets a `504`
+(Gateway Timeout): the service was reached and did not answer in time. Someone
+watching their `502`s is looking for a service that is down, and a slow one is
+another question.
 
 What is **never** bounded is the body. A download or a websocket already under way
 runs as long as it needs: what is bounded is how long a service may take to accept a

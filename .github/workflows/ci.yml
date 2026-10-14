@@ -128,7 +128,9 @@ jobs:
   #
   # ./internal and ./cmd under the race detector: the concurrency in those
   # packages is the same code in both editions, and this is where it is
-  # watched. No ./ee/...: that tree is this commit with ee/ REMOVED, and naming
+  # watched. The root package too (.): its tests hold the contracts between
+  # files - the License screen against FEATURES.md, the plug pin against the
+  # Dockerfile and go.mod - and no ./... pattern above reached them. No ./ee/...: that tree is this commit with ee/ REMOVED, and naming
   # it here is `FAIL ./ee/... [setup failed]`.
   #
   # The builds: static, no CGO, amd64 and arm64. Linux only, and that is the
@@ -146,7 +148,7 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test
-        run: go test -race ./internal/... ./cmd/...
+        run: go test -race . ./internal/... ./cmd/...
       - name: Build
         env:
           CGO_ENABLED: "0"
@@ -189,6 +191,15 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # Docker Hub through mirror.gcr.io (see the first job that does it).
+      - name: Pull Docker Hub images through mirror.gcr.io
+        run: |
+          cfg=/etc/docker/daemon.json
+          { sudo cat "$cfg" 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > /tmp/daemon.json
+          sudo install -m 0644 /tmp/daemon.json "$cfg"
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{.RegistryConfig.Mirrors}}'
       - name: Run
         env:
           RUNNER_LABEL: ${{ matrix.runner }}
@@ -255,6 +266,19 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
+      # Docker Hub pulls on this runner go through mirror.gcr.io, Google's
+      # public cache of Docker Hub, falling back to Docker Hub for what it does
+      # not hold. Every pull counts against one quota shared by the whole CI,
+      # and a day of runs ran it dry (429 Too Many Requests, the 1.8.0 image).
+      # Set before anything here pulls: it restarts the daemon.
+      - name: Pull Docker Hub images through mirror.gcr.io
+        run: |
+          cfg=/etc/docker/daemon.json
+          { sudo cat "$cfg" 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > /tmp/daemon.json
+          sudo install -m 0644 /tmp/daemon.json "$cfg"
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{.RegistryConfig.Mirrors}}'
       - name: Start Dex
         working-directory: test/ldap
         run: docker compose up -d dex
@@ -317,6 +341,15 @@ jobs:
       - name: Type-check the specs
         working-directory: e2e
         run: npx tsc --noEmit
+      # Docker Hub through mirror.gcr.io (see the first job that does it).
+      - name: Pull Docker Hub images through mirror.gcr.io
+        run: |
+          cfg=/etc/docker/daemon.json
+          { sudo cat "$cfg" 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > /tmp/daemon.json
+          sudo install -m 0644 /tmp/daemon.json "$cfg"
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{.RegistryConfig.Mirrors}}'
       - name: Run integration suite
         working-directory: e2e
         run: npx playwright test

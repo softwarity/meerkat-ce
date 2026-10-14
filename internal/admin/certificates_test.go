@@ -38,7 +38,7 @@ func jsonString(s string) string {
 // argument for having four is that the rooms Meerkat runs in are not alike -
 // and an untested door is a room without TLS.
 func TestTheFourDoors(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 
 	// 1. Import: what a CA e-mailed back, what certbot wrote.
 	certPEM, keyPEM := pemPair(t, "imported.example.com")
@@ -234,7 +234,7 @@ func authority(t *testing.T, f fixture, body string) authorityView {
 // secret an authority holds: a literal never travels back, and a blank field
 // means "leave it alone" rather than "erase it".
 func TestTheExternalAccountKeyFollowsTheVaultRule(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	ctx := context.Background()
 	v := authority(t, f, `{"provider":"zerossl","acceptTos":true,"eabKeyId":"kid-1","eabHmacKey":"c2VjcmV0LWhtYWMta2V5"}`)
 	if v.EABHMACKey != "" || !v.EABSecretSet {
@@ -254,7 +254,7 @@ func TestTheExternalAccountKeyFollowsTheVaultRule(t *testing.T) {
 // TestAnAuthorityIsRefusedAtSaveTimeRatherThanAtRenewalTime: what is missing
 // is said when the authority is saved, naming where to find it.
 func TestAnAuthorityIsRefusedAtSaveTimeRatherThanAtRenewalTime(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	f.api.DiscoverACME = func(context.Context, certs.Authority) error { return nil }
 	for body, want := range map[string]string{
 		`{"provider":"letsencrypt"}`:                          "terms of service",
@@ -286,7 +286,7 @@ func TestAnAuthorityIsRefusedAtSaveTimeRatherThanAtRenewalTime(t *testing.T) {
 // from a custom authority would ride along unseen once Let's Encrypt is
 // chosen - and a private root in place of the public ones fails every call.
 func TestAPublicAuthorityKeepsNothingOfAPrivateOne(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	v := authority(t, f, `{"provider":"custom","directoryUrl":"https://ca.internal/dir","acceptTos":true,"eabKeyId":"kid","eabHmacKey":"c2VjcmV0"}`)
 	f.api.DiscoverACME = func(context.Context, certs.Authority) error { return nil }
 	if code, out := f.call(t, "PUT", "/api/acme/authorities/"+v.ID, `{"provider":"letsencrypt","acceptTos":true,"eabKeyId":"kid"}`, f.rootC); code != http.StatusOK {
@@ -571,7 +571,7 @@ func TestProxiedNamesAreDeclaredPerDoor(t *testing.T) {
 // placed like one, in conflict like one, deleted like one. An authority
 // still asked cannot be deleted.
 func TestAnOrderToTheAuthorityLivesInThePool(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	ctx := context.Background()
 	if code, out := f.call(t, "POST", "/api/certificates/acme", `{"authority":"nobody","names":["shop.example.com"]}`, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "no authority") {
 		t.Fatalf("an order with no authority: %d %s", code, out)

@@ -49,7 +49,7 @@ func TestDiffFields(t *testing.T) {
 // A tenant update records the exact field-level change, and the viewer is
 // scoped: root sees the event, an unrelated tenant admin does not.
 func TestAuditViewerScope(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 
 	// root creates a tenant and makes bob its ADMIN.
 	code, body := f.call(t, "POST", "/api/tenants", `{"name":"acme"}`, f.rootC)

@@ -90,11 +90,15 @@ Fournir la clé par l'environnement évite de l'écrire sur le disque, et la con
 indique lequel des deux cas s'applique à votre installation.
 
 Cette même clé ne scelle pas que le coffre : les **clés privées des certificats**, la
-**clé du compte ACME**, la **clé d'hôte** du tunnel développeur et le **secret TOTP** de
-chaque compte passent eux aussi par elle. Un secret TOTP est un mot de passe qui ne
-change jamais - quiconque le lit peut calculer tous les codes que le compte acceptera à
-l'avenir - de sorte qu'une base copiée n'en contient aucun en clair. Ceux qui ont été
-écrits auparavant sont scellés au démarrage suivant.
+**clé du compte ACME**, la **clé d'hôte** du tunnel développeur, le **secret TOTP** de
+chaque compte, les **clés de signature d'identité** (les moitiés privées du JWKS) et la
+clé qui signe les jetons de test du simulateur de routage passent eux aussi par elle. Un
+secret TOTP est un mot de passe qui ne change jamais - quiconque le lit peut calculer
+tous les codes que le compte acceptera à l'avenir - et une clé de signature signe une
+identité que chaque service derrière la passerelle croit, de sorte qu'une base copiée
+n'en contient aucun en clair. Ceux qui ont été écrits auparavant sont scellés au
+démarrage suivant, et les clés elles-mêmes ne changent pas : les jetons signés avant
+restent valides.
 
 > [!WARNING]
 > **La clé reste un fichier local, même avec une base de données externe.** C'est

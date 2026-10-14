@@ -71,15 +71,31 @@ L'endpoint est activé et affiche son URL, le sélecteur de client est positionn
 Claude Code avec la commande d'une ligne prête à être copiée, et aucun agent n'est
 encore connecté.
 
-Il est livré **désactivé**. L'interrupteur en haut de l'écran l'active et affiche l'URL.
+Il est livré **désactivé**. L'interrupteur en haut de l'écran l'active et affiche l'URL ;
+tant qu'il est désactivé, le reste de l'écran est masqué, puisqu'il n'y a rien à quoi se
+connecter.
 
 **Connect an agent** fournit la commande exacte pour Claude Code, Gemini CLI, Kimi CLI
-et Codex CLI, ou un bloc JSON générique pour tout autre client. Le premier appel ouvre
+et Codex CLI, ou un bloc JSON générique pour tout autre client. Chaque commande installe
+le serveur à la portée la plus large que le client propose, **tous vos projets** :
+`-s user` pour Claude Code, `--scope user` pour Gemini CLI, et Codex le garde de toute
+façon dans `~/.codex/config.toml`. Le premier appel ouvre
 votre navigateur sur cette console : vous vous connectez, vous choisissez ce que
 l'agent a le droit de faire, et **aucune clé n'est jamais écrite dans un fichier**.
 
 **Connected agents** liste les agents connectés, avec le périmètre de chacun et la date
 de sa dernière utilisation, et permet d'en déconnecter un en un clic.
+
+Quand la console est servie en HTTPS avec un certificat d'une **autorité privée** (ou
+auto-signé), l'agent le refuse tant qu'il ne fait pas confiance à cette autorité. Le
+panneau *My certificate comes from a private authority*, affiché seulement en HTTPS,
+donne la commande pour l'agent choisi et pour macOS, Linux ou Windows : Claude Code et
+Gemini CLI tournent sur Node.js et lisent `NODE_EXTRA_CA_CERTS`, qui ajoute votre
+autorité aux autorités publiques (sur macOS :
+`echo 'export NODE_EXTRA_CA_CERTS=/chemin/vers/ca.crt' >> ~/.zshrc && source ~/.zshrc`,
+puis relancer l'agent depuis un nouveau terminal) ; Codex CLI fait confiance aux
+autorités du système, la vôtre s'ajoute donc au magasin du système ; Kimi CLI ne
+documente aucun réglage propre, et c'est le magasin du système qui est proposé.
 
 Pour un client incapable de s'authentifier par un navigateur, le panneau *My client
 cannot do that* affiche la même commande avec un en-tête Bearer et renvoie vers

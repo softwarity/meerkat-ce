@@ -79,7 +79,7 @@ cœur change d'état, la liste se met à jour sans rechargement.
 - **Global** rassemble ce qui vaut pour toutes les routes à la fois :
   l'interrupteur **Unavailable**, qui les ferme toutes (les pages de connexion
   restent en service, et quiconque administre ou développe ici continue de
-  passer), le temps qu'une route attend un service avant de répondre 502, et le
+  passer), le temps qu'une route attend un service avant de répondre 504, et le
   plafond de ce qu'un filtre de réécriture du corps peut garder en mémoire. Tant
   que l'interrupteur est actif, le bouton lui-même vire à l'ambre et affiche
   *Unavailable* : personne n'a besoin de l'ouvrir pour le savoir.
@@ -183,7 +183,9 @@ Sur une route en mode proxy, vous réglez aussi :
   que la gateway a découverts.
 - **When the service is slow or down** - les timeouts de connexion et de première
   réponse, qui reprennent les valeurs de Global tant qu'ils ne sont pas réglés
-  ici. Passé l'un ou l'autre, l'appelant reçoit une réponse 502. Ce qui suit la
+  ici. Passé le timeout de connexion, l'appelant reçoit un 502 (le service est
+  injoignable) ; passé celui de première réponse, un 504 (il a été joint et n'a
+  pas répondu à temps). Ce qui suit la
   première ligne n'est jamais borné : un téléchargement ou un websocket dure
   aussi longtemps que nécessaire.
 - **Stop calling this service when it stops answering** - le disjoncteur : après

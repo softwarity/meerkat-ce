@@ -45,7 +45,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # The base images (golang, node, busybox) through mirror.gcr.io, Google's
+      # public cache of Docker Hub, falling back to Docker Hub for what it does
+      # not hold. Docker Hub counts every resolution of a base against one
+      # quota shared by every job of every run, and a day of CI ran it dry: the
+      # 1.8.0 image died resolving golang:1.27 (429). Pushes still go to Docker
+      # Hub; a mirror only serves pulls.
       - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
       # One architecture, loaded into the runner's Docker: the script copies it
       # from there into the cluster. Nothing is pushed.
       - name: Build the image under test
@@ -79,7 +89,12 @@ jobs:
           ref: ${{ inputs.ref }}
           token: ${{ steps.token.outputs.token }}
           persist-credentials: false
+      # Bases through mirror.gcr.io (see the first build of this file).
       - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
       - name: Build the image under test
         uses: docker/build-push-action@v7
         with:

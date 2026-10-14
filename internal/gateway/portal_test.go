@@ -123,6 +123,26 @@ func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
 	}
 }
 
+// The portal's HTML page follows the gateway's code: an upstream that does not
+// answer in time is a 504 there too, still carrying the bar.
+func TestUnavailableUIPageSaysTimeoutWith504(t *testing.T) {
+	r := pathRoute("r1", "demo", 1, "/demo/**", hangingUpstream(t),
+		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
+	r.IsUI = true
+	r.Timeouts = &store.RouteTimeouts{Response: "PT1S"}
+	on := routerWithPortal(t,
+		store.PortalConfig{Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
+			Entries: []store.PortalEntry{{RouteID: "r1"}}},
+		r)
+	res, body := get(t, on, "/demo/x")
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Fatalf("want 504, got %d", res.StatusCode)
+	}
+	if !strings.Contains(body, "<meerkat-portal-nav>") {
+		t.Errorf("the 504 page must carry the portal bar:\n%s", body)
+	}
+}
+
 // TestPortalFragmentOnlyForUIRoutes: a service route wears no portal bar - the
 // bar is a UI-only injection, like the button it replaces.
 func TestPortalFragmentOnlyForUIRoutes(t *testing.T) {

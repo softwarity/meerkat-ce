@@ -1,0 +1,557 @@
+{
+  "_why": "Every routed screen of the console (console/src/app/app.routes.ts), who may open it, and the title that says it rendered. Read by tests/every-screen.spec.ts (QUAL-01), which also fails when app.routes.ts routes a component this file does not list. 'edition': 'ee' needs several organisations, 'ce' is a single-organisation screen the multi-organisation console replaces by Tenants. 'refused' lists the reads a screen makes that its viewer is refused today, each with why; any OTHER failed request fails the spec, so a new one is caught and an old one is a decision written down.",
+  "containers": [
+    "./theme/built-in-pages/built-in-pages.component",
+    "./identity/tenant-page/tenant-page.component",
+    "./gateway/configuration/configuration-page.component"
+  ],
+  "screens": [
+    {
+      "path": "/infra/routes",
+      "module": "./routes/routes-page/routes-page.component",
+      "title": "Routes",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/infra/endpoint-security",
+      "module": "./routes/endpoint-security/endpoint-security.component",
+      "title": "Endpoint security",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "refused": [
+        {
+          "profile": "infra-admin",
+          "request": "GET /api/roles",
+          "why": "the access editor offers the role catalogue, which only an application admin may read (TEST-PLAN: to decide)"
+        },
+        {
+          "profile": "infra-admin",
+          "request": "GET /api/users",
+          "why": "the access editor offers named accounts, which only an application admin may list (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/infra/endpoint-limits",
+      "module": "./routes/endpoint-security/endpoint-security.component",
+      "title": "Endpoint rate limits",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "refused": [
+        {
+          "profile": "infra-admin",
+          "request": "GET /api/roles",
+          "why": "the access editor offers the role catalogue, which only an application admin may read (TEST-PLAN: to decide)"
+        },
+        {
+          "profile": "infra-admin",
+          "request": "GET /api/users",
+          "why": "the access editor offers named accounts, which only an application admin may list (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/infra/endpoint-audit",
+      "module": "./routes/endpoint-security/endpoint-security.component",
+      "title": "Endpoint audit",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "refused": [
+        {
+          "profile": "infra-admin",
+          "request": "GET /api/roles",
+          "why": "the access editor offers the role catalogue, which only an application admin may read (TEST-PLAN: to decide)"
+        },
+        {
+          "profile": "infra-admin",
+          "request": "GET /api/users",
+          "why": "the access editor offers named accounts, which only an application admin may list (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/infra/auth-providers",
+      "module": "./gateway/auth-providers/auth-providers-page.component",
+      "title": "Authentication",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/infra/mail-relay",
+      "module": "./gateway/mail-relay-page.component",
+      "title": "Mail relay",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "refused": [
+        {
+          "profile": "infra-admin",
+          "request": "GET /api/locales",
+          "why": "the mail templates name the languages, which only an application admin may read (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/infra/tls",
+      "module": "./gateway/tls/tls-page.component",
+      "title": "Domains & TLS",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/infra/access-tokens",
+      "module": "./gateway/access-tokens-page.component",
+      "title": "Access tokens",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/infra/mcp",
+      "module": "./gateway/mcp-page.component",
+      "title": "MCP",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/infra/model",
+      "module": "./model/user-model.component",
+      "title": "Model",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/infra/opentelemetry",
+      "module": "./otel/otel-page.component",
+      "title": "OpenTelemetry",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/infra/plug",
+      "module": "./plug/plug-page.component",
+      "title": "Plug",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/application/general",
+      "module": "./settings/general-page.component",
+      "title": "General",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/roles",
+      "module": "./identity/roles-page/roles-page.component",
+      "title": "Roles",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/groups",
+      "module": "./identity/app-scoped/app-groups.component",
+      "title": "Groups",
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "edition": "ce",
+      "refused": [
+        {
+          "profile": "app-admin",
+          "request": "GET /api/tenants/default",
+          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+        },
+        {
+          "profile": "app-admin",
+          "request": "GET /api/tenants/default/groups",
+          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/application/users",
+      "module": "./identity/users-page/users-page.component",
+      "title": "Users",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/members",
+      "module": "./identity/app-scoped/app-members.component",
+      "title": "Members",
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "edition": "ce",
+      "refused": [
+        {
+          "profile": "app-admin",
+          "request": "GET /api/tenants/default",
+          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+        },
+        {
+          "profile": "app-admin",
+          "request": "GET /api/tenants/default/members",
+          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+        },
+        {
+          "profile": "app-admin",
+          "request": "GET /api/tenants/default/groups",
+          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/application/group-rules",
+      "module": "./identity/app-scoped/app-rules.component",
+      "title": "Group rules",
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "edition": "ce",
+      "refused": [
+        {
+          "profile": "app-admin",
+          "request": "GET /api/tenants/default",
+          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/application/built-in-pages/theme",
+      "module": "./theme/built-in-pages/theme-tab.component",
+      "title": "Built-in pages",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/built-in-pages/layout",
+      "module": "./theme/built-in-pages/layout-tab.component",
+      "title": "Built-in pages",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/built-in-pages/branding",
+      "module": "./theme/built-in-pages/branding-tab.component",
+      "title": "Built-in pages",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/built-in-pages/locale",
+      "module": "./theme/built-in-pages/locale-tab.component",
+      "title": "Built-in pages",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/portal",
+      "module": "./portal/portal-page.component",
+      "title": "Portal",
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "refused": [
+        {
+          "profile": "app-admin",
+          "request": "GET /api/routes",
+          "why": "the portal places UI routes, which only an infra admin may list: an application admin builds a portal with nothing to place (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/application/security",
+      "module": "./settings/security-page.component",
+      "title": "Security",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/application/access-tokens",
+      "module": "./gateway/access-tokens-page.component",
+      "title": "Access tokens",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/tenants",
+      "module": "./identity/no-tenant.component",
+      "title": "General",
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "edition": "ee"
+    },
+    {
+      "path": "/tenants/{tenantId}/general",
+      "module": "./identity/tenant-sections/tenant-general.component",
+      "title": "General",
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "edition": "ee"
+    },
+    {
+      "path": "/tenants/{tenantId}/groups",
+      "module": "./identity/tenant-sections/tenant-groups.component",
+      "title": "Groups",
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "edition": "ee",
+      "refused": [
+        {
+          "profile": "tenant-admin",
+          "request": "GET /api/roles",
+          "why": "a group grants catalogue roles, which only an application admin may read (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/tenants/{tenantId}/members",
+      "module": "./identity/tenant-sections/tenant-members.component",
+      "title": "Members",
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "edition": "ee",
+      "refused": [
+        {
+          "profile": "tenant-admin",
+          "request": "GET /api/users",
+          "why": "adding a member offers the accounts, which only an application admin may list (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/tenants/{tenantId}/rules",
+      "module": "./identity/tenant-sections/tenant-rules.component",
+      "title": "Group rules",
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "edition": "ee",
+      "refused": [
+        {
+          "profile": "tenant-admin",
+          "request": "GET /api/auth-providers",
+          "why": "a rule names an authentication provider, which only an infra admin may read (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/tenants/{tenantId}/danger",
+      "module": "./identity/tenant-sections/tenant-danger.component",
+      "title": "Danger zone",
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "edition": "ee"
+    },
+    {
+      "path": "/vault",
+      "module": "./gateway/vault-page.component",
+      "title": "Vault",
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/data-plane/audit",
+      "module": "./settings/audit-page.component",
+      "title": "Audit",
+      "allowed": [
+        "root",
+        "app-admin",
+        "tenant-admin"
+      ]
+    },
+    {
+      "path": "/data-plane/sessions",
+      "module": "./identity/sessions-page/sessions-page.component",
+      "title": "Sessions",
+      "allowed": [
+        "root",
+        "app-admin",
+        "tenant-admin"
+      ]
+    },
+    {
+      "path": "/data-plane/scheduler",
+      "module": "./scheduler/scheduler-page.component",
+      "title": "Scheduler",
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "refused": [
+        {
+          "profile": "app-admin",
+          "request": "GET /api/routes",
+          "why": "the route filter names routes, which only an infra admin may list; the rows show route ids instead (TEST-PLAN: to decide)"
+        }
+      ]
+    },
+    {
+      "path": "/data-plane/metrics",
+      "module": "./metrics/metrics-page.component",
+      "title": "Metrics",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/data-plane/issues",
+      "module": "./issues/issues-page.component",
+      "title": "Issues",
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin"
+      ]
+    },
+    {
+      "path": "/system/audit",
+      "module": "./settings/audit-page.component",
+      "title": "Audit",
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin"
+      ]
+    },
+    {
+      "path": "/system/logs",
+      "module": "./logs/logs-page.component",
+      "title": "Logs",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
+      "path": "/system/sessions",
+      "module": "./identity/sessions-page/sessions-page.component",
+      "title": "Sessions",
+      "allowed": [
+        "root"
+      ]
+    },
+    {
+      "path": "/system/configuration/database",
+      "module": "./gateway/configuration/database-tab.component",
+      "title": "Configuration",
+      "allowed": [
+        "root"
+      ]
+    },
+    {
+      "path": "/system/configuration/history",
+      "module": "./gateway/configuration/history-tab.component",
+      "title": "Configuration",
+      "allowed": [
+        "root"
+      ]
+    },
+    {
+      "path": "/system/configuration/management",
+      "module": "./gateway/configuration/management-tab.component",
+      "title": "Configuration",
+      "allowed": [
+        "root"
+      ]
+    },
+    {
+      "path": "/system/api",
+      "module": "./gateway/api-docs-page.component",
+      "title": "API reference",
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin"
+      ]
+    },
+    {
+      "path": "/system/release-notes",
+      "module": "./shared/release-notes.component",
+      "title": "Release notes",
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin",
+        "user"
+      ]
+    },
+    {
+      "path": "/system/license",
+      "module": "./settings/license-page.component",
+      "title": "License",
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin",
+        "tenant-admin",
+        "user"
+      ]
+    }
+  ]
+}

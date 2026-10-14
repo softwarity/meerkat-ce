@@ -153,3 +153,24 @@ func TestWithoutABreakerNothingIsRefused(t *testing.T) {
 		t.Errorf("the upstream was called %d times, want 8", calls.Load())
 	}
 }
+
+// The gateway's own 504 counts against the upstream like a 502: a service
+// that stops answering trips the circuit as surely as one that is down.
+func TestAnUpstreamThatStopsAnsweringTripsTheCircuit(t *testing.T) {
+	r := pathRoute("r1", "slow", 1, "/**", hangingUpstream(t))
+	r.Timeouts = &store.RouteTimeouts{Response: "PT1S"}
+	r.Breaker = &store.CircuitBreaker{Enabled: true, Trip: 2, Cool: "PT1M"}
+	rt := newRouter(t, r)
+	for range 2 {
+		if res, _ := get(t, rt, "/x"); res.StatusCode != http.StatusGatewayTimeout {
+			t.Fatalf("before the trip: %d, want 504", res.StatusCode)
+		}
+	}
+	start := time.Now()
+	if res, _ := get(t, rt, "/x"); res.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("after two 504: %d, want 503 from the open circuit", res.StatusCode)
+	}
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Errorf("the open circuit still waited on the upstream (%v)", elapsed)
+	}
+}

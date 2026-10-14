@@ -2,11 +2,14 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/m3color"
+	"github.com/softwarity/meerkat/internal/vault"
 )
 
 // The ledger: what a CREATE cannot say.
@@ -49,6 +52,65 @@ var migrations = []migration{
 	{Version: 73, Name: "certificates are a pool, placed on planes", Up: certificatesPlaced},
 	{Version: 77, Name: "a theme is its source colours", Up: themesFromColours},
 	{Version: 80, Name: "a route's custom code is an ordered list", Up: injectionsFromBlocks},
+	{Version: 83, Name: "the signing keys are sealed", Up: signingKeysSealed},
+}
+
+// signingKeysSealed seals, under the master key, the two settings that were
+// stored in clear (v83): the identity signing keys and the simulator's token
+// key. Whoever read a dump of the database could sign a JWT every service
+// trusts, or a simulated identity the data plane believes. The keys do not
+// change, only how they are stored, so every token signed before still
+// verifies.
+func signingKeysSealed(ctx context.Context, tx *transaction) error {
+	return sealPlainSettings(ctx, tx, tx.cipher)
+}
+
+// settingsDB is what sealing a setting needs, inside a transaction or not.
+type settingsDB interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// sealPlainSettings seals the signing keys and the simulator's key where they
+// are still in clear. The v83 step runs it once; every start runs it again
+// (sealAtRest), because during a rolling upgrade a node of the previous build
+// still runs beside the migrated database, and one asked for a simulated token
+// finds the sealed key unreadable and writes a fresh one in clear. A row is
+// only rewritten if it still holds what was read.
+func sealPlainSettings(ctx context.Context, db settingsDB, cipher *vault.Cipher) error {
+	for _, key := range []string{SettingSigningKeys, SettingSimulationKey} {
+		var stored string
+		err := db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, key).Scan(&stored)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("setting %s: %w", key, err)
+		}
+		// The signing keys were a JSON object, the simulator's key a JSON
+		// string: the plain value is what the readers parse.
+		plain := stored
+		var text string
+		if json.Unmarshal([]byte(stored), &text) == nil {
+			if strings.HasPrefix(text, sealedSetting) {
+				continue
+			}
+			plain = text
+		}
+		blob, err := cipher.Seal(plain)
+		if err != nil {
+			return fmt.Errorf("setting %s: %w", key, err)
+		}
+		encoded, err := json.Marshal(sealedSetting + blob)
+		if err != nil {
+			return fmt.Errorf("setting %s: %w", key, err)
+		}
+		if _, err := db.ExecContext(ctx, `UPDATE settings SET value = ? WHERE key = ? AND value = ?`,
+			string(encoded), key, stored); err != nil {
+			return fmt.Errorf("setting %s: %w", key, err)
+		}
+	}
+	return nil
 }
 
 // injectionsFromBlocks turns the two free blocks of a UI route (customCss,
@@ -330,6 +392,7 @@ func (s *Store) runMigrations(steps []migration, from int) error {
 		if err != nil {
 			return fmt.Errorf("store: migration %d (%s): %w", m.Version, m.Name, err)
 		}
+		tx.cipher = s.vaultCipher
 		if err := m.Up(ctx, tx); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("store: migration %d (%s): %w", m.Version, m.Name, err)

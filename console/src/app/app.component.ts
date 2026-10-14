@@ -132,7 +132,8 @@ export class AppComponent {
     // Role-based UI visibility (styles/_roles.scss): MeService loads /api/me and
     // mirrors the user's capabilities and tenant-admin status as classes on
     // <body>; `any-role="..."` elements show accordingly.
-    inject(MeService).ensureLoaded();
+    const me = inject(MeService);
+    void me.ensureLoaded();
     // Leave for the login page ON TIME rather than when a click finds out
     // (the 401 interceptor cannot fire before a request does), and tell the
     // other tabs so one sign-in serves them all.
@@ -145,7 +146,8 @@ export class AppComponent {
     // also what opens the one socket for the tab, so the indicator beside the
     // user menu reports the connection from the first paint rather than from
     // whichever screen happened to watch something.
-    inject(LiveChangesService).on('tenant', () => this.loadTenants());
+    // Not for somebody who administers nothing: the channel refuses them.
+    if (me.mayWatch()) inject(LiveChangesService).on('tenant', () => this.loadTenants());
   }
 
   // Clicking "Tenants" lands on the first org's options; the drawer lists the rest.

@@ -20,7 +20,7 @@ import (
 // different door: saving changes nothing, deleting changes nothing, and only
 // activating touches what is served.
 func TestSeveralConfigurations(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "hello from "+r.URL.Path)

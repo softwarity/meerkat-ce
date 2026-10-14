@@ -117,7 +117,7 @@ to the sentence a human reads on it, never to its doctype.
 
 Nothing special happens, and that is the point: the call comes in by the front
 door, so it gets what a browser would have got. The gateway answers `502` for a
-service that is not responding, the run closes as failed, and the console keeps
+service it cannot reach and `504` for one that does not answer in time, the run closes as failed, and the console keeps
 the sentence: "502 Bad Gateway: Unavailable This application is not responding".
 
 - **Three attempts, then the next turn.** A failure worth trying again - see

@@ -12,7 +12,7 @@ import (
 // tokens of the routing simulator (DEV-10).
 //
 // A SECRET, on the same terms as SettingSigningKeys: never returned by an API,
-// never logged. Whoever holds it can mint a token naming any username and any
+// never logged, sealed under the master key. Whoever holds it can mint a token naming any username and any
 // role, and the data plane will believe it.
 //
 // It lives in the database because it used to be drawn at every boot, and that
@@ -51,7 +51,7 @@ func (s *Store) EnsureSimulationKey(ctx context.Context) ([]byte, error) {
 		if _, err := rand.Read(fresh); err != nil {
 			return fmt.Errorf("store: simulation key: %w", err)
 		}
-		if err := s.SetSetting(ctx, SettingSimulationKey, base64.StdEncoding.EncodeToString(fresh)); err != nil {
+		if err := s.setSealed(ctx, SettingSimulationKey, base64.StdEncoding.EncodeToString(fresh)); err != nil {
 			return fmt.Errorf("store: simulation key: %w", err)
 		}
 		key = fresh
@@ -64,8 +64,8 @@ func (s *Store) EnsureSimulationKey(ctx context.Context) ([]byte, error) {
 }
 
 func (s *Store) simulationKey(ctx context.Context) ([]byte, error) {
-	var encoded string
-	if err := s.GetSetting(ctx, SettingSimulationKey, &encoded); err != nil {
+	encoded, err := s.getSealed(ctx, SettingSimulationKey)
+	if err != nil {
 		return nil, err
 	}
 	key, err := base64.StdEncoding.DecodeString(encoded)

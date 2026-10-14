@@ -2,6 +2,9 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,7 +17,8 @@ import (
 //
 // One key seals everything this database must not hold in clear: the vault's
 // secrets, the certificates' private keys, the ACME account, the developer
-// tunnel's host key and the TOTP secrets. Rotating it is a restart with two
+// tunnel's host key, the TOTP secrets, the identity signing keys and the
+// simulator's token key. Rotating it is a restart with two
 // keys: MEERKAT_VAULT_KEY is the new one, MEERKAT_VAULT_KEY_PREVIOUS the one it
 // replaces. Each node then reads both, and the first to start seals again,
 // under the new key, everything the old one sealed. Once every node runs with
@@ -22,8 +26,9 @@ import (
 // a node still on the old key alone is the only thing that breaks, and it
 // breaks loudly, as a wrong key always has.
 
-// loadCipher reads the key (and, during a rotation, the previous one), then
-// seals again whatever needs it.
+// loadCipher reads the key (and, during a rotation, the previous one). It runs
+// before the schema is migrated: a step of the ledger may have to seal what an
+// older build stored in clear (v83).
 func (s *Store) loadCipher(dataDir string) error {
 	key, err := vault.LoadOrCreateKey(dataDir, os.Getenv("MEERKAT_VAULT_KEY"))
 	if err != nil {
@@ -33,9 +38,13 @@ func (s *Store) loadCipher(dataDir string) error {
 	if err != nil {
 		return err
 	}
-	if s.vaultCipher, err = vault.NewCipher(key, previous); err != nil {
-		return err
-	}
+	s.vaultCipher, err = vault.NewCipher(key, previous)
+	return err
+}
+
+// sealAtRest runs once the schema is current: during a rotation it seals again
+// whatever the previous key sealed, then seals what is still in clear.
+func (s *Store) sealAtRest() error {
 	ctx := context.Background()
 	if s.vaultCipher.Rotating() {
 		n, err := s.resealStale(ctx)
@@ -44,6 +53,11 @@ func (s *Store) loadCipher(dataDir string) error {
 		}
 		slog.Info("vault key rotation: sealed again under the new key", "values", n,
 			"next", "once every node runs with the new key, remove "+vault.PreviousKeyEnv)
+	}
+	// What a node of the previous build may have written in clear beside a
+	// migrated database, during a rolling upgrade (see sealPlainSettings).
+	if err := sealPlainSettings(ctx, s.db, s.vaultCipher); err != nil {
+		return fmt.Errorf("store: seal the signing keys: %w", err)
 	}
 	// The TOTP secrets written in clear before they were sealed.
 	return s.sealStoredTOTP(ctx)
@@ -76,21 +90,60 @@ func (s *Store) resealStale(ctx context.Context) (int, error) {
 		}
 		total += n
 	}
-	// The developer tunnel's host key is a setting, stored as JSON.
-	var sealed string
-	if err := s.GetSetting(ctx, SettingPlugHostKey, &sealed); err == nil && sealed != "" {
-		plain, stale, err := s.vaultCipher.OpenStale(sealed)
+	for _, c := range sealedSettings {
+		n, err := s.resealSetting(ctx, c.key, c.prefix)
 		if err != nil {
-			return total, fmt.Errorf("store: vault key rotation, plug host key: %w", err)
+			return total, fmt.Errorf("store: vault key rotation, setting %s: %w", c.key, err)
 		}
-		if stale {
-			if err := s.SetPlugHostKey(ctx, plain); err != nil {
-				return total, err
-			}
-			total++
-		}
+		total += n
 	}
 	return total, nil
+}
+
+// sealedSettings are the settings that hold a sealed value, stored as a JSON
+// string: the blob after its marker. The tunnel's host key has none, it was
+// sealed before the marker existed.
+var sealedSettings = []struct{ key, prefix string }{
+	{SettingPlugHostKey, ""},
+	{SettingSigningKeys, sealedSetting},
+	{SettingSimulationKey, sealedSetting},
+}
+
+// resealSetting is resealColumn for one setting: rewritten only if it still
+// holds what was read.
+func (s *Store) resealSetting(ctx context.Context, key, prefix string) (int, error) {
+	var stored, text string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, key).Scan(&stored)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	if json.Unmarshal([]byte(stored), &text) != nil || text == "" {
+		return 0, nil
+	}
+	blob, sealed := strings.CutPrefix(text, prefix)
+	if !sealed {
+		return 0, nil
+	}
+	plain, stale, err := s.vaultCipher.OpenStale(blob)
+	if err != nil || !stale {
+		return 0, err
+	}
+	fresh, err := s.vaultCipher.Seal(plain)
+	if err != nil {
+		return 0, err
+	}
+	encoded, err := json.Marshal(prefix + fresh)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE settings SET value = ? WHERE key = ? AND value = ?`, string(encoded), key, stored); err != nil {
+		return 0, err
+	}
+	return 1, nil
 }
 
 func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {

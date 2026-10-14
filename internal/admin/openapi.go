@@ -151,6 +151,7 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 	}
 	after := routeSecurityPayload{Access: route.Access, Endpoints: sec.Endpoints, DenyUnlisted: sec.DenyUnlisted}
 	a.auditUpdate(r.Context(), actor, "route.security", "route", route.ID, route.Name, "", before, after)
+	after.Endpoints = orEmpty(after.Endpoints)
 	writeJSON(w, http.StatusOK, after)
 }
 
@@ -210,6 +211,7 @@ func (a *API) putRouteAudit(w http.ResponseWriter, r *http.Request, actor store.
 	}
 	after := routeAuditPayload{Endpoints: auditOf(route)}
 	a.auditUpdate(r.Context(), actor, "route.audit", "route", route.ID, route.Name, "", before, after)
+	after.Endpoints = orEmpty(after.Endpoints)
 	writeJSON(w, http.StatusOK, after)
 }
 

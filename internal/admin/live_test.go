@@ -21,7 +21,7 @@ func perimeterOf(t *testing.T, f fixture, cookie *http.Cookie) (int, LivePerimet
 	var seen LivePerimeter
 	f.api.Live = func(p LivePerimeter, w http.ResponseWriter, _ *http.Request) {
 		seen = p
-		writeJSON(w, http.StatusOK, p)
+		w.WriteHeader(http.StatusOK)
 	}
 	code, _ := f.call(t, "GET", "/api/live", "", cookie)
 	return code, seen
@@ -98,7 +98,7 @@ func TestLivePerimeterFollowsTheCapability(t *testing.T) {
 // cannot check that this group belongs to an organisation THIS reader
 // administers. The screen asks the API, which checks it.
 func TestLivePerimeterOfATenantAdminSaysNothingAboutWhatMoved(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	code, body := f.call(t, "POST", "/api/tenants", `{"name":"acme"}`, f.rootC)
 	if code != http.StatusCreated {
 		t.Fatalf("create tenant: %d %s", code, body)

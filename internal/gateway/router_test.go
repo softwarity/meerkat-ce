@@ -491,30 +491,108 @@ func TestCatchAllRouteTraps(t *testing.T) {
 	}
 }
 
-// TestUpstreamHangIs502: an upstream that never answers its headers must fail
-// fast as 502 thanks to the transport's ResponseHeaderTimeout (ROUTE-07).
-func TestUpstreamHangIs502(t *testing.T) {
+// hangingUpstream accepts the request and never answers it.
+func hangingUpstream(t *testing.T) string {
+	t.Helper()
 	release := make(chan struct{})
 	up := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		<-release // hang until the test ends
 	}))
 	t.Cleanup(func() { close(release); up.Close() })
+	return up.URL
+}
 
+// TestUpstreamHangIs504: an upstream that never answers its headers gets a 504
+// (Gateway Timeout) at the route's response bound, not before and not much
+// after, thanks to the transport's ResponseHeaderTimeout (ROUTE-07). A 502
+// stays for an upstream that cannot be reached at all.
+func TestUpstreamHangIs504(t *testing.T) {
 	// The route says how long it will wait, which is the point of ROUTE-07:
 	// one global bound meant the slowest legitimate endpoint in an
 	// installation set the wait for every other one.
-	route := pathRoute("r1", "hang", 1, "/**", up.URL)
+	route := pathRoute("r1", "hang", 1, "/**", hangingUpstream(t))
 	route.Timeouts = &store.RouteTimeouts{Response: "PT1S"}
 	rt := newRouter(t, route)
 
 	start := time.Now()
 	rec := httptest.NewRecorder()
 	rt.ServeHTTP(rec, httptest.NewRequest("GET", "/x", nil))
-	if rec.Code != http.StatusBadGateway {
-		t.Fatalf("hanging upstream: %d, want 502", rec.Code)
+	elapsed := time.Since(start)
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("hanging upstream: %d, want 504", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "did not answer in time") {
+		t.Errorf("the 504 does not say what happened: %q", rec.Body.String())
+	}
+	if elapsed < 900*time.Millisecond {
+		t.Errorf("504 after %v - the gateway gave up before the route's bound", elapsed)
+	}
+	if elapsed > 3*time.Second {
+		t.Fatalf("504 took %v - the route's own bound did not hold", elapsed)
+	}
+}
+
+// A refused connection is the upstream being down, not slow: 502, at once.
+func TestUpstreamRefusingIs502(t *testing.T) {
+	dead := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	deadURL := dead.URL
+	dead.Close()
+	route := pathRoute("r1", "refused", 1, "/**", deadURL)
+	route.Timeouts = &store.RouteTimeouts{Response: "PT5S"}
+	rt := newRouter(t, route)
+
+	start := time.Now()
+	res, body := get(t, rt, "/x")
+	if res.StatusCode != http.StatusBadGateway || !strings.Contains(body, "upstream unavailable") {
+		t.Fatalf("refused connection: %d %q, want 502", res.StatusCode, body)
 	}
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
-		t.Fatalf("502 took %v - the route's own bound did not hold", elapsed)
+		t.Errorf("502 took %v - a refused connection waited for the response bound", elapsed)
+	}
+}
+
+// A TLS handshake that never completes is the connect bound running out, not
+// the response one: 502.
+func TestUpstreamSilentHandshakeIs502(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			t.Cleanup(func() { _ = c.Close() }) // accepted, never a word of TLS
+		}
+	}()
+	route := pathRoute("r1", "mute", 1, "/**", "https://"+ln.Addr().String())
+	route.Timeouts = &store.RouteTimeouts{Connect: "PT1S", Response: "PT10S"}
+	rt := newRouter(t, route)
+	res, _ := get(t, rt, "/x")
+	if res.StatusCode != http.StatusBadGateway {
+		t.Fatalf("silent TLS handshake: %d, want 502", res.StatusCode)
+	}
+}
+
+// No connection within the connect bound is unreachable, not slow: 502 near
+// the connect bound, never the response one.
+func TestUpstreamUnreachableIs502(t *testing.T) {
+	// A non-routable address: the SYN goes nowhere (or the network says at
+	// once it cannot get there, which is the same answer sooner).
+	route := pathRoute("r1", "unreachable", 1, "/**", "http://10.255.255.1:81")
+	route.Timeouts = &store.RouteTimeouts{Connect: "PT1S", Response: "PT10S"}
+	rt := newRouter(t, route)
+
+	start := time.Now()
+	res, _ := get(t, rt, "/x")
+	if res.StatusCode != http.StatusBadGateway {
+		t.Fatalf("unreachable upstream: %d, want 502", res.StatusCode)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("502 took %v - the connect bound did not hold", elapsed)
 	}
 }
 

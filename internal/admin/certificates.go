@@ -77,6 +77,7 @@ type certView struct {
 }
 
 func viewOf(c store.Certificate) certView {
+	c.Info.DNSNames, c.Info.IPAddresses = orEmpty(c.Info.DNSNames), orEmpty(c.Info.IPAddresses)
 	v := certView{Certificate: c, Pending: c.Pending()}
 	if v.Pending {
 		if info, err := certs.ParseCSR(c.CSRPEM); err == nil {
@@ -139,6 +140,7 @@ func (a *API) orderView(ctx context.Context, c store.Certificate) certView {
 			v.Info.DNSNames = names
 		}
 	}
+	v.Info.DNSNames, v.Info.IPAddresses = orEmpty(v.Info.DNSNames), orEmpty(v.Info.IPAddresses)
 	return v
 }
 
@@ -875,6 +877,7 @@ func (a *API) tlsView(ctx context.Context) tlsPayload {
 	if a.TLS != nil {
 		v.State = a.TLS.State()
 	}
+	v.State.Problems = orEmpty(v.State.Problems)
 	v.Published = discovery.Self(ctx)
 	return v
 }
@@ -1030,9 +1033,9 @@ func proxiedNames(raw []string) ([]string, error) {
 }
 
 // orEmpty is a list that encodes as [] rather than null.
-func orEmpty(in []string) []string {
+func orEmpty[T any](in []T) []T {
 	if in == nil {
-		return []string{}
+		return []T{}
 	}
 	return in
 }

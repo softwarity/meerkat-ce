@@ -199,7 +199,7 @@ jobs:
         run: go vet -tags ee ./...
       - name: Test
         run: |
-          go test -tags ee ./internal/... ./cmd/...
+          go test -tags ee . ./internal/... ./cmd/...
           go test -race -tags ee ./ee/...
       # Static, no CGO, amd64 and arm64. Linux only, and that is the whole
       # target - Meerkat ships as an image.
@@ -234,7 +234,11 @@ jobs:
     environment: enterprise
     services:
       postgres:
-        image: postgres:18-alpine
+        # Through mirror.gcr.io, Google's cache of Docker Hub, by name: a
+        # service container is pulled before the first step, so the daemon's
+        # mirror setting cannot reach it, and Docker Hub's pull quota is shared
+        # by the whole CI.
+        image: mirror.gcr.io/library/postgres:18-alpine
         env:
           POSTGRES_USER: meerkat
           POSTGRES_PASSWORD: meerkat
@@ -348,6 +352,19 @@ jobs:
       - name: Make the identity provider's certificate
         if: matrix.service == 'simplesamlphp'
         run: sh test/ldap/simplesamlphp/cert.sh
+      # Docker Hub pulls on this runner go through mirror.gcr.io, Google's
+      # public cache of Docker Hub, falling back to Docker Hub for what it does
+      # not hold. Every pull counts against one quota shared by the whole CI,
+      # and a day of runs ran it dry (429 Too Many Requests, the 1.8.0 image).
+      # Set before anything here pulls: it restarts the daemon.
+      - name: Pull Docker Hub images through mirror.gcr.io
+        run: |
+          cfg=/etc/docker/daemon.json
+          { sudo cat "$cfg" 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > /tmp/daemon.json
+          sudo install -m 0644 /tmp/daemon.json "$cfg"
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{.RegistryConfig.Mirrors}}'
       - name: Start ${{ matrix.directory }}
         working-directory: test/ldap
         run: docker compose up -d ${{ matrix.service }}
@@ -450,6 +467,15 @@ jobs:
         run: npx tsc --noEmit
       # No report uploaded, on purpose: it would be a public download. A
       # failure here is read in the log, or reproduced on a laptop.
+      # Docker Hub through mirror.gcr.io (see the first job that does it).
+      - name: Pull Docker Hub images through mirror.gcr.io
+        run: |
+          cfg=/etc/docker/daemon.json
+          { sudo cat "$cfg" 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > /tmp/daemon.json
+          sudo install -m 0644 /tmp/daemon.json "$cfg"
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{.RegistryConfig.Mirrors}}'
       - name: Run integration suite
         working-directory: e2e
         run: npx playwright test
@@ -489,6 +515,15 @@ jobs:
       # Both images, because half of what is checked here is the difference
       # between them: one carries plug's payload, the other has nothing to hand
       # out and nothing to run.
+      # Docker Hub through mirror.gcr.io (see the first job that does it).
+      - name: Pull Docker Hub images through mirror.gcr.io
+        run: |
+          cfg=/etc/docker/daemon.json
+          { sudo cat "$cfg" 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > /tmp/daemon.json
+          sudo install -m 0644 /tmp/daemon.json "$cfg"
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{.RegistryConfig.Mirrors}}'
       - name: Build the two images
         run: |
           # Not quiet: a build that fails has to say why in the log.
@@ -683,7 +718,17 @@ jobs:
       # runner's platform and only its last stage is per target, so QEMU runs
       # two shell lines, not a compiler.
       - uses: docker/setup-qemu-action@v4
+      # The base images (golang, node, busybox) through mirror.gcr.io, Google's
+      # public cache of Docker Hub, falling back to Docker Hub for what it does
+      # not hold. Docker Hub counts every resolution of a base against one
+      # quota shared by every job of every run, and a day of CI ran it dry: the
+      # 1.8.0 image died resolving golang:1.27 (429). Pushes still go to Docker
+      # Hub; a mirror only serves pulls.
       - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
       # A classic token with write:packages. This repository's own GITHUB_TOKEN
       # cannot push to a package that belongs to another repository, and GH
       # Packages does not document accepting an App's token.
@@ -921,7 +966,12 @@ jobs:
           echo "$last -> $maj.$min.$pat ($BUMP)"
 
       - uses: docker/setup-qemu-action@v4
+      # Bases through mirror.gcr.io (see the first build of this file).
       - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
       - name: Log in to GH Packages
         uses: docker/login-action@v4
         with:

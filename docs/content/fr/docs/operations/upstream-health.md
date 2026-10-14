@@ -28,7 +28,11 @@ Deux bornes, héritées chacune séparément, sur trois niveaux :
 | Connexion | l'acceptation de la connexion, négociation TLS comprise | `1s` à `30s` |
 | Première réponse | l'attente de la première ligne de la réponse - le service réfléchit | `1s` à `10m` |
 
-Une fois l'une ou l'autre dépassée, l'appelant reçoit un `502` au lieu d'attendre.
+Passé la borne de connexion, l'appelant reçoit un `502` : le service est injoignable
+(une connexion refusée le reçoit tout de suite). Passé la borne de première réponse,
+il reçoit un `504` (Gateway Timeout) : le service a été joint et n'a pas répondu à
+temps. Qui surveille ses `502` cherche un service tombé, et un service lent est une
+autre question.
 
 Ce qui n'est **jamais** borné, c'est le corps. Un téléchargement ou un websocket déjà
 en cours dure aussi longtemps que nécessaire : la borne porte sur le temps dont dispose

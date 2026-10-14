@@ -200,7 +200,8 @@
           </mat-form-field>
         </div>
         <p class="field-hint" i18n="@@Timeouts_hint">
-          Past either, the caller gets a 502. A download or websocket already started is not cut.
+          Past the connect timeout the caller gets a 502, past the first answer a 504. A download or
+          websocket already started is not cut.
         </p>
 
         <mat-checkbox

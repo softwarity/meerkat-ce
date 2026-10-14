@@ -27,14 +27,21 @@ type fixture struct {
 
 func setup(t *testing.T) fixture {
 	t.Helper()
-	// These tests are about the API's behaviour, and most of them need a second
-	// organisation to have anything to administer - which the community image
-	// cannot create, by design. So the suite runs under the Enterprise build
-	// (`make test-ee`) and skips under the community one, where the REFUSALS
-	// are what gets asserted instead (edition_test.go, pagelayout_ee_test.go).
-	// CI runs both, so nothing goes unexercised.
+	// These tests are about the API's behaviour, the same in both editions, so
+	// they run in both: the community pipeline is the one the public mirror
+	// runs on every pull request, and a suite that skipped there proved nothing
+	// about the image most installations run.
+	return setupBare(t)
+}
+
+// setupEE is the fixture for a test that exercises an Enterprise feature
+// (several organisations, ACME, a git location, access hours, more than three
+// configurations). The community image refuses those BY DESIGN, and its
+// refusals are asserted instead (edition_test.go, pagelayout_ee_test.go).
+func setupEE(t *testing.T) fixture {
+	t.Helper()
 	if !edition.Enterprise {
-		t.Skip("community build: this suite needs the edition that can create organisations")
+		t.Skip("community build: this test exercises an Enterprise feature")
 	}
 	return setupBare(t)
 }

@@ -121,7 +121,8 @@ un échec, avec le statut et ce que disait la réponse - une page d'erreur est r
 
 Il ne se passe rien de particulier, et c'est tout l'intérêt : l'appel entre par la
 porte d'entrée, il obtient donc ce qu'un navigateur aurait obtenu. La gateway
-répond `502` pour un service qui ne répond pas, l'exécution se clôt en échec, et la
+répond `502` pour un service injoignable et `504` pour un service qui ne répond pas
+à temps, l'exécution se clôt en échec, et la
 console conserve la phrase : "502 Bad Gateway: Unavailable This application is not
 responding".
 

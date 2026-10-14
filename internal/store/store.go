@@ -100,11 +100,15 @@ func openEmbedded(dataDir string) (*Store, error) {
 	// while the skeleton has no connection-pool needs.
 	db.SetMaxOpenConns(1)
 	s := &Store{db: &database{DB: db, dialect: dialectSQLite}, dataDir: dataDir}
+	if err := s.loadCipher(dataDir); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := s.loadCipher(dataDir); err != nil {
+	if err := s.sealAtRest(); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -1154,7 +1158,8 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // port, removed the same day); the number stays so those databases still open.
 // 82 carries no step either: the peer columns of login_events and
 // audit_events are additive, filled in by the additive pass.
-const schemaVersion = 82
+// 83 seals the identity signing keys and the simulator's token key.
+const schemaVersion = 83
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

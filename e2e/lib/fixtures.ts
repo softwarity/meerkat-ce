@@ -41,7 +41,9 @@ export interface Profile {
 // repository name: the community mirror is this commit with ee/ removed, and
 // it has to run the suite too - a pull request there proves nothing if the
 // integration matrix does not run at all.
-export const ENTERPRISE = existsSync(join(__dirname, '..', '..', 'ee'));
+// E2E_EDITION=ce asks for the community run from a tree that has ee/ (see
+// scripts/start-gateway.mjs, which builds accordingly).
+export const ENTERPRISE = existsSync(join(__dirname, '..', '..', 'ee')) && process.env.E2E_EDITION !== 'ce';
 
 export const profiles: Profile[] = scenariosFile.profiles;
 
@@ -60,7 +62,20 @@ export const authDataFile = (profileId: string) => join(AUTH_DIR, `${profileId}.
 
 // Written by the setup project: ids and passwords of the seeded fixtures.
 export interface Seeded {
+  // acme's id: the organisation tadmin administers and alice belongs to.
   tenantId: string;
+  // Every organisation the seed furnished, by name: acme always, globex on the
+  // Enterprise build only (a community one serves a single organisation).
+  tenants: Record<string, {
+    id: string;
+    admin: string;
+    members: string[];
+    groups: Array<{ id: string; name: string }>;
+    // Names of its secrets, in the vault scope tenant:<id>.
+    vault: string[];
+  }>;
+  // root, infra-admin, app-admin, tenant-admin, user; and on Enterprise
+  // globex-admin and globex-user, the second organisation's people.
   users: Record<string, { id: string; username: string; password: string }>;
 }
 

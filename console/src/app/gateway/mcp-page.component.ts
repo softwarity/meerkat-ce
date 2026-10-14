@@ -22,29 +22,68 @@ interface AgentClient {
   id: string;
   label: string;
   // command is what to run; json is what to write when there is no command.
+  // Each is written for the widest scope the client offers - every project of
+  // the user: Claude Code and Gemini CLI otherwise write to the folder they
+  // are run in, and the gateway is gone from the next one.
   command: (url: string) => string;
   // withToken is the same, for a client that cannot do the browser flow.
   withToken: (url: string) => string;
+  // How it comes to trust a private authority: 'node' reads NODE_EXTRA_CA_CERTS,
+  // which ADDS to the public roots; 'system' trusts the operating system's
+  // store (Codex falls back on it, Kimi documents nothing of its own).
+  trust: 'node' | 'system' | 'any';
+}
+
+type Os = 'macos' | 'linux' | 'windows';
+
+// What to run so a client trusts the authority that signed this console's
+// certificate, per way of trusting and per system. The path is the
+// operator's to replace.
+const TRUST: Record<'node' | 'system', Record<Os, string>> = {
+  node: {
+    macos: `echo 'export NODE_EXTRA_CA_CERTS=/path/to/ca.crt' >> ~/.zshrc && source ~/.zshrc`,
+    linux: `echo 'export NODE_EXTRA_CA_CERTS=/path/to/ca.crt' >> ~/.bashrc && source ~/.bashrc`,
+    windows: `setx NODE_EXTRA_CA_CERTS "C:\\path\\to\\ca.crt"`,
+  },
+  system: {
+    macos: `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /path/to/ca.crt`,
+    linux:
+      `# Debian, Ubuntu\n` +
+      `sudo cp /path/to/ca.crt /usr/local/share/ca-certificates/meerkat-ca.crt && sudo update-ca-certificates\n` +
+      `# Fedora, RHEL\n` +
+      `sudo cp /path/to/ca.crt /etc/pki/ca-trust/source/anchors/meerkat-ca.crt && sudo update-ca-trust`,
+    windows: `certutil -addstore -f Root C:\\path\\to\\ca.crt`,
+  },
+};
+
+function guessOs(): Os {
+  const p = navigator.userAgent.toLowerCase();
+  if (p.includes('win')) return 'windows';
+  if (p.includes('mac')) return 'macos';
+  return 'linux';
 }
 
 const CLIENTS: AgentClient[] = [
   {
     id: 'claude',
     label: 'Claude Code',
-    command: (url) => `claude mcp add --transport http meerkat ${url}`,
+    trust: 'node',
+    command: (url) => `claude mcp add --transport http -s user meerkat ${url}`,
     withToken: (url) =>
-      `claude mcp add --transport http meerkat ${url} --header "Authorization: Bearer $MEERKAT_MCP_TOKEN"`,
+      `claude mcp add --transport http -s user meerkat ${url} --header "Authorization: Bearer $MEERKAT_MCP_TOKEN"`,
   },
   {
     id: 'gemini',
     label: 'Gemini CLI',
-    command: (url) => `gemini mcp add --transport http meerkat ${url}`,
+    trust: 'node',
+    command: (url) => `gemini mcp add --transport http --scope user meerkat ${url}`,
     withToken: (url) =>
-      `gemini mcp add --transport http meerkat ${url} --header "Authorization: Bearer $MEERKAT_MCP_TOKEN"`,
+      `gemini mcp add --transport http --scope user meerkat ${url} --header "Authorization: Bearer $MEERKAT_MCP_TOKEN"`,
   },
   {
     id: 'kimi',
     label: 'Kimi CLI',
+    trust: 'system',
     command: (url) => `kimi mcp add --transport http meerkat ${url}`,
     withToken: (url) =>
       `kimi mcp add --transport http meerkat ${url} --header "Authorization: Bearer $MEERKAT_MCP_TOKEN"`,
@@ -52,6 +91,7 @@ const CLIENTS: AgentClient[] = [
   {
     id: 'codex',
     label: 'Codex CLI',
+    trust: 'system',
     // Codex keeps its own shape, and its own second step: the login is not
     // implicit there.
     command: (url) => `codex mcp add meerkat --url ${url}\ncodex mcp login meerkat`,
@@ -61,6 +101,7 @@ const CLIENTS: AgentClient[] = [
   {
     id: 'json',
     label: 'Other (JSON)',
+    trust: 'any',
     command: (url) =>
       JSON.stringify({ mcpServers: { meerkat: { type: 'http', url } } }, null, 2),
     withToken: (url) =>
@@ -118,6 +159,23 @@ export class McpPageComponent {
 
   protected readonly command = computed(() => this.client().command(this.url));
   protected readonly tokenCommand = computed(() => this.client().withToken(this.url));
+
+  // Over TLS, the client checks this console's certificate like any site's,
+  // and one signed by a private authority is refused until the client trusts
+  // that authority. Plain HTTP has nothing to say about it.
+  protected readonly overTls = window.location.protocol === 'https:';
+  protected readonly oses: Array<{ id: Os; label: string }> = [
+    { id: 'macos', label: 'macOS' },
+    { id: 'linux', label: 'Linux' },
+    { id: 'windows', label: 'Windows' },
+  ];
+  protected readonly os = signal<Os>(guessOs());
+  // 'any' (a client we do not know) is shown the Node way, the commonest.
+  protected readonly trustKind = computed(() => {
+    const t = this.client().trust;
+    return t === 'system' ? 'system' : 'node';
+  });
+  protected readonly trustCommand = computed(() => TRUST[this.trustKind()][this.os()]);
 
   constructor() {
     this.api.getAgentEndpoint().subscribe({

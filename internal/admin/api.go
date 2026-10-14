@@ -418,6 +418,8 @@ func (a *API) saveRoute(ctx context.Context, actor store.User, route store.Route
 	if strings.TrimSpace(route.ID) == "" {
 		return route, invalid("a route needs an id: it is what names it in an export and in the audit")
 	}
+	// A body without filters means none: stored as [], and answered so.
+	route.Filters = orEmpty(route.Filters)
 	if strings.TrimSpace(route.Name) == "" {
 		return route, invalid("route name is required")
 	}
@@ -619,7 +621,16 @@ func (a *API) internal(w http.ResponseWriter, err error) {
 	writeErr(w, http.StatusInternalServerError, "internal error")
 }
 
+// checkAnswer sees every value the API is about to answer, when set. The tests
+// set it to the guard that no list goes out as null (jsonshape_test.go): the
+// console reads a list as a list, and a null one emptied a whole dialog.
+// Production leaves it nil.
+var checkAnswer func(v any)
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	if checkAnswer != nil {
+		checkAnswer(v)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil && !errors.Is(err, http.ErrHandlerTimeout) {

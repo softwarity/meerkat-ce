@@ -64,15 +64,30 @@ is where your console already is.
 The endpoint is on and shows its URL, the client picker has Claude Code selected
 with the one-line command ready to copy, and no agent is connected yet.
 
-It ships **off**. The switch at the top turns it on and shows the URL.
+It ships **off**. The switch at the top turns it on and shows the URL; while it is
+off, the rest of the screen is hidden, since there is nothing to connect to.
 
 **Connect an agent** gives the exact command for Claude Code, Gemini CLI, Kimi
-CLI, Codex CLI, or a generic JSON block for anything else. The first call opens
+CLI, Codex CLI, or a generic JSON block for anything else. Each command installs
+the server at the widest scope the client offers, **all your projects**:
+`-s user` for Claude Code, `--scope user` for Gemini CLI, and Codex keeps it in
+`~/.codex/config.toml` anyway. The first call opens
 your browser on this console: you sign in, you choose what the agent may do, and
 **no key is ever written into a file**.
 
 **Connected agents** lists what is plugged in, with each one's perimeter and when
 it was last used, and disconnects one in a click.
+
+When the console is served over HTTPS with a certificate from a **private
+authority** (or a self-signed one), the agent refuses it until it trusts that
+authority. The *My certificate comes from a private authority* panel, shown only
+over HTTPS, gives the command for the chosen agent and for macOS, Linux or
+Windows: Claude Code and Gemini CLI run on Node.js and read `NODE_EXTRA_CA_CERTS`,
+which adds your authority to the public ones (on macOS:
+`echo 'export NODE_EXTRA_CA_CERTS=/path/to/ca.crt' >> ~/.zshrc && source ~/.zshrc`,
+then start the agent again from a new terminal); Codex CLI trusts the system's
+authorities, so yours is added to the system store; Kimi CLI documents no setting
+of its own, and the system store is the way offered.
 
 For a client that cannot authenticate through a browser, the *My client cannot do
 that* panel shows the same command with a bearer header, and links to Access

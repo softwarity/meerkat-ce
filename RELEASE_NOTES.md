@@ -3,6 +3,34 @@
 ## NEXT RELEASE
 
 - **plug 2.26.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
+- **The MCP screen connects an assistant to all your projects.** The command for
+  Claude Code and Gemini CLI now carries their user scope (`-s user`, `--scope user`),
+  so the gateway is there in every folder rather than only where the command ran. And
+  while the agent endpoint is off, the screen shows the switch alone.
+- **The MCP screen says how an agent trusts a private authority.** Over HTTPS, a
+  console whose certificate comes from your own authority is refused by the agent until
+  it trusts that authority. A new panel gives the command per agent and per system:
+  `NODE_EXTRA_CA_CERTS` for Claude Code and Gemini CLI, the system store for Codex and
+  Kimi, on macOS, Linux or Windows.
+- **A service that does not answer in time is now a 504, not a 502.** When an upstream
+  is reached but gives no answer within the route's first-answer timeout, the gateway
+  answers `504 Gateway Timeout` (the portal's unavailable page too). `502 Bad Gateway`
+  stays for a service that cannot be reached: connection refused, no route, or no
+  connection within the connect timeout. **If you alert on 502 to catch slow services,
+  add 504.** The circuit breaker counts both, as before, and the access log still reads
+  `upstream-down` for either.
+- **The identity signing keys are sealed at rest.** The private keys that sign the JWT
+  forwarded to your services, and the key that signs the routing simulator's test tokens,
+  were stored in clear in the database: a copy of it was enough to forge an identity every
+  service believes. They are now sealed under the master key like the vault's secrets,
+  taken along by a master key rotation, and sealed at the first start of this version.
+  The keys do not change: tokens signed before keep verifying, and the JWKS is the same.
+- **The console cannot be shown in another site's frame.** Its pages now carry
+  `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'`: a page
+  that framed the console under a decoy could have turned an operator's click into one on
+  the console (clickjacking). The previews and the API reference the console frames
+  itself are other pages, and they are unchanged.
+
 ---
 
 ## 1.8.0

@@ -85,10 +85,13 @@ key by environment keeps it off the disk entirely, and the console says which of
 two your installation does.
 
 The same key seals more than the vault: **certificate private keys**, the **ACME account
-key**, the developer tunnel's **host key** and every account's **TOTP secret** go through it
-too. A TOTP secret is a password that never changes - whoever reads it computes every code the
-account will ever accept - so a copied database holds none in clear. Those written before are
-sealed at the next start.
+key**, the developer tunnel's **host key**, every account's **TOTP secret**, the **identity
+signing keys** (the private halves of the JWKS) and the key that signs the routing
+simulator's test tokens go through it too. A TOTP secret is a password that never changes -
+whoever reads it computes every code the account will ever accept - and a signing key signs
+an identity every service behind the gateway believes, so a copied database holds none in
+clear. Those written before are sealed at the next start, and the keys themselves do not
+change: tokens signed before keep verifying.
 
 > [!WARNING]
 > **The key stays a local file even with an external database.** That is deliberate - it

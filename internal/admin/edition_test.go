@@ -119,7 +119,7 @@ func TestEditionReportsWhatThisInstallationIs(t *testing.T) {
 // nothing - they stop being served, and the count is what the console's banner
 // says out loud.
 func TestSingleModeReportsWhatItHoldsBack(t *testing.T) {
-	f := setup(t) // needs the image that can hold several organisations
+	f := setupEE(t) // needs the image that can hold several organisations
 
 	// The way it happens for real: the organisation is created while the
 	// gateway serves several, and the switch back is what hides it.
@@ -208,7 +208,7 @@ func TestJoiningSomeoneNeedsNoLicence(t *testing.T) {
 func TestSingleModeRefusesASecondOrganisation(t *testing.T) {
 	// The refusal here is about the MODE, not the edition: even the image that
 	// sells several organisations serves one while it is set to single.
-	f := setup(t)
+	f := setupEE(t)
 	if err := f.api.st.SetTenancy(context.Background(), store.TenancySingle); err != nil {
 		t.Fatal(err)
 	}

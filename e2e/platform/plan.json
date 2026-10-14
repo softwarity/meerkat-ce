@@ -313,14 +313,17 @@
   },
   {
    "id": "AUTH-19",
-   "priority": "-",
-   "feasibility": "blocked",
-   "targets": [],
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "U",
+    "C1"
+   ],
    "editions": [
     "EE"
    ],
-   "en": "Not built (SAML).",
-   "fr": "Non construite (SAML)."
+   "en": "SAML: a sign-in against a real identity provider (SimpleSAMLphp) creates or matches the account; a forged, unsigned or wrapped assertion is refused; the CE build offers no SAML provider.",
+   "fr": "SAML : une connexion contre un vrai fournisseur d'identité (SimpleSAMLphp) crée ou retrouve le compte ; une assertion forgée, non signée ou enveloppée est refusée ; le build CE ne propose aucun fournisseur SAML."
   },
   {
    "id": "AUTH-20",
@@ -928,6 +931,7 @@
    "priority": "P1",
    "feasibility": "easy",
    "targets": [
+    "U",
     "I",
     "C1"
    ],
@@ -935,23 +939,23 @@
     "CE",
     "EE"
    ],
-   "en": "Timeouts: a slow upstream (delay endpoint) gets 504 at the configured time, not before.",
-   "fr": "Timeouts : un upstream lent (endpoint delay) reçoit un 504 au timeout configuré, pas avant."
+   "en": "Timeouts: an upstream that does not answer within the response bound gets 504 at the configured time, not before; one that refuses or cannot be reached gets 502 near the connect bound; a body already started is never cut.",
+   "fr": "Timeouts : un upstream qui ne répond pas dans la borne de réponse reçoit un 504 au délai configuré, pas avant ; un upstream qui refuse la connexion ou reste injoignable reçoit un 502 vers la borne de connexion ; un corps déjà commencé n'est jamais coupé."
   },
   {
    "id": "ROUTE-08",
    "priority": "P1",
    "feasibility": "medium",
    "targets": [
-    "I",
-    "CC"
+    "U",
+    "I"
    ],
    "editions": [
     "CE",
     "EE"
    ],
-   "en": "Rate limit answers 429 past the bound, and the bound is shared across nodes.",
-   "fr": "Le rate limit répond 429 une fois le seuil dépassé, et ce seuil est partagé entre les nœuds."
+   "en": "Rate limit answers 429 with Retry-After past the bound, counted per node (sharing the bound across nodes is QUOTA-04).",
+   "fr": "Le rate limit répond 429 avec Retry-After une fois le seuil dépassé, compté par nœud (le partage du seuil entre nœuds est QUOTA-04)."
   },
   {
    "id": "ROUTE-09",
@@ -2606,15 +2610,15 @@
    "priority": "P2",
    "feasibility": "medium",
    "targets": [
-    "I",
-    "CC"
+    "U",
+    "I"
    ],
    "editions": [
     "CE",
     "EE"
    ],
-   "en": "Quotas count per caller and are shared across nodes.",
-   "fr": "Les quotas comptent par appelant et sont partagés entre les nœuds."
+   "en": "Quotas count per caller (route, user, token, organisation, address), per node (sharing them across nodes is QUOTA-04).",
+   "fr": "Les quotas comptent par appelant (route, utilisateur, jeton, organisation, adresse), par nœud (leur partage entre nœuds est QUOTA-04)."
   },
   {
    "id": "QUOTA-02",

@@ -1,6 +1,6 @@
 import { expect, request, test as setup, type APIRequestContext } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { ADMIN_URL, DATA_URL, ROOT_PASSWORD } from '../playwright.config';
+import { ADMIN_URL, DATA_URL, HTTPBIN_URL, ROOT_PASSWORD } from '../playwright.config';
 import { AUTH_DIR, authDataFile, authFile, ENTERPRISE, type Seeded } from '../lib/fixtures';
 
 // Seeds the five profiles THROUGH THE REAL FLOWS (no store shortcut): root
@@ -31,9 +31,9 @@ async function loginFirstTime(ctx: APIRequestContext, username: string, oneTime:
   expect(me.ok(), `session incomplete for ${username}`).toBeTruthy();
 }
 
-async function organisation(root: APIRequestContext): Promise<string> {
+async function organisation(root: APIRequestContext, name = 'acme'): Promise<string> {
   if (ENTERPRISE) {
-    const res = await root.post('/api/tenants', { data: { name: 'acme' } });
+    const res = await root.post('/api/tenants', { data: { name } });
     expect(res.status(), await res.text()).toBe(201);
     return ((await res.json()) as { id: string }).id;
   }
@@ -44,7 +44,53 @@ async function organisation(root: APIRequestContext): Promise<string> {
   return primary;
 }
 
-const HTTPBIN = 'http://localhost:18099';
+const HTTPBIN = HTTPBIN_URL;
+
+// What an organisation holds besides its people, so that every tenant-scoped
+// read has something to show and every cross-organisation probe something to
+// refuse (TENANT-06): a group its members are in, and a secret of its own in
+// the vault.
+async function furnish(
+  root: APIRequestContext,
+  tenantId: string,
+  name: string,
+  members: Array<{ id: string; type: 'ADMIN' | 'USER' }>,
+): Promise<Seeded['tenants'][string]> {
+  for (const m of members) {
+    const res = await root.put(`/api/tenants/${tenantId}/members/${m.id}`, {
+      data: { userId: m.id, tenantId, type: m.type, enabled: true, businessAccess: { inherited: true }, sessionTTL: '' },
+    });
+    expect(res.ok(), `member of ${name}: ${await res.text()}`).toBeTruthy();
+  }
+  const group = await root.post(`/api/tenants/${tenantId}/groups`, {
+    data: { name: `${name}-staff`, description: `Everyone at ${name}`, roles: [] },
+  });
+  expect(group.ok(), `group of ${name}: ${await group.text()}`).toBeTruthy();
+  const groupId = ((await group.json()) as { id: string }).id;
+  for (const m of members) {
+    const res = await root.put(`/api/tenants/${tenantId}/members/${m.id}/groups`, { data: [groupId] });
+    expect(res.ok(), `groups of a member of ${name}: ${await res.text()}`).toBeTruthy();
+  }
+  return {
+    id: tenantId,
+    admin: members.find((m) => m.type === 'ADMIN')!.id,
+    members: members.map((m) => m.id),
+    groups: [{ id: groupId, name: `${name}-staff` }],
+    vault: [],
+  };
+}
+
+// A secret of the organisation's own, written by its administrator: a tenant
+// scope belongs to whoever administers that organisation, not to root (who
+// writes the global ones).
+async function stashTenantSecret(admin: APIRequestContext, tenant: Seeded['tenants'][string], name: string): Promise<void> {
+  const secret = `${name}-api-key`;
+  const res = await admin.put(`/api/vault/${encodeURIComponent(`tenant:${tenant.id}`)}/${secret}`, {
+    data: { kind: 'secret', value: `${name}-secret-value` },
+  });
+  expect(res.ok(), `vault of ${name}: ${await res.text()}`).toBeTruthy();
+  tenant.vault.push(secret);
+}
 
 async function seedRoutes(root: APIRequestContext): Promise<void> {
   const path = (p: string) => [{ type: 'path', args: { patterns: [p] } }];
@@ -118,14 +164,28 @@ setup('seed profiles and tenant', async () => {
   // into the one every installation already serves - the same memberships, the
   // same matrix, on the shape that build can serve.
   const tenantId = await organisation(root);
-  for (const [userId, type] of [
-    [tadmin.id, 'ADMIN'],
-    [alice.id, 'USER'],
-  ] as const) {
-    const res = await root.put(`/api/tenants/${tenantId}/members/${userId}`, {
-      data: { userId, tenantId, type, enabled: true, businessAccess: { inherited: true }, sessionTTL: '' },
-    });
-    expect(res.ok(), await res.text()).toBeTruthy();
+  const tenants: Seeded['tenants'] = {
+    acme: await furnish(root, tenantId, 'acme', [
+      { id: tadmin.id, type: 'ADMIN' },
+      { id: alice.id, type: 'USER' },
+    ]),
+  };
+
+  // A SECOND organisation, with its own administrator, member, group and
+  // secret: what proves that one organisation's administrator reaches nothing
+  // of another's (TENANT-06). The community build serves one organisation BY
+  // DESIGN, so it has none. Its people are not profiles of scenarios.json -
+  // the access matrix stays the five it was written for - but they are signed
+  // in and saved like them, for the specs that need them.
+  const extra: Array<[string, { id: string; oneTime: string; username: string }]> = [];
+  if (ENTERPRISE) {
+    const gadmin = { ...(await create({ username: 'gadmin', enabled: true })), username: 'gadmin' };
+    const bob = { ...(await create({ username: 'bob', enabled: true, fullname: 'Bob Durand' })), username: 'bob' };
+    tenants.globex = await furnish(root, await organisation(root, 'globex'), 'globex', [
+      { id: gadmin.id, type: 'ADMIN' },
+      { id: bob.id, type: 'USER' },
+    ]);
+    extra.push(['globex-admin', gadmin], ['globex-user', bob]);
   }
 
   await root.storageState({ path: authFile('root') });
@@ -148,16 +208,19 @@ setup('seed profiles and tenant', async () => {
     ['app-admin', { ...appadmin, username: 'appadmin' }],
     ['tenant-admin', { ...tadmin, username: 'tadmin' }],
     ['user', { ...alice, username: 'alice' }],
+    ...extra,
   ] as const) {
     const ctx = await request.newContext({ baseURL: ADMIN_URL });
     await loginFirstTime(ctx, u.username, u.oneTime);
     await ctx.storageState({ path: authFile(profile) });
+    const administered = Object.entries(tenants).find(([, t]) => t.admin === u.id);
+    if (administered) await stashTenantSecret(ctx, administered[1], administered[0]);
     seededUsers[profile] = { id: u.id, username: u.username, password: USER_PASSWORD };
     await ctx.dispose();
     await dataLogin(profile, u.username, USER_PASSWORD);
   }
 
-  const seeded: Seeded = { tenantId, users: seededUsers };
+  const seeded: Seeded = { tenantId, tenants, users: seededUsers };
   writeFileSync(`${AUTH_DIR}/seeded.json`, JSON.stringify(seeded, null, 2));
   await root.dispose();
 });

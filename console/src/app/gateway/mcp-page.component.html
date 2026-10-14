@@ -26,58 +26,109 @@
     </span>
   </div>
 
-  <h2 i18n="@@Connect_an_agent">Connect an agent</h2>
-  <mat-button-toggle-group [value]="client().id" hideSingleSelectionIndicator>
-    @for (c of clients; track c.id) {
-      <mat-button-toggle [value]="c.id" (click)="pick(c)">{{ c.label }}</mat-button-toggle>
-    }
-  </mat-button-toggle-group>
+  @if (enabled()) {
+    <h2 i18n="@@Connect_an_agent">Connect an agent</h2>
+    <mat-button-toggle-group [value]="client().id" hideSingleSelectionIndicator>
+      @for (c of clients; track c.id) {
+        <mat-button-toggle [value]="c.id" (click)="pick(c)">{{ c.label }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
 
-  <app-snippet [filename]="client().id === 'json' ? 'mcp.json' : 'connect.sh'" [downloadable]="false" [content]="command()" />
-  <p class="hint" i18n="@@MCP_first_call_hint">
-    The first call opens this console in your browser: approve it.
-  </p>
-
-  <mat-expansion-panel class="fallback">
-    <mat-expansion-panel-header>
-      <mat-panel-title i18n="@@My_client_cannot_do_that">My client cannot do that</mat-panel-title>
-    </mat-expansion-panel-header>
-    <p class="hint" i18n="@@MCP_token_fallback_hint">
-      Pass a console token as a header instead, kept in an environment variable.
+    <app-snippet [filename]="client().id === 'json' ? 'mcp.json' : 'connect.sh'" [downloadable]="false" [content]="command()" />
+    <p class="hint" i18n="@@MCP_first_call_hint">
+      The first call opens this console in your browser: approve it.
     </p>
-    <p class="hint">
-      <a routerLink="/infra/access-tokens" i18n="@@Generate_a_token">Generate a token</a>
-    </p>
-    <app-snippet
-      [filename]="client().id === 'json' ? 'mcp.json' : 'connect-with-token.sh'"
-      [downloadable]="false"
-      [content]="tokenCommand()"
-    />
-  </mat-expansion-panel>
 
-  <h2 i18n="@@Connected_agents">Connected agents</h2>
-  @if (loading()) {
-    <loading-indicator withContainer />
-  } @else {
-    @for (a of agents(); track a.id) {
-      <div class="agent">
-        <mat-icon>smart_toy</mat-icon>
-        <span class="name">{{ a.clientName || a.name }}</span>
-        <button
-          matIconButton
-          (click)="revoke(a)"
-          i18n-matTooltip="@@Disconnect"
-          matTooltip="Disconnect"
+    @if (overTls) {
+      <mat-expansion-panel class="fallback">
+        <mat-expansion-panel-header>
+          <mat-panel-title i18n="@@MCP_private_ca_title">My certificate comes from a private authority</mat-panel-title>
+        </mat-expansion-panel-header>
+        <p class="hint" i18n="@@MCP_private_ca_hint">
+          The agent checks this console's certificate like any site's. Signed by your own
+          authority (or self-signed), it is refused until the agent trusts that authority: give it
+          the authority's certificate, the file your certificates were issued from.
+        </p>
+        <mat-button-toggle-group
+          [value]="os()"
+          (change)="os.set($event.value)"
+          hideSingleSelectionIndicator
         >
-          <mat-icon>link_off</mat-icon>
-        </button>
-        <span class="meta">
-          {{ perimeter(a) }}
-          &nbsp;-&nbsp;{{ lastUsed(a.lastUsedAt) }}
-        </span>
-      </div>
-    } @empty {
-      <p class="empty" i18n="@@No_agent_connected">No agent connected yet.</p>
+          @for (o of oses; track o.id) {
+            <mat-button-toggle [value]="o.id">{{ o.label }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+        <app-snippet
+          [filename]="os() === 'windows' ? 'trust-ca.ps1' : 'trust-ca.sh'"
+          [downloadable]="false"
+          [content]="trustCommand()"
+        />
+        @switch (client().trust) {
+          @case ('node') {
+            <p class="hint" i18n="@@MCP_private_ca_node">
+              {{ client().label }} runs on Node.js, which keeps its own list of authorities:
+              NODE_EXTRA_CA_CERTS adds yours to it. Replace the path, then start the agent again
+              from a new terminal - it reads this when it starts.
+            </p>
+          }
+          @case ('system') {
+            <p class="hint" i18n="@@MCP_private_ca_system">
+              {{ client().label }} trusts the authorities of the system: add yours there (an
+              administrator's command). Replace the path, then start the agent again.
+            </p>
+          }
+          @default {
+            <p class="hint" i18n="@@MCP_private_ca_any">
+              A Node.js client reads NODE_EXTRA_CA_CERTS, as above; any other trusts the
+              authorities of the system, where your authority is added the way your system does
+              it. Then start the client again.
+            </p>
+          }
+        }
+      </mat-expansion-panel>
+    }
+
+    <mat-expansion-panel class="fallback">
+      <mat-expansion-panel-header>
+        <mat-panel-title i18n="@@My_client_cannot_do_that">My client cannot do that</mat-panel-title>
+      </mat-expansion-panel-header>
+      <p class="hint" i18n="@@MCP_token_fallback_hint">
+        Pass a console token as a header instead, kept in an environment variable.
+      </p>
+      <p class="hint">
+        <a routerLink="/infra/access-tokens" i18n="@@Generate_a_token">Generate a token</a>
+      </p>
+      <app-snippet
+        [filename]="client().id === 'json' ? 'mcp.json' : 'connect-with-token.sh'"
+        [downloadable]="false"
+        [content]="tokenCommand()"
+      />
+    </mat-expansion-panel>
+
+    <h2 i18n="@@Connected_agents">Connected agents</h2>
+    @if (loading()) {
+      <loading-indicator withContainer />
+    } @else {
+      @for (a of agents(); track a.id) {
+        <div class="agent">
+          <mat-icon>smart_toy</mat-icon>
+          <span class="name">{{ a.clientName || a.name }}</span>
+          <button
+            matIconButton
+            (click)="revoke(a)"
+            i18n-matTooltip="@@Disconnect"
+            matTooltip="Disconnect"
+          >
+            <mat-icon>link_off</mat-icon>
+          </button>
+          <span class="meta">
+            {{ perimeter(a) }}
+            &nbsp;-&nbsp;{{ lastUsed(a.lastUsedAt) }}
+          </span>
+        </div>
+      } @empty {
+        <p class="empty" i18n="@@No_agent_connected">No agent connected yet.</p>
+      }
     }
   }
 </div>

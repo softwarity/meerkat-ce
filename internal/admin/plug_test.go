@@ -18,7 +18,7 @@ import (
 // page lists who holds the developer capability and whether they deposited a
 // key - by fingerprint, never the key.
 func TestThePlugSettingBelongsToInfra(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	ctx := context.Background()
 	for _, u := range []store.User{
 		{ID: "infra", Username: "infra", PasswordHash: "x", InfraAdmin: true, Enabled: true},

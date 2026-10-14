@@ -64,8 +64,8 @@
     <div class="grow">
       <div class="title" i18n="@@Upstream_waits">How long to wait for a service</div>
       <p class="hint" i18n="@@Upstream_waits_hint">
-        Past either, the caller gets a 502. Once the answer starts, it is never cut: downloads and
-        websockets run as long as needed.
+        Past the connect timeout the caller gets a 502, past the first answer a 504. Once the
+        answer starts, it is never cut: downloads and websockets run as long as needed.
       </p>
     </div>
   </div>

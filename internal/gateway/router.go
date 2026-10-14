@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -3196,31 +3197,36 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 					"request body too large", -1, mbe.Limit)
 				return
 			}
-			slog.Warn("upstream error", "route", r.Name, "upstream", r.Upstream, "err", err)
+			status := upstreamFailure(err)
+			slog.Warn("upstream error", "route", r.Name, "upstream", r.Upstream, "status", status, "err", err)
 			// On a UI route under a portal, a dead upstream must not strand the
 			// visitor: serve an HTML page that still carries the bar, so they can
-			// open another application. Elsewhere, the plain 502 stands.
+			// open another application. Elsewhere, the plain answer stands.
 			if unavailable != "" {
 				h := w.Header()
 				h.Set("Content-Type", "text/html; charset=utf-8")
 				h.Set("Cache-Control", "no-store")
 				h.Set("Retry-After", "30")
-				w.WriteHeader(http.StatusBadGateway)
+				w.WriteHeader(status)
 				_, _ = io.WriteString(w,
 					strings.Replace(unavailable, tracing.Placeholder, tracing.ID(req.Context()), 1))
 				return
 			}
 			// The name of the request goes in the TEXT as well as the header:
-			// this is the 502 a person actually sees - in a curl, in a browser
-			// console, pasted into a ticket - and a header is invisible there.
-			http.Error(w, "upstream unavailable (request "+tracing.ID(req.Context())+")",
-				http.StatusBadGateway)
+			// this is the 502 or 504 a person actually sees - in a curl, in a
+			// browser console, pasted into a ticket - and a header is
+			// invisible there.
+			text := "upstream unavailable"
+			if status == http.StatusGatewayTimeout {
+				text = "upstream did not answer in time"
+			}
+			http.Error(w, text+" (request "+tracing.ID(req.Context())+")", status)
 		},
 	}
 	proxy.ModifyResponse = func(res *http.Response) error {
 		// Make upstream failures visible in OUR logs: a 5xx reaching the client
 		// through the proxy comes from the application, not from the gateway
-		// (the gateway's own failure is the 502 in ErrorHandler).
+		// (the gateway's own failures are the 502 and 504 in ErrorHandler).
 		if res.StatusCode >= 500 {
 			slog.Warn("upstream answered 5xx", "route", r.Name, "upstream", r.Upstream, "status", res.StatusCode)
 		}
@@ -3244,6 +3250,29 @@ func buildProxy(r store.Route, cf routing.CompiledFilters, defaults store.RouteT
 		return nil
 	}
 	return proxy, nil
+}
+
+// upstreamFailure says what the gateway answers when the upstream did not
+// (ROUTE-07): 504 when it was reached but gave no answer within the route's
+// response bound, 502 when it could not be reached at all - the connection
+// refused, no route to it, or no connection within the connect bound, TLS
+// handshake included. The two are different news: whoever watches their 502s
+// is looking for a service that is down, and a slow one is another question.
+func upstreamFailure(err error) int {
+	var op *net.OpError
+	if errors.As(err, &op) && op.Op == "dial" {
+		return http.StatusBadGateway
+	}
+	// The handshake shares the connect bound (transportFor), and net/http
+	// says it ran out only in words: its error type is not exported.
+	if strings.Contains(err.Error(), "TLS handshake timeout") {
+		return http.StatusBadGateway
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return http.StatusGatewayTimeout
+	}
+	return http.StatusBadGateway
 }
 
 // guarded puts the route's circuit breaker (ROUTE-09) in front of a handler.

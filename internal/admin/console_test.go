@@ -269,3 +269,56 @@ func TestEmbeddedConsoleIsStampedToo(t *testing.T) {
 		t.Fatalf("anonymous body must stay untouched: %q", anon)
 	}
 }
+
+// No page may show the console in a frame (clickjacking): the shell, a deep
+// link, an asset and the not-mounted answer all say so, embedded or proxied.
+func TestTheConsoleRefusesToBeFramed(t *testing.T) {
+	refused := func(t *testing.T, base, path string) {
+		t.Helper()
+		res, err := http.Get(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		if got := res.Header.Get("X-Frame-Options"); got != "DENY" {
+			t.Errorf("%s: X-Frame-Options %q, want DENY", path, got)
+		}
+		if got := res.Header.Get("Content-Security-Policy"); got != "frame-ancestors 'none'" {
+			t.Errorf("%s: Content-Security-Policy %q, want frame-ancestors 'none'", path, got)
+		}
+	}
+	serve := func(t *testing.T, target string) string {
+		t.Helper()
+		mux := http.NewServeMux()
+		if err := RegisterConsole(mux, target, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+		return srv.URL
+	}
+
+	t.Run("embedded", func(t *testing.T) {
+		fsys := fstest.MapFS{
+			"index.html":     {Data: []byte("<html><body>shell</body></html>")},
+			"main-K7KMUD.js": {Data: []byte("js")},
+		}
+		mux := http.NewServeMux()
+		mux.Handle("/", noFraming(consoleHandler(fsys, nil, nil)))
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+		for _, path := range []string{"/", "/infra/routes", "/main-K7KMUD.js"} {
+			refused(t, srv.URL, path)
+		}
+	})
+	t.Run("proxied", func(t *testing.T) {
+		dev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(w, "<html><body>dev</body></html>")
+		}))
+		t.Cleanup(dev.Close)
+		refused(t, serve(t, dev.URL), "/infra/routes")
+	})
+	t.Run("not mounted", func(t *testing.T) {
+		refused(t, serve(t, ""), "/")
+	})
+}

@@ -73,7 +73,7 @@ the list follows without a reload.
 - **Global** holds what is true of every route at once: the **Unavailable**
   switch that closes all of them (sign-in pages keep working, and anyone who
   administers or develops here still gets through), how long any route waits for
-  a service before answering 502, and the ceiling on what a body-rewriting
+  a service before answering 504, and the ceiling on what a body-rewriting
   filter may hold in memory. The button itself turns amber and reads
   *Unavailable* while the switch is on, so nobody has to open it to find out.
 - **JWT** holds the keys that sign the identity JWT your services verify: the
@@ -169,8 +169,9 @@ On a proxy route you also set:
   a cluster TLS ends at the gateway, `https` for a third party, `h2c` for a gRPC
   service. Services the gateway discovered are offered in the field.
 - **When the service is slow or down** - connect and first-answer timeouts,
-  which inherit the Global values unless set here. Past either the caller gets
-  a 502. What follows the first line is never bounded, so a download or a
+  which inherit the Global values unless set here. Past the connect timeout the
+  caller gets a 502 (the service cannot be reached), past the first-answer one a
+  504 (it was reached and did not answer in time). What follows the first line is never bounded, so a download or a
   websocket runs as long as it needs.
 - **Stop calling this service when it stops answering** - the circuit breaker:
   after N failures in a row, callers get the unavailable page at once, and after

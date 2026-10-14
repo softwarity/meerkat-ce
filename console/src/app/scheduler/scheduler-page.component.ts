@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
+import { catchError, of } from "rxjs";
 import { httpResource } from "@angular/common/http";
 import { MatButtonModule } from "@angular/material/button";
 import { MatSlideToggleModule } from "@angular/material/slide-toggle";
@@ -148,14 +149,17 @@ export class SchedulerPageComponent {
   protected readonly retentionChoices = signal<number[]>([]);
 
   // The lists the filters offer. Read once: an account, an organisation and a
-  // route are not what changes while somebody watches a scheduler.
-  protected readonly users = toSignal(this.api.listUsers(), {
+  // route are not what changes while somebody watches a scheduler. A list the
+  // viewer may not read (an application admin is refused the routes) is an
+  // empty one: toSignal rethrows an error on every read, and one refused list
+  // took the whole screen down with it.
+  protected readonly users = toSignal(this.api.listUsers().pipe(catchError(() => of([]))), {
     initialValue: [],
   });
-  protected readonly tenants = toSignal(this.api.listTenants(), {
+  protected readonly tenants = toSignal(this.api.listTenants().pipe(catchError(() => of([]))), {
     initialValue: [],
   });
-  protected readonly routes = toSignal(this.api.listRoutes(), {
+  protected readonly routes = toSignal(this.api.listRoutes().pipe(catchError(() => of([]))), {
     initialValue: [],
   });
 

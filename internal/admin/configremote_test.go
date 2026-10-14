@@ -32,7 +32,7 @@ func remoteID(t *testing.T, body string) string {
 }
 
 func TestAPullAppliesNothing(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 
@@ -90,7 +90,7 @@ func TestAPullAppliesNothing(t *testing.T) {
 // Pushing writes the saved copy into the location's directory, and the commit
 // carries the operator.
 func TestAPushWritesTheDirectory(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 
@@ -145,7 +145,7 @@ func TestAPushWritesTheDirectory(t *testing.T) {
 // A push REPLACES what the location holds, whatever somebody else pushed
 // there since - as a pull replaces the saved configuration.
 func TestAPushReplacesWhatTheRepositoryHolds(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 
@@ -187,7 +187,7 @@ func TestAPushReplacesWhatTheRepositoryHolds(t *testing.T) {
 // A location is a directory, so two of them in one repository never see each
 // other - which is the whole one-platform-per-customer story.
 func TestTwoLocationsOneRepository(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 
@@ -230,7 +230,7 @@ func TestTwoLocationsOneRepository(t *testing.T) {
 // The token is a vault REFERENCE or nothing: a literal in this table would be a
 // credential in clear in a row the console reads and a snapshot carries.
 func TestTheTokenMustBeAVaultReference(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 
@@ -265,7 +265,7 @@ func TestTheTokenMustBeAVaultReference(t *testing.T) {
 // Only https, and the refusal says what is supported rather than failing later
 // with a transport error nobody can read.
 func TestOnlyHTTPSWithAToken(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 
@@ -282,7 +282,7 @@ func TestOnlyHTTPSWithAToken(t *testing.T) {
 // Deleting a location keeps the configurations that came from it - they are
 // copies of a state, and losing a destination is not losing them.
 func TestDeletingALocationKeepsItsConfigurations(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 	repo.Put(confrepo.DocumentName, []byte("version: 1\n"))
@@ -321,7 +321,7 @@ func TestDeletingALocationKeepsItsConfigurations(t *testing.T) {
 // A location with nothing in it yet is a destination waiting for a push, not a
 // failure - and the message says so.
 func TestAnEmptyLocationSaysSo(t *testing.T) {
-	f := setup(t)
+	f := setupEE(t)
 	repo := confrepotest.New()
 	repo.Register(t)
 

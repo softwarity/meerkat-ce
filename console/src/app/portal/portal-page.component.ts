@@ -189,8 +189,11 @@ export class PortalPageComponent {
   // Load a stored portal into the signals - on first read and to roll back a
   // failed save.
   private loadRoutes(): void {
+    // A viewer refused the routes (an application admin) gets none to pick
+    // from rather than an uncaught error.
     this.api.listRoutes().subscribe({
       next: (rs) => this.uiRoutes.set(rs.filter((r) => r.isUi && r.enabled)),
+      error: () => this.uiRoutes.set([]),
     });
   }
 

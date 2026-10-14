@@ -1,16 +1,22 @@
 import { defineConfig } from '@playwright/test';
 
 // The suite runs against a REAL gateway: a fresh binary built from the tree,
-// a disposable database, and the console served as static files behind the
-// admin plane's dev proxy (--console-url). Ports are offset from the dev ones
-// so a running `make dev` never collides.
+// a disposable database, and the console EMBEDDED in that binary, which is
+// what ships (scripts/start-gateway.mjs stages the production build the way
+// `make ui` does). E2E_CONSOLE=served serves it instead as static files
+// behind the admin plane's dev proxy (--console-url), for a developer
+// iterating on the console. Ports are offset from the dev ones so a running
+// `make dev` never collides.
 export const CONSOLE_PORT = 14200;
+const SERVED = process.env.E2E_CONSOLE === 'served';
 export const DATA_URL = 'http://localhost:18082';
 export const ADMIN_URL = 'http://localhost:19092';
 // The internal plane: what the services behind the gateway call (the JWKS,
 // the scheduler's API).
 export const INTERNAL_URL = 'http://localhost:17072';
 export const ROOT_PASSWORD = 'e2e-Root-Password-1';
+// The local go-httpbin every seeded route answers from (see webServer below).
+export const HTTPBIN_URL = 'http://localhost:18099';
 
 export default defineConfig({
   testDir: '.',
@@ -42,12 +48,16 @@ export default defineConfig({
     },
   ],
   webServer: [
-    {
-      command: 'node scripts/serve-console.mjs',
-      url: `http://localhost:${CONSOLE_PORT}/`,
-      reuseExistingServer: true,
-      timeout: 30_000,
-    },
+    ...(SERVED
+      ? [
+          {
+            command: 'node scripts/serve-console.mjs',
+            url: `http://localhost:${CONSOLE_PORT}/`,
+            reuseExistingServer: true,
+            timeout: 30_000,
+          },
+        ]
+      : []),
     {
       // SMTP sink: the self-registration flow reads its confirmation mail
       // back from .tmp/mail. Port-only readiness (no HTTP endpoint).

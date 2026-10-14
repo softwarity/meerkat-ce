@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/softwarity/meerkat/internal/tracing"
+	"github.com/softwarity/meerkat/internal/vault"
 )
 
 // A thin wrapper over database/sql that rebinds the placeholders on the way
@@ -153,6 +154,9 @@ type transaction struct {
 	// paused is the database's: a transaction begun just before the pause is
 	// refused at its next write, and its rollback leaves nothing behind.
 	paused *atomic.Bool
+	// cipher is the master key's, set while a step of the ledger runs: a step
+	// may have to seal what an older build stored in clear (v83).
+	cipher *vault.Cipher
 }
 
 // hasColumn says whether a table has a column, read inside the transaction a
@@ -319,14 +323,18 @@ func openPostgres(dataDir, url string) (*Store, error) {
 		return nil, fmt.Errorf("store: the database named by MEERKAT_DATABASE_URL does not answer: %w", err)
 	}
 	s := &Store{db: &database{DB: raw, dialect: dialectPostgres}, dataDir: dataDir, location: postgresLocation(url)}
-	if err := s.migrate(); err != nil {
-		_ = raw.Close()
-		return nil, err
-	}
 	// The vault key stays a FILE beside the gateway even here, and that is
 	// deliberate: it seals what is in the database, so keeping it in the
 	// database would seal the door with the key in the lock.
 	if err := s.loadCipher(dataDir); err != nil {
+		_ = raw.Close()
+		return nil, err
+	}
+	if err := s.migrate(); err != nil {
+		_ = raw.Close()
+		return nil, err
+	}
+	if err := s.sealAtRest(); err != nil {
 		_ = raw.Close()
 		return nil, err
 	}

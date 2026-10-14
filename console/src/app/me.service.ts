@@ -26,6 +26,18 @@ export class MeService {
   // Administers at least one tenant (owner or ADMIN), computed server-side and
   // carried on /api/me (a non-member owner would be missed by the memberships).
   readonly isTenantAdmin = computed(() => this.isRoot() || (this.me()?.tenantAdmin ?? false));
+  // Administers something, so the live channel is open to them: it refuses
+  // whoever administers nothing (a plain account reading the licence), and a
+  // console that asked anyway logged a refused socket on every page. Unknown
+  // until loaded, which counts as yes - the old behaviour, never a lost feed.
+  readonly mayWatch = computed(
+    () =>
+      this.me() === null ||
+      this.isRoot() ||
+      this.isInfraAdmin() ||
+      this.isAppAdmin() ||
+      this.isTenantAdmin(),
+  );
 
   // What this installation IS. Stamped on <body> by the gateway, like the
   // roles: read here, never written. The CSS in styles/_modes.scss already
@@ -111,7 +123,12 @@ export class MeService {
       infraAdmin: has('infra-admin'),
       appAdmin: has('app-admin'),
     } as User;
-    return { user, tenants: [] };
+    // The tenant-admin class is the server's answer to the same question
+    // /api/me answers (owner or ADMIN of an organisation). Left out, every
+    // guard asking isTenantAdmin said no on the console that ships - only the
+    // unstamped dev server asked /api/me - and an organisation's administrator
+    // was bounced off the Audit, Sessions and Issues screens the rail offered.
+    return { user, tenants: [], tenantAdmin: has('tenant-admin') };
   }
 
   private apply(me: Me): void {
