@@ -259,8 +259,10 @@ const PORTAL = {
   showAppName: true,
   entries: [
     {
-      routeId: 'billing', label: 'Billing', icon: 'receipt_long',
+      // A container: a module holds no sub-modules (store/portal.go).
+      label: 'Billing', icon: 'receipt_long',
       children: [
+        { routeId: 'billing', label: 'Invoices', icon: 'receipt_long' },
         { routeId: 'docs-portal', label: 'Overview', icon: 'home' },
         { routeId: 'inventory', label: 'Price list', icon: 'menu_book' },
       ],

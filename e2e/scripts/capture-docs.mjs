@@ -1,5 +1,9 @@
 // Retakes the console screenshots the documentation site publishes.
 //
+// The documentation's, into img/console/*: each shows the state its page
+// explains. The showcase has its own pictures (img/showcase/*), taken from a
+// demo instance by docs/scripts/screenshots.mjs, and this never writes them.
+//
 // The doc images are the product's face, and a stale one is a lie somebody
 // acts on: a section list that still names a screen we renamed sends a reader
 // hunting for it. They were taken by hand until now, which is why they drifted.

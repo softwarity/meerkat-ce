@@ -1,5 +1,5 @@
 {
-  "_why": "Where every screenshot on this site comes from, so a screen that moved can be retaken instead of guessed at. The loop is in scripts/screenshots.mjs.",
+  "_why": "Where every screenshot of the SHOWCASE comes from, so a screen that moved can be retaken instead of guessed at: a demo instance with a rich dataset and live traffic, chosen to show the product. The loop is in scripts/screenshots.mjs, and the pictures are img/showcase/*, used by the showcase page alone. The documentation's screenshots are another job - each shows the state its page explains - and are retaken by e2e/scripts/capture-docs.mjs into img/console/*. Neither writes the other's files.",
   "instance": {
     "build": "CGO_ENABLED=0 go build -tags ee -o /tmp/meerkat-doc ./cmd/meerkat",
     "console": "the binary must EMBED the console, or the admin port answers a JSON status page: make ui first, or stage console/dist/console/browser into internal/admin/ui/dist",
@@ -25,7 +25,7 @@
   "convert": "cwebp -quiet -q 82 -resize 1600 0 <shot>.png -o public/<file>  (done by screenshots.mjs --shoot)",
   "shots": [
     {
-      "file": "img/app/maintenance.webp",
+      "file": "img/showcase/maintenance.webp",
       "plane": "data",
       "path": "/inventory/",
       "status": 503,
@@ -38,7 +38,7 @@
       ]
     },
     {
-      "file": "img/app/portal-dark.webp",
+      "file": "img/showcase/portal-dark.webp",
       "plane": "data",
       "path": "/docs/",
       "colorScheme": "dark",
@@ -57,7 +57,7 @@
       ]
     },
     {
-      "file": "img/app/portal-light.webp",
+      "file": "img/showcase/portal-light.webp",
       "plane": "data",
       "path": "/docs/",
       "clip": [
@@ -75,7 +75,7 @@
       ]
     },
     {
-      "file": "img/app/signin-dark.webp",
+      "file": "img/showcase/signin-dark.webp",
       "plane": "data",
       "path": "/login",
       "colorScheme": "dark",
@@ -89,7 +89,7 @@
       ]
     },
     {
-      "file": "img/app/signin-light.webp",
+      "file": "img/showcase/signin-light.webp",
       "plane": "data",
       "path": "/login",
       "signedIn": false,
@@ -102,7 +102,7 @@
       ]
     },
     {
-      "file": "img/app/user-button.webp",
+      "file": "img/showcase/user-button.webp",
       "plane": "data",
       "path": "/docs/",
       "steps": [
@@ -128,7 +128,7 @@
       ]
     },
     {
-      "file": "img/console/access-tokens.webp",
+      "file": "img/showcase/access-tokens.webp",
       "plane": "admin",
       "path": "/infra/access-tokens",
       "viewport": [
@@ -136,12 +136,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/access-and-agents",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/audit.webp",
+      "file": "img/showcase/audit.webp",
       "plane": "admin",
       "path": "/audit",
       "viewport": [
@@ -149,8 +148,6 @@
         1000
       ],
       "usedBy": [
-        "docs/console/audit-and-issues",
-        "docs/operations/audit",
         "showcase/index"
       ],
       "steps": [
@@ -163,56 +160,7 @@
       ]
     },
     {
-      "file": "img/console/logs.webp",
-      "plane": "admin",
-      "path": "/logs",
-      "steps": [
-        {
-          "click": "mat-select"
-        },
-        {
-          "click": "mat-option:has-text(\"debug\")"
-        },
-        {
-          "waitFor": ".reverts"
-        },
-        {
-          "click": ".line:has-text(\"routes reloaded\")"
-        },
-        {
-          "wait": 500
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/logs"
-      ]
-    },
-    {
-      "file": "img/console/license.webp",
-      "plane": "admin",
-      "path": "/license",
-      "steps": [
-        {
-          "waitFor": ".feature"
-        },
-        {
-          "wait": 500
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/overview"
-      ]
-    },
-    {
-      "file": "img/console/auth-providers.webp",
+      "file": "img/showcase/auth-providers.webp",
       "plane": "admin",
       "path": "/infra/auth-providers",
       "viewport": [
@@ -220,12 +168,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/authentication",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/built-in-pages-branding.webp",
+      "file": "img/showcase/built-in-pages-branding.webp",
       "plane": "admin",
       "path": "/application/built-in-pages/branding",
       "settle": 3000,
@@ -234,13 +181,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/built-in-pages",
-        "docs/customise/branding",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/built-in-pages-theme.webp",
+      "file": "img/showcase/built-in-pages-theme.webp",
       "plane": "admin",
       "path": "/application/built-in-pages/theme",
       "settle": 3000,
@@ -249,14 +194,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/built-in-pages",
-        "docs/customise/theme",
-        "index",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/configuration.webp",
+      "file": "img/showcase/configuration.webp",
       "plane": "admin",
       "path": "/infra/configuration",
       "viewport": [
@@ -264,78 +206,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/configuration",
-        "docs/operations/backup-restore",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/endpoint-audit.webp",
-      "plane": "admin",
-      "path": "/infra/endpoint-audit?route=orders-api",
-      "steps": [
-        {
-          "click": "text=\"/orders/{id}/refund\""
-        },
-        {
-          "wait": 800
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/audit"
-      ]
-    },
-    {
-      "file": "img/console/endpoint-limits.webp",
-      "plane": "admin",
-      "path": "/infra/endpoint-limits?route=orders-api",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/endpoints",
-        "docs/operations/rate-limits"
-      ]
-    },
-    {
-      "file": "img/console/endpoint-rule.webp",
-      "plane": "admin",
-      "path": "/infra/endpoint-security?route=orders-api",
-      "steps": [
-        {
-          "click": "text=\"/orders/reindex\""
-        },
-        {
-          "wait": 800
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/access/endpoint-security"
-      ]
-    },
-    {
-      "file": "img/console/endpoint-security.webp",
-      "plane": "admin",
-      "path": "/infra/endpoint-security?route=orders-api",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/access/endpoint-security"
-      ]
-    },
-    {
-      "file": "img/console/general.webp",
+      "file": "img/showcase/general.webp",
       "plane": "admin",
       "path": "/application/general",
       "viewport": [
@@ -343,32 +218,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/application",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/security.webp",
-      "plane": "admin",
-      "path": "/application/security",
-      "steps": [
-        {
-          "scrollTo": "text=\"Temporary (hours)\""
-        },
-        {
-          "wait": 500
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/application"
-      ]
-    },
-    {
-      "file": "img/console/groups.webp",
+      "file": "img/showcase/groups.webp",
       "plane": "admin",
       "path": "/application/groups",
       "instance": "single",
@@ -377,13 +231,11 @@
         1000
       ],
       "usedBy": [
-        "docs/access/roles",
-        "docs/console/organisation",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/mcp.webp",
+      "file": "img/showcase/mcp.webp",
       "plane": "admin",
       "path": "/infra/mcp",
       "viewport": [
@@ -391,12 +243,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/access-and-agents",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/members.webp",
+      "file": "img/showcase/members.webp",
       "plane": "admin",
       "path": "/application/members",
       "instance": "single",
@@ -405,96 +256,11 @@
         1000
       ],
       "usedBy": [
-        "docs/access/tenants",
-        "docs/console/organisation",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/metrics.webp",
-      "plane": "admin",
-      "path": "/traffic",
-      "steps": [
-        {
-          "scrollTo": "table.routes tbody tr:visible >> nth=-1"
-        }
-      ],
-      "traffic": true,
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/traffic",
-        "docs/operations/traffic"
-      ]
-    },
-    {
-      "file": "img/console/opentelemetry-collector.webp",
-      "plane": "admin",
-      "path": "/infra/opentelemetry",
-      "steps": [
-        {
-          "click": "button:has-text(\"No collector yet\")"
-        },
-        {
-          "wait": 800
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/tracing"
-      ]
-    },
-    {
-      "file": "img/console/opentelemetry.webp",
-      "plane": "admin",
-      "path": "/infra/opentelemetry",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/tracing"
-      ]
-    },
-    {
-      "file": "img/console/plug.webp",
-      "plane": "admin",
-      "path": "/infra/plug",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/plug"
-      ]
-    },
-    {
-      "file": "img/console/plug-machine.webp",
-      "plane": "admin",
-      "path": "/infra/plug",
-      "steps": [
-        {
-          "click": "button:has-text(\"On a developer\")"
-        },
-        {
-          "wait": 800
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/plug"
-      ]
-    },
-    {
-      "file": "img/console/portal.webp",
+      "file": "img/showcase/portal.webp",
       "plane": "admin",
       "path": "/application/portal",
       "settle": 3500,
@@ -503,39 +269,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/portal",
-        "docs/customise/portal",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/release-notes.webp",
-      "plane": "admin",
-      "path": "/infra/routes",
-      "steps": [
-        {
-          "click": "app-user-menu rail-nav-item"
-        },
-        {
-          "click": ".mat-mdc-menu-panel button:has-text(\"Meerkat\")"
-        },
-        {
-          "waitFor": "h3.part"
-        },
-        {
-          "wait": 500
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/overview"
-      ]
-    },
-    {
-      "file": "img/console/roles.webp",
+      "file": "img/showcase/roles.webp",
       "plane": "admin",
       "path": "/application/roles",
       "viewport": [
@@ -543,26 +281,11 @@
         1000
       ],
       "usedBy": [
-        "docs/access/roles",
-        "docs/console/roles",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/route-editor-color-scheme.webp",
-      "plane": "admin",
-      "path": "/infra/routes/billing/scheme",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/routes",
-        "docs/customise/color-scheme"
-      ]
-    },
-    {
-      "file": "img/console/route-editor-filters.webp",
+      "file": "img/showcase/route-editor-filters.webp",
       "plane": "admin",
       "path": "/infra/routes/billing/modin",
       "viewport": [
@@ -570,13 +293,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/routes",
-        "docs/start/first-route",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/route-editor-predicates.webp",
+      "file": "img/showcase/route-editor-predicates.webp",
       "plane": "admin",
       "path": "/infra/routes/orders-api/predicates",
       "viewport": [
@@ -584,13 +305,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/routes",
-        "docs/start/first-route",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/route-editor-security.webp",
+      "file": "img/showcase/route-editor-security.webp",
       "plane": "admin",
       "path": "/infra/routes/orders-api/security",
       "viewport": [
@@ -598,14 +317,11 @@
         1000
       ],
       "usedBy": [
-        "docs/access/route-access",
-        "docs/console/endpoints",
-        "docs/start/first-route",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/route-editor-target.webp",
+      "file": "img/showcase/route-editor-target.webp",
       "plane": "admin",
       "path": "/infra/routes/orders-api/target",
       "viewport": [
@@ -613,13 +329,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/routes",
-        "docs/start/first-route",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/routes-list.webp",
+      "file": "img/showcase/routes-list.webp",
       "plane": "admin",
       "path": "/infra/routes",
       "viewport": [
@@ -627,38 +341,11 @@
         1000
       ],
       "usedBy": [
-        "docs/concepts/routes",
-        "docs/console/routes",
-        "index",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/scheduler.webp",
-      "plane": "admin",
-      "path": "/scheduler",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/scheduler"
-      ]
-    },
-    {
-      "file": "img/console/sessions.webp",
-      "plane": "admin",
-      "path": "/sessions",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/auth/sessions"
-      ]
-    },
-    {
-      "file": "img/console/tls.webp",
+      "file": "img/showcase/tls.webp",
       "plane": "admin",
       "path": "/infra/tls",
       "viewport": [
@@ -666,53 +353,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/tls",
-        "docs/operations/tls",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/tls-authorities.webp",
-      "plane": "admin",
-      "path": "/infra/tls",
-      "steps": [
-        {
-          "click": "section.card button:has-text(\"ACME\")"
-        },
-        {
-          "wait": 800
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/tls"
-      ]
-    },
-    {
-      "file": "img/console/tls-local.webp",
-      "plane": "admin",
-      "path": "/infra/tls",
-      "steps": [
-        {
-          "click": "button:has-text(\"On a local machine\")"
-        },
-        {
-          "wait": 800
-        }
-      ],
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/operations/tls"
-      ]
-    },
-    {
-      "file": "img/console/traffic.webp",
+      "file": "img/showcase/traffic.webp",
       "plane": "admin",
       "path": "/traffic",
       "traffic": true,
@@ -721,14 +366,11 @@
         1000
       ],
       "usedBy": [
-        "docs/console/traffic",
-        "docs/operations/traffic",
-        "index",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/users.webp",
+      "file": "img/showcase/users.webp",
       "plane": "admin",
       "path": "/application/users",
       "viewport": [
@@ -736,14 +378,11 @@
         1000
       ],
       "usedBy": [
-        "docs/access/capabilities",
-        "docs/console/overview",
-        "docs/console/users",
         "showcase/index"
       ]
     },
     {
-      "file": "img/console/vault.webp",
+      "file": "img/showcase/vault.webp",
       "plane": "admin",
       "path": "/vault",
       "viewport": [
@@ -751,57 +390,7 @@
         1000
       ],
       "usedBy": [
-        "docs/console/vault",
-        "docs/operations/vault",
         "showcase/index"
-      ]
-    },
-    {
-      "file": "img/console/configuration-keep.webp",
-      "plane": "admin",
-      "path": "/system/configuration",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/configuration"
-      ]
-    },
-    {
-      "file": "img/console/database.webp",
-      "plane": "admin",
-      "path": "/system/configuration/database",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/configuration"
-      ]
-    },
-    {
-      "file": "img/console/database-migrate.webp",
-      "plane": "admin",
-      "path": "/system/configuration/database",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/configuration"
-      ]
-    },
-    {
-      "file": "img/console/tls-proxied.webp",
-      "plane": "admin",
-      "path": "/infra/tls",
-      "viewport": [
-        1600,
-        1000
-      ],
-      "usedBy": [
-        "docs/console/tls"
       ]
     }
   ],

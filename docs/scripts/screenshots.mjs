@@ -1,6 +1,13 @@
-// Retake the site's screenshots instead of remembering how they were taken.
+// Retake the showcase's screenshots instead of remembering how they were taken.
 //
-// A documentation screenshot rots silently: the screen moves, the picture does
+// The showcase shows the product, so its pictures come from a demo instance
+// with a rich dataset and live traffic, chosen to look like a gateway in use.
+// They are img/showcase/*, and only the showcase page uses them. The
+// documentation's screenshots are another job - each shows the exact state its
+// page explains - and e2e/scripts/capture-docs.mjs retakes them into
+// img/console/*; neither script writes the other's files.
+//
+// A screenshot rots silently: the screen moves, the picture does
 // not, and the first person to notice is a reader who no longer finds the
 // button. screenshots.json says where every one of them comes from - which
 // instance, which plane, which address, which viewport, what to click before
