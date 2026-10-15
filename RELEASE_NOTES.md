@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.10.2
+
 - **A route with no language gets no language menu under the portal bar.** The bar fell back to
   the gateway's whole offer, so the account menu listed the sign-in page's languages over an
   application that speaks none of them, and picking one changed nothing on the page.
