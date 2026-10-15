@@ -1579,8 +1579,8 @@
     "CE",
     "EE"
    ],
-   "en": "An upstream in HTTPS signed by a private authority is a 502 until that authority is imported - chosen, dropped as a file or pasted - then answers on every node; a private key is refused.",
-   "fr": "Un upstream en HTTPS signé par une autorité privée répond 502 tant que cette autorité n'est pas importée - choisie, déposée en fichier ou collée -, puis répond sur chaque nœud ; une clé privée est refusée."
+   "en": "An upstream in HTTPS signed by a private authority is a 502 until that authority is imported - chosen, dropped as a file or pasted - then answers on every node; a private key is refused. On a cluster with cert-manager, From the cluster lists its CA issuer whatever its name, takes its certificate through a throwaway Certificate deleted afterwards, and the issuer's own Secret is never read; a chart without trustDiscovery says which value is missing. Each authority lists the routes in https it signs (a refused one picks it in advance) and the services cert-manager records it signed; once taken, a route in http whose service answers in https on another port is offered with that port.",
+   "fr": "Un upstream en HTTPS signé par une autorité privée répond 502 tant que cette autorité n'est pas importée - choisie, déposée en fichier ou collée -, puis répond sur chaque nœud ; une clé privée est refusée. Sur un cluster avec cert-manager, From the cluster liste son émetteur CA quel que soit son nom, prend son certificat par un Certificate jetable supprimé ensuite, et le Secret de l'émetteur n'est jamais lu ; un chart sans trustDiscovery dit quelle valeur manque. Chaque autorité liste les routes en https qu'elle signe (une route refusée la coche d'avance) et les services que cert-manager enregistre comme signés par elle ; une fois prise, une route en http dont le service répond en https sur un autre port est proposée avec ce port."
   },
   {
    "id": "SSL-10",

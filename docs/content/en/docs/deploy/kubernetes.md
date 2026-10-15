@@ -372,6 +372,8 @@ The gateway reads its OWN namespace for two things. The route editor offers its 
 
 There is no switch for either: what opens them is what the deployment grants. The chart grants both (`rbac.read` and `rbac.watch`, on by default). By hand, the ServiceAccount needs `list` and `watch` on services and pods in its own namespace and nothing else - no secret, no other namespace. Without the pods, the editor still offers the Services and the targets are checked by a connection; without anything, the console says which right it lacks while free typing stays exactly as it was.
 
+The authorities the cluster publishes are found for the console's **Trusted authorities, From the cluster**: `trustDiscovery.certManager` (on by default) lets the gateway list the cert-manager issuers and learn one's certificate from a throwaway Certificate, never from the issuer's Secret; `trustDiscovery.trustManager` (on by default) lets it list the trust-manager Bundles and read their ConfigMap in its namespace. Set either false and the console says which is missing - see [Found in the cluster](/docs/operations/tls#found-in-the-cluster).
+
 A route whose upstream lives in ANOTHER namespace (`grafana.monitoring.svc`) is read the same way once that namespace is listed in `rbac.watchNamespaces`: the chart creates a Role in each one named, never a ClusterRole, so the gateway reads the namespaces somebody chose and not the whole cluster. A namespace not listed is checked by a connection.
 
 Reading the pods reads the environment variables their manifests declare. Where a manifest carries a secret in clear, set `rbac.watch: false`, or better, move the secret into a Secret.

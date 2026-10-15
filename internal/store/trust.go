@@ -12,9 +12,12 @@ import (
 // TrustedAuthority is one authority the gateway trusts when it calls an
 // upstream in HTTPS (SSL-09): its PEM, one certificate or several.
 type TrustedAuthority struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	PEM       string `json:"pem"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	PEM  string `json:"pem"`
+	// Source is the platform reference it was taken from (discovery's
+	// FoundAuthority.Ref), empty when imported by hand.
+	Source    string `json:"source,omitempty"`
 	CreatedAt int64  `json:"createdAt"`
 	UpdatedAt int64  `json:"updatedAt"`
 }
@@ -52,11 +55,11 @@ func (s *Store) SaveTrustedAuthority(ctx context.Context, a *TrustedAuthority) e
 	}
 	a.UpdatedAt = now
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO trusted_authorities (id, name, pem, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?)
+		`INSERT INTO trusted_authorities (id, name, pem, source, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
-		   name = excluded.name, pem = excluded.pem, updated_at = excluded.updated_at`,
-		a.ID, a.Name, a.PEM, a.CreatedAt, a.UpdatedAt)
+		   name = excluded.name, pem = excluded.pem, source = excluded.source, updated_at = excluded.updated_at`,
+		a.ID, a.Name, a.PEM, a.Source, a.CreatedAt, a.UpdatedAt)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
 			return fmt.Errorf("a trusted authority is already named %q", a.Name)
@@ -69,7 +72,7 @@ func (s *Store) SaveTrustedAuthority(ctx context.Context, a *TrustedAuthority) e
 // ListTrustedAuthorities returns them by name.
 func (s *Store) ListTrustedAuthorities(ctx context.Context) ([]TrustedAuthority, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, pem, created_at, updated_at FROM trusted_authorities ORDER BY name`)
+		`SELECT id, name, pem, source, created_at, updated_at FROM trusted_authorities ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list trusted authorities: %w", err)
 	}
@@ -77,7 +80,7 @@ func (s *Store) ListTrustedAuthorities(ctx context.Context) ([]TrustedAuthority,
 	out := []TrustedAuthority{}
 	for rows.Next() {
 		var a TrustedAuthority
-		if err := rows.Scan(&a.ID, &a.Name, &a.PEM, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.PEM, &a.Source, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("store: scan trusted authority: %w", err)
 		}
 		out = append(out, a)
@@ -89,8 +92,8 @@ func (s *Store) ListTrustedAuthorities(ctx context.Context) ([]TrustedAuthority,
 func (s *Store) GetTrustedAuthority(ctx context.Context, id string) (TrustedAuthority, error) {
 	var a TrustedAuthority
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, pem, created_at, updated_at FROM trusted_authorities WHERE id = ?`, id).
-		Scan(&a.ID, &a.Name, &a.PEM, &a.CreatedAt, &a.UpdatedAt)
+		`SELECT id, name, pem, source, created_at, updated_at FROM trusted_authorities WHERE id = ?`, id).
+		Scan(&a.ID, &a.Name, &a.PEM, &a.Source, &a.CreatedAt, &a.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return TrustedAuthority{}, ErrTrustedAuthorityNotFound
 	}

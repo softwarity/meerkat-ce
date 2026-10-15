@@ -1,0 +1,111 @@
+<h2 mat-dialog-title>
+  @if (switches()) {
+    <ng-container i18n="@@Trust_title_switch">Routes that can go in HTTPS</ng-container>
+  } @else {
+    <ng-container i18n="@@Trust_title_platform">Authorities from the cluster</ng-container>
+  }
+</h2>
+
+<mat-dialog-content class="body">
+  @if (switches(); as list) {
+    <p class="note" i18n="@@Trust_switch_note">
+      These routes still call their service in HTTP. The gateway tried each one in HTTPS, with the authority just
+      trusted: it answered, on the port and under the name shown. Switch the ones you want.
+    </p>
+    <mat-selection-list [disabled]="switching()" (selectionChange)="toSwitch.set($event.source.selectedOptions.selected.map((o) => o.value))">
+      @for (s of list; track s.routeId) {
+        <mat-list-option togglePosition="before" [value]="s.routeId" [selected]="toSwitch().includes(s.routeId)">
+          <span matListItemTitle>{{ s.name }}</span>
+          <span matListItemLine class="source">{{ s.from }}</span>
+          <span matListItemLine class="to">{{ s.to }}</span>
+          <ng-container ngProjectAs="[matListItemLine]">
+            @if (switchFailed()[s.routeId]) {<span matListItemLine class="why">{{ switchFailed()[s.routeId] }}</span>}
+          </ng-container>
+        </mat-list-option>
+      }
+    </mat-selection-list>
+  } @else if (result(); as r) {
+    @if (r.found.length) {
+      <p class="note" i18n="@@Trust_platform_note2">
+        What this cluster publishes, without the authorities trusted already, and what each signs here. The one that
+        unblocks a route refused today is picked.
+      </p>
+      <!-- A checkbox and a free block per authority, not a list option: an
+           option is three fixed-height lines, and an authority may sign many
+           services. The dialog scrolls when it is long. -->
+      @for (a of r.found; track a.ref) {
+        <div class="authority" [class.off]="!a.ready">
+          <mat-checkbox [checked]="picked().includes(a.ref)" [disabled]="!a.ready || taking()" (change)="toggle(a.ref, $event.checked)">
+            <span class="name">{{ a.name }}</span>
+          </mat-checkbox>
+          <div class="detail">
+            <div class="source">{{ sourceLabel[a.source] }}</div>
+            @for (c of a.certificates; track c.fingerprint) {
+              <div class="cert">{{ c.subject }} <span i18n="@@Trust_until">until {{ expiry(c.notAfter) | date: 'mediumDate' }}</span></div>
+            }
+            @if (routes(a).length) {
+              <div class="label" i18n="@@Trust_unblocks">Unblocks, refused today:</div>
+              <ul>
+                @for (s of routes(a); track s.routeId) {
+                  <li class="refused">{{ s.name }}</li>
+                }
+              </ul>
+            }
+            @if (services(a); as svc) {
+              @if (svc.length) {
+                <div class="label" i18n="@@Trust_signs_services">Services:</div>
+                <ul>
+                  @for (n of svc; track n) {
+                    <li>{{ n }}</li>
+                  }
+                </ul>
+              }
+            }
+            @if (!a.signs.length) {
+              <div class="nothing" i18n="@@Trust_signs_nothing">Nothing seen signed by it here</div>
+            }
+            @if (failed()[a.ref] ?? a.why; as why) {
+              <div class="why">{{ why }}</div>
+            }
+          </div>
+        </div>
+      }
+    } @else {
+      <p class="note" i18n="@@Trust_platform_none">
+        This cluster publishes no authority the gateway can see. A cert-manager issuer that signs with its own
+        authority is one way; trust-manager, or the certificate imported by hand, are others.
+      </p>
+      @for (n of r.notes; track n.source) {
+        @if (n.absent) {
+          <p class="absent"><mat-icon>remove_circle_outline</mat-icon><span>{{ n.why }}</span></p>
+        }
+      }
+      <app-snippet filename="cluster-issuer.yaml" [content]="example" />
+    }
+    @if (r.unmatched.length) {
+      <p class="note" i18n="@@Trust_unmatched2">
+        Refused today, and signed by an authority this cluster does not publish - import it with Add authority:
+      </p>
+      @for (u of r.unmatched; track u.routeId) {
+        <p class="problem"><mat-icon>block</mat-icon><span><b>{{ u.name }}</b>: {{ u.why }}</span></p>
+      }
+    }
+    @for (n of blocked(); track $index) {
+      <p class="problem"><mat-icon>lock</mat-icon><span>{{ n.why }}</span></p>
+    }
+  } @else {
+    <loading-indicator />
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  @if (switches()) {
+    <button matButton (click)="close()" i18n="@@Trust_leave_http">Leave in HTTP</button>
+    <button matButton="filled" [disabled]="!toSwitch().length || switching()" (click)="switchRoutes()" i18n="@@Trust_switch">Switch to HTTPS</button>
+  } @else {
+    <button matButton (click)="close()" i18n="@@Cancel">Cancel</button>
+    @if (result()?.found?.length) {
+      <button matButton="filled" [disabled]="!picked().length || taking()" (click)="take()" i18n="@@Trust_take">Trust</button>
+    }
+  }
+</mat-dialog-actions>

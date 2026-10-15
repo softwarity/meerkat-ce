@@ -479,6 +479,52 @@ private key - that one signs the Services' certificates, and stays with the
 cluster's PKI (cert-manager, a company authority). Take the certificate it
 publishes.
 
+### Found in the cluster
+
+On Kubernetes and OpenShift the gateway finds the authorities the cluster
+publishes, whatever they are called: **From the cluster**, on the Trusted
+authorities tab. Several found, you pick. Each source, and what it needs:
+
+| Source | Where the gateway finds it | Right in the chart |
+|---|---|---|
+| OpenShift service CA | `service-ca.crt`, mounted in every pod: the authority of the Services' serving certificates | none |
+| cert-manager | the ClusterIssuers, and the Issuers of its namespace, of type `ca`, `vault` or `venafi` | `trustDiscovery.certManager` (on by default) |
+| trust-manager | the Bundles whose ConfigMap reaches its namespace | `trustDiscovery.trustManager` (on by default) |
+| Kubernetes cluster CA | `ca.crt`, mounted in every pod: it signs the API server, rarely the services | none |
+
+**An issuer's key is never read.** A cert-manager CA issuer keeps its
+certificate and its key in one Secret, and Kubernetes grants a Secret whole: a
+right to read the certificate there would be a right to read the key that
+signs every service. So the gateway asks the issuer for a throwaway
+certificate, `<release>-meerkat-trust-probe`, for a name nothing resolves;
+cert-manager writes the issuer's certificate beside it (`ca.crt`), the gateway
+takes that, and deletes both. The chart grants creating Certificates in the
+gateway's namespace - Kubernetes cannot grant a create on one name - and
+reading and deleting that one Certificate and its Secret.
+
+**What each one signs here** is shown under it, to help the pick - indicative,
+nothing is decided from it. Each route in https the gateway refuses today is
+dialled once (one that verifies already, or does not answer, says nothing
+about which authority to pick): the certificate its upstream presents is
+matched to the authority that signed it,
+by that authority's certificate, or, for a cert-manager issuer, through the
+names cert-manager records it signed. And the services: every cert-manager
+`Certificate` names its issuer and its dnsNames (listed in the gateway's
+namespace and in `rbac.watchNamespaces`; a Certificate holds no key), and
+OpenShift marks with an annotation each Service it gives a serving
+certificate. A service that has not asked yet, or is not deployed, cannot be
+seen.
+
+**Routes still in http** are offered in https once an authority is taken, when
+their Service answers in TLS on one of its ports, under a name its certificate
+carries, with a chain the gateway now accepts. The port and the name are tried,
+not guessed: a service's https port is rarely its http one. Each is the
+operator's to switch.
+
+The certificate taken is **copied**, as an import would: an authority renewed
+at its source is taken again. On Swarm, compose or a bare binary nothing
+publishes an authority, and the button is not offered.
+
 **What an authority vouches for is not a DNS name.** Verifying an upstream
 asks two questions: does its certificate chain to a trusted authority, and
 does it carry the name the route calls - the host of the target URL, such as

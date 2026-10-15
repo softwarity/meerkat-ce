@@ -207,7 +207,10 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"POST /api/acme/authorities":          true, "PUT /api/acme/authorities/{id}": true,
 		"POST /api/trusted-authorities": true, "PUT /api/trusted-authorities/{id}": true,
 		"DELETE /api/trusted-authorities/{id}": true,
-		"DELETE /api/acme/authorities/{id}":    true, "POST /api/certificates/{id}/retry": true,
+		// An authority the platform publishes, taken: an entry created, and
+		// for a cert-manager issuer a throwaway Certificate asked and deleted.
+		"POST /api/trusted-authorities/platform": true,
+		"DELETE /api/acme/authorities/{id}":      true, "POST /api/certificates/{id}/retry": true,
 		"POST /api/config/import": true, "POST /api/config/history/{id}/restore": true,
 		"POST /api/config/history/{id}/save": true,
 		// The scheduled calls: pausing one stops it firing, running one brings

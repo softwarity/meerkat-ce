@@ -200,6 +200,16 @@ func routeSchema() map[string]any {
 		"timeouts": map[string]any{"type": "object", "description": "The waits for this route, overriding the installation's."},
 		"breaker":  map[string]any{"type": "object", "description": "The circuit breaker for this route."},
 		"limits":   map[string]any{"type": "array", "description": "The rate limits for this route.", "items": map[string]any{"type": "object"}},
+		// The scalars too, for the same reason: undeclared, a number or a
+		// boolean reaches the server as a string, and a route read with
+		// get_route and sent back whole was refused on rev or telemetry.
+		// TestEveryRouteFieldIsDeclared keeps this list whole.
+		"rev": map[string]any{"type": "integer",
+			"description": "The revision get_route read; a save is refused when the route moved on since. Omit it to write regardless."},
+		"telemetry": map[string]any{"type": "boolean",
+			"description": "Whether the gateway reports on what this route answers. Absent follows the installation."},
+		"telemetryUi": map[string]any{"type": "boolean",
+			"description": "Whether the pages of this UI route report from the browser too."},
 	}, "id", "name", "predicates")
 	// Anything this build does not name still travels: a route read from a
 	// newer gateway must not lose a field on its way back.

@@ -145,6 +145,27 @@ internalTls:
   # read and remove that one Secret, and to list the issuers.
   certManager: false
 
+# The authorities the cluster publishes, found by the console's Trusted
+# authorities, From the cluster (SSL-09): what signs the services a route in
+# HTTPS points at. The files Kubernetes and OpenShift mount in every pod need
+# nothing; these two sources need a right each. Without it the console says
+# which value to set, and the certificate can still be imported by hand.
+trustDiscovery:
+  # cert-manager: list the ClusterIssuers and this namespace's Issuers, list
+  # the Certificates here and in rbac.watchNamespaces (what each issuer signs;
+  # a Certificate holds no key), and ask the one picked for a throwaway
+  # Certificate,
+  # <release>-meerkat-trust-probe, deleted at once. Its Secret carries the
+  # issuer's certificate (ca.crt) - never the issuer's key, which this grants
+  # no access to. It grants creating Certificates in this namespace (Kubernetes
+  # cannot grant a create on one name), and reading and removing that one
+  # Certificate and its Secret.
+  certManager: true
+  # trust-manager: list the Bundles and read the ConfigMap each writes in this
+  # namespace. A Bundle's ConfigMap is named after it, so the name cannot be
+  # granted in advance: this reads the namespace's ConfigMaps.
+  trustManager: true
+
 persistence:
   # Everything the gateway knows lives here: routes, accounts, the sealed
   # vault, the certificates. Without a volume, a restarted pod is a new

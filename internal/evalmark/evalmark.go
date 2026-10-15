@@ -35,6 +35,13 @@ var (
 	// layout is untouched.
 	MenuEntry string
 
+	// MenuCSS dresses MenuEntry, added to the user button's own <style> block.
+	// Never a style attribute on the entry: the button lives on applications
+	// whose policy restricts style-src to nonces (GeoServer's), and a nonce
+	// can be carried by a <style> element, never by an attribute - the entry
+	// would be refused there, with an error in every page's console.
+	MenuCSS string
+
 	// MailNote is the line added at the foot of transactional mail.
 	MailNote string
 

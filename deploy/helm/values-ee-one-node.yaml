@@ -48,3 +48,14 @@ plug:
     nodePort: ""
 
 production: false
+
+# The authorities the cluster publishes, found by Domains & TLS, Trusted
+# authorities, From the cluster: what signs the services a route in HTTPS
+# calls. cert-manager: list the issuers, and learn one's certificate from a
+# throwaway Certificate (<release>-meerkat-trust-probe, deleted at once) -
+# never from the issuer's Secret, which holds its key. trust-manager: list the
+# Bundles and read their ConfigMap in this namespace. On by default; false
+# leaves the certificate to import by hand.
+trustDiscovery:
+  certManager: true
+  trustManager: true

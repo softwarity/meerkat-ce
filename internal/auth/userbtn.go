@@ -103,6 +103,12 @@ func containsFold(list []string, v string) bool {
 	return false
 }
 
+// userButtonScript is the button's script with the evaluation's menu entry
+// and its rules in place (empty in the other editions).
+func userButtonScript() string {
+	return strings.NewReplacer("__MK_EVAL_CSS__", evalmark.MenuCSS, "__MK_EVAL__", evalmark.MenuEntry).Replace(userButtonJS)
+}
+
 func (h *Handler) userButtonJS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")
@@ -111,7 +117,7 @@ func (h *Handler) userButtonJS(w http.ResponseWriter, _ *http.Request) {
 	// are untouched, so a hosted application's layout cannot move because of
 	// it. Empty in the two shipped images, where the substitution removes the
 	// placeholder and leaves the script byte-identical to what it always was.
-	_, _ = w.Write([]byte(strings.Replace(userButtonJS, "__MK_EVAL__", evalmark.MenuEntry, 1)))
+	_, _ = w.Write([]byte(userButtonScript()))
 }
 
 type userButtonTenant struct {
@@ -741,7 +747,12 @@ const userButtonJS = `(() => {
         ' line-height: 1; }' +
         '.sw svg { width: 18px; height: 18px; display: block; }' +
         '.sw:hover { border-color: var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent)); }' +
-        '.sw.on { color: var(--mk-on-secondary-container, var(--mk-primary, CanvasText)); background: var(--mk-secondary-container, transparent); border-color: var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent));' +
+        // One pair, the glyph's colour and the fill it sits on: on-surface on
+        // surface-container-high. It used to take on-secondary-container -
+        // the colour meant for a secondary-container fill - over this other
+        // fill, and a theme whose two differ drew a dark moon on dark and a
+        // white sun on light.
+        '.sw.on { color: var(--mk-on-surface, CanvasText); border-color: var(--mk-outline, color-mix(in srgb, CanvasText 25%, transparent));' +
         ' background: var(--mk-surface-container-high, color-mix(in srgb, CanvasText 10%, transparent)); }' +
         'hr { border: 0; border-top: 1px solid var(--mk-outline, color-mix(in srgb, CanvasText 15%, transparent)); margin: 6px 4px; }' +
         '.mark { font-weight: 700; }' +
@@ -841,6 +852,7 @@ const userButtonJS = `(() => {
         ' border: 1px solid var(--mk-outline, color-mix(in srgb, CanvasText 22%, transparent)); }' +
         '.db-note { flex-basis: 100%; margin: 0; font-size: .75rem; opacity: .65; line-height: 1.35; }' +
         '.db-err { flex-basis: 100%; margin: 0; font-size: .8rem; color: var(--mk-error, color-mix(in srgb, red 70%, CanvasText)); }' +
+        '__MK_EVAL_CSS__' +
         '</style>' +
         '<div class="wrap">' +
         '<button class="btn" id="toggle" aria-haspopup="menu">' +

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/icons"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -233,7 +232,7 @@ func portalPreviewHTML(key string, t store.Theme, b store.Branding, scheme strin
 		`<div class="row"><span class="dot"></span><b>AC-4822</b><span class="g">Northwind, one line</span></div>` +
 		`<div class="row"><span class="dot"></span><b>AC-4823</b><span class="g">Initech, six lines</span></div>` +
 		`</div></main>` +
-		`<script>` + strings.Replace(userButtonJS, "__MK_EVAL__", evalmark.MenuEntry, 1) + `</script>` + bars + `</body></html>`
+		`<script>` + userButtonScript() + `</script>` + bars + `</body></html>`
 
 	return page, true
 }

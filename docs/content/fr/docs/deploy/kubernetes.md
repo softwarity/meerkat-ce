@@ -522,6 +522,14 @@ Sans les pods, l'éditeur propose toujours les Services et les cibles sont véri
 connexion ; sans rien, la console indique le droit qui lui manque, la saisie libre restant
 exactement ce qu'elle était.
 
+Les autorités que le cluster publie sont trouvées pour **Trusted authorities, From the
+cluster** de la console : `trustDiscovery.certManager` (actif par défaut) laisse la gateway
+lister les émetteurs cert-manager et apprendre le certificat de l'un d'eux par un Certificate
+jetable, jamais par le Secret de l'émetteur ; `trustDiscovery.trustManager` (actif par défaut)
+la laisse lister les Bundles trust-manager et lire leur ConfigMap dans son namespace. L'un ou
+l'autre à false, et la console dit lequel manque - voir
+[Trouvées dans le cluster](/docs/operations/tls#trouves-dans-le-cluster).
+
 Une route dont l'upstream vit dans un AUTRE namespace (`grafana.monitoring.svc`) se lit de
 la même façon dès que ce namespace figure dans `rbac.watchNamespaces` : le chart crée un Role
 dans chaque namespace nommé, jamais un ClusterRole, donc la gateway lit les namespaces que

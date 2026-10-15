@@ -44,6 +44,14 @@ est volontairement la valeur par défaut : dans un cluster, TLS se termine en
 général sur la gateway, et le dernier tronçon jusqu'au service circule en
 clair. Les deux autres choix sont `https` et `h2c`.
 
+> [!NOTE]
+> Un upstream en `https` dans un cluster est en général signé par l'autorité
+> du cluster, que la gateway ne connaît pas encore : la route répond 502, et le
+> journal dit `certificate signed by unknown authority`. Dans **Infra >
+> Domains & TLS > Trusted authorities**, **From the cluster** liste les
+> autorités que le cluster publie - choisissez celle qui signe vos services.
+> Voir [Trouvées dans le cluster](/docs/operations/tls#trouves-dans-le-cluster).
+
 > [!TIP]
 > Quand la gateway peut lire son environnement d'exécution - un socket
 > Docker ou Swarm, ou un namespace Kubernetes vu de l'intérieur - ce champ

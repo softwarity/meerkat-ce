@@ -67,3 +67,10 @@
   color: var(--mat-sys-on-surface-variant);
   overflow-wrap: anywhere;
 }
+
+/* The spinner inside the icon's box while the cluster is searched. */
+mat-icon.searching {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

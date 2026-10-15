@@ -1138,6 +1138,10 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL UNIQUE,
   pem        TEXT NOT NULL DEFAULT '',
+  -- Where it was taken from, when the cluster published it (an issuer, a
+  -- bundle, a mounted file): what keeps it from being offered again. Empty for
+  -- a certificate imported by hand.
+  source     TEXT NOT NULL DEFAULT '',
   created_at BIGINT NOT NULL DEFAULT 0,
   updated_at BIGINT NOT NULL DEFAULT 0
 );`
@@ -1159,7 +1163,7 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // 82 carries no step either: the peer columns of login_events and
 // audit_events are additive, filled in by the additive pass.
 // 83 seals the identity signing keys and the simulator's token key.
-const schemaVersion = 83
+const schemaVersion = 84
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

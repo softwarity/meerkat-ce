@@ -2,6 +2,22 @@
 
 ## NEXT RELEASE
 
+- **The color scheme switch in the user button reads in both schemes.** Its glyph took a colour
+  meant for another background, and some themes drew a dark moon on dark and a white sun on light.
+- **An agent can send a route back whole.** `save_route` refused a route read with `get_route`
+  on its revision or its telemetry switch; every field a route carries is now declared.
+- **The evaluation's line in the user button no longer trips a strict page policy.** On an
+  application that only allows styles carrying its nonce, such as GeoServer, the line was
+  refused with an error in the browser console on every page; it now renders there too.
+- **Trust the cluster's authority without fetching a file.** On Kubernetes and OpenShift,
+  Trusted authorities offers **From the cluster**: the authorities the cluster publishes -
+  OpenShift's service CA, the cert-manager issuers, the trust-manager bundles - are found
+  whatever their name, and the one picked is trusted. Routes to services in HTTPS then verify.
+  A cert-manager issuer's key is never read: its certificate is learnt from a throwaway one.
+  Under each authority, what it signs here - the routes refused today, the services that
+  asked it for a certificate - and the routes still in http that could now go in https are
+  offered, tried port and name included, to switch in one click.
+
 ---
 
 ## 1.9.0

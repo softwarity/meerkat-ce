@@ -1010,6 +1010,21 @@
     "guard": "infraAdmin"
   },
   {
+    "method": "GET",
+    "path": "/api/trusted-authorities/https-switch",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/trusted-authorities/platform",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/trusted-authorities/platform",
+    "guard": "infraAdmin"
+  },
+  {
     "method": "DELETE",
     "path": "/api/trusted-authorities/{id}",
     "guard": "infraAdmin"

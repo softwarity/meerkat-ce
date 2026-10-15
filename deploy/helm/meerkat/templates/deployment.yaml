@@ -73,6 +73,12 @@ spec:
               containerPort: {{ .Values.plug.port }}
             {{- end }}
           env:
+            {{- with include "meerkat.trustProbe" . }}
+            # The throwaway Certificate it may ask cert-manager for, to learn
+            # an issuer's certificate (SSL-09): the name the Role grants.
+            - name: MEERKAT_TRUST_PROBE
+              value: {{ . | quote }}
+            {{- end }}
             {{- with include "meerkat.issuedSecret" . }}
             # The Certificate it may ask cert-manager for (SSL-13), and the
             # Secret it reads: the name the Role below is granted on.

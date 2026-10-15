@@ -69,6 +69,14 @@ or the one OpenShift's service CA writes for the internal Service.
 The Certificate, and its Secret, the gateway asks cert-manager for itself
 (internalTls.certManager, SSL-13); empty when it may not.
 */}}
+{{/* The throwaway Certificate asked of cert-manager to learn an issuer's
+certificate (SSL-09), and its Secret. */}}
+{{- define "meerkat.trustProbe" -}}
+{{- if ne ((.Values.trustDiscovery | default dict).certManager) false -}}
+{{ include "meerkat.fullname" . }}-trust-probe
+{{- end -}}
+{{- end }}
+
 {{- define "meerkat.issuedSecret" -}}
 {{- if ((.Values.internalTls | default dict).certManager) -}}
 {{ include "meerkat.fullname" . }}-internal-issued

@@ -162,6 +162,13 @@ rules:
   - apiGroups: [""]
     resources: ["services", "pods"]
     verbs: ["get", "list", "watch"]
+  {{- if ne (($.Values.trustDiscovery | default dict).certManager) false }}
+  # Which authority signs the services there (trustDiscovery.certManager): a
+  # Certificate names its issuer and its dnsNames, and holds no key.
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["list"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -250,4 +257,96 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "meerkat.fullname" $ }}
     namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- /* Absent means on, as for rbac.read: an upgrade with --reuse-values
+     keeps the release's old values, without the defaults a newer chart adds,
+     and a right that appears with a chart must not vanish on that path. Only
+     an explicit false turns one off. */}}
+{{- $trust := (.Values.trustDiscovery | default dict) }}
+{{- $cm := ne $trust.certManager false }}
+{{- $tm := ne $trust.trustManager false }}
+{{- if or $cm $tm }}
+---
+# The authorities the cluster publishes (SSL-09), for the console's Trusted
+# authorities, From the cluster. Public certificates only: an issuer's is
+# learnt from a throwaway Certificate's Secret (ca.crt), never from the
+# issuer's own Secret, which holds its key and is not granted here.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "meerkat.fullname" . }}-trust
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+rules:
+  {{- with include "meerkat.trustProbe" . }}
+  - apiGroups: ["cert-manager.io"]
+    resources: ["issuers"]
+    verbs: ["list"]
+  # What each issuer signs here: a Certificate names its issuer and its
+  # dnsNames, and holds no key.
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["list"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["create"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    resourceNames: [{{ . | quote }}]
+    verbs: ["get", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ . | quote }}]
+    verbs: ["get", "delete"]
+  {{- end }}
+  {{- if $tm }}
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "meerkat.fullname" . }}-trust
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "meerkat.fullname" . }}-trust
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" . }}
+---
+# The cluster-wide half: ClusterIssuers and Bundles have no namespace. Read
+# only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-trust
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+rules:
+  {{- if $cm }}
+  - apiGroups: ["cert-manager.io"]
+    resources: ["clusterissuers"]
+    verbs: ["list"]
+  {{- end }}
+  {{- if $tm }}
+  - apiGroups: ["trust.cert-manager.io"]
+    resources: ["bundles"]
+    verbs: ["list"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-trust
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-trust
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" . }}
+    namespace: {{ .Release.Namespace }}
 {{- end }}

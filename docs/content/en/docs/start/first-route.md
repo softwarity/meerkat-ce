@@ -43,6 +43,14 @@ the default on purpose - inside a cluster, TLS usually ends at the gateway and
 the hop to the service is cleartext. `https` and `h2c` are the other two
 choices.
 
+> [!NOTE]
+> An upstream in `https` inside a cluster is usually signed by the cluster's
+> own authority, which the gateway does not know yet: the route answers 502,
+> and the log says `certificate signed by unknown authority`. On **Infra >
+> Domains & TLS > Trusted authorities**, **From the cluster** lists the
+> authorities the cluster publishes - pick the one that signs your services.
+> See [Found in the cluster](/docs/operations/tls#found-in-the-cluster).
+
 > [!TIP]
 > Where the gateway can read its runtime - a Docker or Swarm socket, or a
 > Kubernetes namespace from the inside - the services it found are offered in

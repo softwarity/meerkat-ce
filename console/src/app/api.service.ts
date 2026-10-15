@@ -665,9 +665,50 @@ export interface TrustedAuthority {
   id: string;
   name: string;
   pem: string;
+  // Where it was taken from when the cluster published it ("clusterissuer/
+  // company-ca", "openshift/service-ca"); absent when imported by hand.
+  source?: string;
   createdAt: number;
   updatedAt: number;
   certificates: AuthorityCert[];
+}
+
+// An authority the cluster publishes (SSL-09), found by the gateway: a file
+// Kubernetes or OpenShift mounts, a cert-manager issuer, a trust-manager
+// Bundle. An issuer's certificates are learnt only when it is taken.
+export interface PlatformAuthority {
+  ref: string;
+  source: 'openshift' | 'cert-manager' | 'trust-manager' | 'cluster';
+  name: string;
+  ready: boolean;
+  why?: string;
+  certificates: AuthorityCert[];
+  // What it signs here, indicative: the routes in https whose upstream it
+  // signed (refused: the gateway turns them away today), and the services the
+  // platform records it signed.
+  signs: { kind: 'route' | 'service'; name: string; routeId?: string; refused?: boolean; names?: string[] }[];
+  // It signs a route refused today: picked in advance.
+  preselect?: boolean;
+}
+
+// A route in http whose service answers in https, with a certificate the
+// gateway now accepts, at `to`.
+export interface HttpsSwitch {
+  routeId: string;
+  name: string;
+  from: string;
+  to: string;
+}
+
+export interface PlatformAuthorities {
+  // False where there is no cluster to ask: no search is offered.
+  kubernetes: boolean;
+  found: PlatformAuthority[];
+  // Why a source offers nothing: absent, or not granted by the chart.
+  notes: { source: string; why: string; absent?: boolean }[];
+  // The routes in https refused today whose certificate comes from an
+  // authority the cluster does not publish: to import by hand.
+  unmatched: { routeId: string; name: string; why: string }[];
 }
 
 export interface SigningKeys {
@@ -3329,6 +3370,18 @@ export class ApiService {
 
   createTrustedAuthority(body: { name: string; pem: string }): Observable<TrustedAuthority> {
     return this.http.post<TrustedAuthority>('/api/trusted-authorities', body);
+  }
+
+  platformAuthorities(): Observable<PlatformAuthorities> {
+    return this.http.get<PlatformAuthorities>('/api/trusted-authorities/platform');
+  }
+
+  httpsSwitch(): Observable<HttpsSwitch[]> {
+    return this.http.get<HttpsSwitch[]>('/api/trusted-authorities/https-switch');
+  }
+
+  takePlatformAuthority(ref: string, name = ''): Observable<TrustedAuthority> {
+    return this.http.post<TrustedAuthority>('/api/trusted-authorities/platform', { ref, name });
   }
 
   deleteTrustedAuthority(id: string): Observable<void> {

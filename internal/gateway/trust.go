@@ -96,3 +96,17 @@ func setUpstreamRoots(pool *x509.CertPool) {
 func upstreamTLS() *tls.Config {
 	return &tls.Config{RootCAs: upstreamRoots.Load(), MinVersion: tls.VersionTLS12}
 }
+
+// UpstreamRoots is the pool the upstreams are verified with now: the system's
+// and every trusted authority. Asked by the console to tell an upstream that
+// verifies from one that is refused.
+func UpstreamRoots() *x509.CertPool {
+	if p := upstreamRoots.Load(); p != nil {
+		return p
+	}
+	p, err := x509.SystemCertPool()
+	if err != nil {
+		return x509.NewCertPool()
+	}
+	return p
+}

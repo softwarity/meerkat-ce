@@ -399,6 +399,24 @@ quand elle appelle un upstream en HTTPS, au-delà des autorités publiques. **Ad
 authority** ouvre une fenêtre : un nom, et le certificat de l'autorité -
 choisissez son fichier, déposez-le sur la fenêtre, ou collez-le.
 
+Sur Kubernetes ou OpenShift, **From the cluster** liste les autorités que le
+cluster publie, trouvées plutôt que nommées : l'autorité des services
+qu'OpenShift monte dans chaque pod, les émetteurs cert-manager qui signent avec
+une autorité à eux, les bundles trust-manager qui atteignent le namespace de la
+gateway, et l'autorité du cluster lui-même (qui signe l'API server, rarement
+les services). Sous chacune, ce qu'elle signe ici : les routes en https que la
+gateway refuse aujourd'hui et qu'elle débloquerait, et les services que la
+plateforme enregistre comme signés par elle. Celle qui débloque une route
+refusée est cochée d'avance ; une route refusée signée par une autorité que le
+cluster ne publie pas est nommée, à importer à la main. Cochez-en une ou plusieurs, puis
+**Trust**. La fenêtre propose ensuite les routes encore en http dont le service
+répond maintenant en https - essayées par la gateway, avec le port et le nom
+que porte le certificat - à passer en **Switch to HTTPS** ou à laisser. Quand le cluster
+n'en publie aucune, la fenêtre le dit et montre un émetteur cert-manager qui en
+publierait une ; quand une source est là mais que le chart ne laisse pas la
+gateway la lire, la fenêtre nomme la valeur à positionner. Voir
+[Trouvées dans le cluster](/docs/operations/tls#trouves-dans-le-cluster).
+
 Chaque entrée montre les certificats qu'elle contient et jusqu'à quand. Voir
 [Appeler des upstreams en HTTPS](/docs/operations/tls#appeler-des-upstreams-en-https).
 

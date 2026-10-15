@@ -2,6 +2,14 @@
   <div class="plane-head">
     <h2 i18n="@@Trusted_authorities">Trusted authorities</h2>
     <span class="grow"></span>
+    @if (searching() || platform()?.kubernetes) {
+      <button matButton [disabled]="searching()" (click)="fromCluster()">
+        <!-- One mat-icon, always there, so the button places it the same way in
+             both states: the spinner inside it while searching. -->
+        <mat-icon [class.searching]="searching()">@if (searching()) {<mat-progress-spinner mode="indeterminate" diameter="18" strokeWidth="2" />} @else {travel_explore}</mat-icon>
+        <ng-container i18n="@@Trust_from_cluster">From the cluster</ng-container>
+      </button>
+    }
     <button matButton="tonal" (click)="add()">
       <mat-icon>add</mat-icon>
       <ng-container i18n="@@Add_authority">Add authority</ng-container>
@@ -16,6 +24,9 @@
       <mat-icon class="kind">verified</mat-icon>
       <div class="what">
         <span class="name">{{ a.name }}</span>
+        @if (a.source) {
+          <span class="cert" i18n="@@Trust_from_source">from the cluster: {{ a.source }}</span>
+        }
         @for (c of a.certificates; track c.fingerprint) {
           <span class="cert">
             {{ c.subject }}

@@ -509,6 +509,53 @@ clé privée - celle-là signe les certificats des Services, et reste dans la PK
 du cluster (cert-manager, une autorité d'entreprise). Prenez le certificat
 qu'elle publie.
 
+### Trouvées dans le cluster
+
+Sur Kubernetes et OpenShift, la gateway trouve les autorités que le cluster
+publie, quel que soit leur nom : **From the cluster**, dans l'onglet Trusted
+authorities. S'il y en a plusieurs, vous choisissez. Chaque source, et ce
+qu'elle demande :
+
+| Source | Où la gateway la trouve | Droit dans le chart |
+|---|---|---|
+| Autorité des services d'OpenShift | `service-ca.crt`, monté dans chaque pod : l'autorité des certificats des Services | aucun |
+| cert-manager | les ClusterIssuers, et les Issuers de son namespace, de type `ca`, `vault` ou `venafi` | `trustDiscovery.certManager` (actif par défaut) |
+| trust-manager | les Bundles dont la ConfigMap atteint son namespace | `trustDiscovery.trustManager` (actif par défaut) |
+| Autorité du cluster Kubernetes | `ca.crt`, monté dans chaque pod : elle signe l'API server, rarement les services | aucun |
+
+**La clé d'un émetteur n'est jamais lue.** Un émetteur cert-manager de type CA
+range son certificat et sa clé dans un même Secret, et Kubernetes accorde un
+Secret en entier : le droit d'y lire le certificat serait le droit d'y lire la
+clé qui signe tous les services. La gateway demande donc à l'émetteur un
+certificat jetable, `<release>-meerkat-trust-probe`, pour un nom que rien ne
+résout ; cert-manager écrit à côté le certificat de l'émetteur (`ca.crt`), la
+gateway le prend, et supprime les deux. Le chart accorde la création de
+Certificates dans le namespace de la gateway - Kubernetes ne sait pas accorder
+une création sur un seul nom - et la lecture et la suppression de ce seul
+Certificate et de son Secret.
+
+**Ce que chacune signe ici** s'affiche sous elle, pour aider à choisir - à titre
+indicatif, rien n'est décidé à partir de là. Chaque route en https que la
+gateway refuse aujourd'hui est appelée une fois (une route déjà acceptée, ou
+qui ne répond pas, ne dit rien du choix de l'autorité) : le certificat que présente son upstream est rattaché à l'autorité
+qui l'a signé, par le certificat de cette autorité, ou, pour un émetteur
+cert-manager, par les noms que cert-manager enregistre comme signés par lui. Et
+les services : chaque `Certificate` cert-manager nomme son émetteur et ses
+dnsNames (listés dans le namespace de la gateway et dans
+`rbac.watchNamespaces` ; un Certificate ne contient aucune clé), et OpenShift
+marque d'une annotation chaque Service à qui il donne un certificat. Un service
+qui ne l'a pas encore demandé, ou qui n'est pas déployé, ne se voit pas.
+
+**Les routes encore en http** sont proposées en https une fois une autorité
+prise, quand leur Service répond en TLS sur l'un de ses ports, sous un nom que
+porte son certificat, avec une chaîne que la gateway accepte maintenant. Le
+port et le nom sont essayés, pas devinés : le port https d'un service est
+rarement son port http. Chacune reste à basculer par l'opérateur.
+
+Le certificat pris est **copié**, comme un import : une autorité renouvelée à sa
+source se reprend. Sur Swarm, compose ou un binaire nu, rien ne publie
+d'autorité, et le bouton n'est pas proposé.
+
 **Ce que garantit une autorité n'est pas un nom DNS.** Vérifier un upstream pose
 deux questions : son certificat remonte-t-il à une autorité de confiance, et
 porte-t-il le nom qu'appelle la route - l'hôte de l'URL de la cible, par exemple

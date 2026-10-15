@@ -1,0 +1,66 @@
+.body {
+  display: grid;
+  gap: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.authority {
+  padding: 8px 0;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+.authority.off .name {
+  color: var(--mat-sys-on-surface-variant);
+}
+.name {
+  font-weight: 500;
+}
+.detail {
+  padding-left: 40px;
+  font-size: 0.875rem;
+  display: grid;
+  gap: 2px;
+}
+.label {
+  margin-top: 4px;
+  color: var(--mat-sys-on-surface-variant);
+}
+.detail ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.note {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+.source,
+.cert {
+  color: var(--mat-sys-on-surface-variant);
+}
+.why {
+  color: var(--mat-sys-error);
+}
+.problem,
+.absent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.problem {
+  color: var(--mat-sys-error);
+}
+.absent {
+  color: var(--mat-sys-on-surface-variant);
+}
+.signs,
+.to {
+  color: var(--mat-sys-on-surface);
+}
+.refused {
+  color: var(--mat-sys-error);
+}
+.nothing {
+  color: var(--mat-sys-on-surface-variant);
+  font-style: italic;
+}

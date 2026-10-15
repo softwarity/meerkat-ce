@@ -374,6 +374,22 @@ it calls an upstream in HTTPS, beyond the public authorities. **Add authority**
 opens a dialog: a name, and the authority's certificate - choose its file, drop
 it on the dialog, or paste it.
 
+On Kubernetes or OpenShift, **From the cluster** lists the authorities the
+cluster publishes, found rather than named: the service CA OpenShift mounts in
+every pod, the cert-manager issuers that sign with an authority of their own,
+the trust-manager bundles that reach the gateway's namespace, and the cluster's
+own CA (which signs the API server, rarely the services). Under each, what it
+signs here: the routes in https the gateway refuses today that it would
+unblock, and the services the platform records it signed. The one that
+unblocks a refused route is picked in advance; a refused route signed by an
+authority the cluster does not publish is named, to import by hand. Pick one or several
+and **Trust**. The dialog then offers the routes still in http whose service
+now answers in https - tried by the gateway, with the port and the name the
+certificate carries - each to **Switch to HTTPS** or leave. When the cluster publishes none, the dialog says so and shows a
+cert-manager issuer that would; when a source is there but the chart does not
+let the gateway read it, the dialog names the value to set. See
+[Found in the cluster](/docs/operations/tls#found-in-the-cluster).
+
 Each entry shows the certificates it holds and until when. See
 [Calling upstreams in HTTPS](/docs/operations/tls#calling-upstreams-in-https).
 
