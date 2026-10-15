@@ -125,7 +125,11 @@ expect "group" 0 "$gid"
 node test -s "/proc/$pid/root/data/meerkat.db" || die "no database in /data: the store could not write"
 ok "the store wrote /data/meerkat.db"
 want=$([ "$EDITION" = ee ] && echo "Enterprise edition" || echo "Community edition")
-oc -n $NS logs "$pod" | grep -q "$want" || die "the log does not say '$want'"
+# Read whole, then searched: `oc logs | grep -q` under pipefail fails when grep
+# stops at the match while oc is still writing - oc dies of SIGPIPE, and a log
+# that says the edition reads as one that does not (2026-10-15).
+log=$(oc -n $NS logs "$pod")
+grep -q "$want" <<<"$log" || die "the log does not say '$want'"
 ok "the log says $want"
 
 say "behind Routes"
