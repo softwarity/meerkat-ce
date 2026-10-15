@@ -65,7 +65,7 @@ func TestPortalBarReplacesTheUserButton(t *testing.T) {
 			Entries: []store.PortalEntry{{RouteID: "r1"}}},
 		uiRoute())
 	_, body := get(t, on, "/demo/page")
-	if !strings.Contains(body, "<meerkat-portal-nav>") {
+	if !strings.Contains(body, "<meerkat-portal-nav") {
 		t.Errorf("portal on: the bar should be injected:\n%s", body)
 	}
 	if !strings.Contains(body, "/meerkat/portal.js") {
@@ -108,7 +108,7 @@ func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
 	if !strings.Contains(res.Header.Get("Content-Type"), "text/html") {
 		t.Errorf("the unavailable page should be HTML, got %q", res.Header.Get("Content-Type"))
 	}
-	if !strings.Contains(body, "<meerkat-portal-nav>") || !strings.Contains(body, "/meerkat/portal.js") {
+	if !strings.Contains(body, "<meerkat-portal-nav") || !strings.Contains(body, "/meerkat/portal.js") {
 		t.Errorf("the unavailable page must carry the portal bar:\n%s", body)
 	}
 
@@ -138,7 +138,7 @@ func TestUnavailableUIPageSaysTimeoutWith504(t *testing.T) {
 	if res.StatusCode != http.StatusGatewayTimeout {
 		t.Fatalf("want 504, got %d", res.StatusCode)
 	}
-	if !strings.Contains(body, "<meerkat-portal-nav>") {
+	if !strings.Contains(body, "<meerkat-portal-nav") {
 		t.Errorf("the 504 page must carry the portal bar:\n%s", body)
 	}
 }
@@ -146,11 +146,25 @@ func TestUnavailableUIPageSaysTimeoutWith504(t *testing.T) {
 // TestPortalFragmentOnlyForUIRoutes: a service route wears no portal bar - the
 // bar is a UI-only injection, like the button it replaces.
 func TestPortalFragmentOnlyForUIRoutes(t *testing.T) {
-	if f := portalFragment(store.Route{IsUI: true}, nil); !strings.Contains(f, "<meerkat-portal-nav>") ||
+	if f := portalFragment(store.Route{IsUI: true}, nil); !strings.Contains(f, "<meerkat-portal-nav") ||
 		!strings.Contains(f, "/meerkat/portal.js") || !strings.Contains(f, "/meerkat/user-button.js") {
 		t.Errorf("a UI route should get the full portal fragment, got %q", f)
 	}
 	if f := portalFragment(store.Route{IsUI: false}, nil); f != "" {
 		t.Errorf("a non-UI route should get no portal fragment, got %q", f)
+	}
+}
+
+// TestARouteWithNoLanguageOffersNoLanguageMenu: a route that declares no
+// language still writes the attribute, empty. Absent, the bar would fall back
+// to portal.json's languages - the gateway's whole offer - and the account
+// menu would list the sign-in page's languages over an application that
+// speaks none of them.
+func TestARouteWithNoLanguageOffersNoLanguageMenu(t *testing.T) {
+	if f := portalFragment(store.Route{IsUI: true}, nil); !strings.Contains(f, `<meerkat-portal-nav languages=""`) {
+		t.Errorf("a route with no language should say so with an empty attribute, got %q", f)
+	}
+	if f := portalFragment(store.Route{IsUI: true}, []string{"fr", "de"}); !strings.Contains(f, `languages="fr,de"`) {
+		t.Errorf("a route's own languages should ride on the bar, got %q", f)
 	}
 }

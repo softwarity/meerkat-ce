@@ -2939,10 +2939,12 @@ func portalFragment(r store.Route, localeCodes []string) string {
 	// payload carries for want of knowing which page asked. A route written in
 	// a language Meerkat does not embed still offers it here, which is the
 	// point: the sign-in page cannot, and this page can.
-	attr := ""
-	if len(localeCodes) > 0 {
-		attr = ` languages="` + htmlEscape(strings.Join(localeCodes, ",")) + `"`
-	}
+	//
+	// ALWAYS WRITTEN, empty when the route declares nothing: an absent
+	// attribute is what sends the bar to the payload, and the payload is the
+	// gateway's whole offer. A page that speaks no language of ours must get
+	// no language menu, not the sign-in page's.
+	attr := ` languages="` + htmlEscape(strings.Join(localeCodes, ",")) + `"`
 	// Route-specific, like the languages above: the bar is global, the
 	// application behind THIS route is not. The bar mounts the user button, so
 	// what that button offers is decided per route here.

@@ -510,12 +510,15 @@ const portalNavJS = `(function () {
       // position's first word is the anchored edge and decides which way the
       // menu opens: at the bottom of a rail it must open UPWARD, not down.
       b.setAttribute('position', position || 'top-right');
-      // THIS PAGE's languages when the injection named them, the payload's
+      // THIS PAGE's languages when the injection is a route's, the payload's
       // otherwise. The bar is injected into one route's page and portal.json
       // does not know which, so it carries the gateway's whole offer - right
-      // for a bar drawn before any page, wrong for the menu on this one.
-      var langs = (this.getAttribute('languages') || '').split(',').filter(Boolean);
-      if (!langs.length) langs = d.languages || [];
+      // for a bar drawn before any page (the preview), wrong for the menu on
+      // a route's page. A route always writes the attribute, empty when it
+      // declares no language: empty then means no menu, not the whole offer.
+      var langs = this.hasAttribute('languages')
+        ? (this.getAttribute('languages') || '').split(',').filter(Boolean)
+        : (d.languages || []);
       if (langs.length) b.setAttribute('languages', langs.join(','));
       // What the switch may be, in order of who decides. The installation
       // first: built-in pages settled on light or dark leave nothing to switch
