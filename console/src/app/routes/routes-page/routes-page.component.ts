@@ -436,11 +436,16 @@ export class RoutesPageComponent {
   // typing the whole thing again to compare two of them is how a difference
   // nobody meant creeps in.
   duplicate(route: Route): void {
-    const name = `${route.name}-copy`;
+    // Names are unique: a second copy of the same route takes the next free one.
+    const taken = new Set(this.routes().map((r) => r.name));
+    let name = `${route.name}-copy`;
+    for (let i = 2; taken.has(name); i++) name = `${route.name}-copy-${i}`;
     this.api
       // A fresh identity, like the editor mints for a new route: PUT is
-      // keyed on the id, so reusing the original's would be an edit.
-      .putRoute({ ...route, id: crypto.randomUUID(), name, enabled: false, order: route.order + 1 })
+      // keyed on the id, so reusing the original's would be an edit. And no
+      // revision: the original's, on an id the store has never seen, reads as
+      // a route deleted since it was read, and the copy is refused.
+      .putRoute({ ...route, id: crypto.randomUUID(), rev: undefined, name, enabled: false, order: route.order + 1 })
       .subscribe({
         next: (saved) => {
           this.snack.open(
@@ -451,7 +456,12 @@ export class RoutesPageComponent {
           this.load();
           void this.router.navigate(['/infra/routes', saved.id, 'target']);
         },
-        error: () => this.snack.open($localize`:@@Request_failed:Request failed`, undefined, { duration: 3000 }),
+        error: (e) => {
+          // A 409 already has its own snack (staleInterceptor); a second one
+          // on top would push it away before it could be read.
+          if (e.status === 409) return;
+          this.snack.open(e.error?.error ?? $localize`:@@Request_failed:Request failed`, undefined, { duration: 6000 });
+        },
       });
   }
 
