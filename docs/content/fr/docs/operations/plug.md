@@ -132,6 +132,88 @@ plug -p <profile> -s my-service:8080:3000 npm run start
 Le cluster le joint à l'adresse `my-service:8080`, redirigée vers votre port local `3000`,
 aussi longtemps que la commande tourne.
 
+## À côté d'Argo CD, de Flux et des autres contrôleurs GitOps
+
+Un cluster piloté par un contrôleur de déploiement continu - Argo CD, Flux, Rancher Fleet,
+Crossplane - maintient chaque objet conforme à ce que déclare un dépôt, et annule tout ce
+qui s'en écarte. `-s` fait l'inverse, volontairement : le temps de la session, il modifie
+`spec.selector` et `spec.ports` du Service pour que le nom pointe vers la machine du
+développeur. Le contrôleur y voit une dérive et rétablit l'objet, en général en quelques
+minutes. Consommer les services du cluster n'est pas concerné : seul `-s` l'est.
+
+Rien n'échoue, ni d'un côté ni de l'autre, et c'est ce qui rend le problème facile à
+manquer. Si l'application déployée tourne, le nom revient vers elle : l'application répond,
+la page se charge, simplement ce n'est pas le code du développeur qui répond. Une session
+qui fonctionne quelques minutes puis cesse de refléter les modifications en est le premier
+signe. plug vérifie le chemin en arrière-plan et prévient : le nom *est servi par autre
+chose*, ou *n'est pas joignable dans le cluster* quand rien n'est déployé.
+
+Qui gère un Service se lit dans ses métadonnées (`kubectl describe svc <nom>`) :
+
+| Contrôleur | Ce qu'il faut chercher |
+|---|---|
+| Argo CD | l'annotation `argocd.argoproj.io/tracking-id` |
+| Flux | `kustomize.toolkit.fluxcd.io/name`, `helm.toolkit.fluxcd.io/name` |
+| Rancher Fleet | `fleet.cattle.io/bundle-name` |
+| Crossplane, opérateurs | `crossplane.io/composite`, ou une entrée `ownerReferences` avec `controller: true` |
+
+`app.kubernetes.io/managed-by: Helm` seul ne signifie rien ici : Helm agit lors d'une mise à
+jour et ne réconcilie pas, donc un Service déployé par un chart peut être pris.
+
+**Argo CD** : demandez à l'Application de ne pas comparer les deux champs que plug modifie ;
+tout le reste du Service continue d'être réconcilié. Cela se règle dans l'Application, pas
+dans le chart :
+
+```yaml
+spec:
+  ignoreDifferences:
+    - group: ""
+      kind: Service
+      name: my-service
+      namespace: my-namespace
+      jsonPointers:
+        - /spec/selector
+        - /spec/ports
+```
+
+Sur un cluster où plug sert couramment, réglez-le une fois pour tous les Services dans la
+ConfigMap `argocd-cm` :
+
+```yaml
+data:
+  resource.customizations.ignoreDifferences._Service: |
+    jsonPointers:
+      - /spec/selector
+      - /spec/ports
+```
+
+Désactiver Self Heal fonctionne aussi pour un besoin ponctuel, mais cela suspend la
+correction des dérives pour toute l'Application, et on oublie facilement de le réactiver.
+
+**Flux** accepte l'instruction sur la ressource elle-même : c'est donc dans le chart qu'elle
+se place, avec l'annotation `kustomize.toolkit.fluxcd.io/reconcile: disabled` sur le
+Service. Elle arrête la réconciliation de tout l'objet, pas de deux champs.
+
+**Rancher Fleet** compare avec `diff.comparePatches` dans le `fleet.yaml` du bundle, en
+retirant `/spec/selector` et `/spec/ports`. **Crossplane** : un Object passé en
+`managementPolicies: ["Observe"]` n'est plus réappliqué. Un opérateur maison offre rarement
+un équivalent : suspendez-le le temps de la session, ou branchez un nom qu'il ne gère pas.
+
+> [!WARNING] Terminez une session par Ctrl-C
+> C'est Ctrl-C qui rétablit le Service, à partir d'un reçu que plug a déposé dessus. Une
+> session tuée par `kill -9` le laisse de côté jusqu'au balayage de l'agent, une fois par
+> minute, qui constate que la session a disparu et le rétablit : le chart Helm accorde le
+> droit `deployments` dont ce balayage a besoin. Sous un contrôleur, un Service peut
+> toutefois garder une clé `app: plug` en trop dans son sélecteur, que le contrôleur ne
+> retire pas puisqu'il ne gère que les champs qu'il connaît : le Service ne sélectionne
+> alors plus aucun pod, et le nom ne répond plus à personne. Si c'est encore le cas après
+> deux minutes, retirez cette clé à la main. Le chart accorde aussi `endpoints` : l'agent
+> écrit lui-même les Endpoints quand un sélecteur ne peut pas être réorienté, plutôt que de
+> se rabattre sur cette clé.
+
+Le détail, et les autres symptômes, sont dans la documentation de plug :
+[Continuous deployment & GitOps](https://softwarity.github.io/plug/#/continuous-deployment).
+
 ## Retirer un accès
 
 Retirer la clé du profil, retirer la capacité développeur du compte ou désactiver l'un des

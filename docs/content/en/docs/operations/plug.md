@@ -129,6 +129,90 @@ plug -p <profile> -s my-service:8080:3000 npm run start
 The cluster reaches it as `my-service:8080`, forwarded to your local `3000`,
 for as long as the command runs.
 
+## Beside Argo CD, Flux and other GitOps controllers
+
+A cluster driven by a continuous-deployment controller - Argo CD, Flux, Rancher
+Fleet, Crossplane - keeps every object equal to what a repository declares, and
+undoes whatever differs. `-s` does the opposite on purpose: for the session, it
+changes the Service's `spec.selector` and `spec.ports` so the name points at the
+developer's machine. The controller sees drift and puts it back, usually within
+minutes. Consuming the cluster's services is not affected: only `-s` is.
+
+Nothing fails on either side, which is what makes it easy to miss. When the
+deployed workload is running, the name goes back to it: the application
+answers, the page loads, and it is simply not the developer's code answering.
+A session that works for a few minutes and then stops reflecting changes is
+the first sign. plug checks the path in the background and warns: the name *is
+answered by something else*, or *is not reachable inside the cluster* when
+nothing is deployed.
+
+Who manages a Service is in its metadata (`kubectl describe svc <name>`):
+
+| Controller | What to look for |
+|---|---|
+| Argo CD | annotation `argocd.argoproj.io/tracking-id` |
+| Flux | `kustomize.toolkit.fluxcd.io/name`, `helm.toolkit.fluxcd.io/name` |
+| Rancher Fleet | `fleet.cattle.io/bundle-name` |
+| Crossplane, operators | `crossplane.io/composite`, or an `ownerReferences` entry with `controller: true` |
+
+`app.kubernetes.io/managed-by: Helm` alone means nothing here: Helm acts on an
+upgrade and does not reconcile, so a Service deployed by a chart can be taken.
+
+**Argo CD**: tell the Application not to compare the two fields plug changes;
+everything else about the Service keeps being reconciled. This goes in the
+Application, not in the chart:
+
+```yaml
+spec:
+  ignoreDifferences:
+    - group: ""
+      kind: Service
+      name: my-service
+      namespace: my-namespace
+      jsonPointers:
+        - /spec/selector
+        - /spec/ports
+```
+
+On a cluster where plug is used routinely, set it once for every Service in the
+`argocd-cm` ConfigMap:
+
+```yaml
+data:
+  resource.customizations.ignoreDifferences._Service: |
+    jsonPointers:
+      - /spec/selector
+      - /spec/ports
+```
+
+Turning Self Heal off also works for a one-off, but it suspends drift
+correction for the whole Application, and it is easy to forget to turn back on.
+
+**Flux** takes the instruction on the resource itself, so the chart is the place:
+the annotation `kustomize.toolkit.fluxcd.io/reconcile: disabled` on the Service.
+It stops reconciling the whole object, not two fields.
+
+**Rancher Fleet** compares with `diff.comparePatches` in the bundle's
+`fleet.yaml`, removing `/spec/selector` and `/spec/ports`. **Crossplane**: an
+Object switched to `managementPolicies: ["Observe"]` is no longer re-applied.
+An in-house operator rarely offers an equivalent: suspend it for the session, or
+plug in a name it does not own.
+
+> [!WARNING] End a session with Ctrl-C
+> Ctrl-C is what puts the Service back, from a receipt plug stored on it. A
+> session killed with `kill -9` leaves it parked until the agent's sweep, once a
+> minute, finds the session gone and restores it: the Helm chart grants the
+> `deployments` right that sweep needs. Under a controller, a Service can still
+> keep an extra `app: plug` key in its selector, which the controller does not
+> remove since it only manages the fields it knows: the Service then selects no
+> pod, and the name answers nobody. If it still does after a couple of minutes,
+> remove that key by hand. The chart also grants `endpoints`, so the agent
+> writes the Endpoints itself when a selector cannot be repointed, rather than
+> falling back to that key.
+
+The details, and the other symptoms, are in plug's documentation:
+[Continuous deployment & GitOps](https://softwarity.github.io/plug/#/continuous-deployment).
+
 ## Taking an access back
 
 Removing the key on the profile, the developer capability on the account, or
