@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.10.0
+
 - **The color scheme switch in the user button reads in both schemes.** Its glyph took a colour
   meant for another background, and some themes drew a dark moon on dark and a white sun on light.
 - **An agent can send a route back whole.** `save_route` refused a route read with `get_route`
