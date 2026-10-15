@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.10.1
+
 - **The access log is a console switch.** Infra, OpenTelemetry, Logs tab, **Access log**: on and
   off live, on every node, kept across restarts. It replaces `MEERKAT_ACCESS_LOG`, and the
   trace export set by `MEERKAT_OTLP_ENDPOINT` and `MEERKAT_OTLP_SAMPLE` is set on the same
