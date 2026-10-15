@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.9.0
+
 - **plug 2.26.1 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **Domains & TLS, plane by plane, and a proxy that re-encrypts.** One tab per plane -
   Console, Application, Internal - and the trusted authorities in a fourth. Each plane has
