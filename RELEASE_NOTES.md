@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.11.0
+
 - **Duplicating a route works again.** The copy carried the original's revision on a new id, which
   the gateway read as a route deleted since it was opened, and refused. A second copy of the same
   route now takes the next free name (`-copy-2`...), and a refusal shows the gateway's own reason
