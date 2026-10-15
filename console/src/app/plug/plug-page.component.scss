@@ -157,3 +157,19 @@ a {
   max-width: 320px;
   margin-bottom: 4px;
 }
+
+/* What the runtime publishes the tunnel as: a line under the hint. */
+.exposure {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.exposure mat-icon {
+  flex: none;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}

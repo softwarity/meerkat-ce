@@ -1,4 +1,4 @@
-{{- if and .Values.plug.enabled (not .Values.production) }}
+{{- if .Values.plug.enabled }}
 # The rights the plug agent needs, one per feature it grew. The grant IS the
 # switch - without it the tunnel does not run, the gateway says so once and
 # serves as usual. `plug doctor` names whichever one is missing.
@@ -30,16 +30,12 @@
 # pods/exec is the widest of these: in this namespace it amounts to running
 # code in the pods, and reading an environment a pod has already resolved is
 # reading the secrets it resolved. It is scoped to a Role rather than a
-# ClusterRole, and it follows the TUNNEL rather than a switch of its own:
-#
-#   production: true   the developer surface is closed, the gateway opens no
-#                      tunnel, and nothing here is granted - a right nobody
-#                      exercises is surface for nothing.
-#   otherwise          the gateway opens the tunnel (developer mode ships on),
-#                      so the deployment grants what it is about to use. The
-#                      earlier default granted nothing while the tunnel opened
-#                      anyway, which is the one combination that cannot work:
-#                      an agent that cannot do its job, saying so every minute.
+# ClusterRole, and it follows the TUNNEL rather than a switch of its own: the
+# gateway opens the tunnel once its switches say so (Infra, Plug and developer
+# mode, in the console), so the deployment grants what it is about to use. The
+# earlier default granted nothing while the tunnel opened anyway, which is the
+# one combination that cannot work: an agent that cannot do its job, saying so
+# every minute.
 #
 # plug.enabled: false still refuses it outright, for an installation that wants
 # the developer surface without the tunnel.

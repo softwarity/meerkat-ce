@@ -35,10 +35,9 @@ utilisateur, le mode de test de l'interface, la documentation d'API des routes.
 Désactivé, rien de tout cela n'existe, quel que soit le nombre de comptes dotés de la
 capacité. Gratuit dans les deux éditions.
 
-Si la gateway est déclarée en production là où elle tourne, l'interrupteur est
-grisé et l'indique : la surface développeur reste fermée quoi qu'en dise la console,
-si bien qu'une base de données restaurée depuis la préproduction ne peut pas la
-rouvrir.
+Cet interrupteur décide sur une gateway de production comme ailleurs. Il est stocké :
+un export de configuration ou une base restaurée depuis la préproduction l'emporte avec
+elle.
 
 **Working hours** définit la plage d'accès de toute l'application : chaque organisation
 en hérite, sauf si elle définit la sienne.

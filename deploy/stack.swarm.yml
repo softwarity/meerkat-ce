@@ -50,9 +50,6 @@ services:
       # Read once, on the FIRST start, to create the admin account: the task
       # that arrives first creates it, the others find it already there.
       MEERKAT_ADMIN_PASSWORD: ${MEERKAT_ADMIN_PASSWORD:?set a password for the first admin}
-      # A cluster is a production gateway: the whole developer surface stays
-      # closed here, whatever the database says.
-      MEERKAT_PRODUCTION: "1"
       # The runtime, through the read-only proxy below, on every node: the
       # route editor offers the services it finds, and the routes screen shows
       # each target's ready replicas and the image they run, as Swarm's events

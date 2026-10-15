@@ -52,12 +52,6 @@ admin:
   existingSecret: ""
   existingSecretKey: password
 
-# Declare this gateway a PRODUCTION one: the whole developer surface stays
-# closed here whatever the database says. Worth setting even when nobody
-# expects a developer tunnel - the stored switch travels in a backup or a
-# configuration export, and this does not.
-production: false
-
 # Whose X-Forwarded-For and X-Forwarded-Proto the gateway believes is no
 # longer a value here: it is said on the console's Domains & TLS screen, plane
 # by plane - who serves the public names (this gateway, or a proxy in front)
@@ -73,16 +67,14 @@ production: false
 # pod with the workload's claim for the live mount. The list is plug's own
 # (deploy/plug-k8s.yaml in that repository) - see templates/rbac.yaml.
 #
-# It follows `production` above rather than standing on its own: a production
-# gateway closes the developer surface, opens no tunnel, and is granted none of
-# this - a right nobody exercises is surface for nothing. Anywhere else the
-# grant is made, so the tunnel CAN open - it does once an infrastructure
+# The grant is made so the tunnel CAN open: it does once an infrastructure
 # administrator switches it on (console: Infra, Plug; it ships off) while
-# developer mode is on (Application, General; it ships on).
+# developer mode is on (Application, General; it ships on). Those two switches
+# decide, on a production gateway as anywhere else.
 #
 # Setting it to false refuses the grant outright - for an installation that
 # wants the developer surface without the tunnel. It does not close the tunnel:
-# that is `production: true`, the Infra, Plug switch, or developer mode.
+# the Infra, Plug switch and developer mode do.
 plug:
   enabled: true
   port: 22222

@@ -35,10 +35,6 @@ service:
   appPort: 8080
   adminPort: 9090
 
-# Declare it a production gateway and the whole developer surface stays closed
-# here, whatever the database says.
-production: false
-
 # The authorities the cluster publishes, found by Domains & TLS, Trusted
 # authorities, From the cluster: what signs the services a route in HTTPS
 # calls. cert-manager: list the issuers, and learn one's certificate from a

@@ -24,7 +24,8 @@ aiguille d'après le champ `type`, vers deux destinations et avec deux durées d
 
 ```
 MEERKAT_LOG_LEVEL    debug | info | warn | error      info par défaut
-MEERKAT_LOG_FORMAT   json | text                      json en production, text ailleurs
+MEERKAT_LOG_FORMAT   json | text                      text par défaut ; le JSON pour un agent est
+                                                      Infra, OpenTelemetry (écrit pour un agent)
 ```
 
 Une faute de frappe dans le niveau ramène à `info` au lieu d'empêcher le démarrage.
@@ -55,11 +56,9 @@ secondes. Pour cela, il y a [Metrics](/docs/console/traffic) et les traces.
 ## Le journal d'accès
 
 Il est désactivé par défaut : à quatre cents requêtes par seconde, il représente trente-cinq
-millions de lignes par jour.
-
-```
-MEERKAT_ACCESS_LOG=1
-```
+millions de lignes par jour. Il s'active dans la console, **Infra, OpenTelemetry**, onglet
+Logs, **Access log** - à chaud, sur tous les nœuds. (`MEERKAT_ACCESS_LOG`, qui l'activait,
+n'est plus lue.)
 
 Une ligne, telle qu'elle sort :
 

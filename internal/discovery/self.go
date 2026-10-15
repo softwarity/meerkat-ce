@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Where the world reaches THIS gateway's ports.
@@ -115,6 +117,14 @@ type selfService struct {
 			Name       string `json:"name"`
 		} `json:"ports"`
 	} `json:"spec"`
+	Status struct {
+		LoadBalancer struct {
+			Ingress []struct {
+				IP       string `json:"ip"`
+				Hostname string `json:"hostname"`
+			} `json:"ingress"`
+		} `json:"loadBalancer"`
+	} `json:"status"`
 }
 
 // readK8sSelf reads this pod, then every Service of the namespace.
@@ -225,4 +235,104 @@ func selects(selector, labels map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// Exposure is how the runtime publishes ONE inside port of this gateway:
+// what a machine outside reaches, as far as the runtime knows. What sits in
+// front of it - a k3d or Docker Desktop port mapping, a firewall, a load
+// balancer's DNS name - is out of its sight, so this is a suggestion the
+// operator's own entry overrides.
+type Exposure struct {
+	// Source is the runtime that answered: kubernetes, swarm, docker; empty
+	// when none could be asked.
+	Source string `json:"source,omitempty"`
+	// Kind is loadbalancer, nodeport, clusterip (reachable inside the
+	// cluster only), published (a Docker or Swarm port), or none.
+	Kind    string `json:"kind"`
+	Service string `json:"service,omitempty"`
+	// Host is a LoadBalancer's address, once it has one (Pending until then).
+	Host    string `json:"host,omitempty"`
+	Port    int    `json:"port,omitempty"`
+	Pending bool   `json:"pending,omitempty"`
+	Why     string `json:"why,omitempty"`
+}
+
+var (
+	exposureMu   sync.Mutex
+	exposureSeen = map[int]exposureAt{}
+)
+
+type exposureAt struct {
+	e  Exposure
+	at time.Time
+}
+
+// ExposureOf says how the inside port is published. Kept for half a minute:
+// a page asks it at every render, and a Service changes when somebody runs
+// helm upgrade, not between two clicks.
+func ExposureOf(ctx context.Context, inside int) Exposure {
+	exposureMu.Lock()
+	if c, ok := exposureSeen[inside]; ok && time.Since(c.at) < 30*time.Second {
+		exposureMu.Unlock()
+		return c.e
+	}
+	exposureMu.Unlock()
+	e := exposureOf(ctx, inside)
+	exposureMu.Lock()
+	exposureSeen[inside] = exposureAt{e, time.Now()}
+	exposureMu.Unlock()
+	return e
+}
+
+func exposureOf(ctx context.Context, inside int) Exposure {
+	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" {
+		p := Self(ctx)
+		if p.Source == "" {
+			return Exposure{Kind: "none", Why: p.Why}
+		}
+		if out, ok := p.Ports[inside]; ok && out > 0 {
+			return Exposure{Source: p.Source, Kind: "published", Port: out}
+		}
+		return Exposure{Source: p.Source, Kind: "none", Why: "the container does not publish this port"}
+	}
+	ctx, cancel := context.WithTimeout(ctx, lookupTimeout)
+	defer cancel()
+	self, err := readK8sSelf(ctx)
+	if err != nil {
+		return Exposure{Source: "kubernetes", Kind: "none", Why: "could not read this gateway's Services: " + err.Error()}
+	}
+	// The widest way out wins: a LoadBalancer over a NodePort over a
+	// ClusterIP, whatever order the Services come in.
+	rank := map[string]int{"LoadBalancer": 3, "NodePort": 2, "ClusterIP": 1}
+	best := Exposure{Source: "kubernetes", Kind: "none", Why: "no Service of this gateway carries this port"}
+	bestRank := 0
+	for _, svc := range self.services {
+		if len(svc.Spec.Selector) == 0 || !selects(svc.Spec.Selector, self.labels) || rank[svc.Spec.Type] <= bestRank {
+			continue
+		}
+		for _, p := range svc.Spec.Ports {
+			if self.inside(p.TargetPort, p.Port) != inside {
+				continue
+			}
+			e := Exposure{Source: "kubernetes", Service: svc.Metadata.Name}
+			switch svc.Spec.Type {
+			case "LoadBalancer":
+				e.Kind, e.Port = "loadbalancer", p.Port
+				if in := svc.Status.LoadBalancer.Ingress; len(in) > 0 {
+					e.Host = in[0].Hostname
+					if e.Host == "" {
+						e.Host = in[0].IP
+					}
+				}
+				e.Pending = e.Host == ""
+			case "NodePort":
+				e.Kind, e.Port = "nodeport", p.NodePort
+			default:
+				e.Kind = "clusterip"
+			}
+			best, bestRank = e, rank[svc.Spec.Type]
+			break
+		}
+	}
+	return best
 }

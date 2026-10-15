@@ -96,7 +96,6 @@ services:
       - "22222:22222"   # the developer tunnel
     environment:
       MEERKAT_ADMIN_PASSWORD: your-first-password
-      # MEERKAT_PRODUCTION: "1"   # see below
     volumes:
       - meerkat-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -150,13 +149,6 @@ helm install meerkat meerkat/meerkat \
 helm install meerkat meerkat/meerkat \
   -f https://www.softwarity.io/deploy/values-eval-one-node.yaml \
   --set admin.password='your-first-password'
-
-# Enterprise in production: the developer surface is closed, and the chart
-# then grants nothing at all on the namespace.
-helm install meerkat meerkat/meerkat \
-  --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
-  --set admin.password='your-first-password' \
-  --set production=true
 ```
 
 What the chart grants this gateway's ServiceAccount, **in its own namespace
@@ -179,11 +171,9 @@ reading the secrets it resolved. It is also why the agent never asks for
 be discovered at the moment somebody uses the feature, which is the worst place
 to find out.
 
-The grant **follows the tunnel** rather than a switch of its own.
-`production: true` closes the developer surface: the gateway opens no tunnel,
-and the chart then grants strictly nothing - a right nobody exercises is
-surface for nothing. Otherwise the tunnel can open - it does once it is switched
-on under **Infra, Plug** - so the deployment grants what it may be asked to use,
+The grant **follows the tunnel** rather than a switch of its own. The tunnel
+can open - it does once it is switched on under **Infra, Plug**, with developer
+mode on - so the deployment grants what it may be asked to use,
 which is why `plug.enabled` defaults to **true**: the other way round - the
 tunnel open, the rights missing - is the one combination that cannot work, with
 an agent saying every minute that it cannot do its job. `plug.enabled: false` still refuses the grant outright, for an
@@ -270,23 +260,16 @@ pointer to the screen.
 The audit never shows only what a header claimed: when the address came from a
 proxy, the line keeps both - `203.0.113.5 via 10.42.0.15`.
 
-## Declaring a gateway production
+## The developer surface in production
 
-`MEERKAT_PRODUCTION` (`production: true` in the chart) closes the whole
-developer surface here - the tooling, the API docs, the UI test mode, the
-tunnel - whatever the database says.
+The tooling, the API docs, the UI test mode and the tunnel are switched in the
+console - **Application, General** for developer mode, **Infra, Plug** for the
+tunnel - on a production gateway as anywhere else. Nothing in the environment
+overrules them. `MEERKAT_PRODUCTION`, which used to, is no longer read: set, it
+only logs a warning.
 
-It is worth setting even where nobody expects a tunnel, and the reason is the
-interesting one: **the stored switch travels**. A configuration export, a
-restored backup, a database copied from staging can each carry developer mode
-ON into production, and nobody notices until there is a tunnel port in front of
-customers. The environment does not travel - it is a property of where the
-process runs.
-
-It only goes one way: it closes a surface, it never opens one an operator
-turned off. The console shows the switch disabled *with the reason* rather than
-hiding it, because someone looking for tooling that is not there has to learn
-why.
+Keep in mind that these switches are stored: a configuration export, a
+restored backup or a database copied from staging carries them along.
 
 ## What each variable does
 
@@ -300,6 +283,6 @@ why.
 | `MEERKAT_DATABASE_URL` | - | An external PostgreSQL instead of the embedded store. Enterprise, and the prerequisite of a [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | a file under the data directory | The vault master key. It has to be supplied, and identical, on every node of a cluster. |
 | `MEERKAT_PLUG_ADDR` | `:22222` | Moves the developer tunnel's port. It does not turn it off: the **Infra, Plug** switch does, and so does closing the developer surface. |
-| `MEERKAT_PRODUCTION` | unset | Declares this gateway production and closes the developer surface for good. |
+| `MEERKAT_PRODUCTION` | - | No longer read: set, it only logs a warning. The developer surface is switched in the console - see [The developer surface in production](#the-developer-surface-in-production). |
 | `MEERKAT_TRUSTED_PROXIES` | - | No longer read: set, it only logs a warning. Whose `X-Forwarded-For` and `X-Forwarded-Proto` are believed is said plane by plane on **Infra > Domains & TLS** - see [Behind a proxy or a load balancer](#behind-a-proxy-or-a-load-balancer). |
 | `MEERKAT_TENANCY` | `single` | One implicit organisation, or several (Enterprise). Chosen once, at the first start; the console owns it afterwards. |

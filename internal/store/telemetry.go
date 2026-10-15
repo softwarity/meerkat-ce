@@ -76,6 +76,13 @@ type TelemetryConfig struct {
 	// way out, for a node with no agent): the outputs keep the format chosen
 	// at startup. One or the other - both would deliver every line twice.
 	LogsPush bool `json:"logsPush,omitempty"`
+	// AccessLog writes one line per request crossing the front door, on
+	// standard output, typed "access" - refusals included. Off by default: at
+	// four hundred requests a second it is thirty-five million lines a day. A
+	// switch of the console, applied live on every node; it used to be the
+	// MEERKAT_ACCESS_LOG variable, which is no longer read. Like Logs, it
+	// writes to the outputs and depends on no collector.
+	AccessLog bool `json:"accessLog,omitempty"`
 	// Audit sends the DATA PLANE's audit to the collector, as logs marked
 	// meerkat.stream=audit (AUD-03, AUD-04): the accounts' sign-ins and
 	// refusals, and the calls of the audited endpoints.

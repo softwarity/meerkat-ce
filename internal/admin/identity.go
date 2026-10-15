@@ -1141,11 +1141,6 @@ type settingsPayload struct {
 	// saving a locale would close the developer tooling of an installation
 	// nobody asked about. Absent means UNCHANGED.
 	DevMode *bool `json:"devMode,omitempty"`
-	// DevModeLocked says the ENVIRONMENT closed the developer surface
-	// (MEERKAT_PRODUCTION), not an operator. Read-only, and it exists so a
-	// screen can explain a switch it must not offer: a toggle that saves and
-	// changes nothing is worse than no toggle at all.
-	DevModeLocked bool `json:"devModeLocked,omitempty"`
 }
 
 // smtpPayload is READ-ONLY context about outbound e-mail: who the recipient
@@ -1204,7 +1199,6 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	p.Telemetry = a.st.RawTelemetry(ctx)
 	devMode := a.st.DevMode(ctx)
 	p.DevMode = &devMode
-	p.DevModeLocked = store.Production()
 	smtp := a.st.GetSMTP(ctx)
 	p.SMTP = smtpPayload{
 		FromName: smtp.FromName, RelayHost: smtp.Host, RelayFrom: smtp.Address(),

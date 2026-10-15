@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -107,14 +106,6 @@ func main() {
 		"application (data plane) HTTPS listen address, opened when TLS is switched on")
 	adminTLSAddr := flag.String("admin-tls-addr", envOr("MEERKAT_ADMIN_TLS_ADDR", ":9443"),
 		"administration (control plane) HTTPS listen address, opened when TLS is switched on")
-	// This gateway is a PRODUCTION one: the whole developer surface is closed
-	// here, whatever the database says. An environment decision rather than a
-	// stored one, because the stored switch travels - a configuration export,
-	// a restored backup, a database copied from staging can each carry it ON
-	// into production, and nobody notices until there is a tunnel port in
-	// front of customers.
-	production := flag.Bool("production", envOr("MEERKAT_PRODUCTION", "") != "",
-		"declare this gateway production: the developer surface (tooling, API docs, tunnel) stays closed whatever the settings say")
 	// The developer tunnel's SSH port (DEV-11). Always has one - turning the
 	// tunnel off is done by its switch (Infra, Plug) or by closing the
 	// developer surface, not by withholding a port. Above 1024 because binding a privileged port would want root or
@@ -128,19 +119,7 @@ func main() {
 	logLevel := flag.String("log-level", envOr("MEERKAT_LOG_LEVEL", "info"),
 		"how much the gateway says about itself: debug, info, warn, error")
 	logFormat := flag.String("log-format", envOr("MEERKAT_LOG_FORMAT", ""),
-		"json or text; empty picks json for a production gateway and text elsewhere")
-	// One line per request, and off unless asked: at four hundred requests a
-	// second this is thirty-five million lines a day, and an operator reading
-	// the container's log for a startup problem should not have to opt out.
-	accessLog := flag.Bool("access-log", envOr("MEERKAT_ACCESS_LOG", "") != "",
-		"write one line per request crossing the front door, on standard output, typed \"access\"")
-	// Where the gateway's own spans go (OBS-04), Enterprise. Empty means
-	// nowhere, which is the default and costs nothing: the trace context still
-	// travels and its identifier is still in the access log.
-	otlpEndpoint := flag.String("otlp-endpoint", envOr("MEERKAT_OTLP_ENDPOINT", ""),
-		"collector to export traces to, such as http://otel-collector:4318 (Enterprise)")
-	otlpSample := flag.String("otlp-sample", envOr("MEERKAT_OTLP_SAMPLE", "0.1"),
-		"share of the journeys this gateway opens that get recorded, 0 to 1; a caller's own decision is always respected")
+		"json or text, text when empty: what is written before the settings are read; JSON for an agent is the console's switch (Infra, OpenTelemetry)")
 	flag.Parse()
 
 	if *showVersion {
@@ -154,40 +133,27 @@ func main() {
 	// Who writes, on every line in OpenTelemetry's format (OBS-03).
 	logging.SetResource(map[string]string{"service.name": "meerkat", "service.version": version.Version})
 	format := logging.Setup(logging.Options{
-		Format: logging.Format(*logFormat), Level: *logLevel, Production: *production,
+		Format: logging.Format(*logFormat), Level: *logLevel,
 	})
-	if *accessLog {
-		logging.EnableAccessLog(format)
-	}
-	if *otlpEndpoint != "" {
-		sample, err := strconv.ParseFloat(*otlpSample, 64)
-		if err != nil {
-			slog.Warn("otlp-sample is not a number between 0 and 1, using 0.1", "got", *otlpSample)
-			sample = 0.1
-		}
-		stop, err := tracing.Start(tracing.Config{
-			Endpoint: *otlpEndpoint, Service: "meerkat",
-			Version: version.Version, Sample: sample,
-		})
-		if err != nil {
-			// Named rather than silent: an operator who set an endpoint and
-			// sees no traces must find out which of the two reasons it is.
-			slog.Warn("traces are not being exported", "endpoint", *otlpEndpoint, "why", err)
-		} else {
-			defer stop()
-			slog.Info("traces", "endpoint", *otlpEndpoint, "sample", sample)
+	// The access log and the trace export are switches of the console now
+	// (Infra, OpenTelemetry), stored and applied on every node. The variables
+	// that used to set them are read only to say so: ignored in silence, they
+	// would look like they still worked.
+	for _, v := range []string{"MEERKAT_ACCESS_LOG", "MEERKAT_OTLP_ENDPOINT", "MEERKAT_OTLP_SAMPLE"} {
+		if os.Getenv(v) != "" {
+			slog.Warn(v+" is no longer read: the access log and the trace export are set in the console (Infra, OpenTelemetry)",
+				"ignored", os.Getenv(v))
 		}
 	}
 	// Not "level": slog writes the RECORD's level under that name, and a JSON
 	// object with the same key twice is a line a collector reads at random.
-	slog.Info("logs", "threshold", *logLevel, "format", string(format), "access_log", *accessLog)
+	slog.Info("logs", "threshold", *logLevel, "format", string(format))
 
 	if err := run(options{
 		addr: *addr, adminAddr: *adminAddr, internalAddr: *internalAddr, internalTLSAddr: *internalTLSAddr,
 		tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
 		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr, databaseURL: *databaseURL,
-		production: *production,
 	}); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
@@ -207,7 +173,6 @@ type options struct {
 	tenancy               string
 	plugAddr              string
 	databaseURL           string
-	production            bool
 }
 
 func run(o options) error {
@@ -217,9 +182,13 @@ func run(o options) error {
 	// already has the environment's answer. Said out loud once: an operator
 	// looking for tooling that is not there deserves to find the reason in the
 	// startup lines rather than in the source.
-	store.SetProduction(o.production)
-	if o.production {
-		slog.Info("production gateway: the developer surface is closed here", "why", "MEERKAT_PRODUCTION")
+	// MEERKAT_PRODUCTION used to close the developer surface whatever the
+	// console said. The console's switch decides now, everywhere; the
+	// variable is read only to tell whoever still sets it, since ignored in
+	// silence it would look like it still worked.
+	if v := os.Getenv("MEERKAT_PRODUCTION"); v != "" {
+		slog.Warn("MEERKAT_PRODUCTION is no longer read: developer mode (Application, General) and the tunnel (Infra, Plug) are switched in the console",
+			"ignored", v)
 	}
 	// Whose forwarded headers are believed is said on the Domains & TLS
 	// screen now, plane by plane (SSL-14). The variable that used to say it
@@ -909,14 +878,11 @@ func run(o options) error {
 	} else {
 		adminAPI.CertManagerWhy = why
 	}
-	// Where the spans and the pushed counters go (OBS-04, OBS-06), from the
-	// STORED setting: an operator who switched it on in the console must find
-	// it on again after a restart - and on every node when it changes. Only
-	// when it is ON at startup: -otlp-endpoint, set by a manifest, still works
-	// for an installation that never touched the screen.
-	if st.RawTelemetry(ctx).Enabled {
-		adminAPI.ApplyTelemetry(ctx)
-	}
+	// Where the spans, the pushed counters and the logs go (OBS-04, OBS-06),
+	// and whether the access log is written: the STORED setting, applied at
+	// every start - an operator who switched something on in the console
+	// finds it on again after a restart - and on every node when it changes.
+	adminAPI.ApplyTelemetry(ctx)
 	bus.Register(store.TopicTelemetry, func(ctx context.Context) error {
 		adminAPI.ApplyTelemetry(ctx)
 		return nil

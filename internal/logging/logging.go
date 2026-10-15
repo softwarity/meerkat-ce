@@ -52,13 +52,14 @@ var level = new(slog.LevelVar)
 
 // Options is what startup settled on.
 type Options struct {
-	// Format, empty meaning "decide from Production".
+	// Format, empty meaning text. JSON for an agent is the console's switch
+	// (Infra, OpenTelemetry, Logs written for an agent), which turns the
+	// output to OpenTelemetry's JSON live, on every node; this is only what
+	// the gateway writes before it has read its settings, or MEERKAT_LOG_FORMAT
+	// imposing one.
 	Format Format
 	// Level, empty meaning Info.
 	Level string
-	// Production picks the default format: a deployment wants JSON, a laptop
-	// wants to be readable.
-	Production bool
 }
 
 // Setup installs the handler and returns the format actually chosen, for the
@@ -71,9 +72,6 @@ func Setup(o Options) Format {
 	format := o.Format
 	if format != FormatJSON && format != FormatText {
 		format = FormatText
-		if o.Production {
-			format = FormatJSON
-		}
 	}
 
 	// Standard ERROR for what the gateway says about itself, which leaves

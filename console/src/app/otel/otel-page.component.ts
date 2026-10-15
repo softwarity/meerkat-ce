@@ -93,6 +93,7 @@ export class OtelPageComponent {
   protected readonly auditConsole = signal(false);
   protected readonly logs = signal(false);
   protected readonly logsPush = signal(false);
+  protected readonly accessLog = signal(false);
   protected readonly logsLost = signal(0);
   // The three positions of the logs, as the radio group reads them.
   protected readonly logsMode = computed(() => (this.logsPush() ? 'push' : this.logs() ? 'agent' : 'off'));
@@ -157,6 +158,7 @@ export class OtelPageComponent {
     this.auditConsole.set(!!s.auditConsole);
     this.logs.set(!!s.logs);
     this.logsPush.set(!!s.logsPush);
+    this.accessLog.set(!!s.accessLog);
     this.logsLost.set(s.logsLost ?? 0);
     this.auditLost.set(s.auditLost ?? 0);
     this.enterprise.set(s.enterprise);
@@ -222,6 +224,11 @@ export class OtelPageComponent {
   protected setLogsMode(mode: 'off' | 'agent' | 'push') {
     this.logs.set(mode === 'agent');
     this.logsPush.set(mode === 'push');
+    this.commit();
+  }
+
+  protected toggleAccessLog(on: boolean) {
+    this.accessLog.set(on);
     this.commit();
   }
 
@@ -322,6 +329,7 @@ export class OtelPageComponent {
       auditConsole: this.auditConsole(),
       logs: this.logs(),
       logsPush: this.logsPush(),
+      accessLog: this.accessLog(),
     };
     this.api
       .setTelemetrySetting(cfg)

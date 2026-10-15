@@ -11,8 +11,7 @@
 #
 #   1. the tunnel is switched on (Infra, Plug in the console - it ships OFF;
 #      the page also hands out the install commands per OS);
-#   2. developer mode is on (Application, General - it is on by default, and
-#      MEERKAT_PRODUCTION below closes it for good);
+#   2. developer mode is on (Application, General - it is on by default);
 #   3. the gateway can reach an orchestrator AND is a container that
 #      orchestrator knows - which is what the socket below grants.
 #
@@ -34,11 +33,6 @@ services:
       - "22222:22222"
     environment:
       MEERKAT_ADMIN_PASSWORD: ${MEERKAT_ADMIN_PASSWORD:?set a password for the first admin}
-      # Uncomment on a PRODUCTION gateway. It closes the whole developer
-      # surface - tooling, API docs, UI test mode, tunnel - whatever the
-      # database says. Worth setting even here: the stored switch travels in a
-      # backup or a configuration export, and this one does not.
-      # MEERKAT_PRODUCTION: "1"
     volumes:
       - meerkat-data:/data
       # What lets the agent give a name to a developer's machine: it creates a

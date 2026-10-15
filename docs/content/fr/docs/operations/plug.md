@@ -30,9 +30,8 @@ Le tunnel ne fonctionne que si ces **deux** interrupteurs sont activés :
 | Developer mode | Application, General | l'administrateur de l'application | ce que cette installation propose à ses développeurs : le menu Developer, la documentation des API, les connexions simulées |
 | Open the developer tunnel | **Infra, Plug** | l'administrateur de l'infrastructure | un port ouvert sur le cluster, et les droits du déploiement sur celui-ci (socket Docker, rôle Kubernetes) |
 
-L'interrupteur du tunnel est **désactivé à la livraison**. Une gateway déclarée en
-production (`MEERKAT_PRODUCTION`) garde fermé tout ce qui est destiné aux développeurs, quel
-que soit l'état de ces deux interrupteurs.
+L'interrupteur du tunnel est **désactivé à la livraison**. Ces deux interrupteurs décident,
+sur une gateway de production comme ailleurs.
 
 Tant que le tunnel est fermé, on ne propose pas au développeur de déposer une clé : la page
 n'existe pas, et le menu utilisateur ne l'affiche pas. Une clé pour une porte qui n'existe

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/softwarity/meerkat/internal/devtunnel"
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
 	"golang.org/x/crypto/ssh"
@@ -31,9 +32,6 @@ type plugAnswer struct {
 	// DevMode is the other switch, read-only here: it belongs to the
 	// application administrator, and the page says so rather than offering it.
 	DevMode bool `json:"devMode"`
-	// Production says MEERKAT_PRODUCTION closes the developer surface, so the
-	// page explains a switch that cannot open instead of offering one.
-	Production bool `json:"production"`
 	// Status is what the tunnel is doing on the node that answered.
 	Status devtunnel.Status `json:"status"`
 	// Version is the plug client this image hands out.
@@ -43,6 +41,14 @@ type plugAnswer struct {
 	// DataOrigin is where the applications answer: the developer's profile
 	// page, where the key is deposited, lives there.
 	DataOrigin string `json:"dataOrigin"`
+	// Exposure is how the runtime publishes the tunnel's port, and Address
+	// the host and port the commands carry: what was recorded, else that,
+	// else the defaults (devtunnel.Address).
+	Exposure discovery.Exposure `json:"exposure"`
+	Address  struct {
+		Host string `json:"host"`
+		Port int    `json:"port"`
+	} `json:"address"`
 	// Profile is the plug profile the commands name: the application's name,
 	// cut down to what plug accepts (store.PlugProfile).
 	Profile string `json:"profile"`
@@ -68,11 +74,12 @@ func (a *API) plugState(r *http.Request) (plugAnswer, error) {
 	ctx := r.Context()
 	out := plugAnswer{
 		PlugSetting: a.st.Plug(ctx), Enterprise: edition.Enterprise,
-		DevMode: a.st.DevMode(ctx), Production: store.Production(),
-		Status: devtunnel.CurrentStatus(), Version: devtunnel.ClientVersion(),
+		DevMode: a.st.DevMode(ctx),
+		Status:  devtunnel.CurrentStatus(), Version: devtunnel.ClientVersion(),
 		DefaultPort: store.DefaultPlugPort, DataOrigin: a.dataOrigin(r), Profile: a.st.PlugProfile(ctx),
 		Developers: []plugDeveloper{},
 	}
+	out.Address.Host, out.Address.Port, out.Exposure = devtunnel.Address(ctx, out.PlugSetting)
 	devs, err := a.st.Developers(ctx)
 	if err != nil {
 		return out, err

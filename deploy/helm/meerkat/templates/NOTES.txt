@@ -22,22 +22,11 @@ Publishing the control plane is a decision. Put it behind what your network
 uses to say who may reach it.
 {{- end }}
 
-{{- if .Values.production }}
-
-This gateway is declared PRODUCTION: the developer surface stays closed here
-whatever the settings say.
-{{- end }}
-{{- if and .Values.plug.enabled .Values.production }}
-
-The developer tunnel is NOT open here: this is a production gateway, so the
-developer surface is closed and the deployment grants none of the rights the
-tunnel would use.
-{{- else if not .Values.plug.enabled }}
+{{- if not .Values.plug.enabled }}
 
 The developer tunnel is granted nothing (plug.enabled=false). The gateway still
-OPENS it wherever developer mode is on - that switch is in the console, or
-production: true closes the whole developer surface - and an agent with no
-rights says so in its log every minute:
+OPENS it wherever its switches say so - developer mode and Infra, Plug, in the
+console - and an agent with no rights says so in its log every minute:
 
   kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "meerkat.fullname" . }} | grep plug
 {{- else }}

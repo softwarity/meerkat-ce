@@ -11,11 +11,26 @@ export interface PlugSetting {
   port?: number;
 }
 
+// How the runtime publishes the tunnel's port, as far as it can see: what
+// sits in front of it (a k3d mapping, a firewall) is not part of it.
+export interface PlugExposure {
+  source?: 'kubernetes' | 'swarm' | 'docker';
+  kind: 'loadbalancer' | 'nodeport' | 'clusterip' | 'published' | 'none';
+  service?: string;
+  host?: string;
+  port?: number;
+  pending?: boolean;
+  why?: string;
+}
+
 export interface PlugState extends PlugSetting {
+  exposure: PlugExposure;
+  // What the commands carry when nothing is typed: the recorded address,
+  // else what the runtime publishes, else the defaults.
+  address: { host: string; port: number };
   enterprise: boolean;
   // The other switch, the application administrator's: read-only here.
   devMode: boolean;
-  production: boolean;
   status: { state: 'off' | 'unavailable' | 'running' | 'absent'; why?: string; port?: string };
   version?: string;
   defaultPort: number;
@@ -66,6 +81,9 @@ export interface TelemetryConfig {
   logs?: boolean;
   // ...or pushed to the collector over OTLP. One or the other.
   logsPush?: boolean;
+  // One line per request on standard output, typed "access": a switch of
+  // its own, applied live on every node, needing no collector.
+  accessLog?: boolean;
 }
 
 export interface TelemetrySetting extends TelemetryConfig {
@@ -1992,7 +2010,6 @@ export interface Settings {
   // tooling of a whole installation by accident.
   devMode?: boolean;
   /** The ENVIRONMENT closed the developer surface (MEERKAT_PRODUCTION), not an operator. Read-only. */
-  devModeLocked?: boolean;
 }
 
 // One of the built-in arrangements. `side` is which edge the brand takes and

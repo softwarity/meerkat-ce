@@ -99,7 +99,6 @@ services:
       - "22222:22222"   # le tunnel développeur
     environment:
       MEERKAT_ADMIN_PASSWORD: your-first-password
-      # MEERKAT_PRODUCTION: "1"   # voir plus bas
     volumes:
       - meerkat-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -156,13 +155,6 @@ helm install meerkat meerkat/meerkat \
 helm install meerkat meerkat/meerkat \
   -f https://www.softwarity.io/deploy/values-eval-one-node.yaml \
   --set admin.password='your-first-password'
-
-# Enterprise en production : la surface développeur est fermée, et le chart
-# n'accorde alors plus aucun droit sur le namespace.
-helm install meerkat meerkat/meerkat \
-  --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
-  --set admin.password='your-first-password' \
-  --set production=true
 ```
 
 Ce que le chart accorde au ServiceAccount de cette gateway, **dans son
@@ -187,12 +179,9 @@ dépôt) : un droit que l'agent aurait acquis depuis ne se découvrirait qu'au
 moment où quelqu'un utilise la fonction, c'est-à-dire au pire moment.
 
 Ces droits **suivent le tunnel**, et non un interrupteur qui leur serait
-propre. `production: true` ferme la surface développeur : la gateway
-n'ouvre aucun tunnel, et le chart n'accorde alors strictement rien - un droit
-que personne n'exerce est une surface d'attaque gratuite. Dans le cas
-contraire, le tunnel peut s'ouvrir - il le fait dès qu'il est activé dans
-**Infra, Plug** - et le déploiement accorde donc ce qu'on pourra lui demander
-d'utiliser. C'est pourquoi `plug.enabled` vaut **true** par défaut : la
+propre. Le tunnel peut s'ouvrir - il le fait dès qu'il est activé dans
+**Infra, Plug**, avec le mode développeur actif - et le déploiement accorde
+donc ce qu'on pourra lui demander d'utiliser. C'est pourquoi `plug.enabled` vaut **true** par défaut : la
 situation inverse - le tunnel ouvert, les droits absents - est la seule
 combinaison qui ne peut pas fonctionner, avec un agent qui répète chaque
 minute qu'il ne peut pas faire son travail. `plug.enabled: false` refuse
@@ -280,24 +269,17 @@ vers l'écran.
 L'audit ne montre jamais seulement ce qu'un en-tête prétendait : quand l'adresse vient d'un
 proxy, la ligne garde les deux - `203.0.113.5 via 10.42.0.15`.
 
-## Déclarer une gateway de production
+## La surface développeur en production
 
-`MEERKAT_PRODUCTION` (`production: true` dans le chart) ferme ici toute la
-surface développeur - l'outillage, la documentation des API, le mode de test
-des interfaces, le tunnel - quoi que dise la base de données.
+L'outillage, la documentation des API, le mode de test des interfaces et le
+tunnel s'activent dans la console - **Application, General** pour le mode
+développeur, **Infra, Plug** pour le tunnel - sur une gateway de production
+comme ailleurs. Rien dans l'environnement ne passe par-dessus.
+`MEERKAT_PRODUCTION`, qui le faisait, n'est plus lue : posée, elle ne fait
+qu'écrire un avertissement dans le journal.
 
-Ce réglage mérite d'être posé même là où personne n'attend de tunnel, et la
-raison en est intéressante : **l'interrupteur stocké en base voyage**. Un
-export de configuration, une sauvegarde restaurée, une base copiée depuis la
-préproduction peuvent chacun amener en production un mode développeur ACTIVÉ,
-et personne ne le remarque avant qu'un port de tunnel se retrouve face aux
-clients. L'environnement, lui, ne voyage pas : il est une propriété de
-l'endroit où s'exécute le processus.
-
-Il n'agit que dans un sens : il ferme une surface, il n'en rouvre jamais une
-qu'un exploitant a coupée. La console affiche l'interrupteur désactivé *en en
-donnant la raison* plutôt que de le masquer, car celui qui cherche un outil
-absent doit pouvoir comprendre pourquoi.
+Ces interrupteurs sont stockés : un export de configuration, une sauvegarde
+restaurée ou une base copiée depuis la préproduction les emportent avec eux.
 
 ## Ce que fait chaque variable
 
@@ -311,6 +293,6 @@ absent doit pouvoir comprendre pourquoi.
 | `MEERKAT_DATABASE_URL` | - | Un PostgreSQL externe à la place du stockage embarqué. Édition Enterprise, et condition préalable à un [cluster](/docs/deploy/kubernetes). |
 | `MEERKAT_VAULT_KEY` | un fichier dans le répertoire de données | La clé maîtresse du coffre. Elle doit être fournie, et identique, sur chaque nœud d'un cluster. |
 | `MEERKAT_PLUG_ADDR` | `:22222` | Change le port du tunnel développeur. Elle ne le désactive pas : c'est le rôle de l'interrupteur **Infra, Plug**, ou de la fermeture de la surface développeur. |
-| `MEERKAT_PRODUCTION` | non définie | Déclare cette gateway comme étant de production et ferme définitivement la surface développeur. |
+| `MEERKAT_PRODUCTION` | - | N'est plus lue : posée, elle ne fait qu'écrire un avertissement. La surface développeur s'active dans la console - voir [La surface développeur en production](#la-surface-dveloppeur-en-production). |
 | `MEERKAT_TRUSTED_PROXIES` | - | N'est plus lue : posée, elle ne fait que journaliser un avertissement. De qui `X-Forwarded-For` et `X-Forwarded-Proto` sont crus se dit plan par plan dans **Infra > Domains & TLS** - voir [Derrière un proxy ou un load balancer](#derrire-un-proxy-ou-un-load-balancer). |
 | `MEERKAT_TENANCY` | `single` | Une seule organisation implicite, ou plusieurs (Enterprise). Se choisit une fois, au premier démarrage ; c'est ensuite la console qui en décide. |

@@ -116,7 +116,7 @@ site : ce que vous téléchargez est ce que déploie la version publiée.
 
 | Fichier | Usage |
 |---|---|
-| [index.yaml](/deploy/index.yaml) | Le dépôt Helm : `helm repo add meerkat https://www.softwarity.io/deploy` |
+| [index.yaml](/deploy/index.yaml) | Le dépôt Helm : `helm repo add meerkat https://www.softwarity.io/deploy`. Il liste toutes les versions publiées : `helm install` prend la plus récente, et `--version 1.9.0` (ou une version épinglée dans Argo CD, Flux ou Terraform) reste installable après la release suivante |
 | [meerkat-chart.tgz](/deploy/meerkat-chart.tgz) | Le chart Helm, à installer tel quel |
 | [values-ce-one-node.yaml](/deploy/values-ce-one-node.yaml) | Une gateway Community sur son volume |
 | [values-ee-one-node.yaml](/deploy/values-ee-one-node.yaml) | Une gateway Enterprise, tunnel développeur ouvert |

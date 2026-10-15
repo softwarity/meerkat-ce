@@ -198,39 +198,33 @@ et le journal le dit aussi.
 
 | Option | Variable | Rôle |
 |---|---|---|
-| `-production` | `MEERKAT_PRODUCTION` | déclare cette gateway comme étant en production : tout ce qui est destiné aux développeurs reste fermé, quoi que disent les réglages stockés |
 | `-plug-addr` | `MEERKAT_PLUG_ADDR` | adresse d'écoute du tunnel développeur, `:22222` par défaut, Enterprise uniquement |
 | `-console-url` | `MEERKAT_CONSOLE_URL` | pour le développement : relaie la console vers un serveur de développement front |
 | `-version` | - | affiche la version et quitte |
 
-Si `MEERKAT_PRODUCTION` relève de l'environnement et non d'un réglage stocké,
-c'est pour une raison précise : un réglage stocké voyage. Un export de
-configuration, une sauvegarde restaurée ou une base copiée depuis la
-préproduction peuvent chacun amener le mode développeur en production, et
-personne ne s'en aperçoit avant qu'un port de tunnel se retrouve exposé aux
-clients.
+La surface développeur - l'outillage, la documentation des API, le mode de
+test des interfaces, le tunnel - s'active dans la console (**Application,
+General** et **Infra, Plug**), sur une gateway de production comme ailleurs.
+`MEERKAT_PRODUCTION`, qui la fermait depuis l'environnement, n'est plus lue :
+posée, elle ne fait qu'écrire un avertissement dans le journal.
 
 ### Journaux et traces
 
 | Option | Variable | Valeur par défaut | Rôle |
 |---|---|---|---|
 | `-log-level` | `MEERKAT_LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` ; une faute de frappe ramène à `info` au lieu d'empêcher le démarrage |
-| `-log-format` | `MEERKAT_LOG_FORMAT` | vide | `json` ou `text` ; une valeur vide donne du JSON sur une gateway de production et du texte ailleurs |
-| `-access-log` | `MEERKAT_ACCESS_LOG` | désactivé | une ligne par requête qui franchit la porte d'entrée, sur la sortie standard - voir [Journaux](/docs/operations/logs) |
-| `-otlp-endpoint` | `MEERKAT_OTLP_ENDPOINT` | vide | un collecteur vers lequel exporter les traces dès la première seconde, par exemple `http://otel-collector:4318` (Enterprise) |
-| `-otlp-sample` | `MEERKAT_OTLP_SAMPLE` | `0.1` | la proportion enregistrée des parcours ouverts par cette gateway, de 0 à 1 |
+| `-log-format` | `MEERKAT_LOG_FORMAT` | text | `json` ou `text` : ce qui s'écrit avant que la gateway ait lu ses réglages. Le JSON pour un agent est l'interrupteur de la console, **Infra, OpenTelemetry**, journaux écrits pour un agent |
 
-Le niveau de journalisation est fixé au démarrage ; le modifier impose un
-redémarrage.
+Ce niveau est celui auquel revient un démarrage ; l'écran **Logs** de la
+console le change à chaud, pour un temps, sur tous les nœuds.
 
-Les deux réglages `otlp` s'adressent à une gateway qui doit tracer avant
-même que quelqu'un ait ouvert la console - une image lancée par un pipeline,
-par exemple. Dans les autres cas, utilisez le réglage de la console (**Infra,
-OpenTelemetry**) : il ajoute les métriques, l'identifiant d'accès rangé dans le
-coffre, le choix route par route et le bouton Test. Tant que ce réglage n'a
-jamais été activé, c'est l'export configuré au démarrage qui tourne ; dès qu'il
-l'est, il prend le relais, et le désactiver ensuite arrête l'export jusqu'au
-prochain démarrage. Voir [Traces](/docs/operations/tracing).
+Le journal d'accès, l'export des traces, des métriques et des journaux vers un
+collecteur, et le format des journaux pour un agent se règlent dans la console,
+**Infra, OpenTelemetry** : stockés, appliqués à chaque démarrage et à chaud sur
+tous les nœuds. `MEERKAT_ACCESS_LOG`, `MEERKAT_OTLP_ENDPOINT` et
+`MEERKAT_OTLP_SAMPLE` ne sont plus lues : posée, chacune ne fait qu'écrire un
+avertissement. Voir [Traces](/docs/operations/tracing) et
+[Journaux](/docs/operations/logs).
 
 ## Health checks
 

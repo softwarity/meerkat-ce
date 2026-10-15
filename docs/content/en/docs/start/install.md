@@ -189,34 +189,32 @@ single-tenant, and says that too.
 
 | Flag | Variable | What |
 |---|---|---|
-| `-production` | `MEERKAT_PRODUCTION` | declares this gateway production: the whole developer surface stays closed whatever the stored settings say |
 | `-plug-addr` | `MEERKAT_PLUG_ADDR` | developer tunnel listen address, default `:22222`, Enterprise only |
 | `-console-url` | `MEERKAT_CONSOLE_URL` | development override: proxy the console to a front dev server |
 | `-version` | - | print version and exit |
 
-`MEERKAT_PRODUCTION` is an environment decision rather than a stored one for a
-reason: the stored switch travels. A configuration export, a restored backup or
-a database copied from staging can each carry developer mode into production,
-and nobody notices until there is a tunnel port in front of customers.
+The developer surface - the tooling, the API docs, the UI test mode, the
+tunnel - is switched in the console (**Application, General** and **Infra,
+Plug**), on a production gateway as anywhere else. `MEERKAT_PRODUCTION`, which
+used to close it from the environment, is no longer read: set, it only logs a
+warning.
 
 ### Logs and traces
 
 | Flag | Variable | Default | What |
 |---|---|---|---|
 | `-log-level` | `MEERKAT_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`; a typo falls back to `info` rather than stopping the start |
-| `-log-format` | `MEERKAT_LOG_FORMAT` | empty | `json` or `text`; empty picks JSON on a production gateway and text elsewhere |
-| `-access-log` | `MEERKAT_ACCESS_LOG` | off | one line per request crossing the front door, on standard output - see [Logs](/docs/operations/logs) |
-| `-otlp-endpoint` | `MEERKAT_OTLP_ENDPOINT` | empty | a collector to export traces to from the first second, such as `http://otel-collector:4318` (Enterprise) |
-| `-otlp-sample` | `MEERKAT_OTLP_SAMPLE` | `0.1` | the share of the journeys this gateway opens that get recorded, 0 to 1 |
+| `-log-format` | `MEERKAT_LOG_FORMAT` | text | `json` or `text`: what is written before the gateway has read its settings. JSON for an agent is the console's switch, **Infra, OpenTelemetry**, logs written for an agent |
 
-The level is set at startup; changing it means a restart.
+The level is the one a start comes back to; the console's **Logs** screen
+changes it live, for a while, on every node.
 
-The two `otlp` settings are for a gateway that must trace before anybody has
-opened the console - an image started by a pipeline, say. The console's own
-setting (**Infra, OpenTelemetry**) is the one to use otherwise: it adds the
-metrics, the credential in the vault, the per-route choice and the Test button.
-While it has never been switched on, the startup exporter runs; once it is, it
-takes over, and switching it off again stops the export until the next start. See [Traces](/docs/operations/tracing).
+The access log, the export of traces, metrics and logs to a collector, and the
+logs' format for an agent are set in the console, **Infra, OpenTelemetry**:
+stored, applied at every start and live on every node. `MEERKAT_ACCESS_LOG`,
+`MEERKAT_OTLP_ENDPOINT` and `MEERKAT_OTLP_SAMPLE` are no longer read: set, each
+only logs a warning. See [Traces](/docs/operations/tracing) and
+[Logs](/docs/operations/logs).
 
 ## Probes
 

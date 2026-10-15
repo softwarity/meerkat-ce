@@ -125,10 +125,6 @@ spec:
                   name: {{ include "meerkat.adminSecretName" . }}
                   key: {{ .Values.admin.existingSecretKey }}
             {{- end }}
-            {{- if .Values.production }}
-            - name: MEERKAT_PRODUCTION
-              value: "1"
-            {{- end }}
             {{- if .Values.plug.enabled }}
             - name: MEERKAT_PLUG_ADDR
               value: ":{{ .Values.plug.port }}"

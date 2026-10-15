@@ -18,10 +18,14 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/store"
@@ -472,11 +476,7 @@ func Supervise(ctx context.Context, d Deps) {
 		case !d.Store.DevMode(ctx):
 			stop("developer mode is off")
 			retryAfter, nextTry, lastSaid = 0, time.Time{}, ""
-			why := "developer mode is off (Application, General)"
-			if store.Production() {
-				why = "this gateway is declared production (MEERKAT_PRODUCTION)"
-			}
-			setStatus(Status{State: StateOff, Why: why})
+			setStatus(Status{State: StateOff, Why: "developer mode is off (Application, General)"})
 		case !d.Store.Plug(ctx).Enabled:
 			stop("the tunnel is switched off")
 			retryAfter, nextTry, lastSaid = 0, time.Time{}, ""
@@ -529,4 +529,51 @@ func Supervise(ctx context.Context, d Deps) {
 		case <-wake:
 		}
 	}
+}
+
+// InsidePort is the port the tunnel listens on in the container: what the
+// running tunnel says, else what the deployment asks (MEERKAT_PLUG_ADDR),
+// else the default.
+func InsidePort() int {
+	addr := CurrentStatus().Port
+	if addr == "" {
+		addr = os.Getenv("MEERKAT_PLUG_ADDR")
+	}
+	if addr == "" {
+		addr = DefaultAddr
+	}
+	_, p, err := net.SplitHostPort(addr)
+	if err != nil {
+		p = strings.TrimPrefix(addr, ":")
+	}
+	n, err := strconv.Atoi(p)
+	if err != nil {
+		return store.DefaultPlugPort
+	}
+	return n
+}
+
+// Address is what a developer types to reach the tunnel: what the operator
+// recorded (Infra, Plug), else what the runtime publishes the tunnel's port
+// as - a LoadBalancer's address and port, a NodePort, a Docker port - else
+// the defaults. The recorded entry wins on purpose: what sits in front of the
+// runtime (a port mapping, a load balancer's DNS name) is only known to the
+// person who set it up. The exposure is returned too, for the page to say
+// what the runtime sees.
+func Address(ctx context.Context, p store.PlugSetting) (host string, port int, seen discovery.Exposure) {
+	seen = discovery.ExposureOf(ctx, InsidePort())
+	host, port = p.Host, p.Port
+	if host == "" && seen.Host != "" {
+		host = seen.Host
+	}
+	if port == 0 && seen.Port > 0 && (seen.Kind == "loadbalancer" || seen.Kind == "nodeport" || seen.Kind == "published") {
+		port = seen.Port
+	}
+	if host == "" {
+		host = store.DefaultPlugHost
+	}
+	if port == 0 {
+		port = store.DefaultPlugPort
+	}
+	return host, port, seen
 }

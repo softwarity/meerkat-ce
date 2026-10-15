@@ -310,3 +310,17 @@ func TestTheClusterHearsEveryChangeAtOnce(t *testing.T) {
 		t.Errorf("the emptied list was not sent as empty: %+v", told[1])
 	}
 }
+
+// The address the commands carry: what the operator recorded wins, since
+// what sits in front of the runtime is theirs to know; with nothing recorded
+// and no runtime to ask, the defaults.
+func TestTheRecordedPlugAddressWins(t *testing.T) {
+	host, port, seen := Address(context.Background(), store.PlugSetting{Host: "dev.example.com", Port: 30222})
+	if host != "dev.example.com" || port != 30222 {
+		t.Fatalf("recorded: %s:%d (runtime said %+v)", host, port, seen)
+	}
+	host, port, _ = Address(context.Background(), store.PlugSetting{})
+	if host != store.DefaultPlugHost || port != store.DefaultPlugPort {
+		t.Fatalf("nothing recorded, no runtime: %s:%d", host, port)
+	}
+}

@@ -223,10 +223,6 @@ spec:
                 secretKeyRef:
                   name: meerkat
                   key: admin-password
-            # Cette gateway est une gateway de production : la surface
-            # développeur y reste fermée, quoi que dise la base.
-            - name: MEERKAT_PRODUCTION
-              value: "1"
           # Les trois sondes tournent DANS le conteneur, sur la boucle locale :
           # l'image n'a pas de shell, c'est donc le binaire de la gateway qui
           # interroge. Un port en clair éteint sur Domains & TLS n'écoute plus

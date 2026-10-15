@@ -141,10 +141,6 @@ spec:
                 secretKeyRef:
                   name: meerkat
                   key: admin-password
-            # This gateway is a production one: the developer surface stays
-            # closed here whatever the database says.
-            - name: MEERKAT_PRODUCTION
-              value: "1"
           # The three probes run INSIDE the container, on the loopback: the
           # image has no shell, so the gateway's own binary asks. A plain
           # port switched off on Domains & TLS listens on 127.0.0.1 only -

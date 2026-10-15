@@ -3503,7 +3503,7 @@ const plugClosed = "the developer tunnel (plug) is not open on this gateway: an 
 
 func (h *Handler) renderProfileDevKey(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
 	data := profileDevData{flowChrome: h.flowData(r, ""), Error: errMsg, PlugOpen: true}
-	data.PlugHost, data.PlugPort = h.st.Plug(r.Context()).Address()
+	data.PlugHost, data.PlugPort, _ = devtunnel.Address(r.Context(), h.st.Plug(r.Context()))
 	data.PlugProfile = h.st.PlugProfile(r.Context())
 	data.Title = "plug keys - Meerkat"
 	data.Keys = h.devKeyRows(r, sess.UserID)

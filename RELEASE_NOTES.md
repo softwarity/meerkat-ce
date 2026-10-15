@@ -2,6 +2,23 @@
 
 ## NEXT RELEASE
 
+- **The access log is a console switch.** Infra, OpenTelemetry, Logs tab, **Access log**: on and
+  off live, on every node, kept across restarts. It replaces `MEERKAT_ACCESS_LOG`, and the
+  trace export set by `MEERKAT_OTLP_ENDPOINT` and `MEERKAT_OTLP_SAMPLE` is set on the same
+  screen: the three variables are no longer read, and set they only log a warning. If you
+  relied on one of them, switch the matching setting on in the console.
+- **Developer mode and plug are switched in the console, in production too.** `production: true`
+  in the chart (`MEERKAT_PRODUCTION`) used to close them whatever the console said; it is no
+  longer read, and set it only logs a warning. Logs start as text; JSON for an agent is the
+  console's switch (Infra, OpenTelemetry).
+- **The plug page says how the tunnel is published.** It reads the gateway's own Services: a
+  LoadBalancer and its address, a NodePort, or "inside the cluster only" with the chart value to
+  change. With no address recorded, the commands on the plug page and on a developer's key page
+  use what it finds; an address recorded by hand still wins, for a mapping the runtime cannot see.
+- **Every released chart stays installable.** The Helm repository on the site listed only the
+  newest chart, so a version pinned with `--version`, or in Argo CD, Flux or Terraform, stopped
+  installing the day the next one shipped. It now lists every release, each rebuilt from its tag.
+
 ---
 
 ## 1.10.0

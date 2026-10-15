@@ -29,9 +29,8 @@ The tunnel runs only when **both** of these are on:
 | Developer mode | Application, General | application admin | what this installation offers its developers: the Developer menu, the API docs, the simulated sign-ins |
 | Open the developer tunnel | **Infra, Plug** | infrastructure admin | a port into the cluster, and the deployment's rights over it (Docker socket, Kubernetes role) |
 
-The tunnel's own switch **ships off**. A gateway declared production
-(`MEERKAT_PRODUCTION`) keeps the whole developer surface closed whatever either
-switch says.
+The tunnel's own switch **ships off**. These two switches decide, on a
+production gateway as anywhere else.
 
 While the tunnel is closed, a developer is not offered a key to deposit: the
 page does not exist, and the user menu does not show it. A key for a door that

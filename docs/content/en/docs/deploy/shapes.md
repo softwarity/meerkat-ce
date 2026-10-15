@@ -113,7 +113,7 @@ what you download is what the released version deploys.
 
 | File | For |
 |---|---|
-| [index.yaml](/deploy/index.yaml) | The Helm repository: `helm repo add meerkat https://www.softwarity.io/deploy` |
+| [index.yaml](/deploy/index.yaml) | The Helm repository: `helm repo add meerkat https://www.softwarity.io/deploy`. It lists every released version: `helm install` takes the newest, and `--version 1.9.0` (or a version pinned in Argo CD, Flux or Terraform) stays installable after the next release |
 | [meerkat-chart.tgz](/deploy/meerkat-chart.tgz) | The Helm chart, installed as it is |
 | [values-ce-one-node.yaml](/deploy/values-ce-one-node.yaml) | One community gateway on its volume |
 | [values-ee-one-node.yaml](/deploy/values-ee-one-node.yaml) | One Enterprise gateway, developer tunnel open |

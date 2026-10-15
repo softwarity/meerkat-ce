@@ -374,6 +374,15 @@
           Sent to the collector above, for nodes with no agent.
         </p>
       </mat-radio-group>
+      <!-- Its own switch: which lines are written, where the radio above says
+           how they leave. -->
+      <mat-slide-toggle class="access-log" [checked]="accessLog()" [disabled]="saving()" (change)="toggleAccessLog($event.checked)">
+        <ng-container i18n="@@Tracing_access_log">Access log</ng-container>
+      </mat-slide-toggle>
+      <p class="hint" i18n="@@Tracing_access_log_note">
+        One line per request crossing the front door, refusals included, on standard output and
+        typed <b>access</b>. Off by default: it grows with the traffic.
+      </p>
       @if (logsLost() > 0) {
         <p class="warn" i18n="@@Tracing_logs_lost">
           <mat-icon inline>warning</mat-icon>

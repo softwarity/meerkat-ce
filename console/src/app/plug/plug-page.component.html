@@ -107,7 +107,7 @@
   <div class="row">
     <mat-slide-toggle
       [checked]="s.enabled"
-      [disabled]="!s.enterprise || s.production || saving()"
+      [disabled]="!s.enterprise || saving()"
       (change)="toggle($event.checked)"
     >
       <ng-container i18n="@@Plug_open">Open the developer tunnel</ng-container>
@@ -139,14 +139,9 @@
     }
   </p>
 
-  <!-- The two conditions this page does not hold, each said rather than
-       discovered: developer mode is the application administrator's, and the
-       production declaration is the deployment's. -->
-  @if (s.production) {
-    <p class="hint" i18n="@@Plug_production">
-      This gateway is declared <b>production</b> (MEERKAT_PRODUCTION): the tunnel stays closed.
-    </p>
-  } @else if (!s.devMode) {
+  <!-- The condition this page does not hold, said rather than discovered:
+       developer mode is the application administrator's. -->
+  @if (!s.devMode) {
     <p class="hint" i18n="@@Plug_devmode_off">
       <b>Developer mode is off</b>, and the tunnel needs it. Turn it on in
       <a routerLink="/application/general">Application, General</a>.
@@ -163,6 +158,39 @@
   <p class="hint" i18n="@@Plug_address_hint">
     Where a developer's machine reaches the tunnel (NodePort, LoadBalancer, Docker port). The
     commands below use it.
+  </p>
+  <!-- What the runtime says, as a starting point: it fills the fields until
+       somebody records an address, and never overrides one. A mapping in
+       front of the runtime (k3d, Docker Desktop, a firewall) it cannot see. -->
+  @let x = s.exposure;
+  <p class="exposure">
+    <mat-icon>{{ x.kind === 'clusterip' || x.kind === 'none' ? 'info' : 'lan' }}</mat-icon>
+    <span>
+      @switch (x.kind) {
+        @case ('loadbalancer') {
+          @if (x.pending) {
+            <ng-container i18n="@@Plug_exposed_lb_pending">Kubernetes publishes it through the LoadBalancer {{ x.service }} on port {{ x.port }}, which has no address yet.</ng-container>
+          } @else {
+            <ng-container i18n="@@Plug_exposed_lb">Kubernetes publishes it through the LoadBalancer {{ x.service }} at {{ x.host }}:{{ x.port }}.</ng-container>
+          }
+        }
+        @case ('nodeport') {
+          <ng-container i18n="@@Plug_exposed_nodeport">Kubernetes publishes it as NodePort {{ x.port }} ({{ x.service }}), on every node's address.</ng-container>
+        }
+        @case ('clusterip') {
+          <ng-container i18n="@@Plug_exposed_clusterip">Reachable inside the cluster only ({{ x.service }}, ClusterIP). For machines outside it, set plug.service.type to NodePort or LoadBalancer in the Helm chart.</ng-container>
+        }
+        @case ('published') {
+          <ng-container i18n="@@Plug_exposed_published">{{ x.source === 'swarm' ? 'Swarm' : 'Docker' }} publishes it on port {{ x.port }} of the host.</ng-container>
+        }
+        @default {
+          <ng-container i18n="@@Plug_exposed_none">The runtime could not say how it is published.</ng-container> {{ x.why }}
+        }
+      }
+      @if (x.kind !== 'clusterip') {
+        <ng-container i18n="@@Plug_exposed_front"> A mapping in front of it (k3d, Docker Desktop, a firewall) is not seen: what developers type is what to record.</ng-container>
+      }
+    </span>
   </p>
   <div class="pair">
     <app-form-field

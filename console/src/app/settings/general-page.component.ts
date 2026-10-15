@@ -52,7 +52,6 @@ export class GeneralPageComponent {
   // and disabled rather than hidden: an operator looking for the developer
   // tooling has to find out WHY it is not there, and a missing card answers
   // nothing.
-  protected readonly devLocked = signal(false);
 
   constructor() {
     this.load();
@@ -70,7 +69,6 @@ export class GeneralPageComponent {
         this.settings.set(s);
         this.businessAccess.set(s.businessAccess ?? { inherited: false });
         this.devMode.set(s.devMode ?? true);
-        this.devLocked.set(s.devModeLocked ?? false);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),

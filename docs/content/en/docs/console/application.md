@@ -34,9 +34,8 @@ the applications this gateway serves: the Developer menu in the user button, the
 UI test mode, the routes' API docs. Off, none of it is there at all, however many
 accounts carry the capability. Free in both editions.
 
-If the gateway is declared production where it runs, the switch is disabled and
-says so: the developer surface stays closed here whatever the console says, so a
-database restored from staging cannot carry it back open.
+This switch decides on a production gateway as anywhere else. It is stored, so
+a configuration export or a database restored from staging carries it along.
 
 **Working hours** are the application-wide access window every organisation
 inherits unless it defines its own.

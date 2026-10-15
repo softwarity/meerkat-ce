@@ -374,6 +374,7 @@ func (a *API) ApplyTelemetry(ctx context.Context) {
 	// The logs' format is applied whatever the export says: it writes to the
 	// outputs, it does not send.
 	logging.SetOTel(cfg.Logs)
+	logging.SetAccessLog(cfg.AccessLog)
 	// Pushing them is an export: it needs the collector, and the edition.
 	err = tracing.ApplyLogs(tracing.Config{
 		Endpoint: cfg.Endpoint,

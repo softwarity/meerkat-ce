@@ -48,16 +48,10 @@
             Gives accounts with the developer capability their tools: Developer menu, UI test mode,
             API docs. The plug tunnel also needs its own switch in Infra.
           </p>
-          @if (devLocked()) {
-            <p class="hint text-muted" i18n="@@Developer_mode_locked">
-              This gateway is declared production: developer mode stays off. Set in the gateway's
-              deployment, not here.
-            </p>
-          }
         </div>
         <mat-slide-toggle
           [checked]="devMode()"
-          [disabled]="switchingDev() || devLocked()"
+          [disabled]="switchingDev()"
           (change)="setDevMode($event.checked)"
         />
       </div>

@@ -49,6 +49,18 @@ func EnableAccessLogTo(w io.Writer, format Format) {
 // is the ordinary use, so turning it off again has to be as cheap.
 func DisableAccessLog() { accessLogger.Store(nil) }
 
+// SetAccessLog turns the access log on or off, live, in the format the
+// outputs are written in now.
+func SetAccessLog(on bool) {
+	if !on {
+		DisableAccessLog()
+		return
+	}
+	if !AccessLogEnabled() {
+		accessLogger.Store(newAccessLogger(os.Stdout, current()))
+	}
+}
+
 // AccessLogEnabled answers the console and the API.
 func AccessLogEnabled() bool { return accessLogger.Load() != nil }
 

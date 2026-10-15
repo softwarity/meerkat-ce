@@ -50,27 +50,32 @@ const archive = `meerkat-${version}.tgz`;
 // with "unable to load chart archive" - its own packager writes no directory
 // entry either. Checked against one: the two listings differ by those lines
 // alone.
-const files = [];
-const walk = async (dir, prefix) => {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.')) continue;
-    const rel = `${prefix}/${entry.name}`;
-    if (entry.isDirectory()) await walk(join(dir, entry.name), rel);
-    else files.push(rel);
-  }
+// Packs the chart directory under root into dest. FILES only, named one by
+// one, for the reason above.
+const pack = async (root, dest) => {
+  const files = [];
+  const walk = async (dir, prefix) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue;
+      const rel = `${prefix}/${entry.name}`;
+      if (entry.isDirectory()) await walk(join(dir, entry.name), rel);
+      else files.push(rel);
+    }
+  };
+  await walk(join(root, 'meerkat'), 'meerkat');
+  files.sort();
+  const tar = spawnSync('tar', ['-czf', dest, '-C', root, ...files], {
+    encoding: 'utf8',
+    // macOS tar smuggles an AppleDouble twin of every file into the archive
+    // (._name, carrying extended attributes). Its own listing hides them; the
+    // Go reader inside helm does not, and reads ._helpers.tpl as a template:
+    // "control characters are not allowed". Ignored on Linux, where the runner
+    // packages the real thing.
+    env: { ...process.env, COPYFILE_DISABLE: '1' },
+  });
+  if (tar.status !== 0) throw new Error(`packaging the chart failed: ${tar.stderr || tar.status}`);
 };
-await walk(join(deploy, 'helm', 'meerkat'), 'meerkat');
-files.sort();
-const tar = spawnSync('tar', ['-czf', join(out, archive), '-C', join(deploy, 'helm'), ...files], {
-  encoding: 'utf8',
-  // macOS tar smuggles an AppleDouble twin of every file into the archive
-  // (._name, carrying extended attributes). Its own listing hides them; the
-  // Go reader inside helm does not, and reads ._helpers.tpl as a template:
-  // "control characters are not allowed". Ignored on Linux, where the runner
-  // packages the real thing.
-  env: { ...process.env, COPYFILE_DISABLE: '1' },
-});
-if (tar.status !== 0) throw new Error(`packaging the chart failed: ${tar.stderr || tar.status}`);
+await pack(join(deploy, 'helm'), join(out, archive));
 
 // The page names the archive, and the archive carries the chart's version:
 // one of the two has to learn it from the other, and a page is written by
@@ -87,28 +92,69 @@ await copyFile(join(out, archive), join(out, 'meerkat-chart.tgz'));
 // version, its digest, and a URL RELATIVE to the index - helm resolves it
 // against the repository's address, so the same index works on the preview
 // server and on the published site.
-const field = (name) => /^(?:"?)(.*?)(?:"?)$/.exec((new RegExp(`^${name}:\\s*(.+)$`, 'm').exec(chart)?.[1] ?? '').trim())?.[1] ?? '';
-const digest = createHash('sha256').update(await readFile(join(out, archive))).digest('hex');
+const fieldOf = (text) => (name) =>
+  /^(?:"?)(.*?)(?:"?)$/.exec((new RegExp(`^${name}:\\s*(.+)$`, 'm').exec(text)?.[1] ?? '').trim())?.[1] ?? '';
 const now = new Date().toISOString();
 const q = (s) => JSON.stringify(s);
-const index = [
-  'apiVersion: v1',
-  'entries:',
-  '  meerkat:',
-  `  - apiVersion: ${field('apiVersion')}`,
-  `    appVersion: ${q(field('appVersion'))}`,
-  `    created: ${q(now)}`,
-  `    description: ${q(field('description'))}`,
-  `    digest: ${digest}`,
-  `    home: ${q(field('home'))}`,
-  '    name: meerkat',
-  `    type: ${field('type') || 'application'}`,
-  '    urls:',
-  `    - ${archive}`,
-  `    version: ${q(version)}`,
-  `generated: ${q(now)}`,
-  '',
-].join('\n');
+const entry = async (text, file, created) => {
+  const field = fieldOf(text);
+  const digest = createHash('sha256').update(await readFile(join(out, file))).digest('hex');
+  return [
+    `  - apiVersion: ${field('apiVersion')}`,
+    `    appVersion: ${q(field('appVersion'))}`,
+    `    created: ${q(created)}`,
+    `    description: ${q(field('description'))}`,
+    `    digest: ${digest}`,
+    `    home: ${q(field('home'))}`,
+    '    name: meerkat',
+    `    type: ${field('type') || 'application'}`,
+    '    urls:',
+    `    - ${file}`,
+    `    version: ${q(field('version'))}`,
+  ];
+};
+const entries = await entry(chart, archive, now);
+
+// EVERY version released, not only this one. An installation that pins one -
+// Argo CD, Flux, Terraform, a skill's CHART_VERSION, a version validated in
+// staging and taken to production a week later - asks for it again at each
+// sync, and an index that forgets it answers "chart not found" the day the
+// next release ships, with nobody having changed anything on their side.
+// helm install without --version still takes the newest.
+//
+// Each one is rebuilt from its release tag (vX.Y.Z, whose Chart.yaml the
+// release bot stamped with that version): the archives are not kept anywhere
+// between two builds, and a tag is what that version WAS. A tag whose chart
+// says another version, or has none, is not a chart release and is skipped.
+// Without the history (a shallow clone) only this version is published - the
+// CI fetches it whole (fetch-depth: 0).
+const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 64 << 20 });
+const tags = (git('tag', '--list', 'v*').stdout || '').split('\n').filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
+let older = 0;
+for (const tag of tags) {
+  const text = git('show', `${tag}:deploy/helm/meerkat/Chart.yaml`);
+  if (text.status !== 0) continue;
+  const v = fieldOf(text.stdout)('version');
+  if (v !== tag.slice(1) || v === version) continue;
+  const tmp = join(out, `.chart-${v}`);
+  await mkdir(tmp, { recursive: true });
+  // Bytes, not text: a tar read as UTF-8 is a corrupted tar.
+  const files = spawnSync('git', ['archive', '--format=tar', tag, 'deploy/helm/meerkat'], { cwd: repo, maxBuffer: 64 << 20 });
+  if (files.status !== 0) continue;
+  const untar = spawnSync('tar', ['-x', '-C', tmp, '--strip-components=2'], { input: files.stdout });
+  if (untar.status !== 0) {
+    await rm(tmp, { recursive: true, force: true });
+    continue;
+  }
+  const file = `meerkat-${v}.tgz`;
+  await pack(tmp, join(out, file));
+  await rm(tmp, { recursive: true, force: true });
+  const created = (git('log', '-1', '--format=%cI', tag).stdout || '').trim() || now;
+  entries.push(...(await entry(text.stdout, file, created)));
+  older++;
+}
+
+const index = ['apiVersion: v1', 'entries:', '  meerkat:', ...entries, `generated: ${q(now)}`, ''].join('\n');
 await writeFile(join(out, 'index.yaml'), index);
 
-console.log(`[gen-deploy] ${plain.length} file(s) + ${archive} (also as meerkat-chart.tgz) + index.yaml`);
+console.log(`[gen-deploy] ${plain.length} file(s) + ${archive} (also as meerkat-chart.tgz) + ${older} older release(s) + index.yaml`);

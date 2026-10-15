@@ -24,7 +24,8 @@ routes them on the `type` field, to two destinations and two retentions.
 
 ```
 MEERKAT_LOG_LEVEL    debug | info | warn | error      info by default
-MEERKAT_LOG_FORMAT   json | text                      json in production, text elsewhere
+MEERKAT_LOG_FORMAT   json | text                      text by default; JSON for an agent is
+                                                      Infra, OpenTelemetry (written for an agent)
 ```
 
 A typo in the level falls back to `info` rather than stopping a start.
@@ -54,11 +55,9 @@ few seconds. [Metrics](/docs/console/traffic) and the traces answer it.
 ## The access log
 
 Off by default: at four hundred requests a second, that is thirty-five million lines
-a day.
-
-```
-MEERKAT_ACCESS_LOG=1
-```
+a day. It is switched in the console, **Infra, OpenTelemetry**, Logs tab,
+**Access log** - live, on every node. (`MEERKAT_ACCESS_LOG`, which used to turn
+it on, is no longer read.)
 
 One line, as it comes out:
 

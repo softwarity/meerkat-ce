@@ -74,10 +74,9 @@ export class PlugPageComponent {
   protected readonly addressDirty = computed(() => {
     const s = this.state();
     if (!s) return false;
-    return (
-      this.addr().host !== (s.host || 'localhost') ||
-      this.addr().port !== (s.port || s.defaultPort)
-    );
+    // Against what the gateway serves the commands with, recorded or
+    // detected: a detected address shown as it is is not a change to save.
+    return this.addr().host !== s.address.host || this.addr().port !== s.address.port;
   });
 
   // What the commands carry: the fields AS THEY ARE, so typing the published
@@ -133,8 +132,8 @@ export class PlugPageComponent {
 
   private take(s: PlugState) {
     this.state.set(s);
-    this.host.set(s.host || 'localhost');
-    this.port.set(s.port || s.defaultPort);
+    this.host.set(s.host || s.address.host);
+    this.port.set(s.port || s.address.port);
     this.profile.set(s.profile);
   }
 
