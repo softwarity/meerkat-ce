@@ -139,7 +139,7 @@ func (s *Store) Close() error {
 // v18 split administration (RBAC-05): infra_admin (routing plane, built-in
 // pages) and app_admin (users, roles, identity settings) capabilities - root
 // keeps implying both; tenant administration stays the membership type;
-// v19 self-registration (AUTH-20): users carry email_verified +
+// v19 self-registration (AUTH-12): users carry email_verified +
 // self_registered, one-shot email_tokens (confirmation, later resets);
 // v20 the webauthn_challenges table became the GENERIC one-shot challenges
 // store (WebAuthn ceremonies + the registration captcha);
@@ -315,7 +315,7 @@ CREATE TABLE IF NOT EXISTS users (
   -- all of the 31st.
   valid_from           BIGINT NOT NULL DEFAULT 0,
   valid_until          BIGINT NOT NULL DEFAULT 0,
-  -- Self-registration (AUTH-20). email_verified defaults to 1: admin-created
+  -- Self-registration (AUTH-12). email_verified defaults to 1: admin-created
   -- accounts answer for their address; only the /register flow creates
   -- unverified ones (and confirms them by e-mail).
   email_verified       BOOLEAN NOT NULL DEFAULT TRUE,
@@ -626,7 +626,7 @@ CREATE TABLE IF NOT EXISTS login_events (
 );
 CREATE INDEX IF NOT EXISTS login_events_user ON login_events(user_id, at);
 
--- One-shot e-mail tokens (v19, AUTH-20): address confirmation now, password
+-- One-shot e-mail tokens (v19, AUTH-12): address confirmation now, password
 -- resets later (purpose). Only the HASH is stored; consuming deletes the row.
 CREATE TABLE IF NOT EXISTS email_tokens (
   token_hash TEXT PRIMARY KEY,
@@ -1289,7 +1289,7 @@ type RouteAPI struct {
 //	            instead of it.
 //	auth        a valid session. Says who it is, nothing more - a person whose
 //	            account is confirmed but who belongs to no organisation yet
-//	            (AUTH-20's waiting room) passes here, and that is deliberate:
+//	            (AUTH-12's waiting room) passes here, and that is deliberate:
 //	            it is how one serves the page explaining how to ask for access.
 //	tenant      a session with an ACTIVE organisation. This is what the waiting
 //	            room does not pass, and what someone who belongs to several
@@ -2286,7 +2286,7 @@ type User struct {
 	// global setting, "true"/"false" force it for this user.
 	MFARequired string `json:"mfaRequired"`
 	// EmailVerified is false only for a self-registered account that has not
-	// confirmed its address yet (AUTH-20) - such an account cannot sign in.
+	// confirmed its address yet (AUTH-12) - such an account cannot sign in.
 	EmailVerified bool `json:"emailVerified"`
 	// SelfRegistered marks accounts born on /register (purge + admin display).
 	SelfRegistered bool `json:"selfRegistered"`

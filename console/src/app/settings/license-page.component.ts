@@ -90,19 +90,19 @@ interface FeatureRow {
               <ng-container i18n="@@EE_features_offer">What the Enterprise edition adds</ng-container>
             }
           </h3>
+          <!-- How far each one is built, said once here and then by its icon:
+               a word on every row read as a list of excuses. -->
+          <p class="legend">
+            @for (s of states; track s.status) {
+              <span><mat-icon>{{ s.icon }}</mat-icon>{{ s.label }}</span>
+            }
+          </p>
           <div class="features">
             @for (f of rows(); track f.key) {
               <div class="feature" [class.on]="f.on">
-                <mat-icon>{{ f.status === 'planned' ? 'schedule' : f.on ? 'check_circle' : 'lock' }}</mat-icon>
+                <mat-icon [matTooltip]="stateOf(f).label">{{ stateOf(f).icon }}</mat-icon>
                 <div class="grow">
-                  <div class="name">
-                    {{ f.label }}
-                    @if (f.status === 'partial') {
-                      <span class="state" i18n="@@Feature_partial">partly built</span>
-                    } @else if (f.status === 'planned') {
-                      <span class="state" i18n="@@Feature_planned">planned</span>
-                    }
-                  </div>
+                  <div class="name">{{ f.label }}</div>
                   <div class="what">
                     {{ f.what }}
                     @if (f.where) {
@@ -112,7 +112,6 @@ interface FeatureRow {
                     }
                   </div>
                 </div>
-                <span class="id">{{ f.key }}</span>
               </div>
             }
           </div>
@@ -227,20 +226,23 @@ interface FeatureRow {
         margin-left: 6px;
         font-style: italic;
       }
-      .state {
-        margin-left: 8px;
-        padding: 0 6px;
-        border-radius: 8px;
-        font-size: 0.72rem;
-        font-weight: 400;
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        margin: 0 0 12px;
+        font-size: 0.8rem;
         color: var(--mat-sys-on-surface-variant);
-        border: 1px solid var(--mat-sys-outline-variant);
       }
-      .id {
-        flex-shrink: 0;
-        font-family: var(--mk-mono, monospace);
-        font-size: 0.72rem;
-        color: var(--mat-sys-outline);
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .legend mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
       }
     `,
   ],
@@ -251,6 +253,17 @@ export class LicensePageComponent {
   protected readonly loading = signal(true);
   protected readonly edition = signal<Edition | null>(null);
   protected readonly hidden = computed(() => this.edition()?.hiddenTenants ?? 0);
+
+  // How far a feature is built, as an icon. The row's ID (AUTH-03...) is the
+  // contract's key, not a name anyone reading this screen knows it by.
+  protected readonly states: { status: FeatureRow['status']; icon: string; label: string }[] = [
+    { status: 'done', icon: 'check_circle', label: $localize`:@@Feature_done:built` },
+    { status: 'partial', icon: 'incomplete_circle', label: $localize`:@@Feature_partial:partly built` },
+    { status: 'planned', icon: 'schedule', label: $localize`:@@Feature_planned:planned` },
+  ];
+  protected stateOf(f: FeatureRow) {
+    return this.states.find((s) => s.status === f.status) ?? this.states[0];
+  }
 
   // The Enterprise rows of FEATURES.md, sent with the edition (CONSOLE-14),
   // named and placed by ee-features.ts. A row on the CE image is what the

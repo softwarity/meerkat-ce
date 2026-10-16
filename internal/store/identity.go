@@ -488,7 +488,7 @@ const (
 	// SettingTenancyChosen marks the mode as settled: the -tenancy flag seeds
 	// it on a first boot, the console owns it afterwards.
 	SettingTenancyChosen = "tenancy_chosen"
-	// SettingRegistration is the self-registration policy (AUTH-20): who may
+	// SettingRegistration is the self-registration policy (AUTH-12): who may
 	// create their own account. Ships closed.
 	SettingRegistration = "registration"
 	// SettingRateLimit throttles the credential endpoints (RateLimitPolicy).

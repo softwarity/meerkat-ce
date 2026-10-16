@@ -21,7 +21,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
 // judge, and the point here is only to stop a pointless round-trip.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// The mail relay (AUTH-20) - INFRA plane. A third-party service reached by host
+// The mail relay (NOTIF-01) - INFRA plane. A third-party service reached by host
 // and port, with credentials: the same nature as a route's upstream, and the
 // reason it does not sit with the application settings. What the recipient
 // sees, the sender address, belongs to the application (Security page).

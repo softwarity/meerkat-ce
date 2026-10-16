@@ -1981,7 +1981,7 @@ export interface Settings {
   // asked for, and a rule that is not asked for is not shown either: the
   // checklist on the sign-up, reset and profile pages is drawn from this.
   passwordPolicy: PasswordPolicy;
-  // Outbound e-mail (AUTH-20): confirmations, admin notifications.
+  // Outbound e-mail (NOTIF-01): confirmations, admin notifications.
   smtp: SMTPSettings;
   // /register open for local accounts (requires a configured SMTP).
   selfRegistration: boolean;

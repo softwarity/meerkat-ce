@@ -1094,7 +1094,7 @@ type settingsPayload struct {
 	PasskeysAllowed bool                       `json:"passkeysAllowed"` // gateway-wide passkey policy (AUTH-15)
 	APITokens       bool                       `json:"apiTokens"`       // personal API tokens allowed (AUTH-16)
 	TrustedBrowser  store.TrustedBrowserPolicy `json:"trustedBrowser"`  // remember-this-browser policy (MFA-03)
-	SMTP            smtpPayload                `json:"smtp"`            // outbound e-mail (AUTH-20)
+	SMTP            smtpPayload                `json:"smtp"`            // outbound e-mail (NOTIF-01)
 	// SelfRegistration is the MASTER switch over every authority: off, a first
 	// arrival creates no account anywhere. Which doors may create one is each
 	// authority's own AutoCreate (Gateway, Authorities).

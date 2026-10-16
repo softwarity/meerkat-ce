@@ -74,7 +74,7 @@ export class AuthProvidersPageComponent {
     return p && this.isLocal(p) ? p : null;
   });
 
-  // The master switch over every authority (AUTH-20): it lives here because
+  // The master switch over every authority (AUTH-12): it lives here because
   // this is the list of doors, and it is the one that closes all of them.
   protected readonly signUpOpen = signal(false);
   // How long a mailed confirmation link lives (AUTH-22): three choices, each

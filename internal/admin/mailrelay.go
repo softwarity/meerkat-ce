@@ -11,7 +11,7 @@ import (
 	"github.com/softwarity/meerkat/internal/vault"
 )
 
-// The mail relay (AUTH-20) is INFRASTRUCTURE: a third-party service reached by
+// The mail relay (NOTIF-01) is INFRASTRUCTURE: a third-party service reached by
 // host and port, with credentials. It belongs to the infra plane for the same
 // reason a route's upstream does, and an app admin has no business holding a
 // relay's password just to word an account e-mail.

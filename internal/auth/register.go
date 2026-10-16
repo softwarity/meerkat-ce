@@ -20,7 +20,7 @@ import (
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// Self-registration (AUTH-20): an OPT-IN policy. The account is created
+// Self-registration (AUTH-12): an OPT-IN policy. The account is created
 // disabled-for-login until its address is confirmed through a one-shot mailed
 // link; once confirmed, the app-admins are notified and the user waits on
 // /account-pending until someone (or a mapping rule, later) grants access.
@@ -575,7 +575,7 @@ func (h *Handler) notifyAdminsNewAccount(ctx context.Context, u store.User) {
 	}
 }
 
-// showAccountPending is the waiting room (AUTH-20): signed in, confirmed, but
+// showAccountPending is the waiting room (AUTH-12): signed in, confirmed, but
 // no access granted yet - offer the public routes meanwhile.
 func (h *Handler) showAccountPending(w http.ResponseWriter, r *http.Request) {
 	sess, err := h.sm.Resolve(r.Context(), r)

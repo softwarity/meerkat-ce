@@ -1,4 +1,4 @@
-// Package captcha is Meerkat's home-grown anti-robot check (AUTH-20): a PNG
+// Package captcha is Meerkat's home-grown anti-robot check (AUTH-12): a PNG
 // of distorted digits rendered with the standard library only - no font
 // files, no external service, offline like the rest of the gateway. It slows
 // naive sign-up bots; the rate limit and the e-mail confirmation do the rest.

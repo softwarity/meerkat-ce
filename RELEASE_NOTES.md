@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+- **The License screen says how far each feature is built with an icon.** A word on every row
+  ("partly built", "planned") gave way to one icon per state, explained once in a legend, and the
+  contract's keys (SVC-02, AUTH-03...) no longer show: nobody knows a feature by them.
+
 ---
 
 ## 1.11.1

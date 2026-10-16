@@ -11,7 +11,7 @@ import (
 	"github.com/softwarity/meerkat/internal/vault"
 )
 
-// Outbound e-mail + self-registration (AUTH-20): the SMTP config is a
+// Outbound e-mail + self-registration (NOTIF-01, AUTH-12): the SMTP config is a
 // gateway-wide setting; self-registration is a policy PER PROVIDER (local
 // only today - external providers will carry their own knob).
 
@@ -88,7 +88,7 @@ func (s *Store) expandRelay(ctx context.Context, host, username, password string
 	return host, username, password
 }
 
-// RegistrationPolicy says who may create their own account (AUTH-20).
+// RegistrationPolicy says who may create their own account (AUTH-12).
 // Everything ships CLOSED: opening self-registration is an explicit admin act.
 type RegistrationPolicy struct {
 	// Enabled is the MASTER switch: off, no first arrival creates an account

@@ -2177,7 +2177,7 @@ func (h *Handler) Register(raw *http.ServeMux) {
 		mux.HandleFunc("GET /profile/dev", h.showProfileDev)
 		mux.HandleFunc("GET /profile/dev/key", h.showProfileDevKey)
 		mux.HandleFunc("POST /profile/dev-key", h.doProfileDevKey)
-		// Self-registration (AUTH-20) - the pages 404 while the policy is off.
+		// Self-registration (AUTH-12) - the pages 404 while the policy is off.
 		mux.HandleFunc("GET /register", h.showRegister)
 		mux.HandleFunc("POST /register", h.doRegister)
 		mux.HandleFunc("POST /register/captcha", h.doRegisterCaptcha)
@@ -2487,7 +2487,7 @@ func (h *Handler) doLogin(w http.ResponseWriter, r *http.Request) {
 	// The password is proved: the one moment a weak hash can be made strong.
 	h.rehashIfWeak(r, user, password)
 	// A self-registered account stays unusable until its address is confirmed
-	// (AUTH-20). Only revealed to someone holding the CORRECT password, and
+	// (AUTH-12). Only revealed to someone holding the CORRECT password, and
 	// the confirmation is re-sent (rate-limited) - the usual lost-mail rescue.
 	if user.SelfRegistered && !user.EmailVerified {
 		h.security(r, secSigninRefused, user, refusedUnconfirmed)
@@ -2562,7 +2562,7 @@ func (h *Handler) resolveTenantAndGo(w http.ResponseWriter, r *http.Request, use
 	switch len(memberships) {
 	case 0:
 		// Confirmed but nothing granted yet: land on the waiting room instead
-		// of the data plane's catch-all (AUTH-20) - unless a precise
+		// of the data plane's catch-all (AUTH-12) - unless a precise
 		// destination was asked for.
 		if waitingRoom(user, 0) && dest == "/" {
 			dest = "/account-pending"

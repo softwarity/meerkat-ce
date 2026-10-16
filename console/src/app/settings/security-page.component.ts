@@ -17,8 +17,8 @@ const TRUST_TTL_CHOICES = ['P1D', 'P7D', 'P14D', 'P30D'];
 const SESSION_TTL_CHOICES = ['PT15M', 'PT30M', 'PT1H', 'PT2H', 'PT4H', 'PT8H', 'PT12H', 'P1D'];
 
 // Application-wide security policy (root only): how long a session lives, second
-// factor (MFA-04), passkeys (AUTH-15), API tokens (AUTH-16), self-registration
-// (AUTH-20), rate limiting (SEC-10), trusted browsers (MFA-03), and the outbound
+// factor (MFA-04), passkeys (AUTH-15), API tokens (AUTH-09), self-registration
+// (AUTH-12), rate limiting (SEC-10), trusted browsers (MFA-03), and the outbound
 // e-mail sender the account flows use. A full PUT of /api/settings - the other
 // fields ride along untouched.
 //

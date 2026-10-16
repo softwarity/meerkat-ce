@@ -273,7 +273,7 @@ func (h *Handler) linkOrCreate(ctx context.Context, p store.AuthProvider, id idp
 	}
 
 	// This authority's own answer, or the application-wide default when it has
-	// none (AUTH-20): the default is what closes every door at once, and an
+	// none (AUTH-12): the default is what closes every door at once, and an
 	// authority one trusts may keep its own answer through that.
 	if !h.st.SelfRegistrationAllowed(ctx, p) {
 		return store.User{}, false, errNoAutoCreate

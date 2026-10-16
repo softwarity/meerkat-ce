@@ -28,7 +28,7 @@ func externalFixture(t *testing.T) (*Handler, *store.Store) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 	h := New(st, session.NewManager(st))
-	// The master switch over every authority (AUTH-20): an authority that may
+	// The master switch over every authority (AUTH-12): an authority that may
 	// create accounts still creates none while it is off.
 	if err := st.SetSetting(context.Background(), store.SettingRegistration,
 		store.RegistrationPolicy{Enabled: true}); err != nil {
