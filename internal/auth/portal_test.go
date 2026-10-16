@@ -100,3 +100,84 @@ func TestPortalJSONDisabled(t *testing.T) {
 		t.Fatalf("portal should be off with no parents, got %+v", payload)
 	}
 }
+
+// TestPortalJSONGreysATurnedOffRoute: an entry whose route is turned off is
+// shown in its place, greyed out and leading nowhere; a container whose shown
+// modules are all off is greyed out too; an entry turned off in the portal
+// itself, or a container with nothing shown, is not there at all.
+func TestPortalJSONGreysATurnedOffRoute(t *testing.T) {
+	mux, _, st := mfaSetup(t)
+	ctx := context.Background()
+	off := func(rt store.Route) store.Route { rt.Enabled = false; return rt }
+	for _, rt := range []store.Route{
+		uiRoute("shop", 1, false, ""),
+		off(uiRoute("docs", 2, false, "")),
+		off(uiRoute("wiki", 3, false, "")),
+		off(uiRoute("ops", 4, true, "operations")), // off AND out of the caller's reach
+		uiRoute("intranet", 5, false, ""),
+	} {
+		if err := st.SaveRoute(ctx, rt); err != nil {
+			t.Fatalf("SaveRoute %s: %v", rt.ID, err)
+		}
+	}
+	portal := store.PortalConfig{
+		Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
+		Entries: []store.PortalEntry{
+			{RouteID: "docs"},
+			{RouteID: "shop"},
+			{Label: "Library", Children: []store.PortalSubEntry{{RouteID: "wiki"}, {RouteID: "intranet", Disabled: true}}},
+			{Label: "Work", Children: []store.PortalSubEntry{{RouteID: "wiki"}, {RouteID: "intranet"}}},
+			{Label: "Back office", Children: []store.PortalSubEntry{{RouteID: "ops"}}},
+			{RouteID: "intranet", Disabled: true},
+		},
+	}
+	if err := store.SanitizePortalConfig(&portal, mustRoutes(t, st), nil); err != nil {
+		t.Fatalf("the portal was refused: %v", err)
+	}
+	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {
+		t.Fatalf("SetSetting portal: %v", err)
+	}
+
+	raw := bodyString(do(t, mux, "GET", "/meerkat/portal.json", nil, nil))
+	type item struct {
+		Label    string `json:"label"`
+		Href     string `json:"href"`
+		Off      bool   `json:"off"`
+		Children []item `json:"children"`
+	}
+	var payload struct {
+		Parents []item `json:"parents"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("portal.json is not valid JSON: %v\n%s", err, raw)
+	}
+	got := []string{}
+	for _, p := range payload.Parents {
+		got = append(got, p.Label)
+	}
+	if strings.Join(got, ",") != "docs,shop,Library,Work" {
+		t.Fatalf("expected docs, shop, Library and Work, got %v:\n%s", got, raw)
+	}
+	docs, shop, library, work := payload.Parents[0], payload.Parents[1], payload.Parents[2], payload.Parents[3]
+	if !docs.Off || docs.Href != "" {
+		t.Errorf("docs is turned off: greyed out, no address, got %+v", docs)
+	}
+	if shop.Off || shop.Href != "/shop" {
+		t.Errorf("shop is on, got %+v", shop)
+	}
+	if !library.Off || library.Href != "" || len(library.Children) != 1 || !library.Children[0].Off {
+		t.Errorf("Library shows only wiki, off, and is off itself, got %+v", library)
+	}
+	if work.Off || work.Href != "/intranet" || len(work.Children) != 2 || !work.Children[0].Off || work.Children[1].Off {
+		t.Errorf("Work shows wiki greyed and intranet, and leads to intranet, got %+v", work)
+	}
+}
+
+func mustRoutes(t *testing.T, st *store.Store) []store.Route {
+	t.Helper()
+	routes, err := st.ListRoutes(context.Background())
+	if err != nil {
+		t.Fatalf("ListRoutes: %v", err)
+	}
+	return routes
+}

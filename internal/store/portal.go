@@ -189,11 +189,18 @@ func (s *Store) Portal(ctx context.Context) PortalConfig {
 // that exist now. An unknown layout, side or route is an error that NAMES what
 // is allowed - a refusal one cannot act on is a refusal reported as a bug.
 //
-// A route referenced here and deleted LATER is not this function's problem: it
-// leaves a dangling id that the payload builder skips at read time. This one
-// guards the WRITE: nothing enters the portal that is not, right now, an
-// enabled UI route.
-func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
+// The routes are checked for what they ARE, a UI route, not for what they are
+// doing: a route turned off for a while (maintenance, an upstream not deployed
+// here) keeps its place, label and icon, and the bar greys it out until it
+// comes back. Requiring it enabled made one such entry refuse every save of
+// the whole portal, including saves that only added something valid.
+//
+// stored is the portal as saved (nil for none). A reference it already holds
+// passes even when its route was deleted or stopped being a UI route since:
+// the payload builder skips it at read time, and the console names it so the
+// entry can be removed. Refusing it would turn a change made ELSEWHERE into a
+// portal nobody can save any more. Only what a write ADDS must be a UI route.
+func SanitizePortalConfig(cfg *PortalConfig, routes []Route, stored *PortalConfig) error {
 	cfg.Mode = strings.TrimSpace(cfg.Mode)
 	if cfg.Mode == "" {
 		cfg.Mode = PortalModeNone
@@ -229,20 +236,33 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route) error {
 		return fmt.Errorf("portal logo radius %d: allowed are 0 (as drawn) to 50 (circle)", cfg.LogoRadius)
 	}
 
-	// A catalogue entry points at an application: the route must exist, be
-	// enabled and be a UI route. Anything else is refused, naming the id.
-	uiRoutes := map[string]bool{}
+	// A catalogue entry points at an application: the route must exist and be
+	// a UI route, enabled or not. Anything else is refused, naming the id.
+	known := map[string]Route{}
 	for _, rt := range routes {
-		if rt.Enabled && rt.IsUI {
-			uiRoutes[rt.ID] = true
+		known[rt.ID] = rt
+	}
+	held := map[string]bool{}
+	if stored != nil {
+		for _, e := range stored.Entries {
+			held[e.RouteID] = true
+			for _, c := range e.Children {
+				held[c.RouteID] = true
+			}
 		}
 	}
 	checkRoute := func(kind, id string) error {
 		if id == "" {
 			return fmt.Errorf("portal %s: an entry needs a route", kind)
 		}
-		if !uiRoutes[id] {
-			return fmt.Errorf("portal %s route %q: not an enabled UI route", kind, id)
+		rt, ok := known[id]
+		switch {
+		case held[id] && (!ok || !rt.IsUI):
+			return nil // see stored above
+		case !ok:
+			return fmt.Errorf("portal %s route %q: no such route", kind, id)
+		case !rt.IsUI:
+			return fmt.Errorf("portal %s route %q (%s): not a UI route - turn UI on in the route, or pick another", kind, id, rt.Name)
 		}
 		return nil
 	}

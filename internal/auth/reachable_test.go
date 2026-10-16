@@ -41,7 +41,7 @@ func seedCatalogue(t *testing.T, st *store.Store, mode string, ids ...string) {
 	if err != nil {
 		t.Fatalf("ListRoutes: %v", err)
 	}
-	if err := store.SanitizePortalConfig(&cfg, routes); err != nil {
+	if err := store.SanitizePortalConfig(&cfg, routes, nil); err != nil {
 		t.Fatalf("SanitizePortalConfig: %v", err)
 	}
 	if err := st.SetSetting(context.Background(), store.SettingPortal, cfg); err != nil {

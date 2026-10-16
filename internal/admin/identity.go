@@ -1399,16 +1399,17 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	// The portal (PORTAL-01) is validated against the routes as they are now:
-	// every module must bind to an enabled UI route, and an unknown one is
-	// refused naming what is allowed. A route deleted LATER leaves a dangling
-	// reference the served bar skips - this only guards the write.
+	// every module must bind to a UI route, and an unknown one is refused
+	// naming what is allowed. A route deleted LATER leaves a dangling
+	// reference the served bar skips, and the stored portal lets it through.
 	portal := p.Portal
 	routes, err := a.st.ListRoutes(r.Context())
 	if err != nil {
 		a.internal(w, err)
 		return
 	}
-	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+	stored := a.st.Portal(r.Context())
+	if err := store.SanitizePortalConfig(&portal, routes, &stored); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}

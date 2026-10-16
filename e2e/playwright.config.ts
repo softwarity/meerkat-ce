@@ -34,7 +34,7 @@ export default defineConfig({
       use: { browserName: 'chromium' },
       dependencies: ['setup'],
       testMatch: /tests\/.*\.spec\.ts/,
-      testIgnore: /tests\/tenancy\.spec\.ts/,
+      testIgnore: [/tests\/tenancy\.spec\.ts/, /tests\/portal\.spec\.ts/],
     },
     // The tenancy switch flips the WHOLE installation to single mode for a
     // moment. Run beside the rest, it made a landing test read the wrong mode
@@ -45,6 +45,16 @@ export default defineConfig({
       use: { browserName: 'chromium' },
       dependencies: ['chromium'],
       testMatch: /tests\/tenancy\.spec\.ts/,
+    },
+    // The portal tests switch the WHOLE installation's bar on for a moment,
+    // and with it every proxied page swaps its user button for the bar: a page
+    // test running beside them would find neither where it expects. Last,
+    // then, and in one file, so they run one after the other.
+    {
+      name: 'portal',
+      use: { browserName: 'chromium' },
+      dependencies: ['tenancy'],
+      testMatch: /tests\/portal\.spec\.ts/,
     },
   ],
   webServer: [

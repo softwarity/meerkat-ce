@@ -26,7 +26,7 @@ const portalNavJS = `(function () {
   function nonced(st) { if (NONCE) st.nonce = NONCE; return st; }
 
   var SRC = '/meerkat/portal.json';
-  var RAIL_W = 72, RAIL_EXP = 280, HEADER_H = 56, STRIP_H = 48;
+  var RAIL_W = 72, RAIL_EXP_MIN = 160, RAIL_EXP_MAX = 360, HEADER_H = 56, STRIP_H = 48;
   // The rail's own head is TALLER than the top bar, and deliberately so:
   // it is @softwarity/rail-nav's 64px, and a rail sitting beside an
   // application that uses rail-nav must line its burger up with theirs.
@@ -151,7 +151,9 @@ const portalNavJS = `(function () {
       'background:var(--surface);color:var(--onsurface);transition:width .2s ease;overflow:visible;}' +
     // Expanded, the rail is a drawer over everything (backdrop below it): lift it
     // above the top bar and the children strip so its logo is not clipped by them.
-    '.rail.exp{width:' + RAIL_EXP + 'px;z-index:2147483104;}' +
+    // Its width is set inline when it opens: the widest label or the head, see
+    // _railWidth.
+    '.rail.exp{z-index:2147483104;}' +
     '.rail.l{left:0;border-right:1px solid var(--outline);}' +
     '.rail.r{right:0;border-left:1px solid var(--outline);}' +
     '.rail.exp.l{box-shadow:4px 0 12px rgba(0,0,0,.22);}' +
@@ -204,25 +206,32 @@ const portalNavJS = `(function () {
       'padding:0;transition:gap .2s ease;}' +
     '.rail.r a.ritem,.rail.r button.ritem{align-items:flex-end;}' +
     '.rail.exp a.ritem,.rail.exp button.ritem{gap:0;}' +
-    // 10px, not 13: with a 12px items pad and a 24px glyph that puts the icon
-    // centre at 34px, which is where rail-nav puts it. Three pixels is
-    // invisible alone and obvious when the two rails are side by side.
+    // 13px: the glyph is 22px, so (48 - 22) / 2 centres it in its pill, and
+    // 12 (items pad) + 13 + 11 puts it at 36px, the burger's axis. At 10px it
+    // sat 3px left of both, which reads as a pill drawn off its icon.
     '.pill{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:flex-start;' +
-      'width:48px;height:32px;border-radius:9999px;margin-top:12px;padding-left:10px;' +
+      'width:48px;height:32px;border-radius:9999px;margin-top:12px;padding-left:13px;' +
       '-webkit-tap-highlight-color:transparent;transition:background .2s ease,width .2s ease,' +
       'height .2s ease,margin .2s ease;}' +
-    '.rail.r .pill{justify-content:flex-end;padding-left:0;padding-right:10px;}' +
+    '.rail.r .pill{justify-content:flex-end;padding-left:0;padding-right:13px;}' +
     // The first item sits closer to the head, so that expanding - which
     // drops every margin-top - does not slide it up: 8 + 16 collapsed is
     // 0 + 24 expanded, the same 24px from the top either way.
     'a.ritem:first-child .pill,button.ritem:first-child .pill{margin-top:8px;}' +
     'a.ritem:hover .pill,button.ritem:hover .pill{background:var(--hover);}' +
     'a.ritem.cur .pill,button.ritem.cur .pill{background:var(--active);color:var(--onactive);}' +
-    '.rail.exp a.ritem .pill,.rail.exp button.ritem .pill{width:auto;height:48px;padding:0 16px 0 10px;gap:12px;margin-top:0;}' +
-    '.rail.r.exp a.ritem .pill,.rail.r.exp button.ritem .pill{flex-direction:row-reverse;padding:0 10px 0 16px;}' +
+    // An entry whose route is turned off: shown in its place, greyed out, and
+    // nothing happens under the pointer.
+    'button.tab.off,button.ritem.off,.grid button.tile.off{opacity:.38;cursor:default;}' +
+    'button.tab.off:hover,.grid button.tile.off:hover,button.ritem.off:hover .pill{background:transparent;}' +
+    '.rail.exp a.ritem .pill,.rail.exp button.ritem .pill{width:auto;height:48px;padding:0 16px 0 13px;gap:12px;margin-top:0;}' +
+    '.rail.r.exp a.ritem .pill,.rail.r.exp button.ritem .pill{flex-direction:row-reverse;padding:0 13px 0 16px;}' +
     '.pill .badge{position:absolute;top:-6px;right:-6px;}' +
+    // The label under a collapsed item takes the rail's width less 2px each
+    // side, not the pill's 48px: "References" was cut to "Refere...".
     '.lblo{font-size:12px;font-weight:500;line-height:16px;text-align:center;white-space:nowrap;overflow:hidden;' +
-      'text-overflow:ellipsis;width:48px;max-height:16px;opacity:1;transition:opacity .1s ease,max-height .2s ease;}' +
+      'text-overflow:ellipsis;width:calc(100% + 20px);margin:0 -10px;max-height:16px;opacity:1;' +
+      'transition:opacity .1s ease,max-height .2s ease;}' +
     '.rail.exp a.ritem .lblo,.rail.exp button.ritem .lblo{opacity:0;max-height:0;}' +
     '.lbli{font-size:14px;font-weight:500;line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
       'width:0;opacity:0;}' +
@@ -264,6 +273,13 @@ const portalNavJS = `(function () {
     var uri = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svgStr) + '")';
     el.style.webkitMaskImage = uri;
     el.style.maskImage = uri;
+  }
+  // A greyed-out entry leads nowhere: no address, and it says so to
+  // assistive technology rather than only by its colour.
+  function markOff(el, entry) {
+    if (!entry.off) return;
+    el.classList.add('off');
+    el.setAttribute('aria-disabled', 'true');
   }
   function longestMatch(entries, path) {
     var best = null, len = -1;
@@ -365,7 +381,8 @@ const portalNavJS = `(function () {
       // current one is matched from the URL.
       this._current = this._preview
         ? (this._byId(d.selected) || d.parents[0] || null)
-        : (owningParent(d.parents, location.pathname) || d.parents[0]);
+        : (owningParent(d.parents, location.pathname) ||
+           d.parents.filter(function (p) { return !p.off; })[0] || d.parents[0]);
       this._render();
     }
 
@@ -416,6 +433,7 @@ const portalNavJS = `(function () {
       var a = document.createElement(entry.href ? 'a' : 'button');
       a.className = 'tab' + (cur ? ' cur' : '');
       if (entry.href) a.setAttribute('href', entry.href); else a.setAttribute('type', 'button');
+      markOff(a, entry);
       if (entry.description) a.setAttribute('title', entry.description);
       var g = this._glyph(entry); if (g) a.appendChild(g);
       if (this._showLabel()) {
@@ -566,6 +584,7 @@ const portalNavJS = `(function () {
         var p = this._data.parents[i];
         var t = document.createElement(p.href ? 'a' : 'button'); t.className = 'tile';
         if (p.href) t.setAttribute('href', p.href); else t.setAttribute('type', 'button');
+        markOff(t, p);
         if (p.description) t.setAttribute('title', p.description);
         var g = this._glyph(p) || document.createElement('span'); if (g.className === 'ico') g.style.width = g.style.height = '24px';
         var wrap = document.createElement('span'); wrap.className = 'cr'; wrap.appendChild(g); t.appendChild(wrap);
@@ -608,6 +627,7 @@ const portalNavJS = `(function () {
       var a = document.createElement(entry.href ? 'a' : 'button');
       a.className = 'ritem' + (cur ? ' cur' : '');
       if (entry.href) a.setAttribute('href', entry.href); else a.setAttribute('type', 'button');
+      markOff(a, entry);
       if (entry.description) a.setAttribute('title', entry.description);
       var pill = document.createElement('span'); pill.className = 'pill';
       var g = this._glyph(entry, true); // rail: always the icon
@@ -618,7 +638,7 @@ const portalNavJS = `(function () {
       var li = document.createElement('span'); li.className = 'lbli'; li.textContent = entry.label || ''; pill.appendChild(li);
       a.appendChild(pill);
       var lo = document.createElement('span'); lo.className = 'lblo'; lo.textContent = entry.label || ''; a.appendChild(lo);
-      a.addEventListener('pointerdown', function (ev) { self._ripple(pill, ev); });
+      if (!entry.off) a.addEventListener('pointerdown', function (ev) { self._ripple(pill, ev); });
       a.addEventListener('click', function () { if (self._expanded) self._setExpanded(false); });
       this._wireSelect(a, entry);
       return a;
@@ -665,10 +685,29 @@ const portalNavJS = `(function () {
       // animates the width, the burger cross-fade and the labels. A rebuild would
       // snap to the end state. The offset stays put - collapsed width is always
       // reserved, the drawer just overlays. The backdrop fades with it.
-      if (this._railEl) this._railEl.classList.toggle('exp', v);
+      if (this._railEl) {
+        this._railEl.style.width = v ? this._railWidth() + 'px' : '';
+        this._railEl.classList.toggle('exp', v);
+      }
       if (this._backdropEl) this._backdropEl.classList.toggle('on', v);
       var self = this;
       requestAnimationFrame(function () { self._updateArrows(); });
+    }
+
+    // The width an open rail needs: its widest label, or its head with the
+    // logo, with the padding around them. A fixed width left most of a drawer
+    // empty beside short labels and cut long ones. Measured on the standing
+    // DOM: a label folded to width 0 still reports its text in scrollWidth.
+    _railWidth() {
+      var rail = this._railEl, w = 0;
+      var labels = rail.querySelectorAll('.lbli');
+      for (var i = 0; i < labels.length; i++) w = Math.max(w, labels[i].scrollWidth);
+      // items pad, pill pad, glyph, gap, label, pill pad, items pad
+      w += 12 + 13 + 22 + 12 + 16 + 12;
+      var logo = rail.querySelector('.rlogo');
+      // head pad, burger, gap, logo, head pad
+      if (logo) w = Math.max(w, 24 + 24 + 10 + logo.scrollWidth + 24);
+      return Math.max(RAIL_EXP_MIN, Math.min(w, RAIL_EXP_MAX, window.innerWidth - 16));
     }
 
     // Preview scheme switch: force light or dark on the host AND the iframe root,
@@ -763,6 +802,7 @@ const portalNavJS = `(function () {
           logo: true, footer: true, currentEntry: this._current
         });
         wrap.appendChild(rail);
+        if (this._expanded) rail.style.width = this._railWidth() + 'px';
         var hasStrip = children.length > 0;
         if (hasStrip) {
           wrap.appendChild(this._buildStrip(children, currentChild));
@@ -779,6 +819,7 @@ const portalNavJS = `(function () {
           });
           crail.style.top = HEADER_H + 'px';
           wrap.appendChild(crail);
+          if (this._expanded) crail.style.width = this._railWidth() + 'px';
         }
         this._offset('header', d.side, hasRail);
       }

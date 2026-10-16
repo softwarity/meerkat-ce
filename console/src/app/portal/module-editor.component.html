@@ -53,10 +53,10 @@
       <mat-label i18n="@@Portal_module_route">Application (route)</mat-label>
       <mat-select [value]="routeId()" (selectionChange)="routeId.set($event.value)">
         @for (r of data().routes; track r.id) {
-          <mat-option [value]="r.id">{{ r.name }}</mat-option>
+          <mat-option [value]="r.id">{{ r.name }}@if (!r.enabled) { <span class="text-muted" i18n="@@Portal_route_off_option">(turned off)</span> }</mat-option>
         }
       </mat-select>
-      <mat-hint>{{ data().routes.length ? '' : noRoutes }}</mat-hint>
+      <mat-hint>{{ !data().routes.length ? noRoutes : routeOff() ? offHint : '' }}</mat-hint>
     </mat-form-field>
   }
 

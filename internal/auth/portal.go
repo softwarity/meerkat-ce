@@ -112,11 +112,15 @@ type portalEntry struct {
 	Label string `json:"label"`
 	// Icon is an SVG string (viewBox + path), rendered as a CSS mask by the
 	// bar - no icon font. Empty falls back to the label's initial.
-	Icon        string        `json:"icon,omitempty"`
-	Href        string        `json:"href,omitempty"`
-	Description string        `json:"description,omitempty"`
-	Badge       string        `json:"badge,omitempty"`
-	Children    []portalEntry `json:"children,omitempty"`
+	Icon        string `json:"icon,omitempty"`
+	Href        string `json:"href,omitempty"`
+	Description string `json:"description,omitempty"`
+	Badge       string `json:"badge,omitempty"`
+	// Off draws the entry greyed out and leads nowhere: its route is turned
+	// off for now, and the entry keeps its place until the route comes back.
+	// A container is off when every module it shows is.
+	Off      bool          `json:"off,omitempty"`
+	Children []portalEntry `json:"children,omitempty"`
 }
 
 // portalPayload is what portal.json returns, per session, no-store.
@@ -206,9 +210,11 @@ func (h *Handler) portalJSON(w http.ResponseWriter, r *http.Request) {
 // entry's address, and drops the access rules. It is reachableLinks grown a
 // second level and a caller that can be anonymous.
 //
-// A route referenced by the config but since deleted (or turned off, or no
-// longer UI) is simply skipped - the write-time SanitizePortalConfig guards
-// what ENTERS the config; this guards what a stale reference does at READ.
+// A route referenced by the config but since deleted, or no longer UI, is
+// simply skipped - the write-time SanitizePortalConfig guards what ENTERS the
+// config; this guards what a stale reference does at READ. A route turned OFF
+// is shown greyed out (Off) to whoever its access lets in: it is away, not
+// gone, and an entry that came and went with it would move the others around.
 func (h *Handler) portalNav(ctx context.Context, caller store.Caller) (store.PortalConfig, []portalEntry) {
 	cfg := h.st.Portal(ctx)
 	if cfg.Mode != store.PortalModePortal || h.adminPlane {
@@ -223,24 +229,30 @@ func (h *Handler) portalNav(ctx context.Context, caller store.Caller) (store.Por
 		byID[rt.ID] = rt
 	}
 
-	entry := func(routeID, icon, label, desc, badge string) (portalEntry, bool, bool) {
+	// entry resolves one module, and says whether it is shown at all: it is
+	// shown with its address when the caller may open it, greyed out (Off)
+	// when the caller may open it but its route is turned off.
+	entry := func(routeID, icon, label, desc, badge string) (portalEntry, bool) {
 		rt, ok := byID[routeID]
-		if !ok || !rt.Enabled || !rt.IsUI {
-			return portalEntry{}, false, false
+		if !ok || !rt.IsUI || !rt.Access.Grants(caller) {
+			return portalEntry{}, false
 		}
-		visible := rt.Access.Grants(caller)
 		href := routeEntryPath(rt)
-		navigable := visible && href != ""
+		if href == "" {
+			return portalEntry{}, false
+		}
 		e := portalEntry{
 			Label:       portalLabel(label, rt),
 			Icon:        icon,
 			Description: desc,
 			Badge:       badge,
 		}
-		if navigable {
+		if rt.Enabled {
 			e.Href = href
+		} else {
+			e.Off = true
 		}
-		return e, visible, navigable
+		return e, true
 	}
 
 	var out []portalEntry
@@ -249,27 +261,31 @@ func (h *Handler) portalNav(ctx context.Context, caller store.Caller) (store.Por
 			continue
 		}
 		if !p.IsContainer() {
-			if pe, _, navigable := entry(p.RouteID, p.Icon, p.Label, p.Description, p.Badge); navigable {
+			if pe, shown := entry(p.RouteID, p.Icon, p.Label, p.Description, p.Badge); shown {
 				out = append(out, pe)
 			}
 			continue
 		}
 		// A container offers the modules the caller may open, and leads to the
-		// first of them. With none, it is a heading that leads nowhere, and it
-		// is not offered at all.
+		// first of them that is on. With none shown, it is a heading that leads
+		// nowhere, and it is not offered at all; with every one shown greyed
+		// out, it is greyed out too.
 		ce := portalEntry{Label: p.Label, Icon: p.Icon, Description: p.Description, Badge: p.Badge}
 		for _, c := range p.Children {
 			if c.Disabled {
 				continue
 			}
-			if child, _, navigable := entry(c.RouteID, c.Icon, c.Label, c.Description, c.Badge); navigable {
+			if child, shown := entry(c.RouteID, c.Icon, c.Label, c.Description, c.Badge); shown {
 				ce.Children = append(ce.Children, child)
+				if ce.Href == "" {
+					ce.Href = child.Href
+				}
 			}
 		}
 		if len(ce.Children) == 0 {
 			continue
 		}
-		ce.Href = ce.Children[0].Href
+		ce.Off = ce.Href == ""
 		out = append(out, ce)
 	}
 	return cfg, out

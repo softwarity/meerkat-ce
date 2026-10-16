@@ -2,6 +2,23 @@
 
 ## NEXT RELEASE
 
+- **The portal's rail lines up and fits its labels.** Collapsed, an application's icon sat a few
+  pixels left of its pill and of the menu button, and a label longer than the pill was cut
+  ("Refere..."): the icons are centred on one axis and a label takes the rail's width. Opened,
+  the rail took a fixed 280px; it is now as wide as its widest label, or its logo and name, with
+  the same padding on both sides.
+- **A portal entry may point at a route turned off.** The portal was refused as a whole as soon
+  as one of its entries pointed at a disabled route ("not an enabled UI route"), so a single such
+  entry blocked every save, even one that only added a valid application. A route turned off is
+  now accepted: the bar shows its entry in place, greyed out and leading nowhere, until the route
+  is back on, and a container whose modules are all off is greyed out too. A route deleted or no
+  longer UI after its entry was saved no longer blocks the save either: the bar skips it and the
+  console names it so the entry can be removed.
+- **A new sub-module no longer takes its container's name.** Added from a container's drawer, it
+  came up with the container's label and description already filled in, and so did any entry
+  clicked in the preview while another one was open. A new entry now starts empty, and an empty
+  label is the route's name.
+
 ---
 
 ## 1.11.0

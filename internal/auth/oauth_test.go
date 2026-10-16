@@ -459,7 +459,7 @@ func TestTheAppsMenuOffersTheCatalogueAndNothingElse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+	if err := store.SanitizePortalConfig(&portal, routes, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {

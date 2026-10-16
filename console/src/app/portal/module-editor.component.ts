@@ -103,6 +103,7 @@ export class ModuleEditorComponent implements OnInit {
   private readonly q$ = new Subject<string>();
 
   protected readonly noRoutes = $localize`:@@Portal_no_ui_routes:No UI route yet: a module opens one.`;
+  protected readonly offHint = $localize`:@@Portal_route_off_hint:The route is turned off: the bar greys the entry until it is back on.`;
 
   ngOnInit(): void {
     // input() is not bound in field initializers - seed here.
@@ -125,6 +126,10 @@ export class ModuleEditorComponent implements OnInit {
 
   protected routeName(): string {
     return this.data().routes.find((r) => r.id === this.routeId())?.name ?? '';
+  }
+
+  protected routeOff(): boolean {
+    return this.data().routes.find((r) => r.id === this.routeId())?.enabled === false;
   }
 
   protected onQuery(v: string): void {

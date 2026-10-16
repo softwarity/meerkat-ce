@@ -48,8 +48,8 @@ bar, come back: the entries stay.
 
 **Add a module** for an application, **Add a container** to group modules.
 
-- **Application (route)** - a module's UI route. Only **enabled UI routes** are
-  offered. The module inherits the route's access, and that is what makes the
+- **Application (route)** - a module's UI route. Only **UI routes** are
+  offered, those turned off included, marked *(turned off)*. The module inherits the route's access, and that is what makes the
   list differ per visitor: the payload carries no access rule. A container has
   no route.
 - **Label** - required on a container; on a module, empty takes the route's
@@ -70,8 +70,14 @@ inside it.
 
 - **A new UI route does not show up on its own.** It is offered only if it is in
   this list: that is what replaces the route editor's old *Link* field.
-- **No UI route, no catalogue.** An entry needs a route that is enabled and
-  marked UI in [Routes](/docs/console/routes).
+- **No UI route, no catalogue.** An entry needs a route marked UI in
+  [Routes](/docs/console/routes).
+- **A route turned off keeps its entry.** The bar shows it in its place, greyed
+  out and leading nowhere, until the route is back on; a container whose modules
+  are all turned off is greyed out too. To take an entry out of the bar
+  whatever its route does, disable the entry itself. A route deleted, or no
+  longer UI, is skipped by the bar, and the list names it so the entry can be
+  removed.
 - **A visitor sees fewer entries than you do**, deliberately: the list is
   filtered by each entry's route access.
 - **The bar never shows in an iframe.** A page embedded in another is not the

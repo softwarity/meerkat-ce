@@ -48,6 +48,12 @@ export class PortalPageComponent {
   // The module editor lives in a drawer on this page (not a modal): open it with
   // the entry to edit and a callback that applies the result to the tree.
   protected readonly editing = signal<ModuleFormData | null>(null);
+  // Which editor the drawer holds. The editor reads its entry once, when it is
+  // made, so opening ANOTHER entry has to make a new one: reusing it showed
+  // the previous entry's fields - a sub-module added from its container's
+  // drawer came up with the container's name. Moving the open entry keeps it,
+  // and with it whatever is typed and not saved yet.
+  protected readonly editorKey = signal(0);
   private applyEdit: ((m: ModuleDraft) => void) | null = null;
   // Which existing module the drawer edits (null while adding a new one), so the
   // quick actions know their target.
@@ -74,7 +80,8 @@ export class PortalPageComponent {
   protected readonly brandLogo = signal('');
   protected readonly entries = signal<PortalEntry[]>([]);
 
-  // Only enabled UI routes can wear the bar; those are what a module binds to.
+  // Only UI routes can wear the bar; those are what a module binds to. A
+  // route turned off stays bindable: the bar greys its entry until it is back.
   protected readonly uiRoutes = signal<Route[]>([]);
 
   private settings: Settings | null = null;
@@ -157,22 +164,29 @@ export class PortalPageComponent {
       // `parents` is the BAR's own word, not the catalogue's: the component
       // draws two surfaces, and what is a parent there is simply an entry
       // here. Renaming it in the payload silently emptied the preview.
-      parents: this.entries().map((p, i) => ({
-        id: String(i),
-        label: this.label(p),
-        icon: p.icon ?? '',
-        description: p.description ?? '',
-        badge: p.badge ?? '',
-        disabled: !!p.disabled,
-        children: (p.children ?? []).map((c, j) => ({
+      parents: this.entries().map((p, i) => {
+        const children = (p.children ?? []).map((c, j) => ({
           id: `${i}/${j}`,
           label: this.label(c),
           icon: c.icon ?? '',
           description: c.description ?? '',
           badge: c.badge ?? '',
           disabled: !!c.disabled,
-        })),
-      })),
+          off: this.routeOff(c.routeId),
+        }));
+        // A container is greyed out when every module it shows is.
+        const shown = children.filter((c) => !c.disabled);
+        return {
+          id: String(i),
+          label: this.label(p),
+          icon: p.icon ?? '',
+          description: p.description ?? '',
+          badge: p.badge ?? '',
+          disabled: !!p.disabled,
+          off: this.isContainer(p) ? shown.length > 0 && shown.every((c) => c.off) : this.routeOff(p.routeId),
+          children,
+        };
+      }),
     };
   }
 
@@ -192,7 +206,7 @@ export class PortalPageComponent {
     // A viewer refused the routes (an application admin) gets none to pick
     // from rather than an uncaught error.
     this.api.listRoutes().subscribe({
-      next: (rs) => this.uiRoutes.set(rs.filter((r) => r.isUi && r.enabled)),
+      next: (rs) => this.uiRoutes.set(rs.filter((r) => r.isUi)),
       error: () => this.uiRoutes.set([]),
     });
   }
@@ -267,6 +281,17 @@ export class PortalPageComponent {
 
   protected routeName(id: string): string {
     return this.uiRoutes().find((r) => r.id === id)?.name ?? id;
+  }
+
+  // The route is there and turned off: its entry shows greyed out.
+  protected routeOff(id: string | undefined): boolean {
+    return this.uiRoutes().find((r) => r.id === id)?.enabled === false;
+  }
+
+  // The route was deleted, or is no longer a UI route: the bar skips the
+  // entry, and only removing it here tidies the catalogue.
+  protected routeGone(id: string | undefined): boolean {
+    return !!id && !this.uiRoutes().some((r) => r.id === id);
   }
 
   protected label(m: PortalEntry | PortalSubEntry): string {
@@ -354,12 +379,13 @@ export class PortalPageComponent {
     });
   }
 
-  protected editParent(i: number): void {
+  protected editParent(i: number, keep = false): void {
     const e = this.entries()[i];
     const container = this.isContainer(e);
     this.open(container ? this.data.title.editContainer : this.data.title.edit, container ? 'container' : 'module', e,
       { pi: i, ci: null }, (m) =>
         this.entries.update((ps) => ps.map((x, j) => (j === i ? { ...x, ...entryFromDraft(m), routeId: container ? '' : m.routeId } : x))),
+      keep,
     );
   }
 
@@ -371,10 +397,11 @@ export class PortalPageComponent {
     });
   }
 
-  private editChild(pi: number, ci: number): void {
+  private editChild(pi: number, ci: number, keep = false): void {
     const c = (this.entries()[pi].children ?? [])[ci];
     this.open(this.data.title.editSub, 'sub', c, { pi, ci }, (m) =>
       this.mutateChildren(pi, (cs) => cs.map((x, j) => (j === ci ? { ...x, ...childFromDraft(m) } : x))),
+      keep,
     );
   }
 
@@ -393,12 +420,12 @@ export class PortalPageComponent {
       const ni = p.pi + dir;
       this.entries.update((ps) => move(ps, p.pi, dir));
       this.persist();
-      this.editParent(ni);
+      this.editParent(ni, true);
     } else {
       const nc = p.ci + dir;
       this.mutateChildren(p.pi, (cs) => move(cs, p.ci as number, dir));
       this.persist();
-      this.editChild(p.pi, nc);
+      this.editChild(p.pi, nc, true);
     }
   }
 
@@ -418,7 +445,7 @@ export class PortalPageComponent {
       const ti = target > p.pi ? target - 1 : target;
       this.entries.set(without.map((x, j) => (j === ti ? { ...x, children: [...(x.children ?? []), moved] } : x)));
       this.persist();
-      this.editChild(ti, (this.entries()[ti].children ?? []).length - 1);
+      this.editChild(ti, (this.entries()[ti].children ?? []).length - 1, true);
       return;
     }
     const child = (ps[p.pi].children ?? [])[p.ci];
@@ -429,12 +456,12 @@ export class PortalPageComponent {
       lifted.splice(p.pi + 1, 0, { ...child });
       this.entries.set(lifted);
       this.persist();
-      this.editParent(p.pi + 1);
+      this.editParent(p.pi + 1, true);
       return;
     }
     this.entries.set(lifted.map((x, j) => (j === target ? { ...x, children: [...(x.children ?? []), child] } : x)));
     this.persist();
-    this.editChild(target, (this.entries()[target].children ?? []).length - 1);
+    this.editChild(target, (this.entries()[target].children ?? []).length - 1, true);
   }
 
   protected onToggleDisabled(v: boolean): void {
@@ -471,7 +498,9 @@ export class PortalPageComponent {
     m: PortalEntry | PortalSubEntry | undefined,
     path: { pi: number; ci: number | null } | null,
     apply: (m: ModuleDraft) => void,
+    keep = false,
   ): void {
+    if (!keep || !this.editing()) this.editorKey.update((k) => k + 1);
     this.applyEdit = apply;
     this.editingPath = path;
     this.selected.set(path ? (path.ci === null ? String(path.pi) : `${path.pi}/${path.ci}`) : null);

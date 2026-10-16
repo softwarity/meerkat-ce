@@ -527,7 +527,7 @@ func TestLoginPageOffersPublicUIRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListRoutes: %v", err)
 	}
-	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+	if err := store.SanitizePortalConfig(&portal, routes, nil); err != nil {
 		t.Fatalf("SanitizePortalConfig: %v", err)
 	}
 	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {

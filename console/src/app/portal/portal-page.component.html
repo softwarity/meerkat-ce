@@ -4,9 +4,12 @@
   <mat-drawer-container class="wrap" autosize>
     <mat-drawer position="end" mode="over" [opened]="!!editing()" (closed)="onClosed()">
       @if (editing(); as ed) {
-        <app-module-editor [data]="ed" (saved)="onSaved($event)" (closed)="onClosed()"
-          (moved)="onMove($event)" (toggledDisabled)="onToggleDisabled($event)"
-          (addedSub)="onAddSub()" (removed)="onDelete()" (relocated)="onRelocate($event)" />
+        <!-- One editor per entry opened: see editorKey. -->
+        @for (k of [editorKey()]; track k) {
+          <app-module-editor [data]="ed" (saved)="onSaved($event)" (closed)="onClosed()"
+            (moved)="onMove($event)" (toggledDisabled)="onToggleDisabled($event)"
+            (addedSub)="onAddSub()" (removed)="onDelete()" (relocated)="onRelocate($event)" />
+        }
       }
     </mat-drawer>
     <mat-drawer-content>
@@ -187,6 +190,11 @@
                 } @else {
                   <b>{{ e.label || routeNameOf(e.routeId) }}</b>
                   <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
+                  @if (routeOff(e.routeId)) {
+                    <span class="text-muted path" i18n="@@Portal_route_off">route turned off</span>
+                  } @else if (routeGone(e.routeId)) {
+                    <span class="text-muted path" i18n="@@Portal_route_gone">no such UI route</span>
+                  }
                 }
               </span>
               <button matIconButton [disabled]="i === 0" (click)="moveEntry(i, -1)"

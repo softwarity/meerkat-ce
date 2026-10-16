@@ -33,8 +33,13 @@ test('route-duplicate: a route is copied twice from the routes screen', async ({
     const row = page.locator('mat-row', { hasText: id }).filter({ hasNotText: `${id}-copy` });
     const saved = page.waitForResponse((r) => r.url().includes('/api/routes/') && r.request().method() === 'PUT');
     // The row's actions are a toolbar floating over the hovered row, outside it.
-    await row.hover();
-    await page.getByRole('button', { name: 'Duplicate route' }).click();
+    // Other specs write routes meanwhile, the live list redraws, and the
+    // toolbar closes under the cursor: hover and click are retried together.
+    // A click landing on another row would name a different copy, and fail below.
+    await expect(async () => {
+      await row.hover();
+      await page.getByRole('button', { name: 'Duplicate route' }).click({ timeout: 2000 });
+    }).toPass({ timeout: 20_000 });
     const answer = await saved;
     expect(answer.status(), await answer.text()).toBe(200);
     const copy = await answer.json();

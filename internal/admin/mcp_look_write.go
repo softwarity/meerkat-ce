@@ -63,7 +63,7 @@ func portalSchema() map[string]any {
 	sub := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"routeId":     str("The id of an enabled UI route, from list_routes. Required."),
+			"routeId":     str("The id of a UI route, from list_routes. Required. A route turned off is shown greyed out until it is back on."),
 			"label":       str("What the bar shows. Empty uses the route's own name."),
 			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
 			"description": str("The entry's tooltip."),
@@ -77,7 +77,7 @@ func portalSchema() map[string]any {
 			"in children). A container opens its first module the visitor may open, and is not shown when " +
 			"the visitor may open none of them.",
 		"properties": map[string]any{
-			"routeId":     str("A module's route: the id of an enabled UI route, from list_routes. Leave out for a container."),
+			"routeId":     str("A module's route: the id of a UI route, from list_routes. Leave out for a container. A route turned off is shown greyed out until it is back on."),
 			"label":       str("What the bar shows. Required on a container; on a module, empty uses the route's own name."),
 			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
 			"description": str("The entry's tooltip."),
@@ -134,10 +134,9 @@ func (a *API) toolSavePortal(ctx context.Context, args json.RawMessage) (any, er
 	if err != nil {
 		return nil, err
 	}
-	// The same guard the console gets: every catalogue entry binds to an
-	// enabled UI route, and an icon NAME becomes the stored drawing
-	// (icons.Resolve).
-	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+	// The same guard the console gets: every catalogue entry binds to a UI
+	// route, and an icon NAME becomes the stored drawing (icons.Resolve).
+	if err := store.SanitizePortalConfig(&portal, routes, &before); err != nil {
 		return nil, err
 	}
 	if err := a.st.SetSetting(ctx, store.SettingPortal, portal); err != nil {

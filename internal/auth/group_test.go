@@ -59,7 +59,7 @@ func groupSetup(t *testing.T) (*http.ServeMux, *session.Manager, *store.Store) {
 		Entries: []store.PortalEntry{{RouteID: "opsapp", Label: "opsapp"}, {RouteID: "salesapp", Label: "salesapp"}}}
 	routes, err := st.ListRoutes(ctx)
 	must(err)
-	must(store.SanitizePortalConfig(&portal, routes))
+	must(store.SanitizePortalConfig(&portal, routes, nil))
 	must(st.SetSetting(ctx, store.SettingPortal, portal))
 	return mux, sm, st
 }

@@ -51,8 +51,9 @@ transformer en barre, puis revenir en arrière : les entrées sont conservées.
 
 **Add a module** ajoute une application, **Add a container** un groupe de modules.
 
-- **Application (route)** - la route UI d'un module. Seules les **routes UI
-  activées** sont proposées. Le module hérite de l'accès de la route : c'est ce
+- **Application (route)** - la route UI d'un module. Seules les **routes UI**
+  sont proposées, y compris celles qui sont désactivées, marquées *(turned off)*.
+  Le module hérite de l'accès de la route : c'est ce
   qui fait que la liste varie d'un visiteur à l'autre, car les données envoyées
   ne contiennent aucune règle d'accès. Un conteneur n'a pas de route.
 - **Label** - obligatoire pour un conteneur ; pour un module, laissé vide, il
@@ -73,8 +74,14 @@ d'abord le premier niveau, puis les conteneurs. Sur un conteneur, **+** ajoute u
 - **Une nouvelle route UI n'apparaît pas toute seule.** Elle n'est proposée que si
   elle figure dans cette liste : c'est ce qui remplace l'ancien champ *Link* de
   l'éditeur de route.
-- **Sans route UI, pas de catalogue.** Une entrée a besoin d'une route activée et
-  déclarée UI dans [Routes](/docs/console/routes).
+- **Sans route UI, pas de catalogue.** Une entrée a besoin d'une route déclarée
+  UI dans [Routes](/docs/console/routes).
+- **Une route désactivée garde son entrée.** La barre l'affiche à sa place,
+  grisée et sans lien, jusqu'à ce que la route soit réactivée ; un conteneur dont
+  tous les modules sont désactivés est grisé lui aussi. Pour retirer une entrée
+  de la barre quoi que fasse sa route, désactivez l'entrée elle-même. Une route
+  supprimée, ou qui n'est plus UI, est ignorée par la barre, et la liste le
+  signale pour qu'on retire l'entrée.
 - **Un visiteur voit moins d'entrées que vous**, et c'est voulu : la liste est
   filtrée selon l'accès de la route de chaque entrée.
 - **La barre ne s'affiche jamais dans une iframe.** Une page intégrée dans une

@@ -168,7 +168,7 @@ func run(dataDir string) error {
 			{RouteID: "demo-ops-app", Label: "Ops app"},
 		},
 	}
-	if err := store.SanitizePortalConfig(&portal, routes); err != nil {
+	if err := store.SanitizePortalConfig(&portal, routes, nil); err != nil {
 		return fmt.Errorf("portal: %w", err)
 	}
 	if err := st.SetSetting(ctx, store.SettingPortal, portal); err != nil {

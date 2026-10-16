@@ -3752,7 +3752,8 @@ type publicLink struct {
 
 // catalogue resolves the portal catalogue into offerable links: the entries
 // in the order somebody chose, each one an existing enabled UI route with a
-// usable entry path, each one passing `grants`.
+// usable entry path, each one passing `grants`. A route turned off is left
+// out here, where the bar greys it: a list of links has no greyed-out link.
 //
 // THE CATALOGUE SAYS WHAT EXISTS, THE ROUTE SAYS WHO SEES IT. Nothing here
 // decides access: `grants` is the caller's own test, and an entry whose route
