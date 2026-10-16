@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.11.1
+
 - **The portal's rail lines up and fits its labels.** Collapsed, an application's icon sat a few
   pixels left of its pill and of the menu button, and a label longer than the pill was cut
   ("Refere..."): the icons are centred on one axis and a label takes the rail's width. Opened,
