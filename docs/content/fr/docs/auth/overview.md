@@ -83,6 +83,16 @@ enregistrées sous forme de liens - un par autorité et par sujet. Un même comp
 être ouvert à la fois par un mot de passe, par un fournisseur et par un annuaire, et une
 personne qui s'est inscrite localement conserve tout lorsqu'elle passe au SSO.
 
+## L'autre sens : les applications
+
+Tout ce qui précède est la façon dont une personne prouve qui elle est **à
+Meerkat**. Dire aux applications derrière les routes qui est cette personne vient
+ensuite, et c'est un réglage de route : des en-têtes ou un JWT signé à chaque
+requête, ou, pour une application qui tient à connecter elle-même ses utilisateurs,
+Meerkat comme fournisseur OpenID (édition Enterprise). Voir
+[Brancher une application](/docs/auth/connect-an-application) et
+[Meerkat fournisseur OpenID](/docs/auth/oidc-provider).
+
 ## Où se configure quoi
 
 | Écran | Ce qu'on y trouve |

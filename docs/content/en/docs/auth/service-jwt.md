@@ -21,7 +21,7 @@ client sent is removed first, so a caller cannot forge one. It carries:
 
 | Claim | What it holds |
 |---|---|
-| `iss` | the issuer: `meerkat` until you set one |
+| `iss` | the issuer: the application plane's public address (`https://<public name>`), `meerkat` while none is declared |
 | `sub` | the caller's account id |
 | `aud` | the name of the route |
 | `iat`, `exp` | when it was signed, and when it stops being valid: two minutes later by default, set per route |
@@ -39,7 +39,7 @@ Everything a service needs is served on the **internal plane**, port
 ingress. Nothing outside the cluster has a reason to read it, so nothing
 outside reaches it. It needs no token: it holds public keys only, which give
 no power, and a service has to read them before it holds anything at all.
-`meerkat` below is the gateway's name in our deployment files; the JWT drawer
+`meerkat` below is the gateway's name in our deployment files; the OIDC / JWT drawer
 writes the real one, asked of the runtime - on Kubernetes the Service's full
 name, such as `http://meerkat-internal.shop.svc.cluster.local:7070`, on Swarm
 or compose the service's. Once a certificate is placed on the internal plane,
@@ -71,13 +71,15 @@ the gateway the way the service reaches it.
 Libraries take it in one of two ways:
 
 - **The document's address**, as above - .NET's `MetadataAddress`, Node's
-  `openid-client`. Any issuer works, `meerkat` included. Over plain HTTP, say
-  so where the library asks (`RequireHttpsMetadata = false` in .NET).
+  `openid-client`. Whatever the issuer, this is the way a service inside the
+  cluster should take. Over plain HTTP, say so where the library asks
+  (`RequireHttpsMetadata = false` in .NET).
 - **The issuer alone** - Spring's `issuer-uri`, go-oidc's provider. They read
-  `{issuer}/.well-known/openid-configuration` and check that the document
-  names the same issuer, so the issuer has to be the internal plane's URL:
-  set it to `http://meerkat:7070` in the JWT drawer (see below), and the
-  service's whole configuration is that one line.
+  `{issuer}/.well-known/openid-configuration` on the gateway's public address,
+  which answers only while the [OpenID provider](/docs/auth/oidc-provider)
+  (Enterprise edition) has a client declared. Otherwise, give such a library the
+  JWKS below and the issuer to check (Spring: `jwk-set-uri` beside the expected
+  issuer) rather than the issuer alone.
 
 ### The JWKS, for a library that only takes keys
 
@@ -89,28 +91,35 @@ The public half of the keys, as a standard JWKS - for a library that knows no
 discovery, such as `jose`'s remote key set. The token's `kid` names the key,
 and the key carries its algorithm, so the service takes the algorithm from the
 key, never from the token's header. It then checks the issuer itself, against
-the value set in the drawer.
+the one the drawer shows.
 
 ### A PEM, for a service that cannot fetch anything
 
-The **JWT** drawer, beside **Global** on the Routes screen, shows each
+The **OIDC / JWT** drawer, beside **Global** on the Routes screen, shows each
 algorithm's public key as PEM. That key must be replaced by hand at every
 rotation, where the two addresses above follow it on their own.
 
 ## The issuer
 
-Every token says who issued it in `iss`, and a service checks it. It is
-`meerkat` until you set another one, in the **JWT** drawer: **Issuer**. Change
-it and the next token carries the new one, on every node - so change what the
-services expect at the same time. An issuer that is a URL is an http or https
-one with a host, and no query, fragment or trailing slash.
+Every token says who issued it in `iss`, and a service checks it. It is not
+typed: it is the application plane's **public name**, declared in **Domains &
+TLS**, **Application** tab, as `https://<name>` (a name on this machine,
+`localhost`, gives `http://localhost:<data-plane port>`). With several names,
+the **OIDC / JWT** drawer chooses one in **Public address**, the first until
+then; with none, the tokens say `meerkat` and the drawer links to that tab. The
+same issuer is the [OpenID provider](/docs/auth/oidc-provider)'s.
+
+Declare, remove or choose a public name and the next token carries the new
+issuer, on every node - so change what the services expect at the same time.
 
 > [!NOTE]
 > The discovery document describes how to verify a token, not how to obtain
-> one. There is no authorization, token or userinfo endpoint: the gateway is
-> not an OAuth server, it signs one short token for each request it forwards.
-> A library that insists on those endpoints is one to point at the JWKS
-> instead.
+> one: for this mechanism the gateway signs one short token for each request it
+> forwards, and there is nothing to exchange. A library that insists on
+> authorization and token endpoints is one to point at the JWKS instead. An
+> application that wants to sign its users in itself is a different case: with
+> the [OpenID provider](/docs/auth/oidc-provider) (Enterprise edition), the same
+> document then also names those endpoints.
 
 ## Rotation
 
@@ -136,7 +145,7 @@ port the path is now an ordinary one, which a route may claim.
 > can no longer verify its tokens, and refuses the requests it receives. Point
 > it at the internal plane before or with the upgrade - the discovery document,
 > `http://<gateway>:7070/.well-known/openid-configuration`, or the JWKS beside
-> it; the JWT drawer gives both. Nothing else changes: same keys, same tokens.
+> it; the OIDC / JWT drawer gives both. Nothing else changes: same keys, same tokens.
 
 ## Read more
 
@@ -146,3 +155,5 @@ port the path is now an ordinary one, which a route may claim.
   NetworkPolicy that keeps the console away from the backends.
 - [Scheduled calls](/docs/operations/scheduler) - the other API of the
   internal plane.
+- [Meerkat as an OpenID provider](/docs/auth/oidc-provider) - when the
+  application signs its users in itself, with the same keys.

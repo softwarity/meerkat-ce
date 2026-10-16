@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -18,7 +19,27 @@ import (
 
 // specClient fetches OpenAPI specs from upstreams server-side. The per-request
 // context carries the real deadline; the client Timeout is a backstop.
-var specClient = &http.Client{Timeout: 20 * time.Second}
+//
+// It verifies the upstream the way the route's own traffic does: the system's
+// roots AND the trusted authorities (SSL-09). A plain client knew only the
+// system's, so a service signed by the cluster's CA answered its pages through
+// the route and refused its spec with "certificate signed by unknown authority"
+// (2026-10-16). Built per call, because the trusted pool changes at runtime.
+func specClient() *http.Client { return upstreamClient(20 * time.Second) }
+
+// upstreamClient is a short-lived client to an upstream, trusting what the
+// router trusts. No keep-alive: these calls are rare, and a pool held by a
+// client nobody keeps would only leak its connections.
+func upstreamClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			Proxy:             http.ProxyFromEnvironment,
+			TLSClientConfig:   &tls.Config{RootCAs: gateway.UpstreamRoots(), MinVersion: tls.VersionTLS12},
+			DisableKeepAlives: true,
+		},
+	}
+}
 
 // registerOpenAPI mounts the endpoint-security surface (RBAC-07): read the
 // route's OpenAPI operations, and pose per-endpoint access rules. Routing plane
@@ -289,7 +310,7 @@ func (a *API) readSpecRaw(ctx context.Context, route store.Route) (*openapi.Spec
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	return openapi.Fetch(ctx, specClient, specURL)
+	return openapi.Fetch(ctx, specClient(), specURL)
 }
 
 // specDeposit is what the console gets back after depositing a file: what the
@@ -436,7 +457,7 @@ func (a *API) shadowedStatus(ctx context.Context, route store.Route) int {
 	if err != nil {
 		return 0
 	}
-	res, err := specClient.Do(req)
+	res, err := specClient().Do(req)
 	if err != nil {
 		return 0
 	}

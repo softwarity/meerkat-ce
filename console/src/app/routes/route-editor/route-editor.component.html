@@ -442,11 +442,28 @@
         <div class="btn-row">
           <mat-form-field class="position-field">
             <mat-label i18n="@@Mechanism">Mechanism</mat-label>
-            <mat-select [value]="draft().identityMechanism" (selectionChange)="setMechanism($event.value)">
+            <mat-select [value]="draft().identityMechanism" [panelWidth]="null" (selectionChange)="setMechanism($event.value)">
+              <!-- The OIDC option explains itself in the list; once chosen, its
+                   name is enough, and the sentence would not fit the field. -->
+              <!-- No whitespace around it: the console compiles with
+                   preserveWhitespaces, and a text node would stop the trigger
+                   from being projected. -->
+              @if (draft().identityMechanism === 'oidc') {<mat-select-trigger>OIDC</mat-select-trigger>}
               <mat-option value="" i18n="@@None">None</mat-option>
               <mat-option value="headers" i18n="@@Headers">Headers</mat-option>
               <mat-option value="jwt" i18n="@@JWT">JWT</mat-option>
               <mat-option value="signed-jwt" i18n="@@Signed_JWT">Signed JWT</mat-option>
+              <!-- The other direction: nothing rides on the request, the
+                   service sends its users to Meerkat to sign in. Enterprise:
+                   locked, with its cap, on the community image. -->
+              <mat-option value="oidc" ee-feature="SAUTH-05">
+                <span i18n="@@Mechanism_oidc">OIDC (the service signs in through Meerkat)</span>
+                <app-ee-lock
+                  feature="SAUTH-05"
+                  i18n-why="@@Oidc_provider_ee_why"
+                  why="Applications sign their users in through Meerkat, as with any OpenID Connect provider."
+                />
+              </mat-option>
               <!-- Announced where it will live, disabled until it exists: the
                    palette's "planned" block only covers bricks, so a mechanism
                    that is coming had nowhere to be seen. -->
@@ -458,7 +475,9 @@
           </mat-form-field>
           <!-- Beside the mechanism: it shows what the transport SENDS, for every
                transport, rather than belonging to one of the blocks below. -->
-          @if (draft().identityMechanism) {
+          <!-- Not for OIDC: nothing is added to the request, the tokens are
+               the provider's answer to the application's own sign-in. -->
+          @if (draft().identityMechanism && draft().identityMechanism !== 'oidc') {
             <button matButton="tonal" type="button" (click)="openIdentityPreview()">
               <mat-icon>visibility</mat-icon>
               <span i18n="@@Preview">Preview</span>
@@ -495,8 +514,115 @@
             </p>
           }
           <p class="section-hint id-hint" i18n="@@Signed_jwt_hint">
-            Backends verify each token against the published JWKS. Keys are under "Signing keys" on the Routes page.
+            Backends verify each token against the published JWKS. Keys are under "OIDC / JWT" on the Routes page.
           </p>
+        }
+
+        @if (draft().identityMechanism === 'oidc') {
+          <!-- The reverse of the transports above: the service is an OIDC
+               client, and the route says which one and what its tokens tell.
+               Who may sign in is the route's access rule (Security). -->
+          <p class="section-hint id-hint" i18n="@@Oidc_mechanism_hint">
+            The service sends its users to Meerkat to sign in and gets tokens saying who they are. Who may sign in is this route's access rule.
+          </p>
+          @if (!enterprise()) {
+            <p class="section-hint">
+              <app-ee-lock
+                feature="SAUTH-05"
+                i18n-why="@@Oidc_provider_ee_why"
+                why="Applications sign their users in through Meerkat, as with any OpenID Connect provider."
+              />
+            </p>
+          }
+          <h3 class="sub" i18n="@@OIDC_client">OIDC client</h3>
+          <div class="btn-row oidc-client-row">
+            <mat-form-field class="position-field" subscriptSizing="dynamic">
+              <mat-label i18n="@@Client">Client</mat-label>
+              <mat-select
+                [value]="draft().identityClient"
+                (selectionChange)="patch('identityClient', $event.value)"
+              >
+                @for (c of oidcClients(); track c.id) {
+                  <mat-option [value]="c.id">{{ c.id }}</mat-option>
+                }
+                <!-- A client named by the route but not in the list stays
+                     readable rather than leaving the select blank. -->
+                @if (oidcClientUnlisted()) {
+                  <mat-option [value]="draft().identityClient">{{ draft().identityClient }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button matButton="tonal" type="button" (click)="newOidcClient()">
+              <mat-icon>add</mat-icon>
+              <span i18n="@@New_client">New client</span>
+            </button>
+          </div>
+
+          <h3 class="sub" i18n="@@Claims_sent">Claims sent</h3>
+          <p class="section-hint id-hint" i18n="@@Claims_sent_hint">
+            What the tokens say about the person: a fact declared in Identity, or a fixed value.
+          </p>
+          @if (draft().identityClaims.length) {
+            <div class="claims">
+              @for (c of draft().identityClaims; track $index; let i = $index) {
+                <div class="claim">
+                  <app-form-field class="claim-name" subscriptSizing="dynamic" i18n-label="@@Claim" label="Claim" [clearable]="false">
+                    <input
+                      matInput
+                      spellcheck="false"
+                      autocapitalize="off"
+                      [value]="c.name"
+                      (input)="setClaim(i, { name: $any($event.target).value })"
+                    />
+                  </app-form-field>
+                  <span class="id-eq">=</span>
+                  <mat-form-field class="claim-from" subscriptSizing="dynamic">
+                    <mat-label i18n="@@Source">Source</mat-label>
+                    <mat-select [value]="c.from" (selectionChange)="setClaim(i, { from: $event.value })">
+                      <mat-option value="" i18n="@@Fixed_value">Fixed value</mat-option>
+                      @for (f of oidcFacts(); track f) {
+                        <mat-option [value]="f">{{ f }}</mat-option>
+                      }
+                      <!-- A fact Identity no longer declares: kept visible, and
+                           named among what stands between the route and Save. -->
+                      @if (c.from && !oidcFacts().includes(c.from)) {
+                        <mat-option [value]="c.from">{{ c.from }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  @if (c.from) {
+                    <code class="id-sample">{{ mappedExample(c.from) }}</code>
+                  } @else {
+                    <app-form-field class="claim-value" subscriptSizing="dynamic" i18n-label="@@Value" label="Value" [clearable]="false">
+                      <input
+                        matInput
+                        spellcheck="false"
+                        [value]="c.value"
+                        (input)="setClaim(i, { value: $any($event.target).value })"
+                      />
+                    </app-form-field>
+                  }
+                  <button
+                    matIconButton
+                    type="button"
+                    (click)="removeClaim(i)"
+                    i18n-matTooltip="@@Remove"
+                    matTooltip="Remove"
+                    i18n-aria-label="@@Remove"
+                    aria-label="Remove"
+                  >
+                    <mat-icon>remove_circle_outline</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+          <div class="btn-row">
+            <button matButton type="button" (click)="addClaim()">
+              <mat-icon>add</mat-icon>
+              <span i18n="@@Add_a_claim">Add a claim</span>
+            </button>
+          </div>
         }
 
         @if (draft().identityMechanism === 'jwt' || draft().identityMechanism === 'signed-jwt') {
@@ -528,9 +654,19 @@
                a role is. The page injection never uses it - roles land there
                as the plain list (see the Roles block in User info). -->
           <h3 class="sub" i18n="@@Shape_of_the_roles">Shape of the roles</h3>
-          <p class="section-hint id-hint" i18n="@@Roles_shape_hint">
-            Roles travel on every request: trim them to what the service reads.
-          </p>
+          @if (draft().identityMechanism === 'oidc') {
+            <p class="section-hint id-hint" i18n="@@Roles_shape_hint_oidc">
+              A claim built from the roles carries every role of the person, comma-separated, unless shaped
+              here: keep or drop roles by name or by tag, cut or add a prefix, change the case, then write
+              the list separated or as a JSON array - what the application reads, and nothing more.
+            </p>
+          } @else {
+            <p class="section-hint id-hint" i18n="@@Roles_shape_hint">
+              The roles travel on every request, all of them comma-separated unless shaped here: keep or drop
+              roles by name or by tag, cut or add a prefix, change the case, then write the list separated or
+              as a JSON array - what the service reads, and nothing more.
+            </p>
+          }
           <div class="btn-row">
             <button
               matButton="tonal"
@@ -550,6 +686,17 @@
           <p class="id-weight">
             <code [tpl]="draft().identityAttrs['roles'].expr || defaultRoleExpr" [syntax]="SYNTAX"></code>
           </p>
+          <!-- What that expression gives today, on this catalogue: the person
+               who holds every role is the widest case, so the filter shows what
+               it keeps and the format shows what it costs. -->
+          @if (draft().identityAttrs['roles'].selected && rolesExample(); as ex) {
+            <div class="roles-example">
+              <span class="section-hint" i18n="@@Roles_example_lead"
+                >For someone holding every role of the catalogue ({{ ex.total }}), it sends {{ ex.count }}:</span
+              >
+              <code class="roles-out">{{ ex.text || '""' }}</code>
+            </div>
+          }
         }
       }
       @case ('scheme') {

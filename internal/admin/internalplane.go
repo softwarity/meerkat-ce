@@ -13,6 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/gateway"
+	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/signing"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -48,6 +49,13 @@ func (a *API) RegisterInternal(mux Mux) {
 	// What a library that starts from the issuer reads first - which is why
 	// it is worth setting the issuer to this plane's own URL.
 	mux.HandleFunc("GET "+DiscoveryPath, a.serveDiscovery)
+	// The OpenID provider's server-to-server endpoints (SAUTH-05), when this
+	// binary carries one: an application's server exchanges its codes here,
+	// inside the cluster. Not behind tokensOnly - a client proves itself by
+	// its secret or its PKCE verifier, which is the provider's to check.
+	if a.OIDC != nil {
+		a.OIDC.MountInternal(mux)
+	}
 	for _, e := range []struct {
 		pattern string
 		h       userHandler
@@ -136,29 +144,66 @@ func (a *API) warnMoved(r *http.Request) {
 const DiscoveryPath = "/.well-known/openid-configuration"
 
 // discoveryDocument is what a token's verifier needs, and nothing it would
-// take for a promise: there is no authorization, token or userinfo endpoint,
-// because the gateway is not an OAuth server - it signs one short token per
-// request it forwards. The fields are the ones a library that starts from the
-// issuer reads (Spring's issuer-uri, go-oidc): the issuer to compare, the keys
-// to verify with, the algorithms they sign.
+// take for a promise. Without the OpenID provider there is no authorization,
+// token or userinfo endpoint: the gateway then signs one short token per
+// request it forwards and is no OAuth server. The fields are the ones a
+// library that starts from the issuer reads (Spring's issuer-uri, go-oidc):
+// the issuer to compare, the keys to verify with, the algorithms they sign.
+//
+// With the provider active (SAUTH-05, Enterprise) the document also names its
+// endpoints, because an application's SERVER reads it here, inside the
+// cluster: the authorize endpoint is the public one - it is the person's
+// browser that goes there - and the token, userinfo and keys endpoints are on
+// this plane, at the address the server used, so a code is exchanged without
+// going out through the public name and back.
 type discoveryDocument struct {
-	Issuer     string   `json:"issuer"`
-	JWKSURI    string   `json:"jwks_uri"`
-	Algorithms []string `json:"id_token_signing_alg_values_supported"`
-	Subjects   []string `json:"subject_types_supported"`
+	Issuer                string   `json:"issuer"`
+	AuthorizationEndpoint string   `json:"authorization_endpoint,omitempty"`
+	TokenEndpoint         string   `json:"token_endpoint,omitempty"`
+	UserinfoEndpoint      string   `json:"userinfo_endpoint,omitempty"`
+	JWKSURI               string   `json:"jwks_uri"`
+	EndSessionEndpoint    string   `json:"end_session_endpoint,omitempty"`
+	ResponseTypes         []string `json:"response_types_supported,omitempty"`
+	GrantTypes            []string `json:"grant_types_supported,omitempty"`
+	CodeChallengeMethods  []string `json:"code_challenge_methods_supported,omitempty"`
+	TokenAuthMethods      []string `json:"token_endpoint_auth_methods_supported,omitempty"`
+	Scopes                []string `json:"scopes_supported,omitempty"`
+	Algorithms            []string `json:"id_token_signing_alg_values_supported"`
+	Subjects              []string `json:"subject_types_supported"`
 }
 
 // serveDiscovery answers with the issuer the gateway signs with, and the JWKS
 // at the address the caller used to get here: inside a cluster that is the
 // gateway's name there, which is the one a service can reach.
 func (a *API) serveDiscovery(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "public, max-age=300")
-	writeJSON(w, http.StatusOK, discoveryDocument{
+	base := filters.Scheme(r) + "://" + r.Host
+	doc := discoveryDocument{
 		Issuer:     a.router.Issuer(),
-		JWKSURI:    filters.Scheme(r) + "://" + r.Host + gateway.JWKSPath,
+		JWKSURI:    base + gateway.JWKSPath,
 		Algorithms: signing.Algorithms,
 		Subjects:   []string{"public"},
-	})
+	}
+	if a.OIDC != nil {
+		if e, ok := a.OIDC.Endpoints(r.Context(), base); ok {
+			doc.AuthorizationEndpoint = e.Authorization
+			doc.TokenEndpoint = e.Token
+			doc.UserinfoEndpoint = e.Userinfo
+			doc.EndSessionEndpoint = e.EndSession
+			doc.ResponseTypes = oidcprovider.ResponseTypes
+			doc.GrantTypes = oidcprovider.GrantTypes
+			doc.CodeChallengeMethods = oidcprovider.CodeChallengeMethods
+			doc.TokenAuthMethods = oidcprovider.TokenAuthMethods
+			doc.Scopes = oidcprovider.Scopes
+		}
+	}
+	// Not cached by anything in between while the provider can answer: the
+	// document then depends on the provider's state, and on the host asked.
+	if doc.TokenEndpoint != "" {
+		w.Header().Set("Cache-Control", "no-store")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=300")
+	}
+	writeJSON(w, http.StatusOK, doc)
 }
 
 // internalOriginAt is the runtime's answer, for which port, and when.

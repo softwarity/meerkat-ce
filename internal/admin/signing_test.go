@@ -93,3 +93,35 @@ func TestIdentityPreviewSignedIsVerifiable(t *testing.T) {
 		t.Fatal("preview token does not verify against the PEM it ships with")
 	}
 }
+
+// The drawer offers the issuer among the public addresses, and hands an
+// application the provider's discovery document only under an issuer the
+// provider can live at: none while there is no public name, the issuer's own
+// once there is - https behind a proxy as well, http on a loopback name with
+// the data plane's port.
+func TestTheDrawerOffersThePublicAddresses(t *testing.T) {
+	f := setupBare(t)
+	f.api.DataAddr = ":18082"
+	view := func() signingKeysView {
+		t.Helper()
+		code, body := f.call(t, "GET", "/api/identity/signing-keys", "", f.rootC)
+		var v signingKeysView
+		if err := json.Unmarshal([]byte(body), &v); code != http.StatusOK || err != nil {
+			t.Fatalf("signing keys: %d %s", code, body)
+		}
+		return v
+	}
+	if v := view(); v.Issuer != "meerkat" || v.Issuers == nil || len(v.Issuers) != 0 || v.PublicDiscovery != "" {
+		t.Fatalf("no public name: %+v", v)
+	}
+	declareAppNames(t, f, "gw.example.com")
+	if v := view(); v.Issuer != "https://gw.example.com" ||
+		v.PublicDiscovery != "https://gw.example.com/.well-known/openid-configuration" {
+		t.Fatalf("a name behind a proxy: %+v", v)
+	}
+	declareAppNames(t, f, "localhost")
+	if v := view(); v.Issuer != "http://localhost:18082" || len(v.Issuers) != 1 ||
+		v.PublicDiscovery != "http://localhost:18082/.well-known/openid-configuration" {
+		t.Fatalf("a loopback name: %+v", v)
+	}
+}

@@ -129,7 +129,7 @@ Voir [Ce que la gateway injecte](/docs/concepts/data-plane-chrome).
 | Timeouts | connexion et première réponse, par route, sinon ceux de l'installation, sinon 5 s / 15 s. Le corps n'est jamais borné : un téléchargement ou un websocket qui a commencé dure aussi longtemps que nécessaire |
 | Disjoncteur | désactivé par défaut. Après N échecs consécutifs, la route cesse d'appeler l'upstream et sert la page d'indisponibilité, puis laisse passer une requête une fois le temps de repos écoulé. Un 500 ne compte pas : un service qui répond 500 fonctionne, et il a un bug |
 | Rate limits | plusieurs à la fois, chacun indexé sur un critère différent - la route, un utilisateur, un jeton, une organisation, une adresse. Le premier dépassé répond |
-| Transmission de l'identité | ce que l'upstream apprend de l'appelant - par des en-têtes, ou par un JWT signé |
+| Transmission de l'identité | ce que l'upstream apprend de l'appelant - par des en-têtes, ou par un JWT signé ; ou, dans l'autre sens, l'application connecte ses utilisateurs par Meerkat [fournisseur OpenID](/docs/auth/oidc-provider) |
 | Langues | les langues que propose la route, et la manière dont la langue est transmise à l'upstream |
 | Spec OpenAPI | publiée par le service ou déposée ici ; c'est sur elle que se posent les règles par endpoint |
 

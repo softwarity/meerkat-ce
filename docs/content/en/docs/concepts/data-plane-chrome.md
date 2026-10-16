@@ -90,7 +90,9 @@ to, the applications they may open, their roles and groups. It is served
 Neither of these is how an **upstream service** learns who is calling. That is a
 separate mechanism - headers or a signed JWT, configured in the route's Identity
 section - and the gateway purges any inbound value of those headers first, so a
-caller cannot claim to be somebody.
+caller cannot claim to be somebody. An application can also sign its users in
+itself, through Meerkat as its OpenID provider: see
+[Connecting an application](/docs/auth/connect-an-application).
 
 ## Your own CSS and JavaScript
 

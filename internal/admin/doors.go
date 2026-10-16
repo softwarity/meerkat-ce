@@ -216,6 +216,16 @@ func (a *API) putDoor(w http.ResponseWriter, r *http.Request, actor store.User) 
 	}
 	// Through the supervisor, which every node reloads on the change bus.
 	a.applyTLS(r.Context())
+	// The application's public names are what the issuer is chosen among
+	// (store.JWTIssuer): the router signs with what it read at reload, on
+	// every node, so a name added, removed or reordered reloads it as
+	// choosing the issuer does.
+	if plane == store.PlaneApp {
+		if err := a.reloadRouting(r.Context()); err != nil {
+			a.internal(w, fmt.Errorf("stored, but reload failed: %w", err))
+			return
+		}
+	}
 	a.auditUpdate(r.Context(), actor, "tls.door", "settings", plane, planeWord(plane), "",
 		before, doorAudited(cfg.DoorOn(plane)))
 	writeJSON(w, http.StatusOK, a.tlsView(r.Context()))

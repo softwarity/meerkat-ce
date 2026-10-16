@@ -1,6 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse, httpResource, HttpResourceRef } from '@angular/common/http';
-import { Component, computed, DestroyRef, inject, linkedSignal, LOCALE_ID, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, input, linkedSignal, LOCALE_ID, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -132,8 +132,16 @@ export class TlsPageComponent {
   protected readonly onApp = computed(() => this.certificates().filter((c) => c.app));
   protected readonly onInternal = computed(() => this.certificates().filter((c) => c.internal));
 
-  // The tab last looked at, kept for the next visit.
-  protected readonly tab = signal(readTab());
+  // A plane asked for in the address (?plane=app): a link that sends the
+  // reader to one tab, such as the OIDC / JWT drawer's "declare a public
+  // name". Bound by the router (withComponentInputBinding).
+  readonly plane = input<string>();
+
+  // The tab asked for, else the one last looked at, kept for the next visit.
+  protected readonly tab = linkedSignal(() => {
+    const asked = this.planes.indexOf(this.plane() as Plane);
+    return asked >= 0 ? asked : readTab();
+  });
 
   protected setTab(i: number): void {
     this.tab.set(i);

@@ -751,6 +751,56 @@ CREATE TABLE IF NOT EXISTS oauth_refresh (
   expires_at BIGINT NOT NULL DEFAULT 0
 );
 
+-- The applications this gateway signs people into as an OIDC provider (v85,
+-- SAUTH-05). Apart from oauth_clients on purpose: those are agents reaching
+-- the control plane, these are applications behind the data plane, and a
+-- client of one kind must never be accepted by the other. Declared by an
+-- administrator, so there is no registration and no consent: the secret is
+-- kept as its sha256 only, shown once in clear when it is drawn.
+CREATE TABLE IF NOT EXISTS oidc_clients (
+  id            TEXT PRIMARY KEY,
+  confidential  BOOLEAN NOT NULL DEFAULT TRUE,
+  secret_hash   TEXT NOT NULL DEFAULT '',
+  secret_prefix TEXT NOT NULL DEFAULT '',
+  -- One per line, compared exactly at authorisation.
+  redirect_uris TEXT NOT NULL DEFAULT '',
+  audience      TEXT NOT NULL DEFAULT '',
+  token_ttl     TEXT NOT NULL DEFAULT '',
+  created_at    BIGINT NOT NULL DEFAULT 0,
+  updated_at    BIGINT NOT NULL DEFAULT 0
+);
+-- An authorisation code in flight: a minute to live, spent once. It carries
+-- everything the exchange needs, because the browser that asked is gone by
+-- then - the session it came from included, so a sign-out ends what it opened.
+CREATE TABLE IF NOT EXISTS oidc_codes (
+  code_hash    TEXT PRIMARY KEY,
+  client_id    TEXT NOT NULL DEFAULT '',
+  user_id      TEXT NOT NULL DEFAULT '',
+  tenant_id    TEXT NOT NULL DEFAULT '',
+  group_id     TEXT NOT NULL DEFAULT '',
+  session_hash TEXT NOT NULL DEFAULT '',
+  route_id     TEXT NOT NULL DEFAULT '',
+  redirect_uri TEXT NOT NULL DEFAULT '',
+  challenge    TEXT NOT NULL DEFAULT '',
+  nonce        TEXT NOT NULL DEFAULT '',
+  scope        TEXT NOT NULL DEFAULT '',
+  expires_at   BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_oidc_codes_client ON oidc_codes (client_id);
+-- A refresh token of an application: rotating, taken on use and replaced.
+CREATE TABLE IF NOT EXISTS oidc_refresh (
+  token_hash   TEXT PRIMARY KEY,
+  client_id    TEXT NOT NULL DEFAULT '',
+  session_hash TEXT NOT NULL DEFAULT '',
+  user_id      TEXT NOT NULL DEFAULT '',
+  tenant_id    TEXT NOT NULL DEFAULT '',
+  group_id     TEXT NOT NULL DEFAULT '',
+  scope        TEXT NOT NULL DEFAULT '',
+  expires_at   BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_oidc_refresh_client ON oidc_refresh (client_id);
+CREATE INDEX IF NOT EXISTS idx_oidc_refresh_session ON oidc_refresh (session_hash);
+
 -- Audit trail (v25): one row per administrative mutation. actor_id/target_id
 -- are NOT foreign keys - the trail must outlive a deleted actor or target
 -- (knowing who did what matters most once they are gone). target_name is the
@@ -1163,7 +1213,9 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // 82 carries no step either: the peer columns of login_events and
 // audit_events are additive, filled in by the additive pass.
 // 83 seals the identity signing keys and the simulator's token key.
-const schemaVersion = 84
+// 85 carries no step: the OIDC provider's tables (oidc_clients, oidc_codes,
+// oidc_refresh) are new, created by the DDL above.
+const schemaVersion = 85
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -1824,16 +1876,58 @@ var IdentityFields = []string{"username", "userid", "fullname", "tenant", "tenan
 // mapping) feed every transport: the "headers" mechanism writes one header per
 // attribute, the "jwt"/"signed-jwt" mechanisms write one claim per attribute in
 // a token carried by Authorization: Bearer. An empty Mechanism forwards nothing.
+//
+// The "oidc" mechanism is the other way round: nothing is added to the
+// request. The application signs its users in against this gateway as an
+// OpenID provider (SAUTH-05), through Client, and Claims say what its tokens
+// carry. The Authorization header it sends is its own access token, so it
+// travels untouched.
 type IdentityForward struct {
-	Mechanism  string         `json:"mechanism,omitempty"` // "" (off) | headers | jwt | signed-jwt
+	Mechanism  string         `json:"mechanism,omitempty"` // "" (off) | headers | jwt | signed-jwt | oidc
 	Attributes []IdentityAttr `json:"attributes,omitempty"`
 	// TTL is the token lifetime (exp) for the jwt/signed-jwt transports, an
-	// ISO-8601 duration; empty means the default (2 minutes).
+	// ISO-8601 duration; empty means the default (2 minutes). Not used by oidc:
+	// the client says how long its tokens live.
 	TTL string `json:"ttl,omitempty"`
 	// Algorithm is the signature algorithm for signed-jwt (ES256|EdDSA|RS256);
-	// unused by the header and unsigned-jwt transports.
+	// unused by the header and unsigned-jwt transports, and by oidc.
 	Algorithm string `json:"algorithm,omitempty"`
+	// Client is the OIDC client this route signs people into (oidc only): an
+	// OIDCClient id. Several routes may name the same client - one per level
+	// of access - and the first whose access rule grants the person wins.
+	Client string `json:"client,omitempty"`
+	// Claims are what the oidc tokens carry beyond the registered ones (oidc
+	// only), in order.
+	Claims []OIDCClaim `json:"claims,omitempty"`
 }
+
+// IdentityOIDC is the mechanism that makes a route's application a client of
+// this gateway as an OpenID provider.
+const IdentityOIDC = "oidc"
+
+// IdentityMechanisms is the roster, named in every refusal.
+var IdentityMechanisms = []string{"headers", "jwt", "signed-jwt", IdentityOIDC}
+
+// OIDCClaim is one claim the oidc tokens of a route carry: either a fact about
+// the person or a fixed Value - never both.
+type OIDCClaim struct {
+	// Name is the claim's name in the tokens.
+	Name string `json:"name"`
+	// Field is a fact the route's Identity section declares: the Field of one
+	// of its Attributes, rendered as the jwt mechanism renders it - the roles
+	// through that attribute's Expr. The section stays the one place a route
+	// says what it knows about the caller; a claim only names one of them.
+	Field string `json:"field,omitempty"`
+	// Value is a fixed value, the same for every person.
+	Value string `json:"value,omitempty"`
+}
+
+// OIDCReservedClaims are the claims the provider writes itself. A route that
+// could set them could forge who issued a token, for whom, or until when -
+// so they are refused by name. sub is NOT here: a fixed subject is a
+// legitimate wish (one shared identity for an application).
+var OIDCReservedClaims = []string{"iss", "aud", "exp", "iat", "nbf", "nonce", "azp",
+	"auth_time", "at_hash", "jti", "client_id", "scope"}
 
 // IdentityAttr is one caller fact to forward, optionally renamed on the way out
 // (As is the target header name or claim name; the field name is the default).

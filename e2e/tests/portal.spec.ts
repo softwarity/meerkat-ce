@@ -179,3 +179,43 @@ test('portal: a sub-module added from its container starts with no label', async
     await root.dispose();
   }
 });
+
+// An entry turned off in the portal looked like any other in the console's
+// preview (2026-10-16): nothing said the bar would not offer it. It is crossed
+// out there, and never reaches the people's bar.
+test('portal: an entry turned off in the portal is crossed out in the preview', async ({ browser }) => {
+  const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
+  const before = await (await root.get('/api/settings')).json();
+  const settings = structuredClone(before);
+  settings.portal = {
+    ...(before.portal ?? {}),
+    mode: 'portal',
+    layout: 'header',
+    entries: [
+      { routeId: 'demo', label: 'References' },
+      { routeId: 'demo-secure', label: 'Hidden', disabled: true },
+    ],
+  };
+  try {
+    const saved = await root.put('/api/settings', { data: settings });
+    expect(saved.ok(), await saved.text()).toBeTruthy();
+
+    const context = await browser.newContext({ storageState: authFile('root') });
+    const page = await context.newPage();
+    await page.goto(ADMIN_URL + '/application/portal');
+    const preview = page.frameLocator('iframe.preview-frame').locator('meerkat-portal-nav');
+    await expect(preview.locator('.top .tab', { hasText: 'Hidden' })).toHaveClass(/\bhid\b/);
+    await expect(preview.locator('.top .tab', { hasText: 'References' })).not.toHaveClass(/\bhid\b/);
+
+    // The people's bar does not carry it at all.
+    await page.goto(`${DATA_URL}/demo/html`);
+    const bar = page.locator('meerkat-portal-nav');
+    await expect(bar.locator('.top .tab', { hasText: 'References' })).toBeVisible();
+    await expect(bar.locator('.top .tab', { hasText: 'Hidden' })).toHaveCount(0);
+    await context.close();
+  } finally {
+    const back = await root.put('/api/settings', { data: before });
+    expect(back.ok(), await back.text()).toBeTruthy();
+    await root.dispose();
+  }
+});

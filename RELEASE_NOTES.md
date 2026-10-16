@@ -6,6 +6,51 @@
 - **The License screen says how far each feature is built with an icon.** A word on every row
   ("partly built", "planned") gave way to one icon per state, explained once in a legend, and the
   contract's keys (SVC-02, AUTH-03...) no longer show: nobody knows a feature by them.
+- **An entry turned off in the portal is crossed out in its preview.** It looked like any other
+  in the console, though the people's bar never offers it.
+- **The issuer is chosen among the application's public names, no longer typed.** Every token
+  Meerkat signs - the identity JWT of a route, the OpenID provider's - and both discovery
+  documents carry one issuer: `https://<name>` for a public name declared on the Application tab
+  of Domains & TLS (`http://localhost:<port>` for a name on this machine). With several names,
+  the OIDC / JWT drawer's **Public address** chooses; adding, removing or reordering them moves
+  the issuer on every node. With none, tokens still say `meerkat` and the drawer links to that
+  tab. A typed issuer is gone: an installation that had set one now signs with its first public
+  name, so the services checking `iss` must expect it. A library that started from an issuer set
+  to the internal plane's URL now reads the internal discovery document's address instead.
+- **Meerkat is the OpenID provider of the applications behind its routes (Enterprise).** An
+  application that only knows how to sign in through an OpenID Connect provider now signs in
+  through the gateway: authorization code with PKCE, refresh tokens, userinfo, discovery, tokens
+  signed RS256 with the gateway's keys. Who may sign in is the route's access rule, and what the
+  tokens say is the route's own list of claims; two levels of access for one application are two
+  routes on the same paths and client, and the first that grants the person decides, again at
+  every refresh. There is no consent screen: the clients are declared by an administrator. A
+  client declares no redirect URI: a code goes back only under the path of a route bound to
+  it, on that route's host. The provider lives at the issuer, the application plane's public
+  name, and servers inside the cluster may exchange their codes on the internal plane. The
+  community image refuses to declare a client and serves none of the provider's paths.
+- **The JWT drawer is now "OIDC / JWT", and a route can sign in through a client.** At its top,
+  the three well-known addresses to copy: the internal discovery, the provider's public
+  discovery while it answers, the JWKS. Beside the issuer and the keys, it lists the OIDC
+  clients and the routes using each: id, whether the application keeps a secret (shown once,
+  regenerated on demand), a warning mark when one of its routes covers a whole host, audience
+  and token lifetime. In a route's Auth forward, the OIDC mechanism picks a client and lists the
+  claims sent, each a fact of the Identity section or a fixed value.
+- **Applications can sign out through the gateway by a link.** `/logout` on the data plane now
+  also answers a GET, which is all a sign-out button inside an application can send: from a page
+  of the site it signs out at once, like the POST; from anywhere else, or ahead of a click, it
+  asks first. No address to return to is read from the request.
+- **Expired sign-in leftovers are now swept.** The agents' OAuth codes and refresh tokens, the
+  one-shot challenges of passkeys and of the sign-up check, and trusted browsers past their trust
+  were written with an expiry that nothing ever acted on: the ones abandoned halfway stayed in the
+  database for good. The periodic upkeep now removes them.
+- **A route's OpenAPI spec is read with the route's own trust.** A service whose certificate an
+  authority trusted in Domains & TLS served its pages through the route but refused its spec
+  ("certificate signed by unknown authority"): the spec was fetched trusting the system's
+  authorities only.
+- **The shape of the roles says what it does, and shows what it sends.** In a route's Auth
+  forward, the roles block explains the expression (keep or drop by name or tag, cut or add a
+  prefix, change the case, a separated list or a JSON array) and renders the configured one on
+  the real catalogue, for someone holding every role.
 
 ---
 

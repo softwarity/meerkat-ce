@@ -573,6 +573,7 @@ func (m *Manager) Destroy(ctx context.Context, w http.ResponseWriter, r *http.Re
 			return err
 		}
 		m.dropped(th)
+		m.revokeOIDC(ctx, th)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     ForScheme(m.cookieName, r),
@@ -654,5 +655,29 @@ func (m *Manager) RevokeByID(ctx context.Context, id string) (userID, plane stri
 		return "", "", err
 	}
 	m.dropped(hash)
+	m.revokeOIDC(ctx, hash)
 	return userID, plane, nil
+}
+
+// revokeOIDC ends what a session handed to the applications that sign in
+// through this gateway (store.RevokeOIDCSession): signing out of the gateway
+// signs out of them at their next refresh, not whenever their refresh token
+// would have run out. Best effort - the session is already gone, and a refresh
+// checks that it still exists anyway; this only spares the rows the wait.
+func (m *Manager) revokeOIDC(ctx context.Context, tokenHash string) {
+	if _, err := m.st.RevokeOIDCSession(ctx, tokenHash); err != nil {
+		slog.Warn("the OIDC refresh tokens of a closed session were not revoked; they die with their next use",
+			"session", store.SessionID(tokenHash), "err", err)
+	}
+}
+
+// CurrentHash is the hash of the session token the request carries - the
+// session's key in the store - "" without one. What the OpenID provider binds
+// its codes and refresh tokens to, so a sign-out reaches them.
+func (m *Manager) CurrentHash(r *http.Request) string {
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
+	if err != nil || c.Value == "" {
+		return ""
+	}
+	return hashToken(c.Value)
 }

@@ -69,6 +69,11 @@ var agentCovers = map[string][]string{
 	// door but a rename that FOLLOWS its references (roleref.go) and a deletion
 	// that says what still names the role. Both paths share that code now.
 	"roles": {"list_roles", "list_role_references", "save_role", "delete_role"},
+	// The applications signing their people in against this gateway: the
+	// other half of a route bound with the oidc mechanism, which an agent
+	// writes with save_route. The secret is shown once, in the answer of the
+	// call that drew it, and is never readable - by an agent or a person.
+	"oidc": {"list_oidc_clients", "save_oidc_client", "regenerate_oidc_client_secret", "delete_oidc_client"},
 }
 
 // agentIgnores says why a section is out of an agent's reach, and each reason
@@ -238,7 +243,10 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"PUT /api/auth-providers/{id}": true, "DELETE /api/auth-providers/{id}": true,
 		"POST /api/identity/signing-keys/renew": true,
 		// A stored issuer, and the router reloads on it: a write.
-		"PUT /api/identity/issuer":       true,
+		"PUT /api/identity/issuer": true,
+		// The OIDC clients: declared, changed, a secret drawn, deleted.
+		"POST /api/oidc/clients": true, "PUT /api/oidc/clients/{id}": true,
+		"POST /api/oidc/clients/{id}/secret": true, "DELETE /api/oidc/clients/{id}": true,
 		"POST /api/issues/{id}/comments": true, "PUT /api/issues/{id}/status": true,
 		"DELETE /api/issues/{id}": true,
 		"POST /api/roles":         true, "PUT /api/roles/{name}": true, "DELETE /api/roles/{name}": true,
@@ -339,6 +347,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"activate_configuration",
 		"call_route",
 		"delete_group",
+		"delete_oidc_client",
 		"delete_role",
 		"delete_route",
 		"describe_gateway",
@@ -352,6 +361,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"list_groups",
 		"list_languages",
 		"list_members",
+		"list_oidc_clients",
 		"list_operations",
 		"list_role_references",
 		"list_roles",
@@ -370,11 +380,13 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"read_language",
 		"read_logs",
 		"read_traffic",
+		"regenerate_oidc_client_secret",
 		"run_schedule",
 		"save_branding",
 		"save_configuration",
 		"save_group",
 		"save_member",
+		"save_oidc_client",
 		"save_portal",
 		"save_role",
 		"save_route",

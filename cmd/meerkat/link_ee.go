@@ -13,6 +13,7 @@ import (
 	_ "github.com/softwarity/meerkat/ee/directories"
 	_ "github.com/softwarity/meerkat/ee/gitdriver"
 	_ "github.com/softwarity/meerkat/ee/layouts"
+	_ "github.com/softwarity/meerkat/ee/oidc"
 	_ "github.com/softwarity/meerkat/ee/saml"
 	_ "github.com/softwarity/meerkat/ee/telemetry"
 )

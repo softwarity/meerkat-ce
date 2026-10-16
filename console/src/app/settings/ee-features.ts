@@ -32,6 +32,12 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     label: $localize`:@@EE_AUTH_20:Kerberos`,
     what: $localize`:@@EE_AUTH_20_what:Sign in without typing anything, from a machine in the domain.`,
   },
+  'SAUTH-05': {
+    label: $localize`:@@EE_SAUTH_05:OpenID provider`,
+    what: $localize`:@@EE_SAUTH_05_what:Applications behind your routes sign their users in through Meerkat, as with any OpenID Connect provider.`,
+    where: '/infra/routes',
+    whereLabel: $localize`:@@Routes:Routes`,
+  },
   'RBAC-10': {
     label: $localize`:@@EE_RBAC_10:Group rules`,
     what: $localize`:@@EE_RBAC_10_what:Put people in groups from what their directory says about them.`,

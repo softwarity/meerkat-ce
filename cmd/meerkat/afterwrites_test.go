@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/softwarity/meerkat/internal/oidcprovider"
 )
 
 // The identity the router remembers is forgotten after a write served by the
@@ -41,5 +43,26 @@ func TestAfterWritesForgetsOnTheGatewaysOwnWritesOnly(t *testing.T) {
 	admin.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPut, "/api/groups/g1", nil))
 	if forgotten-before != 1 {
 		t.Errorf("an admin write did not forget")
+	}
+}
+
+// The OpenID provider's token calls are an application refreshing its tokens:
+// traffic, and none of this cache's business either.
+func TestAfterWritesLeavesTheProvidersTokenCallsAlone(t *testing.T) {
+	mux := http.NewServeMux()
+	ok := func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
+	mux.HandleFunc("POST /meerkat/oidc/token", ok)
+	mux.HandleFunc("POST /logout", ok)
+	mux.HandleFunc("/", ok)
+
+	forgotten := 0
+	h := afterWrites(mux, "/", func() { forgotten++ }, oidcprovider.PathPrefix)
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, oidcprovider.TokenPath, nil))
+	if forgotten != 0 {
+		t.Fatalf("a token call forgot every identity")
+	}
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/logout", nil))
+	if forgotten != 1 {
+		t.Fatalf("a sign-out no longer forgets")
 	}
 }

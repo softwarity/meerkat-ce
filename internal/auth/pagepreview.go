@@ -295,6 +295,9 @@ var PreviewPages = []PreviewPage{
 	{"account-pending", cSignIn, "Waiting room", "titlePending", func(c flowChrome) (*template.Template, any) {
 		return pendingPage, pendingData{flowChrome: c, Public: samplePublicLinks()}
 	}},
+	{"signout-confirm", cSignIn, "Sign-out confirmation", "titleSignOut", func(c flowChrome) (*template.Template, any) {
+		return signOutPage, struct{ flowChrome }{c}
+	}},
 	{"profile", cAccount, "Profile", "titleProfile", func(c flowChrome) (*template.Template, any) {
 		return profilePage, profileData{
 			flowChrome: c, Error: c.PreviewErrors, Initials: "AM", Username: "alice",
@@ -512,6 +515,14 @@ var PreviewPages = []PreviewPage{
 			// As an ADMINISTRATOR sees it: the two lines offering to look at
 			// the application anyway exist only for them.
 			Continue: "/", SignedIn: true,
+		}
+	}},
+	// Every reason again: the provider names one of four, and each is a
+	// sentence a translator has to see somewhere.
+	{"app-refused", cRefused, "Application sign-in refused", "titleAppRefused", func(c flowChrome) (*template.Template, any) {
+		return appRefusedPage, appRefusedData{
+			flowChrome: c,
+			Reason:     stack(c, "appRefusedUnknown", "appRefusedReturn", "appRefusedUnavailable", "appRefusedUnreadable"),
 		}
 	}},
 }

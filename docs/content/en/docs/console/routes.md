@@ -76,16 +76,22 @@ the list follows without a reload.
   a service before answering 504, and the ceiling on what a body-rewriting
   filter may hold in memory. The button itself turns amber and reads
   *Unavailable* while the switch is on, so nobody has to open it to find out.
-- **JWT** holds the keys that sign the identity JWT your services verify: the
-  discovery document to hand a backend - the recommended address - and the
-  JWKS beside it, the issuer every token carries (`meerkat` until set), each
+- **OIDC / JWT** holds the keys that sign the identity JWT your services verify: at
+  the top the well-known addresses - the internal discovery document to hand a
+  backend (the recommended one), the OpenID provider's public discovery while
+  it answers, and the JWKS - then the **Public address**, the issuer every
+  token carries, chosen among the application plane's public names
+  (`meerkat` while none is declared, with a link to declare one), each
   algorithm's public half, the rotation, and which routes sign with what.
   Point a service at the discovery document and it needs nothing else: it
   learns the issuer and the keys from it. The token's `kid` names the key, and
   the key carries its algorithm, so the algorithm is chosen once, in Auth
   forward; the service takes it from the key, never from the token's header.
   Both addresses are on the internal plane, port 7070, and only there. See
-  [The identity JWT](/docs/auth/service-jwt).
+  [The identity JWT](/docs/auth/service-jwt). Under the keys, **OIDC clients**
+  lists the applications that sign their users in through Meerkat, and the routes
+  bound to each (Enterprise edition): see
+  [Meerkat as an OpenID provider](/docs/auth/oidc-provider).
 
 ## The editor
 

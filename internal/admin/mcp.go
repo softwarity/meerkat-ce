@@ -350,6 +350,7 @@ func (a *API) tools() []mcp.Tool {
 	read = append(read, a.writeTools()...)
 	read = append(read, a.scheduleTools()...)
 	read = append(read, a.roleTools()...)
+	read = append(read, a.oidcTools()...)
 	read = append(read, a.grantTools()...)
 	read = append(read, a.accountTools()...)
 	read = append(read, a.gitTools()...)

@@ -319,7 +319,8 @@ app-form-field.height-field {
 .id-attr .id-eq {
   color: var(--mat-sys-outline);
 }
-.id-attr .id-sample {
+.id-attr .id-sample,
+.claim .id-sample {
   font-family: monospace;
   font-size: 0.82rem;
   padding: 2px 8px;
@@ -330,6 +331,33 @@ app-form-field.height-field {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 240px;
+}
+/* OIDC "Claims sent": one row per claim - its name, where it comes from, then
+   the fixed value or a sample of the fact. A grid on the list, rows as
+   display:contents, for the same reason as the Identity table above: every
+   column as wide as its widest cell. FIVE columns, one per child of a row. */
+.claims {
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: 200px min-content 200px minmax(0, 1fr) min-content;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 8px;
+}
+.claim {
+  display: contents;
+}
+.claim .id-eq {
+  color: var(--mat-sys-outline);
+}
+.claim .id-sample {
+  justify-self: start;
+}
+.claim app-form-field {
+  display: block;
+}
+.oidc-client-row {
+  align-items: center;
 }
 /* The token lifetime gets its own line, the preview closing it on the right.
    The field is subscript-less (dynamic), so both really center on each other. */
@@ -676,4 +704,20 @@ footer .gaps {
 // Audit on a redirect: kept in place, greyed - there are no operations.
 .audit-block.off {
   opacity: 0.5;
+}
+
+/* The shaped roles, as they leave on this catalogue. */
+.roles-example {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+.roles-example .roles-out {
+  font-family: var(--mk-mono);
+  font-size: 0.8rem;
+  word-break: break-all;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--mat-sys-surface-container);
 }

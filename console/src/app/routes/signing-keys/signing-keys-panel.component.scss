@@ -181,14 +181,123 @@ pre.pem {
   font-size: 0.82rem;
   margin-right: auto;
 }
-/* The issuer and its Save, on one line under the two addresses. */
+/* The issuer's select and its info marker, on one line under the addresses. */
 .issuer {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin: 8px 0 12px;
+  gap: 2px;
+  margin: 16px 0 12px;
 }
-/* Level with the field's box, whether or not an error shows under it. */
-.issuer > button {
+/* app-form-field's info marker, which cannot host a select (it projects a
+   matInput): an explanation beside the field, not an action on the value. */
+.field-info {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  margin-top: 8px;
+}
+.field-info:hover,
+.field-info:focus-visible {
+  opacity: 1;
+}
+.field-info:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: -4px;
+}
+/* The locked line of the community image: its badge on the right. */
+.jwks app-ee-lock {
+  margin-left: auto;
+  min-height: 40px;
+  align-items: center;
+}
+
+/* The OIDC clients, under the keys: a list of applications, with the routes
+   that use each one. */
+.clients {
+  margin-top: 24px;
+}
+.clients-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.clients-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.clients mat-table {
+  background: transparent;
+}
+.clients mat-cell,
+.clients mat-header-cell {
+  padding: 0 8px;
+}
+.clients .who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+  min-width: 0;
+  padding: 6px 0;
+}
+.clients .cid {
+  font-family: var(--mk-mono);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+/* A bound route covers a whole host: said by a mark, its sentence on hover. */
+.clients .whole-host {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--mat-sys-tertiary);
+}
+.clients .sub-line {
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.clients .idle {
+  font-style: italic;
+  opacity: 0.7;
+}
+/* A route name is an identifier, shown as typed, and the list is names, not
+   a menu: the same tight buttons as the routes signed with a key. */
+.clients .route-link {
+  --mat-button-text-container-height: 26px;
+  text-transform: none;
+  font-family: var(--mk-mono);
+}
+.warn-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--mat-sys-tertiary);
+}
+.warn-line mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+/* The renew button, under the key pairs it renews. */
+.renew {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: 8px;
 }

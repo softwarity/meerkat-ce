@@ -24,6 +24,7 @@ import (
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/metrics"
+	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -33,6 +34,10 @@ import (
 // API serves the admin endpoints. Every endpoint requires a session whose
 // user is root.
 type API struct {
+	// OIDC is the OpenID provider (SAUTH-05), for the internal plane: its
+	// server-to-server endpoints, and their place in the discovery document.
+	// Nil, or the community image's absent one, adds nothing.
+	OIDC oidcprovider.Provider
 	// Mailer sends outbound e-mail through the STORED config; nil answers "not
 	// configured". Wired by main, faked in tests.
 	Mailer func(ctx context.Context, msg mail.Message) error
@@ -223,6 +228,7 @@ func (a *API) Register(mux Mux) {
 	a.registerOpenAPI(mux)
 	a.registerRouteFiles(mux)
 	a.registerSigning(mux)
+	a.registerOIDC(mux)
 	a.registerVault(mux)
 	a.registerMailRelay(mux)
 	a.registerProbe(mux)
@@ -442,6 +448,18 @@ func (a *API) saveRoute(ctx context.Context, actor store.User, route store.Route
 			return route, invalidErr(err)
 		}
 	}
+	// The OIDC provider is Enterprise (SAUTH-05). Refused only when the
+	// identity CHANGES, like the endpoint audit below: a route a configuration
+	// brought over keeps its mechanism, and stays saveable for everything else.
+	// Asked before validateRoute, so the community image says what it is
+	// rather than that the client is missing - it could never declare one.
+	if id := route.Identity; id != nil && id.Mechanism == store.IdentityOIDC {
+		if prev, err := a.st.GetRoute(ctx, route.ID); err != nil || !reflect.DeepEqual(prev.Identity, route.Identity) {
+			if err := edition.Require(oidcEdition); err != nil {
+				return route, invalidErr(err)
+			}
+		}
+	}
 	if err := a.validateRoute(ctx, route); err != nil {
 		return route, invalidErr(err)
 	}
@@ -535,6 +553,9 @@ func (a *API) validateRoute(ctx context.Context, route store.Route) error {
 		return fmt.Errorf("unknown vault entries: %s", strings.Join(missing, ", "))
 	}
 	if err := gateway.Validate(expanded); err != nil {
+		return err
+	}
+	if err := a.knownOIDCClient(ctx, expanded); err != nil {
 		return err
 	}
 	return a.knownFields(ctx, expanded)

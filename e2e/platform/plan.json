@@ -251,8 +251,8 @@
     "CE",
     "EE"
    ],
-   "en": "Sign-out on node A ends the session on node B too.",
-   "fr": "Se déconnecter sur le nœud A met aussi fin à la session sur le nœud B."
+   "en": "Sign-out on node A ends the session on node B too; a GET /logout from a page of the site signs out at once, one from elsewhere or a prefetch only asks first.",
+   "fr": "Se déconnecter sur le nœud A met aussi fin à la session sur le nœud B ; un GET /logout venu d'une page du site déconnecte aussitôt, venu d'ailleurs ou d'un préchargement il ne fait que demander."
   },
   {
    "id": "AUTH-15",
@@ -1335,20 +1335,23 @@
     "CE",
     "EE"
    ],
-   "en": "The internal plane's /.well-known/openid-configuration names the issuer the tokens carry and a jwks_uri that answers; setting the issuer changes both the document and the next token.",
-   "fr": "Le /.well-known/openid-configuration du plan interne nomme l'émetteur que portent les jetons et un jwks_uri qui répond ; régler l'émetteur change à la fois le document et le jeton suivant."
+   "en": "The internal plane's /.well-known/openid-configuration names the issuer the tokens carry and a jwks_uri that answers; declaring a public name on the application plane, or choosing among several, changes both the document and the next token, and a typed issuer is refused naming the public addresses.",
+   "fr": "Le /.well-known/openid-configuration du plan interne nomme l'émetteur que portent les jetons et un jwks_uri qui répond ; déclarer un nom public sur le plan Application, ou choisir parmi plusieurs, change à la fois le document et le jeton suivant, et un émetteur tapé est refusé en nommant les adresses publiques."
   },
   {
    "id": "SAUTH-05",
-   "priority": "-",
-   "feasibility": "blocked",
-   "targets": [],
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "U",
+    "I",
+    "CC"
+   ],
    "editions": [
-    "CE",
     "EE"
    ],
-   "en": "Not built (OIDC provider).",
-   "fr": "Non construite (fournisseur OIDC)."
+   "en": "OIDC provider: a standard client library (discovery, code + PKCE, then a refresh) signs a person in through a route bound to a declared client and gets RS256 tokens whose claims are the route's and whose issuer and audience it accepts; a person no route grants is refused; with two routes on one client, the first that grants the person decides, and a role removed changes the claims at the next refresh; a client declares no redirect URI (one passed is refused) and gets its code at an address under its route's path, while another route's path, a lookalike prefix, another host or a disabled route's path is refused; the issuer is the application plane's public name, and none declared turns the provider off; a wrong secret, a reused code and a refresh after /logout are refused; the internal plane exchanges a code; on a cluster a code drawn on one node is exchanged on another; the CE image mounts no endpoint and refuses to declare a client.",
+   "fr": "Fournisseur OIDC : une bibliothèque cliente standard (découverte, code + PKCE, puis un refresh) connecte une personne par une route liée à un client déclaré et reçoit des jetons RS256 dont les claims sont ceux de la route, et dont elle accepte l'émetteur et l'audience ; une personne qu'aucune route n'accorde est refusée ; avec deux routes sur un client, la première qui accorde la personne décide, et un rôle retiré change les claims au refresh suivant ; un client ne déclare aucune redirect URI (une fournie est refusée) et reçoit son code à une adresse sous le chemin de sa route, tandis que le chemin d'une autre route, un préfixe sosie, un autre hôte ou le chemin d'une route désactivée sont refusés ; l'émetteur est le nom public du plan Application, et sans nom déclaré le fournisseur est éteint ; un secret faux, un code réutilisé et un refresh après /logout sont refusés ; le plan interne échange un code ; en cluster, un code tiré sur un nœud s'échange sur un autre ; l'image CE ne monte aucun endpoint et refuse de déclarer un client."
   },
   {
    "id": "VAULT-01",

@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	github.com/andybalholm/brotli v1.2.3
 	github.com/beevik/etree v1.7.0
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-git/go-billy/v5 v5.9.0
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-ldap/ldap/v3 v3.4.14
@@ -17,6 +18,7 @@ require (
 	github.com/softwarity/plug/agent v0.0.0-20261016171857-15ad1c464d06
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.57.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/text v0.42.0
 	modernc.org/sqlite v1.58.0
 	rsc.io/qr v0.2.0
@@ -38,6 +40,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/x v0.3.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect

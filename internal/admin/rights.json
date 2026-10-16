@@ -526,6 +526,31 @@
   },
   {
     "method": "GET",
+    "path": "/api/oidc/clients",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/oidc/clients",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/oidc/clients/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/oidc/clients/{id}",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/oidc/clients/{id}/secret",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/portal/icons",
     "guard": "authed"
   },

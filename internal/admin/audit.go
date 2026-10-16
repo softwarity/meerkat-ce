@@ -296,6 +296,11 @@ func summarizeDataURI(s string) string {
 }
 
 func isSensitiveKey(k string) bool {
+	// A lifetime is not a credential: the word "token" in its name would
+	// otherwise hide every change of how long an OIDC client's tokens live.
+	if k == "tokenTtl" {
+		return false
+	}
 	k = strings.ToLower(k)
 	return strings.Contains(k, "password") || strings.Contains(k, "secret") ||
 		strings.Contains(k, "token") || strings.Contains(k, "hash")

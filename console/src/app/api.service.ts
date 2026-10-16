@@ -422,11 +422,73 @@ export interface IdentityAttr {
 // mechanism picks the transport: '' (off), headers (one per attribute), jwt
 // (unsigned) or signed-jwt, the token carried by Authorization: Bearer. ttl is
 // the token lifetime (ISO-8601); algorithm is the signed-jwt signature (Lot 2).
+//
+// oidc is the other way round: nothing rides on the request, the application
+// signs its users in through Meerkat as an OpenID Connect client. client names
+// the OIDC client it signs in as, claims what its tokens say about the person.
+// ttl and algorithm do not apply: the client carries the token lifetime.
 export interface IdentityForward {
-  mechanism?: '' | 'headers' | 'jwt' | 'signed-jwt';
+  mechanism?: IdentityMechanism;
   attributes?: IdentityAttr[];
   ttl?: string;
   algorithm?: string;
+  client?: string;
+  claims?: OIDCClaim[];
+}
+
+export type IdentityMechanism = '' | 'headers' | 'jwt' | 'signed-jwt' | 'oidc';
+
+// One claim of the tokens an OIDC client receives: a fact the route's Identity
+// section declares (field), or a fixed value - exactly one of the two.
+export interface OIDCClaim {
+  name: string;
+  field?: string;
+  value?: string;
+}
+
+// The claims the provider writes itself: a route may not set them. sub is not
+// among them, a route may fix it.
+export const OIDC_RESERVED_CLAIMS = [
+  'iss',
+  'aud',
+  'exp',
+  'iat',
+  'nbf',
+  'nonce',
+  'azp',
+  'auth_time',
+  'at_hash',
+  'jti',
+  'client_id',
+  'scope',
+] as const;
+
+// An application that signs in through Meerkat (the OIDC provider). id is the
+// client_id, chosen once and never changed. A confidential client keeps a
+// secret; its clear value is only ever in the answer that created or
+// regenerated it, secretPrefix is what recognises it afterwards. routes are
+// the routes bound to it, sent by the server. A client declares no return
+// address: the server accepts one under acceptedUnder (https://host/prefix/,
+// read from the enabled routes bound to the client), and wholeHostRoutes
+// names those covering a whole host.
+export interface OIDCClient {
+  id: string;
+  confidential: boolean;
+  secretPrefix?: string;
+  audience?: string;
+  tokenTtl?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  routes?: { id: string; name: string }[];
+  acceptedUnder?: string[];
+  wholeHostRoutes?: string[];
+}
+
+// What creating a client or regenerating its secret answers: the client, and
+// the secret in clear, this once.
+export interface OIDCClientSecret {
+  client: OIDCClient;
+  secret?: string;
 }
 
 // What an upstream would receive for a fictional caller, given a (possibly
@@ -738,9 +800,16 @@ export interface SigningKeys {
   // The internal plane as the runtime names it (a Kubernetes Service's FQDN,
   // a Swarm or compose service); absent when no runtime could be asked.
   internalOrigin?: string;
-  // The "iss" of every identity JWT: "meerkat" until somebody sets one.
+  // The "iss" of every token Meerkat signs: one of issuers, or "meerkat"
+  // while the application plane has no public name.
   issuer: string;
+  // What it may be: the application plane's public addresses, declared in
+  // Domains & TLS. Empty until one is declared.
+  issuers: string[];
   keys: SigningKey[];
+  // The OpenID provider's discovery document under the issuer, for an
+  // application; absent while the issuer is not an address.
+  publicDiscovery?: string;
 }
 
 export interface Route {
@@ -2404,6 +2473,30 @@ export class ApiService {
   // The issuer the gateway signs with, and the discovery document names.
   setIssuer(issuer: string): Observable<SigningKeys> {
     return this.http.put<SigningKeys>('/api/identity/issuer', { issuer });
+  }
+
+  // The OIDC clients (the provider's applications), each with the routes bound
+  // to it. Writes are Enterprise: the community image refuses them by name.
+  oidcClients(): Observable<OIDCClient[]> {
+    return this.http.get<OIDCClient[]>('/api/oidc/clients');
+  }
+
+  createOidcClient(c: OIDCClient): Observable<OIDCClientSecret> {
+    return this.http.post<OIDCClientSecret>('/api/oidc/clients', c);
+  }
+
+  // The secret is untouched by an update: only regenerating changes it.
+  updateOidcClient(c: OIDCClient): Observable<OIDCClient> {
+    return this.http.put<OIDCClient>(`/api/oidc/clients/${encodeURIComponent(c.id)}`, c);
+  }
+
+  regenerateOidcClientSecret(id: string): Observable<OIDCClientSecret> {
+    return this.http.post<OIDCClientSecret>(`/api/oidc/clients/${encodeURIComponent(id)}/secret`, null);
+  }
+
+  // Refused (409, naming them) while a route uses the client.
+  deleteOidcClient(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/oidc/clients/${encodeURIComponent(id)}`);
   }
 
   // ── mail relay (infra plane) ───────────────────────────────────────────────

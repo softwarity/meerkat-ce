@@ -52,8 +52,9 @@ type Router struct {
 	loaded atomic.Bool
 	// trust is what the trusted authorities' last read found (trust.go).
 	trust trustState
-	// issuer is the "iss" of the identity JWT (store.SettingJWTIssuer), as
-	// the last reload read it. Saving it reloads the router, so every node
+	// issuer is the "iss" of the identity JWT (store.JWTIssuer), as the last
+	// reload read it: an address among the application plane's public names.
+	// Choosing it, or changing those names, reloads the router, so every node
 	// signs with the new one from its next request.
 	issuer atomic.Value
 
@@ -77,6 +78,10 @@ type Router struct {
 	// the data plane answers CORS for exactly that sibling origin (the admin
 	// console's swagger Try it out) and no other. Empty disables it.
 	AdminAddr string
+	// DataAddr is the data plane's plain listen address (main's -addr): its
+	// port is the one a loopback public name is reached on, and so the
+	// issuer's port on a developer's machine (store.IssuerAddress).
+	DataAddr string
 	// AdminSessions resolves admin-plane sessions, ONLY to authorize identity
 	// simulation (simulate.go). Nil disables simulation entirely.
 	AdminSessions *session.Manager
@@ -190,6 +195,10 @@ type compiledRoute struct {
 	// already expanded; empty for one that answers by itself. Read by the
 	// target check (targets.go).
 	upstream string
+	// oidc is what the OpenID provider reads of a route signing people into
+	// one of its clients (oidc.go): the base access rule and the identity
+	// section, vault references expanded. Nil for every other route.
+	oidc *OIDCRoute
 }
 
 // New builds a Router over the store. sm may be nil when no route requires
@@ -230,7 +239,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 	// setting reloads the router, exactly as changing the branding does - both
 	// are compiled into the routes below.
 	portalOn := rt.st.Portal(ctx).Mode == store.PortalModePortal
-	rt.issuer.Store(rt.st.JWTIssuer(ctx))
+	rt.issuer.Store(rt.st.JWTIssuer(ctx, rt.DataAddr))
 	// The tracing setting (OBS-04), read here for the same reason: it is baked
 	// into the injection of every route that asked for one, so changing the
 	// setting reloads the router exactly as changing the branding does. WHICH
@@ -350,12 +359,14 @@ func (rt *Router) Reload(ctx context.Context) error {
 	if err := routing.ResolveWeights(allPreds); err != nil {
 		return fmt.Errorf("gateway: %w", err)
 	}
-	// Identity signing keys (signed-jwt): generate them the first time a route
-	// actually needs them; otherwise just load what already exists (so the JWKS
-	// keeps serving), leaving fresh installs that never sign untouched.
+	// Identity signing keys (signed-jwt, and the oidc provider's tokens):
+	// generate them the first time a route actually needs them; otherwise just
+	// load what already exists (so the JWKS keeps serving), leaving fresh
+	// installs that never sign untouched.
 	needSigning := false
 	for _, r := range stored {
-		if r.Enabled && r.Identity != nil && r.Identity.Mechanism == "signed-jwt" {
+		if r.Enabled && r.Identity != nil &&
+			(r.Identity.Mechanism == "signed-jwt" || r.Identity.Mechanism == store.IdentityOIDC) {
 			needSigning = true
 			break
 		}
@@ -562,8 +573,9 @@ func (rt *Router) currentSigning() *signing.Set {
 
 // ServeJWKS publishes the public halves of the signing keys. Empty (but valid)
 // when no key exists yet, so a backend can always fetch and cache it. The
-// internal plane mounts it, and only that plane: nothing outside the cluster
-// has a reason to read these keys.
+// internal plane mounts it for the services behind the gateway; the data plane
+// only through the OpenID provider (Enterprise), whose applications verify
+// their tokens with these keys from wherever they run.
 func (rt *Router) ServeJWKS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
@@ -933,7 +945,12 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	}
 	// Identity forwarding (both route types): the signed-in user rides
 	// upstream headers; inbound values are purged first (spoofing guard).
-	if r.Identity != nil && r.Identity.Mechanism != "" {
+	//
+	// Not oidc: there the application signs its people in against this
+	// gateway as an OpenID provider, and nothing rides on the request - least
+	// of all a purge of Authorization, which carries the application's own
+	// access token from its browser code to its server.
+	if r.Identity != nil && r.Identity.Mechanism != "" && r.Identity.Mechanism != store.IdentityOIDC {
 		filters.Request = append(filters.Request, rt.identityForwardFilter(*r.Identity, r.Name))
 	}
 	// A UI route's own CSS and JavaScript, in its order, at its places (see
@@ -1162,7 +1179,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	}
 	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler, breaker: cfg,
 		access: selectAccess, isUI: r.IsUI, noTrace: noTracing(r), counters: rt.routeCounters(r),
-		ops: ops, upstream: upstream}, nil
+		ops: ops, upstream: upstream, oidc: oidcRouteOf(r)}, nil
 }
 
 // noTracing reads the route's tracing switch. A route that never mentioned the
@@ -1229,6 +1246,52 @@ func Validate(r store.Route) error {
 	return validateRouteType(r)
 }
 
+// validateOIDCIdentity guards the oidc mechanism: a client named, and claims
+// the provider can write. Whether the client EXISTS is not asked here - this
+// is a pure function on a route, and the store answers it where there is one
+// (admin saveRoute).
+func validateOIDCIdentity(id store.IdentityForward) error {
+	if strings.TrimSpace(id.Client) == "" {
+		return errors.New("identity mechanism oidc needs a client: the OIDC client this route signs people into")
+	}
+	declared := make(map[string]bool, len(id.Attributes))
+	for _, a := range id.Attributes {
+		declared[a.Field] = true
+	}
+	seen := make(map[string]bool, len(id.Claims))
+	for _, c := range id.Claims {
+		if !claimNameOK.MatchString(c.Name) {
+			return fmt.Errorf("oidc claim %q is not allowed: letters, digits, and _ - . only", c.Name)
+		}
+		if slices.Contains(store.OIDCReservedClaims, c.Name) {
+			return fmt.Errorf("oidc claim %q is not allowed: the provider writes it itself. Reserved claims are %s",
+				c.Name, strings.Join(store.OIDCReservedClaims, ", "))
+		}
+		if seen[c.Name] {
+			return fmt.Errorf("oidc claim %q is set twice", c.Name)
+		}
+		seen[c.Name] = true
+		switch {
+		case c.Field == "" && c.Value == "":
+			return fmt.Errorf("oidc claim %q says nothing: give it a field of the Identity section or a fixed value", c.Name)
+		case c.Field != "" && c.Value != "":
+			return fmt.Errorf("oidc claim %q has both a field and a value: one or the other", c.Name)
+		case c.Field != "" && !declared[c.Field]:
+			fields := make([]string, 0, len(id.Attributes))
+			for _, a := range id.Attributes {
+				fields = append(fields, a.Field)
+			}
+			allowed := "none - select facts in the Identity section first"
+			if len(fields) > 0 {
+				allowed = strings.Join(fields, ", ")
+			}
+			return fmt.Errorf("oidc claim %q names field %q, which the Identity section does not declare: declared fields are %s",
+				c.Name, c.Field, allowed)
+		}
+	}
+	return nil
+}
+
 // validateRouteType guards the route options: forwarding configs for every
 // route, plus the UI extras when the UI toggle is on (ROUTE-02).
 func validateRouteType(r store.Route) error {
@@ -1254,8 +1317,16 @@ func validateRouteType(r store.Route) error {
 				return fmt.Errorf("identity signature algorithm %q is not allowed: allowed algorithms are %s",
 					id.Algorithm, strings.Join(signing.Algorithms, ", "))
 			}
+		case store.IdentityOIDC:
+			if err := validateOIDCIdentity(*id); err != nil {
+				return err
+			}
 		default:
-			return fmt.Errorf("identity mechanism %q is not allowed: allowed mechanisms are headers, jwt, signed-jwt", id.Mechanism)
+			return fmt.Errorf("identity mechanism %q is not allowed: allowed mechanisms are %s",
+				id.Mechanism, strings.Join(store.IdentityMechanisms, ", "))
+		}
+		if id.Mechanism != store.IdentityOIDC && (id.Client != "" || len(id.Claims) > 0) {
+			return fmt.Errorf("identity mechanism %q takes no client and no claims: they belong to the oidc mechanism", id.Mechanism)
 		}
 		seen := make(map[string]bool, len(id.Attributes))
 		for _, a := range id.Attributes {
@@ -1513,6 +1584,18 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	// A machine calling with an API token: the access line names the token
 	// beside the account it belongs to (OBS-03).
 	noteToken(req.Context(), sess.TokenName)
+	d, ok := rt.identityOfSession(req, sess)
+	if !ok {
+		return identityData{}, false
+	}
+	spanPerson(req.Context(), d)
+	return d, true
+}
+
+// identityOfSession is who a stored session is: the account, its
+// organisation, its roles - from memory between writes. ok is false for an
+// account that is disabled or outside its validity window.
+func (rt *Router) identityOfSession(req *http.Request, sess store.Session) (identityData, bool) {
 	now := time.Now()
 	key := identityKey{user: sess.UserID, tenant: sess.TenantID, group: sess.GroupID}
 	e, ok := rt.cachedIdentity(key, now)
@@ -1529,7 +1612,6 @@ func (rt *Router) sessionIdentity(req *http.Request) (identityData, bool) {
 	if !e.owner.Enabled || !e.owner.ValidAt(now) {
 		return identityData{}, false
 	}
-	spanPerson(req.Context(), e.data)
 	return e.data.clone(), true
 }
 
@@ -2191,29 +2273,37 @@ func (rt *Router) refuse(w http.ResponseWriter, req *http.Request, a store.Acces
 	// Redirecting a machine to a page it cannot read turns "you may not" into
 	// "303 See Other", which is what the scheduler recorded before this.
 	if isUI && isNavigation(req) {
-		if offer := rt.switchWouldHelp(req.Context(), a, userID, a.Switchable(who)); len(offer) > 0 {
-			// WHY, carried to the page: an organisation chooser that reappears
-			// saying nothing is the reason someone switches back and forth
-			// wondering what they did wrong.
-			http.Redirect(w, req, "/select-tenant?next="+url.QueryEscape(req.URL.RequestURI())+
-				"&why="+refusalCode(a, who), http.StatusSeeOther)
-			return
-		}
-		// No organisation at all and none to switch to: the waiting room says
-		// who to ask, which a 403 does not.
-		if len(who.Memberships) == 0 && needsTenant(a) {
-			http.Redirect(w, req, "/account-pending", http.StatusSeeOther)
-			return
-		}
-		// Nothing to switch to and nothing to wait for: still a browser, and
-		// still someone who did nothing wrong. The page says which rule turned
-		// them away and what this session CAN open - the same answer the other
-		// two refusals give, instead of a line of text on a blank page.
-		http.Redirect(w, req, "/refused?next="+url.QueryEscape(req.URL.RequestURI())+
-			"&why="+refusalCode(a, who), http.StatusSeeOther)
+		rt.refusePage(w, req, a, who, userID)
 		return
 	}
 	http.Error(w, refusalReason(a, who), http.StatusForbidden)
+}
+
+// refusePage sends a person a rule turned away to the page they can act on:
+// the organisation chooser when another organisation would let them in, the
+// waiting room when they belong to none, the refusal page otherwise. Each
+// carries the way back, so whatever they do there resumes what they asked.
+func (rt *Router) refusePage(w http.ResponseWriter, req *http.Request, a store.Access, who store.Caller, userID string) {
+	if offer := rt.switchWouldHelp(req.Context(), a, userID, a.Switchable(who)); len(offer) > 0 {
+		// WHY, carried to the page: an organisation chooser that reappears
+		// saying nothing is the reason someone switches back and forth
+		// wondering what they did wrong.
+		http.Redirect(w, req, "/select-tenant?next="+url.QueryEscape(req.URL.RequestURI())+
+			"&why="+refusalCode(a, who), http.StatusSeeOther)
+		return
+	}
+	// No organisation at all and none to switch to: the waiting room says
+	// who to ask, which a 403 does not.
+	if len(who.Memberships) == 0 && needsTenant(a) {
+		http.Redirect(w, req, "/account-pending", http.StatusSeeOther)
+		return
+	}
+	// Nothing to switch to and nothing to wait for: still a browser, and
+	// still someone who did nothing wrong. The page says which rule turned
+	// them away and what this session CAN open - the same answer the other
+	// two refusals give, instead of a line of text on a blank page.
+	http.Redirect(w, req, "/refused?next="+url.QueryEscape(req.URL.RequestURI())+
+		"&why="+refusalCode(a, who), http.StatusSeeOther)
 }
 
 // answerOrRefuse lets a route answer, with one arbitration when a refusal is
@@ -2442,7 +2532,7 @@ func stripPrefixCount(filters []routing.Spec) int {
 }
 
 // Issuer is the "iss" this gateway signs with, as the last reload read it -
-// what the internal plane's discovery document names.
+// what both discovery documents name, and where the OpenID provider lives.
 func (rt *Router) Issuer() string {
 	if v, ok := rt.issuer.Load().(string); ok && v != "" {
 		return v

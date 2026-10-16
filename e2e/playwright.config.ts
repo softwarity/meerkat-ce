@@ -34,7 +34,7 @@ export default defineConfig({
       use: { browserName: 'chromium' },
       dependencies: ['setup'],
       testMatch: /tests\/.*\.spec\.ts/,
-      testIgnore: [/tests\/tenancy\.spec\.ts/, /tests\/portal\.spec\.ts/],
+      testIgnore: [/tests\/tenancy\.spec\.ts/, /tests\/portal\.spec\.ts/, /tests\/oidc-provider\.spec\.ts/],
     },
     // The tenancy switch flips the WHOLE installation to single mode for a
     // moment. Run beside the rest, it made a landing test read the wrong mode
@@ -55,6 +55,16 @@ export default defineConfig({
       use: { browserName: 'chromium' },
       dependencies: ['tenancy'],
       testMatch: /tests\/portal\.spec\.ts/,
+    },
+    // The OIDC provider sets the issuer the WHOLE gateway signs with, and
+    // while a client exists the data plane answers the discovery path in
+    // front of the routes: a spec reading either beside it would read its
+    // values. Last, after the portal.
+    {
+      name: 'oidc-provider',
+      use: { browserName: 'chromium' },
+      dependencies: ['portal'],
+      testMatch: /tests\/oidc-provider\.spec\.ts/,
     },
   ],
   webServer: [

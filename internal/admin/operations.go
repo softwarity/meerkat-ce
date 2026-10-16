@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/gateway"
@@ -20,10 +19,10 @@ import (
 // gateway fronts.
 const refreshOperationsEvery = 10 * time.Minute
 
-// opsClient is deliberately not specClient: this runs in the background,
+// opsTimeout is deliberately not specClient's: this runs in the background,
 // unasked, and a service that hangs must not hold the refresher for twenty
 // seconds - the next round will catch it.
-var opsClient = &http.Client{Timeout: 5 * time.Second}
+const opsTimeout = 5 * time.Second
 
 // RefreshOperations keeps the data plane's per-endpoint counters named.
 //
@@ -91,9 +90,9 @@ func (a *API) upstreamOperations(ctx context.Context, route store.Route) ([]gate
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, opsClient.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, opsTimeout)
 	defer cancel()
-	spec, _, err := openapi.Fetch(ctx, opsClient, specURL)
+	spec, _, err := openapi.Fetch(ctx, upstreamClient(opsTimeout), specURL)
 	if err != nil {
 		return nil, err
 	}

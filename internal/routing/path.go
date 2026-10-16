@@ -200,6 +200,67 @@ func PathPrefixes(specs []Spec) []string {
 	return out
 }
 
+// PathHeads is PathPrefixes kept apart per path predicate, with "/" for a
+// pattern that has nothing literal ("/**", "/{tenant}/x"): the places a route
+// serves, as the OIDC provider reads them to know where an application behind
+// it may receive its sign-in. One list per predicate because predicates are
+// AND - a route under two of them lives where both agree - and patterns in
+// one list are OR.
+func PathHeads(specs []Spec) [][]string {
+	var out [][]string
+	for _, spec := range specs {
+		if spec.Type != "path" {
+			continue
+		}
+		var heads []string
+		for _, raw := range allStrings(spec.Args, "patterns") {
+			var head []string
+			for _, seg := range splitPath(raw) {
+				if seg == "**" || strings.HasPrefix(seg, "{") {
+					break
+				}
+				head = append(head, seg)
+			}
+			heads = append(heads, "/"+strings.Join(head, "/"))
+		}
+		out = append(out, heads)
+	}
+	return out
+}
+
+// HostNames is what the host predicates accept, one list per predicate (AND
+// between them), lower-cased: exact names and *.suffix wildcards, as written.
+func HostNames(specs []Spec) [][]string {
+	var out [][]string
+	for _, spec := range specs {
+		if spec.Type != "host" {
+			continue
+		}
+		var names []string
+		for _, h := range allStrings(spec.Args, "hosts") {
+			names = append(names, strings.ToLower(h))
+		}
+		out = append(out, names)
+	}
+	return out
+}
+
+// HostMatches says whether host (a name, no port) is one the host predicate
+// names accept: the predicate's own rule, a wildcard covering subdomains only.
+func HostMatches(names []string, host string) bool {
+	host = strings.ToLower(host)
+	for _, want := range names {
+		if suffix, ok := strings.CutPrefix(want, "*."); ok {
+			if strings.HasSuffix(host, "."+suffix) {
+				return true
+			}
+		} else if host == want {
+			return true
+		}
+	}
+	return false
+}
+
 // allStrings reads a string-list argument in the three shapes a spec may carry
 // it (one string, []any from JSON, []string from Go).
 func allStrings(args map[string]any, key string) []string {

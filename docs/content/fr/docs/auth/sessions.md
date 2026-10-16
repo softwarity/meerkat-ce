@@ -110,7 +110,7 @@ n'est pas encore connue.
 
 | Cause | Portée | Immédiat |
 |---|---|---|
-| `POST /logout` | cette session uniquement | oui, la ligne est supprimée |
+| `POST /logout`, ou `GET /logout` depuis une page du site | cette session uniquement | oui, la ligne est supprimée |
 | L'expiration pour inactivité | cette session | oui, elle est refusée d'après l'heure réelle |
 | Une réinitialisation du mot de passe par le lien reçu par e-mail | **toutes** les sessions du compte, sur toutes les gateways | oui |
 | La suppression du compte | toutes les sessions du compte | oui |
@@ -118,9 +118,19 @@ n'est pas encore connue.
 | **Déconnecter** dans les *Sessions actives* du profil, ou *Déconnecter partout ailleurs* | cette session, ou toutes les autres sessions de la personne | oui |
 | **Sign out** sur l'écran *Sessions* de la console | cette session | oui |
 
-La déconnexion est un `POST` - il n'y a pas de `GET /logout`. Elle supprime la ligne au
-lieu de se contenter d'effacer le cookie, puis efface les deux cookies et demande aux
-autres gateways d'oublier la session. Elle met fin à **cette** session : les autres
+La déconnexion supprime la ligne au lieu de se contenter d'effacer le cookie, puis
+efface les deux cookies et demande aux autres gateways d'oublier la session.
+
+Nos propres pages se déconnectent par `POST`. Sur le plan de données, `/logout`
+répond aussi à un `GET`, parce que le bouton de déconnexion d'une application
+derrière la gateway ne peut qu'envoyer le navigateur vers une adresse. C'est la
+provenance qui décide : depuis une page de ce site (le navigateur dit
+`Sec-Fetch-Site: same-origin` ou `same-site`), la déconnexion est immédiate ;
+depuis un autre site, une adresse tapée ou en favori, ou un navigateur qui la
+précharge avant un clic, une page demande d'abord, et son bouton est le `POST`
+ordinaire. Un lien forgé coûte un clic, pas une session. Aucune adresse de retour
+n'est lue dans la requête : la personne arrive sur la page de connexion. Le plan de
+contrôle garde le `POST` seul. Elle met fin à **cette** session : les autres
 navigateurs de la même personne gardent la leur, et la console et l'application sont
 indépendantes.
 

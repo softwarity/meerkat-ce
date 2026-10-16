@@ -22,7 +22,7 @@ porte :
 
 | Claim | Ce qu'il contient |
 |---|---|
-| `iss` | l'émetteur : `meerkat` tant que vous n'en réglez pas un autre |
+| `iss` | l'émetteur : l'adresse publique du plan Application (`https://<nom public>`), `meerkat` tant qu'aucun n'est déclaré |
 | `sub` | l'identifiant du compte de l'appelant |
 | `aud` | le nom de la route |
 | `iat`, `exp` | quand il a été signé, et quand il cesse d'être valide : deux minutes plus tard par défaut, réglable par route |
@@ -41,7 +41,7 @@ jamais placé derrière un ingress. Rien hors du cluster n'a de raison de le
 lire, donc rien hors du cluster ne l'atteint. Il ne demande aucun jeton : il ne
 contient que des clés publiques, qui ne donnent aucun pouvoir, et un service
 doit pouvoir les lire avant de détenir quoi que ce soit. `meerkat` ci-dessous
-est le nom de la gateway dans nos fichiers de déploiement ; le tiroir JWT écrit le
+est le nom de la gateway dans nos fichiers de déploiement ; le tiroir OIDC / JWT écrit le
 vrai, demandé au runtime - sur Kubernetes le nom complet du Service, par exemple
 `http://meerkat-internal.shop.svc.cluster.local:7070`, sur Swarm ou compose celui
 du service. Dès qu'un certificat est placé sur le plan interne, le même contenu est
@@ -74,14 +74,16 @@ service l'atteint.
 Les bibliothèques le prennent de l'une de deux façons :
 
 - **L'adresse du document**, comme ci-dessus - `MetadataAddress` en .NET,
-  `openid-client` en Node. N'importe quel émetteur convient, `meerkat`
-  compris. En HTTP simple, dites-le là où la bibliothèque le demande
-  (`RequireHttpsMetadata = false` en .NET).
+  `openid-client` en Node. Quel que soit l'émetteur, c'est la voie que doit
+  prendre un service dans le cluster. En HTTP simple, dites-le là où la
+  bibliothèque le demande (`RequireHttpsMetadata = false` en .NET).
 - **L'émetteur seul** - `issuer-uri` chez Spring, le provider de go-oidc.
-  Elles lisent `{issuer}/.well-known/openid-configuration` et vérifient que le
-  document nomme le même émetteur : l'émetteur doit donc être l'URL du plan
-  interne. Réglez-le sur `http://meerkat:7070` dans le tiroir JWT (voir
-  plus bas), et toute la configuration du service tient en cette ligne.
+  Elles lisent `{issuer}/.well-known/openid-configuration` sur l'adresse
+  publique de la gateway, qui ne répond que tant que le
+  [fournisseur OpenID](/docs/auth/oidc-provider) (édition Enterprise) a un
+  client déclaré. Sinon, donnez à une telle bibliothèque le JWKS ci-dessous et
+  l'émetteur à vérifier (Spring : `jwk-set-uri` à côté de l'émetteur attendu)
+  plutôt que l'émetteur seul.
 
 ### Le JWKS, pour une bibliothèque qui ne prend que des clés
 
@@ -93,30 +95,37 @@ La partie publique des clés, sous forme de JWKS standard - pour une
 bibliothèque qui ne connaît pas la découverte, comme le jeu de clés distant de
 `jose`. Le `kid` du jeton désigne la clé, et la clé porte son algorithme : le
 service prend donc l'algorithme dans la clé, jamais dans l'en-tête du jeton. Il
-vérifie alors lui-même l'émetteur, avec la valeur réglée dans le tiroir.
+vérifie alors lui-même l'émetteur, celui que montre le tiroir.
 
 ### Un PEM, pour un service qui ne peut rien lire
 
-Le tiroir **JWT**, à côté de **Global** sur l'écran Routes, montre la clé
+Le tiroir **OIDC / JWT**, à côté de **Global** sur l'écran Routes, montre la clé
 publique de chaque algorithme au format PEM. Cette clé doit être remplacée à la
 main à chaque rotation, là où les deux adresses ci-dessus la suivent toutes
 seules.
 
 ## L'émetteur
 
-Chaque jeton dit qui l'a émis dans `iss`, et un service le vérifie. Il vaut
-`meerkat` tant que vous n'en réglez pas un autre, dans le tiroir **JWT** :
-**Issuer**. Changez-le, et le jeton suivant porte le nouveau, sur chaque nœud -
-changez donc en même temps ce qu'attendent les services. Un émetteur qui est une
-URL est une URL http ou https avec un hôte, sans requête, sans fragment et sans
-barre finale.
+Chaque jeton dit qui l'a émis dans `iss`, et un service le vérifie. Il ne se
+tape pas : c'est le **nom public** du plan Application, déclaré dans **Domains &
+TLS**, onglet **Application**, écrit `https://<nom>` (un nom de cette machine,
+`localhost`, donne `http://localhost:<port du plan de données>`). Avec plusieurs
+noms, le tiroir **OIDC / JWT** en choisit un dans **Public address**, le premier
+jusque-là ; sans aucun, les jetons disent `meerkat` et le tiroir mène à cet
+onglet. Le même émetteur est celui du [fournisseur OpenID](/docs/auth/oidc-provider).
+
+Déclarez, retirez ou choisissez un nom public, et le jeton suivant porte le
+nouvel émetteur, sur chaque nœud - changez donc en même temps ce qu'attendent
+les services.
 
 > [!NOTE]
 > Le document de découverte décrit comment vérifier un jeton, pas comment en
-> obtenir un. Il n'y a ni endpoint d'autorisation, ni de jeton, ni userinfo : la
-> gateway n'est pas un serveur OAuth, elle signe un jeton court pour chaque
-> requête qu'elle transmet. Une bibliothèque qui exige ces endpoints doit plutôt
-> être pointée vers le JWKS.
+> obtenir un : pour ce mécanisme, la gateway signe un jeton court pour chaque
+> requête qu'elle transmet, et il n'y a rien à échanger. Une bibliothèque qui
+> exige des endpoints d'autorisation et de jeton doit plutôt être pointée vers le
+> JWKS. Une application qui veut connecter elle-même ses utilisateurs est un autre
+> cas : avec le [fournisseur OpenID](/docs/auth/oidc-provider) (édition
+> Enterprise), le même document nomme alors aussi ces endpoints.
 
 ## La rotation
 
@@ -144,7 +153,7 @@ désormais un chemin ordinaire, qu'une route peut prendre.
 > refuse les requêtes qu'il reçoit. Faites-le pointer vers le plan interne
 > avant la mise à jour ou en même temps - le document de découverte,
 > `http://<gateway>:7070/.well-known/openid-configuration`, ou le JWKS à côté ;
-> le tiroir JWT donne les deux. Rien d'autre ne change : mêmes clés, mêmes
+> le tiroir OIDC / JWT donne les deux. Rien d'autre ne change : mêmes clés, mêmes
 > jetons.
 
 ## Pour aller plus loin
@@ -154,3 +163,5 @@ désormais un chemin ordinaire, qu'une route peut prendre.
 - [Cluster Kubernetes](/docs/deploy/kubernetes) - le Service interne, et une
   NetworkPolicy qui tient la console à l'écart des backends.
 - [Appels planifiés](/docs/operations/scheduler) - l'autre API du plan interne.
+- [Meerkat fournisseur OpenID](/docs/auth/oidc-provider) - quand l'application
+  connecte elle-même ses utilisateurs, avec les mêmes clés.

@@ -83,10 +83,13 @@ cœur change d'état, la liste se met à jour sans rechargement.
   plafond de ce qu'un filtre de réécriture du corps peut garder en mémoire. Tant
   que l'interrupteur est actif, le bouton lui-même vire à l'ambre et affiche
   *Unavailable* : personne n'a besoin de l'ouvrir pour le savoir.
-- **JWT** rassemble les clés qui signent le JWT d'identité que vérifient vos
-  services : le document de découverte à fournir à un backend - l'adresse
-  recommandée - et le JWKS à côté, l'émetteur que porte chaque jeton (`meerkat`
-  tant qu'il n'est pas réglé), la partie publique de chaque algorithme, la
+- **OIDC / JWT** rassemble les clés qui signent le JWT d'identité que vérifient vos
+  services : en haut les adresses bien connues - le document de découverte
+  interne à fournir à un backend (l'adresse recommandée), la découverte publique
+  du fournisseur OpenID tant qu'il répond, et le JWKS -, puis la **Public
+  address**, l'émetteur que porte chaque jeton, choisi parmi les noms publics du
+  plan Application (`meerkat` tant qu'aucun n'est déclaré, avec un lien pour en
+  déclarer un), la partie publique de chaque algorithme, la
   rotation, et quelles routes signent avec quelle clé.
   Un service qui pointe sur le document de découverte n'a besoin de rien
   d'autre : il y apprend l'émetteur et les clés. Le `kid` du jeton désigne la
@@ -94,7 +97,10 @@ cœur change d'état, la liste se met à jour sans rechargement.
   fois, dans Auth forward, et le service le lit sur la clé, jamais dans
   l'en-tête du jeton. Les deux adresses sont sur le plan interne, port 7070, et
   seulement là. Voir
-  [Le JWT d'identité](/docs/auth/service-jwt).
+  [Le JWT d'identité](/docs/auth/service-jwt). Sous les clés, **OIDC clients**
+  liste les applications qui connectent leurs utilisateurs par Meerkat, et les
+  routes liées à chacune (édition Enterprise) : voir
+  [Meerkat fournisseur OpenID](/docs/auth/oidc-provider).
 
 ## L'éditeur
 

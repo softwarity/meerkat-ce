@@ -236,7 +236,11 @@ Les plans Console et Application disent donc chacun qui sert leurs noms publics,
 **A proxy in front**. Les deux déclarent leurs **noms publics**, un nom complet à chaque fois
 (`shop.example.com`) ; un nom n'appartient qu'à un plan, et le premier nom de
 l'Application est l'adresse d'un lien envoyé par mail ou du callback d'un fournisseur
-d'identité quand aucune requête ne dit laquelle. Changer de mode garde les noms et les
+d'identité quand aucune requête ne dit laquelle. Les noms publics de l'Application sont
+aussi ceux parmi lesquels se choisit l'**émetteur** de tous les jetons que signe Meerkat,
+écrit `https://<nom>` : le `iss` du JWT d'identité et l'adresse du fournisseur OpenID
+(voir [Le JWT d'identité](/docs/auth/service-jwt)). En ajouter, en retirer ou
+les réordonner déplace l'émetteur sur chaque nœud. Changer de mode garde les noms et les
 certificats : un certificat qui ne convient pas au nouveau mode reste placé, marqué
 *Inactive in this mode*, et sert de nouveau quand le plan revient en arrière. À l'écran,
 le sélecteur ne fait que proposer ; **Apply**, puis une confirmation, enregistre. Un
@@ -398,7 +402,7 @@ affiche la nouvelle date de fin.
 
 Un certificat du système de fichiers se place comme les autres. Le plan **Internal**
 n'accepte qu'un certificat qui porte l'un des noms par lesquels les services l'appellent - lu
-auprès du runtime, un joker compte -, et il y ouvre la porte HTTPS sur `:7443`, et le tiroir JWT comme la page du scheduler nomment
+auprès du runtime, un joker compte -, et il y ouvre la porte HTTPS sur `:7443`, et le tiroir OIDC / JWT comme la page du scheduler nomment
 dès lors l'adresse en `https://`. Les services qui l'appellent doivent faire confiance à
 l'autorité qui l'a signé - le cluster la distribue généralement déjà : une ConfigMap
 annotée `service.beta.openshift.io/inject-cabundle` sur OpenShift, un bundle trust-manager

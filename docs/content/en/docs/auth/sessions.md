@@ -103,7 +103,7 @@ the installation-wide lifetime, because the organisation is not known yet.
 
 | Cause | Scope | Immediate |
 |---|---|---|
-| `POST /logout` | that one session | yes, the row is deleted |
+| `POST /logout`, or `GET /logout` from a page of the site | that one session | yes, the row is deleted |
 | Idle expiry | that session | yes, refused on the wall clock |
 | A password reset from the e-mailed link | **every** session of that account, on every gateway | yes |
 | Deleting the account | every session of that account | yes |
@@ -111,9 +111,18 @@ the installation-wide lifetime, because the organisation is not known yet.
 | **Sign out** on the profile's *Active sessions*, or *Sign out everywhere else* | that session, or every other one of that person | yes |
 | **Sign out** on the console's *Sessions* screen | that session | yes |
 
-Logout is a `POST` - there is no `GET /logout` - and it deletes the row rather
-than merely clearing the cookie, then clears both cookies and tells the other
-gateways to forget it. It ends **that** session: other browsers of the same
+Logout deletes the row rather than merely clearing the cookie, then clears both
+cookies and tells the other gateways to forget it.
+
+Our own pages sign out by `POST`. On the data plane, `/logout` also answers a
+`GET`, because a sign-out button inside an application behind the gateway can only
+send the browser to an address. Who sent it decides: from a page of this site
+(the browser says `Sec-Fetch-Site: same-origin` or `same-site`) it signs out at
+once; from another site, an address typed or bookmarked, or a browser fetching it
+ahead of a click, a page asks first, and its button is the ordinary `POST`. A
+forged link costs a click, not a session. No address to go back to is read from
+the request: the person lands on the sign-in page. The control plane keeps the
+`POST` alone. It ends **that** session: other browsers of the same
 person keep theirs, and the console and the application are independent.
 
 ## What does not end a session

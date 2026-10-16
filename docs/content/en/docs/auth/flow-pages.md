@@ -1,7 +1,7 @@
 ---
 title: The pages the gateway serves
 section: Authentication
-order: 118
+order: 120
 summary: Sign-in, second factor, password change, organisation choice - the pages Meerkat draws itself, and how far you can restyle them.
 ---
 
@@ -21,6 +21,7 @@ never sit in a shared cache.
 |---|---|
 | `/login` | the sign-in page: the credential form, one button per identity provider, the passkey button, and the links to sign up or recover a password when those are open |
 | `POST /logout` | ends this session and comes back to the sign-in page |
+| `GET /logout` | the sign-out an application's own button sends to: from a page of the site it ends the session at once, like the POST; from anywhere else it asks first, with a **Sign out** button |
 | `/totp` | the second-factor challenge, with *trust this browser* and the code-by-e-mail link when they are available |
 | `/totp-enroll` | forced enrolment, when a second factor is required and the account has none |
 | `/update-password` | the forced change: a temporary or expired password |

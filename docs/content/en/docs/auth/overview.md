@@ -83,6 +83,15 @@ recorded as links - one per authority and subject - so the same account can be
 reached through a password, a provider and a directory at once, and someone who
 signed up locally keeps everything when they move to SSO.
 
+## The other direction: the applications
+
+Everything above is how a person proves who they are **to Meerkat**. Telling the
+applications behind the routes who that person is comes next, and it is a route's
+setting: headers or a signed JWT on every request, or, for an application that
+insists on signing its users in itself, Meerkat as its OpenID provider (Enterprise
+edition). See [Connecting an application](/docs/auth/connect-an-application) and
+[Meerkat as an OpenID provider](/docs/auth/oidc-provider).
+
 ## Where things are configured
 
 | Screen | What lives there |

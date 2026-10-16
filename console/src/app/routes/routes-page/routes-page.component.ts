@@ -264,12 +264,13 @@ export class RoutesPageComponent {
     this.keysOpen.set(true);
   }
 
-  // A route named by the signing keys: land on its Identity section, which is
-  // where the algorithm that put it in that list is chosen. The drawer swaps
-  // content rather than stacking - it shows one thing at a time.
-  protected openIdentity(routeId: string): void {
+  // A route named by the OIDC / JWT drawer: land on the section that put it
+  // there - Identity for a key it signs with, Auth forward for an OIDC client
+  // it signs in as. The drawer swaps content rather than stacking - it shows
+  // one thing at a time.
+  protected openIdentity(pick: { id: string; section: string }): void {
     this.keysOpen.set(false);
-    void this.router.navigate(['/infra/routes', routeId, 'identity']);
+    void this.router.navigate(['/infra/routes', pick.id, pick.section]);
   }
 
   // Route probe (ROUTE-15): compose a fictional request, see which route takes

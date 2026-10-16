@@ -25,6 +25,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 )
 
@@ -373,4 +374,65 @@ func jwkOf(alg, kid string, pub crypto.PublicKey) (map[string]any, error) {
 		return nil, fmt.Errorf("signing: cannot render %T as a JWK", pub)
 	}
 	return m, nil
+}
+
+// ---- verification ----------------------------------------------------------
+
+// VerifyRS256 checks a compact JWT this set signed with RS256 - the active key
+// or one still inside its grace window, chosen by the header's kid - and
+// returns its claims. The signature only: what the claims SAY (issuer,
+// expiry, audience) is the caller's to judge, since only the caller knows what
+// it expects.
+//
+// RS256 alone, on purpose: it is what the OpenID provider signs its tokens
+// with, and a verifier that accepted whatever algorithm the header names is
+// the classic way to accept a token nobody signed.
+func (s *Set) VerifyRS256(token string) (map[string]any, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return nil, fmt.Errorf("signing: not a compact JWT: three base64url segments separated by dots are expected")
+	}
+	hb, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("signing: the token header is not base64url: %w", err)
+	}
+	var header struct {
+		Alg string `json:"alg"`
+		Kid string `json:"kid"`
+	}
+	if err := json.Unmarshal(hb, &header); err != nil {
+		return nil, fmt.Errorf("signing: the token header is not JSON: %w", err)
+	}
+	if header.Alg != RS256 {
+		return nil, fmt.Errorf("signing: token algorithm %q is not accepted here: only %s is", header.Alg, RS256)
+	}
+	var pub *rsa.PublicKey
+	if k := s.active[RS256]; k != nil && k.kid == header.Kid {
+		pub, _ = k.pub.(*rsa.PublicKey)
+	}
+	for _, r := range s.retired {
+		if pub == nil && r.alg == RS256 && r.kid == header.Kid {
+			pub, _ = r.pub.(*rsa.PublicKey)
+		}
+	}
+	if pub == nil {
+		return nil, fmt.Errorf("signing: no %s key has the id %q: the token was not signed by this gateway, or with a key rotated out", RS256, header.Kid)
+	}
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return nil, fmt.Errorf("signing: the token signature is not base64url: %w", err)
+	}
+	h := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
+	if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig); err != nil {
+		return nil, fmt.Errorf("signing: the token signature does not verify")
+	}
+	cb, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("signing: the token payload is not base64url: %w", err)
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(cb, &claims); err != nil {
+		return nil, fmt.Errorf("signing: the token payload is not a JSON object: %w", err)
+	}
+	return claims, nil
 }

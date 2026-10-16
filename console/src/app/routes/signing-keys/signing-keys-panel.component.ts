@@ -1,15 +1,21 @@
+import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormField, form, required, validate } from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ApiService, Route, SigningKeys } from '../../api.service';
-import { FormFieldComponent } from '../../shared/form-field.component';
+import { RouterLink } from '@angular/router';
+import { RowActionsDirective } from '@softwarity/row-actions';
+import { ApiService, OIDCClient, Route, SigningKeys } from '../../api.service';
+import { DialogsService } from '../../shared/dialogs.service';
+import { LiveChangesService } from '../../shared/live-changes.service';
+import { EeLockComponent } from '../../shared/ee-lock.component';
 
 // The identity JWT signing keys (signed-jwt): the JWKS the backends should
 // verify against (the recommended path), plus each algorithm's PUBLIC key as a
@@ -21,17 +27,24 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 // one line long. These are keys, with a rotation, a JWKS to hand to a backend
 // and three PEMs to copy, and they filled more of that drawer than the three
 // settings together. A subject that large is a subject of its own.
+//
+// "OIDC / JWT" since the OIDC provider: its clients sit here because the
+// issuer and the keys are the provider's too - the tokens an application gets
+// when it signs in through Meerkat are signed with the same keys, under the
+// same issuer, as the ones a route forwards.
 @Component({
   selector: 'app-signing-keys-panel',
   imports: [
-    FormField,
-    FormFieldComponent,
+    EeLockComponent,
     MatButtonModule,
     MatExpansionModule,
     MatIconModule,
-    MatInputModule,
     MatProgressBarModule,
+    MatSelectModule,
+    MatTableModule,
     MatTooltipModule,
+    RouterLink,
+    RowActionsDirective,
   ],
   styleUrl: './signing-keys-panel.component.scss',
   templateUrl: './signing-keys-panel.component.html',
@@ -39,12 +52,15 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 export class SigningKeysPanelComponent {
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
+  private readonly dialogs = inject(DialogsService);
 
   // The page's routes, handed down so a key can say who uses it. It is the
   // question three identical-looking rows never answered - and the reason they
   // read as one thing shown three times.
   readonly routes = input<Route[]>([]);
-  readonly routePicked = output<string>();
+  // A route named here, and the section of it that put it in this drawer.
+  readonly routePicked = output<{ id: string; section: 'identity' | 'authforward' }>();
   readonly closed = output<void>();
 
   // Which routes sign with each algorithm. A route on signed-jwt with no
@@ -53,8 +69,15 @@ export class SigningKeysPanelComponent {
   protected readonly users = computed(() => {
     const by = new Map<string, Route[]>();
     for (const r of this.routes()) {
-      if (r.identity?.mechanism !== 'signed-jwt') continue;
-      const alg = r.identity.algorithm || 'ES256';
+      // An OIDC route's tokens are signed by the provider, with RS256: the one
+      // algorithm every OIDC library verifies. Rotating that key concerns it.
+      const alg =
+        r.identity?.mechanism === 'signed-jwt'
+          ? r.identity.algorithm || 'ES256'
+          : r.identity?.mechanism === 'oidc'
+            ? 'RS256'
+            : '';
+      if (!alg) continue;
       by.set(alg, [...(by.get(alg) ?? []), r]);
     }
     return by;
@@ -63,6 +86,10 @@ export class SigningKeysPanelComponent {
   protected usersOf(alg: string): Route[] {
     return this.users().get(alg) ?? [];
   }
+
+  // Which image serves this console (ee-lock.component.ts): the community
+  // one shows the provider's public discovery locked, never as an address.
+  protected readonly enterprise = inject(DOCUMENT).body.classList.contains('ee');
 
   protected readonly loading = signal(true);
   protected readonly renewing = signal(false);
@@ -85,67 +112,125 @@ export class SigningKeysPanelComponent {
     return (d.internalOrigin || `http://meerkat:${d.internalPort || '7070'}`) + path;
   }
 
-  // The issuer, edited in place. The rules mirror the server's
-  // (store.CheckJWTIssuer), so the field refuses what a save would.
-  protected readonly issuerDraft = signal({ issuer: '' });
-  protected readonly issuerForm = form(this.issuerDraft, (p) => {
-    required(p.issuer, { message: $localize`:@@Issuer_required:An issuer is required.` });
-    validate(p.issuer, ({ value }) => {
-      const v = value();
-      if (/\s/.test(v)) {
-        return [{ kind: 'issuer', message: $localize`:@@Issuer_space:No space: a service compares it byte for byte.` }];
-      }
-      if (v.includes('://') && (!/^https?:\/\/[^/?#]+/.test(v) || /[?#]/.test(v) || v.endsWith('/'))) {
-        return [{ kind: 'issuer', message: $localize`:@@Issuer_url:An http or https URL with a host, without a query, a fragment or a trailing slash.` }];
-      }
-      return [];
-    });
-  });
-  protected readonly issuerChanged = computed(() => {
-    const d = this.data();
-    return !!d && this.issuerDraft().issuer !== d.issuer;
-  });
+  // The issuer, chosen among the application plane's public addresses
+  // (Domains & TLS): never typed, since it has to be an address the gateway
+  // answers on. Saved as soon as it is picked; the server refuses anything
+  // else, naming what it accepts.
   protected readonly savingIssuer = signal(false);
-  protected readonly issuerError = signal('');
-  // What the field says under it: the rule it breaks while typing, else what
-  // the server answered.
-  protected readonly issuerMessage = computed(
-    () => this.issuerForm.issuer().errors()[0]?.message ?? this.issuerError(),
-  );
 
-  protected saveIssuer(): void {
-    if (this.issuerForm().invalid()) return;
+  protected chooseIssuer(issuer: string): void {
+    const d = this.data();
+    if (!d || issuer === d.issuer) return;
     this.savingIssuer.set(true);
-    this.issuerError.set('');
-    this.api.setIssuer(this.issuerDraft().issuer).subscribe({
-      next: (d) => {
-        this.setData(d);
+    this.api.setIssuer(issuer).subscribe({
+      next: (out) => {
+        this.data.set(out);
         this.savingIssuer.set(false);
         this.snack.open($localize`:@@Issuer_saved:Issuer saved`, undefined, { duration: 2000 });
       },
       error: (e: HttpErrorResponse) => {
         this.savingIssuer.set(false);
-        this.issuerError.set(e.error?.error ?? $localize`:@@Request_failed:Request failed`);
+        // The select goes back to what is stored.
+        this.data.set({ ...d });
+        this.fail(e);
       },
     });
   }
 
-  // The keys and the issuer field together: a reload puts the stored issuer
-  // back in the field.
-  private setData(d: SigningKeys): void {
-    this.data.set(d);
-    this.issuerDraft.set({ issuer: d.issuer });
-  }
+  // The OpenID provider's discovery for applications, beside the internal
+  // one: only while the provider answers - an issuer that is an address, and
+  // a client declared.
+  protected readonly publicDiscovery = computed(() =>
+    this.clients().length ? (this.data()?.publicDiscovery ?? '') : '',
+  );
 
   constructor() {
     this.reload();
+    this.reloadClients();
+    // Another administrator, an agent, or this console's route editor moves
+    // the list while the drawer is open: a client written, or a route bound
+    // to one - each row names the routes using it. A list, so it is simply
+    // read again; the drawer's own writes re-read it on their own.
+    const live = inject(LiveChangesService);
+    live.on('oidc-client', () => this.reloadClients());
+    live.on('route', () => this.reloadClients());
+  }
+
+  // OIDC clients.
+
+  protected readonly clients = signal<OIDCClient[]>([]);
+  protected readonly clientColumns = ['id', 'secret', 'routes'];
+
+  // The provider answers only under an issuer that is an address: until the
+  // application plane has a public name, the issuer is a name.
+  protected readonly noPublicName = computed(() => {
+    const d = this.data();
+    return !!d && !d.issuers?.length;
+  });
+
+  private reloadClients(): void {
+    this.api.oidcClients().subscribe({
+      next: (c) => this.clients.set(c ?? []),
+      error: () => this.clients.set([]),
+    });
+  }
+
+  protected async editClient(c?: OIDCClient): Promise<void> {
+    const { editOidcClient } = await import('./oidc-client-dialog.component');
+    const saved = await editOidcClient(this.dialog, this.api, {
+      client: c,
+      taken: this.clients().map((x) => x.id),
+    });
+    if (saved) this.reloadClients();
+  }
+
+  protected async regenerate(c: OIDCClient): Promise<void> {
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Regenerate_secret_of_CLIENT:Regenerate the secret of ${c.id}:client:?`,
+      message: $localize`:@@Regenerate_secret_message:The current secret stops working at once: the application signs nobody in until it has the new one.`,
+      confirmLabel: $localize`:@@Regenerate:Regenerate`,
+      danger: true,
+    });
+    if (!ok) return;
+    const { showOidcSecret } = await import('./oidc-client-dialog.component');
+    this.api.regenerateOidcClientSecret(c.id).subscribe({
+      next: (out) => {
+        this.reloadClients();
+        void showOidcSecret(this.dialog, out);
+      },
+      error: (e: HttpErrorResponse) => this.fail(e),
+    });
+  }
+
+  protected async removeClient(c: OIDCClient): Promise<void> {
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Delete_OIDC_client:Delete ${c.id}:client:?`,
+      message: $localize`:@@Delete_OIDC_client_message:The application can no longer sign anyone in through Meerkat.`,
+      confirmLabel: $localize`:@@Delete:Delete`,
+      danger: true,
+    });
+    if (!ok) return;
+    this.api.deleteOidcClient(c.id).subscribe({
+      next: () => this.reloadClients(),
+      // A client a route still uses is refused, and the refusal names the
+      // routes: that sentence is the answer, so it is shown as it came.
+      error: (e: HttpErrorResponse) => this.fail(e),
+    });
+  }
+
+  private fail(e: HttpErrorResponse): void {
+    this.snack.open(
+      typeof e.error?.error === 'string' ? e.error.error : $localize`:@@Request_failed:Request failed`,
+      $localize`:@@Close:Close`,
+      { duration: 10000 },
+    );
   }
 
   private reload(): void {
     this.loading.set(true);
     this.api.getSigningKeys().subscribe({
       next: (d) => {
-        this.setData(d);
+        this.data.set(d);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),

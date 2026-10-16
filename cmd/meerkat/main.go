@@ -40,6 +40,7 @@ import (
 	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/metrics"
+	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/scheduler"
 	"github.com/softwarity/meerkat/internal/session"
@@ -297,6 +298,7 @@ func run(o options) error {
 
 	router := gateway.New(st, sessions)
 	router.AdminAddr = adminAddr         // CORS for the admin console's Try it out
+	router.DataAddr = addr               // the issuer's port under a loopback public name
 	router.AdminSessions = adminSessions // authorizes identity simulation (Try it out)
 	if err := router.Reload(ctx); err != nil {
 		return err
@@ -336,7 +338,14 @@ func run(o options) error {
 	authHandler.Register(mux)
 	router.RegisterDevDocs(mux) // /meerkat/apidocs - developer docs (dev capability)
 	router.RegisterUISim(mux)   // /meerkat/dev-sim - UI test mode (dev capability)
-	mux.Handle("/", router)
+	// The OpenID provider (SAUTH-05): the applications behind the routes sign
+	// their people in through this gateway. Enterprise code; in the community
+	// image the provider mounts nothing and wraps nothing, and its paths fall
+	// through to the routes like any other.
+	oidc := oidcprovider.New(oidcprovider.Deps{Store: st, Sessions: sessions, Router: router,
+		Refuse: authHandler.ServeAppRefused})
+	oidc.MountData(mux)
+	mux.Handle("/", oidc.WrapData(router))
 
 	// Control plane (:9090): admin API and the console. Keep this port off
 	// the public load balancer. Login/logout are mounted here too, so the
@@ -348,6 +357,7 @@ func run(o options) error {
 	adminAuth.Mailer = mailer
 	adminAuth.Register(adminMux)
 	adminAPI := admin.New(st, adminSessions, router)
+	adminAPI.OIDC = oidc
 	adminAPI.Mailer = mailer
 	adminAPI.DataAddr = addr
 	adminAPI.InternalAddr = o.internalAddr
@@ -683,7 +693,11 @@ func run(o options) error {
 	// healthz handler and the flow pages are requests like the others, and a
 	// deadline that only moved on SOME paths would end sessions at random.
 	everything := func(*http.Request) bool { return true }
-	dataPlane := whilePaused(st, everything, router.ServePaused, sessions.Sliding(afterWrites(mux, "/", identityChanged)))
+	dataPlane := whilePaused(st, everything, router.ServePaused, sessions.Sliding(afterWrites(mux, "/", identityChanged,
+		// The OpenID provider's writes are its own codes and refresh tokens,
+		// never an identity - and an application refreshing its tokens is
+		// traffic, not an administrator's write.
+		oidcprovider.PathPrefix)))
 	adminAPI.DataPlane = dataPlane
 	srv := &http.Server{
 		Addr:              addr,
@@ -1003,8 +1017,9 @@ func run(o options) error {
 //
 // The router's own pattern is left out: a POST proxied to an application is
 // that application's business, and the one kind of write that arrives by the
-// thousand.
-func afterWrites(mux *http.ServeMux, proxied string, changed func()) http.Handler {
+// thousand. So are the paths under each of quiet: writes that touch no
+// identity, made by programs at their own pace.
+func afterWrites(mux *http.ServeMux, proxied string, changed func(), quiet ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
 		switch r.Method {
@@ -1013,6 +1028,11 @@ func afterWrites(mux *http.ServeMux, proxied string, changed func()) http.Handle
 		}
 		if proxied != "" {
 			if _, pattern := mux.Handler(r); pattern == proxied {
+				return
+			}
+		}
+		for _, prefix := range quiet {
+			if strings.HasPrefix(r.URL.Path, prefix) {
 				return
 			}
 		}
@@ -1217,6 +1237,23 @@ func purge(ctx context.Context, sessions *session.Manager, st *store.Store) {
 	// again anyway.
 	if _, err := st.PurgeSpentAssertions(ctx, time.Now().Unix()); err != nil {
 		slog.Error("spent assertion purge failed", "err", err)
+	}
+	// The one-shot challenges (passkey ceremonies, the sign-up captcha), the
+	// trusted browsers past their trust, the agents' OAuth codes and refresh
+	// tokens, and the OIDC provider's: all were written with an expiry and,
+	// until now, swept by nobody - spent ones go when taken, and the ones
+	// abandoned halfway stayed for ever.
+	if _, err := st.PurgeExpiredChallenges(ctx, time.Now().Unix()); err != nil {
+		slog.Error("challenge purge failed", "err", err)
+	}
+	if _, err := st.PurgeExpiredTrustedBrowsers(ctx, time.Now().Unix()); err != nil {
+		slog.Error("trusted browser purge failed", "err", err)
+	}
+	if err := st.PurgeOAuthLeftovers(ctx); err != nil {
+		slog.Error("oauth leftover purge failed", "err", err)
+	}
+	if _, err := st.PurgeOIDCLeftovers(ctx, time.Now().Unix()); err != nil {
+		slog.Error("oidc leftover purge failed", "err", err)
 	}
 	// The audited calls of the data plane (AUD-04), on their own, shorter
 	// lifetime: the one kind of the trail whose volume follows the traffic.

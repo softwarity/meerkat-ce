@@ -17,6 +17,7 @@ export type ChangeKind =
   | 'theme'
   | 'locale'
   | 'authprovider'
+  | 'oidc-client'
   | 'certificate'
   | 'trusted-authority'
   | 'vault'

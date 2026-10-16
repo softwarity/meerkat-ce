@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/gateway"
+	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/signing"
 	"github.com/softwarity/meerkat/internal/store"
@@ -18,8 +19,9 @@ import (
 func (a *API) registerSigning(mux Mux) {
 	mux.Handle("GET /api/identity/signing-keys", a.gw(a.getSigningKeys))
 	mux.Handle("POST /api/identity/signing-keys/renew", a.infraAdmin(a.renewSigningKeys))
-	// The "iss" of every identity JWT (AUTH-06), and the issuer the discovery
-	// document names (SAUTH-04). The router reloads on it.
+	// Which of the application plane's public addresses is the "iss" of every
+	// token (AUTH-06), the issuer both discovery documents name (SAUTH-04) and
+	// the OpenID provider's address (SAUTH-05). The router reloads on it.
 	mux.Handle("PUT /api/identity/issuer", a.infraAdmin(a.putIssuer))
 	mux.Handle("POST /api/identity/preview", a.infraAdmin(a.previewIdentity))
 }
@@ -77,7 +79,7 @@ func (a *API) previewIdentity(w http.ResponseWriter, r *http.Request, _ store.Us
 	case "headers":
 		res.Headers = gateway.PreviewHeaders(cfg)
 	case "jwt", "signed-jwt":
-		claims := gateway.PreviewClaims(cfg, req.RouteName, a.st.JWTIssuer(r.Context()))
+		claims := gateway.PreviewClaims(cfg, req.RouteName, a.st.JWTIssuer(r.Context(), a.DataAddr))
 		res.Claims = claims
 		if cfg.Mechanism == "jwt" {
 			tok, err := gateway.MintUnsignedJWT(claims)
@@ -137,9 +139,19 @@ type signingKeysView struct {
 	InternalPort  string `json:"internalPort"`
 	// InternalOrigin is the internal plane as the runtime names it, "" when
 	// none could be asked (see discovery.InternalOrigin).
-	InternalOrigin string       `json:"internalOrigin,omitempty"`
-	Issuer         string       `json:"issuer"`
-	Keys           []signingKey `json:"keys"`
+	InternalOrigin string `json:"internalOrigin,omitempty"`
+	// Issuer is the one in effect (store.JWTIssuer), Issuers what it may be:
+	// the application plane's public addresses, none while it has no public
+	// name - the console then says where to declare one.
+	Issuer  string       `json:"issuer"`
+	Issuers []string     `json:"issuers"`
+	Keys    []signingKey `json:"keys"`
+	// PublicDiscovery is the OpenID provider's discovery document under the
+	// issuer, the one address an application is told; absent while the
+	// issuer is not an address the provider can live at
+	// (oidcprovider.IssuerOrigin). Whether this image carries the provider is
+	// not its question: the community console shows the section dimmed.
+	PublicDiscovery string `json:"publicDiscovery,omitempty"`
 }
 
 func (a *API) signingView(ctx context.Context) (signingKeysView, error) {
@@ -148,7 +160,11 @@ func (a *API) signingView(ctx context.Context) (signingKeysView, error) {
 		return signingKeysView{}, err
 	}
 	view := signingKeysView{JwksPath: gateway.JWKSPath, DiscoveryPath: DiscoveryPath,
-		InternalPort: portOf(a.InternalAddr), InternalOrigin: a.internalOriginOf(ctx), Issuer: a.st.JWTIssuer(ctx)}
+		InternalPort: portOf(a.InternalAddr), InternalOrigin: a.internalOriginOf(ctx),
+		Issuer: a.st.JWTIssuer(ctx, a.DataAddr), Issuers: a.st.IssuerChoices(ctx, a.DataAddr)}
+	if _, err := oidcprovider.IssuerOrigin(view.Issuer); err == nil {
+		view.PublicDiscovery = view.Issuer + oidcprovider.DiscoveryPath
+	}
 	for _, alg := range signing.Algorithms {
 		pemStr, err := set.PublicPEM(alg)
 		if err != nil {
@@ -189,7 +205,8 @@ func (a *API) renewSigningKeys(w http.ResponseWriter, r *http.Request, actor sto
 	writeJSON(w, http.StatusOK, view)
 }
 
-// issuerChange is the issuer as the console sends it.
+// issuerChange is the issuer as the console sends it: one of the public
+// addresses the view lists.
 type issuerChange struct {
 	Issuer string `json:"issuer"`
 }
@@ -200,8 +217,8 @@ func (a *API) putIssuer(w http.ResponseWriter, r *http.Request, actor store.User
 		writeErr(w, http.StatusBadRequest, "malformed issuer: "+err.Error())
 		return
 	}
-	before := a.st.JWTIssuer(r.Context())
-	if err := a.st.SetJWTIssuer(r.Context(), p.Issuer); err != nil {
+	before := a.st.JWTIssuer(r.Context(), a.DataAddr)
+	if err := a.st.SetJWTIssuer(r.Context(), a.DataAddr, p.Issuer); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}

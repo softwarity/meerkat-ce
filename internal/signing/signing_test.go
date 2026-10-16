@@ -248,3 +248,44 @@ func uncompressed(x, y []byte) []byte {
 	copy(point[1+2*size-len(y):], y)
 	return point
 }
+
+// VerifyRS256 accepts what the set signed with RS256 - before and after a
+// rotation, inside the grace window - and nothing else: another algorithm, a
+// tampered payload, a key it never held.
+func TestVerifyRS256(t *testing.T) {
+	s, err := Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, err := s.SignJWT(RS256, map[string]any{"sub": "u1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims, err := s.VerifyRS256(tok)
+	if err != nil || claims["sub"] != "u1" {
+		t.Fatalf("own token: %v %v", claims, err)
+	}
+	if err := s.Renew(time.Now(), DefaultGrace); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.VerifyRS256(tok); err != nil {
+		t.Fatalf("a token signed before a rotation must verify inside the grace window: %v", err)
+	}
+	es, _ := s.SignJWT(ES256, map[string]any{"sub": "u1"})
+	if _, err := s.VerifyRS256(es); err == nil {
+		t.Fatal("an ES256 token was accepted")
+	}
+	parts := strings.Split(tok, ".")
+	forged := parts[0] + "." + b64([]byte(`{"sub":"root"}`)) + "." + parts[2]
+	if _, err := s.VerifyRS256(forged); err == nil {
+		t.Fatal("a tampered payload was accepted")
+	}
+	other, _ := Generate()
+	foreign, _ := other.SignJWT(RS256, map[string]any{"sub": "u1"})
+	if _, err := s.VerifyRS256(foreign); err == nil {
+		t.Fatal("a token of another key set was accepted")
+	}
+	if _, err := s.VerifyRS256("not-a-token"); err == nil {
+		t.Fatal("garbage was accepted")
+	}
+}

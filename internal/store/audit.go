@@ -205,6 +205,9 @@ var auditTargets = map[string]AuditTarget{
 	"acme-authority": {Domains: []string{AuditDomainInfra}},
 	// An authority the gateway trusts when it calls an upstream (SSL-09).
 	"trusted-authority": {Domains: []string{AuditDomainInfra}},
+	// An application signing its people in against this gateway (SAUTH-05),
+	// declared beside the issuer and the signing keys.
+	"oidc-client": {Domains: []string{AuditDomainInfra}},
 	// The application's identity and appearance: what an app-admin runs.
 	"theme":    {Domains: []string{AuditDomainApp}},
 	"locale":   {Domains: []string{AuditDomainApp}},

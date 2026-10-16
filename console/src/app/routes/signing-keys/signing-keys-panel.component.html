@@ -1,5 +1,5 @@
 <div class="head">
-  <h2 i18n="@@JWT_signing_keys">JWT signing keys</h2>
+  <h2 i18n="@@OIDC_JWT">OIDC / JWT</h2>
   <span class="grow"></span>
   <button matIconButton (click)="closed.emit()" i18n-matTooltip="@@Close" matTooltip="Close" i18n-aria-label="@@Close" aria-label="Close">
     <mat-icon>close</mat-icon>
@@ -10,8 +10,8 @@
 }
 <div class="panel-body">
   <p class="workflow" i18n="@@Signing_keys_workflow">
-    Three key pairs, one per algorithm. A route picks the one its service can verify; private keys
-    never leave this server.
+    What Meerkat signs with and where it publishes it: the identity a route passes to its service, as a
+    JWT on each request or by OIDC sign-in.
   </p>
   @if (data(); as d) {
     <!-- Both labels sit ON the border, the way an outlined field carries its
@@ -24,11 +24,13 @@
          installation gives it, and none of them is this console's. So the line
          below says which address to put in front, in the reader's terms rather
          than in ours. -->
-    <!-- The discovery document first, and the recommended one: from one
-         address a library learns both things it checks - the issuer and the
-         keys. The JWKS under it is for a library that only takes keys. -->
+    <!-- The well-known addresses together, in the order a reader needs them:
+         the internal discovery first, the recommended one - from one address a
+         library learns both things it checks, the issuer and the keys; the
+         provider's public discovery, the one address an application signing
+         people in is told; the JWKS, for a library that only takes keys. -->
     <div class="jwks">
-      <span class="lbl" i18n="@@Discovery_endpoint">Discovery</span>
+      <span class="lbl" i18n="@@Discovery_internal">Discovery (internal)</span>
       <span class="badge" i18n="@@Recommended">Recommended</span>
       <code class="path">{{ discoveryUrl() }}</code>
       <span class="spacer"></span>
@@ -36,6 +38,28 @@
         <mat-icon>content_copy</mat-icon>
       </button>
     </div>
+    <!-- Enterprise, like the rest of the provider: the community image shows
+         the line locked, never an address that would answer nothing. On the
+         Enterprise image, only while the provider answers. -->
+    @if (!enterprise) {
+      <div class="jwks" ee-feature="SAUTH-05">
+        <span class="lbl" i18n="@@Oidc_discovery_public">OIDC discovery (public)</span>
+        <app-ee-lock
+          feature="SAUTH-05"
+          i18n-why="@@Oidc_provider_ee_why"
+          why="Applications sign their users in through Meerkat, as with any OpenID Connect provider."
+        />
+      </div>
+    } @else if (publicDiscovery(); as pub) {
+      <div class="jwks">
+        <span class="lbl" i18n="@@Oidc_discovery_public">OIDC discovery (public)</span>
+        <code class="path">{{ pub }}</code>
+        <span class="spacer"></span>
+        <button matIconButton (click)="copy(pub)" i18n-matTooltip="@@Copy" matTooltip="Copy">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </div>
+    }
     <div class="jwks">
       <span class="lbl" i18n="@@JWKS_endpoint">JWKS</span>
       <code class="path">{{ jwksUrl() }}</code>
@@ -44,41 +68,59 @@
         <mat-icon>content_copy</mat-icon>
       </button>
     </div>
-    <!-- Said ONCE, here: it is about the JWKS above and about all three rows
-         at the same time. Inside each row it was the same paragraph three
-         times over. -->
+    <!-- Said ONCE, here: it is about the internal addresses above and about
+         all three key rows at the same time. -->
     <!-- The choice and its consequence, rather than the mechanism: what a
          reader has to leave with is that one path costs nothing forever and
          the other is theirs to maintain forever. -->
     <p class="fallback" i18n="@@Static_fallback5">
-      Both served on the internal plane (port {{ d.internalPort }}), under the gateway's name inside your
-      cluster: no ingress reaches them. A service reading either follows rotations on its own; one
-      holding a PEM from below must be updated at every rotation.
+      Services verify Meerkat's tokens from these addresses: the internal ones from inside the cluster
+      (port {{ d.internalPort }}), the public OIDC discovery for applications that sign their users in. A
+      service reading them follows key rotations on its own; one holding a PEM from below must be
+      updated at every rotation.
     </p>
-    <!-- The "iss" every token carries. "meerkat" by default; a library that
-         starts from the issuer needs it to be this plane's URL, since it
-         reads {issuer}/.well-known/openid-configuration. -->
-    <div class="issuer">
-      <app-form-field
-        class="grow"
-        subscriptSizing="dynamic"
-        i18n-label="@@Issuer"
-        label="Issuer"
-        i18n-info="@@Issuer_info"
-        info="The iss of every identity JWT, and the issuer of the discovery document. A library that starts from the issuer reads {issuer}/.well-known/openid-configuration: give it the internal plane's URL, such as http://meerkat:7070."
-        [error]="issuerMessage()"
-        [clearable]="false"
-      >
-        <input matInput [formField]="issuerForm.issuer" />
-      </app-form-field>
-      <button
-        matButton="tonal"
-        [disabled]="!issuerChanged() || issuerForm().invalid() || savingIssuer()"
-        (click)="saveIssuer()"
-        i18n="@@Save"
-      >Save</button>
-    </div>
+    <!-- The "iss" of every token, chosen among the application plane's public
+         addresses: never typed, since a library reads
+         {issuer}/.well-known/openid-configuration and the gateway has to
+         answer there. None declared yet: the tokens say "meerkat", and the
+         line says where to declare one. -->
+    @if (d.issuers.length) {
+      <div class="issuer">
+        <mat-form-field class="grow" subscriptSizing="dynamic">
+          <mat-label i18n="@@Public_address">Public address</mat-label>
+          <mat-select [value]="d.issuer" [disabled]="savingIssuer()" (selectionChange)="chooseIssuer($event.value)">
+            @for (a of d.issuers; track a) {
+              <mat-option [value]="a">{{ a }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <!-- Beside the field, as app-form-field does it: an explanation, not
+             an action on the value. Focusable, so the tooltip reaches a
+             keyboard. -->
+        <button
+          type="button"
+          class="field-info"
+          i18n-matTooltip="@@Public_address_info"
+          matTooltip="The issuer (iss) of every token Meerkat signs, and where applications find its OpenID discovery"
+          matTooltipPositionAtOrigin
+          i18n-aria-label="@@More_information"
+          aria-label="More information"
+          (click)="$event.preventDefault()"
+        ><mat-icon>info</mat-icon></button>
+      </div>
+    } @else {
+      <p class="warn-line">
+        <mat-icon>info</mat-icon>
+        <a routerLink="/infra/tls" [queryParams]="{ plane: 'app' }" i18n="@@Declare_public_name_link"
+          >Declare a public name in Domains &amp; TLS, Application tab</a
+        >
+      </p>
+    }
 
+    <p class="workflow" i18n="@@Signing_keys_pairs">
+      One key pair per algorithm. A route sending a JWT picks the one its service verifies; OIDC tokens
+      are signed RS256. Private keys never leave the gateway.
+    </p>
     @for (k of d.keys; track k.algorithm) {
       <mat-expansion-panel class="key">
         <mat-expansion-panel-header>
@@ -120,7 +162,10 @@
           <ul class="routes">
             @for (r of usersOf(k.algorithm); track r.id) {
               <li>
-                <button matButton (click)="routePicked.emit(r.id)">
+                <button
+                  matButton
+                  (click)="routePicked.emit({ id: r.id, section: r.identity?.mechanism === 'oidc' ? 'authforward' : 'identity' })"
+                >
                   <mat-icon>alt_route</mat-icon>
                   <span>{{ r.name }}</span>
                 </button>
@@ -145,17 +190,138 @@
         </div>
       </mat-expansion-panel>
     }
+    <!-- With the key pairs it renews. At the foot of the drawer it sat under
+         the OIDC clients, and read as something done to them. -->
+    <div class="renew">
+      @if (confirming()) {
+        <span class="warn" i18n="@@Rotate_confirm">Rotate now? The old keys stay valid for a short grace window.</span>
+        <button matButton (click)="confirming.set(false)" i18n="@@Cancel">Cancel</button>
+        <button matButton="filled" [disabled]="renewing()" (click)="renew()" i18n="@@Rotate">Rotate</button>
+      } @else {
+        <button matButton (click)="confirming.set(true)" [disabled]="renewing() || loading()">
+          <mat-icon>autorenew</mat-icon>
+          <span i18n="@@Renew_keys">Renew keys</span>
+        </button>
+      }
+    </div>
   }
-</div>
-<div class="panel-actions">
-  @if (confirming()) {
-    <span class="warn" i18n="@@Rotate_confirm">Rotate now? The old keys stay valid for a short grace window.</span>
-    <button matButton (click)="confirming.set(false)" i18n="@@Cancel">Cancel</button>
-    <button matButton="filled" [disabled]="renewing()" (click)="renew()" i18n="@@Rotate">Rotate</button>
-  } @else {
-    <button matButton (click)="confirming.set(true)" [disabled]="renewing() || loading()">
-      <mat-icon>autorenew</mat-icon>
-      <span i18n="@@Renew_keys">Renew keys</span>
-    </button>
-  }
+
+  <!-- The applications that sign their users in through Meerkat. In the
+       community image the block stays in sight, dimmed, with its cap: the
+       keys above it are not Enterprise and stay fully usable. -->
+  <section class="clients" ee-feature="SAUTH-05">
+    <div class="clients-head">
+      <h3 i18n="@@OIDC_clients">OIDC clients</h3>
+      <app-ee-lock
+        feature="SAUTH-05"
+        i18n-why="@@Oidc_provider_ee_why"
+        why="Applications sign their users in through Meerkat, as with any OpenID Connect provider."
+      />
+      <span class="spacer"></span>
+      <button matButton="tonal" (click)="editClient()">
+        <mat-icon>add</mat-icon>
+        <span i18n="@@New_client">New client</span>
+      </button>
+    </div>
+    <p class="workflow" i18n="@@Oidc_clients_workflow">
+      Applications that sign their users in through Meerkat. A route picks its client in Auth forward,
+      and its access rule decides who signs in.
+    </p>
+    @if (noPublicName()) {
+      <p class="warn-line">
+        <mat-icon>warning</mat-icon>
+        <span i18n="@@Oidc_needs_public_name">The provider answers once this gateway has a public address.</span>
+        <a routerLink="/infra/tls" [queryParams]="{ plane: 'app' }" i18n="@@Declare_public_name_link"
+          >Declare a public name in Domains &amp; TLS, Application tab</a
+        >
+      </p>
+    }
+    @if (clients().length === 0) {
+      <p class="idle" i18n="@@No_OIDC_client">None yet.</p>
+    } @else {
+      <mat-table [dataSource]="clients()">
+        <!-- One line per client, three columns: it has room since the return
+             addresses left - they come from its routes now. -->
+        <ng-container matColumnDef="id">
+          <mat-header-cell *matHeaderCellDef i18n="@@Client_id">Client id</mat-header-cell>
+          <mat-cell *matCellDef="let c"><span class="cid">{{ c.id }}</span></mat-cell>
+        </ng-container>
+        <ng-container matColumnDef="secret">
+          <mat-header-cell *matHeaderCellDef i18n="@@Secret">Secret</mat-header-cell>
+          <mat-cell *matCellDef="let c">
+            <span class="sub-line">
+              @if (c.confidential) {
+                <ng-container i18n="@@Secret_PREFIX">secret {{ c.secretPrefix }}...</ng-container>
+              } @else {
+                <ng-container i18n="@@No_secret_PKCE">no secret, PKCE</ng-container>
+              }
+            </span>
+          </mat-cell>
+        </ng-container>
+        <ng-container matColumnDef="routes">
+          <mat-header-cell *matHeaderCellDef i18n="@@Routes">Routes</mat-header-cell>
+          <mat-cell *matCellDef="let c">
+            <span class="who">
+              <!-- Who uses it: the routes that say what its tokens tell. -->
+              @for (r of c.routes ?? []; track r.id) {
+                <button matButton class="route-link" (click)="routePicked.emit({ id: r.id, section: 'authforward' })">
+                  <mat-icon>alt_route</mat-icon>
+                  <span>{{ r.name }}</span>
+                </button>
+              } @empty {
+                <span class="sub-line idle" i18n="@@No_route_uses_it">no route uses it</span>
+              }
+              @if (c.wholeHostRoutes?.length) {
+                <mat-icon
+                  class="whole-host"
+                  i18n-matTooltip="@@Oidc_whole_host_warning"
+                  matTooltip="{{ c.wholeHostRoutes.join(', ') }} covers a whole host: any address on it may receive a code."
+                  >warning</mat-icon
+                >
+              }
+            </span>
+            <!-- The row actions live in the LAST existing column: the routes. -->
+            <span rowActions="tonal">
+              <button
+                matIconButton
+                (click)="editClient(c)"
+                i18n-matTooltip="@@Edit"
+                matTooltip="Edit"
+                i18n-aria-label="@@Edit"
+                aria-label="Edit"
+              >
+                <mat-icon>edit</mat-icon>
+              </button>
+              @if (c.confidential) {
+                <button
+                  matIconButton
+                  (click)="regenerate(c)"
+                  i18n-matTooltip="@@Regenerate_secret"
+                  matTooltip="Regenerate the secret"
+                  i18n-aria-label="@@Regenerate_secret"
+                  aria-label="Regenerate the secret"
+                >
+                  <mat-icon>key</mat-icon>
+                </button>
+              }
+              <button
+                matIconButton
+                (click)="removeClient(c)"
+                i18n-matTooltip="@@Delete"
+                matTooltip="Delete"
+                i18n-aria-label="@@Delete"
+                aria-label="Delete"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </span>
+          </mat-cell>
+        </ng-container>
+
+        <mat-header-row *matHeaderRowDef="clientColumns"></mat-header-row>
+        <mat-row *matRowDef="let row; columns: clientColumns"></mat-row>
+      </mat-table>
+
+    }
+  </section>
 </div>

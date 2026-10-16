@@ -187,8 +187,14 @@ func routeSchema() map[string]any {
 		// inside it is still not this schema's job.
 		"identity": map[string]any{"type": "object",
 			"description": "What the route forwards about the caller to the service: mechanism " +
-				"('headers', 'jwt', 'signed-jwt'), the attributes, ttl, and algorithm for signed-jwt " +
-				"(ES256 by default, or EdDSA, RS256). Read it with get_route and send it back whole."},
+				"('headers', 'jwt', 'signed-jwt', 'oidc'), the attributes, ttl, and algorithm for signed-jwt " +
+				"(ES256 by default, or EdDSA, RS256). With 'oidc' nothing is forwarded: the application " +
+				"signs its people in against this gateway as an OpenID provider, through 'client' (an id " +
+				"from list_oidc_clients), and 'claims' say what its tokens carry - each {name, field} " +
+				"naming one of the attributes, or {name, value} fixed. The provider's own claims (iss, " +
+				"aud, exp, iat, nbf, nonce, azp, auth_time, at_hash, jti, client_id, scope) are refused; " +
+				"sub may be set. The route's access rule decides who may sign in. Enterprise edition " +
+				"only. Read it with get_route and send it back whole."},
 		"ui": map[string]any{"type": "object",
 			"description": "What a UI route injects: the colour scheme it drives, the roles and user info " +
 				"it writes on the page, the user button, the custom CSS and script."},

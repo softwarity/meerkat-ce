@@ -1,7 +1,7 @@
 ---
 title: Les pages servies par la gateway
 section: Authentification
-order: 118
+order: 120
 summary: Connexion, second facteur, changement de mot de passe, choix de l'organisation - les pages que Meerkat affiche lui-même, et jusqu'où vous pouvez les personnaliser.
 ---
 
@@ -21,6 +21,7 @@ ne doit jamais séjourner dans un cache partagé.
 |---|---|
 | `/login` | la page de connexion : le formulaire d'identification, un bouton par fournisseur d'identité, le bouton passkey, et les liens pour s'inscrire ou récupérer un mot de passe quand ces fonctions sont ouvertes |
 | `POST /logout` | met fin à cette session et revient à la page de connexion |
+| `GET /logout` | la déconnexion vers laquelle le bouton d'une application envoie : depuis une page du site, elle met fin à la session aussitôt, comme le POST ; depuis ailleurs, elle demande d'abord, avec un bouton **Sign out** |
 | `/totp` | la demande du second facteur, avec la case *faire confiance à ce navigateur* et le lien pour recevoir un code par e-mail quand ils sont disponibles |
 | `/totp-enroll` | l'enrôlement imposé, quand un second facteur est exigé et que le compte n'en a pas |
 | `/update-password` | le changement imposé : mot de passe temporaire ou expiré |

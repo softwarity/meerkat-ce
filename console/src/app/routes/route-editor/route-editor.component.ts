@@ -49,8 +49,12 @@ import {
   IDENTITY_FIELDS,
   IdentityAttr,
   IdentityForward,
+  IdentityMechanism,
   Injection,
   LocaleMechanism,
+  OIDCClaim,
+  OIDCClient,
+  OIDC_RESERVED_CLAIMS,
   PAGE_USER_FIELDS,
   RateLimit,
   Role,
@@ -338,6 +342,33 @@ const IDENTITY_TTL_CHOICES = [
   "PT1H",
 ];
 
+// The claims a new OIDC setup starts with, each kept only when Identity
+// declares its fact: the names every OIDC library reads first.
+const OIDC_DEFAULT_CLAIMS: [string, string][] = [
+  ["sub", "userid"],
+  ["preferred_username", "username"],
+  ["email", "email"],
+  ["name", "fullname"],
+];
+
+// One row of the "Claims sent" table, as edited: `from` is the Identity fact
+// it carries, or "" for a fixed value written in `value`. The wire shape
+// (OIDCClaim) has one of field or value; the row keeps both so switching the
+// source back and forth does not lose what was typed.
+interface ClaimRow {
+  name: string;
+  from: string;
+  value: string;
+}
+
+function claimRows(claims: OIDCClaim[] | undefined): ClaimRow[] {
+  return (claims ?? []).map((c) => ({
+    name: c.name,
+    from: c.field ?? "",
+    value: c.value ?? "",
+  }));
+}
+
 // The route's base Access as the editor's non-optional shape.
 function toAccessState(a: Access | undefined): AccessState {
   if (!a) return emptyAccess();
@@ -447,9 +478,12 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     // being traced is not a UI matter, only starting from the page is.
     telemetry: r?.telemetry ?? true,
     telemetryUi: r?.telemetryUi ?? false,
-    identityMechanism: r?.identity?.mechanism ?? "",
+    identityMechanism: (r?.identity?.mechanism ?? "") as IdentityMechanism,
     identityTtl: r?.identity?.ttl || "PT2M",
     identityAlgorithm: r?.identity?.algorithm || "ES256",
+    // OIDC: the client the application signs in as, and what its tokens say.
+    identityClient: r?.identity?.client ?? "",
+    identityClaims: claimRows(r?.identity?.claims),
     // One row per forwardable fact. On a route that already forwards, a fact is
     // selected when it appears in attributes (with its stored mapping); on a
     // fresh route everything is selected by default (nothing hidden from the
@@ -951,8 +985,132 @@ export class RouteEditorComponent {
   protected setMechanism(v: string): void {
     this.draft.update((d) => ({
       ...d,
-      identityMechanism: v as "" | "headers" | "jwt" | "signed-jwt",
+      identityMechanism: v as IdentityMechanism,
+      // A first OIDC setup starts from the claims every library reads, among
+      // the facts Identity declares. One already written is kept as it is.
+      identityClaims:
+        v === "oidc" && !d.identityClaims.length
+          ? OIDC_DEFAULT_CLAIMS.filter(([, f]) =>
+              this.oidcFacts().includes(f),
+            ).map(([name, from]) => ({ name, from, value: "" }))
+          : d.identityClaims,
     }));
+  }
+
+  // OIDC: the application signs in through Meerkat.
+
+  // The clients a route may sign in as. Read only once OIDC is picked: every
+  // other route has no use for the list.
+  private readonly oidcRes = httpResource<OIDCClient[]>(() =>
+    this.draft().identityMechanism === "oidc" ? "/api/oidc/clients" : undefined,
+  );
+  protected readonly oidcClients = computed(() => this.oidcRes.value() ?? []);
+  // The route names a client the list does not have (deleted, or not loaded
+  // yet): offered anyway, so the select shows what is stored.
+  protected readonly oidcClientUnlisted = computed(() => {
+    const id = this.draft().identityClient;
+    return !!id && !this.oidcClients().some((c) => c.id === id);
+  });
+  // The provider is Enterprise: on the community image the block says so.
+  protected readonly enterprise = computed(() => this.me.enterprise());
+
+  // The facts a claim may carry: what Identity declares, as it declares it.
+  protected readonly oidcFacts = computed(() => {
+    const declared = this.draft().identityAttrs;
+    return this.identityFields().filter(
+      (f) => declared[f]?.selected && !this.frozen(f),
+    );
+  });
+
+  // The same editor as the OIDC / JWT drawer's, and the new client chosen at
+  // once: it was made for this route.
+  protected async newOidcClient(): Promise<void> {
+    const { editOidcClient } = await import(
+      "../signing-keys/oidc-client-dialog.component"
+    );
+    const saved = await editOidcClient(this.dialog, this.api, {
+      taken: this.oidcClients().map((c) => c.id),
+    });
+    if (!saved) return;
+    this.oidcRes.reload();
+    this.draft.update((d) => ({ ...d, identityClient: saved.id }));
+  }
+
+  protected addClaim(): void {
+    this.draft.update((d) => ({
+      ...d,
+      identityClaims: [...d.identityClaims, { name: "", from: "", value: "" }],
+    }));
+  }
+
+  protected removeClaim(i: number): void {
+    this.draft.update((d) => ({
+      ...d,
+      identityClaims: d.identityClaims.filter((_, j) => j !== i),
+    }));
+  }
+
+  protected setClaim(i: number, change: Partial<ClaimRow>): void {
+    this.draft.update((d) => ({
+      ...d,
+      identityClaims: d.identityClaims.map((c, j) =>
+        j === i ? { ...c, ...change } : c,
+      ),
+    }));
+  }
+
+  // What stands between the OIDC setup and Save. The rules mirror the
+  // server's (gateway.Validate): it stays the authority, this only spares the
+  // reader a refusal they could have seen coming.
+  private oidcProblems(): string[] {
+    const d = this.draft();
+    if (d.identityMechanism !== "oidc") return [];
+    const out: string[] = [];
+    if (!d.identityClient) {
+      out.push($localize`:@@Gap_oidc_client:an OIDC client`);
+    } else if (
+      this.oidcRes.hasValue() &&
+      !this.oidcClients().some((c) => c.id === d.identityClient)
+    ) {
+      out.push(
+        $localize`:@@Gap_oidc_client_gone:the OIDC client ${d.identityClient}:client: no longer exists`,
+      );
+    }
+    const facts = this.oidcFacts();
+    const seen = new Set<string>();
+    const reserved: readonly string[] = OIDC_RESERVED_CLAIMS;
+    for (const c of d.identityClaims) {
+      const name = c.name.trim();
+      if (!name) {
+        out.push($localize`:@@Gap_claim_name:a name for every claim`);
+        continue;
+      }
+      if (/[\s"\\]/.test(name)) {
+        out.push(
+          $localize`:@@Gap_claim_name_shape:claim ${name}:claim:: no space, quote or backslash in a name`,
+        );
+      }
+      if (reserved.includes(name)) {
+        out.push(
+          $localize`:@@Gap_claim_reserved:claim ${name}:claim: is written by the provider itself`,
+        );
+      }
+      if (seen.has(name)) {
+        out.push($localize`:@@Gap_claim_twice:claim ${name}:claim: is sent twice`);
+      }
+      seen.add(name);
+      if (c.from && !facts.includes(c.from)) {
+        out.push(
+          $localize`:@@Gap_claim_fact:claim ${name}:claim: carries ${c.from}:fact:, which Identity does not declare`,
+        );
+      }
+      if (!c.from && !c.value.trim()) {
+        out.push(
+          $localize`:@@Gap_claim_value:claim ${name}:claim: needs a fact or a fixed value`,
+        );
+      }
+    }
+    return out;
   }
 
   // The roles format button states: what the value looks like right now.
@@ -982,6 +1140,27 @@ export class RouteEditorComponent {
   // same five characters - and it is opt-in: a service testing for ROLE_ADMIN
   // has to keep receiving it.
   protected readonly defaultRoleExpr = '{{join "," .Roles}}';
+
+  // The configured expression run on the real catalogue, tags included, for
+  // the widest case: a person holding every role. Undefined while the
+  // catalogue is loading or the expression is one the browser cannot read -
+  // the server judges that one on save.
+  protected readonly rolesExample = computed(() => {
+    const roles = this.roles();
+    if (!roles.length) return undefined;
+    const expr = this.draft().identityAttrs["roles"].expr || this.defaultRoleExpr;
+    try {
+      const out = runRoleExpr(
+        expr,
+        roles.map((r) => r.name),
+        new Map(roles.map((r) => [r.name, r.tags ?? []])),
+      );
+      const text = out.text.length > 300 ? out.text.slice(0, 300) + "..." : out.text;
+      return { text, count: out.count, total: roles.length };
+    } catch {
+      return undefined;
+    }
+  });
   // The expression under the row is coloured like the editor colours it.
   protected readonly SYNTAX = ROLE_SYNTAX;
 
@@ -1148,6 +1327,9 @@ export class RouteEditorComponent {
     // refuse. Flagged from the moment it is posed, therefore.
     validate(p.filters, ({ value }) =>
       this.brickGaps(cleanSpecs(value()), (e) => sectionOfPhase(e?.phase)),
+    );
+    validate(p.identityClaims, () =>
+      this.oidcProblems().map((m) => gapError("authforward", m)),
     );
   });
 
@@ -1682,6 +1864,7 @@ export class RouteEditorComponent {
       | "upstream"
       | "identityTtl"
       | "identityAlgorithm"
+      | "identityClient"
       | "btnPosition"
       | "btnShape"
       | "btnName"
@@ -2010,6 +2193,16 @@ export class RouteEditorComponent {
     }
     if (d.identityMechanism === "signed-jwt" && d.identityAlgorithm) {
       identity.algorithm = d.identityAlgorithm;
+    }
+    // OIDC carries its client and its claims, and nothing of the token
+    // settings above: the client holds the lifetime, the provider the keys.
+    if (d.identityMechanism === "oidc") {
+      identity.client = d.identityClient;
+      identity.claims = d.identityClaims.map((c) =>
+        c.from
+          ? { name: c.name.trim(), field: c.from }
+          : { name: c.name.trim(), value: c.value.trim() },
+      );
     }
     return identity;
   }

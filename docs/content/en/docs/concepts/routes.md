@@ -120,7 +120,7 @@ See [What the gateway injects](/docs/concepts/data-plane-chrome).
 | Timeouts | connect and first answer, per route, else the installation, else 5 s / 15 s. The body is never bounded: a download or a websocket that has started runs as long as it needs |
 | Circuit breaker | off by default. After N consecutive failures the route stops calling and serves the unavailable page, letting one request through after the cooldown. A 500 does not count - a service answering 500 is up and has a bug |
 | Rate limits | several at once, each keyed on something different - the route, a user, a token, an organisation, an address. The first one exceeded answers |
-| Identity forwarding | what the upstream is told about the caller - headers, or a signed JWT |
+| Identity forwarding | what the upstream is told about the caller - headers, or a signed JWT; or, the other way round, the application signs its users in through Meerkat as an [OpenID provider](/docs/auth/oidc-provider) |
 | Locales | the route's language offer, and how the language travels to the upstream |
 | OpenAPI spec | published by the service or deposited here; it is what per-endpoint rules are posed on |
 

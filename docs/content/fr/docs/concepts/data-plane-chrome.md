@@ -96,7 +96,9 @@ Aucune de ces deux voies n'est celle par laquelle un **service upstream** appren
 qui appelle. Il s'agit d'un mécanisme distinct - des en-têtes ou un JWT signé,
 configurés dans la section Identity de la route - et la gateway commence par
 purger toute valeur entrante de ces en-têtes : un appelant ne peut donc pas se
-faire passer pour quelqu'un d'autre.
+faire passer pour quelqu'un d'autre. Une application peut aussi connecter elle-même
+ses utilisateurs, par Meerkat comme fournisseur OpenID : voir
+[Brancher une application](/docs/auth/connect-an-application).
 
 ## Votre propre CSS et JavaScript
 

@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"html/template"
 	"net/http"
@@ -473,11 +471,7 @@ func (h *Handler) oauthRevoke(w http.ResponseWriter, r *http.Request) {
 
 // pkceMatches checks the S256 challenge against the verifier.
 func pkceMatches(challenge, verifier string) bool {
-	if challenge == "" || verifier == "" {
-		return false
-	}
-	sum := sha256.Sum256([]byte(verifier))
-	return base64.RawURLEncoding.EncodeToString(sum[:]) == challenge
+	return store.PKCEMatches(challenge, verifier)
 }
 
 // mintAgentToken produces an access token shaped exactly like a hand-minted

@@ -50,15 +50,16 @@
       <!-- Its own button, beside Global rather than inside it. Global holds
            settings, one line each; these are keys, with a rotation, a JWKS to
            hand to a backend and three PEMs to copy - they filled more of that
-           drawer than everything else in it. -->
+           drawer than everything else in it. "OIDC / JWT" since the OIDC
+           clients joined them: same issuer, same keys. -->
       <button
         matButton="tonal"
         (click)="openKeys()"
-        i18n-matTooltip="@@What_signs_the_identity_jwt"
-        matTooltip="What signs the identity JWT services verify"
+        i18n-matTooltip="@@What_signs_identity_tokens_and_oidc_clients"
+        matTooltip="What signs the identity tokens, and the applications that sign in through Meerkat"
       >
         <mat-icon svgIcon="jwt" />
-        <ng-container i18n="@@JWT">JWT</ng-container>
+        <ng-container i18n="@@OIDC_JWT">OIDC / JWT</ng-container>
       </button>
     </div>
 

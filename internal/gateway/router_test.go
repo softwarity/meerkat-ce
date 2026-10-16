@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -955,9 +956,14 @@ func TestIdentityForwardJWT(t *testing.T) {
 		t.Fatalf("missing exp claim: %+v", claims)
 	}
 
-	// The issuer is the installation's to set (AUTH-06), and the next
-	// request after the reload carries it.
-	if err := st.SetJWTIssuer(ctx, "http://meerkat:7070"); err != nil {
+	// The issuer follows the application plane's public names (AUTH-06),
+	// and the next request after the reload carries it.
+	tls := st.RawTLS(ctx)
+	tls.AppDoor = certs.Door{Names: []string{"gw.example.com", "id.example.com"}}
+	if err := st.SetSetting(ctx, store.SettingTLS, tls); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetJWTIssuer(ctx, rt.DataAddr, "https://id.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	if err := rt.Reload(ctx); err != nil {
@@ -972,7 +978,7 @@ func TestIdentityForwardJWT(t *testing.T) {
 	body3, _ := io.ReadAll(res3.Body)
 	_ = res3.Body.Close()
 	payload3, _ := base64.RawURLEncoding.DecodeString(strings.Split(strings.TrimPrefix(string(body3), "Bearer "), ".")[1])
-	if !strings.Contains(string(payload3), `"iss":"http://meerkat:7070"`) {
+	if !strings.Contains(string(payload3), `"iss":"https://id.example.com"`) {
 		t.Fatalf("the issuer set is not the one signed: %s", payload3)
 	}
 

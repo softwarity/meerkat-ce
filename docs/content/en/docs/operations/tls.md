@@ -219,7 +219,11 @@ So the Console and Application planes each say who serves their public names,
 plane, or **A proxy in front**. Both declare their **public names**, one full name each
 (`shop.example.com`); a name belongs to one plane, and the first name of the
 Application is the address of a mailed link or an identity provider's callback
-when no request says which. Switching mode keeps the names and the certificates:
+when no request says which. The Application's public names are also what the
+**issuer** of every token Meerkat signs is chosen among, as `https://<name>`: the
+`iss` of the identity JWT and the OpenID provider's address (see
+[The identity JWT](/docs/auth/service-jwt#the-issuer)). Adding, removing or
+reordering them moves the issuer on every node. Switching mode keeps the names and the certificates:
 a certificate that does not fit the new mode stays placed, marked *Inactive in
 this mode*, and serves again when the plane switches back. On the screen the
 toggle only proposes; **Apply**, then a confirmation, saves. A change of the
@@ -372,7 +376,7 @@ anybody saving anything. The screen shows the new end date.
 
 A file certificate is placed like any other. The **Internal** plane only takes one that
 carries one of the names the services call it by - read from the runtime, a wildcard counts - and
-there it opens the HTTPS door on `:7443`, and from then on the JWT drawer and the scheduler's page name the
+there it opens the HTTPS door on `:7443`, and from then on the OIDC / JWT drawer and the scheduler's page name the
 `https://` address. The services calling it must trust the authority that signed it - the
 cluster usually distributes it already: a ConfigMap annotated
 `service.beta.openshift.io/inject-cabundle` on OpenShift, a trust-manager bundle with

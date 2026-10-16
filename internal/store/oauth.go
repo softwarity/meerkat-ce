@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -79,6 +82,17 @@ func SameRedirect(registered, asked string) bool {
 		return false
 	}
 	return a.Hostname() == b.Hostname() && a.Path == b.Path
+}
+
+// PKCEMatches checks an S256 challenge against its verifier (RFC 7636). Shared
+// by the two authorisation servers - the agents' and the applications' - as
+// code, never as rows. "plain" is not a method here: it protects nothing.
+func PKCEMatches(challenge, verifier string) bool {
+	if challenge == "" || verifier == "" {
+		return false
+	}
+	sum := sha256.Sum256([]byte(verifier))
+	return subtle.ConstantTimeCompare([]byte(base64.RawURLEncoding.EncodeToString(sum[:])), []byte(challenge)) == 1
 }
 
 func isLoopback(host string) bool {

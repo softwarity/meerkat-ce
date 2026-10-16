@@ -86,6 +86,7 @@ const portalNavJS = `(function () {
       '--outline:var(--mk-outline,color-mix(in srgb,CanvasText 22%,transparent));' +
       '--primary:var(--mk-primary,#3355dd);' +
       '--onprimary:var(--mk-on-primary,#fff);' +
+      '--err:var(--mk-error,#b3261e);' +
       '--hover:color-mix(in srgb,var(--onsurface) 8%,transparent);' +
       // The current module wears the secondary container, as the navigation
       // indicator does in Material 3; a theme without one falls back to a tint.
@@ -224,6 +225,16 @@ const portalNavJS = `(function () {
     // nothing happens under the pointer.
     'button.tab.off,button.ritem.off,.grid button.tile.off{opacity:.38;cursor:default;}' +
     'button.tab.off:hover,.grid button.tile.off:hover,button.ritem.off:hover .pill{background:transparent;}' +
+    // An entry turned off in the portal itself reaches the bar only in the
+    // console's preview (people never get it): crossed out, so the editor sees
+    // at a glance what nobody will be offered.
+    '.hid{position:relative;}' +
+    '.hid>*{opacity:.45;}' +
+    '.hid::after{content:"";position:absolute;inset:4px;pointer-events:none;' +
+      'background:linear-gradient(to top right,transparent calc(50% - 1.5px),var(--err) calc(50% - 1.5px),' +
+      'var(--err) calc(50% + 1.5px),transparent calc(50% + 1.5px)),' +
+      'linear-gradient(to bottom right,transparent calc(50% - 1.5px),var(--err) calc(50% - 1.5px),' +
+      'var(--err) calc(50% + 1.5px),transparent calc(50% + 1.5px));}' +
     '.rail.exp a.ritem .pill,.rail.exp button.ritem .pill{width:auto;height:48px;padding:0 16px 0 13px;gap:12px;margin-top:0;}' +
     '.rail.r.exp a.ritem .pill,.rail.r.exp button.ritem .pill{flex-direction:row-reverse;padding:0 13px 0 16px;}' +
     '.pill .badge{position:absolute;top:-6px;right:-6px;}' +
@@ -275,8 +286,10 @@ const portalNavJS = `(function () {
     el.style.maskImage = uri;
   }
   // A greyed-out entry leads nowhere: no address, and it says so to
-  // assistive technology rather than only by its colour.
+  // assistive technology rather than only by its colour. One turned off in
+  // the portal (the console's preview only) is crossed out instead.
   function markOff(el, entry) {
+    if (entry.disabled) el.classList.add('hid');
     if (!entry.off) return;
     el.classList.add('off');
     el.setAttribute('aria-disabled', 'true');

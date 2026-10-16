@@ -2187,6 +2187,10 @@ func (h *Handler) Register(raw *http.ServeMux) {
 		// Signed in and refused anyway (RBAC-06), the third of the three
 		// refusals that has something to say.
 		mux.HandleFunc("GET /refused", h.showRefused)
+		// Signing out from an application's own button (logout.go): a GET,
+		// the only thing such a button can send. Not on the control plane,
+		// which has no application behind it and keeps the POST alone.
+		mux.HandleFunc("GET /logout", h.showLogout)
 		// The injected <meerkat-user-button> web component (UI routes).
 		h.registerUserButton(mux)
 		// The browser half of the tracing (OBS-04): the bundle this gateway
@@ -3698,16 +3702,6 @@ func (h *Handler) renderSelect(w http.ResponseWriter, r *http.Request, tenants [
 		data.Why = h.tr(r, "whyNamed")
 	}
 	writeFlow(w, selectTenantPage, data, status)
-}
-
-func (h *Handler) doLogout(w http.ResponseWriter, r *http.Request) {
-	if sess, err := h.sm.Resolve(r.Context(), r); err == nil {
-		h.securityOfIn(r, secSignout, sess.UserID, sess.TenantID, "")
-	}
-	if err := h.sm.Destroy(r.Context(), w, r); err != nil {
-		slog.Error("logout failed", "err", err)
-	}
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func (h *Handler) render(w http.ResponseWriter, r *http.Request, next, errMsg string, status int) {

@@ -151,8 +151,9 @@ func between(s, from, to string) string {
 }
 
 // TestTheDiscoveryDocumentNamesTheIssuerAndItsKeys: the issuer the gateway
-// signs with, and the JWKS at the address the caller used. Setting the issuer
-// from the console changes both the document and the tokens.
+// signs with, and the JWKS at the address the caller used. The issuer is one
+// of the application plane's public addresses: declaring a public name changes
+// both the document and the tokens, and choosing among several too.
 func TestTheDiscoveryDocumentNamesTheIssuerAndItsKeys(t *testing.T) {
 	f := setupBare(t)
 	srv := internalPlane(t, f)
@@ -172,24 +173,53 @@ func TestTheDiscoveryDocumentNamesTheIssuerAndItsKeys(t *testing.T) {
 	if d.Issuer != "meerkat" || d.JWKSURI != srv.URL+"/.well-known/jwks.json" || len(d.Algorithms) != 3 {
 		t.Fatalf("by default: %+v", d)
 	}
-
-	if code, body := f.call(t, "PUT", "/api/identity/issuer", `{"issuer":"two words"}`, f.rootC); code != http.StatusUnprocessableEntity {
-		t.Fatalf("an issuer with a space: %d %s", code, body)
+	// Nothing to choose from yet: refused, saying where to declare a name.
+	if code, body := f.call(t, "PUT", "/api/identity/issuer", `{"issuer":"https://gw.example.com"}`, f.rootC); code != http.StatusUnprocessableEntity ||
+		!strings.Contains(body, "Application tab") {
+		t.Fatalf("no public name: %d %s", code, body)
 	}
-	if code, body := f.call(t, "PUT", "/api/identity/issuer", `{"issuer":"http://meerkat:7070"}`, f.plainC); code != http.StatusForbidden {
+
+	// A public name declared: the issuer follows at once.
+	declareAppNames(t, f, "gw.example.com", "id.example.com")
+	if d := read(); d.Issuer != "https://gw.example.com" {
+		t.Fatalf("after declaring the names: %+v", d)
+	}
+
+	if code, body := f.call(t, "PUT", "/api/identity/issuer", `{"issuer":"http://meerkat:7070"}`, f.rootC); code != http.StatusUnprocessableEntity ||
+		!strings.Contains(body, "https://gw.example.com, https://id.example.com") {
+		t.Fatalf("an issuer outside the public addresses: %d %s", code, body)
+	}
+	if code, body := f.call(t, "PUT", "/api/identity/issuer", `{"issuer":"https://id.example.com"}`, f.plainC); code != http.StatusForbidden {
 		t.Fatalf("a plain account setting it: %d %s", code, body)
 	}
-	code, body := f.call(t, "PUT", "/api/identity/issuer", `{"issuer":"http://meerkat:7070"}`, f.rootC)
-	if code != http.StatusOK || !strings.Contains(body, `"issuer":"http://meerkat:7070"`) {
+	code, body := f.call(t, "PUT", "/api/identity/issuer", `{"issuer":"https://id.example.com"}`, f.rootC)
+	if code != http.StatusOK || !strings.Contains(body, `"issuer":"https://id.example.com"`) ||
+		!strings.Contains(body, `"issuers":["https://gw.example.com","https://id.example.com"]`) {
 		t.Fatalf("setting it: %d %s", code, body)
 	}
-	if d := read(); d.Issuer != "http://meerkat:7070" {
+	if d := read(); d.Issuer != "https://id.example.com" {
 		t.Fatalf("after the change: %+v", d)
 	}
 	code, body = f.call(t, "POST", "/api/identity/preview",
 		`{"routeName":"orders","identity":{"mechanism":"signed-jwt","algorithm":"ES256"}}`, f.rootC)
-	if code != http.StatusOK || !strings.Contains(body, `"iss":"http://meerkat:7070"`) {
+	if code != http.StatusOK || !strings.Contains(body, `"iss":"https://id.example.com"`) {
 		t.Fatalf("the token a service would receive: %d %s", code, body)
+	}
+
+	// The chosen name removed: the issuer follows to the one left.
+	declareAppNames(t, f, "gw.example.com")
+	if d := read(); d.Issuer != "https://gw.example.com" {
+		t.Fatalf("after removing the chosen name: %+v", d)
+	}
+}
+
+// declareAppNames declares the application plane's public names, served by a
+// proxy in front so no certificate is needed, as the Domains & TLS screen does.
+func declareAppNames(t *testing.T, f fixture, names ...string) {
+	t.Helper()
+	raw, _ := json.Marshal(map[string]any{"proxied": true, "names": names, "proxyAddresses": []string{}})
+	if code, body := f.call(t, "PUT", "/api/settings/tls/doors/app", string(raw), f.rootC); code != http.StatusOK {
+		t.Fatalf("declaring %v: %d %s", names, code, body)
 	}
 }
 
