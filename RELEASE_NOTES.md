@@ -2,6 +2,7 @@
 
 ## NEXT RELEASE
 
+- **plug 2.26.2 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The License screen says how far each feature is built with an icon.** A word on every row
   ("partly built", "planned") gave way to one icon per state, explained once in a legend, and the
   contract's keys (SVC-02, AUTH-03...) no longer show: nobody knows a feature by them.
