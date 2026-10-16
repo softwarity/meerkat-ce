@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.12.0
+
 - **plug 2.26.3 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The License screen says how far each feature is built with an icon.** A word on every row
   ("partly built", "planned") gave way to one icon per state, explained once in a legend, and the
