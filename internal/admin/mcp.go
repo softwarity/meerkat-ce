@@ -122,6 +122,10 @@ func (a *API) serveMCP(w http.ResponseWriter, r *http.Request, actor store.User)
 	// The tools run as the caller: they read the actor from the context rather
 	// than take it as an argument, so a tool added later cannot forget it.
 	r = r.WithContext(context.WithValue(r.Context(), mcpActorKey{}, actor))
+	// And its credentials, for the calls the agent makes through the control
+	// plane itself (mcp_api.go): they go in as this request came, so the
+	// guards, the token's perimeter and the audit see the same caller.
+	r = r.WithContext(context.WithValue(r.Context(), mcpCredsKey{}, mcpCreds(r)))
 	a.mcpServer().Handle(w, r, caller, a.mcpAllowOrigin)
 }
 
@@ -352,6 +356,8 @@ func (a *API) tools() []mcp.Tool {
 	read = append(read, a.scheduleTools()...)
 	read = append(read, a.roleTools()...)
 	read = append(read, a.oidcTools()...)
+	read = append(read, a.identityTools()...)
+	read = append(read, a.apiTools()...)
 	read = append(read, a.grantTools()...)
 	read = append(read, a.accountTools()...)
 	read = append(read, a.gitTools()...)

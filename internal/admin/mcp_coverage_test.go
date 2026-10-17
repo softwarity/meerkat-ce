@@ -2,24 +2,26 @@ package admin
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strings"
 	"testing"
 )
 
-// The rule that keeps the agent's tools from rotting (MCP-04).
+// The rule that keeps the agent from knowing less than the console (MCP-04,
+// MCP-09).
 //
-// A surface like this decays one feature at a time: someone adds a section to
-// the console, nobody adds the tool, and six months later the agent knows a
-// gateway that no longer exists. So the control plane's sections are the unit,
-// and every one of them is either covered by tools or deliberately not - with
-// the reason written down. A NEW SECTION fails this test until somebody
-// decides, which is the whole point.
+// Every endpoint of the control plane is in an agent's reach through
+// call_admin_api, unless agentClosedSections or agentClosedEndpoints
+// (mcp_api.go) close it with a reason. That was not always so: the tools were
+// written section by section, and a section counted as covered while forty of
+// its actions had no tool. So the unit here is the endpoint: each one either
+// resolves for an agent's call, or is closed by name.
 //
-// The section, not the endpoint, is the unit on purpose: an agent tool answers
-// a question ("who may reach this route"), and a question spans half a dozen
-// endpoints. Requiring one tool per endpoint would give sixty tools and an
-// agent recomposing REST calls, which is exactly what MCP-04 refuses.
+// The dedicated tools stay, because an agent tool answers a question ("who may
+// reach this route") better than an endpoint does. agentCovers says which
+// sections have them; a section without one is still open, through the
+// generic tools.
 
 // agentCovers maps a control-plane section to the tools that speak for it.
 var agentCovers = map[string][]string{
@@ -73,37 +75,10 @@ var agentCovers = map[string][]string{
 	// other half of a route bound with the oidc mechanism, which an agent
 	// writes with save_route. The secret is shown once, in the answer of the
 	// call that drew it, and is never readable - by an agent or a person.
-	"oidc": {"list_oidc_clients", "save_oidc_client", "regenerate_oidc_client_secret", "delete_oidc_client"},
-}
-
-// agentIgnores says why a section is out of an agent's reach, and each reason
-// has to be a reason - "not yet" is one, as long as it names what would change
-// it.
-var agentIgnores = map[string]string{
-	"me":                  "who the caller is, for the console's own chrome; an agent is told by describe_gateway",
-	"release-notes":       "what the running release brought, prose for a person under the console's account button",
-	"data-tokens":         "every account's application tokens: an agent holding one token has no business listing or revoking other people's",
-	"sessions":            "who is signed in where, and ending a person's session: a decision about a human in front of a screen, taken by a human in front of the console",
-	"apidocs":             "the developer documentation pages, served to a browser",
-	"backup":              "a snapshot is a file to download; export_configuration is the readable half an agent can reason about",
-	"certificates":        "certificates and private keys, one of the two places this product refuses to be clever",
-	"acme":                "the ACME accounts certificates are asked of: an account binding is a credential, and opening one is accepting an authority's terms - a legal act",
-	"trusted-authorities": "which authorities the gateway trusts when it calls: the other half of TLS, decided on the screen that holds the certificates, by the person who knows which PKI signs what",
-	"vault":               "secrets: the vault answers references, never values, and an agent has no business asking",
-	"admin-tokens":        "minting a control-plane token from an agent that holds one is how a perimeter stops meaning anything",
-	"auth-providers":      "external identity providers carry client secrets; the check endpoint reaches a third party under our credentials",
-	"identity":            "JWT signing keys",
-	"issues":              "user-filed reports, with screenshots",
-	"mcp":                 "the agent endpoint itself",
-	"model": "the shape of an account, not its contents: a field added or removed changes " +
-		"what every route may forward and what every form asks for, which is a decision " +
-		"about this installation rather than a task. An agent that fills the values it " +
-		"defines is save_user's business, not this",
-	"live": "the console's websocket: an agent does not hold a socket open to watch a " +
-		"list change, and what it carries is answered by read_traffic on demand",
-	"portal": "the icon picker's search over the embedded Material Symbols catalogue, " +
-		"for the console's portal editor; an agent picks no icons. The portal ITSELF " +
-		"is a global setting, and it is read by get_settings",
+	"oidc": {"list_oidc_clients", "save_oidc_client", "regenerate_oidc_client_secret", "delete_oidc_client", "try_oidc_sign_in"},
+	// The public keys, the issuer and a draft's preview (mcp_identity.go).
+	// The private halves never leave the server - not to a person either.
+	"identity": {"get_signing_keys", "set_issuer", "renew_signing_keys", "preview_identity"},
 }
 
 // patternRecorder collects what the API registers. See admin.Mux for why the
@@ -125,57 +100,25 @@ func controlPlaneSurface() []string {
 	return rec.patterns
 }
 
-// section is the part of the control plane a pattern belongs to:
-// "PUT /api/tenants/{id}/groups/{groupId}" -> "tenants".
-func section(pattern string) string {
-	_, path, ok := strings.Cut(pattern, " ")
-	if !ok {
-		path = pattern
-	}
-	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
-	if parts[0] == "api" && len(parts) > 1 {
-		return parts[1]
-	}
-	return parts[0]
-}
-
 func TestEverySectionIsEitherCoveredOrKnowinglyNot(t *testing.T) {
 	seen := map[string]bool{}
+	patterns := map[string]bool{}
 	for _, pattern := range controlPlaneSurface() {
 		seen[section(pattern)] = true
+		patterns[pattern] = true
 	}
 	tools := map[string]bool{}
 	for _, tool := range (&API{}).tools() {
 		tools[tool.Name] = true
 	}
-
-	var undecided []string
-	for s := range seen {
-		_, covered := agentCovers[s]
-		_, ignored := agentIgnores[s]
-		switch {
-		case covered && ignored:
-			t.Errorf("section %q is both covered and ignored: decide", s)
-		case !covered && !ignored:
-			undecided = append(undecided, s)
-		}
-	}
-	sort.Strings(undecided)
-	if len(undecided) > 0 {
-		t.Errorf(`the control plane grew a section no one decided about: %s
-
-Adding a section to the console means answering one question: can an agent do
-this? Either add its tools to admin.tools() and list them in agentCovers, or
-say in agentIgnores why an agent has no business there. Both answers are fine;
-silence is not - it is how the agent quietly stops knowing this product.`,
-			strings.Join(undecided, ", "))
-	}
-
-	// A tool named as covering a section must exist, and a section named here
-	// must exist too: both halves rot in silence otherwise.
+	// A tool named as covering a section must exist, a section named must
+	// exist, and so must what is closed: every half rots in silence otherwise.
 	for s, named := range agentCovers {
 		if !seen[s] {
 			t.Errorf("agentCovers names section %q, which the control plane no longer serves", s)
+		}
+		if _, closed := agentClosedSections[s]; closed {
+			t.Errorf("section %q has tools and is closed to agents: decide", s)
 		}
 		for _, name := range named {
 			if !tools[name] {
@@ -183,10 +126,58 @@ silence is not - it is how the agent quietly stops knowing this product.`,
 			}
 		}
 	}
-	for s := range agentIgnores {
+	for s, why := range agentClosedSections {
 		if !seen[s] {
-			t.Errorf("agentIgnores names section %q, which the control plane no longer serves", s)
+			t.Errorf("agentClosedSections names section %q, which the control plane no longer serves", s)
 		}
+		if strings.TrimSpace(why) == "" {
+			t.Errorf("section %q is closed with no reason", s)
+		}
+	}
+	for p, why := range agentClosedEndpoints {
+		if !patterns[p] {
+			t.Errorf("agentClosedEndpoints names %q, which the control plane no longer serves", p)
+		}
+		if strings.TrimSpace(why) == "" {
+			t.Errorf("%q is closed with no reason", p)
+		}
+	}
+}
+
+// Every endpoint resolves for an agent's call to the endpoint it is, or is
+// closed by name: nothing is out of reach by accident.
+func TestEveryEndpointIsInAnAgentsReachOrClosedByName(t *testing.T) {
+	mux := http.NewServeMux()
+	a := &API{}
+	a.Register(mux)
+	if a.selfMux != mux || len(a.surface) == 0 {
+		t.Fatal("Register did not keep what it mounted")
+	}
+	fill := strings.NewReplacer("{name...}", "a/b", "...}", "}")
+	open, closed := 0, 0
+	for _, pattern := range a.surface {
+		method, path, ok := strings.Cut(pattern, " ")
+		if !ok || !strings.HasPrefix(path, "/api/") {
+			continue
+		}
+		if agentClosed(pattern) != "" {
+			closed++
+			continue
+		}
+		concrete := fill.Replace(path)
+		for strings.Contains(concrete, "{") {
+			i := strings.Index(concrete, "{")
+			j := strings.Index(concrete[i:], "}")
+			concrete = concrete[:i] + "x" + concrete[i+j+1:]
+		}
+		req := httptest.NewRequest(method, concrete, nil)
+		if _, got := mux.Handler(req); got != pattern {
+			t.Errorf("%s: an agent's %s %s reaches %q", pattern, method, concrete, got)
+		}
+		open++
+	}
+	if open < 150 || closed == 0 {
+		t.Fatalf("open %d, closed %d: the surface is not what it was", open, closed)
 	}
 }
 
@@ -346,6 +337,7 @@ that list, not by the verb: half the testers in this API are POSTs.`,
 func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 	want := []string{
 		"activate_configuration",
+		"call_admin_api",
 		"call_route",
 		"delete_group",
 		"delete_oidc_client",
@@ -356,7 +348,9 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"get_branding",
 		"get_route",
 		"get_settings",
+		"get_signing_keys",
 		"import_configuration",
+		"list_admin_api",
 		"list_configurations",
 		"list_git_locations",
 		"list_groups",
@@ -375,13 +369,16 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"list_themes",
 		"list_users",
 		"pause_schedule",
+		"preview_identity",
 		"pull_configuration",
 		"push_configuration",
+		"read_admin_api",
 		"read_audit",
 		"read_language",
 		"read_logs",
 		"read_traffic",
 		"regenerate_oidc_client_secret",
+		"renew_signing_keys",
 		"run_schedule",
 		"save_branding",
 		"save_configuration",
@@ -392,7 +389,9 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"save_role",
 		"save_route",
 		"save_user",
+		"set_issuer",
 		"test_routing",
+		"try_oidc_sign_in",
 		"write_language",
 	}
 	var got []string

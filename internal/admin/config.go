@@ -211,6 +211,9 @@ var errReload = errors.New("applied, but the routing table could not be reloaded
 // recompiled and a document that no longer compiles says so rather than
 // reporting a clean import - the previous plan keeps serving in the meantime.
 func (a *API) applyDocument(ctx context.Context, doc *config.Document, prune bool, actor store.User, keep []config.Ref) (*config.Plan, error) {
+	if err := a.agentMayApplyDoc(ctx, doc, prune, false); err != nil {
+		return nil, invalidErr(err)
+	}
 	plan, err := config.Apply(ctx, a.st, doc, prune)
 	if err != nil {
 		return nil, err

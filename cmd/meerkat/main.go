@@ -733,9 +733,13 @@ func run(o options) error {
 	schedCtx, stopSchedules := context.WithCancel(context.Background())
 	defer stopSchedules()
 	go sched.Run(schedCtx)
+	adminHandler := whilePaused(st, refusesWhilePaused, refusePaused, adminSessions.Sliding(afterWrites(adminMux, "", identityChanged)))
+	// The agent calls the control plane through the very chain a request
+	// meets (MCP-09): the same pause, the same reload after a write.
+	adminAPI.Self = adminHandler
 	adminSrv := &http.Server{
 		Addr:              adminAddr,
-		Handler:           whilePaused(st, refusesWhilePaused, refusePaused, adminSessions.Sliding(afterWrites(adminMux, "", identityChanged))),
+		Handler:           adminHandler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	// Internal plane (:7070): the services behind the gateway, by token. No

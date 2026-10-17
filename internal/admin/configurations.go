@@ -217,33 +217,46 @@ func (a *API) recaptureConfiguration(w http.ResponseWriter, r *http.Request, act
 	if !ok {
 		return
 	}
-	file, ok := a.liveDocument(w, r)
-	if !ok {
+	c, err := a.recapture(r.Context(), actor, c)
+	if err != nil {
+		a.internal(w, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+// recapture refreshes a saved configuration from the running gateway and
+// names it the current one. Shared by the endpoint and the agent's tool.
+func (a *API) recapture(ctx context.Context, actor store.User, c store.Configuration) (store.Configuration, error) {
+	doc, _, err := config.Export(ctx, a.st)
+	if err != nil {
+		return c, err
+	}
+	raw, err := config.Marshal(doc)
+	if err != nil {
+		return c, err
+	}
+	file := string(raw)
 	if file == c.Document && c.Active {
 		// Nothing to save AND already the current one: answering the row as it
 		// stands beats a write that pretends something happened. (A document
 		// that matches but does NOT hold the mark still goes through: the mark
 		// is the half being claimed.)
-		writeJSON(w, http.StatusOK, c)
-		return
+		return c, nil
 	}
 	c.Document = file
-	if err := a.st.SaveConfiguration(r.Context(), &c); err != nil {
-		a.internal(w, err)
-		return
+	if err := a.st.SaveConfiguration(ctx, &c); err != nil {
+		return c, err
 	}
 	// Same as a first capture: this name now describes what is running, so it
 	// is the current one - even if another held the mark a second ago.
-	if err := a.st.MarkConfigurationActive(r.Context(), c.ID); err != nil {
-		a.internal(w, err)
-		return
+	if err := a.st.MarkConfigurationActive(ctx, c.ID); err != nil {
+		return c, err
 	}
 	c.Active = true
-	a.auditEvent(r.Context(), actor, "configuration.capture", "configuration", c.ID, c.Name, "",
+	a.auditEvent(ctx, actor, "configuration.capture", "configuration", c.ID, c.Name, "",
 		fmt.Sprintf("refreshed from the running gateway and named as the current one, %d bytes", len(file)))
-	writeJSON(w, http.StatusOK, c)
+	return c, nil
 }
 
 // replaceConfigurationDocument overwrites one configuration's document with an
@@ -473,6 +486,10 @@ func (a *API) activateConfiguration(w http.ResponseWriter, r *http.Request, acto
 	}
 	doc, keep, ok := a.keepOut(w, r, doc)
 	if !ok {
+		return
+	}
+	if err := a.agentMayApplyDoc(r.Context(), doc, true, true); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	plan, err := config.Switch(r.Context(), a.st, doc)

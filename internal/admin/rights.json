@@ -550,6 +550,11 @@
     "guard": "infraAdmin"
   },
   {
+    "method": "POST",
+    "path": "/api/oidc/clients/{id}/try",
+    "guard": "infraAdmin"
+  },
+  {
     "method": "GET",
     "path": "/api/portal/icons",
     "guard": "authed"

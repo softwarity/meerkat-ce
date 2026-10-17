@@ -1028,7 +1028,7 @@ export class RouteEditorComponent {
     const { editOidcClient } = await import(
       "../signing-keys/oidc-client-dialog.component"
     );
-    const saved = await editOidcClient(this.dialog, this.api, {
+    const saved = await editOidcClient(this.dialog, {
       taken: this.oidcClients().map((c) => c.id),
     });
     if (!saved) return;

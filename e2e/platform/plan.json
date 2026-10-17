@@ -2973,6 +2973,21 @@
    "fr": "Un agent liste les opérations d'une route et en appelle une à travers la gateway : 200 avec tous les rôles, 403 nommant le rôle manquant sans lui, le refus propre au service transmis tel quel, chaque appel audité."
   },
   {
+   "id": "MCP-09",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An agent creates an organisation and edits a theme through call_admin_api: the endpoint's guard decides (403 for an account that administers nothing), a read-only token is refused a write, the trail names the token; a closed endpoint (the vault, the TLS doors) is refused with its reason, and a document changing the TLS setting is refused to an agent whichever way it is applied.",
+   "fr": "Un agent crée une organisation et modifie un thème par call_admin_api : la garde de l'endpoint décide (403 pour un compte qui n'administre rien), un jeton en lecture seule se voit refuser une écriture, le journal nomme le jeton ; un endpoint fermé (le coffre, les portes TLS) est refusé avec sa raison, et un document qui change le réglage TLS est refusé à un agent par quelque chemin qu'il s'applique."
+  },
+  {
    "id": "SEC-01",
    "priority": "P1",
    "feasibility": "easy",

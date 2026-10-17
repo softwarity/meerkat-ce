@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -34,6 +35,72 @@ func (a *API) registerOIDC(mux Mux) {
 	mux.Handle("PUT /api/oidc/clients/{id}", a.infraAdmin(a.putOIDCClient))
 	mux.Handle("POST /api/oidc/clients/{id}/secret", a.infraAdmin(a.postOIDCSecret))
 	mux.Handle("DELETE /api/oidc/clients/{id}", a.infraAdmin(a.deleteOIDCClient))
+	// A sign-in tried on someone's behalf: what the application would get.
+	mux.Handle("POST /api/oidc/clients/{id}/try", a.infraAdmin(a.postOIDCTry))
+}
+
+// oidcTryIn is who a sign-in is tried for: an account, by id or username,
+// and the organisation the session would be opened in ("" adopts the only
+// membership, as sign-in does).
+type oidcTryIn struct {
+	User   string `json:"user"`
+	Tenant string `json:"tenant"`
+}
+
+func (a *API) postOIDCTry(w http.ResponseWriter, r *http.Request, _ store.User) {
+	var in oidcTryIn
+	if err := decodeStrict(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed trial: "+err.Error()+` - send {"user": "...", "tenant": "..."}`)
+		return
+	}
+	out, err := a.tryOIDCSignIn(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		a.writeOIDCErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// tryOIDCSignIn resolves the person as their session would be, then asks the
+// provider what it would issue: the route that lets them in, those that do
+// not, and the claims. Nothing is signed, stored or sent. Shared by the
+// endpoint and the agent's tool.
+func (a *API) tryOIDCSignIn(ctx context.Context, clientID string, in oidcTryIn) (oidcprovider.Trial, error) {
+	if err := edition.Require(oidcEdition); err != nil {
+		return oidcprovider.Trial{}, invalidErr(err)
+	}
+	client, err := a.st.GetOIDCClient(ctx, clientID)
+	if err != nil {
+		return oidcprovider.Trial{}, err
+	}
+	ref := strings.TrimSpace(in.User)
+	if ref == "" {
+		return oidcprovider.Trial{}, invalidErr(errors.New("whom to try it for: pass an account, by id or username"))
+	}
+	u, err := a.st.GetUserByID(ctx, ref)
+	if err != nil {
+		if u, err = a.st.GetUserByUsername(ctx, ref); err != nil {
+			return oidcprovider.Trial{}, invalidErr(fmt.Errorf("no account %q, by id or by username", ref))
+		}
+	}
+	tenantID := ""
+	if t := strings.TrimSpace(in.Tenant); t != "" {
+		if tenantID, err = a.tenantRef(ctx, t); err != nil {
+			return oidcprovider.Trial{}, invalidErr(err)
+		}
+	}
+	if a.router == nil || a.OIDC == nil {
+		return oidcprovider.Trial{}, errors.New("the application plane is not reachable from this control plane")
+	}
+	person, err := a.router.PersonFor(ctx, u.ID, tenantID)
+	if err != nil {
+		return oidcprovider.Trial{}, invalidErr(err)
+	}
+	trial, err := a.OIDC.Try(ctx, client, person)
+	if err != nil {
+		return oidcprovider.Trial{}, invalidErr(err)
+	}
+	return trial, nil
 }
 
 // oidcRouteRef is a route that signs people into a client.
@@ -59,7 +126,9 @@ type oidcClientView struct {
 }
 
 // oidcClientIssued is what declaring a client or drawing its secret answers:
-// the secret in clear, this once. Never again - only its hash is kept.
+// the secret in clear, this once. Never again - only its hash is kept. Empty
+// when the secret was the application's: the caller has it already, and
+// sending it back would only be one more place it is written.
 type oidcClientIssued struct {
 	Client oidcClientView `json:"client"`
 	Secret string         `json:"secret,omitempty"`
@@ -74,9 +143,14 @@ type oidcClientIn struct {
 	Confidential *bool  `json:"confidential"`
 	// RedirectURIs is refused when it names an address (checkNoRedirectURIs):
 	// a client declares none any more, and saying so beats dropping it.
-	RedirectURIs []string        `json:"redirectUris"`
-	Audience     string          `json:"audience"`
-	TokenTTL     string          `json:"tokenTtl"`
+	RedirectURIs []string `json:"redirectUris"`
+	Audience     string   `json:"audience"`
+	TokenTTL     string   `json:"tokenTtl"`
+	// Secret is the application's own, when it imposes one (its chart
+	// generates it, its vendor fixed it): kept as a hash, never drawn. Empty
+	// on a new confidential client: one is drawn. Only on a creation - a
+	// client's secret changes through POST /api/oidc/clients/{id}/secret.
+	Secret       string          `json:"secret"`
 	SecretPrefix string          `json:"secretPrefix"`
 	CreatedAt    int64           `json:"createdAt"`
 	UpdatedAt    int64           `json:"updatedAt"`
@@ -202,8 +276,19 @@ func (a *API) putOIDCClient(w http.ResponseWriter, r *http.Request, actor store.
 	writeJSON(w, http.StatusOK, out)
 }
 
+// oidcSecretIn is what POST /api/oidc/clients/{id}/secret accepts: nothing,
+// or null, to draw a secret; the application's own to keep that one.
+type oidcSecretIn struct {
+	Secret string `json:"secret"`
+}
+
 func (a *API) postOIDCSecret(w http.ResponseWriter, r *http.Request, actor store.User) {
-	out, err := a.regenerateOIDCSecret(r.Context(), actor, r.PathValue("id"))
+	var in oidcSecretIn
+	if err := decodeStrict(r, &in); err != nil && !errors.Is(err, io.EOF) {
+		writeErr(w, http.StatusBadRequest, "malformed secret: "+err.Error()+` - send nothing to draw one, or {"secret": "..."} to keep the application's`)
+		return
+	}
+	out, err := a.regenerateOIDCSecret(r.Context(), actor, r.PathValue("id"), in.Secret)
 	if err != nil {
 		a.writeOIDCErr(w, err)
 		return
@@ -219,7 +304,8 @@ func (a *API) deleteOIDCClient(w http.ResponseWriter, r *http.Request, actor sto
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// createOIDCClient declares a client and, when it keeps a secret, draws it.
+// createOIDCClient declares a client and, when it keeps a secret, draws it -
+// or keeps the one the application brings.
 // Shared by the endpoint and the agent's tool: one set of rules about what a
 // client may be.
 func (a *API) createOIDCClient(ctx context.Context, actor store.User, in oidcClientIn) (oidcClientIssued, error) {
@@ -234,7 +320,16 @@ func (a *API) createOIDCClient(ctx context.Context, actor store.User, in oidcCli
 		Audience: in.Audience, TokenTTL: in.TokenTTL,
 	}
 	var secret string
-	if c.Confidential {
+	switch {
+	case in.Secret != "" && !c.Confidential:
+		return oidcClientIssued{}, invalidErr(fmt.Errorf("client %q is public: it keeps no secret, and proves "+
+			"itself with PKCE - make it confidential to give it the application's secret", c.ID))
+	case in.Secret != "":
+		var err error
+		if c.SecretHash, c.SecretPrefix, err = store.OIDCSecretGiven(in.Secret); err != nil {
+			return oidcClientIssued{}, err
+		}
+	case c.Confidential:
 		var err error
 		if secret, c.SecretHash, c.SecretPrefix, err = store.NewOIDCSecret(); err != nil {
 			return oidcClientIssued{}, err
@@ -247,6 +342,9 @@ func (a *API) createOIDCClient(ctx context.Context, actor store.User, in oidcCli
 	kind := "public"
 	if saved.Confidential {
 		kind = "confidential"
+	}
+	if in.Secret != "" {
+		kind += ", secret given"
 	}
 	a.auditEvent(ctx, actor, "oidc.client.create", "oidc-client", saved.ID, saved.ID, "", kind)
 	view, err := a.oidcView(ctx, saved)
@@ -283,6 +381,10 @@ func (a *API) updateOIDCClient(ctx context.Context, actor store.User, in oidcCli
 	if err := checkNoRedirectURIs(in); err != nil {
 		return oidcClientView{}, err
 	}
+	if in.Secret != "" {
+		return oidcClientView{}, invalidErr(fmt.Errorf("an edit does not change the secret of client %q: "+
+			"set it with POST /api/oidc/clients/%s/secret, which says when the old one stops working", in.ID, in.ID))
+	}
 	old, err := a.st.GetOIDCClient(ctx, in.ID)
 	if err != nil {
 		return oidcClientView{}, err
@@ -312,17 +414,26 @@ func (a *API) updateOIDCClient(ctx context.Context, actor store.User, in oidcCli
 	return a.oidcView(ctx, saved)
 }
 
-// regenerateOIDCSecret draws a new secret for a confidential client: the old
-// one stops working at once, which is the point - this is what is done when a
-// secret leaked, or when a client became confidential.
-func (a *API) regenerateOIDCSecret(ctx context.Context, actor store.User, id string) (oidcClientIssued, error) {
+// regenerateOIDCSecret draws a new secret for a confidential client, or keeps
+// the one given (the application's own): the old one stops working at once,
+// which is the point - this is what is done when a secret leaked, when a
+// client became confidential, or when the application's secret changed.
+func (a *API) regenerateOIDCSecret(ctx context.Context, actor store.User, id, given string) (oidcClientIssued, error) {
 	if err := edition.Require(oidcEdition); err != nil {
 		return oidcClientIssued{}, invalidErr(err)
 	}
 	if _, err := a.st.GetOIDCClient(ctx, id); err != nil {
 		return oidcClientIssued{}, err
 	}
-	secret, hash, prefix, err := store.NewOIDCSecret()
+	var secret, hash, prefix string
+	var err error
+	what := "new secret "
+	if given != "" {
+		hash, prefix, err = store.OIDCSecretGiven(given)
+		what = "secret given "
+	} else {
+		secret, hash, prefix, err = store.NewOIDCSecret()
+	}
 	if err != nil {
 		return oidcClientIssued{}, err
 	}
@@ -333,7 +444,7 @@ func (a *API) regenerateOIDCSecret(ctx context.Context, actor store.User, id str
 	if err != nil {
 		return oidcClientIssued{}, err
 	}
-	a.auditEvent(ctx, actor, "oidc.client.secret", "oidc-client", id, id, "", "new secret "+prefix+"...")
+	a.auditEvent(ctx, actor, "oidc.client.secret", "oidc-client", id, id, "", what+prefix+"...")
 	view, err := a.oidcView(ctx, saved)
 	if err != nil {
 		return oidcClientIssued{}, err

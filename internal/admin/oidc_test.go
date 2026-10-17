@@ -263,3 +263,112 @@ func TestOIDCClientTools(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// An application that imposes its secret (its chart generates it, its vendor
+// fixed it) brings it: kept as a hash like a drawn one, never sent back, and
+// held to a length a leaked export does not give away.
+func TestAnOIDCClientKeepsTheApplicationsSecret(t *testing.T) {
+	f := setupEE(t)
+	const given = "chart-generated-0123456789"
+	code, out := f.call(t, "POST", "/api/oidc/clients", `{"id": "dbui", "secret": "`+given+`"}`, f.rootC)
+	if code != http.StatusCreated || strings.Contains(out, given) || strings.Contains(out, `"secret":"`) ||
+		!strings.Contains(out, `"secretPrefix":"char"`) {
+		t.Fatalf("a client created with the application's secret: %d %s", code, out)
+	}
+	c, err := f.api.st.GetOIDCClient(context.Background(), "dbui")
+	if err != nil || !c.SecretMatches(given) {
+		t.Fatalf("the application's secret does not sign in: %v", err)
+	}
+
+	for _, w := range []struct{ method, path, body, says string }{
+		{"POST", "/api/oidc/clients", `{"id": "short", "secret": "too-short"}`, "from 16 to 256"},
+		{"POST", "/api/oidc/clients", `{"id": "spaced", "secret": "a secret with spaces"}`, "a space"},
+		{"POST", "/api/oidc/clients", `{"id": "spa", "confidential": false, "secret": "` + given + `"}`, "is public"},
+		{"PUT", "/api/oidc/clients/dbui", `{"secret": "` + given + `"}`, "/secret"},
+		{"POST", "/api/oidc/clients/dbui/secret", `{"secret": "short"}`, "from 16 to 256"},
+	} {
+		if code, out := f.call(t, w.method, w.path, w.body, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, w.says) {
+			t.Fatalf("%s %s %s: %d %s", w.method, w.path, w.body, code, out)
+		}
+	}
+	if code, out := f.call(t, "POST", "/api/oidc/clients/dbui/secret", `{"colour": "red"}`, f.rootC); code != http.StatusBadRequest {
+		t.Fatalf("an invented field: %d %s", code, out)
+	}
+
+	// The application's secret changed: the old one stops at once.
+	const next = "chart-rotated-abcdefghijklm"
+	code, out = f.call(t, "POST", "/api/oidc/clients/dbui/secret", `{"secret": "`+next+`"}`, f.rootC)
+	if code != http.StatusOK || strings.Contains(out, next) || strings.Contains(out, `"secret":"`) {
+		t.Fatalf("the application's new secret: %d %s", code, out)
+	}
+	c, err = f.api.st.GetOIDCClient(context.Background(), "dbui")
+	if err != nil || c.SecretMatches(given) || !c.SecretMatches(next) {
+		t.Fatalf("the old secret still works, or the new one does not: %v", err)
+	}
+	// And drawing one is still what an empty body does.
+	if code, out := f.call(t, "POST", "/api/oidc/clients/dbui/secret", "", f.rootC); code != http.StatusOK || !strings.Contains(out, `"secret":"`+store.OIDCSecretPrefix) {
+		t.Fatalf("a drawn secret after a given one: %d %s", code, out)
+	}
+
+	events, err := f.api.st.ListAuditEvents(context.Background(), store.AuditFilter{Target: "oidc-client"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range events {
+		raw, _ := json.Marshal(e)
+		if strings.Contains(string(raw), given) || strings.Contains(string(raw), next) {
+			t.Errorf("a secret reached the trail: %s", raw)
+		}
+	}
+
+	// The agent passes it the same way.
+	ctx := context.WithValue(context.Background(), mcpActorKey{}, store.User{ID: "root", Username: "root", Root: true})
+	res, err := f.api.toolSaveOIDCClient(ctx, json.RawMessage(`{"id": "agent-made", "secret": "`+given+`"}`))
+	if err != nil || res.(map[string]any)["secret"] != nil {
+		t.Fatalf("an agent's client with the application's secret: %v %v", res, err)
+	}
+	res, err = f.api.toolRegenerateOIDCSecret(ctx, json.RawMessage(`{"id": "agent-made", "secret": "`+next+`"}`))
+	if err != nil || res.(map[string]any)["secret"] != nil {
+		t.Fatalf("an agent setting the application's secret: %v %v", res, err)
+	}
+	if c, err := f.api.st.GetOIDCClient(context.Background(), "agent-made"); err != nil || !c.SecretMatches(next) {
+		t.Fatalf("the agent's secret does not sign in: %v", err)
+	}
+}
+
+// The console draws a secret in the browser, in the shape the server draws
+// it, and hands it over: the list shows it as a drawn one.
+func TestASecretDrawnByTheConsoleKeepsTheDrawnPrefix(t *testing.T) {
+	f := setupEE(t)
+	drawn, _, _, err := store.NewOIDCSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, out := f.call(t, "POST", "/api/oidc/clients", `{"id": "drawn", "secret": "`+drawn+`"}`, f.rootC)
+	if code != http.StatusCreated || strings.Contains(out, drawn) || !strings.Contains(out, `"secretPrefix":"`+drawn[:12]+`"`) {
+		t.Fatalf("a console-drawn secret: %d %s", code, out)
+	}
+}
+
+// A trial names what it is missing before it asks the provider anything.
+func TestATrialSaysWhoItCannotTry(t *testing.T) {
+	f := setupEE(t)
+	if code, out := f.call(t, "POST", "/api/oidc/clients", `{"id": "app"}`, f.rootC); code != http.StatusCreated {
+		t.Fatalf("client: %d %s", code, out)
+	}
+	for _, c := range []struct{ path, body, says string }{
+		{"/api/oidc/clients/app/try", `{}`, "whom to try it for"},
+		{"/api/oidc/clients/app/try", `{"user": "nobody"}`, `no account \"nobody\"`},
+		{"/api/oidc/clients/app/try", `{"user": "bob", "tenant": "nowhere"}`, `no organisation \"nowhere\"`},
+	} {
+		if code, out := f.call(t, "POST", c.path, c.body, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, c.says) {
+			t.Fatalf("%s: %d %s", c.body, code, out)
+		}
+	}
+	if code, _ := f.call(t, "POST", "/api/oidc/clients/ghost/try", `{"user": "bob"}`, f.rootC); code != http.StatusNotFound {
+		t.Fatalf("an unknown client: %d", code)
+	}
+	if code, _ := f.call(t, "POST", "/api/oidc/clients/app/try", `{"user": "bob"}`, f.plainC); code != http.StatusForbidden {
+		t.Fatalf("a plain account: %d", code)
+	}
+}

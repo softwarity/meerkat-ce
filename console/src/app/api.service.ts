@@ -516,6 +516,17 @@ export interface OIDCClientSecret {
   secret?: string;
 }
 
+// A sign-in tried for a person (oidcprovider.Trial): the route that lets them
+// in (absent when none does), the routes that refuse them, and the claims of
+// the tokens and of userinfo, unsigned.
+export interface OIDCTrial {
+  route?: { id: string; name: string };
+  refused: { id: string; name: string }[];
+  idToken?: Record<string, unknown>;
+  accessToken?: Record<string, unknown>;
+  userinfo?: Record<string, unknown>;
+}
+
 // What an upstream would receive for a fictional caller, given a (possibly
 // unsaved) identity config: the headers, or the bearer token with its decoded
 // claims and, for signed-jwt, the key material that verifies it.
@@ -2518,7 +2529,9 @@ export class ApiService {
     return this.http.get<OIDCClient[]>('/api/oidc/clients');
   }
 
-  createOidcClient(c: OIDCClient): Observable<OIDCClientSecret> {
+  // secret is the application's own when it imposes one: kept as a hash, and
+  // then not sent back. Absent, one is drawn and comes back this once.
+  createOidcClient(c: OIDCClient & { secret?: string }): Observable<OIDCClientSecret> {
     return this.http.post<OIDCClientSecret>('/api/oidc/clients', c);
   }
 
@@ -2527,8 +2540,14 @@ export class ApiService {
     return this.http.put<OIDCClient>(`/api/oidc/clients/${encodeURIComponent(c.id)}`, c);
   }
 
-  regenerateOidcClientSecret(id: string): Observable<OIDCClientSecret> {
-    return this.http.post<OIDCClientSecret>(`/api/oidc/clients/${encodeURIComponent(id)}/secret`, null);
+  regenerateOidcClientSecret(id: string, secret?: string): Observable<OIDCClientSecret> {
+    return this.http.post<OIDCClientSecret>(`/api/oidc/clients/${encodeURIComponent(id)}/secret`, secret ? { secret } : null);
+  }
+
+  // A sign-in tried on someone's behalf, nothing issued: what the application
+  // would get. user by id or username, tenant optional (the only membership).
+  tryOidcSignIn(id: string, user: string, tenant: string): Observable<OIDCTrial> {
+    return this.http.post<OIDCTrial>(`/api/oidc/clients/${encodeURIComponent(id)}/try`, { user, tenant });
   }
 
   // Refused (409, naming them) while a route uses the client.

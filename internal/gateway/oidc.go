@@ -1,12 +1,15 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"maps"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/signing"
@@ -104,6 +107,26 @@ func (rt *Router) PersonOf(req *http.Request, sess store.Session) (Person, bool)
 		return Person{}, false
 	}
 	return Person{d: d}, true
+}
+
+// PersonFor resolves an account as a session opened in tenantID would be: the
+// same facts and roles a request carrying that session gets, read fresh. For
+// an administrator trying a sign-in on someone's behalf, so the answer is
+// what that person would get, not a sample. tenantID "" adopts the only
+// membership, as sign-in does. The refusals say which part does not hold.
+func (rt *Router) PersonFor(ctx context.Context, userID, tenantID string) (Person, error) {
+	req := (&http.Request{}).WithContext(ctx)
+	e, ok := rt.readIdentity(req, store.Session{UserID: userID, TenantID: tenantID})
+	if !ok {
+		return Person{}, fmt.Errorf("no account %q", userID)
+	}
+	if !e.owner.Enabled || !e.owner.ValidAt(time.Now()) {
+		return Person{}, fmt.Errorf("account %q is disabled or outside its validity window: it signs nobody in", e.data.Username)
+	}
+	if tenantID != "" && !slices.Contains(e.data.Memberships, tenantID) {
+		return Person{}, fmt.Errorf("%s is not an enabled member of organisation %q", e.data.Username, tenantID)
+	}
+	return Person{d: e.data}, nil
 }
 
 // Through is the person as route sees them: the same facts, with the route's

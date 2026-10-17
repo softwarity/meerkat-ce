@@ -52,6 +52,7 @@ company, commercially, for free.
 | --- | --- | --- |
 | **Organisations** | One, and the console never makes you name it. | Several, each with its members, groups and owner, chosen at sign-in. |
 | **Corporate directory** | OpenID Connect, GitHub | SAML 2.0, LDAP and Active Directory as well. |
+| **The OpenID provider of your tools** | - | Applications that only sign in against an OpenID provider sign their people in through the gateway, the route deciding who and with which roles. See [the OpenID provider](/docs/auth/oidc-provider). |
 | **Roles from the directory** | Granted in Meerkat | Group rules: an LDAP group, a GitHub team or an OIDC claim becomes a membership and its roles, at each sign-in. |
 | **Certificates** | Generated, imported or signed on request, placed on the console and the application by hand | ACME as well: Let's Encrypt, ZeroSSL, Google or your own step-ca issue and renew them on their own, several authorities side by side. |
 | **Business hours** | - | Access windows: time ranges, week days, time zone. Partial - see the [roadmap](/project/roadmap). |

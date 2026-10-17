@@ -65,6 +65,7 @@ or a paid service.
 | Branded pages, 20 languages | a theme to build | depends on the plan | included |
 | Customer SSO: OIDC, SAML, LDAP, AD | Keycloak | Auth0, WorkOS, billed per connection | included, Enterprise for SAML and LDAP |
 | Organisations your customers manage | admin screens to build | WorkOS, Frontegg | included, Enterprise |
+| Single sign-on into tools that only speak OpenID Connect | Keycloak, a realm and a client per tool | Auth0, Okta | included, Enterprise |
 | Protect an application that has no login | oauth2-proxy, Pomerium Core | Pomerium Enterprise, Cloudflare Access | included |
 | Routing, rate limits, quotas | Kong OSS, APISIX, Traefik, Envoy Gateway | Kong Enterprise, Tyk, Traefik Hub, API7, Gravitee | included |
 | Automatic HTTPS certificates | cert-manager | in the higher gateway plans | included, Enterprise |

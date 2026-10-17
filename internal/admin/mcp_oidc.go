@@ -44,7 +44,8 @@ func (a *API) oidcTools() []mcp.Tool {
 				"id it holds is that client, and on an existing one what you pass is what changes. " +
 				"A NEW confidential client comes back with its secret in clear, ONCE: hand it to " +
 				"the application's configuration, it cannot be read again (regenerate_oidc_client_secret " +
-				"draws a new one). A client declares no redirect uri: a code goes back to an address " +
+				"draws a new one). When the application imposes its own secret (its chart generates it, " +
+				"its vendor fixed it), pass it as secret: it is kept as a hash and not sent back. A client declares no redirect uri: a code goes back to an address " +
 				"under the paths of the enabled routes bound to it, on their host - bind the " +
 				"application's route to the client with save_route. Enterprise edition only.",
 			Schema: object(map[string]any{
@@ -56,19 +57,43 @@ func (a *API) oidcTools() []mcp.Tool {
 						"itself with PKCE alone."},
 				"audience": str("The name the application expects in its access tokens. Empty: the client id."),
 				"tokenTtl": str("How long the id and access tokens live, ISO-8601 from PT1M to PT24H. Empty: PT5M."),
+				"secret": str("A NEW confidential client only: the application's own secret, 16 to 256 characters, " +
+					"no spaces, when it imposes one. Omitted: one is drawn and shown once. An existing client's " +
+					"secret changes with regenerate_oidc_client_secret."),
 			}, "id"),
 			Call: a.toolSaveOIDCClient,
 		},
 		{
-			Name: "regenerate_oidc_client_secret", Allow: administersRouting, Title: "Draw a new secret for an OIDC client",
+			Name: "regenerate_oidc_client_secret", Allow: administersRouting, Title: "Replace the secret of an OIDC client",
 			Description: "Replace a confidential client's secret. The old one stops working AT ONCE, " +
-				"so the application is refused until its configuration carries the new one, which " +
-				"this answer shows in clear, once. Do this when a secret leaked, or after making a " +
-				"public client confidential. Enterprise edition only.",
+				"so the application is refused until its configuration carries the new one. Without " +
+				"secret, one is drawn and this answer shows it in clear, once; with secret, the " +
+				"application's own is kept, as a hash, and not sent back. Do this when a secret leaked, " +
+				"after making a public client confidential, or when the application's secret changed. " +
+				"Enterprise edition only.",
 			Schema: object(map[string]any{
 				"id": str("The client id, as list_oidc_clients spells it."),
+				"secret": str("The application's own secret, 16 to 256 characters, no spaces, when it " +
+					"imposes one. Omitted: one is drawn."),
 			}, "id"),
 			Call: a.toolRegenerateOIDCSecret,
+		},
+		{
+			Name: "try_oidc_sign_in", Allow: administersRouting, Title: "Try a sign-in through an OIDC client", ReadOnly: true,
+			Description: "What an application would get if this person signed in through this client now, " +
+				"with nothing issued: the route that decides (the first bound to the client, in routing " +
+				"order, whose access rule lets them in), the routes whose rule refuses them, and the claims " +
+				"of the ID token, the access token and userinfo - built by the code that issues the real " +
+				"ones, with the person's own roles and facts. Use it after save_route and save_oidc_client " +
+				"to check a setup end to end, or to answer 'why does this person see nothing in the " +
+				"application'. Enterprise edition only.",
+			Schema: object(map[string]any{
+				"id":   str("The client id, as list_oidc_clients spells it."),
+				"user": str("The account, by id or username."),
+				"tenant": str("Optional: the organisation the session would be opened in, by id or name. " +
+					"Empty: the only one the person belongs to, as sign-in adopts it."),
+			}, "id", "user"),
+			Call: a.toolTryOIDCSignIn,
 		},
 		{
 			Name: "delete_oidc_client", Allow: administersRouting, Title: "Delete an OIDC client",
@@ -106,6 +131,7 @@ func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any
 		RedirectURIs []string `json:"redirectUris"`
 		Audience     string   `json:"audience"`
 		TokenTTL     string   `json:"tokenTtl"`
+		Secret       string   `json:"secret"`
 	}
 	if err := decode(args, &in); err != nil {
 		return nil, err
@@ -115,7 +141,7 @@ func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any
 		return nil, fmt.Errorf("which client: pass its id, the client_id the application's configuration spells")
 	}
 	body := oidcClientIn{ID: in.ID, Confidential: in.Confidential, RedirectURIs: in.RedirectURIs,
-		Audience: in.Audience, TokenTTL: in.TokenTTL}
+		Audience: in.Audience, TokenTTL: in.TokenTTL, Secret: in.Secret}
 	if _, err := a.st.GetOIDCClient(ctx, in.ID); err == nil {
 		view, err := a.updateOIDCClient(ctx, mcpActor(ctx), body, given)
 		if err != nil {
@@ -131,23 +157,55 @@ func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any
 	if out.Secret != "" {
 		res["secret"] = out.Secret
 		res["note"] = "the secret is shown this once: put it in the application's configuration now"
+	} else if in.Secret != "" {
+		res["note"] = "the application's secret is kept, as a hash: nothing to copy"
 	}
 	return res, nil
 }
 
 func (a *API) toolRegenerateOIDCSecret(ctx context.Context, args json.RawMessage) (any, error) {
-	id, err := oidcToolID(args)
-	if err != nil {
+	var in struct {
+		ID     string `json:"id"`
+		Secret string `json:"secret"`
+	}
+	if err := decode(args, &in); err != nil {
 		return nil, err
 	}
-	out, err := a.regenerateOIDCSecret(ctx, mcpActor(ctx), id)
+	id := strings.TrimSpace(in.ID)
+	if id == "" {
+		return nil, fmt.Errorf("which client: pass its id, as list_oidc_clients spells it")
+	}
+	out, err := a.regenerateOIDCSecret(ctx, mcpActor(ctx), id, in.Secret)
 	if err != nil {
 		return nil, oidcToolErr(id, err)
+	}
+	if in.Secret != "" {
+		return map[string]any{
+			"client": out.Client,
+			"note":   "the old secret no longer works; the application's is kept, as a hash",
+		}, nil
 	}
 	return map[string]any{
 		"client": out.Client, "secret": out.Secret,
 		"note": "the old secret no longer works; this one is shown this once",
 	}, nil
+}
+
+func (a *API) toolTryOIDCSignIn(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		ID     string `json:"id"`
+		User   string `json:"user"`
+		Tenant string `json:"tenant"`
+	}
+	if err := decode(args, &in); err != nil {
+		return nil, err
+	}
+	id := strings.TrimSpace(in.ID)
+	trial, err := a.tryOIDCSignIn(ctx, id, oidcTryIn{User: in.User, Tenant: in.Tenant})
+	if err != nil {
+		return nil, oidcToolErr(id, err)
+	}
+	return trial, nil
 }
 
 func (a *API) toolDeleteOIDCClient(ctx context.Context, args json.RawMessage) (any, error) {

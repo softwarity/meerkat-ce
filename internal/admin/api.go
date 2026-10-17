@@ -73,6 +73,14 @@ type API struct {
 	// DoorTraffic is which of the console's doors are called (SSL-15): what
 	// keeps the port a proxy still calls from being switched off.
 	DoorTraffic *certs.Traffic
+
+	// Self is the control plane as a request meets it - the mux wrapped in
+	// what main wraps it in (the pause, the sliding session, the reload after
+	// a write) - for the agent's calls through it (mcp_api.go). Nil falls back
+	// to the mux Register was given. surface and selfMux are what Register saw.
+	Self    http.Handler
+	surface []string
+	selfMux *http.ServeMux
 	// DiscoverACME asks an authority's directory whether it answers, when an
 	// authority is saved. Nil: Authority.Discover, over the network. A test
 	// replaces it rather than reach Let's Encrypt.
@@ -217,6 +225,17 @@ type Mux interface {
 // Register mounts the API on mux. The routing plane is GATEWAY scope
 // (RBAC-05): root or the infra-admin capability.
 func (a *API) Register(mux Mux) {
+	// What is mounted is kept, for the agent's way into the whole control
+	// plane (mcp_api.go): the list it reads, and the mux it calls through.
+	rec := &recordingMux{next: mux}
+	a.register(rec)
+	a.surface = rec.patterns
+	if sm, ok := mux.(*http.ServeMux); ok {
+		a.selfMux = sm
+	}
+}
+
+func (a *API) register(mux Mux) {
 	mux.Handle("GET /api/catalog", a.gw(a.catalog))
 	mux.Handle("GET /api/routes", a.gw(a.listRoutes))
 	mux.Handle("POST /api/routes/reorder", a.infraAdmin(a.reorderRoutes))

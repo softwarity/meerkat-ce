@@ -188,6 +188,10 @@ func (a *API) restoreConfigPoint(w http.ResponseWriter, r *http.Request, actor s
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	if err := a.agentMayApplyDoc(r.Context(), doc, true, true); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	plan, err := config.Switch(r.Context(), a.st, doc)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())

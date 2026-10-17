@@ -42,8 +42,10 @@ var readsNothing = map[string]bool{
 	"POST /api/identity/preview":          true,
 	"POST /api/config/preview":            true,
 	"POST /api/auth-providers/{id}/check": true,
-	"POST /api/settings/mail-relay/test":  true,
-	"POST /api/settings/telemetry/test":   true,
+	// A sign-in tried on someone's behalf: nothing issued, nothing stored.
+	"POST /api/oidc/clients/{id}/try":    true,
+	"POST /api/settings/mail-relay/test": true,
+	"POST /api/settings/telemetry/test":  true,
 	// Proving a git location answers and its credential is accepted (CFG-07):
 	// it reaches a repository and stores not one byte.
 	"POST /api/config-remotes/{id}/check": true,

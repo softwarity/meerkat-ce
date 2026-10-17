@@ -495,6 +495,47 @@ async function seedFonts(page) {
   }
 }
 
+// The OpenID provider (SAUTH-05), laid down just before its shots: a public
+// name to be the issuer, three clients - one per kind of secret - and a route
+// signing its people into one of them. Not in the fixture, for the same reason
+// as the fonts route: the routes screen's captions count five.
+const WIKI = {
+  id: 'wiki', name: 'Team wiki', order: 7, enabled: true, isUi: true,
+  upstream: 'http://wiki.svc.acme.internal:3000',
+  access: { level: 'auth' },
+  predicates: [{ type: 'path', args: { patterns: ['/wiki/**'] } }],
+  identity: {
+    mechanism: 'oidc', client: 'wiki',
+    attributes: [{ field: 'username' }, { field: 'fullname' }, { field: 'email' }, { field: 'roles' }],
+    claims: [
+      { name: 'preferred_username', field: 'username' },
+      { name: 'name', field: 'fullname' },
+      { name: 'email', field: 'email' },
+      { name: 'groups', field: 'roles' },
+    ],
+  },
+};
+async function seedOidc(page) {
+  const api = page.request;
+  await api.put(`${ADMIN}/api/settings/tls/doors/app`, {
+    data: { proxied: true, names: ['shop.example.com', 'apps.example.com'], proxyAddresses: [] },
+  });
+  for (const c of [
+    { id: 'wiki' },
+    { id: 'dashboards', secret: 'chart-generated-4f9c2b7e1d' },
+    { id: 'mobile-app', confidential: false },
+  ]) {
+    await api.post(`${ADMIN}/api/oidc/clients`, { data: c });
+  }
+  await api.put(`${ADMIN}/api/routes/wiki`, { data: WIKI });
+}
+const openOidcDrawer = async (page) => {
+  await page.getByRole('button', { name: 'OIDC / JWT' }).first().click();
+  await page.waitForTimeout(1200);
+  await page.locator('app-signing-keys-panel section.clients').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+};
+
 const SHOTS = [
   // ── Infra ──
   { file: 'routes-list', path: '/infra/routes' },
@@ -561,6 +602,41 @@ const SHOTS = [
       await page.waitForTimeout(600);
     },
   },
+  // After tls-proxied, which declares the same public names through the
+  // screen: the provider needs one for its issuer.
+  // The OIDC / JWT drawer down to its clients, one of each kind of secret.
+  { file: 'oidc-clients', path: '/infra/routes', prepare: seedOidc, settle: 1600, act: openOidcDrawer },
+  {
+    // A new client: its secret drawn in the form, to copy before saving.
+    file: 'oidc-client', path: '/infra/routes', settle: 1600,
+    act: async (page) => {
+      await openOidcDrawer(page);
+      await page.getByRole('button', { name: 'New client' }).first().click();
+      await page.waitForTimeout(800);
+      await page.locator('mat-dialog-container input').first().fill('reports');
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    // A sign-in tried for one person through the wiki's client.
+    file: 'oidc-try', path: '/infra/routes', settle: 1600,
+    act: async (page) => {
+      await openOidcDrawer(page);
+      // The row's actions show on hover.
+      const row = page.locator('app-signing-keys-panel mat-row', { hasText: 'Team wiki' });
+      await row.hover();
+      // rowActions lifts them out of the row: found on the page.
+      await page.getByRole('button', { name: 'Try a sign-in' }).first().click();
+      await page.waitForTimeout(900);
+      const dialog = page.locator('mat-dialog-container');
+      await dialog.locator('mat-select').first().click();
+      await page.getByRole('option', { name: /^alice/ }).click();
+      await dialog.getByRole('button', { name: 'Try' }).click();
+      await page.waitForTimeout(1200);
+    },
+  },
+  // A route signing its people into a client, with the claims it sends.
+  { file: 'route-editor-oidc', path: '/infra/routes/wiki/authforward', settle: 1600 },
   { file: 'access-tokens', path: '/infra/access-tokens' },
   { file: 'mcp', path: '/infra/mcp' },
   { file: 'model', path: '/infra/model' },

@@ -250,8 +250,11 @@
           <mat-header-cell *matHeaderCellDef i18n="@@Secret">Secret</mat-header-cell>
           <mat-cell *matCellDef="let c">
             <span class="sub-line">
-              @if (c.confidential && c.secretPrefix) {
+              @if (c.confidential && c.secretPrefix?.startsWith('mko_')) {
                 <ng-container i18n="@@Secret_PREFIX">secret {{ c.secretPrefix }}...</ng-container>
+              } @else if (c.confidential && c.secretPrefix) {
+                <!-- The application's own: drawn neither here nor shown here. -->
+                <ng-container i18n="@@Application_secret_PREFIX">application's secret {{ c.secretPrefix }}...</ng-container>
               } @else if (c.confidential) {
                 <!-- Imported from a configuration that did not carry its
                      secret: the application cannot sign in until one is drawn. -->
@@ -308,6 +311,16 @@
                   <mat-icon>key</mat-icon>
                 </button>
               }
+              <button
+                matIconButton
+                (click)="tryClient(c)"
+                i18n-matTooltip="@@Try_a_sign_in"
+                matTooltip="Try a sign-in"
+                i18n-aria-label="@@Try_a_sign_in"
+                aria-label="Try a sign-in"
+              >
+                <mat-icon>login</mat-icon>
+              </button>
               <button
                 matIconButton
                 (click)="removeClient(c)"

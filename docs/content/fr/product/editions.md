@@ -56,6 +56,7 @@ en entreprise, pour un usage commercial, gratuitement.
 | --- | --- | --- |
 | **Organisations** | Une seule, que la console ne vous demande jamais de nommer. | Plusieurs, chacune avec ses membres, ses groupes et son propriétaire, choisie à la connexion. |
 | **Annuaire d'entreprise** | OpenID Connect, GitHub | SAML 2.0, LDAP et Active Directory en plus. |
+| **Le fournisseur OpenID de vos outils** | - | Les applications qui ne savent se connecter qu'à un fournisseur OpenID connectent leurs utilisateurs par la gateway, la route décidant qui et avec quels rôles. Voir [le fournisseur OpenID](/docs/auth/oidc-provider). |
 | **Rôles issus de l'annuaire** | Accordés dans Meerkat | Règles de groupe : un groupe LDAP, une équipe GitHub ou un claim OIDC devient une appartenance et ses rôles, à chaque connexion. |
 | **Certificats** | Générés, importés ou signés sur demande, placés à la main sur la console et sur l'application | ACME en plus : Let's Encrypt, ZeroSSL, Google ou votre propre step-ca les émettent et les renouvellent sans intervention, avec plusieurs autorités côte à côte. |
 | **Heures ouvrées** | - | Fenêtres d'accès : plages horaires, jours de la semaine, fuseau horaire. Livré en partie - voir la [feuille de route](/project/roadmap). |

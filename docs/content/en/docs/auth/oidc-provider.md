@@ -81,16 +81,41 @@ for a developer's gateway.
 | Field | What it decides |
 |---|---|
 | **Client id** | what the application calls its `client_id`: lower-case letters, digits, `.`, `_` and `-`, up to 63 characters. Fixed once the client exists |
-| **The application keeps a secret** | on for an application with a server side: the gateway draws a secret, starting with `mko_`, shown **once** with a copy button and kept only as a hash. Off for code running in a browser or on a phone, which cannot hide a secret: it then proves itself with **PKCE** (S256), which becomes mandatory |
+| **Client secret** | where the secret comes from, one choice of three (below) |
 | **Audience** | the `aud` of the access tokens: the name the application expects to find there. Empty, the client id. The ID token's `aud` is always the client id |
 | **Token lifetime** | of the ID and access tokens: 5 minutes by default, from 1 minute to 24 hours. A refresh renews them |
 
 A client declares no return address: the routes bound to it say where the
 application lives ([Where the code may go](#where-the-code-may-go)).
 
+![A new client, its secret drawn by Meerkat in the form](img/console/oidc-client.webp)
+
+### The client secret
+
+One field under the three choices, whatever the choice:
+
+| Choice | The field | When |
+|---|---|---|
+| **No secret** | off | code running in a browser or on a phone, which cannot hide a secret: it proves itself with **PKCE** (S256), which becomes mandatory |
+| **Drawn by Meerkat** | a secret starting with `mko_`, drawn in the form, with a copy button and a button to draw another | the application takes the secret it is given: copy it into its configuration before saving |
+| **Given by the application** | empty, to paste into | the application imposes its own: its chart generates it, or its vendor fixed it. 16 to 256 characters, no spaces |
+
+Whichever it is, the gateway keeps only its sha256 and never shows it again: the
+list shows its first characters, `mko_...` for a drawn one, *application's secret*
+and four characters for the other. The minimum length is there because the sha256
+travels in an exported configuration, and a short secret is found back from it.
+
+Editing a client shows the start of its secret and keeps it as it is. Draw another
+or paste another and the hint says it: **the current secret stops working when you
+save**, and the application signs nobody in until it carries the new one. Cancel
+leaves it working.
+
+![The clients under the keys: a secret drawn by Meerkat, the application's own, and none](img/console/oidc-clients.webp)
+
 Each row of the list names the routes that use the client; a click opens one on
 its **Auth forward** section. A warning mark says when one of them covers a whole
-host. The key icon draws a **new secret**: the old one stops working at once. A client a route still uses cannot be deleted, and the
+host. The key icon opens the client on a **new secret** drawn by Meerkat, in force
+once saved. A client a route still uses cannot be deleted, and the
 refusal names the routes.
 
 The clients travel in a [configuration](/docs/console/configuration), the secret as
@@ -109,6 +134,8 @@ name and a source:
   e-mail, the full name, the organisation, the roles... rendered as the JWT
   mechanism renders it, the roles through the expression Identity gives them;
 - **a fixed value**, the same for everyone who signs in through this route.
+
+![A route bound to a client, the claims its tokens carry and what each says for the person editing](img/console/route-editor-oidc.webp)
 
 A new setup starts with the names every OpenID library reads first, each kept
 only if Identity declares its fact: `sub` (the account id), `preferred_username`,
@@ -241,6 +268,24 @@ default lifetime is short. An application that ends only its own session leaves
 the person signed in at the gateway, and its next sign-in goes through without a
 page.
 
+## Try a sign-in
+
+The arrow icon on a client's row tries a sign-in for anyone, without them and
+without issuing anything. Pick the person, and the organisation their session
+would be opened in (their only one by default):
+
+- the route that lets them in - the first bound to the client, in routing order,
+  whose rule does - or a refusal when none does;
+- the routes whose rule turned them away;
+- the claims of the **ID token**, the **access token** and **userinfo**, unsigned.
+
+The claims are built by the code that builds the real tokens, with the person's own
+roles and facts and the route's role mapping: what you read is what the application
+receives. It answers "why does this person see nothing in the application" before
+anyone asks them to sign in again.
+
+![A sign-in tried for one person: the route that lets them in, and the ID token's claims](img/console/oidc-try.webp)
+
 ## When it does not work
 
 What the person or the application sees, and the line the gateway logs
@@ -269,7 +314,13 @@ token):
 
 The control-plane API is `/api/oidc/clients`, every change audited with the secret
 redacted, and an agent has the matching tools (`list_oidc_clients`,
-`save_oidc_client`, `regenerate_oidc_client_secret`, `delete_oidc_client`).
+`save_oidc_client`, `regenerate_oidc_client_secret`, `delete_oidc_client`,
+`try_oidc_sign_in`), and for the issuer and the keys (`get_signing_keys`,
+`set_issuer`, `renew_signing_keys`): an assistant can put an application behind
+the gateway end to end and prove it with a trial. Through
+the API or a tool, a confidential client given no `secret` has one drawn by the
+server and shown once in the answer; given one, the application's, it keeps it and
+sends nothing back.
 
 ## Read more
 

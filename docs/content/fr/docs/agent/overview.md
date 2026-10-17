@@ -59,7 +59,37 @@ assistant plutôt qu'en cliquant.
 | `get_branding`, `save_branding` | L'identité que portent les pages intégrées. |
 | `list_themes` | Les palettes de couleurs, et celle qui est active. |
 | `export_configuration` | Toute la configuration, sous la forme d'un document lisible. |
-| `save_configuration`, `list_configurations` | Des snapshots nommés, auxquels revenir. |
+| `save_configuration`, `list_configurations` | Des snapshots nommés, auxquels revenir ; `replace` en rafraîchit un depuis l'état courant, avant un push. |
+| `list_oidc_clients`, `save_oidc_client`, `try_oidc_sign_in` | Les applications qui se connectent par la gateway, et ce qu'une personne donnée y recevrait. |
+| `get_signing_keys`, `set_issuer`, `renew_signing_keys`, `preview_identity` | L'émetteur et les clés publiques, et ce qu'enverrait une identité en brouillon. |
+
+## Tout ce que fait la console
+
+Les outils ci-dessus répondent bien aux questions fréquentes. Pour tout le reste,
+trois outils atteignent **tout le plan de contrôle** - l'API que la console
+appelle elle-même :
+
+| Outil | Ce qu'il fait |
+|---|---|
+| `list_admin_api` | Les sections, puis les endpoints de l'une d'elles, avec un résumé quand la documentation de l'API en a un. |
+| `read_admin_api` | Un GET, comme le ferait la console. |
+| `call_admin_api` | N'importe quelle requête : créer une organisation, annuler un changement depuis l'historique, comparer deux configurations, modifier un thème ou un réglage. |
+
+Ils passent par les mêmes endpoints que la console, avec le jeton de l'agent :
+la garde de l'endpoint décide, un jeton en lecture seule le reste, et le journal
+d'audit nomme le jeton. Rien n'est réimplémenté, donc rien ne se désynchronise.
+
+Ce qui reste fermé est court, et chaque refus donne sa raison :
+
+- les **certificats** et leurs clés privées, les comptes **ACME** (en ouvrir un,
+  c'est accepter les conditions d'une autorité) et les **autorités de confiance** ;
+- le **coffre** : un agent travaille avec des `$noms`, un secret est saisi par une
+  personne ;
+- la création de **jetons du plan de contrôle** ;
+- les **sauvegardes** (un fichier à télécharger, une copie de base) ;
+- les **portes et ports TLS** et l'interrupteur qui laisse entrer les agents : un
+  changement là peut couper la console. Une configuration qu'un agent importe,
+  active ou restaure est refusée si elle les modifie.
 
 ## Appeler les services derrière les routes
 

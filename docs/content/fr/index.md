@@ -75,6 +75,15 @@ CSS par rôle sont ajoutés aux pages que sert la gateway. Votre
 application en bénéficie quel que soit le langage dans lequel elle est écrite,
 et n'embarque aucune bibliothèque pour cela.
 
+### L'authentification unique de vos autres outils
+
+La console d'un broker, une interface de base de données, un tableau de bord :
+toute application qui parle OpenID Connect connecte ses utilisateurs par la
+gateway, qui devient leur fournisseur OpenID - sans Keycloak à côté. La route
+décide qui entre et les rôles que portent les jetons, et une connexion s'essaie
+pour n'importe qui avant qu'il ne la tente.
+[Enterprise](/docs/auth/oidc-provider).
+
 ### Modifiée à chaud, jamais redémarrée
 
 Onze prédicats décident qu'une requête relève d'une route, trente-quatre filtres
@@ -121,8 +130,8 @@ payer. Lisez le code, modifiez-le, livrez-le dans votre propre produit ; deux
 ans après sa publication, chaque version passe sous licence Apache 2.0.
 
 Enterprise est ce qu'il vous faut dès que l'installation grandit : plusieurs
-organisations, SAML, LDAP et Active Directory, plusieurs gateways derrière un même
-point d'entrée. Jamais une brique de sécurité : TLS, le second facteur, les passkeys,
+organisations, SAML, LDAP et Active Directory, le fournisseur OpenID de vos autres
+outils, plusieurs gateways derrière un même point d'entrée. Jamais une brique de sécurité : TLS, le second facteur, les passkeys,
 le coffre et le journal d'audit sont gratuits et le resteront. Team, c'est
 Enterprise pour un cluster de taille connue, et l'édition d'évaluation, c'est
 Enterprise avec une mention affichée, gratuite, pour tout essayer d'abord.

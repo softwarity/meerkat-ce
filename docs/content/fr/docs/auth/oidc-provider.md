@@ -85,17 +85,42 @@ développeur.
 | Champ | Ce qu'il décide |
 |---|---|
 | **Client id** | ce que l'application appelle son `client_id` : lettres minuscules, chiffres, `.`, `_` et `-`, 63 caractères au plus. Figé une fois le client créé |
-| **The application keeps a secret** | activé pour une application qui a un côté serveur : la gateway tire un secret, qui commence par `mko_`, montré **une seule fois** avec un bouton de copie et gardé seulement sous forme de hash. Désactivé pour du code qui tourne dans un navigateur ou sur un téléphone, qui ne peut rien cacher : il se prouve alors par **PKCE** (S256), qui devient obligatoire |
+| **Client secret** | d'où vient le secret, un choix parmi trois (ci-dessous) |
 | **Audience** | le `aud` des access tokens : le nom que l'application s'attend à y trouver. Vide, l'identifiant du client. Le `aud` de l'ID token est toujours l'identifiant du client |
 | **Token lifetime** | la durée de vie des ID tokens et des access tokens : 5 minutes par défaut, de 1 minute à 24 heures. Un refresh les renouvelle |
 
 Un client ne déclare aucune adresse de retour : les routes qui lui sont liées
 disent où vit l'application ([L'adresse de retour](#ladresse-de-retour)).
 
+![Un nouveau client, son secret tiré par Meerkat dans le formulaire](img/console/oidc-client.webp)
+
+### Le secret du client
+
+Un seul champ sous les trois choix, quel que soit le choix :
+
+| Choix | Le champ | Quand |
+|---|---|---|
+| **No secret** | désactivé | du code qui tourne dans un navigateur ou sur un téléphone, qui ne peut rien cacher : il se prouve par **PKCE** (S256), qui devient obligatoire |
+| **Drawn by Meerkat** | un secret qui commence par `mko_`, tiré dans le formulaire, avec un bouton de copie et un bouton pour en tirer un autre | l'application prend le secret qu'on lui donne : copiez-le dans sa configuration avant d'enregistrer |
+| **Given by the application** | vide, à remplir | l'application impose le sien : son chart le génère, ou son éditeur l'a figé. De 16 à 256 caractères, sans espace |
+
+Dans tous les cas, la gateway n'en garde que le sha256 et ne le montre plus jamais :
+la liste en affiche le début, `mko_...` pour un secret tiré, *application's secret*
+et quatre caractères pour l'autre. La longueur minimale est là parce que le sha256
+voyage dans une configuration exportée, et qu'un secret court se retrouve à partir
+de lui.
+
+Modifier un client affiche le début de son secret et le garde tel quel. Tirez-en un
+autre ou collez-en un autre et l'indication le dit : **le secret actuel cesse de
+fonctionner à l'enregistrement**, et l'application ne connecte plus personne tant
+qu'elle n'a pas le nouveau. Annuler le laisse fonctionner.
+
+![Les clients sous les clés : un secret tiré par Meerkat, celui de l'application, et aucun](img/console/oidc-clients.webp)
+
 Chaque ligne de la liste nomme les routes qui utilisent le client ; un clic en
 ouvre une sur sa section **Auth forward**. Une marque d'avertissement signale
-quand l'une d'elles couvre tout un hôte. L'icône de clé tire un **nouveau
-secret** : l'ancien cesse aussitôt de fonctionner. Un client qu'une route utilise
+quand l'une d'elles couvre tout un hôte. L'icône de clé ouvre le client sur un **nouveau
+secret** tiré par Meerkat, en vigueur une fois enregistré. Un client qu'une route utilise
 encore ne se supprime pas, et le refus nomme les routes.
 
 Les clients voyagent dans une [configuration](/docs/console/configuration), le secret
@@ -115,6 +140,8 @@ Chaque claim est un nom et une source :
   comme le mécanisme JWT le rend, les rôles par l'expression que leur donne
   Identity ;
 - **une valeur fixe**, la même pour tous ceux qui se connectent par cette route.
+
+![Une route liée à un client, les claims que portent ses jetons et ce que chacun dit pour la personne qui l'édite](img/console/route-editor-oidc.webp)
 
 Une nouvelle configuration part des noms que toute bibliothèque OpenID lit
 d'abord, chacun gardé seulement si Identity déclare son fait : `sub` (l'identifiant
@@ -249,6 +276,24 @@ d'où la durée courte par défaut. Une application qui ne termine que sa propre
 session laisse la personne connectée à la gateway, et sa prochaine connexion passe
 sans page.
 
+## Essayer une connexion
+
+L'icône de flèche sur la ligne d'un client essaie une connexion pour n'importe qui,
+sans lui et sans rien émettre. Choisissez la personne, et l'organisation dans laquelle
+sa session serait ouverte (la seule qu'elle ait, par défaut) :
+
+- la route qui la laisse entrer - la première liée au client, dans l'ordre de
+  routage, dont la règle le fait - ou un refus quand aucune ne le fait ;
+- les routes dont la règle l'a écartée ;
+- les claims de l'**ID token**, de l'**access token** et de **userinfo**, non signés.
+
+Les claims sont construits par le code qui construit les vrais jetons, avec les rôles
+et les faits de la personne et le rattachement des rôles de la route : ce que vous
+lisez est ce que l'application reçoit. Cela répond à « pourquoi cette personne ne voit
+rien dans l'application » avant de lui demander de se reconnecter.
+
+![Une connexion essayée pour une personne : la route qui la laisse entrer, et les claims de l'ID token](img/console/oidc-try.webp)
+
 ## Quand ça ne marche pas
 
 Ce que voient la personne ou l'application, et la ligne que journalise la gateway
@@ -276,7 +321,13 @@ Ce que voient la personne ou l'application, et la ligne que journalise la gatewa
 
 L'API du plan de contrôle est `/api/oidc/clients`, chaque changement audité avec le
 secret masqué, et un agent a les outils correspondants (`list_oidc_clients`,
-`save_oidc_client`, `regenerate_oidc_client_secret`, `delete_oidc_client`).
+`save_oidc_client`, `regenerate_oidc_client_secret`, `delete_oidc_client`,
+`try_oidc_sign_in`), ainsi que pour l'émetteur et les clés (`get_signing_keys`,
+`set_issuer`, `renew_signing_keys`) : un assistant peut mettre une application
+derrière la gateway de bout en bout, et le prouver par un essai. Par l'API
+ou un outil, un client confidentiel sans `secret` en reçoit un tiré par le serveur et
+montré une fois dans la réponse ; avec le sien, celui de l'application, il le garde
+et ne renvoie rien.
 
 ## Pour aller plus loin
 

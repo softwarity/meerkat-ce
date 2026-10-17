@@ -195,8 +195,10 @@ secret.
 
 1. The **issuer**: the public name `apps.example.com`, so
    `https://apps.example.com`.
-2. A client `dbgate`, **with a secret** (copy it when it is shown). DbGate comes
-   back under `/dbgate/`, the route's path: nothing to declare.
+2. A client `dbgate` with a secret: **Drawn by Meerkat** (copy it from the form
+   before saving), or **Given by the application** when DbGate's chart generates
+   one - paste it from its Kubernetes Secret. DbGate comes back under `/dbgate/`,
+   the route's path: nothing to declare.
 3. A route on `/dbgate/**` to DbGate, mechanism **OIDC**, client `dbgate`, claim
    `preferred_username` from `username` (and `email`, `name` if you like).
 
@@ -230,6 +232,8 @@ LOGIN_PERMISSIONS_bob=~*, widgets/database
   shared DbGate account; two routes with two fixed values give two shared
   accounts, one per level.
 - Without `OAUTH_LOGIN_FIELD`, DbGate gives every user the same login.
+- Before anyone signs in, **Try a sign-in** on the client's row says, for a given
+  person, which route lets them in and the `preferred_username` DbGate will read.
 
 ## Read more
 

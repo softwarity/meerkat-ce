@@ -58,7 +58,36 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `get_branding`, `save_branding` | The identity the built-in pages wear. |
 | `list_themes` | The colour palettes, and which is active. |
 | `export_configuration` | The whole configuration, as a readable document. |
-| `save_configuration`, `list_configurations` | Named snapshots to come back to. |
+| `save_configuration`, `list_configurations` | Named snapshots to come back to; `replace` refreshes one from the running state, before a push. |
+| `list_oidc_clients`, `save_oidc_client`, `try_oidc_sign_in` | The applications signing in through the gateway, and what one would receive for a given person. |
+| `get_signing_keys`, `set_issuer`, `renew_signing_keys`, `preview_identity` | The issuer and the public keys, and what a draft identity would send. |
+
+## Everything the console does
+
+The tools above answer the frequent questions well. For everything else,
+three tools reach the **whole control plane** - the API the console itself
+calls:
+
+| Tool | What it does |
+|---|---|
+| `list_admin_api` | The sections, then the endpoints of one, with a summary when the API's documentation has one. |
+| `read_admin_api` | A GET, as the console would. |
+| `call_admin_api` | Any request: create an organisation, undo a change from the history, compare two configurations, edit a theme or a setting. |
+
+They go through the same endpoints as the console, with the agent's own token:
+the endpoint's guard decides, a read-only token stays read-only, and the audit
+trail names the token. Nothing is reimplemented, so nothing is out of step.
+
+What stays closed is short, and each refusal gives its reason:
+
+- the **certificates** and their private keys, the **ACME** accounts (opening one
+  accepts an authority's terms) and the **trusted authorities**;
+- the **vault**: an agent works with `$names`, a secret is typed by a person;
+- minting **control-plane tokens**;
+- the **backups** (a file to download, a database copy);
+- the **TLS doors and ports** and the switch that lets agents in: a change there can
+  cut the console off. A configuration an agent imports, activates or restores is
+  refused if it changes them.
 
 ## Calling the services behind the routes
 

@@ -67,6 +67,7 @@ produit gratuit qu'elles hébergent elles-mêmes, ou un service payant.
 | Pages à votre marque, 20 langues | un thème à construire | selon l'offre | inclus |
 | SSO des clients : OIDC, SAML, LDAP, AD | Keycloak | Auth0, WorkOS, facturé à la connexion | inclus, Enterprise pour SAML et LDAP |
 | Organisations gérées par vos clients | des écrans d'administration à construire | WorkOS, Frontegg | inclus, Enterprise |
+| Authentification unique des outils qui ne parlent qu'OpenID Connect | Keycloak, un realm et un client par outil | Auth0, Okta | inclus, Enterprise |
 | Protéger une application sans connexion | oauth2-proxy, Pomerium Core | Pomerium Enterprise, Cloudflare Access | inclus |
 | Routage, limites de débit, quotas | Kong OSS, APISIX, Traefik, Envoy Gateway | Kong Enterprise, Tyk, Traefik Hub, API7, Gravitee | inclus |
 | Certificats HTTPS automatiques | cert-manager | dans les offres haut de gamme des gateways | inclus, Enterprise |

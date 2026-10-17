@@ -82,7 +82,36 @@ type Provider interface {
 	// which on the internal plane is the gateway's name inside the cluster.
 	// ok is false while the provider is not active.
 	Endpoints(ctx context.Context, serverBase string) (e Endpoints, ok bool)
+	// Try is a sign-in tried on a person's behalf, with nothing issued: the
+	// route that would decide, those passed over, and the claims of the
+	// tokens and of userinfo - computed by the code that issues the real
+	// ones, so what an administrator reads is what the application gets.
+	Try(ctx context.Context, client store.OIDCClient, person gateway.Person) (Trial, error)
 }
+
+// Trial is what a sign-in would give, tried without issuing anything.
+type Trial struct {
+	// Route is the route that lets the person in, the first in routing
+	// order; nil when none does.
+	Route *TrialRoute `json:"route,omitempty"`
+	// Refused are the routes bound to the client whose rule does not let the
+	// person in, in routing order, up to the one that does.
+	Refused []TrialRoute `json:"refused"`
+	// The claims, unsigned, absent when no route lets the person in.
+	IDToken     map[string]any `json:"idToken,omitempty"`
+	AccessToken map[string]any `json:"accessToken,omitempty"`
+	Userinfo    map[string]any `json:"userinfo,omitempty"`
+}
+
+// TrialRoute names a route in a trial.
+type TrialRoute struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ErrNotLinked is what the community image answers a trial: there is no
+// provider in it to try.
+var ErrNotLinked = errors.New("the OIDC provider is an Enterprise feature: this image does not carry it")
 
 // Endpoints are the provider's addresses, as a discovery document lists them.
 type Endpoints struct {
@@ -179,4 +208,7 @@ func (absent) MountInternal(Mux)                       {}
 func (absent) Active(context.Context) bool             { return false }
 func (absent) Endpoints(context.Context, string) (Endpoints, bool) {
 	return Endpoints{}, false
+}
+func (absent) Try(context.Context, store.OIDCClient, gateway.Person) (Trial, error) {
+	return Trial{}, ErrNotLinked
 }

@@ -61,6 +61,14 @@ gateway, not beside it. Your corporate directory - OpenID Connect, GitHub, and
 with Enterprise SAML, LDAP or Active Directory - signs people in, and in
 Enterprise its groups can grant roles.
 
+### The single sign-on of your other tools
+
+A broker's console, a database UI, a dashboard: any application that speaks
+OpenID Connect signs its people in through the gateway, which becomes their
+OpenID provider - no Keycloak beside it. The route decides who gets in and the
+roles the tokens carry, and a sign-in can be tried for anyone before they try it.
+[Enterprise](/docs/auth/oidc-provider).
+
 ### Strong sign-in, built in
 
 Passkeys as a first factor, an authenticator app that remembers a browser you
@@ -116,8 +124,8 @@ code, change it, ship it inside your own product; two years after each release,
 that version becomes plain Apache 2.0.
 
 Enterprise is what you need once the installation grows: several
-organisations, SAML, LDAP and Active Directory, several gateways behind one entry
-point. Never
+organisations, SAML, LDAP and Active Directory, the OpenID provider of your
+other tools, several gateways behind one entry point. Never
 a security primitive - TLS, two-factor, passkeys, the vault and the audit trail
 are free and stay free. Team is Enterprise for a cluster of a known size, and
 the evaluation edition is Enterprise with a notice on it, free, to try all of

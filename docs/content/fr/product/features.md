@@ -33,6 +33,7 @@ Pour en savoir plus : [Comment on se connecte](/docs/auth/overview).
 - **Fédération OIDC et GitHub** : Entra ID, Okta, Google, Keycloak ou tout fournisseur d'identité conforme, pour le premier facteur.
 - **SAML 2.0** pour les annuaires qui n'offrent rien d'autre (ADFS, Entra ID, Okta, Shibboleth) : assertions signées, et une assertion rejouée refusée sur tous les nœuds. **Enterprise**
 - **LDAP et Active Directory**, et règles de groupe : un groupe de l'annuaire, une équipe GitHub ou un claim OIDC devient une appartenance et des rôles. **Enterprise**
+- **Le fournisseur OpenID de vos autres outils** : une application qui ne sait se connecter qu'à un fournisseur OpenID - la console d'un broker, une interface de base de données - connecte ses utilisateurs par la gateway. La route décide qui et avec quels rôles, le secret d'un client est tiré, fourni par l'application ou absent, et une connexion s'essaie pour n'importe qui depuis la console. [En savoir plus](/docs/auth/oidc-provider) **Enterprise**
 - **Connexion par code reçu par e-mail** : un code à usage unique à la place du mot de passe, valable dix minutes dans le navigateur qui l'a demandé, et le second facteur s'applique toujours. Désactivée tant que vous ne l'activez pas. *en partie*
 - **Jetons d'API**, personnels ou de machine à machine, dont le secret n'est affiché qu'une fois.
 - **Comptes** avec une durée de validité en jours, des champs personnalisés propres à votre métier et transmis aux applications, et une alerte par e-mail lors d'une connexion depuis un nouveau navigateur.

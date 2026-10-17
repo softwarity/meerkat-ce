@@ -54,6 +54,22 @@ func (a *API) previewIdentity(w http.ResponseWriter, r *http.Request, _ store.Us
 		writeErr(w, http.StatusBadRequest, "malformed identity: "+err.Error())
 		return
 	}
+	res, err := a.identityPreview(r.Context(), req)
+	if err != nil {
+		if isInvalid(err) {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		a.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// identityPreview is what an upstream would receive from a draft identity,
+// for the fixed sample caller. Shared by the endpoint and the agent's tool;
+// a refusal of the draft is an invalidErr.
+func (a *API) identityPreview(ctx context.Context, req identityPreviewRequest) (identityPreviewResponse, error) {
 	cfg := req.Identity
 	// Validate through the engine: a preview must refuse exactly what a save
 	// would refuse (unknown mechanism, bad attribute, bad claim name...).
@@ -63,29 +79,26 @@ func (a *API) previewIdentity(w http.ResponseWriter, r *http.Request, _ store.Us
 		Identity:   &cfg,
 	}
 	if err := gateway.Validate(draft); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
+		return identityPreviewResponse{}, invalidErr(err)
 	}
 	// And through the settings: since a custom field is a name this
 	// installation defines (MODEL-01), the engine accepts any name that COULD
 	// be one, and only the store knows which ones ARE. Asked here too, or a
 	// preview would happily draw a header for a field the save then refuses.
-	if err := a.knownFields(r.Context(), draft); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
+	if err := a.knownFields(ctx, draft); err != nil {
+		return identityPreviewResponse{}, invalidErr(err)
 	}
 	res := identityPreviewResponse{Mechanism: cfg.Mechanism}
 	switch cfg.Mechanism {
 	case "headers":
 		res.Headers = gateway.PreviewHeaders(cfg)
 	case "jwt", "signed-jwt":
-		claims := gateway.PreviewClaims(cfg, req.RouteName, a.st.JWTIssuer(r.Context(), a.DataAddr))
+		claims := gateway.PreviewClaims(cfg, req.RouteName, a.st.JWTIssuer(ctx, a.DataAddr))
 		res.Claims = claims
 		if cfg.Mechanism == "jwt" {
 			tok, err := gateway.MintUnsignedJWT(claims)
 			if err != nil {
-				a.internal(w, err)
-				return
+				return identityPreviewResponse{}, err
 			}
 			res.Token = tok
 			break
@@ -94,27 +107,24 @@ func (a *API) previewIdentity(w http.ResponseWriter, r *http.Request, _ store.Us
 		if alg == "" {
 			alg = signing.ES256
 		}
-		set, err := a.st.EnsureSigningSet(r.Context())
+		set, err := a.st.EnsureSigningSet(ctx)
 		if err != nil {
-			a.internal(w, err)
-			return
+			return identityPreviewResponse{}, err
 		}
 		tok, err := set.SignJWT(alg, claims)
 		if err != nil {
-			a.internal(w, err)
-			return
+			return identityPreviewResponse{}, err
 		}
 		pemStr, err := set.PublicPEM(alg)
 		if err != nil {
-			a.internal(w, err)
-			return
+			return identityPreviewResponse{}, err
 		}
 		res.Token, res.Algorithm, res.Kid, res.PublicPem = tok, alg, set.Kid(alg), pemStr
 	default:
-		writeErr(w, http.StatusUnprocessableEntity, "identity mechanism "+cfg.Mechanism+" has nothing to preview")
-		return
+		return identityPreviewResponse{}, invalidErr(fmt.Errorf("identity mechanism %s has nothing to preview "+
+			"with a sample caller: an oidc route is tried for a real person with try_oidc_sign_in", cfg.Mechanism))
 	}
-	writeJSON(w, http.StatusOK, res)
+	return res, nil
 }
 
 // signingKey is one algorithm's public half as the console shows it. The private
@@ -185,24 +195,28 @@ func (a *API) getSigningKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) renewSigningKeys(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if _, err := a.st.RenewSigningKeys(r.Context()); err != nil {
-		a.internal(w, err)
-		return
-	}
-	// Reload so the gateway signs with the new keys and publishes the new JWKS
-	// (the previous public keys linger there through their grace window).
-	if err := a.reloadRouting(r.Context()); err != nil {
-		a.internal(w, fmt.Errorf("renewed, but reload failed: %w", err))
-		return
-	}
-	a.auditEvent(r.Context(), actor, "identity.signing_renew", "settings", "", "", "",
-		"identity signing keys rotated")
-	view, err := a.signingView(r.Context())
+	view, err := a.renewKeys(r.Context(), actor)
 	if err != nil {
 		a.internal(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, view)
+}
+
+// renewKeys rotates the signing keys. Shared by the endpoint and the agent's
+// tool.
+func (a *API) renewKeys(ctx context.Context, actor store.User) (signingKeysView, error) {
+	if _, err := a.st.RenewSigningKeys(ctx); err != nil {
+		return signingKeysView{}, err
+	}
+	// Reload so the gateway signs with the new keys and publishes the new JWKS
+	// (the previous public keys linger there through their grace window).
+	if err := a.reloadRouting(ctx); err != nil {
+		return signingKeysView{}, fmt.Errorf("renewed, but reload failed: %w", err)
+	}
+	a.auditEvent(ctx, actor, "identity.signing_renew", "settings", "", "", "",
+		"identity signing keys rotated")
+	return a.signingView(ctx)
 }
 
 // issuerChange is the issuer as the console sends it: one of the public
@@ -217,24 +231,32 @@ func (a *API) putIssuer(w http.ResponseWriter, r *http.Request, actor store.User
 		writeErr(w, http.StatusBadRequest, "malformed issuer: "+err.Error())
 		return
 	}
-	before := a.st.JWTIssuer(r.Context(), a.DataAddr)
-	if err := a.st.SetJWTIssuer(r.Context(), a.DataAddr, p.Issuer); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	// The router signs with what it read at reload, on every node.
-	if err := a.reloadRouting(r.Context()); err != nil {
-		a.internal(w, fmt.Errorf("stored, but reload failed: %w", err))
-		return
-	}
-	a.auditUpdate(r.Context(), actor, "identity.issuer", "settings", "", "", "",
-		issuerChange{Issuer: before}, p)
-	view, err := a.signingView(r.Context())
+	view, err := a.setIssuer(r.Context(), actor, p.Issuer)
 	if err != nil {
+		if isInvalid(err) {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		a.internal(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, view)
+}
+
+// setIssuer makes one of the public addresses the issuer. Shared by the
+// endpoint and the agent's tool; a refusal names the addresses allowed.
+func (a *API) setIssuer(ctx context.Context, actor store.User, issuer string) (signingKeysView, error) {
+	before := a.st.JWTIssuer(ctx, a.DataAddr)
+	if err := a.st.SetJWTIssuer(ctx, a.DataAddr, issuer); err != nil {
+		return signingKeysView{}, invalidErr(err)
+	}
+	// The router signs with what it read at reload, on every node.
+	if err := a.reloadRouting(ctx); err != nil {
+		return signingKeysView{}, fmt.Errorf("stored, but reload failed: %w", err)
+	}
+	a.auditUpdate(ctx, actor, "identity.issuer", "settings", "", "", "",
+		issuerChange{Issuer: before}, issuerChange{Issuer: issuer})
+	return a.signingView(ctx)
 }
 
 // portOf is the port of a listen address, ":7070" or "0.0.0.0:7070" alike.

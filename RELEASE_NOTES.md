@@ -2,6 +2,23 @@
 
 ## NEXT RELEASE
 
+- **The agent reaches the whole control plane.** Everything the console does, an assistant can do
+  through MCP, under the same guards and audit; the few things closed to agents say why.
+- **Try an OIDC sign-in for anyone.** The arrow on a client's row picks a person and their
+  organisation and answers what the application would get: the route that lets them in, those
+  that turn them away, and the claims of the ID token, the access token and userinfo - built by
+  the code that builds the real tokens, nothing issued. The agent has `try_oidc_sign_in`.
+- **The issuer and the signing keys are in an agent's reach.** `get_signing_keys` (the public
+  keys only), `set_issuer`, `renew_signing_keys` and `preview_identity`: an assistant putting an
+  application behind the gateway no longer stops at choosing the issuer.
+- **`save_configuration` can refresh a saved configuration** from the running state
+  (`replace: true`), as the console's Capture does, before a push.
+- **An OIDC client's secret, one choice of three.** No secret (PKCE alone), drawn by Meerkat, or
+  given by the application when it imposes its own - its chart generates it, its vendor fixed it.
+  One field under the choice: a drawn secret sits in the form, to copy before saving, so the
+  window that showed it once is gone; the application's is pasted there. Either way only its
+  sha256 is kept. Editing a client keeps its secret until another is drawn or pasted. The API and
+  the agent's tools take an optional `secret`.
 - **No more "Only listed operations are reachable".** The switch at the foot of Endpoint security
   closed every operation no rule lists, from a place nobody looks when a new endpoint answers 403.
   It did what the route's own rule set to **Nobody** already does: closed by default is now said

@@ -92,10 +92,16 @@ func (a *API) writeTools() []mcp.Tool {
 				"organisations, settings - and keep it under a name. It changes nothing: it is a copy, " +
 				"kept beside the running gateway. " +
 				"This is what to do when someone says 'save the current configuration before you start': " +
-				"it gives a named point to come back to, on top of the automatic restore points.",
+				"it gives a named point to come back to, on top of the automatic restore points. " +
+				"A name already taken is refused, unless replace is true: that configuration is then " +
+				"refreshed from the running state, as the console's Capture does - the way to bring a " +
+				"saved configuration up to date before push_configuration.",
 			Schema: object(map[string]any{
 				"name":        str("What to call it, e.g. 'before the billing route'."),
 				"description": str("Optional: a line about why it was taken."),
+				"replace": map[string]any{"type": "boolean",
+					"description": "True to refresh the configuration of that name from the running state, " +
+						"replacing what it held. Its git binding is kept."},
 			}, "name"),
 			Call: a.toolSaveConfiguration,
 		},
@@ -306,9 +312,29 @@ func (a *API) toolSaveConfiguration(ctx context.Context, args json.RawMessage) (
 	var in struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Replace     bool   `json:"replace"`
 	}
 	if err := decode(args, &in); err != nil {
 		return nil, err
+	}
+	if in.Replace {
+		named, err := a.configurationByName(ctx, in.Name)
+		if err != nil {
+			return nil, err
+		}
+		// The list leaves the documents out; the whole row, as the console's
+		// Capture reads it.
+		if named, err = a.st.GetConfiguration(ctx, named.ID); err != nil {
+			return nil, err
+		}
+		c, err := a.recapture(ctx, mcpActor(ctx), named)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"name": c.Name, "bytes": len(c.Document), "replaced": true,
+			"note": "Refreshed from the gateway as it is now, and named the current one. Nothing was applied.",
+		}, nil
 	}
 	if err := a.roomForAnother(ctx); err != nil {
 		return nil, err
@@ -322,7 +348,7 @@ func (a *API) toolSaveConfiguration(ctx context.Context, args json.RawMessage) (
 		return nil, err
 	}
 	if taken {
-		return nil, fmt.Errorf("a configuration called %s already exists: pick another name", name)
+		return nil, fmt.Errorf("a configuration called %s already exists: pick another name, or pass replace: true to refresh it from the running state", name)
 	}
 	file, err := a.liveDocumentText(ctx)
 	if err != nil {
@@ -401,6 +427,13 @@ func (a *API) toolActivateConfiguration(ctx context.Context, args json.RawMessag
 	if err != nil {
 		return nil, err
 	}
+	preview, err := config.PreviewSwitch(ctx, a.st, doc)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.agentMayApply(preview); err != nil {
+		return nil, err
+	}
 	plan, err := config.Switch(ctx, a.st, doc)
 	if err != nil {
 		return nil, err
@@ -477,18 +510,23 @@ func (a *API) toolImportConfiguration(ctx context.Context, args json.RawMessage)
 	if err != nil {
 		return nil, err
 	}
+	// What a document may not change for an agent is asked before anything
+	// is applied, dry run or not.
+	plan, err := config.Preview(ctx, a.st, doc, in.Prune)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.agentMayApply(plan); err != nil {
+		return nil, err
+	}
 	if in.DryRun {
-		plan, err := config.Preview(ctx, a.st, doc, in.Prune)
-		if err != nil {
-			return nil, err
-		}
 		return map[string]any{
 			"dryRun": true, "prune": in.Prune,
 			"changes": plan.Changes, "missing": plan.Missing, "missingFiles": plan.MissingFiles,
 			"note": "Nothing was changed. Call again without dryRun to apply this.",
 		}, nil
 	}
-	plan, err := a.applyDocument(ctx, doc, in.Prune, mcpActor(ctx), nil)
+	plan, err = a.applyDocument(ctx, doc, in.Prune, mcpActor(ctx), nil)
 	if err != nil {
 		return nil, err
 	}

@@ -201,8 +201,10 @@ et qui garde un secret.
 
 1. L'**émetteur** : le nom public `apps.example.com`, donc
    `https://apps.example.com`.
-2. Un client `dbgate`, **avec un secret** (copiez-le quand il s'affiche). DbGate
-   revient sous `/dbgate/`, le chemin de la route : rien à déclarer.
+2. Un client `dbgate` avec un secret : **Drawn by Meerkat** (copiez-le depuis le
+   formulaire avant d'enregistrer), ou **Given by the application** quand le chart
+   de DbGate en génère un - collez-le depuis son Secret Kubernetes. DbGate revient
+   sous `/dbgate/`, le chemin de la route : rien à déclarer.
 3. Une route sur `/dbgate/**` vers DbGate, mécanisme **OIDC**, client `dbgate`,
    claim `preferred_username` depuis `username` (et `email`, `name` si vous le
    souhaitez).
@@ -237,6 +239,9 @@ LOGIN_PERMISSIONS_bob=~*, widgets/database
   monde un seul compte DbGate partagé ; deux routes avec deux valeurs fixes donnent
   deux comptes partagés, un par niveau.
 - Sans `OAUTH_LOGIN_FIELD`, DbGate donne le même login à tous les utilisateurs.
+- Avant que quiconque se connecte, **Try a sign-in** sur la ligne du client dit,
+  pour une personne donnée, quelle route la laisse entrer et le `preferred_username`
+  que DbGate lira.
 
 ## Pour aller plus loin
 

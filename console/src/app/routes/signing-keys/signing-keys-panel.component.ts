@@ -177,31 +177,29 @@ export class SigningKeysPanelComponent {
 
   protected async editClient(c?: OIDCClient): Promise<void> {
     const { editOidcClient } = await import('./oidc-client-dialog.component');
-    const saved = await editOidcClient(this.dialog, this.api, {
+    const saved = await editOidcClient(this.dialog, {
       client: c,
       taken: this.clients().map((x) => x.id),
     });
     if (saved) this.reloadClients();
   }
 
+  // A new secret is the editor opened on one freshly drawn: copied there,
+  // and in force only once saved - Cancel leaves the current one working.
   protected async regenerate(c: OIDCClient): Promise<void> {
-    // A client with no secret yet has nothing to stop working: drawing its
-    // first one asks nothing.
-    const ok = !c.secretPrefix || await this.dialogs.confirm({
-      title: $localize`:@@Regenerate_secret_of_CLIENT:Regenerate the secret of ${c.id}:client:?`,
-      message: $localize`:@@Regenerate_secret_message:The current secret stops working at once: the application signs nobody in until it has the new one.`,
-      confirmLabel: $localize`:@@Regenerate:Regenerate`,
-      danger: true,
+    const { editOidcClient } = await import('./oidc-client-dialog.component');
+    const saved = await editOidcClient(this.dialog, {
+      client: c,
+      taken: this.clients().map((x) => x.id),
+      redraw: true,
     });
-    if (!ok) return;
-    const { showOidcSecret } = await import('./oidc-client-dialog.component');
-    this.api.regenerateOidcClientSecret(c.id).subscribe({
-      next: (out) => {
-        this.reloadClients();
-        void showOidcSecret(this.dialog, out);
-      },
-      error: (e: HttpErrorResponse) => this.fail(e),
-    });
+    if (saved) this.reloadClients();
+  }
+
+  // What the application would get for a person, nothing issued.
+  protected async tryClient(c: OIDCClient): Promise<void> {
+    const { OidcTryDialogComponent } = await import('./oidc-try-dialog.component');
+    this.dialog.open(OidcTryDialogComponent, { data: c, width: '760px', maxWidth: '94vw', restoreFocus: true });
   }
 
   protected async removeClient(c: OIDCClient): Promise<void> {

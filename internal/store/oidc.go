@@ -132,7 +132,43 @@ func NewOIDCSecret() (secret, hash, prefix string, err error) {
 		return "", "", "", fmt.Errorf("store: draw an oidc client secret: %w", err)
 	}
 	secret = OIDCSecretPrefix + base64.RawURLEncoding.EncodeToString(b)
-	return secret, HashOIDCSecret(secret), secret[:12], nil
+	return secret, HashOIDCSecret(secret), secret[:len(OIDCSecretPrefix)+8], nil
+}
+
+// The bounds of a secret the application brings. Its sha256 travels in an
+// exported configuration, and a fast hash of a short secret is one a laptop
+// finds back: sixteen characters is where that stops being an afternoon.
+const (
+	OIDCMinGivenSecret = 16
+	OIDCMaxGivenSecret = 256
+)
+
+// oidcGivenPrefix is how much of a secret the application brings is shown
+// afterwards: four characters recognise it, and leave the rest unguessable
+// even at the shortest length allowed.
+const oidcGivenPrefix = 4
+
+// OIDCSecretGiven keeps a secret handed to the gateway rather than drawn by
+// it: the application's own (its chart generates it, its vendor fixed it), or
+// one the console drew in the browser, shown in its form before it was saved.
+// Its hash and its prefix, like a drawn one; a secret in the drawn shape keeps
+// the drawn prefix, so the list tells the two apart. Refusals name what is
+// allowed.
+func OIDCSecretGiven(secret string) (hash, prefix string, err error) {
+	if n := len(secret); n < OIDCMinGivenSecret || n > OIDCMaxGivenSecret {
+		return "", "", invalidf(fmt.Errorf("a client secret of %d characters is not allowed: from %d to %d, "+
+			"since its sha256 travels in an exported configuration and a short one is found back from it",
+			n, OIDCMinGivenSecret, OIDCMaxGivenSecret))
+	}
+	if strings.ContainsFunc(secret, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+		return "", "", invalidf(errors.New("a client secret with a space or a control character is not allowed: " +
+			"an application sends it in a form or an Authorization header, where either is lost"))
+	}
+	n := oidcGivenPrefix
+	if strings.HasPrefix(secret, OIDCSecretPrefix) {
+		n = len(OIDCSecretPrefix) + 8
+	}
+	return HashOIDCSecret(secret), secret[:n], nil
 }
 
 // SanitizeOIDCClient checks a client and normalises what it can. Refusals

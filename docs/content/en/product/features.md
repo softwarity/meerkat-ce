@@ -32,6 +32,7 @@ Read more: [How someone signs in](/docs/auth/overview).
 - **OIDC and GitHub federation**: Entra ID, Okta, Google, Keycloak or any compliant IdP, for the first factor.
 - **SAML 2.0** for directories that offer nothing else (ADFS, Entra ID, Okta, Shibboleth): signed assertions, a replayed one refused on every node. **Enterprise**
 - **LDAP and Active Directory**, and group rules: a directory group, a GitHub team or an OIDC claim becomes a membership and roles. **Enterprise**
+- **The OpenID provider of your other tools**: an application that only knows how to sign in against an OpenID provider - a broker's console, a database UI - signs its people in through the gateway. The route decides who and with which roles, a client's secret is drawn, given by the application or none, and a sign-in can be tried for anyone from the console. [More](/docs/auth/oidc-provider) **Enterprise**
 - **Sign in by e-mail code**: a one-time code instead of the password, valid ten minutes in the browser that asked for it, with the second factor still applied. Off until you turn it on. *partly*
 - **API tokens**, personal and machine-to-machine, with the secret shown only once.
 - **Accounts** with a validity window in days, custom fields for your domain passed to applications, and an email alert on sign-in from a new browser.
