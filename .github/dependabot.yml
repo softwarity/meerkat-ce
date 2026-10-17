@@ -63,6 +63,11 @@ updates:
     ignore:
       - dependency-name: typescript
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # The theme builder's colours are computed twice: here, and by
+      # internal/m3color, a Go port of THIS release that a golden test holds
+      # to it. A bump alone splits the console's preview from what the
+      # gateway serves; it moves with the port, by hand, or not at all.
+      - dependency-name: "@material/material-color-utilities"
 
   # The integration suite and the doc site: neither one ships, both must keep
   # working, and a browser engine drifting a major behind is how a suite ends
