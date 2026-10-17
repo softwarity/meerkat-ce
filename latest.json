@@ -1,0 +1,935 @@
+{
+  "schema": 1,
+  "runs": [
+    {
+      "schema": 1,
+      "date": "2026-10-17T16:07:48Z",
+      "commit": "a56bcb0204bc76211aa65bc08201dc1c2847fe94",
+      "sourceCommit": "e4b45142",
+      "machine": {
+        "runner": "ubuntu-24.04-arm",
+        "os": "Linux",
+        "arch": "arm64",
+        "cpuModel": "Neoverse-N2",
+        "cpus": 4,
+        "threadsPerCore": 1,
+        "memoryGiB": 15.6,
+        "docker": "28.0.4"
+      },
+      "protocol": {
+        "gatewayCpus": 1,
+        "gatewayMemory": "1g",
+        "rate": 1000,
+        "fixedDuration": "10s",
+        "maxDuration": "10s",
+        "connectionsFixed": 32,
+        "connectionsMax": 64,
+        "loadCpus": "2-3",
+        "loadGenerator": "ghcr.io/hatoo/oha:1.16.0"
+      },
+      "direct": {
+        "fixed": {
+          "rps": 1000.1,
+          "p50": 0.065,
+          "p90": 0.086,
+          "p99": 0.13,
+          "requests": 10000,
+          "success": 1.0
+        },
+        "max": {
+          "rps": 63295.9,
+          "p50": 1.008,
+          "p90": 1.744,
+          "p99": 2.143,
+          "requests": 633070,
+          "success": 1.0
+        }
+      },
+      "gateways": [
+        {
+          "name": "meerkat",
+          "version": "a56bcb0",
+          "startupMs": 549,
+          "memoryIdleMiB": 22.5,
+          "memoryPeakMiB": 42.0,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.189,
+                "p90": 0.221,
+                "p99": 0.315,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.124,
+                "overheadP99": 0.185
+              },
+              "max": {
+                "rps": 12859.5,
+                "p50": 4.697,
+                "p90": 6.312,
+                "p99": 11.965,
+                "requests": 128562,
+                "success": 1.0
+              }
+            },
+            "auth": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.209,
+                "p90": 0.241,
+                "p99": 0.327,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.144,
+                "overheadP99": 0.197
+              },
+              "max": {
+                "rps": 10017.2,
+                "p50": 6.057,
+                "p90": 8.401,
+                "p99": 14.332,
+                "requests": 100142,
+                "success": 1.0
+              },
+              "how": "personal API token resolved by the gateway, caller's name and id forwarded as headers, no roles"
+            },
+            "auth-jwt": {
+              "kind": "extra",
+              "fixed": {
+                "rps": 999.9,
+                "p50": 0.328,
+                "p90": 0.457,
+                "p99": 0.933,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.263,
+                "overheadP99": 0.803
+              },
+              "max": {
+                "rps": 4635.1,
+                "p50": 10.643,
+                "p90": 20.665,
+                "p99": 27.047,
+                "requests": 46300,
+                "success": 1.0
+              },
+              "how": "personal API token resolved by the gateway, caller forwarded as an ES256-signed JWT"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.9,
+                "p50": 0.193,
+                "p90": 0.23,
+                "p99": 0.308,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.128,
+                "overheadP99": 0.178
+              },
+              "max": {
+                "rps": 12496.3,
+                "p50": 4.881,
+                "p90": 6.11,
+                "p99": 12.017,
+                "requests": 124938,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "gostd",
+          "version": "go1.27.0",
+          "startupMs": 138,
+          "memoryIdleMiB": 1.5,
+          "memoryPeakMiB": 9.6,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.4,
+                "p50": 0.144,
+                "p90": 0.169,
+                "p99": 0.256,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.079,
+                "overheadP99": 0.126
+              },
+              "max": {
+                "rps": 19641.5,
+                "p50": 2.983,
+                "p90": 4.311,
+                "p99": 6.155,
+                "requests": 196391,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "kong",
+          "version": "3.9.3",
+          "startupMs": 1760,
+          "memoryIdleMiB": 144.0,
+          "memoryPeakMiB": 223.7,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.7,
+                "p50": 0.166,
+                "p90": 0.199,
+                "p99": 0.314,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.101,
+                "overheadP99": 0.184
+              },
+              "max": {
+                "rps": 15739.5,
+                "p50": 3.883,
+                "p90": 4.408,
+                "p99": 7.345,
+                "requests": 157363,
+                "success": 1.0
+              }
+            },
+            "auth": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.9,
+                "p50": 0.217,
+                "p90": 0.278,
+                "p99": 0.417,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.152,
+                "overheadP99": 0.287
+              },
+              "max": {
+                "rps": 10203.4,
+                "p50": 5.954,
+                "p90": 6.49,
+                "p99": 13.213,
+                "requests": 101995,
+                "success": 1.0
+              },
+              "how": "key-auth plugin, consumer's name and id forwarded as headers, no roles"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.486,
+                "p90": 0.716,
+                "p99": 1.302,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.421,
+                "overheadP99": 1.172
+              },
+              "max": {
+                "rps": 5981.6,
+                "p50": 9.464,
+                "p90": 11.705,
+                "p99": 31.228,
+                "requests": 59767,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "apisix",
+          "version": "3.18.0-debian",
+          "startupMs": 432,
+          "memoryIdleMiB": 49.7,
+          "memoryPeakMiB": 61.9,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.176,
+                "p90": 0.207,
+                "p99": 0.269,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.111,
+                "overheadP99": 0.139
+              },
+              "max": {
+                "rps": 14675.5,
+                "p50": 4.198,
+                "p90": 4.718,
+                "p99": 6.698,
+                "requests": 146715,
+                "success": 1.0
+              }
+            },
+            "auth": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.206,
+                "p90": 0.259,
+                "p99": 0.344,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.141,
+                "overheadP99": 0.214
+              },
+              "max": {
+                "rps": 11333.9,
+                "p50": 5.452,
+                "p90": 6.032,
+                "p99": 8.726,
+                "requests": 113293,
+                "success": 1.0
+              },
+              "how": "key-auth plugin, consumer's name forwarded as headers, no roles"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.7,
+                "p50": 0.22,
+                "p90": 0.273,
+                "p99": 0.36,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.155,
+                "overheadP99": 0.23
+              },
+              "max": {
+                "rps": 10000.6,
+                "p50": 6.141,
+                "p90": 6.977,
+                "p99": 9.947,
+                "requests": 99974,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "traefik",
+          "version": "v3.7.13",
+          "startupMs": 572,
+          "memoryIdleMiB": 16.1,
+          "memoryPeakMiB": 50.2,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.196,
+                "p90": 0.233,
+                "p99": 0.304,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.131,
+                "overheadP99": 0.174
+              },
+              "max": {
+                "rps": 11364.6,
+                "p50": 5.252,
+                "p90": 7.052,
+                "p99": 13.52,
+                "requests": 113615,
+                "success": 1.0
+              }
+            },
+            "auth-delegated": {
+              "kind": "deployed",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.307,
+                "p90": 0.356,
+                "p99": 14.826,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.242,
+                "overheadP99": 14.696
+              },
+              "max": {
+                "rps": 808.5,
+                "p50": 83.149,
+                "p90": 103.875,
+                "p99": 129.871,
+                "requests": 8023,
+                "success": 1.0
+              },
+              "how": "ForwardAuth: an external service decides on every request"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.202,
+                "p90": 0.244,
+                "p99": 0.333,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.137,
+                "overheadP99": 0.203
+              },
+              "max": {
+                "rps": 10661.4,
+                "p50": 5.607,
+                "p90": 8.752,
+                "p99": 14.311,
+                "requests": 106583,
+                "success": 1.0
+              }
+            }
+          }
+        }
+      ],
+      "goBench": [
+        {
+          "name": "BareProxy",
+          "nsPerOp": 102577,
+          "allocsPerOp": 92,
+          "vsBareProxy": 1.0
+        },
+        {
+          "name": "RouteMinimal",
+          "nsPerOp": 118654,
+          "allocsPerOp": 126,
+          "vsBareProxy": 1.16
+        },
+        {
+          "name": "RouteAmong50",
+          "nsPerOp": 121185,
+          "allocsPerOp": 126,
+          "vsBareProxy": 1.18
+        },
+        {
+          "name": "RouteWithFilters",
+          "nsPerOp": 125979,
+          "allocsPerOp": 145,
+          "vsBareProxy": 1.23
+        },
+        {
+          "name": "AuthenticatedToken",
+          "nsPerOp": 261015,
+          "allocsPerOp": 319,
+          "vsBareProxy": 2.54
+        },
+        {
+          "name": "SelectionAmong1",
+          "nsPerOp": 6077,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "SelectionAmong50",
+          "nsPerOp": 6844,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "SelectionAmong200",
+          "nsPerOp": 9288,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "TerminalRespond",
+          "nsPerOp": 6059,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "DeduceKnownShape",
+          "nsPerOp": 96,
+          "allocsPerOp": 1,
+          "vsBareProxy": null
+        },
+        {
+          "name": "DeduceNothingFolds",
+          "nsPerOp": 47,
+          "allocsPerOp": 0,
+          "vsBareProxy": null
+        },
+        {
+          "name": "RateGate",
+          "nsPerOp": 323,
+          "allocsPerOp": 1,
+          "vsBareProxy": null
+        }
+      ]
+    },
+    {
+      "schema": 1,
+      "date": "2026-10-17T16:07:50Z",
+      "commit": "a56bcb0204bc76211aa65bc08201dc1c2847fe94",
+      "sourceCommit": "e4b45142",
+      "machine": {
+        "runner": "ubuntu-latest",
+        "os": "Linux",
+        "arch": "amd64",
+        "cpuModel": "AMD EPYC 7763 64-Core Processor",
+        "cpus": 4,
+        "threadsPerCore": 2,
+        "memoryGiB": 15.6,
+        "docker": "28.0.4"
+      },
+      "protocol": {
+        "gatewayCpus": 1,
+        "gatewayMemory": "1g",
+        "rate": 1000,
+        "fixedDuration": "10s",
+        "maxDuration": "10s",
+        "connectionsFixed": 32,
+        "connectionsMax": 64,
+        "loadCpus": "2-3",
+        "loadGenerator": "ghcr.io/hatoo/oha:1.16.0"
+      },
+      "direct": {
+        "fixed": {
+          "rps": 1000.6,
+          "p50": 0.095,
+          "p90": 0.126,
+          "p99": 0.149,
+          "requests": 10000,
+          "success": 1.0
+        },
+        "max": {
+          "rps": 39835.7,
+          "p50": 1.607,
+          "p90": 2.792,
+          "p99": 3.324,
+          "requests": 398406,
+          "success": 1.0
+        }
+      },
+      "gateways": [
+        {
+          "name": "meerkat",
+          "version": "a56bcb0",
+          "startupMs": 598,
+          "memoryIdleMiB": 29.3,
+          "memoryPeakMiB": 49.0,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.298,
+                "p90": 0.317,
+                "p99": 0.397,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.203,
+                "overheadP99": 0.248
+              },
+              "max": {
+                "rps": 7066.8,
+                "p50": 8.775,
+                "p90": 11.732,
+                "p99": 17.49,
+                "requests": 70620,
+                "success": 1.0
+              }
+            },
+            "auth": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.315,
+                "p90": 0.351,
+                "p99": 0.459,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.22,
+                "overheadP99": 0.31
+              },
+              "max": {
+                "rps": 6149.9,
+                "p50": 10.071,
+                "p90": 10.782,
+                "p99": 20.231,
+                "requests": 61450,
+                "success": 1.0
+              },
+              "how": "personal API token resolved by the gateway, caller's name and id forwarded as headers, no roles"
+            },
+            "auth-jwt": {
+              "kind": "extra",
+              "fixed": {
+                "rps": 1000.3,
+                "p50": 0.406,
+                "p90": 0.591,
+                "p99": 0.807,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.311,
+                "overheadP99": 0.658
+              },
+              "max": {
+                "rps": 3822.8,
+                "p50": 19.168,
+                "p90": 21.686,
+                "p99": 29.719,
+                "requests": 38171,
+                "success": 1.0
+              },
+              "how": "personal API token resolved by the gateway, caller forwarded as an ES256-signed JWT"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.7,
+                "p50": 0.296,
+                "p90": 0.314,
+                "p99": 0.369,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.201,
+                "overheadP99": 0.22
+              },
+              "max": {
+                "rps": 6928.3,
+                "p50": 8.973,
+                "p90": 11.563,
+                "p99": 17.793,
+                "requests": 69236,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "gostd",
+          "version": "go1.27.0",
+          "startupMs": 184,
+          "memoryIdleMiB": 2.7,
+          "memoryPeakMiB": 12.4,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.9,
+                "p50": 0.264,
+                "p90": 0.319,
+                "p99": 0.358,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.169,
+                "overheadP99": 0.209
+              },
+              "max": {
+                "rps": 8177.5,
+                "p50": 7.334,
+                "p90": 11.888,
+                "p99": 14.125,
+                "requests": 81729,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "kong",
+          "version": "3.9.3",
+          "startupMs": 3003,
+          "memoryIdleMiB": 139.5,
+          "memoryPeakMiB": 205.4,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.1,
+                "p50": 0.258,
+                "p90": 0.303,
+                "p99": 0.393,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.163,
+                "overheadP99": 0.244
+              },
+              "max": {
+                "rps": 8918.4,
+                "p50": 6.973,
+                "p90": 7.389,
+                "p99": 13.037,
+                "requests": 89147,
+                "success": 1.0
+              }
+            },
+            "auth": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.3,
+                "p50": 0.285,
+                "p90": 0.339,
+                "p99": 0.644,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.19,
+                "overheadP99": 0.495
+              },
+              "max": {
+                "rps": 6987.1,
+                "p50": 8.707,
+                "p90": 9.461,
+                "p99": 17.971,
+                "requests": 69823,
+                "success": 1.0
+              },
+              "how": "key-auth plugin, consumer's name and id forwarded as headers, no roles"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.473,
+                "p90": 0.615,
+                "p99": 1.514,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.378,
+                "overheadP99": 1.365
+              },
+              "max": {
+                "rps": 5181.0,
+                "p50": 10.852,
+                "p90": 12.751,
+                "p99": 37.437,
+                "requests": 51758,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "apisix",
+          "version": "3.18.0-debian",
+          "startupMs": 561,
+          "memoryIdleMiB": 49.6,
+          "memoryPeakMiB": 61.4,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.248,
+                "p90": 0.289,
+                "p99": 0.34,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.153,
+                "overheadP99": 0.191
+              },
+              "max": {
+                "rps": 9085.2,
+                "p50": 6.849,
+                "p90": 7.449,
+                "p99": 10.045,
+                "requests": 90802,
+                "success": 1.0
+              }
+            },
+            "auth": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.269,
+                "p90": 0.311,
+                "p99": 0.365,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.174,
+                "overheadP99": 0.216
+              },
+              "max": {
+                "rps": 7646.9,
+                "p50": 8.102,
+                "p90": 8.721,
+                "p99": 12.035,
+                "requests": 76421,
+                "success": 1.0
+              },
+              "how": "key-auth plugin, consumer's name forwarded as headers, no roles"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 1000.0,
+                "p50": 0.277,
+                "p90": 0.322,
+                "p99": 2.808,
+                "requests": 10000,
+                "success": 1.0,
+                "overheadP50": 0.182,
+                "overheadP99": 2.659
+              },
+              "max": {
+                "rps": 7239.7,
+                "p50": 8.55,
+                "p90": 9.336,
+                "p99": 12.914,
+                "requests": 72347,
+                "success": 1.0
+              }
+            }
+          }
+        },
+        {
+          "name": "traefik",
+          "version": "v3.7.13",
+          "startupMs": 434,
+          "memoryIdleMiB": 17.6,
+          "memoryPeakMiB": 66.4,
+          "scenarios": {
+            "proxy": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.7,
+                "p50": 0.29,
+                "p90": 0.311,
+                "p99": 0.388,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.195,
+                "overheadP99": 0.239
+              },
+              "max": {
+                "rps": 7153.2,
+                "p50": 8.57,
+                "p90": 11.874,
+                "p99": 18.67,
+                "requests": 71491,
+                "success": 1.0
+              }
+            },
+            "auth-delegated": {
+              "kind": "deployed",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.465,
+                "p90": 0.505,
+                "p99": 1.11,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.37,
+                "overheadP99": 0.961
+              },
+              "max": {
+                "rps": 1052.3,
+                "p50": 25.31,
+                "p90": 153.932,
+                "p99": 192.402,
+                "requests": 10462,
+                "success": 1.0
+              },
+              "how": "ForwardAuth: an external service decides on every request"
+            },
+            "limit": {
+              "kind": "comparable",
+              "fixed": {
+                "rps": 999.8,
+                "p50": 0.298,
+                "p90": 0.317,
+                "p99": 0.405,
+                "requests": 9999,
+                "success": 1.0,
+                "overheadP50": 0.203,
+                "overheadP99": 0.256
+              },
+              "max": {
+                "rps": 6784.3,
+                "p50": 9.021,
+                "p90": 11.573,
+                "p99": 19.032,
+                "requests": 67793,
+                "success": 1.0
+              }
+            }
+          }
+        }
+      ],
+      "goBench": [
+        {
+          "name": "BareProxy",
+          "nsPerOp": 119695,
+          "allocsPerOp": 92,
+          "vsBareProxy": 1.0
+        },
+        {
+          "name": "RouteMinimal",
+          "nsPerOp": 128432,
+          "allocsPerOp": 126,
+          "vsBareProxy": 1.07
+        },
+        {
+          "name": "RouteAmong50",
+          "nsPerOp": 140914,
+          "allocsPerOp": 126,
+          "vsBareProxy": 1.18
+        },
+        {
+          "name": "RouteWithFilters",
+          "nsPerOp": 147476,
+          "allocsPerOp": 145,
+          "vsBareProxy": 1.23
+        },
+        {
+          "name": "AuthenticatedToken",
+          "nsPerOp": 242842,
+          "allocsPerOp": 319,
+          "vsBareProxy": 2.03
+        },
+        {
+          "name": "SelectionAmong1",
+          "nsPerOp": 6047,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "SelectionAmong50",
+          "nsPerOp": 6980,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "SelectionAmong200",
+          "nsPerOp": 9503,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "TerminalRespond",
+          "nsPerOp": 6011,
+          "allocsPerOp": 50,
+          "vsBareProxy": null
+        },
+        {
+          "name": "DeduceKnownShape",
+          "nsPerOp": 130,
+          "allocsPerOp": 1,
+          "vsBareProxy": null
+        },
+        {
+          "name": "DeduceNothingFolds",
+          "nsPerOp": 55,
+          "allocsPerOp": 0,
+          "vsBareProxy": null
+        },
+        {
+          "name": "RateGate",
+          "nsPerOp": 307,
+          "allocsPerOp": 1,
+          "vsBareProxy": null
+        }
+      ]
+    }
+  ]
+}
