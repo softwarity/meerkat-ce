@@ -250,8 +250,12 @@
           <mat-header-cell *matHeaderCellDef i18n="@@Secret">Secret</mat-header-cell>
           <mat-cell *matCellDef="let c">
             <span class="sub-line">
-              @if (c.confidential) {
+              @if (c.confidential && c.secretPrefix) {
                 <ng-container i18n="@@Secret_PREFIX">secret {{ c.secretPrefix }}...</ng-container>
+              } @else if (c.confidential) {
+                <!-- Imported from a configuration that did not carry its
+                     secret: the application cannot sign in until one is drawn. -->
+                <span class="no-secret" i18n="@@Oidc_no_secret_yet">no secret yet: draw one with Regenerate</span>
               } @else {
                 <ng-container i18n="@@No_secret_PKCE">no secret, PKCE</ng-container>
               }

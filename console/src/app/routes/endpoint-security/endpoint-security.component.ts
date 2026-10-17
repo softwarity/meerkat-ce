@@ -36,6 +36,8 @@ import {
   User,
 } from '../../api.service';
 import { AccessBadgesComponent } from './access-badges.component';
+import { RoleMapComponent } from './role-map.component';
+import { UpstreamMarkComponent } from './upstream-mark.component';
 import { AccessEditorComponent, AccessState, emptyAccess, isEmpty } from './access-editor.component';
 import { RateLimitsComponent, limitLabel, limitScope, limitScopeTip } from '../rate-limits.component';
 import { MatInputModule } from '@angular/material/input';
@@ -125,6 +127,8 @@ function fromWire(a: Access | undefined): AccessState {
     AccessEditorComponent,
     AccessBadgesComponent,
     RateLimitsComponent,
+    RoleMapComponent,
+    UpstreamMarkComponent,
     EeLockComponent,
   ],
   templateUrl: './endpoint-security.component.html',
@@ -144,6 +148,9 @@ export class EndpointSecurityComponent {
   private readonly saveTrigger = new Subject<void>();
   protected readonly routes = signal<Route[]>([]);
   protected readonly roles = signal<Role[]>([]);
+  // Whether the catalogue answered at all: a gateway admin without the right
+  // to read it gets an empty list, which is not the same as an empty catalogue.
+  protected readonly rolesReadable = signal(true);
   protected readonly users = signal<User[]>([]);
   protected readonly tenants = signal<Tenant[]>([]);
   protected readonly selectedId = signal('');
@@ -251,7 +258,28 @@ export class EndpointSecurityComponent {
 
   protected readonly apiRoutes = computed(() => this.routes().filter((r) => !!r.api?.spec));
   protected readonly operations = computed(() => this.data()?.operations ?? []);
-  protected readonly columns = ['status', 'method', 'path', 'tags', 'summary', 'expand'];
+  // What the application itself requires, as its spec says it: a column of
+  // its own on the security page, and only when the spec says something about
+  // at least one operation - an empty column is a question nobody asked.
+  protected readonly hasUpstream = computed(() => this.operations().some((o) => !!o.upstream));
+  protected readonly columns = computed(() =>
+    this.intent() === 'security' && this.hasUpstream()
+      ? ['status', 'method', 'path', 'upstream', 'tags', 'summary', 'expand']
+      : ['status', 'method', 'path', 'tags', 'summary', 'expand'],
+  );
+
+  // The roles the spec declares, and the saved mapping of each onto the
+  // catalogue (Auth forward sends the declared ones the person holds).
+  protected readonly declaredRoles = computed(() => this.data()?.declaredRoles ?? []);
+  protected readonly roleMap = computed(() => this.data()?.roleMap ?? {});
+  protected readonly mappedCount = computed(
+    () => this.declaredRoles().filter((r) => !!this.roleMap()[r]).length,
+  );
+  protected readonly selectedName = computed(
+    () => this.routes().find((r) => r.id === this.selectedId())?.name ?? '',
+  );
+  // The drawer shows one operation, or the mapping: one place, one subject.
+  protected readonly mappingOpen = signal(false);
 
   protected readonly openOp = computed(() =>
     this.operations().find((o) => opKey(o.method, o.path) === this.openKey()) ?? null,
@@ -373,7 +401,14 @@ export class EndpointSecurityComponent {
       // nothing).
       const [routes, roles, users, tenants] = await Promise.all([
         firstValueFrom(this.api.listRoutes()),
-        firstValueFrom(this.api.listRoles().pipe(catchError(() => of<Role[]>([])))),
+        firstValueFrom(
+          this.api.listRoles().pipe(
+            catchError(() => {
+              this.rolesReadable.set(false);
+              return of<Role[]>([]);
+            }),
+          ),
+        ),
         firstValueFrom(this.api.listUsers().pipe(catchError(() => of<User[]>([])))),
         firstValueFrom(this.api.listTenants().pipe(catchError(() => of<Tenant[]>([])))),
       ]);
@@ -391,15 +426,24 @@ export class EndpointSecurityComponent {
     }
   }
 
+  // Which selection is current: a slow service's answer that lands after the
+  // operator moved on to another route must not paint over it.
+  private selection = 0;
+
   protected async selectRoute(id: string): Promise<void> {
+    const mine = ++this.selection;
     this.selectedId.set(id);
     this.data.set(null);
     this.close();
     this.error.set('');
-    if (!id) return;
+    if (!id) {
+      this.loadingOps.set(false);
+      return;
+    }
     this.loadingOps.set(true);
     try {
       const ops = await firstValueFrom(this.api.getRouteOperations(id));
+      if (mine !== this.selection) return;
       this.seed(ops);
       this.data.set(ops);
       // Keep only the persisted filters that this route actually has.
@@ -412,9 +456,9 @@ export class EndpointSecurityComponent {
       this.view.tags = this.view.tags.filter((t) => knownTags.has(t));
       this.view.methods = this.view.methods.filter((m) => knownMethods.has(m));
     } catch (e) {
-      this.error.set(this.message(e));
+      if (mine === this.selection) this.error.set(this.message(e));
     } finally {
-      this.loadingOps.set(false);
+      if (mine === this.selection) this.loadingOps.set(false);
     }
   }
 
@@ -477,11 +521,26 @@ export class EndpointSecurityComponent {
   // shut and opened again in front of whoever clicked. A panel that flickers is
   // not paying for a nicety.
   protected open(o: OpenAPIOperation): void {
+    this.mappingOpen.set(false);
     this.openKey.set(opKey(o.method, o.path));
+  }
+
+  protected openMapping(): void {
+    this.openKey.set('');
+    this.mappingOpen.set(true);
   }
 
   protected close(): void {
     this.openKey.set('');
+    this.mappingOpen.set(false);
+  }
+
+  // The mapping as the gateway kept it, on the marks of every operation; and
+  // the catalogue read again, since the save may have created roles in it.
+  protected async mappingSaved(roleMap: Record<string, string>): Promise<void> {
+    this.data.update((d) => (d ? { ...d, roleMap } : d));
+    if (!this.rolesReadable()) return;
+    this.roles.set(await firstValueFrom(this.api.listRoles().pipe(catchError(() => of(this.roles())))));
   }
 
   protected isOpen(o: OpenAPIOperation): boolean {

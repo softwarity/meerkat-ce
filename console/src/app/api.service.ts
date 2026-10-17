@@ -131,6 +131,11 @@ export interface RouteAPIOptions {
   security?: EndpointSecurity;
   // Audited operations (AUD-04). Absent here, the editor's save erased them.
   audit?: EndpointAudit[];
+  // The roles the spec declares, each mapped onto a catalogue role: declared
+  // name to catalogue name. Read-only here: it is written on the Endpoint
+  // security screen (PUT /api/routes/{id}/role-map), and the route editor
+  // only reads it to show what Auth forward sends.
+  roleMap?: Record<string, string>;
 }
 
 // What comes back from depositing a file: what the spec turned out to be,
@@ -215,6 +220,25 @@ export interface OpenAPIOperation {
   operationId?: string;
   summary?: string;
   tags?: string[];
+  // What the APPLICATION requires, as its spec says it (the scopes of a
+  // security requirement). Absent, the spec says nothing about it. Shown, never
+  // enforced: the application checks it itself, Meerkat does not.
+  upstream?: UpstreamAccess;
+}
+
+// public: the spec opens it explicitly; authenticated: a valid token is
+// enough; roles: one of the listed roles (the union over the requirements).
+export interface UpstreamAccess {
+  access: 'public' | 'authenticated' | 'roles';
+  roles?: string[];
+}
+
+// The body of PUT /api/routes/{id}/role-map: the catalogue roles to create
+// first (skipped when one already exists), then the mapping that replaces the
+// route's. A declared role absent from the map is not forwarded.
+export interface RoleMapSave {
+  roleMap: Record<string, string>;
+  create: { name: string; tags: string[] }[];
 }
 
 // What the endpoint-security editor loads: the API metadata, the live operation
@@ -258,6 +282,10 @@ export interface RouteOperations {
   operations: OpenAPIOperation[];
   audit?: EndpointAudit[];
   security?: EndpointSecurity;
+  // Every distinct role the spec declares, sorted, and the saved mapping of
+  // each onto a catalogue role.
+  declaredRoles?: string[];
+  roleMap?: Record<string, string>;
 }
 
 // The injected <meerkat-user-button> web component. The two-word position's
@@ -550,7 +578,7 @@ export interface ConfigLiteral {
 // download: the question is "what nature of information am I handing over",
 // not "which objects" - that is what the file itself answers.
 export interface ConfigSection {
-  kind: 'route' | 'role' | 'authProvider' | 'theme' | 'mailRelay' | 'setting' | 'image';
+  kind: 'route' | 'role' | 'authProvider' | 'oidcClient' | 'theme' | 'mailRelay' | 'setting' | 'image';
   count: number;
   // Settings only: their storage keys, which the console turns into what they
   // are about - "12 settings" says nothing.
@@ -680,7 +708,7 @@ export interface DatabaseCopy {
 
 // One object an import would touch.
 export interface ConfigChange {
-  kind: 'route' | 'role' | 'authProvider' | 'theme' | 'setting' | 'mailRelay' | 'tenant' | 'group';
+  kind: 'route' | 'role' | 'authProvider' | 'oidcClient' | 'theme' | 'setting' | 'mailRelay' | 'tenant' | 'group';
   id?: string;
   label: string;
   action: 'add' | 'update' | 'same' | 'remove';
@@ -704,6 +732,9 @@ export interface ConfigPlan {
   prune: boolean;
   // What the community image leaves out of the document: its Enterprise parts.
   notApplied?: string[];
+  // What the routes ask of the OIDC clients that the import could not settle:
+  // a client kept because a route still uses it, or one nobody declares.
+  unbound?: string[];
   // The lines kept out of an apply: what the gateway held stayed for them.
   kept?: ConfigChange[];
 }
@@ -2456,6 +2487,15 @@ export class ApiService {
 
   saveRouteSecurity(id: string, security: RouteSecurity): Observable<RouteSecurity> {
     return this.http.put<RouteSecurity>(`/api/routes/${encodeURIComponent(id)}/security`, security);
+  }
+
+  // Maps the roles the route's spec declares onto catalogue roles, creating
+  // the ones asked for first (that part needs the right to write roles).
+  saveRoleMap(id: string, body: RoleMapSave): Observable<{ roleMap: Record<string, string>; created?: string[] }> {
+    return this.http.put<{ roleMap: Record<string, string>; created?: string[] }>(
+      `/api/routes/${encodeURIComponent(id)}/role-map`,
+      body,
+    );
   }
 
   // Identity signing keys (signed-jwt): the gateway-wide public keys backends

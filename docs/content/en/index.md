@@ -82,7 +82,8 @@ configuration file to redeploy.
 
 The control plane exposes an MCP endpoint. An assistant reads the installation
 and changes it under exactly the rules a human gets - read-only stays
-read-only.
+read-only. And it drives your own APIs: it reads a route's OpenAPI, then calls
+the service through the gateway, as any role, to do the job or prove a rule.
 :::
 
 ## What it looks like

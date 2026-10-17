@@ -18,6 +18,22 @@ export interface RoleExprData {
   // most of their services, and writing it 150 times is not a design: take the
   // one the service next door uses, change the tag, done.
   others?: { name: string; expr: string }[];
+  // The route's mapping of the roles its spec declares onto catalogue roles
+  // (declared name to catalogue name), for .Declared. Absent, the route maps
+  // nothing and .Declared keeps nothing.
+  roleMap?: Record<string, string>;
+}
+
+// What a route sends when its roles attribute has no expression of its own
+// and it maps the roles its spec declares: the application gets its own names
+// back, and only the ones the person holds. The server's routing.RoleExprDeclared.
+export const DECLARED_ROLE_EXPR = '{{.Roles | .Declared | join ","}}';
+export const PLAIN_ROLE_EXPR = '{{join "," .Roles}}';
+
+// The default the gateway applies to a route: the declared one as soon as the
+// route maps anything, the whole list otherwise.
+export function defaultRoleExprFor(roleMap: Record<string, string> | undefined): string {
+  return roleMap && Object.keys(roleMap).length ? DECLARED_ROLE_EXPR : PLAIN_ROLE_EXPR;
 }
 
 // Shapes to start from. Each one narrows AND rewrites, because that is what a
@@ -31,6 +47,7 @@ const SHAPES: { label: string; pipe: string }[] = [
   { label: 'Everything except one tag', pipe: '.Drop "tag:TAGNAME" | cutHead "ROLE_"' },
   { label: "Under this service's own head", pipe: '.Keep "tag:TAGNAME" | cutHead "ROLE_" | addHead "app:"' },
   { label: 'Everything, untouched', pipe: '' },
+  { label: $localize`:@@Roles_the_application_declares_shape:The roles the application declares`, pipe: '.Declared' },
 ];
 
 // The same shapes, twice: what changes between an upstream reading a header and
@@ -293,6 +310,16 @@ const highlight = templateHighlight(ROLE_SYNTAX);
           </dt>
           <dd>the opposite, for a service whose namespace differs from the catalogue's.</dd>
 
+          <dt><code tpl=".Declared" [syntax]="SYNTAX"></code></dt>
+          <dd i18n="@@Declared_verb_doc">
+            the roles the application's OpenAPI spec declares, among those this caller holds through their
+            mapping, under the <strong>application's own names</strong>. The mapping is set on the Endpoint
+            security screen.
+            @if (!maps) {
+              This route maps none yet: it keeps nothing.
+            }
+          </dd>
+
           <dt><code tpl="lower" [syntax]="SYNTAX"></code>, <code tpl="upper" [syntax]="SYNTAX"></code></dt>
           <dd>case, for a service that expects one.</dd>
 
@@ -321,8 +348,11 @@ export class RoleExprDialogComponent {
   // Written here rather than inline: Angular reads { and } as control flow.
   protected readonly KEEP = '.Keep "tag:BILLING" "ROLE_USER"';
   protected readonly DROP = '.Drop "tag:OTHER"';
-  protected readonly CSV_SHAPES = CSV_SHAPES;
-  protected readonly JSON_SHAPES = JSON_SHAPES;
+  // The declared shape only where it can give something: on a route that maps
+  // nothing it keeps nothing, and a starter that empties the list is a trap.
+  protected readonly maps = Object.keys(this.data.roleMap ?? {}).length > 0;
+  protected readonly CSV_SHAPES = this.maps ? CSV_SHAPES : CSV_SHAPES.filter((p) => !p.expr.includes('.Declared'));
+  protected readonly JSON_SHAPES = this.maps ? JSON_SHAPES : JSON_SHAPES.filter((p) => !p.expr.includes('.Declared'));
   protected readonly SYNTAX = ROLE_SYNTAX;
   protected readonly TAG_COLOR = TPL_COLORS.tag;
   // Where the usual servers stop for ONE header: Apache LimitRequestFieldSize,
@@ -353,7 +383,7 @@ export class RoleExprDialogComponent {
     afterNextRender(() => {
       this.view = new EditorView({
         state: EditorState.create({
-          doc: this.data.expr || '{{join "," .Roles}}',
+          doc: this.data.expr || defaultRoleExprFor(this.data.roleMap),
           extensions: [
             basicSetup,
             catppuccin,
@@ -394,7 +424,7 @@ export class RoleExprDialogComponent {
     try {
       const names = this.data.roles.map((r) => r.name);
       const tagsOf = new Map(this.data.roles.map((r) => [r.name, r.tags ?? []]));
-      const out = runRoleExpr(expr, names, tagsOf);
+      const out = runRoleExpr(expr, names, tagsOf, this.data.roleMap);
       this.error.set('');
       this.sample.set(out.text.length > 400 ? out.text.slice(0, 400) + '...' : out.text);
       this.count.set(out.count);
@@ -451,10 +481,13 @@ function groupByExpr(others: { name: string; expr: string }[], current: string):
 // A reader for the same pipeline the gateway runs. Deliberately narrow: it
 // understands the verbs and nothing else, so anything it cannot read is left
 // for the server to judge on save.
+// roleMap (declared name to catalogue name) is what .Declared reads; without
+// it, .Declared keeps nothing.
 export function runRoleExpr(
   expr: string,
   roles: string[],
   tagsOf: Map<string, string[]>,
+  roleMap?: Record<string, string>,
 ): { text: string; count: number } {
   const body = expr.trim().replace(/^\{\{/, '').replace(/\}\}$/, '').trim();
   if (!body) return { text: roles.join(','), count: roles.length };
@@ -474,6 +507,15 @@ export function runRoleExpr(
         const tags = new Set(args.filter((a) => a.startsWith('tag:')).map((a) => a.slice(4)));
         const hit = (r: string) => wanted.has(r) || (tagsOf.get(r) ?? []).some((t) => tags.has(t));
         list = list.filter((r) => (verb === '.Keep' ? hit(r) : !hit(r)));
+        break;
+      }
+      // The declared roles whose catalogue role is held, under the
+      // application's name: sorted, each once, as the gateway does it.
+      case '.Declared': {
+        const held = new Set(list);
+        const out = new Set<string>();
+        for (const [declared, target] of Object.entries(roleMap ?? {})) if (held.has(target)) out.add(declared);
+        list = [...out].sort();
         break;
       }
       case 'cutHead':

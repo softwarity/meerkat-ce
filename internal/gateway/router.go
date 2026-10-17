@@ -951,7 +951,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	// of all a purge of Authorization, which carries the application's own
 	// access token from its browser code to its server.
 	if r.Identity != nil && r.Identity.Mechanism != "" && r.Identity.Mechanism != store.IdentityOIDC {
-		filters.Request = append(filters.Request, rt.identityForwardFilter(*r.Identity, r.Name))
+		filters.Request = append(filters.Request, rt.identityForwardFilter(*r.Identity, r.Name, r.RoleMap()))
 	}
 	// A UI route's own CSS and JavaScript, in its order, at its places (see
 	// store.Injection). A block cannot break out of its tag: the closing tag
@@ -1306,6 +1306,17 @@ func validateRouteType(r store.Route) error {
 		if err := r.API.Security.Validate(); err != nil {
 			return err
 		}
+		for app, role := range r.API.RoleMap {
+			if !declaredRoleOK.MatchString(app) {
+				return fmt.Errorf("declared role %q is not allowed: letters, digits and _ - . : / only", app)
+			}
+			// The catalogue side is a role a session can HOLD, and a session
+			// only carries names of this shape: any other would map to a role
+			// nobody is ever seen with.
+			if !schemeTokenOK.MatchString(role) {
+				return fmt.Errorf("declared role %s maps to %q, which is not allowed: a catalogue role is letters, digits, - and _ only", app, role)
+			}
+		}
 	}
 	// Identity forwarding is valid for BOTH types (an API service wants the
 	// caller too).
@@ -1516,6 +1527,12 @@ func validateRouteType(r store.Route) error {
 // injected HTML - validated here, so the fragment never carries free text.
 var schemeTokenOK = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
+// declaredRoleOK bounds a role as an APPLICATION names it in its spec: wider
+// than a catalogue name (scopes such as read:orders or api.admin are common),
+// and still nothing that could split a header list or a claim - no space, no
+// comma, no quote.
+var declaredRoleOK = regexp.MustCompile(`^[A-Za-z0-9_.:/-]+$`)
+
 // storageKeyOK is a localStorage key as applications write them - dots, colons
 // and slashes are common in the wild ("vuetify:theme"); quotes and spaces are
 // not, and this lands in an HTML attribute.
@@ -1539,14 +1556,18 @@ type identityData struct {
 	// narrow what they forward. Read from a short-lived cache: a catalogue
 	// changes far less often than requests arrive.
 	TagsOfRole map[string][]string
-	UserID     string
-	Username   string
-	Fullname   string
-	Email      string
-	Timezone   string
-	Locale     string
-	TenantID   string
-	Tenant     string
+	// Declared is the mapping of the route the request goes through (its
+	// RoleMap), set per request on a copy: the rest of this is the caller's,
+	// shared by every route, and this one is not.
+	Declared map[string]string
+	UserID   string
+	Username string
+	Fullname string
+	Email    string
+	Timezone string
+	Locale   string
+	TenantID string
+	Tenant   string
 	// Group is the session's chosen group (exclusive mode, RBAC-03), by name.
 	Group string
 	// Fields are the installation's own facts about this person (store's
@@ -2545,7 +2566,7 @@ func (rt *Router) Issuer() string {
 // are purged first so a client can never spoof them: the header transport drops
 // every catalogue header (and each mapped target); the jwt transport drops the
 // Authorization it is about to write.
-func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName string) routing.RequestFilter {
+func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName string, declared map[string]string) routing.RequestFilter {
 	if cfg.Mechanism == "jwt" || cfg.Mechanism == "signed-jwt" {
 		signed := cfg.Mechanism == "signed-jwt"
 		alg := cfg.Algorithm
@@ -2570,6 +2591,7 @@ func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName str
 			if !ok {
 				return
 			}
+			d.Declared = declared
 			claims := identityClaims(cfg, routeName, rt.Issuer(), d)
 			var tok string
 			if signed {
@@ -2611,6 +2633,7 @@ func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName str
 		if !ok {
 			return
 		}
+		d.Declared = declared
 		for _, h := range identityHeaderPairs(cfg, d) {
 			pr.Out.Header.Set(h.Name, h.Value)
 		}
@@ -2699,11 +2722,17 @@ func identityHeaderPairs(cfg store.IdentityForward, d identityData) []IdentityHe
 // expression cannot reach here - routes are validated on save and on reload -
 // and if one ever did, sending nothing beats sending something half-built.
 func renderRoles(expr string, d identityData) (string, error) {
+	// A route that maps the roles its application declares sends THOSE by
+	// default, in the application's names: what nobody wrote an expression
+	// for is the plain case, and on such a route the plain case is the map.
+	if strings.TrimSpace(expr) == "" && len(d.Declared) > 0 {
+		expr = routing.RoleExprDeclared
+	}
 	compiled, err := routing.CompileRoleExpr(expr)
 	if err != nil {
 		return "", err
 	}
-	return compiled.Render(d.Roles, func(role string) []string { return d.TagsOfRole[role] })
+	return compiled.RenderDeclared(d.Roles, func(role string) []string { return d.TagsOfRole[role] }, d.Declared)
 }
 
 // sampleIdentity is the FICTIONAL caller the identity preview describes. It is

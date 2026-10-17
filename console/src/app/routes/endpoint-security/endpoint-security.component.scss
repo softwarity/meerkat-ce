@@ -542,3 +542,23 @@ mat-drawer {
   background: var(--mat-sys-error-container);
   color: var(--mat-sys-on-error-container);
 }
+
+// What the application requires, read-only: wraps rather than widening the
+// table when an operation lists several roles.
+.c-upstream {
+  max-width: 260px;
+  white-space: normal;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+// The mapping drawer's title, in the op-head where an operation shows its path.
+.map-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.map-link {
+  display: flex;
+  margin-top: 12px;
+}

@@ -33,6 +33,28 @@ Il se choisit dans l'éditeur de route, sous **Auth forward** : le mécanisme
 bibliothèque qui ne connaît rien d'autre), les attributs et la forme des rôles.
 L'aperçu y montre le jeton exact que recevrait un service.
 
+### La forme des rôles
+
+L'attribut roles porte une expression, lue comme un pipeline de gauche à
+droite. La même expression façonne l'en-tête des rôles, un claim JWT et un claim
+OIDC ; un résultat qui est un tableau JSON arrive dans un claim comme un tableau.
+
+| Verbe | Ce qu'il fait |
+|---|---|
+| `.Keep "tag:BILLING" "ROLE_USER"` | garde les rôles qui portent une étiquette du catalogue, ou nommés |
+| `.Drop ...` | l'inverse : tout sauf ceux-là |
+| `.Declared` | les rôles que l'application de la route déclare dans sa spec, rattachés sur Endpoint security : ceux que la personne détient, sous les noms de l'application |
+| `cutHead "ROLE_"`, `cutTail`, `addHead`, `addTail` | retouchent chaque nom |
+| `lower`, `upper` | changent la casse |
+| `join ","`, `json` | le résultat : une liste séparée, ou un tableau JSON |
+
+Sans expression, une route envoie tous les rôles séparés par des virgules
+(`{{join "," .Roles}}`), ou, dès qu'elle rattache les rôles que son application
+déclare, `{{.Roles | .Declared | join ","}}` (voir
+[Sécurité par endpoint](/docs/access/endpoint-security#les-rles-que-lapplication-dclare)).
+`.Keep`, `.Drop` et `.Declared` lisent les noms du catalogue : ils passent avant
+tout verbe qui les retouche.
+
 ## Comment un service le vérifie
 
 Tout ce dont un service a besoin est servi sur le **plan interne**, port

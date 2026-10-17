@@ -378,17 +378,22 @@ async function seedEverythingElse(api) {
   // operation closed to everybody but a named user.
   const spec = {
     openapi: '3.0.3', info: { title: 'Orders', version: '2.4.0' },
+    // What the service itself requires, the way its framework writes it: a
+    // token on everything, and the roles of two operations as scopes
+    // (RBAC-12). The shipments list is open.
+    components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } } },
+    security: [{ bearer: [] }],
     paths: {
       '/orders': {
         get: { operationId: 'listOrders', summary: 'List orders', responses: { 200: { description: 'ok' } } },
-        post: { operationId: 'createOrder', summary: 'Create an order', responses: { 201: { description: 'created' } } },
+        post: { operationId: 'createOrder', summary: 'Create an order', security: [{ bearer: ['ORDERS_WRITE'] }], responses: { 201: { description: 'created' } } },
       },
       '/orders/{id}': {
         get: { operationId: 'getOrder', summary: 'One order', responses: { 200: { description: 'ok' } } },
         delete: { operationId: 'cancelOrder', summary: 'Cancel an order', responses: { 204: { description: 'cancelled' } } },
       },
-      '/shipments': { get: { operationId: 'listShipments', summary: 'List shipments', responses: { 200: { description: 'ok' } } } },
-      '/admin/reindex': { post: { operationId: 'reindex', summary: 'Rebuild the search index', responses: { 202: { description: 'accepted' } } } },
+      '/shipments': { get: { operationId: 'listShipments', summary: 'List shipments', security: [], responses: { 200: { description: 'ok' } } } },
+      '/admin/reindex': { post: { operationId: 'reindex', summary: 'Rebuild the search index', security: [{ bearer: ['ORDERS_ADMIN'] }], responses: { 202: { description: 'accepted' } } } },
     },
   };
   await soft('orders spec', () => api.put('/api/routes/orders-api/spec', {
@@ -401,6 +406,13 @@ async function seedEverythingElse(api) {
       { method: 'GET', path: '/orders', inherit: true, limits: [{ per: 'user', requests: 300, window: 'PT1M' }] },
       { method: 'GET', path: '/shipments', inherit: true, limits: [{ per: 'ip', requests: 50, window: 'PT1S' }] },
     ] } }));
+  // The roles the service declares, tied to the catalogue: one imported under
+  // the route's prefix and tag, one onto a role that already exists.
+  await soft('orders declared roles', () => api.put('/api/routes/orders-api/role-map', {
+    data: {
+      roleMap: { ORDERS_WRITE: 'orders-api-ORDERS_WRITE', ORDERS_ADMIN: 'OPS' },
+      create: [{ name: 'orders-api-ORDERS_WRITE', tags: ['orders-api'] }],
+    } }));
   // A request header read from the vault, now that the entry exists.
   const billing = ROUTES.find((rt) => rt.id === 'billing');
   await soft('billing vault header', () => api.put('/api/routes/billing', { data: { ...billing, filters: [
@@ -498,6 +510,15 @@ const SHOTS = [
     file: 'endpoint-rule', path: '/infra/endpoint-security?route=orders-api', settle: 2000,
     act: async (page) => {
       await page.getByText('/admin/reindex').first().click();
+      await page.waitForTimeout(1000);
+    },
+  },
+  {
+    // The mapping drawer, opened from the header: what the service declares,
+    // and the catalogue role each one is tied to.
+    file: 'endpoint-declared-roles', path: '/infra/endpoint-security?route=orders-api', settle: 2000,
+    act: async (page) => {
+      await page.getByRole('button', { name: /Declared roles/ }).first().click();
       await page.waitForTimeout(1000);
     },
   },

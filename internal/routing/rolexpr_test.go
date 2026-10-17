@@ -58,3 +58,32 @@ func TestKeepORsItsSelectors(t *testing.T) {
 		}
 	}
 }
+
+// .Declared answers in the APPLICATION's names, and only for what the caller
+// holds: the map's other entries, and the caller's other roles, stay home.
+func TestDeclaredSendsTheApplicationsNames(t *testing.T) {
+	c, err := CompileRoleExpr(RoleExprDeclared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declared := map[string]string{"ROLE_ADMIN": "demo-ROLE_ADMIN", "ROLE_USER": "opt-svc", "ROLE_AUDIT": "auditor"}
+	got, err := c.RenderDeclared([]string{"opt-svc", "demo-ROLE_ADMIN", "billing"}, nil, declared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "ROLE_ADMIN,ROLE_USER" {
+		t.Errorf("declared roles %q, want ROLE_ADMIN,ROLE_USER", got)
+	}
+	// Composes: the application's names, as a JSON array.
+	c, err = CompileRoleExpr(`{{.Roles | .Declared | json}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := c.RenderDeclared([]string{"auditor"}, nil, declared); got != `["ROLE_AUDIT"]` {
+		t.Errorf("as json %q, want [\"ROLE_AUDIT\"]", got)
+	}
+	// A route with no map sends nothing through .Declared, not everything.
+	if got, _ := c.RenderDeclared([]string{"auditor"}, nil, nil); got != `[]` {
+		t.Errorf("without a map %q, want []", got)
+	}
+}

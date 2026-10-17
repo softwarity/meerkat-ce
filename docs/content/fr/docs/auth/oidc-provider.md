@@ -98,6 +98,11 @@ quand l'une d'elles couvre tout un hôte. L'icône de clé tire un **nouveau
 secret** : l'ancien cesse aussitôt de fonctionner. Un client qu'une route utilise
 encore ne se supprime pas, et le refus nomme les routes.
 
+Les clients voyagent dans une [configuration](/docs/console/configuration), le secret
+sous forme de son sha256 seulement (`secretHash`) : importé sur une autre gateway, un
+client garde le même secret. Un client confidentiel importé sans lui n'a **pas encore
+de secret**, et sa ligne le dit : l'icône de clé tire le premier.
+
 ## Y lier une route
 
 Dans l'éditeur de route, **Auth forward**, mécanisme **OIDC (the service signs in

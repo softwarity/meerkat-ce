@@ -10,10 +10,14 @@ summary: Transporter la configuration d'une gateway - configurations nommées, p
 **Meerkat > Configuration**, réservé à root. Trois onglets, parce que trois questions
 différentes se partageaient une seule page.
 
-Ce qu'une configuration emporte : **les routes, les rôles, les autorités, le relais de
-messagerie, les thèmes et les réglages de la gateway**. Ce qui reste sur place :
-**les utilisateurs, les organisations, les sessions et le coffre** - ce n'est pas de la
-configuration, c'est ce avec quoi vit cette gateway.
+Ce qu'une configuration emporte : **les routes, les rôles, les organisations et leurs
+groupes, les autorités, les clients OIDC, le relais de messagerie, les thèmes et les
+réglages de la gateway**. Le secret d'un client OIDC ne voyage que sous forme de son
+sha256 (`secretHash`), jamais en clair : le client importé ailleurs garde le même
+secret, et l'application continue de fonctionner sans rien changer. Ce qui reste sur
+place : **les utilisateurs et qui appartient à quoi, les sessions, et les valeurs du
+coffre** (une configuration nomme les entrées qu'elle utilise, jamais leur contenu) -
+ce n'est pas de la configuration, c'est ce avec quoi vit cette gateway.
 
 | Onglet | Ce à quoi il répond |
 |---|---|
@@ -301,8 +305,14 @@ quand la gateway tourne sur cette base. Voir
 - **L'image Community écarte les parties Enterprise.** Une configuration exportée d'une
   gateway Enterprise s'importe dans une gateway Community sans ses heures
   ouvrées, sa disposition, sa mention masquée, son export OpenTelemetry, ses annuaires,
-  ni ses autorités et commandes ACME (la redirection HTTPS et HSTS sont conservés) ; le
-  plan liste ce qui a été écarté.
+  ses clients OIDC, ni ses autorités et commandes ACME (la redirection HTTPS et HSTS
+  sont conservés) ; le plan liste ce qui a été écarté. Une route liée à un client OIDC
+  garde son mécanisme, sans qu'il soit servi.
+- **Un import ne fait pas perdre son client OIDC à une route.** Un client qu'une route
+  utilise encore est gardé, même par un document qui élague sans le lister : une
+  configuration exportée avant que les clients voyagent s'active toujours. Une route qui
+  nomme un client que ni le document ni la gateway ne déclarent s'importe telle quelle,
+  et le plan le dit : déclarez le client sous **OIDC / JWT**.
 - **Un pull depuis git ne change rien.** Il met un document en réserve et vous montre
   le plan. La gateway bascule quand quelqu'un active la configuration, pas quand le
   dépôt évolue.

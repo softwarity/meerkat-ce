@@ -122,7 +122,9 @@ func (a *API) writeTools() []mcp.Tool {
 			Name: "import_configuration", Allow: isRoot, Title: "Apply a configuration document",
 			Description: "Apply a configuration document - the YAML or JSON export_configuration answers, or " +
 				"a file somebody wrote - to this gateway. This is how an installation is set up from a " +
-				"file: routes, roles, organisations, groups, themes, settings and the branding all at once. " +
+				"file: routes, roles, organisations, groups, authorities, OIDC clients, themes, settings and " +
+				"the branding all at once. An OIDC client carrying a secretHash keeps that secret; one without " +
+				"keeps the secret it has here, or is created with none until a person draws one. " +
 				"\n\nBY DEFAULT IT MERGES: what the document does not mention is left alone, so an import " +
 				"cannot quietly delete a route it never knew about. prune: true aligns the gateway ON the " +
 				"document instead - anything absent from a section the document carries is removed. " +
@@ -202,7 +204,11 @@ func routeSchema() map[string]any {
 			"description": "How this application takes a language: mechanism, the languages it speaks, " +
 				"and where the locale lives in the URL."},
 		"api": map[string]any{"type": "object",
-			"description": "Its OpenAPI declaration and the per-endpoint security read from it."},
+			"description": "Its OpenAPI declaration, the per-endpoint security read from it, and roleMap: " +
+				"each role the application declares in its spec (its own name) tied to the catalogue role " +
+				"that grants it. With a roleMap, the roles expression {{.Roles | .Declared | join \",\"}} " +
+				"(the default when none is written) forwards the declared roles the caller holds, under " +
+				"the application's names. list_operations shows what each operation declares."},
 		"timeouts": map[string]any{"type": "object", "description": "The waits for this route, overriding the installation's."},
 		"breaker":  map[string]any{"type": "object", "description": "The circuit breaker for this route."},
 		"limits":   map[string]any{"type": "array", "description": "The rate limits for this route.", "items": map[string]any{"type": "object"}},

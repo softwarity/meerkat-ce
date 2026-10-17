@@ -7,9 +7,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
@@ -80,6 +84,10 @@ type Plan struct {
 	// Kept names the lines the operator kept out (keep.go): the gateway's
 	// current objects stayed in their place.
 	Kept []Change `json:"kept,omitempty"`
+	// Unbound says what the routes ask of the OIDC clients that the import
+	// could not settle: a client kept because a route still uses it, or a
+	// route naming a client nobody declares (oidcBindings). Said, not refused.
+	Unbound []string `json:"unbound,omitempty"`
 }
 
 // Touches reports whether the plan changes anything at all.
@@ -151,6 +159,9 @@ func complete(doc *Document) *Document {
 	if out.AuthProviders == nil {
 		out.AuthProviders = []store.AuthProvider{}
 	}
+	if out.OIDCClients == nil {
+		out.OIDCClients = []OIDCClient{}
+	}
 	// Themes are NOT completed, and a switch does not prune them (see run):
 	// an export carries the ACTIVE theme alone - the others are colour trials
 	// kept on the side - so a document can never be read as the full list of
@@ -184,12 +195,17 @@ func Apply(ctx context.Context, st *store.Store, doc *Document, prune bool) (*Pl
 func run(ctx context.Context, st *store.Store, doc *Document, prune, commit, whole bool) (*Plan, error) {
 	if doc.Empty() {
 		return nil, fmt.Errorf("config: this file configures nothing " +
-			"(no routes, roles, authorities, mail relay, themes or settings)")
+			"(no routes, roles, authorities, OIDC clients, mail relay, themes or settings)")
 	}
 	if err := check(doc); err != nil {
 		return nil, err
 	}
 	plan := &Plan{Prune: prune, NotApplied: notOnCommunity(doc)}
+	keepClients, oidcNotes, err := oidcBindings(ctx, st, doc, prune)
+	if err != nil {
+		return nil, err
+	}
+	plan.Unbound = oidcNotes
 
 	// The vault first: the objects about to be written reference it, and a
 	// route saved before its $name exists reloads with an unresolved reference.
@@ -212,6 +228,10 @@ func run(ctx context.Context, st *store.Store, doc *Document, prune, commit, who
 		plan.Missing = missing
 	}
 
+	// The OIDC clients before the routes that sign people into them.
+	if err := importOIDCClients(ctx, st, doc, plan, prune, commit, keepClients); err != nil {
+		return nil, err
+	}
 	if err := importRoutes(ctx, st, doc, plan, prune, commit); err != nil {
 		return nil, err
 	}
@@ -299,7 +319,115 @@ func check(doc *Document) error {
 			return fmt.Errorf("config: a theme has no id (%q)", t.Name)
 		}
 	}
+	seen := map[string]bool{}
+	for _, c := range doc.OIDCClients {
+		// The store's own rules, on a copy: the id, the audience and the
+		// lifetime are refused here, before anything is written, in the words
+		// the console uses.
+		stored := c.stored()
+		if err := store.SanitizeOIDCClient(&stored); err != nil {
+			return fmt.Errorf("config: OIDC client %q: %w", c.ID, err)
+		}
+		if seen[stored.ID] {
+			return fmt.Errorf("config: OIDC client %q is listed twice: a client id is unique", stored.ID)
+		}
+		seen[stored.ID] = true
+		switch {
+		case c.SecretHash == "" && c.SecretPrefix != "":
+			return fmt.Errorf("config: OIDC client %q carries a secretPrefix without its secretHash: "+
+				"give both, or neither to keep the secret the gateway already has", c.ID)
+		case c.SecretHash == "":
+		case !c.Confidential:
+			return fmt.Errorf("config: OIDC client %q is public (confidential: false) and carries a "+
+				"secretHash: a public client keeps no secret - drop the hash, or make it confidential", c.ID)
+		case !secretHashOK.MatchString(c.SecretHash):
+			return fmt.Errorf("config: the secretHash of OIDC client %q is not a sha256: 64 lower-case "+
+				"hexadecimal characters, as an export writes it", c.ID)
+		}
+	}
 	return nil
+}
+
+// secretHashOK is what an OIDC client's secretHash is: a sha256, hex, the way
+// store.HashOIDCSecret writes it - anything else could never match a secret.
+var secretHashOK = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// oidcBindings reads, before anything is written, what the routes will ask of
+// the OIDC clients once the document is applied. Nothing is refused: a route
+// naming a client that does not exist imported before clients travelled, and
+// a configuration exported then (routes, no oidcClients section) must still
+// apply. Two things follow instead:
+//
+//   - a client some route will still sign people into is never pruned, even
+//     by a document that does not list it - activating an older configuration
+//     would otherwise take the application's sign-in away with it;
+//   - a route left naming a client nobody declares is said in the plan, which
+//     is where an operator reads what an import did.
+//
+// Not asked on the community image: the clients are taken out of the document
+// there (notOnCommunity), and the routes keep their mechanism unserved, as a
+// route saved there does.
+func oidcBindings(ctx context.Context, st *store.Store, doc *Document, prune bool) (map[string]bool, []string, error) {
+	if !edition.Enterprise {
+		return nil, nil, nil
+	}
+	existing, err := st.ListOIDCClients(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	had := map[string]bool{}
+	for _, c := range existing {
+		had[c.ID] = true
+	}
+	listed := map[string]bool{}
+	for _, c := range doc.OIDCClients {
+		listed[strings.TrimSpace(c.ID)] = true
+	}
+	bound := func(r store.Route) string {
+		if r.Identity == nil || r.Identity.Mechanism != store.IdentityOIDC {
+			return ""
+		}
+		return r.Identity.Client
+	}
+	// The routes there will be once the document is applied: its own, and the
+	// gateway's it does not replace (all of them, unless it prunes routes).
+	uses := map[string][]string{}
+	carried := map[string]bool{}
+	for _, r := range doc.Routes {
+		carried[r.ID] = true
+		if c := bound(r); c != "" {
+			uses[c] = append(uses[c], r.Name)
+		}
+	}
+	if doc.Routes == nil || !prune {
+		routes, err := st.ListRoutes(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, r := range routes {
+			if c := bound(r); c != "" && !carried[r.ID] {
+				uses[c] = append(uses[c], r.Name)
+			}
+		}
+	}
+	keep := map[string]bool{}
+	var notes []string
+	for _, client := range slices.Sorted(maps.Keys(uses)) {
+		names := strings.Join(uses[client], ", ")
+		switch {
+		case listed[client]:
+		case had[client]:
+			keep[client] = true
+			if prune && doc.OIDCClients != nil {
+				notes = append(notes, fmt.Sprintf("OIDC client %q kept although the document does not list it: "+
+					"%s still signs people into it", client, names))
+			}
+		default:
+			notes = append(notes, fmt.Sprintf("%s signs people into the OIDC client %q, which neither the "+
+				"document nor this gateway declares: declare it under OIDC / JWT", names, client))
+		}
+	}
+	return keep, notes, nil
 }
 
 // importTenants writes the organisations a document carries.
@@ -625,6 +753,86 @@ func importProviders(ctx context.Context, st *store.Store, doc *Document, plan *
 		if commit {
 			if _, err := st.DeleteAuthProvider(ctx, p.ID); err != nil {
 				return fmt.Errorf("config: remove authority %q: %w", p.Name, err)
+			}
+		}
+	}
+	return nil
+}
+
+// importOIDCClients writes the OIDC clients a document carries.
+//
+// The secret follows the rule every secret of an import follows, adapted to a
+// secret that travels as its hash: a client carrying a secretHash gets exactly
+// that secret, so the application keeps working with nothing to change; a
+// confidential client carrying none keeps the secret it already has, or is
+// created without one - the console says so on its line, and drawing one is
+// the act of a person who will hand it to the application.
+func importOIDCClients(ctx context.Context, st *store.Store, doc *Document, plan *Plan, prune, commit bool, keep map[string]bool) error {
+	if doc.OIDCClients == nil {
+		return nil
+	}
+	existing, err := st.ListOIDCClients(ctx)
+	if err != nil {
+		return err
+	}
+	known := map[string]store.OIDCClient{}
+	for _, c := range existing {
+		known[c.ID] = c
+	}
+	seen := map[string]bool{}
+	for _, in := range doc.OIDCClients {
+		next := in.stored()
+		if err := store.SanitizeOIDCClient(&next); err != nil {
+			return fmt.Errorf("config: OIDC client %q: %w", in.ID, err)
+		}
+		seen[next.ID] = true
+		before, had := known[next.ID]
+		if next.Confidential && next.SecretHash == "" {
+			next.SecretPrefix = ""
+			if had && before.Confidential {
+				next.SecretHash, next.SecretPrefix = before.SecretHash, before.SecretPrefix
+			}
+		}
+		action := decide(had, oidcClientOf(before), oidcClientOf(next))
+		plan.Changes = append(plan.Changes, Change{
+			Kind: "oidcClient", ID: next.ID, Label: next.ID, Action: action,
+		})
+		if !commit || action == ActionSame {
+			continue
+		}
+		if !had {
+			if _, err := st.CreateOIDCClient(ctx, next); err != nil {
+				return fmt.Errorf("config: OIDC client %q: %w", next.ID, err)
+			}
+			continue
+		}
+		// An update leaves the secret alone (UpdateOIDCClient), so one the
+		// document brings is set apart - which is also what makes the old one
+		// stop working.
+		if _, err := st.UpdateOIDCClient(ctx, next); err != nil {
+			return fmt.Errorf("config: OIDC client %q: %w", next.ID, err)
+		}
+		if next.Confidential && next.SecretHash != "" &&
+			(next.SecretHash != before.SecretHash || next.SecretPrefix != before.SecretPrefix) {
+			if err := st.SetOIDCClientSecret(ctx, next.ID, next.SecretHash, next.SecretPrefix); err != nil {
+				return fmt.Errorf("config: OIDC client %q: %w", next.ID, err)
+			}
+		}
+	}
+	if !prune {
+		return nil
+	}
+	for _, c := range existing {
+		// A client a route will still use stays (oidcBindings says so).
+		if seen[c.ID] || keep[c.ID] {
+			continue
+		}
+		plan.Changes = append(plan.Changes, Change{
+			Kind: "oidcClient", ID: c.ID, Label: c.ID, Action: ActionRemove,
+		})
+		if commit {
+			if err := st.DeleteOIDCClient(ctx, c.ID); err != nil {
+				return fmt.Errorf("config: remove OIDC client %q: %w", c.ID, err)
 			}
 		}
 	}

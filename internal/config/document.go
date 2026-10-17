@@ -2,7 +2,8 @@
 //
 // What travels and what does not IS the design. A Document carries the
 // infrastructure: routes, the role catalogue, the authorities people sign in
-// through, the mail relay, the themes, the gateway settings. It carries no
+// through, the applications it is the OpenID provider of, the mail relay, the
+// themes, the gateway settings. It carries no
 // living object - users, organisations, memberships, sessions, certificates,
 // personal tokens, the audit trail - and it never carries the vault.
 //
@@ -10,7 +11,9 @@
 // as its $name reference or not at all. An export is therefore PUBLIC by
 // construction - it goes into a ticket, a mail to support or a git repository
 // without anyone having to wonder what is inside. The day an export may hold a
-// secret, nobody dares share one and the feature dies of its own caution.
+// secret, nobody dares share one and the feature dies of its own caution. An
+// OIDC client's secret is no exception: what travels is its sha256, which
+// checks the secret and never gives it back (see OIDCClient).
 //
 // The counterpart is assumed: a document alone does not start an environment.
 // Its references have to exist in the vault, which is a separate file with a
@@ -61,6 +64,12 @@ type Document struct {
 	AuthProviders []store.AuthProvider `json:"authProviders,omitempty"`
 	MailRelay     *mail.Config         `json:"mailRelay,omitempty"`
 	Themes        []store.Theme        `json:"themes,omitempty"`
+	// OIDCClients are the applications this gateway is the OpenID provider of
+	// (SAUTH-05). They travel because the routes that sign people into them
+	// do: a route bound to a client the gateway does not declare sends its
+	// application to a provider that refuses it. See OIDCClient for the one
+	// thing about them that is not public.
+	OIDCClients []OIDCClient `json:"oidcClients,omitempty"`
 	// Specs holds the OpenAPI files deposited on routes, by route id. It is
 	// NOT part of the document: a spec is a media, like the branding's
 	// pictures, and the json tag says so - Marshal encodes through JSON, so a
@@ -74,12 +83,54 @@ type Document struct {
 	Files map[string][]store.RouteFile `json:"-"`
 }
 
+// OIDCClient is an OIDC client as a document carries it.
+//
+// Its own type rather than store.OIDCClient, and that is the point: the
+// store's type never serialises the hash of the secret, and every API answer,
+// trail diff and agent tool built on it relies on that. A document is the ONE
+// place the hash leaves the database - so that a configuration imported
+// elsewhere keeps the same secret and the application behind it keeps working
+// with nothing to change - and it leaves through this type alone, where
+// nobody reaches it by accident.
+//
+// The hash is a sha256 of 32 random bytes: it lets a gateway CHECK the secret,
+// never recover it, which is what keeps the document public. The secret itself
+// is shown once, when it is drawn, and travels nowhere.
+type OIDCClient struct {
+	ID           string `json:"id"`
+	Confidential bool   `json:"confidential"`
+	Audience     string `json:"audience,omitempty"`
+	TokenTTL     string `json:"tokenTtl,omitempty"`
+	// SecretPrefix is the start of the secret, to recognise it; SecretHash
+	// its sha256, hex. Both empty for a public client, and for a confidential
+	// one whose secret this document does not carry: the import then keeps
+	// the secret already in place, or creates the client without one.
+	SecretPrefix string `json:"secretPrefix,omitempty"`
+	SecretHash   string `json:"secretHash,omitempty"`
+}
+
+// oidcClientOf is a stored client as a document carries it.
+func oidcClientOf(c store.OIDCClient) OIDCClient {
+	return OIDCClient{
+		ID: c.ID, Confidential: c.Confidential, Audience: c.Audience, TokenTTL: c.TokenTTL,
+		SecretPrefix: c.SecretPrefix, SecretHash: c.SecretHash,
+	}
+}
+
+// stored is the client as the store keeps it.
+func (c OIDCClient) stored() store.OIDCClient {
+	return store.OIDCClient{
+		ID: c.ID, Confidential: c.Confidential, Audience: c.Audience, TokenTTL: c.TokenTTL,
+		SecretPrefix: c.SecretPrefix, SecretHash: c.SecretHash,
+	}
+}
+
 // Empty reports whether the document would change nothing, which is what a
 // file of comments and a file of empty sections both amount to.
 func (d *Document) Empty() bool {
 	return len(d.Settings) == 0 && len(d.Roles) == 0 && len(d.Routes) == 0 &&
 		len(d.AuthProviders) == 0 && d.MailRelay == nil && len(d.Themes) == 0 &&
-		len(d.Tenants) == 0 && len(d.Groups) == 0
+		len(d.Tenants) == 0 && len(d.Groups) == 0 && len(d.OIDCClients) == 0
 }
 
 // ExportedSettings are the gateway settings a configuration carries, in a
@@ -199,7 +250,7 @@ func Marshal(doc *Document) ([]byte, error) {
 // what people open the file for, settings are the long tail), then the keys
 // that identify an object.
 var leadingKeys = []string{
-	"version", "routes", "roles", "authProviders", "mailRelay", "themes", "settings",
+	"version", "routes", "roles", "authProviders", "oidcClients", "mailRelay", "themes", "settings",
 	"id", "name", "kind", "type", "enabled", "order", "upstream", "host",
 }
 
@@ -367,8 +418,8 @@ func readable(err error) string {
 	msg := err.Error()
 	if strings.HasPrefix(msg, "json: unknown field ") {
 		return "unknown field " + strings.TrimPrefix(msg, "json: unknown field ") +
-			" - a configuration file only holds: version, settings, roles, routes, " +
-			"authProviders, mailRelay, themes"
+			" - a configuration file only holds: version, settings, roles, tenants, groups, routes, " +
+			"authProviders, oidcClients, mailRelay, themes"
 	}
 	return msg
 }

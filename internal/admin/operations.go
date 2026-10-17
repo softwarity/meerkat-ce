@@ -71,6 +71,11 @@ func (a *API) refreshOperationsOnce(ctx context.Context) {
 		if !r.Enabled || r.Spec().Type != store.SpecUpstream {
 			continue
 		}
+		// Known down: the next round will find it back, and a call now would
+		// only sit out its timeout.
+		if _, down := a.router.Unreachable(r.ID); down && gateway.SpecOnUpstream(r) {
+			continue
+		}
 		ops, err := a.upstreamOperations(ctx, r)
 		if err != nil {
 			// Expected, and often: a service that is down, a spec url that

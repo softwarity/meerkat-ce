@@ -85,7 +85,9 @@ pas de fichier de configuration à redéployer.
 
 Le plan de contrôle expose un endpoint MCP. Un assistant lit l'installation et
 la modifie en suivant exactement les règles imposées à un humain : la lecture
-seule reste la lecture seule.
+seule reste la lecture seule. Et il pilote vos propres API : il lit l'OpenAPI
+d'une route, puis appelle le service à travers la gateway, sous n'importe quel
+rôle, pour faire le travail ou prouver une règle.
 :::
 
 ## À quoi elle ressemble

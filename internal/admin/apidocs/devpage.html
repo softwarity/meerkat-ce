@@ -344,9 +344,16 @@
       box.append(note);
     }
 
+    // Each spec gets a FRESH node: the previous swagger-ui is not destroyed by
+    // a new one, and a slow spec it was still fetching would otherwise land
+    // later and paint over the one chosen since. Detached, it draws nowhere.
     function mount(url) {
+      const host = $('swagger');
+      host.replaceChildren();
+      const node = document.createElement('div');
+      host.append(node);
       window.ui = SwaggerUIBundle({
-        url, dom_id: '#swagger', presets: [SwaggerUIBundle.presets.apis],
+        url, domNode: node, presets: [SwaggerUIBundle.presets.apis],
         layout: 'BaseLayout', docExpansion: 'list', defaultModelsExpandDepth: 0,
         tryItOutEnabled: true, deepLinking: false, validatorUrl: null,
         // Always forge the identity: the effective user + roles. The gateway

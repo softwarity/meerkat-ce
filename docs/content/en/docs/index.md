@@ -13,6 +13,7 @@ your services do not have to.
 
 ## Where to start
 
+- **[What Meerkat does](/docs/capabilities)** - every capability, what it takes without Meerkat, and what comes next.
 - **[What Meerkat is](/product/what-is-meerkat)** - what the product does, in two minutes.
 - **[Quick start](/docs/start/quick-start)** - a gateway running and a first application behind it.
 - **[Concepts](/docs/concepts/architecture)** - the three planes, routes, identity, access.

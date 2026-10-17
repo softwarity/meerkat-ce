@@ -25,7 +25,7 @@ export interface TemplateSyntax {
 // colours, because everything that shows one of these - the editor, its
 // documentation, the line under the Identity section - has to read it the same.
 export const ROLE_SYNTAX: TemplateSyntax = {
-  verbs: ['.Keep', '.Drop', 'cutHead', 'cutTail', 'addHead', 'addTail', 'lower', 'upper', 'join', 'json', 'count'],
+  verbs: ['.Keep', '.Drop', '.Declared', 'cutHead', 'cutTail', 'addHead', 'addTail', 'lower', 'upper', 'join', 'json', 'count'],
   tags: true,
 };
 

@@ -66,6 +66,11 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 **public path** to call - the route's prefix added when the route strips it -
 and, for one operation, its parameters, body and responses with the schemas
 they reference.
+Each operation also says what the **application** requires to call it, when
+its spec says so (public, a signed-in caller, or roles), and the route's
+declared roles come with the catalogue roles they are tied to (see
+[Per-endpoint security](/docs/access/endpoint-security#the-roles-the-application-declares)):
+the agent knows which roles to pass to `call_route` to be let in, or kept out.
 
 `call_route` sends a real request through the route and returns the status,
 the headers and the body (cut at 64 KiB). It is handed to the application plane

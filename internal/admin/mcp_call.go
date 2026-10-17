@@ -52,6 +52,11 @@ func (a *API) callTools() []mcp.Tool {
 				"with the PUBLIC path to pass to call_route (the route's prefix added when the route strips it). " +
 				"Give an operation (its operationId, or \"METHOD /path\") to get its full definition instead: " +
 				"parameters, request body and responses, with the schemas they reference. " +
+				"Each operation carries `upstream` when the spec says what the APPLICATION requires to call it " +
+				"(public, authenticated, or roles: the scopes of its security requirement) - the application " +
+				"enforces that, not the gateway. declaredRoles lists every role the spec names, and roleMap " +
+				"how the route ties them to the catalogue (set with save_route, api.roleMap; create the " +
+				"catalogue roles first with save_role). " +
 				"A route without a spec has no operations to list; call_route still calls any path on it.",
 			Schema: object(map[string]any{
 				"routeId":   str("The route id, as given by list_routes."),
@@ -110,19 +115,27 @@ func (a *API) toolListOperations(ctx context.Context, args json.RawMessage) (any
 	}
 	if strings.TrimSpace(p.Operation) == "" {
 		type op struct {
-			Method      string `json:"method"`
-			Path        string `json:"path"`
-			CallPath    string `json:"callPath"`
-			OperationID string `json:"operationId,omitempty"`
-			Summary     string `json:"summary,omitempty"`
+			Method      string            `json:"method"`
+			Path        string            `json:"path"`
+			CallPath    string            `json:"callPath"`
+			OperationID string            `json:"operationId,omitempty"`
+			Summary     string            `json:"summary,omitempty"`
+			Upstream    *openapi.Upstream `json:"upstream,omitempty"`
 		}
 		ops := make([]op, 0, len(spec.Operations))
 		for _, o := range spec.Operations {
 			ops = append(ops, op{Method: o.Method, Path: o.Path, CallPath: gateway.PublicPath(route, o.Path),
-				OperationID: o.OperationID, Summary: o.Summary})
+				OperationID: o.OperationID, Summary: o.Summary, Upstream: o.Upstream})
 		}
-		return map[string]any{"route": route.Name, "title": spec.Title, "version": spec.Version,
-			"operations": ops}, nil
+		out := map[string]any{"route": route.Name, "title": spec.Title, "version": spec.Version,
+			"operations": ops}
+		if len(spec.Roles) > 0 {
+			out["declaredRoles"] = spec.Roles
+		}
+		if m := route.RoleMap(); len(m) > 0 {
+			out["roleMap"] = m
+		}
+		return out, nil
 	}
 	// One operation, found by id or by "METHOD /path".
 	want := strings.TrimSpace(p.Operation)

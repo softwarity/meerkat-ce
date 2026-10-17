@@ -338,7 +338,8 @@ func (a *API) tools() []mcp.Tool {
 		{
 			Name: "export_configuration", Allow: isRoot, Title: "Export the whole configuration", ReadOnly: true,
 			Description: "The entire infrastructure as one YAML document: routes, roles, organisations, " +
-				"settings and the vault entries it REFERENCES (never their values). " +
+				"authorities, OIDC clients, settings and the vault entries it REFERENCES (never their values). " +
+				"An OIDC client's secret is carried as its sha256 (secretHash) only, never in clear. " +
 				"The cheapest way to get the whole picture in one call before answering a broad question. " +
 				"Pictures are left out, as they are in a plain export.",
 			Schema: noArgs(),

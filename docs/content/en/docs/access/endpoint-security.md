@@ -106,3 +106,47 @@ When the spec is a file you deposited, the gateway serves it on the route, and i
 is served **outside** the endpoint rules: it carries the route's own rule
 instead. Per-operation rules decorate a contract, they do not conceal it - and a
 `curl`, Postman or a client generator all read it from the same URL.
+
+## What the application already requires
+
+Many services say in their own spec which roles an operation needs: the roles
+are the scopes of the operation's security requirement, as libraries such as
+nestjs-granted or springdoc write them from the code's own checks:
+
+```json
+"security": [{ "bearer": ["ROLE_ADMIN"] }]
+```
+
+The screen shows it in an **Application requires** column: the roles, *Signed in*
+for a requirement without a role, or *Public* for an operation the spec opens
+explicitly (the column in the first picture of this page). This is read-only
+knowledge. **The application enforces it, not
+Meerkat**: nothing here changes what the gateway lets through, and with **Only
+listed operations are reachable** on, an operation the application protects is
+still refused by Meerkat until a rule lists it.
+
+The developer's API docs (`/meerkat/apidocs/`) say it too, at the head of each
+operation's description, because swagger-ui shows a padlock for a bearer
+requirement but never its roles.
+
+## The roles the application declares
+
+**Declared roles**, in the screen's header, lists every role the spec names and
+ties each one to the catalogue:
+
+- **New role**: created in the catalogue under a prefix (the route's name and a
+  hyphen by default, `orders-ROLE_ADMIN`) and a tag (the route's name by default);
+- **an existing role**: whoever holds it holds the application's role;
+- **Not mapped**: never forwarded.
+
+![The roles the application declares, each tied to a catalogue role](img/console/endpoint-declared-roles.webp)
+
+Creating catalogue roles takes the right to write the catalogue (root or app
+admin); mapping onto existing roles takes only the route's.
+
+Once a route maps its roles, its **Auth forward** sends, by default, the declared
+roles the caller holds, **under the application's names**: someone holding
+`orders-ROLE_ADMIN` reaches the service as `ROLE_ADMIN`, and the catalogue's other
+roles stay home. The roles expression behind it is
+`{{.Roles | .Declared | join ","}}`; `.Declared` composes with the other verbs, so
+`{{.Roles | .Declared | json}}` sends the same roles as a JSON array.

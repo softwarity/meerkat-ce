@@ -39,7 +39,7 @@ type Ref struct {
 
 // keepable are the kinds a line can be kept out for. The deposited files of a
 // route follow their route: keeping a route keeps its spec and its files.
-var keepable = []string{"route", "role", "group", "authProvider", "theme", "tenant", "mailRelay", "setting"}
+var keepable = []string{"route", "role", "group", "authProvider", "oidcClient", "theme", "tenant", "mailRelay", "setting"}
 
 // ParseRefs reads "kind:id" items - the form the API takes them in. The mail
 // relay has no id: "mailRelay" alone.
@@ -101,6 +101,8 @@ func Keep(ctx context.Context, st *store.Store, doc *Document, keep []Ref) (*Doc
 			out.Groups = keepOne(out.Groups, current.Groups, ref.ID, func(g store.Group) string { return g.ID })
 		case "authProvider":
 			out.AuthProviders = keepOne(out.AuthProviders, current.AuthProviders, ref.ID, func(p store.AuthProvider) string { return p.ID })
+		case "oidcClient":
+			out.OIDCClients = keepOne(out.OIDCClients, current.OIDCClients, ref.ID, func(c OIDCClient) string { return c.ID })
 		case "theme":
 			out.Themes = keepOne(out.Themes, current.Themes, ref.ID, func(t store.Theme) string { return t.ID })
 		case "tenant":

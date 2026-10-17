@@ -115,6 +115,17 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 	}
 	doc.AuthProviders = providers
 
+	// The OIDC clients, hash of their secret included: the one place it leaves
+	// the database, so that the application keeps its secret wherever this
+	// configuration lands (see OIDCClient). Already sorted by id.
+	clients, err := st.ListOIDCClients(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, c := range clients {
+		doc.OIDCClients = append(doc.OIDCClients, oidcClientOf(c))
+	}
+
 	// The ACTIVE theme, and it alone. The others are colour trials kept on the
 	// side; carrying them made themes 71% of a typical export, most of it the
 	// built-in palettes the receiving gateway already ships.
@@ -424,6 +435,7 @@ func Inventory(doc *Document) []Section {
 	add("tenant", len(doc.Tenants))
 	add("group", len(doc.Groups))
 	add("authProvider", len(doc.AuthProviders))
+	add("oidcClient", len(doc.OIDCClients))
 	add("theme", len(doc.Themes))
 	if doc.MailRelay != nil {
 		add("mailRelay", 1)

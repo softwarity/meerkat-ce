@@ -176,6 +176,19 @@ import { ConfigPlan } from '../../api.service';
           </p>
         </div>
       }
+      @if (p.unbound?.length) {
+        <div class="note warn">
+          <mat-icon>key</mat-icon>
+          <div>
+            <p i18n="@@Plan_unbound_note">Sign-in through the OIDC provider:</p>
+            <ul>
+              @for (n of p.unbound; track n) {
+                <li>{{ n }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
       @if (p.notApplied?.length) {
         <div class="note warn">
           <mat-icon>workspace_premium</mat-icon>
@@ -204,7 +217,9 @@ export class PlanTableComponent {
   readonly kept = model<string[]>([]);
 
   // A deposited spec or file follows its route: keeping the route keeps them.
-  private static readonly keepableKinds = ['route', 'role', 'group', 'authProvider', 'theme', 'tenant', 'mailRelay', 'setting'];
+  private static readonly keepableKinds = [
+    'route', 'role', 'group', 'authProvider', 'oidcClient', 'theme', 'tenant', 'mailRelay', 'setting',
+  ];
 
   protected keepable(c: { kind: string }): boolean {
     return PlanTableComponent.keepableKinds.includes(c.kind);
@@ -265,6 +280,8 @@ export class PlanTableComponent {
         return $localize`:@@Role:Role`;
       case 'authProvider':
         return $localize`:@@Authority:Authority`;
+      case 'oidcClient':
+        return $localize`:@@OIDC_client:OIDC client`;
       case 'theme':
         return $localize`:@@Theme:Theme`;
       case 'mailRelay':

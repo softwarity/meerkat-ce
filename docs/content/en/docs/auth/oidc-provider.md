@@ -93,6 +93,11 @@ its **Auth forward** section. A warning mark says when one of them covers a whol
 host. The key icon draws a **new secret**: the old one stops working at once. A client a route still uses cannot be deleted, and the
 refusal names the routes.
 
+The clients travel in a [configuration](/docs/console/configuration), the secret as
+its sha256 only (`secretHash`): imported on another gateway, a client keeps the
+same secret. A confidential client imported without one has **no secret yet**, and
+its row says so: the key icon draws the first.
+
 ## Bind a route to it
 
 In the route editor, **Auth forward**, mechanism **OIDC (the service signs in

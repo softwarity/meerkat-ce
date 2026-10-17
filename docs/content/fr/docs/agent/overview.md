@@ -67,6 +67,12 @@ assistant plutôt qu'en cliquant.
 **chemin public** à appeler - le préfixe de la route ajouté quand la route le
 retire - et, pour une opération, ses paramètres, son corps et ses réponses, avec
 les schémas qu'ils référencent.
+Chaque opération dit aussi ce que l'**application** exige pour l'appeler, quand
+sa spec le dit (public, une personne connectée, ou des rôles), et les rôles
+déclarés de la route viennent avec les rôles du catalogue auxquels ils sont
+rattachés (voir
+[Sécurité par endpoint](/docs/access/endpoint-security#les-rles-que-lapplication-dclare)) :
+l'agent sait quels rôles passer à `call_route` pour être admis, ou refusé.
 
 `call_route` envoie une vraie requête à travers la route et renvoie le statut,
 les en-têtes et le corps (coupé à 64 Kio). Elle est remise en interne au plan

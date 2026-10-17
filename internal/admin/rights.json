@@ -656,6 +656,11 @@
   },
   {
     "method": "PUT",
+    "path": "/api/routes/{id}/role-map",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
     "path": "/api/routes/{id}/security",
     "guard": "infraAdmin"
   },

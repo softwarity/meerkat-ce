@@ -1327,6 +1327,12 @@ type RouteAPI struct {
 	// passes, so an audited operation can never become an access override by
 	// accident.
 	Audit []EndpointAudit `json:"audit,omitempty"`
+	// RoleMap ties each role the APPLICATION declares in its spec (its own
+	// name, e.g. ROLE_ADMIN) to the catalogue role that grants it here. Read by
+	// the role expression's .Declared, which forwards a declared role, under
+	// the application's name, to whoever holds the catalogue role. A declared
+	// role absent from the map is never forwarded.
+	RoleMap map[string]string `json:"roleMap,omitempty"`
 }
 
 // Access levels (RBAC-06), the BELONGING axis of an access rule. They are

@@ -29,7 +29,14 @@ import (
 
 // devSpecClient fetches ABSOLUTE spec urls server-side; relative ones travel
 // through the route in process.
-var devSpecClient = &http.Client{Timeout: 20 * time.Second}
+//
+// The connection gets five seconds of the twenty: a service that is there
+// answers a connect at once, and one that is not would otherwise hold the
+// page for the whole budget.
+var devSpecClient = &http.Client{Timeout: 20 * time.Second, Transport: &http.Transport{
+	Proxy:       http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+}}
 
 // RegisterDevDocs mounts the developer docs on the data-plane mux, ahead of
 // the route fallback.
@@ -227,6 +234,14 @@ func (rt *Router) devDocsSpec(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// A service the gateway already knows is down is not asked: the page
+	// says so now instead of spinning for the whole timeout.
+	if SpecOnUpstream(route) {
+		if why, down := rt.Unreachable(route.ID); down {
+			http.Error(w, "the service behind "+route.Name+" is down ("+why+"): its spec cannot be read", http.StatusServiceUnavailable)
+			return
+		}
+	}
 	var body []byte
 	switch {
 	case spec.Type == store.SpecFile:
@@ -246,6 +261,9 @@ func (rt *Router) devDocsSpec(w http.ResponseWriter, r *http.Request) {
 	}
 	if rewritten, err := openapi.Rewrite(body, routeMatchPrefix(route)); err == nil {
 		body = rewritten
+	}
+	if annotated, err := openapi.AnnotateDeclared(body, route.RoleMap()); err == nil {
+		body = annotated
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")

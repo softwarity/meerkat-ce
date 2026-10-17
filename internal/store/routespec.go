@@ -188,3 +188,11 @@ func (s *Store) RouteSpecContents(ctx context.Context) (map[string][]byte, error
 	}
 	return out, nil
 }
+
+// RoleMap returns the route's declared-role mapping (RouteAPI.RoleMap), or nil.
+func (r Route) RoleMap() map[string]string {
+	if r.API == nil {
+		return nil
+	}
+	return r.API.RoleMap
+}

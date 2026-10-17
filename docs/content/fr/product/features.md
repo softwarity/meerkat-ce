@@ -13,7 +13,8 @@ devrait écrire deux fois. Voici tout le produit, domaine par domaine.
 **Enterprise** signale ce que l'image gratuite Community ne contient pas.
 *en partie* signale une capacité utilisable dès aujourd'hui, dont une part,
 nommée, reste à venir. Ce que coûte la même liste quand on l'assemble soi-même
-est dans [le dossier Meerkat](/product/the-case).
+est dans [le dossier Meerkat](/product/the-case), et ce que demande chaque
+capacité sans Meerkat, ligne par ligne, dans [Ce que fait Meerkat](/docs/capabilities).
 
 ## Connexion et identité
 
@@ -46,6 +47,7 @@ Pour en savoir plus : [Authentifier et autoriser](/docs/access/overview).
 - **Organisations clientes** isolées par la gateway, membres administrateurs ou utilisateurs, organisation choisie à la connexion. Le mode à une seule organisation est gratuit, le mode à plusieurs organisations relève d'Enterprise. **Enterprise**
 - **Accès par route** selon l'organisation, le rôle et le compte ; un refus aboutit à une page qui explique, jamais à une ligne de texte.
 - **Sécurité par endpoint** déduite de la spécification OpenAPI du service, et modifiée dans une console à la manière de Swagger.
+- **Les rôles que l'application déclare**, lus dans sa propre spec, affichés par opération, importés au catalogue en un clic et transmis sous les noms de l'application, à ceux seulement qui les détiennent.
 - **Administration déléguée, aux frontières nettes** : super-administrateur, administrateur de l'infrastructure, administrateur des applications, administrateur d'organisation, et libre-service pour chaque utilisateur.
 - **Plages horaires d'accès** par organisation, selon le jour, la date et le fuseau horaire. **Enterprise** *en partie*
 - **Identité transmise à vos services** sous forme d'en-têtes, de REMOTE_USER ou d'un JWT signé (ES256, EdDSA, RS256), avec des clés publiées qui changent sans interruption ; vous choisissez les rôles que reçoit chaque service.
@@ -151,7 +153,8 @@ L'exploitant demande avec des mots, la gateway exécute et enregistre.
 
 Pour en savoir plus : [Le point d'entrée des agents](/docs/agent/overview).
 
-- **Serveur MCP intégré** : Claude Code, Gemini CLI, Kimi CLI et Codex CLI se connectent à la gateway pour lire, tester ou modifier les routes, les rôles et les planifications, importer une configuration entière, et appeler vos services à travers une route sous n'importe quel rôle.
+- **Serveur MCP intégré** : Claude Code, Gemini CLI, Kimi CLI et Codex CLI se connectent à la gateway pour lire, tester ou modifier les routes, les rôles et les planifications, et importer une configuration entière.
+- **Vos API, pilotées par l'agent** : il lit l'OpenAPI du service derrière une route - opérations, paramètres, corps, et les rôles que l'application exige - puis l'appelle pour de vrai à travers la gateway, ses règles et l'identité qu'elle transmet, sous n'importe quel utilisateur ou rôle. Demandez avec des mots de créer une commande, corriger un enregistrement ou prouver un refus : l'agent trouve l'opération et fait l'appel, et la piste d'audit le garde.
 - **Connexion OAuth sans secret à recopier**, jeton à périmètre restreint (planifications seules, lecture seule ou complet, et les plages réseau d'où il peut venir), révocable en un clic.
 - **Chaque action d'un agent est auditée** sous son nom, avec un point de reprise automatique pour revenir en arrière.
 

@@ -32,7 +32,7 @@ func Compare(from, to *Document) []Change {
 
 // sectionKind names each section's objects the way a plan does.
 var sectionKind = map[string]string{
-	"routes": "route", "roles": "role", "authProviders": "authProvider", "themes": "theme",
+	"routes": "route", "roles": "role", "authProviders": "authProvider", "oidcClients": "oidcClient", "themes": "theme",
 	"tenants": "tenant", "groups": "group", "settings": "setting", "mailRelay": "mailRelay",
 }
 

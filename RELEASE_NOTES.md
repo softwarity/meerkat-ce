@@ -2,6 +2,33 @@
 
 ## NEXT RELEASE
 
+- **What an application requires, read from its own spec.** When a route's OpenAPI says which
+  roles an operation needs (the scopes of its security requirement, as nestjs-granted or springdoc
+  write them), Endpoint security shows it per operation, read-only: the application enforces it,
+  not Meerkat. The developers' API docs write it at the head of each operation, since swagger-ui
+  never shows those roles.
+- **The roles an application declares, mapped onto the catalogue.** Endpoint security lists every
+  role the spec names and ties each one to a catalogue role: created under a prefix and a tag (the
+  route's name by default), or an existing one. A route that maps its roles forwards, by default,
+  only the declared roles the caller holds, under the application's names
+  (`{{.Roles | .Declared | join ","}}`): someone holding `orders-ROLE_ADMIN` reaches the service as
+  `ROLE_ADMIN`.
+- **A route whose service is down no longer holds the API docs.** Endpoint security, the developers'
+  API docs and the agent's list of operations used to wait up to twenty seconds on a spec the
+  service could not serve. A route the health watch knows is down (its target down, or its circuit
+  open) is now answered down at once, and a service that does not take the connection gives up
+  after five seconds. Choosing another route or spec while a slow one loads no longer lets the slow
+  one paint over it.
+- **OIDC clients travel in a configuration.** Export, import, comparison, the startup file, restore
+  points and git now carry the applications Meerkat is the OpenID provider of (`oidcClients`), so
+  an imported route no longer names a client the gateway does not have. A client's secret travels as
+  its sha256 only, never in clear: imported elsewhere it keeps the same secret, and the application
+  changes nothing. A confidential client imported without one has no secret yet, and its row says
+  so. An import never takes a route's sign-in away: a client a route still uses survives a prune,
+  so a configuration exported before clients travelled still activates, and a route naming a
+  client nobody declares imports and is said in the plan. The community image leaves the clients
+  out and says so in the plan.
+
 ---
 
 ## 1.12.0

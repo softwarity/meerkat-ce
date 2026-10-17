@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"text/template"
 )
@@ -30,6 +31,13 @@ import (
 // otherwise. It is also what the editor opens with, so the plain case is read
 // rather than guessed.
 const RoleExprDefault = `{{join "," .Roles}}`
+
+// RoleExprDeclared is the default of a route that maps the roles its
+// application declares (RouteAPI.RoleMap): what that application asks for, in
+// its own names, and only what the caller holds. A mapping says which roles
+// the service reads, so sending the rest would be sending noise - and under
+// the catalogue's names, sending nothing it recognises.
+const RoleExprDeclared = `{{.Roles | .Declared | join ","}}`
 
 // roleExprFuncs are the pipeline's verbs. Each takes the list LAST so it can be
 // piped into: {{.Roles | .Keep "tag:X" | cutHead "ROLE_" | join ","}}.
@@ -78,6 +86,28 @@ func mapEach(roles []string, f func(string) string) []string {
 type RoleExprInput struct {
 	Roles  []string
 	tagsOf func(string) []string
+	// declared is the route's mapping: declared role (the application's
+	// name) -> catalogue role.
+	declared map[string]string
+}
+
+// Declared turns the caller's catalogue roles into the roles the route's
+// APPLICATION declares: every declared role whose catalogue role is in the
+// list, under the application's name, sorted and once each. It reads catalogue
+// names, so it goes before anything that reshapes them.
+func (in RoleExprInput) Declared(roles []string) []string {
+	held := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		held[r] = true
+	}
+	out := []string{}
+	for app, role := range in.declared {
+		if held[role] {
+			out = append(out, app)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Keep narrows to the roles a selector names: "tag:BILLING" is a catalogue tag,
@@ -152,8 +182,9 @@ func CompileRoleExpr(expr string) (*CompiledRoleExpr, error) {
 	c := &CompiledRoleExpr{tmpl: tmpl}
 	// TWO witnesses, not one: a separator only shows up between elements, so a
 	// single role would hide `join "\n"` - the very thing the render checks for.
-	if _, err := c.Render([]string{"ROLE_SAMPLE", "ROLE_OTHER"},
-		func(string) []string { return []string{"SAMPLE"} }); err != nil {
+	if _, err := c.RenderDeclared([]string{"ROLE_SAMPLE", "ROLE_OTHER"},
+		func(string) []string { return []string{"SAMPLE"} },
+		map[string]string{"APP_SAMPLE": "ROLE_SAMPLE", "APP_OTHER": "ROLE_OTHER"}); err != nil {
 		return nil, fmt.Errorf("roles: %s", readableTemplateError(err))
 	}
 	return c, nil
@@ -162,11 +193,17 @@ func CompileRoleExpr(expr string) (*CompiledRoleExpr, error) {
 // Render produces the header value for one caller. tagsOf resolves a role name
 // to its catalogue tags.
 func (c *CompiledRoleExpr) Render(roles []string, tagsOf func(string) []string) (string, error) {
+	return c.RenderDeclared(roles, tagsOf, nil)
+}
+
+// RenderDeclared is Render for a route that maps the roles its application
+// declares: declared is that mapping, read by .Declared.
+func (c *CompiledRoleExpr) RenderDeclared(roles []string, tagsOf func(string) []string, declared map[string]string) (string, error) {
 	if c == nil || c.tmpl == nil {
 		return strings.Join(roles, ","), nil
 	}
 	var buf bytes.Buffer
-	if err := c.tmpl.Execute(&buf, RoleExprInput{Roles: roles, tagsOf: tagsOf}); err != nil {
+	if err := c.tmpl.Execute(&buf, RoleExprInput{Roles: roles, tagsOf: tagsOf, declared: declared}); err != nil {
 		return "", err
 	}
 	out := buf.String()

@@ -116,3 +116,50 @@ route, et elle la sert **en dehors** des règles d'endpoint : c'est la règle de
 la route qui s'y applique. Les règles par opération habillent un contrat, elles
 ne le dissimulent pas - et `curl`, Postman ou un générateur de client le lisent
 tous à la même URL.
+
+## Ce que l'application exige déjà
+
+Beaucoup de services disent dans leur propre spec quels rôles une opération
+demande : ce sont les scopes de l'exigence de sécurité de l'opération, tels que
+des bibliothèques comme nestjs-granted ou springdoc les écrivent à partir des
+contrôles du code :
+
+```json
+"security": [{ "bearer": ["ROLE_ADMIN"] }]
+```
+
+L'écran l'affiche dans une colonne **Application requires** : les rôles, *Signed
+in* pour une exigence sans rôle, ou *Public* pour une opération que la spec ouvre
+explicitement (la colonne de la première image de cette page). C'est une
+information en lecture seule. **C'est l'application qui
+l'applique, pas Meerkat** : rien ici ne change ce que la gateway laisse passer,
+et avec **Only listed operations are reachable** activé, une opération que
+l'application protège reste refusée par Meerkat tant qu'aucune règle ne la liste.
+
+La documentation d'API des développeurs (`/meerkat/apidocs/`) le dit aussi, en
+tête de la description de chaque opération, parce que swagger-ui affiche un
+cadenas pour une exigence bearer mais jamais ses rôles.
+
+## Les rôles que l'application déclare
+
+**Declared roles**, dans l'en-tête de l'écran, liste tous les rôles que la spec
+nomme et rattache chacun au catalogue :
+
+- **New role** : créé dans le catalogue avec un préfixe (le nom de la route et un
+  tiret par défaut, `orders-ROLE_ADMIN`) et une étiquette (le nom de la route par
+  défaut) ;
+- **un rôle existant** : qui le détient détient le rôle de l'application ;
+- **Not mapped** : jamais transmis.
+
+![Les rôles que l'application déclare, chacun rattaché à un rôle du catalogue](img/console/endpoint-declared-roles.webp)
+
+Créer des rôles du catalogue demande le droit d'écrire le catalogue (root ou
+app admin) ; se rattacher à des rôles existants ne demande que celui de la route.
+
+Une fois qu'une route rattache ses rôles, son **Auth forward** envoie par défaut
+les rôles déclarés que la personne détient, **sous les noms de l'application** :
+quelqu'un qui détient `orders-ROLE_ADMIN` arrive au service comme `ROLE_ADMIN`, et
+les autres rôles du catalogue restent à la maison. L'expression des rôles
+derrière est `{{.Roles | .Declared | join ","}}` ; `.Declared` se compose avec les
+autres verbes, donc `{{.Roles | .Declared | json}}` envoie les mêmes rôles en
+tableau JSON.

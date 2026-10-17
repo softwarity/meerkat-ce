@@ -684,8 +684,16 @@
             }
           </div>
           <p class="id-weight">
-            <code [tpl]="draft().identityAttrs['roles'].expr || defaultRoleExpr" [syntax]="SYNTAX"></code>
+            <code [tpl]="draft().identityAttrs['roles'].expr || defaultRoleExpr()" [syntax]="SYNTAX"></code>
           </p>
+          <!-- Where .Declared reads from: the mapping is the Endpoint security
+               screen's, this one only shows what it gives. -->
+          @if (mapsDeclared()) {
+            <p class="section-hint" i18n="@@Roles_declared_mapping_hint">
+              The roles the application declares are mapped on
+              <a routerLink="/infra/endpoint-security" [queryParams]="{ route: route()?.id }">Endpoint security</a>.
+            </p>
+          }
           <!-- What that expression gives today, on this catalogue: the person
                who holds every role is the widest case, so the filter shows what
                it keeps and the format shows what it costs. -->

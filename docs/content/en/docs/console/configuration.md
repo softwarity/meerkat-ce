@@ -10,9 +10,14 @@ summary: Moving a gateway's setup around: named configurations, restore points, 
 **Meerkat > Configuration**, root only. Three tabs, because three different
 questions were sharing one page.
 
-What travels in a configuration: **routes, roles, authorities, mail relay, themes
-and gateway settings**. What stays behind: **users, organisations, sessions and
-the vault** - they are not configuration, they are what this gateway lives with.
+What travels in a configuration: **routes, roles, organisations and their groups,
+authorities, OIDC clients, mail relay, themes and gateway settings**. An OIDC
+client's secret travels as its sha256 only (`secretHash`), never in clear: the
+client imported elsewhere keeps the same secret, and the application keeps working
+with nothing to change. What stays behind: **users and who belongs where,
+sessions, and the values of the vault** (a configuration names the entries it
+uses, never what they hold) - they are not configuration, they are what this
+gateway lives with.
 
 | Tab | Answers |
 |---|---|
@@ -280,9 +285,15 @@ gateway runs on that database. See
   what the Database tab is for.
 - **The community image leaves the Enterprise parts out.** A configuration
   exported from an Enterprise gateway imports into a community one without its
-  working hours, layout, hidden mark, OpenTelemetry export, directories and ACME
-  authorities and orders (the HTTPS redirect and HSTS stay); the plan lists what
-  it left out.
+  working hours, layout, hidden mark, OpenTelemetry export, directories, OIDC
+  clients and ACME authorities and orders (the HTTPS redirect and HSTS stay); the
+  plan lists what it left out. A route bound to an OIDC client keeps its mechanism,
+  unserved.
+- **A route does not lose its OIDC client in an import.** A client a route still
+  signs people into is kept, even by a pruning document that does not list it,
+  so a configuration exported before clients travelled still activates. A route
+  naming a client that neither the document nor the gateway declares imports as
+  it is, and the plan says so: declare the client under **OIDC / JWT**.
 - **Pulling from git changes nothing.** It shelves a document and shows you the
   plan. The gateway switches when somebody activates it, not when the repository
   moves.

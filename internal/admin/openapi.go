@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -30,11 +31,16 @@ func specClient() *http.Client { return upstreamClient(20 * time.Second) }
 // upstreamClient is a short-lived client to an upstream, trusting what the
 // router trusts. No keep-alive: these calls are rare, and a pool held by a
 // client nobody keeps would only leak its connections.
+//
+// A connect gets five seconds at most: a service that is there answers one at
+// once, and one that is not would otherwise hold the screen for the whole
+// timeout.
 func upstreamClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
 			Proxy:             http.ProxyFromEnvironment,
+			DialContext:       (&net.Dialer{Timeout: min(timeout, 5*time.Second)}).DialContext,
 			TLSClientConfig:   &tls.Config{RootCAs: gateway.UpstreamRoots(), MinVersion: tls.VersionTLS12},
 			DisableKeepAlives: true,
 		},
@@ -48,6 +54,7 @@ func (a *API) registerOpenAPI(mux Mux) {
 	mux.Handle("GET /api/routes/{id}/operations", a.gw(a.getRouteOperations))
 	mux.Handle("PUT /api/routes/{id}/security", a.infraAdmin(a.putRouteSecurity))
 	mux.Handle("PUT /api/routes/{id}/audit", a.infraAdmin(a.putRouteAudit))
+	mux.Handle("PUT /api/routes/{id}/role-map", a.infraAdmin(a.putRouteRoleMap))
 	mux.Handle("PUT /api/routes/{id}/spec", a.infraAdmin(a.putRouteSpec))
 	mux.Handle("DELETE /api/routes/{id}/spec", a.infraAdmin(a.deleteRouteSpec))
 }
@@ -72,6 +79,10 @@ type routeOperations struct {
 	// screen says it once instead of repeating it fifteen times in a column
 	// where what differs is the rest.
 	Prefix string `json:"prefix,omitempty"`
+	// DeclaredRoles is every role the spec declares, in the application's
+	// names; RoleMap what each one is tied to in the catalogue.
+	DeclaredRoles []string          `json:"declaredRoles,omitempty"`
+	RoleMap       map[string]string `json:"roleMap,omitempty"`
 }
 
 // routeSecurityPayload is the endpoint-security screen's PUT body: the route's
@@ -114,6 +125,7 @@ func (a *API) getRouteOperations(w http.ResponseWriter, r *http.Request) {
 		Title: spec.Title, Version: spec.Version, Format: spec.Format,
 		Access: route.Access, Operations: ops, Security: securityOf(route),
 		Audit: auditOf(route), Prefix: kept,
+		DeclaredRoles: spec.Roles, RoleMap: route.RoleMap(),
 	})
 }
 
@@ -174,6 +186,103 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 	a.auditUpdate(r.Context(), actor, "route.security", "route", route.ID, route.Name, "", before, after)
 	after.Endpoints = orEmpty(after.Endpoints)
 	writeJSON(w, http.StatusOK, after)
+}
+
+// routeRoleMapPayload ties the roles a route's application declares to the
+// catalogue, creating the catalogue roles that do not exist yet.
+type routeRoleMapPayload struct {
+	RoleMap map[string]string `json:"roleMap"`
+	Create  []store.Role      `json:"create,omitempty"`
+}
+
+// putRouteRoleMap saves a route's declared-role mapping. The roles to create
+// are the import: named with the screen's prefix, tagged with its tag, and
+// created first so every target exists when the map is checked. Creating
+// them is the application's catalogue, so it takes that right on top of the
+// route's; a role that already exists is left as it is.
+func (a *API) putRouteRoleMap(w http.ResponseWriter, r *http.Request, actor store.User) {
+	route, err := a.st.GetRoute(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "route not found")
+		return
+	}
+	var payload routeRoleMapPayload
+	if err := decodeStrict(r, &payload); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed role map: "+err.Error())
+		return
+	}
+	if len(payload.Create) > 0 && !actor.Root && !actor.AppAdmin {
+		writeErr(w, http.StatusForbidden, "creating catalogue roles requires root or the app-admin capability: map onto existing roles, or ask an application administrator")
+		return
+	}
+	before := route.RoleMap()
+	api := store.RouteAPI{}
+	if route.API != nil {
+		api = *route.API
+	}
+	api.RoleMap = nil
+	if len(payload.RoleMap) > 0 {
+		api.RoleMap = payload.RoleMap
+	}
+	route.API = &api
+	// The route first, against the engine: a name it refuses must not leave
+	// roles created for a mapping that is never saved.
+	if err := a.validateRoute(r.Context(), route); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	// Every target exists, or is among the roles this call creates - checked
+	// before creating any, so a refusal leaves the catalogue as it was.
+	toCreate := map[string]bool{}
+	for _, role := range payload.Create {
+		toCreate[strings.TrimSpace(role.Name)] = true
+	}
+	for app, role := range api.RoleMap {
+		if toCreate[role] {
+			continue
+		}
+		if _, err := a.st.GetRole(r.Context(), role); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf("declared role %s maps to %s, which is not in the catalogue: create it, or map onto an existing role", app, role))
+			return
+		}
+	}
+	created := []string{}
+	for _, role := range payload.Create {
+		role.Name = strings.TrimSpace(role.Name)
+		if _, err := a.st.GetRole(r.Context(), role.Name); err == nil {
+			continue
+		}
+		if role.Description == "" {
+			role.Description = "Declared by the application behind the route " + route.Name
+		}
+		role.System, role.Rev = false, 0
+		if err := a.st.SaveRole(r.Context(), role); err != nil {
+			if conflict(w, err) {
+				return
+			}
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		a.auditEvent(r.Context(), actor, "role.create", "role", role.Name, role.Name, "", "")
+		created = append(created, role.Name)
+	}
+	if err := a.st.SaveRoute(r.Context(), route); err != nil {
+		a.internal(w, err)
+		return
+	}
+	if err := a.reloadRouting(r.Context()); err != nil {
+		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
+		return
+	}
+	a.auditUpdate(r.Context(), actor, "route.roles", "route", route.ID, route.Name, "", before, api.RoleMap)
+	writeJSON(w, http.StatusOK, map[string]any{"roleMap": orEmptyMap(api.RoleMap), "created": created})
+}
+
+func orEmptyMap(m map[string]string) map[string]string {
+	if m == nil {
+		return map[string]string{}
+	}
+	return m
 }
 
 // routeAuditPayload is the endpoint-audit screen's PUT body.
@@ -271,9 +380,15 @@ var errNoSpec = errors.New("this route declares no OpenAPI spec")
 // request is fine, the declaration is what is incomplete.
 var errNoFile = errors.New("this route declares a deposited spec, but no file was deposited")
 
+// errRouteDown is a spec not asked for: the service it lives on is known down.
+var errRouteDown = errors.New("route down")
+
 func specReadStatus(err error) int {
 	if errors.Is(err, errNoSpec) || errors.Is(err, errNoFile) {
 		return http.StatusUnprocessableEntity
+	}
+	if errors.Is(err, errRouteDown) {
+		return http.StatusServiceUnavailable
 	}
 	return http.StatusBadGateway
 }
@@ -307,6 +422,12 @@ func (a *API) readSpecRaw(ctx context.Context, route store.Route) (*openapi.Spec
 	specURL, err := resolveSpecURL(route)
 	if err != nil {
 		return nil, nil, err
+	}
+	// Known down: said at once, not after the timeout (gateway.Unreachable).
+	if a.router != nil && gateway.SpecOnUpstream(route) {
+		if why, down := a.router.Unreachable(route.ID); down {
+			return nil, nil, fmt.Errorf("%w: the service behind %s is down (%s)", errRouteDown, route.Name, why)
+		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()

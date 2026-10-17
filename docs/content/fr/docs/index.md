@@ -13,6 +13,7 @@ et de l'observation, pour que vos services n'aient plus à s'en occuper.
 
 ## Par où commencer
 
+- **[Ce que fait Meerkat](/docs/capabilities)** - chaque capacité, ce qu'elle demande sans Meerkat, et ce qui vient ensuite.
 - **[Ce qu'est Meerkat](/product/what-is-meerkat)** - ce que fait le produit, en deux minutes.
 - **[Démarrage rapide](/docs/start/quick-start)** - une gateway en marche et une première application derrière elle.
 - **[Concepts](/docs/concepts/architecture)** - les trois plans, les routes, l'identité, les accès.

@@ -69,7 +69,7 @@ import {
   RespondFilterComponent,
 } from "../filters/filter-fields.component";
 import { RateLimitsComponent } from "../rate-limits.component";
-import { runRoleExpr } from "../role-expr-dialog.component";
+import { defaultRoleExprFor, runRoleExpr } from "../role-expr-dialog.component";
 import { ROLE_SYNTAX } from "../template-highlight";
 import { TplCodeComponent } from "../tpl-code.component";
 import { MeService } from "../../me.service";
@@ -1139,7 +1139,13 @@ export class RouteEditorComponent {
   // Dropping it saves it on every request - 320 roles is 1600 bytes of the
   // same five characters - and it is opt-in: a service testing for ROLE_ADMIN
   // has to keep receiving it.
-  protected readonly defaultRoleExpr = '{{join "," .Roles}}';
+  //
+  // A route that maps the roles its spec declares (Endpoint security) sends,
+  // by default, those of them the person holds, under the application's own
+  // names: the gateway switches its default the same way.
+  protected readonly roleMap = computed(() => this.route()?.api?.roleMap);
+  protected readonly mapsDeclared = computed(() => Object.keys(this.roleMap() ?? {}).length > 0);
+  protected readonly defaultRoleExpr = computed(() => defaultRoleExprFor(this.roleMap()));
 
   // The configured expression run on the real catalogue, tags included, for
   // the widest case: a person holding every role. Undefined while the
@@ -1148,12 +1154,13 @@ export class RouteEditorComponent {
   protected readonly rolesExample = computed(() => {
     const roles = this.roles();
     if (!roles.length) return undefined;
-    const expr = this.draft().identityAttrs["roles"].expr || this.defaultRoleExpr;
+    const expr = this.draft().identityAttrs["roles"].expr || this.defaultRoleExpr();
     try {
       const out = runRoleExpr(
         expr,
         roles.map((r) => r.name),
         new Map(roles.map((r) => [r.name, r.tags ?? []])),
+        this.roleMap(),
       );
       const text = out.text.length > 300 ? out.text.slice(0, 300) + "..." : out.text;
       return { text, count: out.count, total: roles.length };
@@ -1191,6 +1198,7 @@ export class RouteEditorComponent {
               expr: this.draft().identityAttrs["roles"].expr,
               roles: this.roles(),
               others: this.otherExprs(),
+              roleMap: this.roleMap(),
             },
             width: "1120px",
             maxWidth: "92vw",
@@ -1220,10 +1228,18 @@ export class RouteEditorComponent {
       // emptied the preview the moment one was written - which is when the
       // format is worth showing.
       const shape = (
-        this.draft().identityAttrs["roles"].expr || this.defaultRoleExpr
+        this.draft().identityAttrs["roles"].expr || this.defaultRoleExpr()
       ).replace(/\|\s*\.(Keep|Drop)(\s+"[^"]*")*/g, "");
+      // .Declared reads the route's mapping, so its stand-ins are two of the
+      // catalogue roles that mapping targets: two invented names would map to
+      // nothing and the preview would read as an empty list.
+      const map = this.roleMap();
+      const held =
+        shape.includes(".Declared") && map
+          ? [...new Set(Object.values(map))].slice(0, 2)
+          : ["ROLE_ADMIN", "ROLE_OPS"];
       try {
-        return runRoleExpr(shape, ["ROLE_ADMIN", "ROLE_OPS"], new Map()).text;
+        return runRoleExpr(shape, held, new Map(), map).text;
       } catch {
         return "";
       }
@@ -2068,6 +2084,11 @@ export class RouteEditorComponent {
     const audit = this.auditUpload() ?? this.route()?.api?.audit;
     if (audit?.length) {
       route.api = { ...(route.api ?? {}), audit };
+    }
+    // The role mapping too: written on Endpoint security, carried over here.
+    const roleMap = this.roleMap();
+    if (roleMap && Object.keys(roleMap).length) {
+      route.api = { ...(route.api ?? {}), roleMap };
     }
     if (d.isUi && this.uiPossible()) {
       const writesOnTag = ["attribute", "add-attribute", "class"].includes(

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"net/http"
 	"slices"
 
@@ -34,6 +35,9 @@ type OIDCRoute struct {
 	// application may receive its sign-in (OIDCReturns).
 	hosts [][]string
 	paths [][]string
+	// roleMap is the route's declared-role mapping (store.RouteAPI.RoleMap),
+	// read by the roles expression's .Declared.
+	roleMap map[string]string
 }
 
 func oidcRouteOf(r store.Route) *OIDCRoute {
@@ -44,7 +48,8 @@ func oidcRouteOf(r store.Route) *OIDCRoute {
 	id.Attributes = slices.Clone(id.Attributes)
 	id.Claims = slices.Clone(id.Claims)
 	return &OIDCRoute{ID: r.ID, Name: r.Name, Access: r.Access, Identity: id,
-		hosts: routing.HostNames(r.Predicates), paths: routing.PathHeads(r.Predicates)}
+		hosts: routing.HostNames(r.Predicates), paths: routing.PathHeads(r.Predicates),
+		roleMap: maps.Clone(r.RoleMap())}
 }
 
 // OIDCRoutes are the routes signing people into client, in routing order -
@@ -99,6 +104,13 @@ func (rt *Router) PersonOf(req *http.Request, sess store.Session) (Person, bool)
 		return Person{}, false
 	}
 	return Person{d: d}, true
+}
+
+// Through is the person as route sees them: the same facts, with the route's
+// declared-role mapping for its roles expression.
+func (p Person) Through(route OIDCRoute) Person {
+	p.d.Declared = route.roleMap
+	return p
 }
 
 // OIDCClaims renders a route's oidc claims for a person: a fixed value as it

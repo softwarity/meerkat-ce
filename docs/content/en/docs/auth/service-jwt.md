@@ -32,6 +32,28 @@ It is chosen in the route editor, under **Auth forward**: the mechanism
 library that knows nothing else), the attributes and the shape of the roles.
 The preview there shows the exact token a service would receive.
 
+### The shape of the roles
+
+The roles attribute carries one expression, read as a pipeline from left to
+right. The same expression shapes the roles header, a JWT claim and an OIDC
+claim; a result that is a JSON array lands in a claim as an array.
+
+| Verb | What it does |
+|---|---|
+| `.Keep "tag:BILLING" "ROLE_USER"` | keeps the roles carrying a catalogue tag, or named |
+| `.Drop ...` | the opposite: everything except those |
+| `.Declared` | the roles the route's application declares in its spec, mapped on Endpoint security: those the caller holds, under the application's names |
+| `cutHead "ROLE_"`, `cutTail`, `addHead`, `addTail` | reshape each name |
+| `lower`, `upper` | change the case |
+| `join ","`, `json` | the result: a separated list, or a JSON array |
+
+Without an expression a route sends every role, comma-separated
+(`{{join "," .Roles}}`), or, once it maps the roles its application declares,
+`{{.Roles | .Declared | join ","}}` (see
+[Per-endpoint security](/docs/access/endpoint-security#the-roles-the-application-declares)).
+`.Keep`, `.Drop` and `.Declared` read catalogue names, so they go before any
+verb that reshapes them.
+
 ## How a service verifies it
 
 Everything a service needs is served on the **internal plane**, port

@@ -277,6 +277,8 @@ export class ExportDialogComponent {
         return one ? $localize`:@@Role:Role` : $localize`:@@Roles:Roles`;
       case 'authProvider':
         return one ? $localize`:@@Authority:Authority` : $localize`:@@Authorities:Authorities`;
+      case 'oidcClient':
+        return one ? $localize`:@@OIDC_client:OIDC client` : $localize`:@@OIDC_clients:OIDC clients`;
       case 'theme':
         return one ? $localize`:@@Theme:Theme` : $localize`:@@Themes:Themes`;
       case 'mailRelay':

@@ -185,7 +185,9 @@ export class SigningKeysPanelComponent {
   }
 
   protected async regenerate(c: OIDCClient): Promise<void> {
-    const ok = await this.dialogs.confirm({
+    // A client with no secret yet has nothing to stop working: drawing its
+    // first one asks nothing.
+    const ok = !c.secretPrefix || await this.dialogs.confirm({
       title: $localize`:@@Regenerate_secret_of_CLIENT:Regenerate the secret of ${c.id}:client:?`,
       message: $localize`:@@Regenerate_secret_message:The current secret stops working at once: the application signs nobody in until it has the new one.`,
       confirmLabel: $localize`:@@Regenerate:Regenerate`,

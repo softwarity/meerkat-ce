@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -265,6 +267,50 @@ func (rt *Router) Health() map[string]RouteHealth {
 		out[c.id] = rh
 	}
 	return out
+}
+
+// Unreachable says whether a route's service is known to be down - its target
+// found down by the health watch, or its circuit open - and why. A reader
+// about to call that service for something it can do without (a spec, the
+// operations behind a screen) asks first: what is known down is answered
+// down at once, rather than after a timeout the caller sits through.
+func (rt *Router) Unreachable(routeID string) (string, bool) {
+	rt.mu.RLock()
+	routes := rt.routes
+	rt.mu.RUnlock()
+	for _, c := range routes {
+		if c.id != routeID {
+			continue
+		}
+		if c.upstream == "" {
+			return "", false
+		}
+		if h := rt.breakers.of(c.id).health(c.breaker, time.Now()); h.State == circuitOpen {
+			return "not answering (circuit open)", true
+		}
+		if t, ok := rt.targets.get(c.id); ok && t.State == TargetDown {
+			return t.Why, true
+		}
+		return "", false
+	}
+	return "", false
+}
+
+// SpecOnUpstream says whether a route's spec is fetched from the route's own
+// service: a relative address always is; an absolute one when it names the
+// upstream's host. A spec published elsewhere - a repository, a portal - does
+// not go down with the service.
+func SpecOnUpstream(route store.Route) bool {
+	decl := route.Spec()
+	if decl.Type != store.SpecUpstream || decl.Path == "" {
+		return false
+	}
+	if !strings.HasPrefix(decl.Path, "http://") && !strings.HasPrefix(decl.Path, "https://") {
+		return true
+	}
+	spec, err1 := url.Parse(decl.Path)
+	up, err2 := url.Parse(route.Upstream)
+	return err1 == nil && err2 == nil && strings.EqualFold(spec.Host, up.Host)
 }
 
 // RouteHealth is one route's, as the control plane hands it over.

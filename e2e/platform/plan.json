@@ -611,6 +611,21 @@
    "fr": "Non construite (connexion en tant que)."
   },
   {
+   "id": "RBAC-12",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "The roles a route's OpenAPI declares are shown per operation, imported into the catalogue with a prefix and a tag, and forwarded under the application's names to whoever holds the mapped role.",
+   "fr": "Les rôles que l'OpenAPI d'une route déclare sont affichés par opération, importés au catalogue avec un préfixe et une étiquette, et transmis sous les noms de l'application à qui détient le rôle rattaché."
+  },
+  {
    "id": "MODEL-01",
    "priority": "P3",
    "feasibility": "easy",

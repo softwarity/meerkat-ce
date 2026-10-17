@@ -66,6 +66,15 @@ func notOnCommunity(doc *Document) []string {
 		kept = append(kept, p)
 	}
 	doc.AuthProviders = kept
+	// The OIDC clients go as a section: the provider they are clients of is
+	// not in this image (SAUTH-05). Taken out whole, so the clients a database
+	// brought over are neither rewritten nor pruned - the screen lets them be
+	// deleted by hand. The routes bound to them keep their mechanism, as a
+	// route saved here does: carried, not served.
+	if n := len(doc.OIDCClients); n > 0 {
+		out = append(out, fmt.Sprintf("%d OIDC client(s): the OIDC provider is Enterprise", n))
+	}
+	doc.OIDCClients = nil
 	return out
 }
 

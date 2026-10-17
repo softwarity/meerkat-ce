@@ -19,6 +19,7 @@ import (
 	yaml "go.yaml.in/yaml/v4"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
 )
 
@@ -34,6 +35,27 @@ type Operation struct {
 	OperationID string   `json:"operationId,omitempty"`
 	Summary     string   `json:"summary,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	// Upstream is what the DOCUMENT says the application itself requires to
+	// call this operation - absent when it says nothing. Read-only knowledge:
+	// the application enforces it, Meerkat does not, and a rule Meerkat poses
+	// is still written apart, on the route.
+	Upstream *Upstream `json:"upstream,omitempty"`
+}
+
+// The three things a document can say about an operation's security.
+const (
+	UpstreamPublic        = "public"        // explicitly open: `security: []`, or an empty `{}` alternative
+	UpstreamAuthenticated = "authenticated" // a scheme with no role: any valid credential
+	UpstreamRoles         = "roles"         // a scheme with roles: one of them is required
+)
+
+// Upstream is the security a document declares for one operation. The roles
+// are the SCOPES of its requirements - the standard place, which libraries such
+// as nestjs-granted or springdoc fill from the code's own role checks, whatever
+// the scheme (bearer, oauth2, openIdConnect).
+type Upstream struct {
+	Access string   `json:"access"`
+	Roles  []string `json:"roles,omitempty"`
 }
 
 // Spec is the parsed projection of an OpenAPI / Swagger document: API metadata
@@ -49,6 +71,9 @@ type Spec struct {
 	// carries it already, and this field is the piece on its own, for a reader
 	// who has to compare with something else.
 	Base string `json:"base,omitempty"`
+	// Roles is every role the document declares, over all its operations,
+	// sorted: what an application asks of the people calling it, in its words.
+	Roles []string `json:"roles,omitempty"`
 }
 
 // cleanBase normalises what a document says about where it lives: "/api/v3",
@@ -74,7 +99,7 @@ func Parse(data []byte) (*Spec, error) {
 	v := strings.TrimSpace(doc.GetVersion())
 	switch {
 	case strings.HasPrefix(v, "2"):
-		return parseV2(doc)
+		return parseV2(doc, data)
 	case strings.HasPrefix(v, "3"):
 		return parseV3(doc)
 	default:
@@ -82,7 +107,7 @@ func Parse(data []byte) (*Spec, error) {
 	}
 }
 
-func parseV2(doc libopenapi.Document) (*Spec, error) {
+func parseV2(doc libopenapi.Document, data []byte) (*Spec, error) {
 	m, err := doc.BuildV2Model()
 	if err != nil {
 		return nil, fmt.Errorf("openapi: build swagger 2.0 model: %w", err)
@@ -100,19 +125,29 @@ func parseV2(doc libopenapi.Document) (*Spec, error) {
 	if sw.Info != nil {
 		out.Title, out.Version = sw.Info.Title, sw.Info.Version
 	}
+	opened := openedV2(data)
 	if sw.Paths != nil {
 		for pp := orderedmap.First(sw.Paths.PathItems); pp != nil; pp = pp.Next() {
 			path := pp.Key()
 			for op := orderedmap.First(pp.Value().GetOperations()); op != nil; op = op.Next() {
 				o := op.Value()
+				// Both of libopenapi's 2.0 models drop an operation's
+				// `security: []` - precisely the one that says "open" - so it
+				// is read from the document itself.
+				reqs, explicit := o.Security, o.Security != nil || opened[strings.ToLower(op.Key())+" "+path]
+				if !explicit {
+					reqs, explicit = sw.Security, sw.Security != nil
+				}
 				out.Operations = append(out.Operations, Operation{
 					Method: strings.ToUpper(op.Key()), Path: out.Base + path,
 					OperationID: o.OperationId, Summary: o.Summary, Tags: o.Tags,
+					Upstream: upstreamOf(reqs, explicit),
 				})
 			}
 		}
 	}
 	sortOps(out.Operations)
+	out.Roles = declaredRoles(out.Operations)
 	return out, nil
 }
 
@@ -145,14 +180,22 @@ func parseV3(doc libopenapi.Document) (*Spec, error) {
 			path := pp.Key()
 			for op := orderedmap.First(pp.Value().GetOperations()); op != nil; op = op.Next() {
 				o := op.Value()
+				// nil = the operation says nothing and the document's own
+				// requirement applies; an EMPTY list is its own statement.
+				reqs, explicit := o.Security, o.Security != nil
+				if !explicit {
+					reqs, explicit = d.Security, d.Security != nil
+				}
 				out.Operations = append(out.Operations, Operation{
 					Method: strings.ToUpper(op.Key()), Path: out.Base + path,
 					OperationID: o.OperationId, Summary: o.Summary, Tags: o.Tags,
+					Upstream: upstreamOf(reqs, explicit),
 				})
 			}
 		}
 	}
 	sortOps(out.Operations)
+	out.Roles = declaredRoles(out.Operations)
 	return out, nil
 }
 
@@ -314,6 +357,102 @@ func Rewrite(raw []byte, exposedBase string) ([]byte, error) {
 	return out, nil
 }
 
+// AnnotateDeclared writes, at the head of each operation's description, what
+// the APPLICATION requires to call it: swagger-ui shows a padlock for a bearer
+// requirement but never its roles, and the roles are what a developer trying
+// the operation needs to know. roleMap adds the catalogue role that grants
+// each one, which is the name the page's simulation speaks. Serve-time only; a
+// YAML spec comes back unchanged with a non-nil error.
+func AnnotateDeclared(raw []byte, roleMap map[string]string) ([]byte, error) {
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return raw, fmt.Errorf("openapi: annotate expects JSON: %w", err)
+	}
+	global, hasGlobal := doc["security"].([]any)
+	paths, _ := doc["paths"].(map[string]any)
+	changed := false
+	for _, item := range paths {
+		ops, _ := item.(map[string]any)
+		for method, v := range ops {
+			op, _ := v.(map[string]any)
+			if op == nil || !httpMethods[strings.ToLower(method)] {
+				continue
+			}
+			reqs, explicit := op["security"].([]any)
+			if !explicit {
+				reqs, explicit = global, hasGlobal
+			}
+			line := declaredLine(upstreamOfJSON(reqs, explicit), roleMap)
+			if line == "" {
+				continue
+			}
+			if d, _ := op["description"].(string); d != "" {
+				line += "\n\n" + d
+			}
+			op["description"] = line
+			changed = true
+		}
+	}
+	if !changed {
+		return raw, nil
+	}
+	out, err := json.Marshal(doc)
+	if err != nil {
+		return raw, fmt.Errorf("openapi: annotate marshal: %w", err)
+	}
+	return out, nil
+}
+
+var httpMethods = map[string]bool{"get": true, "put": true, "post": true, "delete": true,
+	"options": true, "head": true, "patch": true, "trace": true}
+
+// upstreamOfJSON is upstreamOf on a document read as plain JSON.
+func upstreamOfJSON(reqs []any, explicit bool) *Upstream {
+	conv := make([]*base.SecurityRequirement, 0, len(reqs))
+	for _, r := range reqs {
+		m, _ := r.(map[string]any)
+		req := &base.SecurityRequirement{Requirements: orderedmap.New[string, []string]()}
+		for scheme, scopes := range m {
+			list, _ := scopes.([]any)
+			names := make([]string, 0, len(list))
+			for _, sc := range list {
+				if name, ok := sc.(string); ok {
+					names = append(names, name)
+				}
+			}
+			req.Requirements.Set(scheme, names)
+		}
+		conv = append(conv, req)
+	}
+	return upstreamOf(conv, explicit)
+}
+
+// declaredLine says it in one line of Markdown, or nothing for an operation
+// the document says nothing about or leaves open.
+func declaredLine(up *Upstream, roleMap map[string]string) string {
+	if up == nil {
+		return ""
+	}
+	switch up.Access {
+	case UpstreamAuthenticated:
+		return "**Required by the application:** a signed-in caller."
+	case UpstreamRoles:
+		parts := make([]string, 0, len(up.Roles))
+		for _, r := range up.Roles {
+			part := "`" + r + "`"
+			if m := roleMap[r]; m != "" {
+				part += " (Meerkat role `" + m + "`)"
+			}
+			parts = append(parts, part)
+		}
+		if len(parts) == 1 {
+			return "**Required by the application:** " + parts[0] + "."
+		}
+		return "**Required by the application:** one of " + strings.Join(parts, ", ") + "."
+	}
+	return ""
+}
+
 // InjectSimulation declares the gateway's identity-simulation headers on a
 // spec served by the API-docs page: swagger-ui's Authorize can then input a
 // user and roles (2.0 gets securityDefinitions, 3.x components.securitySchemes)
@@ -412,6 +551,79 @@ func methodRank(m string) int {
 
 // sortOps gives a deterministic order: by path, then by verb rank. The console
 // regroups by tag on top; tests rely on the determinism.
+// openedV2 names the operations of a 2.0 document that set `security: []`, as
+// "method path". A document this cannot read opens nothing.
+func openedV2(data []byte) map[string]bool {
+	var doc struct {
+		Paths map[string]map[string]any `yaml:"paths"`
+	}
+	if yaml.Unmarshal(data, &doc) != nil {
+		return nil
+	}
+	out := map[string]bool{}
+	for path, item := range doc.Paths {
+		for method, op := range item {
+			o, _ := op.(map[string]any)
+			if sec, ok := o["security"].([]any); ok && len(sec) == 0 {
+				out[strings.ToLower(method)+" "+path] = true
+			}
+		}
+	}
+	return out
+}
+
+// upstreamOf reads the requirements that apply to one operation. They are
+// ALTERNATIVES (any one satisfied lets the call in), so an empty alternative
+// makes the whole operation open, and the roles are the union of what the
+// alternatives name. explicit separates "said nothing" from "said []".
+func upstreamOf(reqs []*base.SecurityRequirement, explicit bool) *Upstream {
+	if !explicit {
+		return nil
+	}
+	if len(reqs) == 0 {
+		return &Upstream{Access: UpstreamPublic}
+	}
+	seen := map[string]bool{}
+	var roles []string
+	for _, req := range reqs {
+		if req == nil || req.ContainsEmptyRequirement || req.Requirements == nil || req.Requirements.Len() == 0 {
+			return &Upstream{Access: UpstreamPublic}
+		}
+		for r := orderedmap.First(req.Requirements); r != nil; r = r.Next() {
+			for _, role := range r.Value() {
+				if role = strings.TrimSpace(role); role != "" && !seen[role] {
+					seen[role] = true
+					roles = append(roles, role)
+				}
+			}
+		}
+	}
+	if len(roles) == 0 {
+		return &Upstream{Access: UpstreamAuthenticated}
+	}
+	sort.Strings(roles)
+	return &Upstream{Access: UpstreamRoles, Roles: roles}
+}
+
+// declaredRoles is every role the operations name, once each, sorted.
+func declaredRoles(ops []Operation) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, op := range ops {
+		if op.Upstream == nil {
+			continue
+		}
+		for _, r := range op.Upstream.Roles {
+			if !seen[r] {
+				seen[r] = true
+				out = append(out, r)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func sortOps(ops []Operation) {
 	sort.SliceStable(ops, func(i, j int) bool {
 		if ops[i].Path != ops[j].Path {

@@ -13,7 +13,8 @@ twice. Here is the whole product, domain by domain.
 **Enterprise** marks what the free Community image does not include. *partly*
 marks a capability you can use today, with a named part still to come. What the
 same list costs when you assemble it yourself is in
-[the case for Meerkat](/product/the-case).
+[the case for Meerkat](/product/the-case), and what each capability takes
+without Meerkat, line by line, in [What Meerkat does](/docs/capabilities).
 
 ## Sign-in and identity
 
@@ -45,6 +46,7 @@ Read more: [Authenticating and authorising](/docs/access/overview).
 - **Customer organisations** isolated by the gateway, admin or user members, organisation picked at sign-in. Single-organisation mode is free, multi-organisation is Enterprise. **Enterprise**
 - **Per-route access** on organisation, role and account; a refusal lands on a page that explains, never on a line of text.
 - **Per-endpoint security** derived from the service's OpenAPI spec, edited in a Swagger-like console.
+- **The roles the application declares**, read from its own spec, shown per operation, imported into the catalogue in one click and forwarded under the application's names, only to those who hold them.
 - **Delegated administration with clear boundaries**: super-admin, infrastructure admin, application admin, organisation admin, and self-service for each user.
 - **Access time windows** per organisation, by day, date and time zone. **Enterprise** *partly*
 - **Identity passed to your services** as headers, as REMOTE_USER or as a signed JWT (ES256, EdDSA, RS256), with published keys that rotate without downtime; you choose which roles each service receives.
@@ -149,7 +151,8 @@ The operator asks in words, the gateway executes and records.
 
 Read more: [The agent endpoint](/docs/agent/overview).
 
-- **Built-in MCP server**: Claude Code, Gemini CLI, Kimi CLI and Codex CLI connect to the gateway to read, test or change routes, roles and schedules, import a whole configuration, and call your services through a route as any role.
+- **Built-in MCP server**: Claude Code, Gemini CLI, Kimi CLI and Codex CLI connect to the gateway to read, test or change routes, roles and schedules, and import a whole configuration.
+- **Your APIs, driven by the agent**: it reads the OpenAPI of the service behind a route - operations, parameters, bodies, and the roles the application requires - then calls it for real through the gateway, its rules and the identity it forwards, as any user or role. Ask in words for an order to be created, a record fixed, or a refusal proven: the agent finds the operation and makes the call, and the audit trail keeps it.
 - **OAuth connection with no copied secret**, scoped token (schedules only, read-only or full, and the network ranges it may come from), revocable in one click.
 - **Every agent action is audited** under its name, with an automatic restore point to roll back.
 
