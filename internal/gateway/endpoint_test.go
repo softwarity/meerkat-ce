@@ -176,11 +176,10 @@ func TestEndpointSecurityFallThrough(t *testing.T) {
 	}
 }
 
-// Deny-unlisted (RBAC-07): only the operations a rule lists are reachable. An
-// operation nobody wrote a rule for is refused even to a signed-in caller the
-// route itself would let in - the endpoint the service ships tomorrow is
-// closed until somebody decides otherwise.
-func TestDenyUnlistedClosesWhatNoRuleLists(t *testing.T) {
+// Closed by default (RBAC-07) is the route's own rule set to Nobody: only the
+// operations a rule opens are reachable, and the endpoint the service ships
+// tomorrow is closed until somebody decides otherwise.
+func TestARouteClosedToNobodyOpensOnlyWhatItsRulesList(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "up:"+r.URL.Path)
 	}))
@@ -196,10 +195,9 @@ func TestDenyUnlistedClosesWhatNoRuleLists(t *testing.T) {
 	}
 	route := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,
 		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
-	route.Access = store.Access{Level: store.AccessAuth}
+	route.Access = store.Access{Level: store.AccessDeny}
 	route.API = &store.RouteAPI{Security: &store.EndpointSecurity{
-		DenyUnlisted: true,
-		Endpoints:    []store.EndpointPolicy{{Method: "GET", Path: "/listed", Access: store.Access{Level: store.AccessAuth}}},
+		Endpoints: []store.EndpointPolicy{{Method: "GET", Path: "/listed", Access: store.Access{Level: store.AccessAuth}}},
 	}}
 	if err := st.SaveRoute(ctx, route); err != nil {
 		t.Fatal(err)

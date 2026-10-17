@@ -253,16 +253,6 @@
       <span class="count" i18n="@@endpoints_secured_summary">
         {{ (data()?.operations)?.length || 0 }} operations, {{ securedCount() }} secured
       </span>
-      <!-- Deny-unlisted: what nobody wrote a rule for is closed, so an
-           endpoint the service ships tomorrow stays shut until decided. -->
-      <mat-slide-toggle
-        [checked]="denyUnlisted()"
-        (change)="setDenyUnlisted($event.checked)"
-        i18n-matTooltip="@@Deny_unlisted_tooltip"
-        matTooltip="An operation with no rule of its own is refused to everyone, including one added later."
-      >
-        <span i18n="@@Deny_unlisted">Only listed operations are reachable</span>
-      </mat-slide-toggle>
       <!-- The table repeats the ROUTE's rule on every line, which is what gates
            each operation and reads as if fifteen rules had been set by hand. So
            the split is said here: what the route gates, and what was decided

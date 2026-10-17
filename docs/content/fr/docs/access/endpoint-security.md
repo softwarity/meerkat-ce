@@ -84,17 +84,16 @@ classement donnant l'avantage à la règle la plus précise. Une règle `*` sur
 donc les règles générales en dernier.
 
 Une opération à laquelle **aucune** règle ne correspond retombe sur **la règle
-de la route elle-même** - sauf si **Only listed operations are reachable** est
-activé, au bas de l'écran. Dans ce cas, elle est refusée à tout le monde, et le
-tableau affiche *Nobody* en face d'elle.
+de la route elle-même**. Pour fermer par défaut - seul ce que la liste ouvre est
+joignable, et un endpoint que le service livrera la semaine prochaine reste
+fermé - mettez la règle de la route à **Nobody** et ouvrez les opérations une à
+une.
 
 > [!WARNING]
-> Sans cet interrupteur, une opération que vous avez oubliée n'est pas fermée :
-> elle obéit à la règle de la route, qui peut être déléguée - et il en va de
-> même pour un endpoint que le service livrera la semaine prochaine. Laisser
-> une liste incomplète de règles d'endpoint sur une route déléguée ne protège
-> rien. Activez l'interrupteur quand la liste est censée constituer tout le
-> contrat.
+> Une opération que vous avez oubliée obéit à la règle de la route, qui peut
+> être déléguée - et il en va de même pour un endpoint que le service livrera la
+> semaine prochaine. Laisser une liste incomplète de règles d'endpoint sur une
+> route déléguée ne protège rien.
 
 ## Une règle peut ouvrir aussi bien que fermer
 
@@ -131,10 +130,8 @@ contrôles du code :
 L'écran l'affiche dans une colonne **Application requires** : les rôles, *Signed
 in* pour une exigence sans rôle, ou *Public* pour une opération que la spec ouvre
 explicitement (la colonne de la première image de cette page). C'est une
-information en lecture seule. **C'est l'application qui
-l'applique, pas Meerkat** : rien ici ne change ce que la gateway laisse passer,
-et avec **Only listed operations are reachable** activé, une opération que
-l'application protège reste refusée par Meerkat tant qu'aucune règle ne la liste.
+information en lecture seule. **C'est l'application qui l'applique, pas
+Meerkat** : rien ici ne change ce que la gateway laisse passer.
 
 La documentation d'API des développeurs (`/meerkat/apidocs/`) le dit aussi, en
 tête de la description de chaque opération, parce que swagger-ui affiche un

@@ -151,11 +151,10 @@ posées sur l'inventaire des endpoints que la gateway a lu dans cette spec.
 La première règle qui correspond l'emporte.
 
 > [!NOTE]
-> Une opération sans règle propre retombe sur la règle de la **route**, sauf si
-> **Only listed operations are reachable** est activé : elle est alors refusée
-> à tout le monde. Sans cet interrupteur, une spec qui s'est enrichie d'une
-> opération pour laquelle personne n'a écrit de règle est couverte par la
-> route, et non refusée.
+> Une opération sans règle propre retombe sur la règle de la **route** : une spec
+> qui s'est enrichie d'une opération pour laquelle personne n'a écrit de règle est
+> couverte par la route. Pour fermer par défaut, mettez la règle de la route à
+> **Nobody** et ouvrez les opérations une à une.
 
 ## Ce qui n'existe pas
 

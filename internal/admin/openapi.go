@@ -94,8 +94,6 @@ type routeSecurityPayload struct {
 	// there. This screen shows it as the default its overrides refine.
 	Access    store.Access           `json:"access"`
 	Endpoints []store.EndpointPolicy `json:"endpoints"`
-	// DenyUnlisted: only the listed operations are reachable.
-	DenyUnlisted bool `json:"denyUnlisted,omitempty"`
 }
 
 // getRouteOperations fetches the route's OpenAPI spec, parses it (Swagger 2.0 or
@@ -143,15 +141,12 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 		writeErr(w, http.StatusBadRequest, "malformed security: "+err.Error())
 		return
 	}
-	sec := store.EndpointSecurity{Endpoints: payload.Endpoints, DenyUnlisted: payload.DenyUnlisted}
+	sec := store.EndpointSecurity{Endpoints: payload.Endpoints}
 	if err := sec.Validate(); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	before := routeSecurityPayload{Access: route.Access, Endpoints: endpointsOf(route)}
-	if s := securityOf(route); s != nil {
-		before.DenyUnlisted = s.DenyUnlisted
-	}
 
 	// The route's own Access is NOT written from here: this screen is about
 	// operations. Sent along for context, ignored on the way in - a screen
@@ -161,7 +156,7 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 	if route.API != nil {
 		api = *route.API // keep openapiUrl and any future API options
 	}
-	if len(sec.Endpoints) == 0 && !sec.DenyUnlisted {
+	if len(sec.Endpoints) == 0 {
 		api.Security = nil
 	} else {
 		api.Security = &sec
@@ -182,7 +177,7 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))
 		return
 	}
-	after := routeSecurityPayload{Access: route.Access, Endpoints: sec.Endpoints, DenyUnlisted: sec.DenyUnlisted}
+	after := routeSecurityPayload{Access: route.Access, Endpoints: sec.Endpoints}
 	a.auditUpdate(r.Context(), actor, "route.security", "route", route.ID, route.Name, "", before, after)
 	after.Endpoints = orEmpty(after.Endpoints)
 	writeJSON(w, http.StatusOK, after)

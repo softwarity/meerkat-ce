@@ -139,10 +139,9 @@ plus path, with `{var}` templates and `*` for any method - on the endpoint
 inventory the gateway read from that spec. The first matching override wins.
 
 > [!NOTE]
-> An operation with no override falls back to the **route's** rule, unless
-> **Only listed operations are reachable** is on: then it is refused to
-> everyone. Without that switch, a spec that grew an operation nobody wrote a
-> rule for is covered by the route, not refused.
+> An operation with no override falls back to the **route's** rule: a spec that
+> grew an operation nobody wrote a rule for is covered by the route. To close by
+> default, set the route's rule to **Nobody** and open operations one by one.
 
 ## What is not built
 

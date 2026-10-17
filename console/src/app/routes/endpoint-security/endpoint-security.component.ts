@@ -158,9 +158,6 @@ export class EndpointSecurityComponent {
 
   // The route-wide default rule (applies to every operation with no override).
   protected readonly routeAccess = signal<AccessState>(emptyAccess());
-  // Only what a rule lists is reachable (RBAC-07): an operation with no rule
-  // of its own is then closed to everyone rather than gated by the route.
-  protected readonly denyUnlisted = signal(false);
 
   // Per-operation edits, keyed by opKey.
   private readonly state = signal<Record<string, OpState>>({});
@@ -476,7 +473,6 @@ export class EndpointSecurityComponent {
     // The "whole route" default is the route's own Access now; overrides come
     // from the endpoint-security block.
     this.routeAccess.set(fromWire(ops.access));
-    this.denyUnlisted.set(!!ops.security?.denyUnlisted);
     const saved = new Map<string, EndpointPolicy>();
     for (const e of ops.security?.endpoints ?? []) saved.set(opKey(e.method, e.path), e);
     // A rule may name "*" - every verb on that path, which is how one writes
@@ -597,17 +593,12 @@ export class EndpointSecurityComponent {
   protected effective(o: OpenAPIOperation): AccessState {
     const s = this.stateOf(o);
     if (s.override) return s.access;
-    return this.denyUnlisted() ? { ...emptyAccess(), level: 'deny' } : this.routeAccess();
+    return this.routeAccess();
   }
 
   protected setOpAccess(o: OpenAPIOperation, access: AccessState): void {
     const k = opKey(o.method, o.path);
     this.state.update((s) => ({ ...s, [k]: { ...this.stateOf(o), override: true, access } }));
-    this.scheduleSave();
-  }
-
-  protected setDenyUnlisted(on: boolean): void {
-    this.denyUnlisted.set(on);
     this.scheduleSave();
   }
 
@@ -686,7 +677,6 @@ export class EndpointSecurityComponent {
         ...(ra.users.length ? { users: ra.users } : {}),
       },
       endpoints,
-      ...(this.denyUnlisted() ? { denyUnlisted: true } : {}),
     };
 
     this.saveState.set('saving');

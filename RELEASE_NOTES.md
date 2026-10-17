@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+- **No more "Only listed operations are reachable".** The switch at the foot of Endpoint security
+  closed every operation no rule lists, from a place nobody looks when a new endpoint answers 403.
+  It did what the route's own rule set to **Nobody** already does: closed by default is now said
+  on the route, where its rule is shown, with the operations opened one by one.
 - **plug 2.27.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **What an application requires, read from its own spec.** When a route's OpenAPI says which
   roles an operation needs (the scopes of its security requirement, as nestjs-granted or springdoc

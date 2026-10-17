@@ -1541,13 +1541,6 @@ type EndpointSecurity struct {
 	// match wins, in list order. The whole-route default is the route's own
 	// Access, not a field here.
 	Endpoints []EndpointPolicy `json:"endpoints,omitempty"`
-	// DenyUnlisted closes every operation no rule lists (RBAC-07): only what
-	// is written is reachable. Without it, an operation nobody wrote a rule
-	// for falls back to the route's own rule - which may be delegated, so an
-	// endpoint the service adds tomorrow is open the moment it ships. The
-	// same effect was reachable by a last "* /** Nobody" rule, which has to
-	// stay last and is exactly the kind of line that gets reordered away.
-	DenyUnlisted bool `json:"denyUnlisted,omitempty"`
 }
 
 // EndpointPolicy is one operation's access override. Method is an upper-case

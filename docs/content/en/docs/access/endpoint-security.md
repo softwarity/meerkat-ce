@@ -77,16 +77,15 @@ the access rule - a flood is refused without a session being looked up.
 ranking. A rule for `*` on `/**` placed first would swallow everything under it,
 so put the general rules last.
 
-An operation matched by **no** rule falls back to the **route's own rule** -
-unless **Only listed operations are reachable** is on, at the foot of the
-screen. Then it is refused to everyone, and the table shows *Nobody* on it.
+An operation matched by **no** rule falls back to the **route's own rule**. To
+close by default - only what the list opens is reachable, and an endpoint the
+service ships next week stays shut - set the route's rule to **Nobody** and open
+the operations one by one.
 
 > [!WARNING]
-> Without that switch, an operation you forgot is not closed: it is governed by
-> the route's rule, which may be delegated - and so is an endpoint the service
-> ships next week. Leaving an incomplete list of endpoint rules on a delegated
-> route protects nothing. Turn the switch on when the list is meant to be the
-> whole contract.
+> An operation you forgot is governed by the route's rule, which may be
+> delegated - and so is an endpoint the service ships next week. Leaving an
+> incomplete list of endpoint rules on a delegated route protects nothing.
 
 ## Rules can open as well as close
 
@@ -120,10 +119,8 @@ nestjs-granted or springdoc write them from the code's own checks:
 The screen shows it in an **Application requires** column: the roles, *Signed in*
 for a requirement without a role, or *Public* for an operation the spec opens
 explicitly (the column in the first picture of this page). This is read-only
-knowledge. **The application enforces it, not
-Meerkat**: nothing here changes what the gateway lets through, and with **Only
-listed operations are reachable** on, an operation the application protects is
-still refused by Meerkat until a rule lists it.
+knowledge. **The application enforces it, not Meerkat**: nothing here changes
+what the gateway lets through.
 
 The developer's API docs (`/meerkat/apidocs/`) say it too, at the head of each
 operation's description, because swagger-ui shows a padlock for a bearer

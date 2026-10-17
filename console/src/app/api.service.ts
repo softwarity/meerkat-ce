@@ -200,8 +200,6 @@ export interface EndpointPolicy extends Access {
 // whole-route default is the route's own Access (Route.access), not here.
 export interface EndpointSecurity {
   endpoints?: EndpointPolicy[];
-  // Only the listed operations are reachable; the others refuse everyone.
-  denyUnlisted?: boolean;
 }
 
 // The endpoint-security screen's save body: the route's base Access (the "whole
@@ -209,7 +207,6 @@ export interface EndpointSecurity {
 export interface RouteSecurity {
   access: Access;
   endpoints: EndpointPolicy[];
-  denyUnlisted?: boolean;
 }
 
 // One operation projected from the route's OpenAPI spec (Swagger 2.0 or 3.x),

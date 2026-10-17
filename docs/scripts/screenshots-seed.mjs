@@ -223,7 +223,6 @@ const SPEC = {
 // Who may call what, operation by operation, and how often (RBAC-07, QUOTA-05).
 const SECURITY = {
   access: {},
-  denyUnlisted: false,
   endpoints: [
     { method: 'POST', path: '/orders/reindex', level: 'deny', users: ['t.nakamura'] },
     { method: 'DELETE', path: '/orders/{id}', level: 'auth', roles: ['orders-manager'] },

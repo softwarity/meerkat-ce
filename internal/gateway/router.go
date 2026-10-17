@@ -1055,7 +1055,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	// definition, so they were never what selection had to tell apart.
 	selectAccess := r.Access
 	hasOverrides := r.API != nil && r.API.Security != nil &&
-		(len(r.API.Security.Endpoints) > 0 || r.API.Security.DenyUnlisted)
+		len(r.API.Security.Endpoints) > 0
 	if hasOverrides {
 		selectAccess = store.Access{}
 		if rt.sm == nil {
@@ -2464,12 +2464,9 @@ func (rt *Router) endpointGuard(sec store.EndpointSecurity, routeAccess store.Ac
 		gate   http.Handler
 	}
 	// The route's base Access is the default for any operation with no override
-	// (an empty Access passes through, delegating to the upstream) - unless
-	// the route closes what it does not list, and then nobody passes.
+	// (an empty Access passes through, delegating to the upstream). Closed by
+	// default is that rule set to Nobody, with the operations opened one by one.
 	fallback := routeAccess
-	if sec.DenyUnlisted {
-		fallback = store.Access{Level: store.AccessDeny}
-	}
 	eps := make([]compiledEP, 0, len(sec.Endpoints))
 	for i, e := range sec.Endpoints {
 		cp, err := routing.CompilePath(e.Path)
