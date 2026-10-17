@@ -2,6 +2,7 @@
 
 ## NEXT RELEASE
 
+- **plug 2.27.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **What an application requires, read from its own spec.** When a route's OpenAPI says which
   roles an operation needs (the scopes of its security requirement, as nestjs-granted or springdoc
   write them), Endpoint security shows it per operation, read-only: the application enforces it,
