@@ -44,10 +44,17 @@ import { LiveChangesService } from '../shared/live-changes.service';
               <span class="served">
                 @if (n.parked) {
                   <mat-icon
-                    class="parked"
+                    class="mark"
                     i18n-matTooltip="@@Plug_session_parked"
                     matTooltip="The cluster's {{ n.name }} is parked: this run answers in its place"
                     >garage</mat-icon
+                  >
+                } @else {
+                  <mat-icon
+                    class="mark"
+                    i18n-matTooltip="@@Plug_session_added"
+                    matTooltip="The cluster had no {{ n.name }}: this run adds the name"
+                    >add_circle</mat-icon
                   >
                 }
                 <code class="name">{{ n.name }}</code>

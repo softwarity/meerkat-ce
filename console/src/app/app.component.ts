@@ -124,9 +124,9 @@ export class AppComponent {
   constructor() {
     const icons = inject(MatIconRegistry);
     icons.setDefaultFontSetClass('material-symbols-outlined');
-    // Brand SVG logos from public/, usable as <mat-icon svgIcon="jwt|openapi|swagger-ui|meerkat">.
+    // Brand SVG logos from public/, usable as <mat-icon svgIcon="jwt|openapi|swagger-ui|meerkat|docker">.
     const sanitizer = inject(DomSanitizer);
-    for (const name of ['jwt', 'openapi', 'swagger-ui', 'meerkat']) {
+    for (const name of ['jwt', 'openapi', 'swagger-ui', 'meerkat', 'docker']) {
       icons.addSvgIcon(name, sanitizer.bypassSecurityTrustResourceUrl(`${name}.svg`));
     }
     // Role-based UI visibility (styles/_roles.scss): MeService loads /api/me and

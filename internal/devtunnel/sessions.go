@@ -356,6 +356,8 @@ func (r *Registry) auditServe(action string, s Served) {
 		}
 		if s.Parked {
 			parts = append(parts, "the deployed service set aside")
+		} else {
+			parts = append(parts, "a name the cluster did not have")
 		}
 		if s.Session != "" {
 			parts = append(parts, "session "+s.Session)

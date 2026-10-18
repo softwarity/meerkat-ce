@@ -221,6 +221,8 @@ the workstation (the comment of the key they deposited, and its fingerprint),
 the address it came from, the plug version, the time it was plugged in, and the names it serves.
 A name marked with a garage icon is one whose deployed service the run has
 parked: the cluster's own is set aside and the workstation answers in its place.
+A name marked with a plus is one the cluster did not have: the run adds it. The
+audit trail says the same of each name served.
 A run whose connections landed on several replicas of the gateway is still one
 row.
 

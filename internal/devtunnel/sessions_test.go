@@ -97,8 +97,10 @@ func TestARunSpreadOverReplicasIsOneSession(t *testing.T) {
 		len(list[0].Names) != 1 || list[0].Names[0].Name != "checkout" {
 		t.Fatalf("the merged list: %+v", list)
 	}
-	if n := len(tr.of("plug.serve")); n != 1 {
-		t.Errorf("serving a name wrote %d lines, want 1", n)
+	if serves := tr.of("plug.serve"); len(serves) != 1 {
+		t.Errorf("serving a name wrote %d lines, want 1", len(serves))
+	} else if !strings.Contains(serves[0].Detail, "a name the cluster did not have") {
+		t.Errorf("a name served without parking anything: %q, want it said", serves[0].Detail)
 	}
 
 	// Ended by an administrator on b, while a's part is still there: no end yet.

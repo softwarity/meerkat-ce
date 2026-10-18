@@ -33,10 +33,10 @@
   gap: 4px;
   margin-right: 10px;
 }
-// A name whose deployed service was set aside for the run: the cluster's own
-// is not answering it meanwhile. Said by the icon and its tooltip, never by a
-// colour alone.
-.parked {
+// How the run serves the name, said by an icon and its tooltip, never by a
+// colour alone: a deployed service set aside (garage), or a name the cluster
+// did not have (add).
+.mark {
   font-size: 18px;
   width: 18px;
   height: 18px;
