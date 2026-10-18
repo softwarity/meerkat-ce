@@ -9,7 +9,7 @@
   operator writes. `GET /api/roles` and `list_roles` carry it as `usedBy`, and a write ignores it.
 - **plug 2.29.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **Who is plugged in, and a way to end it.** Infra, Plug lists the plug runs open now, one row
-  per run however many replicas its connections landed on: the developer, the workstation, where
+  per run however many replicas its connections landed on: the developer, where
   from, which plug, when it was plugged in, and what it serves - or "client only". **End this session** stops
   the developer's command as a Ctrl-C would, with the reason in their terminal, and puts back at
   once what it had set aside, on every replica. Removing a key, the developer capability, or the

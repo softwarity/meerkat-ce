@@ -27,19 +27,14 @@ import { LiveChangesService } from '../shared/live-changes.service';
     @if (rows().length === 0) {
       <p class="hint" i18n="@@Plug_no_sessions">Nobody is plugged in.</p>
     } @else {
-      <mat-table [dataSource]="rows()">
+      <table mat-table [dataSource]="rows()">
         <ng-container matColumnDef="who">
-          <mat-header-cell *matHeaderCellDef i18n="@@Plug_session_developer">Developer</mat-header-cell>
-          <mat-cell *matCellDef="let s">
-            <span class="two-line">
-              <span>{{ s.fullname || s.who || '-' }}</span>
-              <span class="sub" [matTooltip]="s.key ?? ''">{{ s.workstation || s.key }}</span>
-            </span>
-          </mat-cell>
+          <th mat-header-cell *matHeaderCellDef i18n="@@Plug_session_developer">Developer</th>
+          <td mat-cell *matCellDef="let s">{{ s.fullname || s.who || '-' }}</td>
         </ng-container>
         <ng-container matColumnDef="serves">
-          <mat-header-cell *matHeaderCellDef i18n="@@Plug_session_serves">Serves</mat-header-cell>
-          <mat-cell *matCellDef="let s">
+          <th mat-header-cell *matHeaderCellDef i18n="@@Plug_session_serves">Serves</th>
+          <td mat-cell *matCellDef="let s">
             @for (n of s.names; track n.name) {
               <span class="served">
                 <!-- The cluster as a grid, the run's piece coloured: IN the grid
@@ -77,26 +72,26 @@ import { LiveChangesService } from '../shared/live-changes.service';
             } @empty {
               <span class="sub" i18n="@@Plug_session_client_only">client only</span>
             }
-          </mat-cell>
+          </td>
         </ng-container>
         <ng-container matColumnDef="from">
-          <mat-header-cell *matHeaderCellDef i18n="@@Plug_session_from">From</mat-header-cell>
-          <mat-cell *matCellDef="let s">
+          <th mat-header-cell *matHeaderCellDef i18n="@@Plug_session_from">From</th>
+          <td mat-cell *matCellDef="let s">
             <span class="two-line">
               <span class="mono">{{ s.from || '-' }}</span>
               @if (s.version) {
                 <span class="sub">plug {{ s.version }}</span>
               }
             </span>
-          </mat-cell>
+          </td>
         </ng-container>
         <!-- The row action lives in the LAST existing column. -->
         <!-- WHEN it was plugged in, not "how long ago": a relative time is
              only true at the moment it is computed, and this list is only read
              again when a run opens or ends. -->
         <ng-container matColumnDef="since">
-          <mat-header-cell *matHeaderCellDef i18n="@@Plug_session_plugged_at">Plugged in at</mat-header-cell>
-          <mat-cell *matCellDef="let s">
+          <th mat-header-cell *matHeaderCellDef i18n="@@Plug_session_plugged_at">Plugged in at</th>
+          <td mat-cell *matCellDef="let s">
             <span class="sub" [title]="full(s.since)">{{ at(s.since) }}</span>
             <span rowActions="tonal">
               <button
@@ -110,11 +105,11 @@ import { LiveChangesService } from '../shared/live-changes.service';
                 <mat-icon>link_off</mat-icon>
               </button>
             </span>
-          </mat-cell>
+          </td>
         </ng-container>
-        <mat-header-row *matHeaderRowDef="columns"></mat-header-row>
-        <mat-row *matRowDef="let row; columns: columns"></mat-row>
-      </mat-table>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+      </table>
     }
   `,
 })

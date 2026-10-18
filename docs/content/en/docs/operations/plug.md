@@ -217,7 +217,6 @@ The details, and the other symptoms, are in plug's documentation:
 
 Infra, Plug lists who is plugged into the cluster now: one row per plug run
 (`plug -s`, or `plug -c` for a client that only consumes), with the developer,
-the workstation (the comment of the key they deposited, and its fingerprint),
 the address it came from, the plug version, the time it was plugged in, and the names it serves.
 Each name served carries a small grid, the cluster, with the run's square
 coloured. In the grid: the run has parked the deployed service, the cluster's
