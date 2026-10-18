@@ -8,9 +8,13 @@
 //   - 404.html is still written, for an address no page claims: the shell boots
 //     there too and shows its own not-found.
 //
-// The body is not pre-rendered - the content is fetched by the application, as
-// it is everywhere else. What is written here is the head, which is what a
-// crawler and a link preview read before any script runs.
+// The body carries the page too: its HTML, the same the application fetches,
+// inside <app-root>. A crawler and a reader without scripts get the text from
+// the file itself; the application replaces it when it starts, as Angular
+// empties the host element of the root component it boots.
+//
+// Last, the two files a crawler asks for first: sitemap.xml, one address per
+// page, and robots.txt, which names it.
 import { mkdir, readFile, readdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +23,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const OUT = join(here, '..', 'dist', 'doc-site', 'browser');
 const SITE = join(OUT, 'assets', 'site');
 const LANGS = ['en', 'fr'];
-const ORIGIN = 'https://www.softwarity.io';
+const ORIGIN = 'https://meerkat.softwarity.dev';
+// The card a link preview shows: 1200 x 630, the size summary_large_image asks.
+const CARD = 'img/og/meerkat.png';
 
 const index = await readFile(join(OUT, 'index.html'), 'utf8');
 await writeFile(join(OUT, '404.html'), index);
@@ -35,7 +41,7 @@ const head = [
 const escape = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// One file for a page: its head, and the shell.
+// One file for a page: its head, and the shell holding the page's text.
 //
 //   canonical  the address search engines keep for this file
 //   alternates the same page in each language, for a crawler: an address names
@@ -44,7 +50,9 @@ function document(lang, page, canonical, alternates) {
   // Same rule as the runtime: the company is the brand, Meerkat is the
   // product, and the tab says which of the two the page is about.
   const house = page.area === 'softwarity' || page.area === 'project' ? 'Softwarity' : 'Meerkat';
-  const title = page.slug === 'index' ? `${page.title} | Softwarity` : `${page.title} | ${house}`;
+  const name = titleOf(lang, page);
+  const title = page.slug === 'index' ? `Meerkat: ${name}` : `${name} | ${house}`;
+  const card = `${ORIGIN}${base}${CARD}`;
   return `<!doctype html>
 <html lang="${lang}">
 <head>
@@ -55,19 +63,35 @@ function document(lang, page, canonical, alternates) {
 <meta name="description" content="${escape(page.summary)}">
 <link rel="canonical" href="${canonical}">
 ${alternates.join('\n')}
-<meta property="og:type" content="article">
+<meta property="og:type" content="${page.slug === 'index' ? 'website' : 'article'}">
+<meta property="og:site_name" content="Meerkat">
 <meta property="og:url" content="${canonical}">
-<meta property="og:title" content="${escape(page.title)}">
+<meta property="og:title" content="${escape(title)}">
 <meta property="og:description" content="${escape(page.summary)}">
+<meta property="og:image" content="${card}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Meerkat, authentication proxy and API gateway, and its administration console">
 <meta name="author" content="Softwarity">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="${escape(page.title)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escape(title)}">
 <meta name="twitter:description" content="${escape(page.summary)}">
+<meta name="twitter:image" content="${card}">
+<style>.prerender{max-width:860px;margin:32px auto;padding:0 16px;font-family:Roboto,Helvetica,Arial,sans-serif;line-height:1.5}.prerender img,.prerender svg{max-width:100%;height:auto}</style>
 ${head.join('\n')}
 </head>
-<body><app-root></app-root></body>
+<body><app-root><main class="prerender">${page.html ?? ''}</main></app-root></body>
 </html>
 `;
+}
+
+// Two pages of one language with the same title ("Routes", the console's
+// screen and the concept) would share a tab and a search result: the second
+// word says which one.
+const titleCount = new Map();
+function titleOf(lang, page) {
+  const n = titleCount.get(`${lang}/${page.title}`) ?? 1;
+  return n > 1 && page.section ? `${page.title} - ${page.section}` : page.title;
 }
 
 async function write(path, html) {
@@ -89,7 +113,13 @@ for (const lang of LANGS) {
   }
 }
 
+for (const [key, page] of pages) {
+  const k = `${key.split('/')[0]}/${page.title}`;
+  titleCount.set(k, (titleCount.get(k) ?? 0) + 1);
+}
+
 let written = 0;
+const sitemap = [];
 for (const [slug, langs] of langsOf) {
   // With the trailing slash Pages itself serves: every page is a directory,
   // so /docs answers a 301 to /docs/, and a canonical that redirects is one
@@ -103,11 +133,11 @@ for (const [slug, langs] of langsOf) {
   // The page itself, at the address that names no language. Its head is in
   // the first language it exists in - a crawler reads one - and the reader's
   // own is chosen when the application starts.
-  if (slug !== 'index') {
-    // The home page is the index.html the builder wrote; it is left alone.
-    await write(path, document(langs[0], pages.get(`${langs[0]}/${slug}`), bare, alternates));
-    written++;
-  }
+  // The home page too: index.html is rewritten with its own head and text,
+  // after 404.html took the shell as the builder wrote it.
+  await write(path, document(langs[0], pages.get(`${langs[0]}/${slug}`), bare, alternates));
+  sitemap.push(bare);
+  written++;
   // And the addresses of before, /en/... and /fr/..., which were sent and
   // indexed: they answer 200 with their own head, name the new address as the
   // canonical one, and the application takes the reader there.
@@ -118,4 +148,16 @@ for (const [slug, langs] of langsOf) {
   }
 }
 
-console.log(`[static-pages] ${written} pages + 404.html`);
+// One address per page, the canonical one: the /en/ and /fr/ addresses of
+// before name it themselves and are left out.
+await writeFile(
+  join(OUT, 'sitemap.xml'),
+  `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${sitemap.map((u) => `  <url><loc>${escape(u)}</loc></url>`).join('\n')}
+</urlset>
+`,
+);
+await writeFile(join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${ORIGIN}${base}sitemap.xml\n`);
+
+console.log(`[static-pages] ${written} pages + 404.html, sitemap.xml (${sitemap.length} addresses), robots.txt`);

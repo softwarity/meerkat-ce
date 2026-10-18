@@ -7,8 +7,8 @@ summary: Tout ce que fait Meerkat, comment l'installer, et à quoi servent chaqu
 
 # Documentation
 
-Meerkat est une app-gateway : une porte unique devant vos applications
-internes. Elle se charge de l'authentification, des règles d'accès, du routage
+Meerkat est un proxy d'authentification et une API gateway : une porte unique
+devant vos applications internes. Elle se charge de l'authentification, des règles d'accès, du routage
 et de l'observation, pour que vos services n'aient plus à s'en occuper.
 
 ## Par où commencer

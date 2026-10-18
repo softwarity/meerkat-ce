@@ -145,7 +145,8 @@ export class PageComponent {
           // The company is the brand, Meerkat is the product: a page about the
           // product says so in the tab, a page about the company says the company.
           const house = p.area === 'softwarity' || p.area === 'project' ? 'Softwarity' : 'Meerkat';
-          document.title = slug === 'index' ? `${p.title} | Softwarity` : `${p.title} | ${house}`;
+          // The home page names the product first, as the file the build wrote does.
+          document.title = slug === 'index' ? `Meerkat: ${p.title}` : `${p.title} | ${house}`;
           const meta = document.querySelector('meta[name="description"]');
           if (meta && p.summary) meta.setAttribute('content', p.summary);
           // The anchors the build wrote point at pages, not at addresses -

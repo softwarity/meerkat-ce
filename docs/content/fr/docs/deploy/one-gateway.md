@@ -141,7 +141,7 @@ que personne ne met par écrit - comment éviter que le point d'entrée ne
 devienne un point de défaillance unique.
 
 ```bash
-helm repo add meerkat https://www.softwarity.io/deploy
+helm repo add meerkat https://meerkat.softwarity.dev/deploy
 
 helm install meerkat meerkat/meerkat \
   --set admin.password='your-first-password'
@@ -153,7 +153,7 @@ helm install meerkat meerkat/meerkat \
 
 # Évaluation : tout ce que fait Enterprise, publique, pas pour la production.
 helm install meerkat meerkat/meerkat \
-  -f https://www.softwarity.io/deploy/values-eval-one-node.yaml \
+  -f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml \
   --set admin.password='your-first-password'
 ```
 

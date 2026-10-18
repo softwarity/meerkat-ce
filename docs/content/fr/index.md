@@ -1,16 +1,17 @@
 ---
-title: L'app-gateway de vos applications internes
-summary: Une porte unique devant vos applications internes. Elle se charge de l'authentification, des règles d'accès, du routage, des quotas et de l'audit, pour que vos services restent légers.
+title: Proxy d'authentification et API gateway pour vos applications internes
+summary: Meerkat place la connexion, le contrôle d'accès, les organisations, le routage, les quotas et l'audit devant vos applications internes, à la place d'un proxy d'authentification, d'un serveur d'identité et d'une API gateway. Un seul binaire, aucune dépendance.
 layout: wide
 ---
 
 ::: hero
 # La sentinelle à la porte de votre application
 
-Meerkat est une **app-gateway** : un point d'entrée unique devant l'application
-interne que construisent vos équipes, qui se charge de tout ce qui n'est pas
-leur cœur de métier. Authentification, règles d'accès, organisations, routage,
-quotas, audit. Une seule image, aucune dépendance.
+Meerkat est un **proxy d'authentification et une API gateway** qui place le
+contrôle d'accès devant les applications internes que construisent vos équipes.
+Il remplace les oauth2-proxy, Keycloak et Kong que l'on assemble d'ordinaire
+autour d'elles : connexion, règles d'accès, organisations, routage, quotas,
+audit. Une seule image, aucune dépendance.
 
 - [Démarrer](/docs/start/quick-start)
 - [La voir](/showcase/index)
@@ -126,7 +127,8 @@ la gateway en cinq minutes environ.
 
 L'édition Community est toute la gateway pour une organisation sur une
 instance - en production, en entreprise, pour un usage commercial, sans rien
-payer. Lisez le code, modifiez-le, livrez-le dans votre propre produit ; deux
+payer. Elle est source-available, sous Functional Source License : lisez le
+code, modifiez-le, livrez-le dans votre propre produit ; deux
 ans après sa publication, chaque version passe sous licence Apache 2.0.
 
 Enterprise est ce qu'il vous faut dès que l'installation grandit : plusieurs
@@ -135,6 +137,10 @@ outils, plusieurs gateways derrière un même point d'entrée. Jamais une brique
 le coffre et le journal d'audit sont gratuits et le resteront. Team, c'est
 Enterprise pour un cluster de taille connue, et l'édition d'évaluation, c'est
 Enterprise avec une mention affichée, gratuite, pour tout essayer d'abord.
+
+[plug](https://softwarity.github.io/plug/), le tunnel développeur de
+Softwarity, est publié à part et tourne à côté de n'importe quelle édition ;
+l'image Enterprise embarque son agent, et la gateway sait qui est branché.
 
 [Comparer les éditions](/product/editions) . [Tarifs](/pricing/index)
 :::

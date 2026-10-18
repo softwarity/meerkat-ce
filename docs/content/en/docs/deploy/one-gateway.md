@@ -135,7 +135,7 @@ part nobody writes down - how not to turn the entry point into a single point
 of failure.
 
 ```bash
-helm repo add meerkat https://www.softwarity.io/deploy
+helm repo add meerkat https://meerkat.softwarity.dev/deploy
 
 helm install meerkat meerkat/meerkat \
   --set admin.password='your-first-password'
@@ -147,7 +147,7 @@ helm install meerkat meerkat/meerkat \
 
 # Evaluation: everything Enterprise does, public, not for production.
 helm install meerkat meerkat/meerkat \
-  -f https://www.softwarity.io/deploy/values-eval-one-node.yaml \
+  -f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml \
   --set admin.password='your-first-password'
 ```
 

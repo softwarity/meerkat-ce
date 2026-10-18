@@ -1,16 +1,17 @@
 ---
-title: The app-gateway for your internal applications
-summary: One door in front of your internal applications. It takes care of authentication, access rules, routing, quotas and audit, so your services stay lean.
+title: Authentication proxy and API gateway for internal applications
+summary: Meerkat puts sign-in, access control, organisations, routing, quotas and audit in front of your internal applications, in place of an authentication proxy, an identity server and an API gateway. One binary, no dependency.
 layout: wide
 ---
 
 ::: hero
 # The sentinel at your application's door
 
-Meerkat is an **app-gateway**: one entry point in front of the internal
-application your teams build, which takes charge of everything that is not
-their core business. Authentication, access rules, organisations, routing,
-quotas, audit. One image, zero dependency.
+Meerkat is an **authentication proxy and API gateway** that puts access
+control in front of the internal applications your teams build. It replaces
+the oauth2-proxy, Keycloak and Kong usually assembled around them: sign-in,
+access rules, organisations, routing, quotas, audit. One image, zero
+dependency.
 
 - [Get started](/docs/start/quick-start)
 - [See it](/showcase/index)
@@ -119,8 +120,8 @@ in about five minutes.
 ### Free, and not a trial
 
 The community edition is the whole gateway for one organisation on one
-instance - in production, in a company, commercially, at no cost. Read the
-code, change it, ship it inside your own product; two years after each release,
+instance - in production, in a company, commercially, at no cost. It is
+source-available under the Functional Source License: read the code, change it, ship it inside your own product; two years after each release,
 that version becomes plain Apache 2.0.
 
 Enterprise is what you need once the installation grows: several
@@ -130,6 +131,10 @@ a security primitive - TLS, two-factor, passkeys, the vault and the audit trail
 are free and stay free. Team is Enterprise for a cluster of a known size, and
 the evaluation edition is Enterprise with a notice on it, free, to try all of
 it first.
+
+[plug](https://softwarity.github.io/plug/), Softwarity's developer tunnel, is
+published on its own and runs beside any edition; the Enterprise image carries
+its agent, so the gateway knows who is plugged in.
 
 [Compare the editions](/product/editions) . [Pricing](/pricing/index)
 :::

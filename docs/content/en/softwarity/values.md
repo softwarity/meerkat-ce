@@ -44,10 +44,10 @@ read a route and know what will happen.
 
 ## Open source is a default, not a campaign
 
-What is generic gets published and maintained. What is our product has a
-licence that lets you read it, run it, change it and ship it inside your own
-work - the Functional Source License - and becomes plain Apache 2.0 two years
-after each release. The only thing it forbids is selling a competing gateway
+What is generic gets published and maintained, as open source. What is our
+product is source-available instead: a licence that lets you read it, run it,
+change it and ship it inside your own work - the Functional Source License -
+and that becomes plain Apache 2.0 two years after each release. The only thing it forbids is selling a competing gateway
 with it.
 
 > [!NOTE]

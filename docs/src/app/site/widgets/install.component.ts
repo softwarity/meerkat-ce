@@ -15,7 +15,7 @@ type Lang = 'en' | 'fr';
 type Edition = 'ce' | 'eval' | 'licensed';
 type Platform = 'docker' | 'swarm' | 'k8s';
 
-const FILES = 'https://www.softwarity.io/deploy';
+const FILES = 'https://meerkat.softwarity.dev/deploy';
 const PASSWORD = "'choose-one-now'";
 
 // The image each edition is pulled as. A licensed image is served for one

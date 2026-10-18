@@ -76,7 +76,8 @@ pris d'interface.
 
 ## Produits
 
-- **[Meerkat](https://github.com/softwarity/meerkat-ce)** - l'app-gateway à
-  laquelle ce site est consacré. Son cœur est sous Functional Source License et
+- **[Meerkat](https://github.com/softwarity/meerkat-ce)** - le proxy
+  d'authentification et l'API gateway auquel ce site est consacré. Il n'est pas
+  open source : son cœur est source-available, sous Functional Source License, et
   passe sous licence Apache 2.0 deux ans après la publication de chaque
   version ; voir [Éditions](/product/editions).

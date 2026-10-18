@@ -7,9 +7,12 @@ summary: Un point d'entrée unique devant vos applications internes, qui se char
 
 # Ce qu'est Meerkat
 
-Meerkat est une **app-gateway** : une porte unique devant les applications de
-votre organisation. Les requêtes arrivent à Meerkat, qui décide quoi en faire,
-puis les transmet.
+Meerkat est un **proxy d'authentification et une API gateway** : une porte
+unique, avec son contrôle d'accès, devant les applications de votre
+organisation. Il prend la place du proxy d'authentification, du serveur
+d'identité et de l'API gateway que l'on assemble d'ordinaire pour elles. Les
+requêtes arrivent à Meerkat, qui décide quoi en faire, puis les transmet.
+Softwarity appelle cela une app-gateway.
 
 Ce dont elle se charge, pour que vos services n'aient pas à le faire :
 

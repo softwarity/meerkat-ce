@@ -75,7 +75,8 @@ and WMO rules, not a UI opinion.
 
 ## Products
 
-- **[Meerkat](https://github.com/softwarity/meerkat-ce)** - the app-gateway
-  this site is about. Its core is under the Functional Source License and
+- **[Meerkat](https://github.com/softwarity/meerkat-ce)** - the
+  authentication proxy and API gateway this site is about. It is not open
+  source: its core is source-available under the Functional Source License and
   becomes Apache 2.0 two years after each release; see
   [Editions](/product/editions).

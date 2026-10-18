@@ -84,8 +84,8 @@ await copyFile(join(out, archive), join(out, 'meerkat-chart.tgz'));
 
 // And the index that makes /deploy a Helm REPOSITORY (DEPLOY-07):
 //
-//   helm repo add meerkat https://www.softwarity.io/deploy
-//   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ce-one-node.yaml
+//   helm repo add meerkat https://meerkat.softwarity.dev/deploy
+//   helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ce-one-node.yaml
 //
 // Written here rather than by `helm repo index`, so building the site needs no
 // helm on the machine. The format is small and fixed: one entry per chart

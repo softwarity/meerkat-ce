@@ -7,9 +7,9 @@ summary: Everything Meerkat does, how to set it up, and what each screen, predic
 
 # Documentation
 
-Meerkat is an app gateway: one door in front of your internal applications,
-which takes care of authentication, access rules, routing and observation, so
-your services do not have to.
+Meerkat is an authentication proxy and API gateway: one door in front of your
+internal applications, which takes care of authentication, access rules,
+routing and observation, so your services do not have to.
 
 ## Where to start
 

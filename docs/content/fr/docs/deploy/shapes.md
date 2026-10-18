@@ -28,12 +28,12 @@ vous avez sauvegardé la gateway.
 
 ```bash
 # Docker
-curl -fsSLO https://www.softwarity.io/deploy/docker-compose.yml
+curl -fsSLO https://meerkat.softwarity.dev/deploy/docker-compose.yml
 MEERKAT_ADMIN_PASSWORD='choose-one' docker compose up -d
 
 # Kubernetes
-helm repo add meerkat https://www.softwarity.io/deploy
-helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ce-one-node.yaml \
+helm repo add meerkat https://meerkat.softwarity.dev/deploy
+helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ce-one-node.yaml \
   --set admin.password='choose-one'
 ```
 
@@ -53,12 +53,12 @@ au registre :
 kubectl create secret docker-registry ghcr \
   --docker-server=ghcr.io --docker-username=YOU --docker-password=TOKEN
 
-helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-one-node.yaml \
+helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ee-one-node.yaml \
   --set admin.password='choose-one'
 ```
 
 Pour l'essayer d'abord, l'image d'évaluation installe la même architecture sans
-secret d'accès : `-f https://www.softwarity.io/deploy/values-eval-one-node.yaml`.
+secret d'accès : `-f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml`.
 
 ## Trois gateways, Enterprise
 
@@ -78,12 +78,12 @@ kubectl create secret generic meerkat-state \
   --from-literal=database-url='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require' \
   --from-literal=vault-key="$(openssl rand -hex 32)"
 
-helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-cluster.yaml \
+helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ee-cluster.yaml \
   --set admin.password='choose-one'
 ```
 
 Le même cluster sur l'image d'évaluation, pour l'essayer avant de l'acheter :
-`-f https://www.softwarity.io/deploy/values-eval-cluster.yaml`, avec le même Secret.
+`-f https://meerkat.softwarity.dev/deploy/values-eval-cluster.yaml`, avec le même Secret.
 
 Sur Swarm, la même architecture se déploie avec la stack ci-dessous. Swarm
 interpole les trois valeurs au moment du déploiement, à partir du shell qui
@@ -116,7 +116,7 @@ site : ce que vous téléchargez est ce que déploie la version publiée.
 
 | Fichier | Usage |
 |---|---|
-| [index.yaml](/deploy/index.yaml) | Le dépôt Helm : `helm repo add meerkat https://www.softwarity.io/deploy`. Il liste toutes les versions publiées : `helm install` prend la plus récente, et `--version 1.9.0` (ou une version épinglée dans Argo CD, Flux ou Terraform) reste installable après la release suivante |
+| [index.yaml](/deploy/index.yaml) | Le dépôt Helm : `helm repo add meerkat https://meerkat.softwarity.dev/deploy`. Il liste toutes les versions publiées : `helm install` prend la plus récente, et `--version 1.9.0` (ou une version épinglée dans Argo CD, Flux ou Terraform) reste installable après la release suivante |
 | [meerkat-chart.tgz](/deploy/meerkat-chart.tgz) | Le chart Helm, à installer tel quel |
 | [values-ce-one-node.yaml](/deploy/values-ce-one-node.yaml) | Une gateway Community sur son volume |
 | [values-ee-one-node.yaml](/deploy/values-ee-one-node.yaml) | Une gateway Enterprise, tunnel développeur ouvert |

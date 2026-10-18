@@ -1,5 +1,5 @@
 ---
-title: Éditions
+title: Éditions : Community et Enterprise
 section: Le produit
 order: 5
 summary: Ce que fait l'édition gratuite, ce qu'ajoute Enterprise, comment tout essayer, et les trois questions qui disent laquelle il vous faut.

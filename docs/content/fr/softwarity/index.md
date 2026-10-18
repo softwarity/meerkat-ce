@@ -30,8 +30,8 @@ la part qui vous appartient reste la vôtre.
 ::: cards
 ### Des produits
 
-[Meerkat](/index), l'app-gateway : une porte unique devant une application
-interne, qui se charge de l'authentification, des règles d'accès, des
+[Meerkat](/index), le proxy d'authentification et l'API gateway : une porte
+unique devant une application interne, qui se charge de l'authentification, des règles d'accès, des
 organisations, du routage, des quotas et de l'audit. Son ancêtre, **Archway**,
 faisait le même travail sur une base Spring Cloud Gateway. Il nous a appris ce
 qu'il fallait faire autrement - et jusqu'où l'idée pouvait être poussée.

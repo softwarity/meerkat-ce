@@ -48,8 +48,8 @@ quelqu'un qui la découvre puisse lire une route et savoir ce qui va se passer.
 
 ## L'open source est le choix par défaut, pas une campagne
 
-Ce qui est générique est publié et maintenu. Ce qui constitue notre produit est
-sous une licence qui vous permet de le lire, de le faire tourner, de le
+Ce qui est générique est publié et maintenu, en open source. Ce qui constitue
+notre produit est source-available : sous une licence qui vous permet de le lire, de le faire tourner, de le
 modifier et de le livrer dans vos propres réalisations - la Functional Source
 License - et passe sous licence Apache 2.0 deux ans après la publication de
 chaque version. Elle n'interdit qu'une chose : s'en servir pour vendre une

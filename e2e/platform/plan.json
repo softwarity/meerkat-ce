@@ -1745,6 +1745,17 @@
    "fr": "Le récapitulatif quotidien est envoyé UNE SEULE fois par jour sur un cluster (verrou consultatif), à l'heure configurée."
   },
   {
+   "id": "NOTIF-05",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "CE"
+   ],
+   "en": "Not built (notify users by organisation, group, role or user).",
+   "fr": "Non construite (notifier des utilisateurs par organisation, groupe, rôle ou utilisateur)."
+  },
+  {
    "id": "SCHED-01",
    "priority": "P1",
    "feasibility": "medium",

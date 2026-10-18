@@ -1,5 +1,5 @@
 ---
-title: Editions
+title: Editions: Community and Enterprise
 section: The product
 order: 5
 summary: What the free edition does, what Enterprise adds, how to try all of it, and the three questions that tell you which one you need.
