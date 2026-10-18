@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.13.0
+
 - **plug 2.30.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The roles screen says what uses each role.** A **Used by** column lists the routes and
   scheduled calls whose rules name the role (access rule, endpoint override, declared role tied
