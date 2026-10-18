@@ -15,6 +15,9 @@ interface SectionLink {
   singleOnly?: boolean;
   // bottom: pushed to the foot of the nav, a space above it.
   bottom?: boolean;
+  // plugOnly: shown while the developer tunnel is open (Enterprise image, the
+  // `plug-open` class stamped by the gateway) - see _modes.scss.
+  plugOnly?: boolean;
 }
 
 const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
@@ -94,6 +97,8 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       // applications wear, in place of their per-route user buttons.
       { path: 'portal', label: $localize`:@@Portal:Portal`, icon: 'apps' },
       { path: 'security', label: $localize`:@@Security:Security`, icon: 'shield' },
+      // Who uses the developer tunnel: only while it is open.
+      { path: 'plug', label: $localize`:@@Plug:Plug`, icon: 'power', plugOnly: true },
       // The same screen as on the infra plane: an app admin's agent needs a key
       // too, and it would otherwise have to borrow somebody else's.
       { path: 'access-tokens', label: $localize`:@@Access_tokens:Access tokens`, icon: 'key' },

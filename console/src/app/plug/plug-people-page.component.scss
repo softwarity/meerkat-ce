@@ -1,0 +1,65 @@
+:host {
+  display: block;
+}
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+}
+.banner h1 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+}
+.content {
+  padding: 0 24px 24px;
+  display: grid;
+  gap: 16px;
+  max-width: 960px;
+}
+mat-card {
+  padding: 16px 20px;
+}
+.hint {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+.group {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.devs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.devs li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.devs mat-icon {
+  color: var(--mat-sys-on-surface-variant);
+}
+.devs mat-icon.on {
+  color: var(--mat-sys-primary);
+}
+.devs .who {
+  min-width: 140px;
+}
+.devs .fp {
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}

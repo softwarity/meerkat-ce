@@ -242,6 +242,48 @@
       }
     },
     {
+      "id": "api-app-plug-developers",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/plug/developers"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Who may plug in",
+        "fr": "Qui peut se brancher"
+      },
+      "description": {
+        "en": "Who holds the developer capability, with the keys they deposited by fingerprint, and whether the tunnel is open (DEV-13). The people of the tunnel are the application's: its administrator grants the capability, so it reads this; the tunnel's switch stays the infrastructure's.",
+        "fr": "Qui détient la capacité développeur, avec les clés déposées désignées par leur empreinte, et si le tunnel est ouvert (DEV-13). Les personnes du tunnel relèvent de l'application : son administrateur accorde la capacité, c'est donc lui qui lit ceci ; l'interrupteur du tunnel reste celui de l'infrastructure."
+      }
+    },
+    {
+      "id": "api-app-plug-sessions",
+      "domain": "application",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/plug/sessions"
+      },
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Who is plugged in now",
+        "fr": "Qui est branché en ce moment"
+      },
+      "description": {
+        "en": "The plug runs open now, merged over the gateway's replicas (DEV-13), read by the administrator who can end one: the application's, who grants the developer capability.",
+        "fr": "Les runs plug ouverts en ce moment, fusionnés entre les réplicas de la passerelle (DEV-13), lus par l'administrateur qui peut en terminer un : celui de l'application, qui accorde la capacité développeur."
+      }
+    },
+    {
       "id": "api-app-roles",
       "domain": "application",
       "kind": "api",

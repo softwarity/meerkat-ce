@@ -38,7 +38,15 @@ export interface PlugState extends PlugSetting {
   // The profile the commands name: the application's name, cut down to what
   // plug accepts.
   profile: string;
-  // One per workstation: plug keeps a key pair per profile.
+}
+
+// Application, Plug (DEV-13): whether the tunnel is open, and who holds the
+// developer capability with the keys they deposited (by fingerprint). Mirrors
+// admin.plugPeople.
+export interface PlugPeople {
+  enabled: boolean;
+  devMode: boolean;
+  // One key per workstation: plug keeps a key pair per profile.
   developers: { username: string; fullname?: string; keys: { fingerprint: string; comment?: string }[] }[];
 }
 
@@ -59,6 +67,11 @@ export interface PlugSession {
   names: { name: string; parked?: boolean; ports?: string[] }[];
   // How many gateway replicas hold part of it.
   nodes: number;
+  // What the run does, said by plug 2.30.0 and later: 'serve' (plug -s) or
+  // 'client' (plug -c); absent from an older plug, which says nothing.
+  mode?: 'serve' | 'client';
+  // A --dockerrun: the session is the container's.
+  docker?: boolean;
 }
 
 // Where this gateway's traces and pushed counters go (OBS-04, OBS-06).
@@ -3471,6 +3484,10 @@ export class ApiService {
 
   setPlugSetting(cfg: PlugSetting): Observable<PlugState> {
     return this.http.put<PlugState>('/api/settings/plug', cfg);
+  }
+
+  plugDevelopers(): Observable<PlugPeople> {
+    return this.http.get<PlugPeople>('/api/plug/developers');
   }
 
   plugSessions(): Observable<PlugSession[]> {

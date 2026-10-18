@@ -11,19 +11,27 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// The developer tunnel's page (DEV-11): Infra, Plug.
+// The developer tunnel's pages: Infra, Plug (DEV-11) and Application, Plug
+// (DEV-13).
 //
-// INFRASTRUCTURE, beside developer mode rather than under it. Developer mode
-// (Application, General) is a configuration - the installation offers its
-// developers the tooling, the API docs, the simulated sign-ins. This opens a
-// port into the cluster and exercises the deployment's rights over it, which
-// is whoever runs the routing plane's decision. The tunnel runs only when
-// both say so.
+// The TUNNEL is infrastructure, beside developer mode rather than under it.
+// Developer mode (Application, General) is a configuration - the installation
+// offers its developers the tooling, the API docs, the simulated sign-ins.
+// The tunnel opens a port into the cluster and exercises the deployment's
+// rights over it, which is whoever runs the routing plane's decision. It runs
+// only when both say so.
+//
+// The PEOPLE are the application's: who holds the developer capability and
+// which key they deposited, who is plugged in now, and ending a run. The
+// capability is granted on Application, Users, and withdrawing it already
+// ends what the key holds, so the same administrator sees the runs and ends
+// one.
 func (a *API) registerPlug(mux Mux) {
 	mux.Handle("GET /api/settings/plug", a.gw(a.getPlug))
 	mux.Handle("PUT /api/settings/plug", a.infraAdmin(a.putPlug))
-	mux.Handle("GET /api/plug/sessions", a.gw(a.listPlugSessions))
-	mux.Handle("POST /api/plug/sessions/{id}/close", a.infraAdmin(a.closePlugSession))
+	mux.Handle("GET /api/plug/developers", a.appAdmin(a.listPlugDevelopers))
+	mux.Handle("GET /api/plug/sessions", a.appAdmin(a.listPlugSessions))
+	mux.Handle("POST /api/plug/sessions/{id}/close", a.appAdmin(a.closePlugSession))
 }
 
 // plugSession is one plug run as the page lists it (DEV-13): who, from which
@@ -37,7 +45,7 @@ type plugSession struct {
 }
 
 // listPlugSessions answers "who is plugged into this cluster, now".
-func (a *API) listPlugSessions(w http.ResponseWriter, r *http.Request) {
+func (a *API) listPlugSessions(w http.ResponseWriter, r *http.Request, _ store.User) {
 	out := []plugSession{}
 	if a.Served == nil {
 		writeJSON(w, http.StatusOK, out)
@@ -110,8 +118,14 @@ type plugAnswer struct {
 	// Profile is the plug profile the commands name: the application's name,
 	// cut down to what plug accepts (store.PlugProfile).
 	Profile string `json:"profile"`
-	// Developers holds the dev capability, with their key if deposited: who
-	// could plug in, and who still has a key to deposit.
+}
+
+// plugPeople is Application, Plug: whether the tunnel is open at all, and who
+// holds the developer capability, with their key if deposited - who could plug
+// in, and who still has a key to deposit.
+type plugPeople struct {
+	Enabled    bool            `json:"enabled"`
+	DevMode    bool            `json:"devMode"`
 	Developers []plugDeveloper `json:"developers"`
 }
 
@@ -135,12 +149,19 @@ func (a *API) plugState(r *http.Request) (plugAnswer, error) {
 		DevMode: a.st.DevMode(ctx),
 		Status:  devtunnel.CurrentStatus(), Version: devtunnel.ClientVersion(),
 		DefaultPort: store.DefaultPlugPort, DataOrigin: a.dataOrigin(r), Profile: a.st.PlugProfile(ctx),
-		Developers: []plugDeveloper{},
 	}
 	out.Address.Host, out.Address.Port, out.Exposure = devtunnel.Address(ctx, out.PlugSetting)
+	return out, nil
+}
+
+func (a *API) listPlugDevelopers(w http.ResponseWriter, r *http.Request, _ store.User) {
+	ctx := r.Context()
+	out := plugPeople{Enabled: edition.Enterprise && a.st.Plug(ctx).Enabled, DevMode: a.st.DevMode(ctx),
+		Developers: []plugDeveloper{}}
 	devs, err := a.st.Developers(ctx)
 	if err != nil {
-		return out, err
+		a.internal(w, err)
+		return
 	}
 	for _, d := range devs {
 		p := plugDeveloper{Username: d.Username, Fullname: d.Fullname, Keys: []plugKey{}}
@@ -151,7 +172,7 @@ func (a *API) plugState(r *http.Request) (plugAnswer, error) {
 		}
 		out.Developers = append(out.Developers, p)
 	}
-	return out, nil
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *API) getPlug(w http.ResponseWriter, r *http.Request) {

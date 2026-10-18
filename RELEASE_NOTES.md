@@ -8,12 +8,18 @@
   to it), read off the configuration rather than typed, so it never drifts from it; a filter in
   the banner narrows the catalogue to what one route or schedule relies on. Tags stay what an
   operator writes. `GET /api/roles` and `list_roles` carry it as `usedBy`, and a write ignores it.
-- **Who is plugged in, and a way to end it.** Infra, Plug lists the plug runs open now, one row
+- **Who is plugged in, and a way to end it.** Application, Plug (Enterprise, while the tunnel is
+  open, for the application administrator who grants the developer capability) lists the plug
+  runs open now, and who may plug in with their keys, one row
   per run however many replicas its connections landed on: the developer, where
   from, which plug, when it was plugged in, and what it serves - or "client only". **End this session** stops
   the developer's command as a Ctrl-C would, with the reason in their terminal, and puts back at
   once what it had set aside, on every replica. Removing a key, the developer capability, or the
   account ends what that key holds at once, whichever screen did it.
+- **A plug run says what it is** (plug 2.30.0 and later): serving or client only, and whether it
+  is a `--dockerrun` (the Docker logo beside its version), on the plugged-in list and in the
+  trail's opening line. Each name served says whether the run parked the cluster's service or
+  added a name the cluster did not have.
 - **plug in the audit trail.** Under **plug**: each run's opening and end, once whatever the
   number of replicas, with how it ended and how long it lasted, and each name served and given
   back.

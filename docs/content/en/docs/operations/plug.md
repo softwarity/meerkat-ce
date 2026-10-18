@@ -215,14 +215,17 @@ The details, and the other symptoms, are in plug's documentation:
 
 ## Who is plugged in
 
-Infra, Plug lists who is plugged into the cluster now: one row per plug run
+**Application, Plug** lists who is plugged into the cluster now: one row per plug run
 (`plug -s`, or `plug -c` for a client that only consumes), with the developer,
 the address it came from, the plug version, the time it was plugged in, and the names it serves.
 Each name served carries a small grid, the cluster, with the run's square
 coloured. In the grid: the run has parked the deployed service, the cluster's
 own is set aside and the workstation answers in its place. Turned and set beside
 it: a name the cluster did not have, which the run adds. The audit trail says
-the same of each name served.
+the same of each name served. From plug 2.30.0 a run also says what it is: a
+`plug -s` that has not served its name yet reads *nothing served yet* rather than
+*client only*, and a `--dockerrun` carries the Docker logo beside its plug
+version. An older plug says neither, and a run without a name reads as a client.
 A run whose connections landed on several replicas of the gateway is still one
 row.
 
@@ -236,8 +239,14 @@ the key is.
 Removing the key on the profile, the developer capability on the account, or
 disabling or deleting the account ends at once what that key has open, whichever
 screen did it, and the developer reads why. Turning either switch off closes the
-tunnel. Nothing was issued that would outlive it. Infra, Plug lists who holds the
+tunnel. Nothing was issued that would outlive it. Application, Plug lists who holds the
 capability, with the fingerprint of their key or the fact that they have none yet.
+
+The people are the application's, the tunnel the infrastructure's. **Application,
+Plug** - who holds the capability, who is plugged in now, ending a run - is the
+application administrator's, the one who grants the capability on Application,
+Users; its entry exists in the Enterprise image while the tunnel is open. **Infra,
+Plug** keeps the switch, the address and the commands.
 
 ## In the audit trail
 

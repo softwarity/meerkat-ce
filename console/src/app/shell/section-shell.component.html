@@ -11,6 +11,7 @@
         class="section-link"
         [attr.any-role]="s.roles || null"
         [attr.single-tenant-only]="s.singleOnly ? '' : null"
+        [attr.plug-open-only]="s.plugOnly ? '' : null"
       >
         <mat-icon>{{ s.icon }}</mat-icon>
         <span>{{ s.label }}</span>

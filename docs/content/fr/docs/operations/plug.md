@@ -216,14 +216,17 @@ Le détail, et les autres symptômes, sont dans la documentation de plug :
 
 ## Qui est branché
 
-La page Infra, Plug liste qui est branché sur le cluster en ce moment : une ligne par run
+La page **Application, Plug** liste qui est branché sur le cluster en ce moment : une ligne par run
 plug (`plug -s`, ou `plug -c` pour un client qui consomme sans rien remplacer), avec le
 développeur, l'adresse
 d'origine, la version de plug, l'heure de début et les noms servis. Chaque nom servi porte une
 petite grille, le cluster, où la case du run est colorée. Dans la grille : le run a parqué
 le service déployé, celui du cluster est mis de côté et le poste répond à sa place.
 Tournée et posée à côté : un nom que le cluster n'avait pas, et que le run ajoute. Le journal d'audit dit la même chose de chaque nom
-servi. Un run dont les connexions sont arrivées sur plusieurs réplicas de la passerelle
+servi. À partir de plug 2.30.0, un run dit aussi ce qu'il est : un `plug -s` qui n'a pas
+encore servi son nom affiche *nothing served yet* plutôt que *client only*, et un
+`--dockerrun` porte le logo Docker à côté de sa version de plug. Un plug plus ancien ne dit
+ni l'un ni l'autre, et un run sans nom se lit comme un client. Un run dont les connexions sont arrivées sur plusieurs réplicas de la passerelle
 reste une seule ligne.
 
 **Terminer la session** arrête la commande du développeur comme un Ctrl-C, avec la raison
@@ -236,9 +239,15 @@ tant que la clé l'est.
 Retirer la clé du profil, retirer la capacité développeur du compte, désactiver ou
 supprimer le compte ferme aussitôt ce que cette clé tient ouvert, quel que soit l'écran qui
 l'a fait, et le développeur lit pourquoi. Désactiver l'un des deux interrupteurs ferme le
-tunnel. Rien n'a été émis qui puisse survivre à ce retrait. La page Infra, Plug liste ceux
-qui détiennent la capacité, avec l'empreinte de leur clé, ou la mention qu'ils n'en ont pas
-encore.
+tunnel. Rien n'a été émis qui puisse survivre à ce retrait. La page Application, Plug liste
+ceux qui détiennent la capacité, avec l'empreinte de leur clé, ou la mention qu'ils n'en ont
+pas encore.
+
+Les personnes relèvent de l'application, le tunnel de l'infrastructure. **Application, Plug**
+(qui détient la capacité, qui est branché, terminer un run) appartient à l'administrateur
+de l'application, celui qui accorde la capacité dans Application, Users ; son entrée existe
+dans l'image Enterprise tant que le tunnel est ouvert. **Infra, Plug** garde
+l'interrupteur, l'adresse et les commandes.
 
 ## Dans le journal d'audit
 

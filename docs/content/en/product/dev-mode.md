@@ -94,7 +94,7 @@ the one the console and the [AI agent](/docs/agent/overview) use.
 
 ## Who is plugged in, and the trail
 
-Infra, Plug lists who is plugged into the cluster now, run by run, with what
+Application, Plug lists who is plugged into the cluster now, run by run, with what
 each serves, and ends a session in one click: the developer's command stops,
 and the service set aside comes back at once. The
 [audit trail](/docs/operations/audit) keeps each run's opening and end and each

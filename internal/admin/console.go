@@ -262,6 +262,11 @@ func consoleBodyAttrs(r *http.Request, st *store.Store, sm *session.Manager) str
 	// instance, so the only question a stylesheet can ask is which image this is.
 	if edition.Enterprise {
 		roles = append(roles, "ee")
+		// The developer tunnel open: Application, Plug is about who uses it,
+		// and has nothing to say while it is closed.
+		if st.Plug(r.Context()).Enabled {
+			roles = append(roles, "plug-open")
+		}
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, `class="%s"`, strings.Join(roles, " "))

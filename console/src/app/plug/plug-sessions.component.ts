@@ -70,7 +70,11 @@ import { LiveChangesService } from '../shared/live-changes.service';
                 <code class="name">{{ n.name }}</code>
               </span>
             } @empty {
-              <span class="sub" i18n="@@Plug_session_client_only">client only</span>
+              @if (s.mode === 'serve') {
+                <span class="sub" i18n="@@Plug_session_nothing_served_yet">nothing served yet</span>
+              } @else {
+                <span class="sub" i18n="@@Plug_session_client_only">client only</span>
+              }
             }
           </td>
         </ng-container>
@@ -79,8 +83,20 @@ import { LiveChangesService } from '../shared/live-changes.service';
           <td mat-cell *matCellDef="let s">
             <span class="two-line">
               <span class="mono">{{ s.from || '-' }}</span>
-              @if (s.version) {
-                <span class="sub">plug {{ s.version }}</span>
+              @if (s.version || s.docker) {
+                <span class="sub version">
+                  @if (s.version) {
+                    plug {{ s.version }}
+                  }
+                  @if (s.docker) {
+                    <mat-icon
+                      class="docker"
+                      svgIcon="docker"
+                      i18n-matTooltip="@@Plug_session_docker"
+                      matTooltip="Runs in a container (--dockerrun)"
+                    />
+                  }
+                </span>
               }
             </span>
           </td>

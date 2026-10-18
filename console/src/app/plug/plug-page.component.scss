@@ -127,30 +127,8 @@ a {
   line-height: 1.5;
   font-size: 0.9em;
 }
-.devs {
-  list-style: none;
+.people {
   margin: 0;
-  padding: 0;
-}
-.devs li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
-}
-.devs mat-icon {
-  color: var(--mat-sys-on-surface-variant);
-}
-.devs mat-icon.on {
-  color: var(--mat-sys-primary);
-}
-.devs .who {
-  min-width: 140px;
-}
-.devs .fp {
-  font-size: 0.75rem;
-  overflow-wrap: anywhere;
 }
 .profile {
   display: block;

@@ -38,6 +38,45 @@ type Session struct {
 	From    string    `json:"from,omitempty"`
 	Version string    `json:"version,omitempty"`
 	Since   time.Time `json:"since"`
+	// Mode is what the run does: "serve" (plug -s) or "client" (plug -c),
+	// "" when its plug is too old to say (before 2.30.0), and the list then
+	// reads a run without a name as a client, as it always did.
+	Mode string `json:"mode,omitempty"`
+	// Docker is a --dockerrun: the session is the container's sidecar, the
+	// workstation that started it presents none.
+	Docker bool `json:"docker,omitempty"`
+}
+
+// Run modes, as plug 2.30.0 and later say them.
+const (
+	ModeServe  = "serve"
+	ModeClient = "client"
+)
+
+// SaysItsMode is whether a plug of this version tells its mode: before
+// 2.30.0 a client presented an id and a version only, so "not serving" meant
+// nothing.
+func SaysItsMode(version string) bool {
+	var major, minor int
+	if _, err := fmt.Sscanf(strings.TrimPrefix(version, "v"), "%d.%d", &major, &minor); err != nil {
+		return false
+	}
+	return major > 2 || major == 2 && minor >= 30
+}
+
+// modeText is the mode as the trail says it, empty when it is not known.
+func (s Session) modeText() string {
+	var parts []string
+	switch s.Mode {
+	case ModeServe:
+		parts = append(parts, "serves names")
+	case ModeClient:
+		parts = append(parts, "client only")
+	}
+	if s.Docker {
+		parts = append(parts, "in a --dockerrun container")
+	}
+	return strings.Join(parts, ", ")
 }
 
 // Control is the agent's hand, registered by the Enterprise package while its
@@ -166,8 +205,11 @@ func (r *Registry) SessionOpened(s Session) {
 		return
 	}
 	if first {
-		r.audit(ctx, "plug.session.open", s.Who, s.ID, r.workstation(ctx, s.Who, s.Key), s.From,
-			fmt.Sprintf("from %s, plug %s, key %s", orDash(s.From), orDash(s.Version), orDash(s.Key)))
+		detail := fmt.Sprintf("from %s, plug %s, key %s", orDash(s.From), orDash(s.Version), orDash(s.Key))
+		if mode := s.modeText(); mode != "" {
+			detail = mode + "; " + detail
+		}
+		r.audit(ctx, "plug.session.open", s.Who, s.ID, r.workstation(ctx, s.Who, s.Key), s.From, detail)
 	}
 }
 

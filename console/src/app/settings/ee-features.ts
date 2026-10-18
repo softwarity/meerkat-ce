@@ -83,7 +83,7 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
   'DEV-02': {
     label: $localize`:@@EE_DEV_02:Developer keys`,
     what: $localize`:@@EE_DEV_02_what:Each developer registers the SSH keys of their machines, one per machine.`,
-    where: '/infra/plug',
+    where: '/application/plug',
     whereLabel: $localize`:@@Plug:Plug`,
   },
   'DEV-03': {
@@ -123,7 +123,7 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
   'DEV-13': {
     label: $localize`:@@EE_DEV_13:Plug sessions`,
     what: $localize`:@@EE_DEV_13_what:Who is plugged into the cluster now, and ending a session in one click.`,
-    where: '/infra/plug',
+    where: '/application/plug',
     whereLabel: $localize`:@@Plug:Plug`,
   },
   'DEV-14': {

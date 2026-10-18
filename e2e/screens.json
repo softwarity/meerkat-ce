@@ -158,6 +158,15 @@
       ]
     },
     {
+      "path": "/application/plug",
+      "module": "./plug/plug-people-page.component",
+      "title": "Plug",
+      "allowed": [
+        "root",
+        "app-admin"
+      ]
+    },
+    {
       "path": "/application/general",
       "module": "./settings/general-page.component",
       "title": "General",

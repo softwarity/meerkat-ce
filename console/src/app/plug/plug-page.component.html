@@ -247,37 +247,14 @@
   </mat-card>
 
 
-  @if (s.enterprise) {
-    <mat-card appearance="outlined">
-      <app-plug-sessions />
-    </mat-card>
-  }
-
-  <mat-card appearance="outlined">
-  <!-- Who could plug in. The capability is granted on Users (application);
-       the key is theirs to deposit - so the list says who still has to. -->
-  <h3 class="group" i18n="@@Plug_group_developers">Developers</h3>
-  @if (s.developers.length === 0) {
-    <p class="hint" i18n="@@Plug_no_developers">
-      Nobody holds the developer capability yet. Grant it in
-      <a routerLink="/application/users">Application, Users</a>.
+  <!-- Who uses the tunnel is the application's: Application, Plug, an
+       entry that exists while the tunnel is open. -->
+  @if (s.enterprise && s.enabled) {
+    <p class="hint people" i18n="@@Plug_people_moved">
+      Who may plug in, who is plugged in now and ending a session are on
+      <a routerLink="/application/plug">Application, Plug</a>.
     </p>
-  } @else {
-    <ul class="devs">
-      @for (d of s.developers; track d.username) {
-        <li>
-          <mat-icon [class.on]="d.keys.length > 0">{{ d.keys.length ? 'key' : 'key_off' }}</mat-icon>
-          <span class="who">{{ d.fullname || d.username }}</span>
-          @for (k of d.keys; track k.fingerprint) {
-            <code class="fp" [title]="k.comment ?? ''">{{ k.fingerprint }}</code>
-          } @empty {
-            <span class="muted" i18n="@@Plug_no_key">no key deposited yet</span>
-          }
-        </li>
-      }
-    </ul>
   }
-  </mat-card>
 }
 </div>
 

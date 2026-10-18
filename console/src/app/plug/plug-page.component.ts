@@ -13,7 +13,6 @@ import { ApiService, PlugState } from '../api.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
 import { FormFieldComponent } from '../shared/form-field.component';
 import { SnippetComponent } from '../shared/snippet.component';
-import { PlugSessionsComponent } from './plug-sessions.component';
 
 // The developer tunnel (DEV-11): Infra, Plug.
 //
@@ -38,7 +37,6 @@ type Os = 'macos' | 'linux' | 'windows';
     MatInputModule,
     MatSlideToggleModule,
     MatSidenavModule,
-    PlugSessionsComponent,
     RouterLink,
     SnippetComponent,
   ],
@@ -134,6 +132,9 @@ export class PlugPageComponent {
 
   private take(s: PlugState) {
     this.state.set(s);
+    // Application, Plug exists while the tunnel is open: its nav entry
+    // follows the switch here at once (the gateway stamps it at load).
+    document.body.classList.toggle('plug-open', s.enterprise && s.enabled);
     this.host.set(s.host || s.address.host);
     this.port.set(s.port || s.address.port);
     this.profile.set(s.profile);

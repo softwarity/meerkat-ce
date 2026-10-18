@@ -250,6 +250,14 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/general-page.component').then((m) => m.GeneralPageComponent),
       },
       {
+        // The developer tunnel's PEOPLE (DEV-13): who may plug in, who is
+        // plugged in now, ending a run. The tunnel itself is Infra, Plug.
+        path: 'plug',
+        canActivate: [appOnly],
+        loadComponent: () =>
+          import('./plug/plug-people-page.component').then((m) => m.PlugPeoplePageComponent),
+      },
+      {
         // Groups, Members and the rules administer the SERVED organisation -
         // the one single mode never names. They are app-scoped screens, not
         // organisation ones.

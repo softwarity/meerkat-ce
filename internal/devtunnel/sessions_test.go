@@ -75,8 +75,8 @@ func TestARunSpreadOverReplicasIsOneSession(t *testing.T) {
 		nodes[node] = r
 	}
 	a, b := nodes["a"], nodes["b"]
-	run := Session{ID: "run-1", Who: "alice", Key: "SHA256:abc", From: "10.0.0.9:51000", Version: "2.29.0",
-		Since: time.Now().Add(-time.Minute)}
+	run := Session{ID: "run-1", Who: "alice", Key: "SHA256:abc", From: "10.0.0.9:51000", Version: "2.30.0",
+		Since: time.Now().Add(-time.Minute), Mode: ModeServe, Docker: true}
 
 	a.SessionOpened(run)
 	later := run
@@ -86,7 +86,8 @@ func TestARunSpreadOverReplicasIsOneSession(t *testing.T) {
 		t.Fatalf("a run on two replicas opened %d times in the trail, want 1", n)
 	}
 	if got := tr.of("plug.session.open")[0]; got.IP != "10.0.0.9" || got.ActorName != "alice" ||
-		!strings.Contains(got.Detail, "plug 2.29.0") {
+		!strings.Contains(got.Detail, "plug 2.30.0") ||
+		!strings.HasPrefix(got.Detail, "serves names, in a --dockerrun container; ") {
 		t.Errorf("the opening line: %+v", got)
 	}
 
@@ -151,5 +152,24 @@ func TestASilentReplicaLetsGoOfItsSessions(t *testing.T) {
 	ends := tr.of("plug.session.close")
 	if len(ends) != 1 || !strings.Contains(ends[0].Detail, "ended: dropped") {
 		t.Fatalf("the silent replica's run: %+v", ends)
+	}
+}
+
+// A plug that does not say its mode is not taken for a client: before 2.30.0
+// "not serving" was simply not said.
+func TestOnlyAPlugThatSaysItsModeIsReadAsAClient(t *testing.T) {
+	for v, want := range map[string]bool{
+		"2.30.0": true, "2.30.0-hosted": true, "v2.31.1": true, "3.0.0": true,
+		"2.29.0-hosted": false, "1.40.0": false, "": false, "dev": false,
+	} {
+		if got := SaysItsMode(v); got != want {
+			t.Errorf("SaysItsMode(%q) = %v, want %v", v, got, want)
+		}
+	}
+	if got := (Session{Mode: ModeClient}).modeText(); got != "client only" {
+		t.Errorf("a client: %q", got)
+	}
+	if got := (Session{}).modeText(); got != "" {
+		t.Errorf("a mode nobody said: %q, want nothing", got)
 	}
 }

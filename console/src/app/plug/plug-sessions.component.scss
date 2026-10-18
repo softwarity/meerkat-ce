@@ -77,3 +77,14 @@ tr.mat-mdc-row:hover {
   stroke: var(--mat-sys-primary);
   stroke-width: 2.4;
 }
+// The plug version, and the container a --dockerrun runs in.
+.version {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.docker {
+  width: 16px;
+  height: 16px;
+  color: #2496ed;
+}

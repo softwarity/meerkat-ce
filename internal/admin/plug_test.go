@@ -14,9 +14,10 @@ import (
 )
 
 // The tunnel's switch and the address developers type are the routing
-// plane's: an infra admin sets them, an application admin does not, and the
-// page lists who holds the developer capability and whether they deposited a
-// key - by fingerprint, never the key.
+// plane's: an infra admin sets them, an application admin does not. Who holds
+// the developer capability, and whether they deposited a key - by
+// fingerprint, never the key - is the application's: its admin reads it, the
+// infra admin does not.
 func TestThePlugSettingBelongsToInfra(t *testing.T) {
 	f := setupEE(t)
 	ctx := context.Background()
@@ -55,10 +56,31 @@ func TestThePlugSettingBelongsToInfra(t *testing.T) {
 	if !got.Enabled || got.Host != "dev.example.com" || got.Port != 30222 || got.DefaultPort != 22222 {
 		t.Errorf("the answer does not say what was decided: %s", out)
 	}
-	if len(got.Developers) != 2 {
+	if strings.Contains(out, `"developers"`) {
+		t.Errorf("the tunnel's answer still lists the people: %s", out)
+	}
+
+	if code, _ := f.call(t, "GET", "/api/plug/developers", "", infraC); code != http.StatusForbidden {
+		t.Errorf("an infra admin read the developers: %d", code)
+	}
+	if code, _ := f.call(t, "GET", "/api/plug/sessions", "", infraC); code != http.StatusForbidden {
+		t.Errorf("an infra admin read who is plugged in: %d", code)
+	}
+	if code, _ := f.call(t, "POST", "/api/plug/sessions/x/close", "", infraC); code != http.StatusForbidden {
+		t.Errorf("an infra admin ended a session: %d", code)
+	}
+	code, out = f.call(t, "GET", "/api/plug/developers", "", appC)
+	if code != http.StatusOK {
+		t.Fatalf("the application admin was refused the developers: %d %s", code, out)
+	}
+	var people plugPeople
+	if err := json.Unmarshal([]byte(out), &people); err != nil {
+		t.Fatal(err)
+	}
+	if !people.Enabled || len(people.Developers) != 2 {
 		t.Fatalf("developers: %s", out)
 	}
-	for _, d := range got.Developers {
+	for _, d := range people.Developers {
 		switch d.Username {
 		case "devon":
 			if len(d.Keys) != 1 || !strings.HasPrefix(d.Keys[0].Fingerprint, "SHA256:") || d.Keys[0].Comment != "devon@laptop" {

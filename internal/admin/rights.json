@@ -556,13 +556,18 @@
   },
   {
     "method": "GET",
+    "path": "/api/plug/developers",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/plug/sessions",
-    "guard": "gw"
+    "guard": "appAdmin"
   },
   {
     "method": "POST",
     "path": "/api/plug/sessions/{id}/close",
-    "guard": "infraAdmin"
+    "guard": "appAdmin"
   },
   {
     "method": "GET",

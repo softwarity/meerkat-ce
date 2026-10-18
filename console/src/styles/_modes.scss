@@ -85,3 +85,13 @@ body:not(.ee) [ee-feature] app-ee-lock {
 // On the Enterprise image the badge stays, as a quiet "EE" (the component
 // picks its form): everything is unlocked there, and without it nobody could
 // tell what the licence bought.
+
+// ── What exists only while the developer tunnel is open ───────────────────────
+//
+// Application, Plug lists who uses the tunnel, and has nothing to say while it
+// is closed. `plug-open` is stamped by the gateway (Enterprise image, tunnel
+// switched on) like `ee`, so the entry is right on the first paint; Infra,
+// Plug sets and clears it when its switch moves.
+body:not(.plug-open) [plug-open-only] {
+  display: none !important;
+}

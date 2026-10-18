@@ -97,7 +97,7 @@ l'[agent IA](/docs/agent/overview).
 
 ## Qui est branché, et le journal
 
-La page Infra, Plug liste qui est branché sur le cluster en ce moment, run par
+La page Application, Plug liste qui est branché sur le cluster en ce moment, run par
 run, avec ce que chacun sert, et termine une session en un clic : la commande du
 développeur s'arrête, et le service mis de côté revient aussitôt. Le
 [journal d'audit](/docs/operations/audit) garde l'ouverture et la fin de chaque
