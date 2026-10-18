@@ -13,7 +13,7 @@ ARG NODE_VERSION=24
 # A RELEASE, pinned. The bare `hosted` tag is moved by plug's CI on every push
 # to its main branch, so an image built from it carries whatever plug was
 # being worked on that morning. Bump this line when plug publishes a release.
-ARG PLUG_VERSION=2.29.0-hosted
+ARG PLUG_VERSION=2.30.0-hosted
 ARG EDITION=ce
 
 # ONE build for every architecture: the console and the binary are made on the
