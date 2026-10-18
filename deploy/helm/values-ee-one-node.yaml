@@ -2,8 +2,8 @@
 #
 #   kubectl create secret docker-registry ghcr \
 #     --docker-server=ghcr.io --docker-username=USER --docker-password=TOKEN
-#   helm repo add meerkat https://www.softwarity.io/deploy
-#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-one-node.yaml \
+#   helm repo add meerkat https://meerkat.softwarity.dev/deploy
+#   helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ee-one-node.yaml \
 #     --set admin.password='choose-one'
 #
 # Same shape as the community one - a single pod on its volume - with the

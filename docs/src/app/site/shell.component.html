@@ -112,7 +112,7 @@
           <div class="foot-made">
             <img src="img/softwarity.svg" alt="Softwarity" />
             <span>{{ words().madeBy }}</span>
-            <a href="https://www.softwarity.io/" target="_blank" rel="noopener">Softwarity</a>
+            <a [routerLink]="path('softwarity/index')" [queryParams]="langQuery()">Softwarity</a>
           </div>
         </footer>
       </div>

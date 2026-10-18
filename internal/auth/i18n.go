@@ -362,7 +362,7 @@ var schemePaths = map[string]string{
 // templates for a string that happens to be spelt the same in each.
 const (
 	MarkText = "powered by softwarity/meerkat"
-	MarkURL  = "https://softwarity.io/meerkat"
+	MarkURL  = "https://meerkat.softwarity.dev/"
 )
 
 // markHidden: the integrator asked for the mark to go AND holds the right to

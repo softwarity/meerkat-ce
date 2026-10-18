@@ -2,7 +2,7 @@
 
 > The sentinel at your application's door.
 
-[![plug](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.softwarity.io%2Fassets%2Fplug.json&query=%24.version&label=plug&color=7c3aed)](https://softwarity.github.io/plug/)
+[![plug](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmeerkat.softwarity.dev%2Fassets%2Fplug.json&query=%24.version&label=plug&color=7c3aed)](https://softwarity.github.io/plug/)
 
 **Meerkat is an authentication proxy and API gateway that puts access control
 in front of your internal applications.** It signs people in, decides who may
@@ -105,4 +105,4 @@ The Enterprise code is not in this repository. It is available to customers
 under a Softwarity commercial license; see
 [the editions](https://meerkat.softwarity.dev/product/editions/).
 
-Edited by [Softwarity](https://www.softwarity.io/).
+Edited by [Softwarity](https://meerkat.softwarity.dev/softwarity/).

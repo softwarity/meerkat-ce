@@ -3,8 +3,8 @@
 #   kubectl create secret generic meerkat-state \
 #     --from-literal=database-url='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require' \
 #     --from-literal=vault-key="$(openssl rand -hex 32)"
-#   helm repo add meerkat https://www.softwarity.io/deploy
-#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-ee-cluster.yaml \
+#   helm repo add meerkat https://meerkat.softwarity.dev/deploy
+#   helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ee-cluster.yaml \
 #     --set admin.password='choose-one'
 #
 # What makes three pods ONE gateway is the shared database, and nothing else:

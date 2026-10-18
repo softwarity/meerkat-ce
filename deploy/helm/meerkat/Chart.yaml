@@ -5,7 +5,7 @@ type: application
 version: 1.13.0
 # The image tag the chart defaults to. Override image.tag to pin a release.
 appVersion: "1.13.0"
-home: https://www.softwarity.io/
+home: https://meerkat.softwarity.dev/
 sources:
   - https://github.com/softwarity/meerkat-ce
 maintainers:

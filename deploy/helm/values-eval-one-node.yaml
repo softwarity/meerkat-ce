@@ -1,7 +1,7 @@
 # Meerkat, evaluation edition, one gateway, with the developer tunnel open.
 #
-#   helm repo add meerkat https://www.softwarity.io/deploy
-#   helm install meerkat meerkat/meerkat -f https://www.softwarity.io/deploy/values-eval-one-node.yaml \
+#   helm repo add meerkat https://meerkat.softwarity.dev/deploy
+#   helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml \
 #     --set admin.password='choose-one'
 #
 # The Enterprise image with nothing taken out, public, and with an evaluation

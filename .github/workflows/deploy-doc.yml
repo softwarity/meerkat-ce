@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 # The site is published from the PUBLIC mirror, softwarity/meerkat-ce, at its
-# custom domain (www.softwarity.io) - the address says what it is whichever
+# custom domain (meerkat.softwarity.dev) - the address says what it is whichever
 # repository serves it.
 #
 # It was published from the private tree for a while, so the front door would
@@ -64,7 +64,7 @@ jobs:
 
       - name: Build doc-site for GitHub Pages
         working-directory: docs
-        # The ROOT, because the site answers on www.softwarity.io rather than
+        # The ROOT, because the site answers on meerkat.softwarity.dev rather than
         # under a repository path. This is not cosmetic: with /meerkat/ baked
         # in, every asset lands one directory beside itself and the page
         # renders black. The CNAME that names the domain rides in the artifact

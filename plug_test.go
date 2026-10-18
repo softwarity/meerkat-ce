@@ -39,7 +39,7 @@ func TestThePlugReleaseIsTheOneOfPlugJSON(t *testing.T) {
 	if m == nil || m[1] != pin.Commit[:12] {
 		t.Errorf("go.mod links the plug agent at %v, not at %s (v%s): run make plug V=%s", m, pin.Commit[:12], pin.Version, pin.Version)
 	}
-	if !strings.Contains(read("README.md"), "www.softwarity.io%2Fassets%2Fplug.json") {
+	if !strings.Contains(read("README.md"), "meerkat.softwarity.dev%2Fassets%2Fplug.json") {
 		t.Error("README.md has lost the badge that reads the site's assets/plug.json")
 	}
 }
