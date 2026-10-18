@@ -75,8 +75,9 @@ line, what is missing from each.
   rather than refusing, and counters that stay right across a cluster.
 - **Dev mode** - the tunnel works, sign-in halts on a page naming what is
   substituted and by whom, and a strip says it again while you work. What is
-  missing is the console screen listing live sessions, and the audit of each
-  substitution (a key deposited is already audited).
+  missing is reading a workload's environment and mounting its volumes in the
+  audit trail; who is plugged in, ending a session, and each run and name
+  served are there.
 - **Notifications** - the SMTP relay is shipped, with one template in the
   theme's colours, and the daily summary of accesses about to close goes out on
   its own. What is missing is one template per event, each of them translated.

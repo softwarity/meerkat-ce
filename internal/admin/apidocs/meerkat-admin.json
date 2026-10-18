@@ -667,12 +667,23 @@
       "Role": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "readOnly": true },
-          "name": { "type": "string" },
+          "name": { "type": "string", "description": "The role's identity: it cannot be renamed" },
           "description": { "type": "string" },
-          "parentId": { "type": "string", "description": "\"\" = top-level; holding a role grants every descendant" },
+          "parent": { "type": "string", "description": "\"\" = top-level; holding a role grants every descendant" },
           "tags": { "type": "array", "items": { "type": "string" } },
-          "system": { "type": "boolean", "readOnly": true }
+          "system": { "type": "boolean", "readOnly": true },
+          "usedBy": {
+            "type": "array", "readOnly": true,
+            "description": "The routes and schedules whose rules name this role, read off the configuration; ignored on a write",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "enum": ["route", "schedule"] },
+                "id": { "type": "string" },
+                "name": { "type": "string" }
+              }
+            }
+          }
         },
         "required": ["name"]
       },

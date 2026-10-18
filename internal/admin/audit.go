@@ -100,6 +100,11 @@ func (a *API) audit(ctx context.Context, ev store.AuditEvent) {
 	a.changed(ctx, ev)
 }
 
+// Record writes one event through the funnel, for what happens outside an
+// endpoint of this API - the developer tunnel's sessions (DEV-14) - and must
+// still reach the trail and the console's live channel.
+func (a *API) Record(ctx context.Context, ev store.AuditEvent) { a.audit(ctx, ev) }
+
 // changed publishes one event to the screens of this node, and to the other
 // nodes' screens through the bus.
 //

@@ -19,6 +19,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/cluster"
+	"github.com/softwarity/meerkat/internal/devtunnel"
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
@@ -38,6 +39,9 @@ type API struct {
 	// server-to-server endpoints, and their place in the discovery document.
 	// Nil, or the community image's absent one, adds nothing.
 	OIDC oidcprovider.Provider
+	// Served is what the developer tunnel serves and who is plugged in
+	// (DEV-11, DEV-13), merged over the nodes; nil in tests that do not care.
+	Served *devtunnel.Registry
 	// Mailer sends outbound e-mail through the STORED config; nil answers "not
 	// configured". Wired by main, faked in tests.
 	Mailer func(ctx context.Context, msg mail.Message) error

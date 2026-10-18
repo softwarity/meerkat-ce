@@ -120,6 +120,18 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     where: '/infra/plug',
     whereLabel: $localize`:@@Plug:Plug`,
   },
+  'DEV-13': {
+    label: $localize`:@@EE_DEV_13:Plug sessions`,
+    what: $localize`:@@EE_DEV_13_what:Who is plugged into the cluster now, and ending a session in one click.`,
+    where: '/infra/plug',
+    whereLabel: $localize`:@@Plug:Plug`,
+  },
+  'DEV-14': {
+    label: $localize`:@@EE_DEV_14:Tunnel audit`,
+    what: $localize`:@@EE_DEV_14_what:Each plug run and each name served, in the audit trail.`,
+    where: '/system/audit',
+    whereLabel: $localize`:@@Audit:Audit`,
+  },
   'CFG-07': {
     label: $localize`:@@EE_CFG_07:Configurations in git`,
     what: $localize`:@@EE_CFG_07_what:Keep configurations in a git repository, exported under your own name.`,

@@ -208,6 +208,9 @@ var auditTargets = map[string]AuditTarget{
 	// An application signing its people in against this gateway (SAUTH-05),
 	// declared beside the issuer and the signing keys.
 	"oidc-client": {Domains: []string{AuditDomainInfra}},
+	// The developer tunnel's sessions (DEV-13, DEV-14): who plugged in, what they
+	// served, how it ended. The tunnel is the routing plane's (Infra, Plug).
+	"plug": {Domains: []string{AuditDomainInfra}},
 	// The application's identity and appearance: what an app-admin runs.
 	"theme":    {Domains: []string{AuditDomainApp}},
 	"locale":   {Domains: []string{AuditDomainApp}},

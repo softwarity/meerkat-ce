@@ -42,6 +42,25 @@ export interface PlugState extends PlugSetting {
   developers: { username: string; fullname?: string; keys: { fingerprint: string; comment?: string }[] }[];
 }
 
+// One plug run (DEV-13), merged over the gateway's replicas. Mirrors
+// admin.plugSession.
+export interface PlugSession {
+  id: string;
+  who?: string;
+  fullname?: string;
+  // The SHA256 fingerprint of the key, and the name the developer gave the
+  // machine it came from (the comment of the deposited line).
+  key?: string;
+  workstation?: string;
+  from?: string;
+  version?: string;
+  since: string;
+  // The cluster names it serves; empty for a client that only consumes.
+  names: { name: string; parked?: boolean; ports?: string[] }[];
+  // How many gateway replicas hold part of it.
+  nodes: number;
+}
+
 // Where this gateway's traces and pushed counters go (OBS-04, OBS-06).
 // Mirrors store.TelemetryConfig.
 export interface TelemetryConfig {
@@ -1192,6 +1211,15 @@ export interface Role {
   // Carried back on a save so a write built on a version somebody has replaced
   // is refused.
   rev?: number;
+  // What uses it: the routes and schedules whose rules name it, read off the
+  // configuration by the gateway. Never written - a save ignores it.
+  usedBy?: RoleUse[];
+}
+
+export interface RoleUse {
+  kind: 'route' | 'schedule';
+  id: string;
+  name: string;
 }
 
 // A per-tenant group (RBAC-02): a named bundle of catalogue roles, managed by
@@ -3179,9 +3207,8 @@ export class ApiService {
   createRole(role: Partial<Role>): Observable<Role> {
     return this.http.post<Role>('/api/roles', role);
   }
-  // `was` is the name the role is stored under; role.name may differ, and that
-  // is a rename - the gateway moves the key and rewrites the access rules that
-  // named it.
+  // `was` is the name the role is stored under; a body naming another one is
+  // refused, since a role cannot be renamed.
   updateRole(was: string, role: Role): Observable<Role> {
     return this.http.put<Role>(`/api/roles/${encodeURIComponent(was)}`, role);
   }
@@ -3444,6 +3471,14 @@ export class ApiService {
 
   setPlugSetting(cfg: PlugSetting): Observable<PlugState> {
     return this.http.put<PlugState>('/api/settings/plug', cfg);
+  }
+
+  plugSessions(): Observable<PlugSession[]> {
+    return this.http.get<PlugSession[]>('/api/plug/sessions');
+  }
+
+  closePlugSession(id: string): Observable<void> {
+    return this.http.post<void>(`/api/plug/sessions/${encodeURIComponent(id)}/close`, {});
   }
 
   // Asks the address ON SCREEN whether anything answers, before saving it. The

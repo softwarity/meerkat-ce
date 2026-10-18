@@ -2,7 +2,21 @@
 
 ## NEXT RELEASE
 
+- **The roles screen says what uses each role.** A **Used by** column lists the routes and
+  scheduled calls whose rules name the role (access rule, endpoint override, declared role tied
+  to it), read off the configuration rather than typed, so it never drifts from it; a filter in
+  the banner narrows the catalogue to what one route or schedule relies on. Tags stay what an
+  operator writes. `GET /api/roles` and `list_roles` carry it as `usedBy`, and a write ignores it.
 - **plug 2.29.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
+- **Who is plugged in, and a way to end it.** Infra, Plug lists the plug runs open now, one row
+  per run however many replicas its connections landed on: the developer, the workstation, where
+  from, which plug, since when, and what it serves - or "client only". **End this session** stops
+  the developer's command as a Ctrl-C would, with the reason in their terminal, and puts back at
+  once what it had set aside, on every replica. Removing a key, the developer capability, or the
+  account ends what that key holds at once, whichever screen did it.
+- **plug in the audit trail.** Under **plug**: each run's opening and end, once whatever the
+  number of replicas, with how it ended and how long it lasted, and each name served and given
+  back.
 - **An agent stays connected.** An assistant that sent two requests at once after its access token
   expired refreshed twice with the same refresh token, lost the race once, and had to sign in
   again. A refresh token presented a second time within 30 seconds is now served like the first.

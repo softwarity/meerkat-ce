@@ -31,7 +31,8 @@ func (a *API) roleTools() []mcp.Tool {
 		{
 			Name: "list_roles", Allow: administersIdentity, Title: "List the role catalogue", ReadOnly: true,
 			Description: "The global role catalogue: each role's name, what holding it also grants, " +
-				"and its tags. The NAME is the contract - an access rule on a route names roles by " +
+				"its tags, and what uses it (usedBy: the routes and schedules whose rules name it, read " +
+				"off the configuration). The NAME is the contract - an access rule on a route names roles by " +
 				"name, and the services behind the gateway compare those strings as they arrive. " +
 				"Call this before writing a rule or adding a role: names are unique.",
 			Schema: noArgs(),
@@ -94,6 +95,10 @@ func (a *API) toolListRoles(ctx context.Context, _ json.RawMessage) (any, error)
 	if err != nil {
 		return nil, err
 	}
+	usage, err := a.roleUsage(ctx)
+	if err != nil {
+		return nil, err
+	}
 	type line struct {
 		Name string `json:"name"`
 		// GrantedBy is the role ABOVE - and it is a name like everything else
@@ -102,12 +107,16 @@ func (a *API) toolListRoles(ctx context.Context, _ json.RawMessage) (any, error)
 		Description string   `json:"description,omitempty"`
 		Tags        []string `json:"tags,omitempty"`
 		System      bool     `json:"system,omitempty"`
+		// UsedBy is read off the configuration, not written: the routes and
+		// schedules whose rules name the role.
+		UsedBy []roleUse `json:"usedBy,omitempty"`
 	}
 	out := make([]line, 0, len(roles))
 	for _, r := range roles {
 		out = append(out, line{
 			Name: r.Name, GrantedBy: r.Parent,
 			Description: r.Description, Tags: r.Tags, System: r.System,
+			UsedBy: usage[r.Name],
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })

@@ -1,0 +1,37 @@
+@use '../../styles/table';
+
+// Inside the page's card: the card is the frame, so the table is banded and
+// left unframed.
+:host {
+  display: block;
+  @include table.banded-rows;
+}
+.group {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.hint {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.sub {
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.mono,
+.name {
+  font-family: var(--mk-mono, monospace);
+}
+.name {
+  margin-right: 6px;
+}
+// A name whose deployed service was set aside for the run: the cluster's own
+// is not answering it meanwhile.
+.name.parked {
+  color: var(--mat-sys-primary);
+}

@@ -22,6 +22,19 @@
           </mat-select>
         </mat-form-field>
       }
+      @if (knownUses().length) {
+        <mat-form-field class="tag-pick" subscriptSizing="dynamic">
+          <mat-label i18n="@@Used_by">Used by</mat-label>
+          <mat-select [value]="useFilter()" (selectionChange)="useFilter.set($event.value)">
+            <mat-option value="" i18n="@@All">All</mat-option>
+            @for (u of knownUses(); track u.key) {
+              <mat-option [value]="u.key">
+                <mat-icon>{{ u.use.kind === 'schedule' ? 'schedule' : 'alt_route' }}</mat-icon>{{ u.use.name }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
       <span class="spacer"></span>
     </div>
 
@@ -82,6 +95,23 @@
                 } @else {
                   <span class="text-muted truncate" i18n="@@Catalogue_root_hint">
                     The catalogue root: roles under it are top-level.
+                  </span>
+                }
+              </mat-cell>
+            </ng-container>
+
+            <!-- Read off the routes and schedules, never typed: a tag says what
+                 somebody wrote about the role, this says what uses it. -->
+            <ng-container matColumnDef="usedBy">
+              <mat-header-cell *matHeaderCellDef i18n="@@Used_by">Used by</mat-header-cell>
+              <mat-cell *matCellDef="let n">
+                @if (n.role?.usedBy?.length) {
+                  <span class="flex flex-wrap gap-1">
+                    @for (u of n.role.usedBy; track useKey(u)) {
+                      <span class="use" [class.on]="useFilter() === useKey(u)">
+                        <mat-icon>{{ u.kind === 'schedule' ? 'schedule' : 'alt_route' }}</mat-icon>{{ u.name }}
+                      </span>
+                    }
                   </span>
                 }
               </mat-cell>

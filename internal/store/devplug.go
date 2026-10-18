@@ -130,6 +130,17 @@ func (s *Store) AddDevKey(ctx context.Context, userID, line string) (DevKey, err
 	return k, nil
 }
 
+// DevKeyDeposited reports whether a key with this fingerprint is deposited at
+// all, whoever it belongs to and whatever their rights: what tells "your key
+// was removed" from "your developer access was withdrawn".
+func (s *Store) DevKeyDeposited(ctx context.Context, fingerprint string) (bool, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM dev_keys WHERE fingerprint = ?`, fingerprint).Scan(&n); err != nil {
+		return false, fmt.Errorf("store: dev key: %w", err)
+	}
+	return n > 0, nil
+}
+
 // ListDevKeys lists one developer's keys, oldest first - the order they were
 // deposited in, which is the order a person remembers their machines.
 func (s *Store) ListDevKeys(ctx context.Context, userID string) ([]DevKey, error) {

@@ -31,24 +31,46 @@ func (a *API) registerRBAC(mux Mux) {
 
 // ── Roles (global catalogue, root) ───────────────────────────────────────────
 
+// catalogueRole is a role as the catalogue shows it: what is stored, plus what
+// the configuration says uses it. UsedBy is read-only - a write that carries
+// it back, as one built on a read does, has it ignored rather than refused.
+type catalogueRole struct {
+	store.Role
+	UsedBy []roleUse `json:"usedBy"`
+}
+
 func (a *API) listRoles(w http.ResponseWriter, r *http.Request, _ store.User) {
 	roles, err := a.st.ListRoles(r.Context())
 	if err != nil {
 		a.internal(w, err)
 		return
 	}
-	if roles == nil {
-		roles = []store.Role{}
+	usage, err := a.roleUsage(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
 	}
-	writeJSON(w, http.StatusOK, roles)
+	out := make([]catalogueRole, 0, len(roles))
+	for _, role := range roles {
+		out = append(out, catalogueRole{Role: role, UsedBy: usedBy(usage, role.Name)})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func usedBy(usage map[string][]roleUse, name string) []roleUse {
+	if uses := usage[name]; uses != nil {
+		return uses
+	}
+	return []roleUse{}
 }
 
 func (a *API) createRole(w http.ResponseWriter, r *http.Request, actor store.User) {
-	var role store.Role
-	if err := decodeStrict(r, &role); err != nil {
+	var in catalogueRole
+	if err := decodeStrict(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed role: "+err.Error())
 		return
 	}
+	role := in.Role
 	// No id is invented: a role IS its name. Creating one that exists would be
 	// an update, so it is refused by name rather than silently merged.
 	if _, err := a.st.GetRole(r.Context(), strings.TrimSpace(role.Name)); err == nil {
@@ -67,11 +89,12 @@ func (a *API) createRole(w http.ResponseWriter, r *http.Request, actor store.Use
 }
 
 func (a *API) updateRole(w http.ResponseWriter, r *http.Request, actor store.User) {
-	var role store.Role
-	if err := decodeStrict(r, &role); err != nil {
+	var in catalogueRole
+	if err := decodeStrict(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed role: "+err.Error())
 		return
 	}
+	role := in.Role
 	// The PATH names the role. A body naming a DIFFERENT one is refused rather
 	// than obeyed: a role is its name, and the name is what left this gateway -
 	// in every token a service reads, in every configuration in a repository,
@@ -136,7 +159,12 @@ func (a *API) writeRole(w http.ResponseWriter, r *http.Request, name string) {
 		a.internal(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, saved)
+	usage, err := a.roleUsage(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, catalogueRole{Role: saved, UsedBy: usedBy(usage, saved.Name)})
 }
 
 // ── Groups (per tenant, tenantScoped) ────────────────────────────────────────

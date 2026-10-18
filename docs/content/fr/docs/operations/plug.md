@@ -214,9 +214,32 @@ un équivalent : suspendez-le le temps de la session, ou branchez un nom qu'il n
 Le détail, et les autres symptômes, sont dans la documentation de plug :
 [Continuous deployment & GitOps](https://softwarity.github.io/plug/#/continuous-deployment).
 
+## Qui est branché
+
+La page Infra, Plug liste qui est branché sur le cluster en ce moment : une ligne par run
+plug (`plug -s`, ou `plug -c` pour un client qui consomme sans rien remplacer), avec le
+développeur, le poste (le commentaire de la clé déposée, et son empreinte), l'adresse
+d'origine, la version de plug, l'heure de début et les noms servis. Un run dont les
+connexions sont arrivées sur plusieurs réplicas de la passerelle reste une seule ligne.
+
+**Terminer la session** arrête la commande du développeur comme un Ctrl-C, avec la raison
+affichée dans son terminal, et ce que le run avait mis de côté dans le cluster revient
+aussitôt, sur tous les réplicas. Ce n'est pas un bannissement : un nouveau run est accepté
+tant que la clé l'est.
+
 ## Retirer un accès
 
-Retirer la clé du profil, retirer la capacité développeur du compte ou désactiver l'un des
-deux interrupteurs ferme la porte dès la connexion suivante : rien n'a été émis qui puisse
-survivre à ce retrait. La page Infra, Plug liste ceux qui détiennent la capacité, avec
-l'empreinte de leur clé, ou la mention qu'ils n'en ont pas encore.
+Retirer la clé du profil, retirer la capacité développeur du compte, désactiver ou
+supprimer le compte ferme aussitôt ce que cette clé tient ouvert, quel que soit l'écran qui
+l'a fait, et le développeur lit pourquoi. Désactiver l'un des deux interrupteurs ferme le
+tunnel. Rien n'a été émis qui puisse survivre à ce retrait. La page Infra, Plug liste ceux
+qui détiennent la capacité, avec l'empreinte de leur clé, ou la mention qu'ils n'en ont pas
+encore.
+
+## Dans le journal d'audit
+
+Le [journal d'audit](/docs/operations/audit), sous **plug**, dit une seule fois chaque run
+ouvert et comment il s'est terminé (le développeur a dit au revoir, la connexion est tombée,
+quelqu'un l'a terminé et pourquoi, la passerelle s'est arrêtée), sa durée, et chaque nom
+servi puis rendu : qui servait checkout mardi à 15 h se retrouve par une recherche. Le dépôt
+et le retrait d'une clé y figurent déjà, avec son empreinte.

@@ -13,6 +13,7 @@ import { ApiService, PlugState } from '../api.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
 import { FormFieldComponent } from '../shared/form-field.component';
 import { SnippetComponent } from '../shared/snippet.component';
+import { PlugSessionsComponent } from './plug-sessions.component';
 
 // The developer tunnel (DEV-11): Infra, Plug.
 //
@@ -37,6 +38,7 @@ type Os = 'macos' | 'linux' | 'windows';
     MatInputModule,
     MatSlideToggleModule,
     MatSidenavModule,
+    PlugSessionsComponent,
     RouterLink,
     SnippetComponent,
   ],

@@ -213,9 +213,32 @@ plug in a name it does not own.
 The details, and the other symptoms, are in plug's documentation:
 [Continuous deployment & GitOps](https://softwarity.github.io/plug/#/continuous-deployment).
 
+## Who is plugged in
+
+Infra, Plug lists who is plugged into the cluster now: one row per plug run
+(`plug -s`, or `plug -c` for a client that only consumes), with the developer,
+the workstation (the comment of the key they deposited, and its fingerprint),
+the address it came from, the plug version, since when, and the names it serves.
+A run whose connections landed on several replicas of the gateway is still one
+row.
+
+**End this session** stops the developer's command as a Ctrl-C would, with the
+reason shown in their terminal, and what the run had set aside in the cluster is
+back at once, on every replica. It is not a ban: a new run is let in as long as
+the key is.
+
 ## Taking an access back
 
 Removing the key on the profile, the developer capability on the account, or
-either switch closes the door at the next connection: nothing was issued that
-would outlive it. Infra, Plug lists who holds the capability, with the
-fingerprint of their key or the fact that they have none yet.
+disabling or deleting the account ends at once what that key has open, whichever
+screen did it, and the developer reads why. Turning either switch off closes the
+tunnel. Nothing was issued that would outlive it. Infra, Plug lists who holds the
+capability, with the fingerprint of their key or the fact that they have none yet.
+
+## In the audit trail
+
+The [audit trail](/docs/operations/audit), under **plug**, says once each run that
+opened and how it ended (the developer said goodbye, dropped, ended by somebody and
+why, the gateway stopped), how long it lasted, and each name served and given
+back: who was serving checkout on Tuesday at three is a search. Depositing and
+removing a key are already there, with its fingerprint.

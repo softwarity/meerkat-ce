@@ -93,6 +93,14 @@ const (
 	// a node it stops hearing from expires. That is what makes a node that
 	// starts late correct within one interval, with nothing to reconcile.
 	TopicServed = "served"
+	// TopicPlugSessions carries the plug runs a node's agent holds a part of
+	// (DEV-13), the same way: one node's whole list, as JSON, replaced on
+	// receipt and expired by silence.
+	TopicPlugSessions = "plug-sessions"
+	// TopicPlugClose asks every node to end a run, or what a key holds: the
+	// kind ("session" or "key"), the id or fingerprint, and the reason the
+	// developer reads, separated by single spaces.
+	TopicPlugClose = "plug-close"
 	// TopicChanged carries ONE administrative write to the consoles the other
 	// nodes hold open (CONSOLE-13): the kind of object, the instance, and who
 	// did it, so a screen anywhere reloads what it is showing. The argument is

@@ -162,16 +162,42 @@ mat-row.dragged {
   background: var(--mat-sys-surface-container-highest);
   color: var(--mat-sys-on-surface-variant);
 }
+/* What uses the role: the tag's shape, with the kind's icon, outlined so it
+   does not read as something somebody typed. */
+.use {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  padding: 0 8px 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  color: var(--mat-sys-on-surface-variant);
+}
+.use mat-icon {
+  font-size: 12px;
+  width: 12px;
+  height: 12px;
+}
+.use.on {
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
 .mat-column-role {
-  flex: 1 1 34%;
+  flex: 1 1 30%;
   justify-content: flex-start;
   padding-left: 16px;
 }
 .mat-column-description {
-  flex: 1 1 42%;
+  flex: 1 1 32%;
+}
+.mat-column-usedBy {
+  flex: 1 1 20%;
+  justify-content: flex-start;
 }
 .mat-column-tags {
-  flex: 1 1 24%;
+  flex: 1 1 18%;
   justify-content: flex-start;
 }
 /* the dragged row's origin collapses to a slim marker */

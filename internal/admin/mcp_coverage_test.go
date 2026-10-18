@@ -238,7 +238,8 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		// The OIDC clients: declared, changed, a secret drawn, deleted.
 		"POST /api/oidc/clients": true, "PUT /api/oidc/clients/{id}": true,
 		"POST /api/oidc/clients/{id}/secret": true, "DELETE /api/oidc/clients/{id}": true,
-		"POST /api/issues/{id}/comments": true, "PUT /api/issues/{id}/status": true,
+		"POST /api/plug/sessions/{id}/close": true,
+		"POST /api/issues/{id}/comments":     true, "PUT /api/issues/{id}/status": true,
 		"DELETE /api/issues/{id}": true,
 		"POST /api/roles":         true, "PUT /api/roles/{name}": true, "DELETE /api/roles/{name}": true,
 		"POST /api/routes/reorder": true, "PUT /api/routes/{id}": true,

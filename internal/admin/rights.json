@@ -556,6 +556,16 @@
   },
   {
     "method": "GET",
+    "path": "/api/plug/sessions",
+    "guard": "gw"
+  },
+  {
+    "method": "POST",
+    "path": "/api/plug/sessions/{id}/close",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/portal/icons",
     "guard": "authed"
   },

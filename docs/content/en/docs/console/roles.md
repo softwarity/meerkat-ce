@@ -28,6 +28,11 @@ on the root is a top-level role.
   list you see is not the tree.
 - **Clicking a row** opens the role in the drawer.
 - A **system** mark means a role Meerkat itself relies on.
+- **Used by** lists the routes and scheduled calls whose rules name the role: an
+  access rule, an endpoint override, a declared role tied to it. Nobody types it;
+  the gateway reads it off the configuration, so it follows every change and
+  never drifts the way a tag can. The **Used by** filter in the banner narrows the
+  catalogue to the roles one route or one schedule relies on.
 
 The hierarchy is not decoration: **a parent implies its children**. Ticking a
 parent in the groups matrix ticks what hangs under it, so a catalogue shaped like
@@ -57,4 +62,7 @@ is born under that row.
   to be in that group.
 - **Tags only help if they are spelt alike.** Take the suggestion the field
   offers.
+- **A tag says what you wrote, Used by says what is configured.** A role tagged
+  after one application and named by two routes keeps its single tag: what uses
+  it is the Used by column's job, not the tag's.
 - **Filter, then drag** does not work: clear the filter to reorder.

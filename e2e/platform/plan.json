@@ -2459,6 +2459,32 @@
    "fr": "La console en mode développeur."
   },
   {
+   "id": "DEV-13",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "A plug run on several replicas is one row; ending it stops the developer's command and restores the parked service on every node.",
+   "fr": "Un run plug réparti sur plusieurs réplicas est une seule ligne ; le terminer arrête la commande du développeur et rend le service mis de côté, sur tous les nœuds."
+  },
+  {
+   "id": "DEV-14",
+   "priority": "P2",
+   "feasibility": "medium",
+   "targets": [
+    "K1"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "A session's opening and end, and each name served, are written to the trail once, whatever the number of replicas.",
+   "fr": "L'ouverture et la fin d'une session, et chaque nom servi, sont écrits une seule fois dans le journal, quel que soit le nombre de réplicas."
+  },
+  {
    "id": "CFG-01",
    "priority": "P2",
    "feasibility": "easy",

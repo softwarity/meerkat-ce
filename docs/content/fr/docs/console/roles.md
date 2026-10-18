@@ -31,6 +31,12 @@ rôle rattaché directement à la racine est un rôle de premier niveau.
   l'arbre.
 - **Un clic sur une ligne** ouvre le rôle dans le tiroir.
 - La mention **system** signale un rôle dont Meerkat lui-même a besoin.
+- **Used by** liste les routes et les appels planifiés dont les règles nomment le
+  rôle : une règle d'accès, une surcharge par endpoint, un rôle déclaré rattaché à
+  lui. Personne ne la saisit : la passerelle la lit dans la configuration, elle suit
+  donc chaque changement et ne dérive jamais comme un tag peut le faire. Le filtre
+  **Used by** du bandeau réduit le catalogue aux rôles dont dépend une route ou un
+  appel planifié.
 
 La hiérarchie n'est pas là pour faire joli : **un parent implique ses enfants**.
 Cocher un parent dans la matrice des groupes coche tout ce qui en dépend. Un catalogue
@@ -63,4 +69,7 @@ le + d'une ligne naît sous cette ligne.
   doit compter au moins un membre.
 - **Les tags ne servent que s'ils sont orthographiés de la même façon.** Retenez la
   suggestion que propose le champ.
+- **Un tag dit ce qu'on a écrit, Used by dit ce qui est configuré.** Un rôle étiqueté
+  au nom d'une application et nommé par deux routes garde son unique tag : dire ce
+  qui l'utilise est le rôle de la colonne Used by, pas du tag.
 - **Filtrer puis glisser** ne fonctionne pas : effacez le filtre avant de réorganiser.

@@ -95,8 +95,15 @@ La console a sa propre page, à l'adresse `/apidocs`, pour l'API
 d'administration de Meerkat : celle qu'utilisent la console et
 l'[agent IA](/docs/agent/overview).
 
+## Qui est branché, et le journal
+
+La page Infra, Plug liste qui est branché sur le cluster en ce moment, run par
+run, avec ce que chacun sert, et termine une session en un clic : la commande du
+développeur s'arrête, et le service mis de côté revient aussitôt. Le
+[journal d'audit](/docs/operations/audit) garde l'ouverture et la fin de chaque
+run et chaque nom servi. Voir [Plug](/docs/operations/plug).
+
 ## Ce qui reste à venir
 
-- **Un écran de la console qui liste les sessions en cours**, et une entrée
-  d'audit pour chaque substitution. L'ajout d'une clé figure déjà dans le
-  [journal d'audit](/docs/operations/audit), avec son empreinte.
+- **La lecture de l'environnement d'un workload et le montage de ses volumes**
+  dans le journal : plug ne les remonte pas encore à la passerelle.

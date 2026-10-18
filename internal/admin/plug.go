@@ -22,6 +22,64 @@ import (
 func (a *API) registerPlug(mux Mux) {
 	mux.Handle("GET /api/settings/plug", a.gw(a.getPlug))
 	mux.Handle("PUT /api/settings/plug", a.infraAdmin(a.putPlug))
+	mux.Handle("GET /api/plug/sessions", a.gw(a.listPlugSessions))
+	mux.Handle("POST /api/plug/sessions/{id}/close", a.infraAdmin(a.closePlugSession))
+}
+
+// plugSession is one plug run as the page lists it (DEV-13): who, from which
+// workstation, what it serves, and since when.
+type plugSession struct {
+	devtunnel.SessionView
+	// Fullname and Workstation are read from the account and the deposited
+	// key: the comment of its line, the name the developer gave the machine.
+	Fullname    string `json:"fullname,omitempty"`
+	Workstation string `json:"workstation,omitempty"`
+}
+
+// listPlugSessions answers "who is plugged into this cluster, now".
+func (a *API) listPlugSessions(w http.ResponseWriter, r *http.Request) {
+	out := []plugSession{}
+	if a.Served == nil {
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	devs, err := a.st.Developers(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	names := map[string]string{}
+	machines := map[string]string{}
+	for _, d := range devs {
+		names[d.Username] = d.Fullname
+		for _, line := range d.Keys {
+			if key, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(line)); err == nil {
+				machines[ssh.FingerprintSHA256(key)] = comment
+			}
+		}
+	}
+	for _, s := range a.Served.Sessions() {
+		out = append(out, plugSession{SessionView: s, Fullname: names[s.Who], Workstation: machines[s.Key]})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// closeReason is what the developer reads in their terminal when an
+// administrator ends their session.
+const closeReason = "closed by an administrator of this gateway"
+
+// closePlugSession ends one run on every node: the developer's command stops
+// as on a Ctrl-C, with this reason, and what the run had set aside in the
+// cluster is back at once. Not a ban - a new run is let in, as long as the key
+// is: keeping somebody out is removing their key or their capability.
+func (a *API) closePlugSession(w http.ResponseWriter, r *http.Request, actor store.User) {
+	id := r.PathValue("id")
+	if a.Served == nil || !a.Served.CloseSession(id, closeReason) {
+		writeErr(w, http.StatusNotFound, "no plug session "+id+" is open: it may have ended already")
+		return
+	}
+	a.auditEvent(r.Context(), actor, "plug.session.terminate", "plug", id, id, "", closeReason)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // plugAnswer is the setting with what the page needs around it.

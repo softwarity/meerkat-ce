@@ -26,6 +26,9 @@ import (
 var purgedElsewhere = map[string]string{
 	// The session manager owns its table, and purge() calls the manager.
 	"PurgeExpiredSessions": "session.Manager.PurgeExpired",
+	// The ended plug sessions go with the tunnel's own sweep of silent
+	// replicas, on every node that runs the registry.
+	"PurgePlugSessions": "devtunnel.Registry.sweepHolds",
 }
 
 func TestEveryStorePurgeIsCalledByTheUpkeep(t *testing.T) {

@@ -1,4 +1,4 @@
-import { Role } from '../api.service';
+import { Role, RoleUse } from '../api.service';
 import { TreeGuide } from './tree-prefix.component';
 
 // One row of a flattened role hierarchy: the role and the guide glyphs that
@@ -28,7 +28,8 @@ export interface FilteredRoleRow extends RoleTreeRow {
   context: boolean;
 }
 
-// Search by name/description plus a single tag, over the TREE.
+// Search by name/description plus a single tag and a single user (a RoleUse
+// key, see useKey), over the TREE.
 //
 // Shared by the roles page and the groups matrix: they draw one catalogue, so
 // they must also narrow it the same way - a search that keeps a role on one
@@ -37,16 +38,17 @@ export interface FilteredRoleRow extends RoleTreeRow {
 // Ancestors of a match come along, dimmed: a row drawn under nothing reads as
 // a top-level role, at the very moment someone filtered in order to understand
 // where a role sits.
-export function filterRoleTree(roles: Role[], query: string, tag: string): FilteredRoleRow[] {
+export function filterRoleTree(roles: Role[], query: string, tag: string, use = ''): FilteredRoleRow[] {
   const q = query.trim().toLowerCase();
-  if (!q && !tag) return flattenRoles(roles).map((row) => ({ ...row, context: false }));
+  if (!q && !tag && !use) return flattenRoles(roles).map((row) => ({ ...row, context: false }));
 
   const matches = new Set<string>();
   for (const r of roles) {
     const matchQ =
       !q || r.name.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q);
     const matchTag = !tag || (r.tags ?? []).includes(tag);
-    if (matchQ && matchTag) matches.add(r.name);
+    const matchUse = !use || (r.usedBy ?? []).some((u) => useKey(u) === use);
+    if (matchQ && matchTag && matchUse) matches.add(r.name);
   }
 
   const parentOf = new Map(roles.filter((r) => r.parent).map((r) => [r.name, r.parent]));
@@ -64,6 +66,11 @@ export function filterRoleTree(roles: Role[], query: string, tag: string): Filte
     ...row,
     context: !matches.has(row.role.name),
   }));
+}
+
+// A route and a schedule may share a name: the kind keeps them apart.
+export function useKey(u: RoleUse): string {
+  return `${u.kind}:${u.id}`;
 }
 
 export function flattenRoles(roles: Role[]): RoleTreeRow[] {

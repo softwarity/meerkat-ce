@@ -611,6 +611,30 @@ CREATE TABLE IF NOT EXISTS dev_keys (
 );
 CREATE INDEX IF NOT EXISTS dev_keys_user ON dev_keys(user_id);
 
+-- One plug run as the developer tunnel saw it (DEV-13, DEV-14): what makes "who served
+-- checkout on Tuesday" answerable, and the one row the replicas agree on. A run
+-- spreads its connections over every replica, each of which reports its own
+-- part; the trail says it once, on the row's first hold and its last release.
+CREATE TABLE IF NOT EXISTS plug_sessions (
+  id          TEXT PRIMARY KEY,
+  who         TEXT NOT NULL DEFAULT '',
+  key_fp      TEXT NOT NULL DEFAULT '',
+  from_addr   TEXT NOT NULL DEFAULT '',
+  version     TEXT NOT NULL DEFAULT '',
+  since       BIGINT NOT NULL DEFAULT 0,
+  ended_at    BIGINT NOT NULL DEFAULT 0,
+  end_kind    TEXT NOT NULL DEFAULT '',
+  reason      TEXT NOT NULL DEFAULT ''
+);
+-- Which replica holds part of a session now. The session ends with its last
+-- hold; a replica that died holding one is found by its silence (devtunnel).
+CREATE TABLE IF NOT EXISTS plug_session_holds (
+  session_id TEXT NOT NULL REFERENCES plug_sessions(id) ON DELETE CASCADE,
+  node       TEXT NOT NULL,
+  held_at    BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (session_id, node)
+);
+
 CREATE TABLE IF NOT EXISTS login_events (
   id           TEXT PRIMARY KEY,
   user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1218,7 +1242,9 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // 83 seals the identity signing keys and the simulator's token key.
 // 85 carries no step: the OIDC provider's tables (oidc_clients, oidc_codes,
 // oidc_refresh) are new, created by the DDL above.
-const schemaVersion = 85
+// 86 carries no step either: plug_sessions and plug_session_holds are new, and
+// oauth_refresh.used_at is filled in by the additive pass.
+const schemaVersion = 86
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

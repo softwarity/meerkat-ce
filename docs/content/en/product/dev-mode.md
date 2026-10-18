@@ -92,8 +92,15 @@ It is not just one more Swagger UI next to a service:
 The console has its own page, at `/apidocs`, for Meerkat's administration API:
 the one the console and the [AI agent](/docs/agent/overview) use.
 
+## Who is plugged in, and the trail
+
+Infra, Plug lists who is plugged into the cluster now, run by run, with what
+each serves, and ends a session in one click: the developer's command stops,
+and the service set aside comes back at once. The
+[audit trail](/docs/operations/audit) keeps each run's opening and end and each
+name served. See [Plug](/docs/operations/plug).
+
 ## Still to come
 
-- **A console screen listing the live sessions**, and an audit entry for every
-  substitution. Adding a key is already in the
-  [audit trail](/docs/operations/audit), with its fingerprint.
+- **Reading a workload's environment and mounting its volumes** in the trail:
+  plug does not report them to the gateway yet.

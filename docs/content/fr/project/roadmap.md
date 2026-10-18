@@ -82,9 +82,9 @@ indique, ligne par ligne, ce qui manque à chacune.
   qui restent justes en cluster.
 - **Le mode développeur** - le tunnel fonctionne, la connexion s'arrête sur une
   page qui dit ce qui est substitué et par qui, et un bandeau le rappelle pendant
-  que vous travaillez. Il manque l'écran de la console qui liste les sessions en
-  cours, et l'audit de chaque substitution (le dépôt d'une clé, lui, est déjà
-  audité).
+  que vous travaillez. Il manque la lecture de l'environnement d'un workload et le
+  montage de ses volumes dans le journal d'audit ; qui est branché, la fin d'une
+  session, chaque run et chaque nom servi y sont.
 - **Les notifications** - le relais SMTP est livré, avec un gabarit unique aux
   couleurs du thème, et le récapitulatif quotidien des accès qui arrivent à
   échéance part tout seul. Il manque un gabarit par événement, chacun traduit.

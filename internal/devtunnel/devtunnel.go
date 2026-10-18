@@ -49,6 +49,9 @@ type Served struct {
 	Ports  []string  `json:"ports,omitempty"`
 	Parked bool      `json:"parked,omitempty"`
 	Since  time.Time `json:"since"`
+	// Session is the plug run serving it (DEV-13); empty for a client that
+	// presents none.
+	Session string `json:"session,omitempty"`
 }
 
 // Registry is what is served right now, ON EVERY NODE.
@@ -83,6 +86,14 @@ type Registry struct {
 	// cluster wiring sets it, which is also the single-node case.
 	publish func([]Served)
 	now     func() time.Time
+
+	// The plug runs this node's agent holds a part of (DEV-13), by id, and what
+	// the other nodes say they hold. See sessions.go.
+	sessions       map[string]Session
+	remoteSessions map[string]remoteSessions
+	publishSess    func([]Session)
+	wiring         Wiring
+	control        Control
 }
 
 type remoteNames struct {
@@ -98,7 +109,8 @@ func NewRegistry(hub *events.Hub) *Registry {
 	return &Registry{
 		names: make(map[string]Served), hub: hub,
 		remote: map[string]remoteNames{}, StaleAfter: DefaultStaleAfter,
-		now: time.Now,
+		now:      time.Now,
+		sessions: map[string]Session{}, remoteSessions: map[string]remoteSessions{},
 	}
 }
 
@@ -164,6 +176,10 @@ func (r *Registry) Tell(ctx context.Context, every time.Duration) {
 			if len(r.Mine()) > 0 {
 				r.tell()
 			}
+			if len(r.MySessions()) > 0 {
+				r.tellSessions()
+			}
+			r.sweepHolds(ctx)
 		}
 	}
 }
@@ -180,6 +196,7 @@ func (r *Registry) Set(s Served) {
 	slog.Info("a name is served from a developer's machine", "name", s.Name, "who", s.Who, "parked", s.Parked)
 	r.hub.Publish(events.TopicAll, events.Message{Type: EventServed, Data: s})
 	r.tell()
+	r.auditServe("plug.serve", s)
 }
 
 // Drop records that a name went back to the cluster.
@@ -188,12 +205,13 @@ func (r *Registry) Set(s Served) {
 // screen shows names nobody is serving, which is worse than showing nothing.
 func (r *Registry) Drop(name string) {
 	r.mu.Lock()
-	_, had := r.names[name]
+	was, had := r.names[name]
 	delete(r.names, name)
 	r.mu.Unlock()
 	if !had {
 		return
 	}
+	defer r.auditServe("plug.unserve", was)
 	slog.Info("a name went back to the cluster", "name", name)
 	r.hub.Publish(events.TopicAll, events.Message{Type: EventUnserved, Data: Served{Name: name}})
 	// Told at once, and told even when the list is now empty: waiting for it
@@ -244,6 +262,11 @@ func (r *Registry) Forget() {
 	for id, rn := range r.remote {
 		if rn.at.Before(cutoff) {
 			delete(r.remote, id)
+		}
+	}
+	for id, rs := range r.remoteSessions {
+		if rs.at.Before(cutoff) {
+			delete(r.remoteSessions, id)
 		}
 	}
 }

@@ -378,6 +378,7 @@ func run(o options) error {
 	bus := cluster.New(st)
 	bus.Register(store.TopicRouting, router.Reload)
 	adminAPI.Bus = bus
+	adminAPI.Served = served
 
 	// The session caches, both planes. A session changed on one gateway - the
 	// organisation just chosen, the login step just completed, the account
@@ -500,6 +501,41 @@ func run(o options) error {
 			return
 		}
 		served.Report(from, names, time.Now())
+	})
+	// The plug runs, the same way (DEV-13, DEV-14): each node says which it holds a
+	// part of, the trail is written once through the store, and ending one is
+	// asked of every node.
+	served.Wire(devtunnel.Wiring{
+		Store: st, Node: bus.Node(), Audit: adminAPI.Record,
+		Close: func(kind, target, reason string) {
+			bus.Signal(ctx, store.TopicPlugClose, kind+" "+target+" "+reason)
+		},
+	})
+	served.RelaySessions(func(sessions []devtunnel.Session) {
+		msg, err := json.Marshal(sessions)
+		if err != nil {
+			return
+		}
+		bus.Signal(ctx, store.TopicPlugSessions, string(msg))
+	})
+	bus.OnSignalFrom(store.TopicPlugSessions, func(from, arg string) {
+		if from == bus.Node() {
+			return
+		}
+		var sessions []devtunnel.Session
+		if err := json.Unmarshal([]byte(arg), &sessions); err != nil {
+			slog.Debug("a plug-sessions message could not be read", "from", from, "err", err)
+			return
+		}
+		served.ReportSessions(from, sessions, time.Now())
+	})
+	bus.OnSignalFrom(store.TopicPlugClose, func(from, arg string) {
+		if from == bus.Node() {
+			return // already applied by the node that asked
+		}
+		kind, rest, _ := strings.Cut(arg, " ")
+		target, reason, _ := strings.Cut(rest, " ")
+		served.ApplyClose(kind, target, reason)
 	})
 	go served.Tell(ctx, metrics.DefaultInterval)
 

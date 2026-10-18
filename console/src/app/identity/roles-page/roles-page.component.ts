@@ -13,9 +13,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { RowActionsDirective } from '@softwarity/row-actions';
-import { ApiService, Role } from '../../api.service';
+import { ApiService, Role, RoleUse } from '../../api.service';
 import { TreeGuide, TreePrefixComponent } from '../../shared/tree-prefix.component';
-import { filterRoleTree } from '../../shared/role-tree';
+import { filterRoleTree, useKey } from '../../shared/role-tree';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { RoleEditorComponent } from '../role-editor/role-editor.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
@@ -75,14 +75,17 @@ export class RolesPageComponent {
 
   protected readonly loading = signal(true);
   protected readonly roles = signal<Role[]>([]);
-  protected readonly columns = ['role', 'description', 'tags'];
+  protected readonly columns = ['role', 'description', 'usedBy', 'tags'];
 
   // Narrowing the catalogue: free text over name and description, plus one
-  // tag. A hundred-odd roles is the normal size of this screen, and scrolling
-  // is not a way to find one.
+  // tag and one user. A hundred-odd roles is the normal size of this screen,
+  // and scrolling is not a way to find one.
   protected readonly query = signal('');
   protected readonly tagFilter = signal('');
-  protected readonly filtering = computed(() => !!this.query().trim() || !!this.tagFilter());
+  protected readonly useFilter = signal('');
+  protected readonly filtering = computed(
+    () => !!this.query().trim() || !!this.tagFilter() || !!this.useFilter(),
+  );
 
   // Depth-first walk of the parentId hierarchy - the table shows the TREE,
   // the catalogue root included as its first row.
@@ -91,7 +94,7 @@ export class RolesPageComponent {
   // creates a top-level role, and a filter should not take a creation away.
   protected readonly nodes = computed<RoleNode[]>(() => [
     { role: null, guides: [], context: false },
-    ...filterRoleTree(this.roles(), this.query(), this.tagFilter()),
+    ...filterRoleTree(this.roles(), this.query(), this.tagFilter(), this.useFilter()),
   ]);
 
   // Re-parenting is a gesture ON THE TREE: filtered, the rows are a selection
@@ -108,6 +111,18 @@ export class RolesPageComponent {
   protected readonly knownTags = computed(() =>
     [...new Set(this.roles().flatMap((r) => r.tags ?? []))].sort((a, b) => a.localeCompare(b)),
   );
+
+  // What uses a role, as the gateway reads it off the routes and schedules:
+  // the tags say what an operator wrote about a role, this says what the
+  // configuration does with it, and nobody has to keep it up to date.
+  protected readonly knownUses = computed(() => {
+    const byKey = new Map<string, RoleUse>();
+    for (const r of this.roles()) for (const u of r.usedBy ?? []) byKey.set(useKey(u), u);
+    return [...byKey.entries()]
+      .map(([key, use]) => ({ key, use }))
+      .sort((a, b) => a.use.kind.localeCompare(b.use.kind) || a.use.name.localeCompare(b.use.name));
+  });
+  protected readonly useKey = useKey;
 
   // The URL drives the drawer (F5-proof): roles/new = creating, roles/:id =
   // editing that role.
@@ -156,7 +171,11 @@ export class RolesPageComponent {
     // Somebody else's write (CONSOLE-13): this list follows what other
     // operators do, quietly - a spinner replacing a list nobody asked to
     // reload takes the screen away from whoever is reading it.
-    inject(LiveChangesService).on('role', () => this.load(true));
+    const live = inject(LiveChangesService);
+    live.on('role', () => this.load(true));
+    // What uses a role moves with the routes and the schedules.
+    live.on('route', () => this.load(true));
+    live.on('schedule', () => this.load(true));
   }
 
   load(quiet = false): void {

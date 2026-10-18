@@ -247,6 +247,12 @@
   </mat-card>
 
 
+  @if (s.enterprise) {
+    <mat-card appearance="outlined">
+      <app-plug-sessions />
+    </mat-card>
+  }
+
   <mat-card appearance="outlined">
   <!-- Who could plug in. The capability is granted on Users (application);
        the key is theirs to deposit - so the list says who still has to. -->
