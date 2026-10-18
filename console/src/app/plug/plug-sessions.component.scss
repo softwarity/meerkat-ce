@@ -34,11 +34,17 @@
   margin-right: 10px;
 }
 // How the run serves the name, said by an icon and its tooltip, never by a
-// colour alone: a deployed service set aside (garage), or a name the cluster
-// did not have (add).
+// colour alone: the cluster's grid with the run's piece in it (a deployed
+// service set aside) or set beside it (a name the cluster did not have).
 .mark {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-  color: var(--mat-sys-primary);
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--mat-sys-on-surface-variant);
+  stroke-width: 2;
+}
+.mark .mine {
+  stroke: var(--mat-sys-primary);
+  stroke-width: 2.4;
 }

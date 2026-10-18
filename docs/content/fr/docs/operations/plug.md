@@ -219,10 +219,10 @@ Le détail, et les autres symptômes, sont dans la documentation de plug :
 La page Infra, Plug liste qui est branché sur le cluster en ce moment : une ligne par run
 plug (`plug -s`, ou `plug -c` pour un client qui consomme sans rien remplacer), avec le
 développeur, le poste (le commentaire de la clé déposée, et son empreinte), l'adresse
-d'origine, la version de plug, l'heure de début et les noms servis. Un nom marqué d'une
-icône de garage est un nom dont le run a parqué le service déployé : celui du cluster est
-mis de côté et le poste répond à sa place. Un nom marqué d'un plus est un nom que le
-cluster n'avait pas : le run l'ajoute. Le journal d'audit dit la même chose de chaque nom
+d'origine, la version de plug, l'heure de début et les noms servis. Chaque nom servi porte une
+petite grille, le cluster, où la case du run est colorée. Dans la grille : le run a parqué
+le service déployé, celui du cluster est mis de côté et le poste répond à sa place.
+Tournée et posée à côté : un nom que le cluster n'avait pas, et que le run ajoute. Le journal d'audit dit la même chose de chaque nom
 servi. Un run dont les connexions sont arrivées sur plusieurs réplicas de la passerelle
 reste une seule ligne.
 

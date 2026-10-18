@@ -42,20 +42,35 @@ import { LiveChangesService } from '../shared/live-changes.service';
           <mat-cell *matCellDef="let s">
             @for (n of s.names; track n.name) {
               <span class="served">
+                <!-- The cluster as a grid, the run's piece coloured: IN the grid
+                     when it takes a deployed service's place (grid_view), set
+                     beside it when the name is new (widgets). -->
                 @if (n.parked) {
-                  <mat-icon
+                  <svg
                     class="mark"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
                     i18n-matTooltip="@@Plug_session_parked"
                     matTooltip="The cluster's {{ n.name }} is parked: this run answers in its place"
-                    >garage</mat-icon
                   >
+                    <rect x="4" y="4" width="6" height="6" />
+                    <rect class="mine" x="14" y="4" width="6" height="6" />
+                    <rect x="4" y="14" width="6" height="6" />
+                    <rect x="14" y="14" width="6" height="6" />
+                  </svg>
                 } @else {
-                  <mat-icon
+                  <svg
                     class="mark"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
                     i18n-matTooltip="@@Plug_session_added"
                     matTooltip="The cluster had no {{ n.name }}: this run adds the name"
-                    >add_circle</mat-icon
                   >
+                    <rect x="4" y="4" width="6" height="6" />
+                    <rect class="mine" x="14.5" y="4.5" width="5" height="5" transform="rotate(45 17 7)" />
+                    <rect x="4" y="14" width="6" height="6" />
+                    <rect x="14" y="14" width="6" height="6" />
+                  </svg>
                 }
                 <code class="name">{{ n.name }}</code>
               </span>
