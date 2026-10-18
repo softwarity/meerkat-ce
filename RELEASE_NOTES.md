@@ -2,6 +2,7 @@
 
 ## NEXT RELEASE
 
+- **plug 2.28.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The agent reaches the whole control plane.** Everything the console does, an assistant can do
   through MCP, under the same guards and audit; the few things closed to agents say why.
 - **Try an OIDC sign-in for anyone.** The arrow on a client's row picks a person and their
@@ -23,7 +24,6 @@
   closed every operation no rule lists, from a place nobody looks when a new endpoint answers 403.
   It did what the route's own rule set to **Nobody** already does: closed by default is now said
   on the route, where its rule is shown, with the operations opened one by one.
-- **plug 2.27.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **What an application requires, read from its own spec.** When a route's OpenAPI says which
   roles an operation needs (the scopes of its security requirement, as nestjs-granted or springdoc
   write them), Endpoint security shows it per operation, read-only: the application enforces it,
