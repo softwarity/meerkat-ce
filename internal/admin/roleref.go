@@ -3,6 +3,8 @@ package admin
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/softwarity/meerkat/internal/store"
@@ -11,7 +13,8 @@ import (
 // What POINTS AT a role.
 //
 // An access rule names roles BY NAME (store.Access.Roles, on a route and on
-// each endpoint policy), and so does a scheduled call. Those are strings
+// each endpoint policy), and so do a route's role map (the catalogue role
+// each declared role is tied to) and a scheduled call. Those are strings
 // written next to the name at a moment in time, and nothing in the database
 // ties them back - no foreign key reaches inside a route's JSON.
 //
@@ -27,7 +30,7 @@ import (
 // roleReference is one place a role name is written, said the way an operator
 // would look for it.
 type roleReference struct {
-	Kind  string `json:"kind"`  // route | endpoint | schedule
+	Kind  string `json:"kind"`  // route | endpoint | roleMap | schedule
 	ID    string `json:"id"`    // the route's or schedule's id - what get_route takes
 	Label string `json:"label"` // what to look for on screen
 	// Method and Path name the endpoint policy inside the route, for the two
@@ -51,6 +54,16 @@ func (a *API) roleReferences(ctx context.Context, name string) ([]roleReference,
 	for _, rt := range routes {
 		if namesRole(rt.Access.Roles, name) {
 			out = append(out, roleReference{Kind: "route", ID: rt.ID, Label: rt.Name})
+		}
+		// A role the application declares, tied to this one: the route
+		// forwards it under the application's name, and a deletion would
+		// leave the declared role granted by nobody.
+		roleMap := rt.RoleMap()
+		for _, declared := range slices.Sorted(maps.Keys(roleMap)) {
+			if roleMap[declared] == name {
+				out = append(out, roleReference{Kind: "roleMap", ID: rt.ID,
+					Label: fmt.Sprintf("%s: declared role %s", rt.Name, declared)})
+			}
 		}
 		if rt.API == nil || rt.API.Security == nil {
 			continue

@@ -115,5 +115,3 @@ de réserve à élargir, chaque route apporte les siennes.
 
 - **Votre propre HTML.** La disposition se choisit dans un catalogue ; remplacer le balisage
  d'une page par votre propre modèle n'est pas possible.
-- La page où le développeur choisit sa variante, qui n'aura de sens que lorsque les
- surcharges pourront être limitées à un développeur.

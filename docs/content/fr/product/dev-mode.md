@@ -97,8 +97,6 @@ l'[agent IA](/docs/agent/overview).
 
 ## Ce qui reste à venir
 
-- **Limiter une substitution à certains utilisateurs** : aujourd'hui, elle vaut
-  pour tout le trafic.
 - **Un écran de la console qui liste les sessions en cours**, et une entrée
   d'audit pour chaque substitution. L'ajout d'une clé figure déjà dans le
   [journal d'audit](/docs/operations/audit), avec son empreinte.

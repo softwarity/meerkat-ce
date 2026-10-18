@@ -73,6 +73,15 @@ spec:
               containerPort: {{ .Values.plug.port }}
             {{- end }}
           env:
+            {{- if .Values.plug.enabled }}
+            # This pod's own address, for the tunnel: a parked Service names the
+            # replica serving it, and every replica's sweep calls that address.
+            # Without it plug guesses the address from a route to the API server.
+            - name: PLUG_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            {{- end }}
             {{- with include "meerkat.trustProbe" . }}
             # The throwaway Certificate it may ask cert-manager for, to learn
             # an issuer's certificate (SSL-09): the name the Role grants.

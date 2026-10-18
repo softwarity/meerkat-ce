@@ -75,8 +75,7 @@ line, what is missing from each.
   rather than refusing, and counters that stay right across a cluster.
 - **Dev mode** - the tunnel works, sign-in halts on a page naming what is
   substituted and by whom, and a strip says it again while you work. What is
-  missing is the scope of a substitution - today it holds for all traffic -
-  then the console screen listing live sessions, and the audit of each
+  missing is the console screen listing live sessions, and the audit of each
   substitution (a key deposited is already audited).
 - **Notifications** - the SMTP relay is shipped, with one template in the
   theme's colours, and the daily summary of accesses about to close goes out on

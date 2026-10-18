@@ -94,7 +94,6 @@ the one the console and the [AI agent](/docs/agent/overview) use.
 
 ## Still to come
 
-- **Limiting a substitution to some users**: today it applies to all traffic.
 - **A console screen listing the live sessions**, and an audit entry for every
   substitution. Adding a key is already in the
   [audit trail](/docs/operations/audit), with its fingerprint.

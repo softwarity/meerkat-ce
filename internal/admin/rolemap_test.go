@@ -84,6 +84,12 @@ func TestTheDeclaredRolesAreImportedAndMapped(t *testing.T) {
 	if code, out := f.call(t, "PUT", "/api/routes/r1/role-map", `{"roleMap":{"ROLE_USER":"opt-svc"}}`, infraC); code != http.StatusOK {
 		t.Fatalf("infra admin mapping: %d %s", code, out)
 	}
+	// A role a declared role is tied to is still in use: its deletion names
+	// the route rather than leaving the declared role granted by nobody.
+	code, out = f.call(t, "DELETE", "/api/roles/opt-svc", "", f.rootC)
+	if code != http.StatusUnprocessableEntity || !strings.Contains(out, "declared role ROLE_USER") {
+		t.Fatalf("deleting a mapped role: %d %s, want 422 naming the route", code, out)
+	}
 	// And an empty map clears it.
 	if code, out := f.call(t, "PUT", "/api/routes/r1/role-map", `{"roleMap":{}}`, f.rootC); code != http.StatusOK {
 		t.Fatalf("clear: %d %s", code, out)
@@ -91,6 +97,9 @@ func TestTheDeclaredRolesAreImportedAndMapped(t *testing.T) {
 	saved, _ = f.api.st.GetRoute(context.Background(), "r1")
 	if saved.RoleMap() != nil {
 		t.Fatalf("cleared map still %v", saved.RoleMap())
+	}
+	if code, out := f.call(t, "DELETE", "/api/roles/opt-svc", "", f.rootC); code != http.StatusNoContent {
+		t.Fatalf("deleting a role no longer mapped: %d %s", code, out)
 	}
 }
 

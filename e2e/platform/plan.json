@@ -2355,14 +2355,14 @@
   {
    "id": "DEV-05",
    "priority": "-",
-   "feasibility": "blocked",
+   "feasibility": "out",
    "targets": [],
    "editions": [
     "CE",
     "EE"
    ],
-   "en": "Not built (substitution scope).",
-   "fr": "Non construite (portée des substitutions)."
+   "en": "Retired (one instance of a service runs at a time).",
+   "fr": "Retirée (une seule instance d'un service tourne à la fois)."
   },
   {
    "id": "DEV-06",

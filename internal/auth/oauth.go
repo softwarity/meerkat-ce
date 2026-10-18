@@ -408,7 +408,7 @@ func (h *Handler) exchangeCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) refreshToken(w http.ResponseWriter, r *http.Request) {
-	id, err := h.st.TakeRefreshToken(r.Context(), hashTrust(r.PostFormValue("refresh_token")))
+	id, err := h.st.TakeRefreshToken(r.Context(), hashTrust(r.PostFormValue("refresh_token")), store.RefreshReuseWindow)
 	if err != nil {
 		oauthError(w, http.StatusBadRequest, "invalid_grant", err.Error())
 		return
@@ -458,7 +458,7 @@ func (h *Handler) issueTokenResponse(w http.ResponseWriter, r *http.Request, tok
 func (h *Handler) oauthRevoke(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err == nil {
 		token := r.PostFormValue("token")
-		if id, err := h.st.TakeRefreshToken(r.Context(), hashTrust(token)); err == nil {
+		if id, err := h.st.TakeRefreshToken(r.Context(), hashTrust(token), 0); err == nil {
 			_ = h.st.DeleteAPIToken(r.Context(), id)
 			h.sm.TokenChanged(id)
 		} else if tok, err := h.st.ResolveAPIToken(r.Context(), hashTrust(token), time.Now().Unix()); err == nil {

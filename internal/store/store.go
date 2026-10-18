@@ -748,7 +748,10 @@ CREATE TABLE IF NOT EXISTS oauth_codes (
 CREATE TABLE IF NOT EXISTS oauth_refresh (
   token_hash TEXT PRIMARY KEY,
   token_id   TEXT NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
-  expires_at BIGINT NOT NULL DEFAULT 0
+  expires_at BIGINT NOT NULL DEFAULT 0,
+  -- When it was first spent; 0 while it has not been. Kept RefreshReuseWindow
+  -- after that, so a client that refreshed twice at once is not signed out.
+  used_at    BIGINT NOT NULL DEFAULT 0
 );
 
 -- The applications this gateway signs people into as an OIDC provider (v85,

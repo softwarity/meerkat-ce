@@ -107,5 +107,3 @@ route brings its own.
 
 - **Your own HTML.** The arrangement is a catalogue; replacing a page's markup with your own
  template is not built.
-- The developer's variant-selection page, which only means something once per-developer
- override scoping exists.

@@ -216,21 +216,43 @@ func (s *Store) SaveRefreshToken(ctx context.Context, hash, tokenID string, expi
 	return nil
 }
 
+// RefreshReuseWindow is how long a spent refresh token is still accepted.
+//
+// Rotation spends a refresh token on use, and a token presented twice used to
+// be refused outright, on the reading that one of the two presenters stole it.
+// The common second presenter is the same client: an agent that sends two
+// requests at once after its access token expired refreshes twice with the one
+// token it holds, loses the race once, and reads invalid_grant as "sign in
+// again" - which is what had people reconnecting their agent every morning.
+// Within the window the second presentation is served like the first; past it,
+// it is refused as before. Both answers carry a refresh token of their own, so
+// whichever the client keeps goes on working.
+const RefreshReuseWindow = 30 * time.Second
+
 // TakeRefreshToken spends a refresh token, returning the access token it
-// renews. Rotating, and deleted on use: a refresh token presented twice means
-// one of the two presenters stole it, and neither gets to go on.
-func (s *Store) TakeRefreshToken(ctx context.Context, hash string) (tokenID string, err error) {
-	var expiresAt int64
+// renews. Rotating: once spent it is accepted again only within grace of its
+// first use (RefreshReuseWindow for a refresh, none for a revocation).
+func (s *Store) TakeRefreshToken(ctx context.Context, hash string, grace time.Duration) (tokenID string, err error) {
+	now := time.Now()
+	var expiresAt, usedAt int64
 	err = s.db.QueryRowContext(ctx,
-		`DELETE FROM oauth_refresh WHERE token_hash = ? RETURNING token_id, expires_at`, hash).
-		Scan(&tokenID, &expiresAt)
+		`UPDATE oauth_refresh SET used_at = ? WHERE token_hash = ? AND used_at = 0 RETURNING token_id, expires_at`,
+		now.Unix(), hash).Scan(&tokenID, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", errors.New("this refresh token is unknown or already used")
+		err = s.db.QueryRowContext(ctx,
+			`SELECT token_id, expires_at, used_at FROM oauth_refresh WHERE token_hash = ?`, hash).
+			Scan(&tokenID, &expiresAt, &usedAt)
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", errors.New("this refresh token is unknown or already used")
+		}
+		if err == nil && now.Sub(time.Unix(usedAt, 0)) > grace {
+			return "", errors.New("this refresh token is unknown or already used")
+		}
 	}
 	if err != nil {
 		return "", fmt.Errorf("store: take refresh token: %w", err)
 	}
-	if time.Now().Unix() >= expiresAt {
+	if now.Unix() >= expiresAt {
 		return "", errors.New("this refresh token has expired")
 	}
 	return tokenID, nil
@@ -244,7 +266,8 @@ func (s *Store) PurgeOAuthLeftovers(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM oauth_codes WHERE expires_at < ?`, now); err != nil {
 		return fmt.Errorf("store: purge oauth codes: %w", err)
 	}
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM oauth_refresh WHERE expires_at < ?`, now); err != nil {
+	spent := time.Now().Add(-RefreshReuseWindow).Unix()
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM oauth_refresh WHERE expires_at < ? OR (used_at > 0 AND used_at < ?)`, now, spent); err != nil {
 		return fmt.Errorf("store: purge refresh tokens: %w", err)
 	}
 	return nil

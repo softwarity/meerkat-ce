@@ -29,7 +29,7 @@ forme du produit.
 
 | Fait | ID | Mot-clé | Description | Ce qui manque | Éd. |
 |:---:|---|---|---|---|:---:|
-| [~] | AUTH-01 | **Pages du flux** | La gateway sert elle-même les pages du flux utilisateur (login, mise à jour de mot de passe, vérification/enrôlement TOTP, sélection | la page de sélection du dev à tester (DEV-06) | CE |
+| [x] | AUTH-01 | **Pages du flux** | La gateway sert elle-même les pages du flux utilisateur (login, mise à jour de mot de passe, vérification/enrôlement TOTP, sélection | - | CE |
 | [x] | AUTH-02 | **Mot de passe** | Authentification par formulaire (login/mot de passe) contre la base locale des utilisateurs | - | CE |
 | [x] | AUTH-03 | **LDAP / AD** | Fédération LDAP/LDAPS (activable) : en search-then-bind : un compte de service retrouve l'entrée, le bind vérifie le mot de passe, l'e-mail | - | EE |
 | [x] | AUTH-04 | **OIDC** | SSO d'entreprise OIDC (activable) : délégation du premier facteur uniquement à tout IdP conforme OIDC (Keycloak, Entra ID, Okta | - | CE |
@@ -264,9 +264,9 @@ forme du produit.
 | [x] | DEV-01 | **Capacité dev** | Le mode dev d'un utilisateur est activé par un admin (flag dev) ; à partir de là, le développeur accède à des fonctionnalités | - | CE |
 | [x] | DEV-02 | **Clés de développeur** | Un utilisateur dev dépose ses clés publiques SSH sur son compte, en self-service (/profile/dev/key, ouvert seulement quand le tunnel est allumé sous Infra, Plug) : **une par poste**, puisque plug garde une paire par profil. Chacune est listée avec l'empreinte SHA256 que `plug pubkey` imprime, son commentaire et sa date, et se retire seule - ce poste-là perd l'accès à la connexion suivante. Une empreinte est **unique sur l'installation** : une connexion acceptée nomme une seule personne. Dépôt et retrait audités (`devkey.add`, `devkey.remove`, avec l'empreinte). La page Infra, Plug liste les clés de chaque développeur | - | EE |
 | [~] | DEV-03 | **Poste vers cluster** | Routage poste -> cluster : la CLI plug lance un processus sur le poste du développeur - ex | porter l'identité et les rôles du développeur, et les conditions posées par l'admin | EE |
-| [~] | DEV-04 | **Cluster vers poste** | Substitution de service (cluster -> poste) : si --service <nom> est spécifié au lancement, plug prend ce nom dans l'orchestrateur et le | la validation du nom faute de catalogue, et la portée : la substitution reste globale | EE |
-| [ ] | DEV-05 | **Portée des substitutions** | Portée par défaut des overrides : rien n'est construit - une substitution est aujourd'hui globale (DEV-04) et vaut pour tout le trafic | tout : une substitution vaut aujourd'hui pour tout le trafic | CE |
-| [~] | DEV-06 | **Annonce aux utilisateurs** | La substitution étant globale (DEV-04), il n'y a rien à choisir - il y a à savoir | le menu de sélection de variante, qui n'a de sens qu'une fois DEV-05 construit | EE |
+| [~] | DEV-04 | **Cluster vers poste** | Substitution de service (cluster -> poste) : si --service <nom> est spécifié au lancement, plug prend ce nom dans l'orchestrateur et le | la validation du nom faute de catalogue | EE |
+| [-] | DEV-05 | **Portée des substitutions** | **Retiré par décision** : limiter une substitution à certains utilisateurs. Une seule instance d'un service tourne à la fois : la substitution met celle du cluster de côté, elle ne route pas vers plusieurs instances du même service | - | CE |
+| [x] | DEV-06 | **Annonce aux utilisateurs** | La substitution étant globale (DEV-04), il n'y a rien à choisir - il y a à savoir | - | EE |
 | [~] | DEV-07 | **Cycle de vie** | Cycle de vie des substitutions : une substitution vit tant que le plug qui l'a déclarée est actif - arrêt du processus ou déconnexion => | un TTL de sécurité côté passerelle : le retrait dépend entièrement de l'agent | EE |
 | [~] | DEV-08 | **Substitutions simultanées** | Plusieurs développeurs servent en parallèle sans se gêner tant qu'ils prennent des noms différents - le | deux devs sur le même nom se marchent dessus, le dernier arrivé gagne | EE |
 | [~] | DEV-09 | **Outillage de test** | Outillage dev hérité de la V1 : Swagger UI embarqué (assets dans le binaire, rien d'un CDN) sur les specs OpenAPI que déclarent les routes | rien ne publie sur le topic dev ; le retour passe par le swagger | CE |
@@ -692,17 +692,13 @@ n'est pas compilée, donc la demander au routeur répondrait 404 sur exactement 
 développeur ouvre pour voir ce qui se construit. Deux chemins de lecture subsistent donc, pour
 une raison qui tient.
 
-### Le mode dev est global, pas par développeur (DEV-05, DEV-06, DEV-08)
+### Le mode dev est global, par décision (DEV-05, DEV-06, DEV-08)
 
-Une substitution vaut aujourd'hui pour tout le trafic ; deux développeurs sur le même nom se
-marchent dessus. C'est assumé et compensé par l'annonce (halte après connexion, bandeau
-permanent). **Ce qui manque** : que le trafic d'un développeur emprunte ses substitutions et
-celui des autres non, avec un menu par lequel un utilisateur choisit la variante qu'il veut
-voir. Cet opt-in par personne demandera **une capacité dédiée** - retirée en attendant, car
-elle ne servait rien (une classe CSS qu'aucun écran ne lisait, et une des quatre conditions,
-déjà couverte par `dev`, pour simuler une identité). Le jour où DEV-05 se construit, elle
-revient avec un rôle réel. **Point dur** : la décision se prend par requête, donc elle doit
-être lisible depuis la session sans coûter une lecture de base.
+Une substitution vaut pour tout le trafic : le service substitué est mis de côté, une seule
+instance tourne à la fois, et deux développeurs sur le même nom se marchent dessus. C'est
+voulu et compensé par l'annonce (halte après connexion, bandeau permanent). Limiter une
+substitution à certains utilisateurs, avec un menu de choix de variante, n'est pas prévu
+(DEV-05 retiré) : cela supposerait de router vers plusieurs instances du même service.
 
 ### L'observabilité : une seule période, et ce qui reste (OBS-01, OBS-04)
 

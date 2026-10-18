@@ -213,12 +213,25 @@ func TestAnAgentConnectsWithoutACopiedSecret(t *testing.T) {
 	if list, _ := st.ListAPITokens(ctx, "root", store.PlaneAdmin); len(list) != 1 {
 		t.Errorf("refreshing made %d connections, want 1", len(list))
 	}
-	// The old refresh token is spent: presented twice, it means one of the two
-	// presenters stole it.
-	if _, err := exchange(t, meta.TokenEndpoint, url.Values{
+	// Presented again at once - an agent that refreshed twice in parallel - it
+	// is served too, and both answers go on working through their own refresh
+	// token, whichever the agent keeps. Past the window it is refused: see
+	// TestASpentRefreshTokenHasAShortGrace in the store.
+	again, err := exchange(t, meta.TokenEndpoint, url.Values{
 		"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken},
-	}); err == nil {
-		t.Error("a refresh token was accepted twice")
+	})
+	if err != nil {
+		t.Fatalf("a refresh token presented twice at once: %v", err)
+	}
+	for _, rt := range []string{renewed.RefreshToken, again.RefreshToken} {
+		if _, err := exchange(t, meta.TokenEndpoint, url.Values{
+			"grant_type": {"refresh_token"}, "refresh_token": {rt},
+		}); err != nil {
+			t.Errorf("the refresh token of either answer must work: %v", err)
+		}
+	}
+	if list, _ := st.ListAPITokens(ctx, "root", store.PlaneAdmin); len(list) != 1 {
+		t.Errorf("refreshing twice made %d connections, want 1", len(list))
 	}
 }
 

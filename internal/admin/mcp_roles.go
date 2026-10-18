@@ -64,7 +64,8 @@ func (a *API) roleTools() []mcp.Tool {
 		{
 			Name: "list_role_references", Allow: administersIdentity, Title: "Where a role is named", ReadOnly: true,
 			Description: "Every rule that names this role: the routes whose access rule names it, the " +
-				"per-endpoint policies inside them, and the scheduled calls that ask for it. Each " +
+				"per-endpoint policies inside them, the routes whose role map ties a declared role to it " +
+				"(kind roleMap), and the scheduled calls that ask for it. Each " +
 				"answer carries the route's id, so the next call is get_route and the one after is " +
 				"save_route - which is how an agent FIXES what a role change would break, rather " +
 				"than finding out from a refusal.\n\nGroups are absent on purpose: they hold roles " +

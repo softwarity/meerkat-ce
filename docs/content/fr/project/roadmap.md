@@ -82,8 +82,7 @@ indique, ligne par ligne, ce qui manque à chacune.
   qui restent justes en cluster.
 - **Le mode développeur** - le tunnel fonctionne, la connexion s'arrête sur une
   page qui dit ce qui est substitué et par qui, et un bandeau le rappelle pendant
-  que vous travaillez. Il manque la portée d'une substitution - aujourd'hui, elle
-  vaut pour tout le trafic - puis l'écran de la console qui liste les sessions en
+  que vous travaillez. Il manque l'écran de la console qui liste les sessions en
   cours, et l'audit de chaque substitution (le dépôt d'une clé, lui, est déjà
   audité).
 - **Les notifications** - le relais SMTP est livré, avec un gabarit unique aux
