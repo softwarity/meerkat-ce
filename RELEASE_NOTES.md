@@ -2,6 +2,7 @@
 
 ## NEXT RELEASE
 
+- **plug 2.29.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **An agent stays connected.** An assistant that sent two requests at once after its access token
   expired refreshed twice with the same refresh token, lost the race once, and had to sign in
   again. A refresh token presented a second time within 30 seconds is now served like the first.
@@ -9,7 +10,6 @@
   the route, as for an access rule; `list_role_references` lists it (kind `roleMap`).
 - **The Helm chart gives each pod its own address to the developer tunnel** (`PLUG_POD_IP`), so
   that with several replicas a parked service always names the one serving it.
-- **plug 2.28.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **The agent reaches the whole control plane.** Everything the console does, an assistant can do
   through MCP, under the same guards and audit; the few things closed to agents say why.
 - **Try an OIDC sign-in for anyone.** The arrow on a client's row picks a person and their
