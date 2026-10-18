@@ -41,7 +41,17 @@ import { LiveChangesService } from '../shared/live-changes.service';
           <mat-header-cell *matHeaderCellDef i18n="@@Plug_session_serves">Serves</mat-header-cell>
           <mat-cell *matCellDef="let s">
             @for (n of s.names; track n.name) {
-              <code class="name" [class.parked]="n.parked">{{ n.name }}</code>
+              <span class="served">
+                @if (n.parked) {
+                  <mat-icon
+                    class="parked"
+                    i18n-matTooltip="@@Plug_session_parked"
+                    matTooltip="The cluster's {{ n.name }} is parked: this run answers in its place"
+                    >garage</mat-icon
+                  >
+                }
+                <code class="name">{{ n.name }}</code>
+              </span>
             } @empty {
               <span class="sub" i18n="@@Plug_session_client_only">client only</span>
             }
@@ -59,10 +69,13 @@ import { LiveChangesService } from '../shared/live-changes.service';
           </mat-cell>
         </ng-container>
         <!-- The row action lives in the LAST existing column. -->
+        <!-- WHEN it was plugged in, not "how long ago": a relative time is
+             only true at the moment it is computed, and this list is only read
+             again when a run opens or ends. -->
         <ng-container matColumnDef="since">
-          <mat-header-cell *matHeaderCellDef i18n="@@Plug_session_since">Since</mat-header-cell>
+          <mat-header-cell *matHeaderCellDef i18n="@@Plug_session_plugged_at">Plugged in at</mat-header-cell>
           <mat-cell *matCellDef="let s">
-            <span class="sub" [title]="full(s.since)">{{ rel(s.since) }}</span>
+            <span class="sub" [title]="full(s.since)">{{ at(s.since) }}</span>
             <span rowActions="tonal">
               <button
                 matIconButton
@@ -117,8 +130,13 @@ export class PlugSessionsComponent {
     });
   }
 
-  protected rel(at: string): string {
-    return at ? (DateTime.fromISO(at).reconfigure({ locale: this.locale }).toRelative() ?? '') : '-';
+  // The time alone for a run plugged in today, the date with it otherwise.
+  protected at(at: string): string {
+    if (!at) return '-';
+    const t = DateTime.fromISO(at).reconfigure({ locale: this.locale });
+    return t.hasSame(DateTime.now(), 'day')
+      ? t.toLocaleString(DateTime.TIME_SIMPLE)
+      : t.toLocaleString({ month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
   protected full(at: string): string {

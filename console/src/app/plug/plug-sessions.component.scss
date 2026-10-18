@@ -27,11 +27,18 @@
 .name {
   font-family: var(--mk-mono, monospace);
 }
-.name {
-  margin-right: 6px;
+.served {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 10px;
 }
 // A name whose deployed service was set aside for the run: the cluster's own
-// is not answering it meanwhile.
-.name.parked {
+// is not answering it meanwhile. Said by the icon and its tooltip, never by a
+// colour alone.
+.parked {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
   color: var(--mat-sys-primary);
 }

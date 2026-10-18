@@ -219,8 +219,10 @@ Le détail, et les autres symptômes, sont dans la documentation de plug :
 La page Infra, Plug liste qui est branché sur le cluster en ce moment : une ligne par run
 plug (`plug -s`, ou `plug -c` pour un client qui consomme sans rien remplacer), avec le
 développeur, le poste (le commentaire de la clé déposée, et son empreinte), l'adresse
-d'origine, la version de plug, l'heure de début et les noms servis. Un run dont les
-connexions sont arrivées sur plusieurs réplicas de la passerelle reste une seule ligne.
+d'origine, la version de plug, l'heure de début et les noms servis. Un nom marqué d'une
+icône de garage est un nom dont le run a parqué le service déployé : celui du cluster est
+mis de côté et le poste répond à sa place. Un run dont les connexions sont arrivées sur
+plusieurs réplicas de la passerelle reste une seule ligne.
 
 **Terminer la session** arrête la commande du développeur comme un Ctrl-C, avec la raison
 affichée dans son terminal, et ce que le run avait mis de côté dans le cluster revient
