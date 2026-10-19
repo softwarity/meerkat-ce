@@ -37,6 +37,17 @@ export const editorSurface = Prec.highest(
     // shell and PromQL have no grammar here, and the flavour's own theme
     // cannot know about a class this console invented.
     '.cm-comment': { color: '#6c7086', fontStyle: 'italic' },
+    // The flavour paints the active line OPAQUE (surface0), and a line's
+    // background sits above the selection layer: the line being selected in
+    // is the active one, so a selection inside one line did not show at all.
+    // A tint lets the selection through; the selection itself is the same
+    // selector as the flavour's, or the flavour's more specific rule wins.
+    '.cm-activeLine, .cm-activeLineGutter': {
+      backgroundColor: 'color-mix(in srgb, var(--mat-sys-on-surface) 6%, transparent)',
+    },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+      backgroundColor: 'color-mix(in srgb, var(--mat-sys-primary) 35%, transparent)',
+    },
   }),
 );
 

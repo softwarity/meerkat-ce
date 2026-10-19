@@ -4,6 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { css } from '@codemirror/lang-css';
 import { javascript } from '@codemirror/lang-javascript';
 import { catppuccin, editorSurface } from '../shared/catppuccin';
+import { saveKey } from '../shared/editor-keys';
 import { basicSetup, EditorView } from 'codemirror';
 
 export interface CodeDialogData {
@@ -92,6 +93,7 @@ export class CodeDialogComponent {
           catppuccin,
           editorSurface,
           EditorView.theme({ '&': { height: '420px' } }),
+          saveKey(() => this.apply()),
         ],
         parent: this.editorHost().nativeElement,
       });

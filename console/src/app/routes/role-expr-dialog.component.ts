@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { EditorState } from '@codemirror/state';
 import { catppuccin, editorSurface } from '../shared/catppuccin';
+import { saveKey } from '../shared/editor-keys';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { Role } from '../api.service';
@@ -393,6 +394,10 @@ export class RoleExprDialogComponent {
             EditorView.theme({ '&': { maxHeight: '160px' }, ...TEMPLATE_COLORS, '.cm-content': { minHeight: '60px' } }),
             EditorView.updateListener.of((u) => {
               if (u.docChanged) this.evaluate(u.state.doc.toString());
+            }),
+            // As the Apply button: not while the expression does not parse.
+            saveKey(() => {
+              if (!this.error()) this.apply();
             }),
           ],
         }),

@@ -3,6 +3,12 @@
 ## NEXT RELEASE
 
 - **plug 2.31.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
+- **Ctrl+S / Cmd+S saves in the console's code editors.** The custom CSS and JavaScript of a
+  route, its scheme and language scripts, the roles expression, the configuration YAML being
+  edited, and anywhere in the route editor: the key does what the Save button does, and the
+  browser's "Save page as" no longer opens over the console.
+- **A selection shows in the code editors.** Selected text on the line being edited was not
+  highlighted: the active line's opaque background covered it.
 ---
 
 ## 1.13.0

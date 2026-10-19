@@ -544,7 +544,11 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
   // Opts this drawer into showing a required-and-empty field in the error
   // colour without waiting to be touched: creating a route is precisely the
   // moment "what is still missing" has to be readable at a glance.
-  host: { class: "mk-show-missing" },
+  // Ctrl+S / Cmd+S anywhere in the editor is its Save button - the inline
+  // template editor included, which has no button of its own. Same guard as
+  // the button; the key is taken either way, or the browser's "Save page as"
+  // opens over the console when there is nothing to save.
+  host: { class: "mk-show-missing", "(keydown.control.s)": "saveKey($event)", "(keydown.meta.s)": "saveKey($event)" },
   templateUrl: "./route-editor.component.html",
   styleUrl: "./route-editor.component.scss",
 })
@@ -2016,6 +2020,11 @@ export class RouteEditorComponent {
   // file uploaded, say - created a second route with the same name, and the
   // gateway refused the duplicate.
   private createdId?: string;
+
+  protected saveKey(event: Event): void {
+    event.preventDefault();
+    if (!this.saving() && this.f().valid() && this.dirty()) this.save();
+  }
 
   protected save(after?: (out: Route) => void, failed?: (msg: string) => void): void {
     this.error.set("");

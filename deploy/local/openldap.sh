@@ -22,5 +22,5 @@ kubectl -n "$ns" apply -f "$here/openldap.yaml" >/dev/null
 kubectl -n "$ns" rollout status deploy/openldap --timeout=180s | tail -1
 kubectl -n "$ns" rollout status deploy/phpldapadmin --timeout=180s | tail -1
 echo "OpenLDAP: ldap://openldap.$ns.svc:389 (base dc=example,dc=com, admin cn=admin,dc=example,dc=com)"
-echo "phpLDAPadmin: http://phpldapadmin.$ns.svc:8091, in the cluster only - publish it through a Meerkat route"
+echo "phpLDAPadmin: http://phpldapadmin.$ns.svc:8091, in the cluster only, signed in as the admin DN - publish it through a Meerkat route reserved to a role"
 echo "The admin password is in $secret"

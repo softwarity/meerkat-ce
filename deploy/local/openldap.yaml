@@ -10,7 +10,8 @@
 #                      cluster only. It is reached THROUGH Meerkat, by a route
 #                      to that address: publishing an application is the
 #                      gateway's job, so nothing here opens a port outside.
-#                      Log in as the admin DN.
+#                      No login form: it binds as the admin DN by itself, so
+#                      give that route a role (only admins should get there).
 #
 # No volume, on purpose: a restart puts the seed back, which is what a test
 # directory is for. Every person's password is "password", except dan's.
@@ -82,8 +83,17 @@ spec:
       containers:
         - name: phpldapadmin
           image: osixia/phpldapadmin:0.9.0
+          # No login form: phpLDAPadmin binds as the admin DN itself (auth_type
+          # config), so whoever reaches it administers the directory. Who
+          # reaches it is the Meerkat route's access rule. The password comes
+          # from the Secret, expanded by Kubernetes ($(VAR) needs it declared
+          # first), never written here.
           env:
-            - { name: PHPLDAPADMIN_LDAP_HOSTS, value: "openldap" }
+            - name: LDAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: openldap-admin, key: password }
+            - name: PHPLDAPADMIN_LDAP_HOSTS
+              value: "#PYTHON2BASH:[{'openldap': [{'login': [{'auth_type': 'config'}, {'bind_id': 'cn=admin,dc=example,dc=com'}, {'bind_pass': '$(LDAP_ADMIN_PASSWORD)'}]}]}]"
             - { name: PHPLDAPADMIN_HTTPS, value: "false" }
           ports:
             - { name: http, containerPort: 80 }

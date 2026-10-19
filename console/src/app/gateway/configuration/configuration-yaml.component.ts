@@ -17,6 +17,7 @@ import { openSearchPanel, search, searchPanelOpen } from '@codemirror/search';
 import { unifiedMergeView } from '@codemirror/merge';
 import { yaml } from '@codemirror/lang-yaml';
 import { catppuccin, editorSurface } from '../../shared/catppuccin';
+import { saveKey } from '../../shared/editor-keys';
 import { basicSetup, EditorView } from 'codemirror';
 
 // A configuration, as the file it is (CFG-01) - read, then edited if asked.
@@ -321,8 +322,9 @@ export class ConfigurationYamlComponent {
             backgroundColor: 'color-mix(in srgb, var(--mat-sys-tertiary) 13%, transparent)',
           },
           // The editor's own selection sits on the current match as well (that
-          // is how next moves), and left alone it washes the ring out.
-          '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+          // is how next moves), and left alone it washes the ring out. The
+          // shared surface's selector, one class heavier, or that one wins.
+          '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground.cm-selectionBackground, .cm-selectionBackground.cm-selectionBackground': {
             backgroundColor: 'color-mix(in srgb, var(--mat-sys-on-surface) 14%, transparent)',
           },
           // The close cross joins the row instead of floating over its corner.
@@ -337,6 +339,10 @@ export class ConfigurationYamlComponent {
         }),
         EditorState.readOnly.of(!editing),
         EditorView.editable.of(editing),
+        // As the Save button, which only exists while editing.
+        saveKey(() => {
+          if (editing && !this.busy()) this.emitSave();
+        }),
       ],
       parent: el,
     });
