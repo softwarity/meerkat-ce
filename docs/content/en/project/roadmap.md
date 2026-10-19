@@ -41,7 +41,7 @@ transform it, an access rule decides, and what happened is visible afterwards.
   human gets.
 - **The navigation portal**: one bar across the applications the gateway
   serves, injected into pages that ship no library for it.
-- **Clustering**: several gateways behind one PostgreSQL, coordinating through
+- **Clustering**: several gateway instances behind one PostgreSQL, coordinating through
   the database rather than with each other.
 - **Versioned configurations**: several coexist, one is active, export and
   import close the loop, a restore point on every change, and two saved

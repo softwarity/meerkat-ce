@@ -127,8 +127,8 @@ MEERKAT_IMAGE=docker.io/softwarity/meerkat:eval docker compose -f docker-compose
 
 ## Kubernetes, with Helm
 
-One gateway on its own volume - the shape below. Several gateways serving one
-installation is a different set of objects (no volume, a shared database, three
+One gateway on its own volume - the shape below. Several instances of the gateway serving
+one installation are a different set of objects (no volume, a shared database, three
 replicas), and it has its own page:
 [Kubernetes cluster](/docs/deploy/kubernetes), with the manifests and with the
 part nobody writes down - how not to turn the entry point into a single point

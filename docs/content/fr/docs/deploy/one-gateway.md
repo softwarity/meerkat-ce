@@ -133,7 +133,7 @@ MEERKAT_IMAGE=docker.io/softwarity/meerkat:eval docker compose -f docker-compose
 ## Kubernetes, avec Helm
 
 Une gateway sur son propre volume : c'est l'architecture décrite ci-dessous.
-Plusieurs gateways au service d'une même installation demandent un autre
+Plusieurs instances de la gateway au service d'une même installation demandent un autre
 jeu d'objets (pas de volume, une base de données partagée, trois répliques),
 et font l'objet d'une page à part :
 [Cluster Kubernetes](/docs/deploy/kubernetes), avec les manifestes et avec ce

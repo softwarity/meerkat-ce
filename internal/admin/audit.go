@@ -75,6 +75,12 @@ func (a *API) auditRegisterViewer(mux Mux) {
 // reads as if a human had done the fifth.
 func (a *API) audit(ctx context.Context, ev store.AuditEvent) {
 	ev.ActorToken = actorToken(ctx)
+	a.record(ctx, ev)
+}
+
+// record is the funnel past the acting token: the write, the identifier, the
+// live channel.
+func (a *API) record(ctx context.Context, ev store.AuditEvent) {
 	// Stamped HERE rather than left to the store, because the same event is
 	// about to be told twice: written to the table, and published on the
 	// console's live channel where that identifier is the version a screen
@@ -101,9 +107,14 @@ func (a *API) audit(ctx context.Context, ev store.AuditEvent) {
 }
 
 // Record writes one event through the funnel, for what happens outside an
-// endpoint of this API - the developer tunnel's sessions (DEV-14) - and must
-// still reach the trail and the console's live channel.
-func (a *API) Record(ctx context.Context, ev store.AuditEvent) { a.audit(ctx, ev) }
+// endpoint of this API - the developer tunnel's sessions (DEV-14), a schedule
+// starting or stopping to fail (SCHED-06) - and must still reach the trail and
+// the console's live channel.
+//
+// It names no acting token, even when the context carries one: a service's
+// report can be what settles a turn, but the verdict on the schedule is the
+// gateway's, and the trail would otherwise read as if that token had made it.
+func (a *API) Record(ctx context.Context, ev store.AuditEvent) { a.record(ctx, ev) }
 
 // changed publishes one event to the screens of this node, and to the other
 // nodes' screens through the bus.

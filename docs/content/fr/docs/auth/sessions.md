@@ -112,7 +112,7 @@ n'est pas encore connue.
 |---|---|---|
 | `POST /logout`, ou `GET /logout` depuis une page du site | cette session uniquement | oui, la ligne est supprimée |
 | L'expiration pour inactivité | cette session | oui, elle est refusée d'après l'heure réelle |
-| Une réinitialisation du mot de passe par le lien reçu par e-mail | **toutes** les sessions du compte, sur toutes les gateways | oui |
+| Une réinitialisation du mot de passe par le lien reçu par e-mail | **toutes** les sessions du compte, sur toutes les instances | oui |
 | La suppression du compte | toutes les sessions du compte | oui |
 | La **désactivation** du compte | toutes les sessions du compte, sur les deux plans | oui |
 | **Déconnecter** dans les *Sessions actives* du profil, ou *Déconnecter partout ailleurs* | cette session, ou toutes les autres sessions de la personne | oui |

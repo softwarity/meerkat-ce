@@ -305,6 +305,8 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 		writeUserButtonJSON(w, payload)
 		return
 	}
+	// The organisation it acts in, as the gateway judges its routes on it.
+	sess.TenantID = h.st.SessionTenant(r.Context(), sess.UserID, sess.TenantID)
 	payload.Authenticated = true
 	payload.Username = u.Username
 	payload.Fullname = u.Fullname

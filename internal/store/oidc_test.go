@@ -126,7 +126,8 @@ func TestOIDCClientRefusalsNameWhatIsAllowed(t *testing.T) {
 		{"ttl short", func(c *OIDCClient) { c.TokenTTL = "PT30S" }, "from PT1M to PT24H"},
 		{"ttl long", func(c *OIDCClient) { c.TokenTTL = "P2D" }, "from PT1M to PT24H"},
 		{"ttl junk", func(c *OIDCClient) { c.TokenTTL = "5m" }, "ISO-8601"},
-		{"audience space", func(c *OIDCClient) { c.Audience = "my app" }, "no spaces"},
+		{"audience control", func(c *OIDCClient) { c.Audience = "my\tapp" }, "no control character"},
+		{"audience long", func(c *OIDCClient) { c.Audience = strings.Repeat("a", 256) }, "up to 255 characters"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			cl := oidcClient("billing")
@@ -284,5 +285,18 @@ func TestRoutesForOIDCClientInRoutingOrder(t *testing.T) {
 	none, err := s.RoutesForOIDCClient(ctx, "nobody")
 	if err != nil || none == nil || len(none) != 0 {
 		t.Errorf("no routes must be an empty list: %#v %v", none, err)
+	}
+}
+
+// One rule for every aud the gateway writes: a client's audience takes a
+// space inside, as a route's does (its default, the route's name, may hold one).
+func TestOIDCClientAudienceTakesASpaceInside(t *testing.T) {
+	cl := oidcClient("billing")
+	cl.Audience = "  Billing API  "
+	if err := SanitizeOIDCClient(&cl); err != nil {
+		t.Fatalf("audience with a space inside refused: %v", err)
+	}
+	if cl.Audience != "Billing API" {
+		t.Fatalf("audience = %q, want it trimmed", cl.Audience)
 	}
 }

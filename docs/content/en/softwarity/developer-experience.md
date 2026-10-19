@@ -21,7 +21,7 @@ docker run -p 8080:8080 -p 9090:9090 \
 
 No database to create, no message broker, no configuration file, no chart to
 render. The gateway starts with its storage inside it, serves its own sign-in
-pages and its own console. The moment you need several gateways it takes a
+pages and its own console. The moment you need several instances it takes a
 PostgreSQL - and not before.
 
 ## An error names what is allowed

@@ -3,13 +3,14 @@ title: Tarifs
 section: Tarifs
 order: 1
 layout: wide
-summary: Quatre éditions d'une même gateway. Deux sont gratuites et se téléchargent en une commande, deux commencent par une conversation.
+summary: Quatre éditions d'une même gateway. Deux sont gratuites ; Team coûte 4 000 € par an, Enterprise 24 000 €, mises à jour et support compris. La licence est perpétuelle et vaut quel que soit le nombre d'installations.
 ---
 
 # Tarifs
 
-Une gateway, quatre éditions. Deux d'entre elles s'obtiennent par un simple
-`docker pull` et ne coûtent rien ; les deux autres sont construites pour vous.
+Une gateway, quatre éditions. Toutes s'obtiennent par un simple `docker pull`.
+Deux ne coûtent rien ; les deux autres, Team et Enterprise, sont l'image
+d'évaluation à laquelle vous donnez une licence.
 
 ::: cards
 ### Community - gratuite
@@ -27,60 +28,106 @@ License. Pas de compte à créer, pas de clé, pas de date d'expiration.
 ### Évaluation - gratuite
 
 **Eval.** Tout le produit, Enterprise compris, pour essayer avant d'en parler :
-plusieurs organisations, SAML, LDAP et Active Directory, le cluster, ACME, les
+plusieurs organisations, SAML, LDAP et Active Directory, plusieurs instances synchronisées, ACME, les
 configurations dans git, l'export OpenTelemetry, le tunnel développeur. Aucune limite de durée, aucun compteur,
 rien de désactivé.
 
 En contrepartie, elle affiche une mention - *version d'évaluation, sans licence
 pour un usage en production* - sur les pages de connexion, dans le bouton
-utilisateur, dans les e-mails et sur toute la console. Aucun réglage ne la
+utilisateur, dans les e-mails et sur toute la console. Seule une licence la
 retire.
 
 [Démarrer](/docs/start/quick-start)
 
-### Team - parlons-en
+### Team - 4 000 € par an
 
-**TE.** Tout ce que fait Enterprise, pour une installation de taille connue :
-un cluster de quelques gateways, dont votre contrat fixe le nombre. Sans
-mention d'évaluation, et avec le support de ceux qui ont écrit la gateway.
+**TE.** Enterprise pour une organisation sur une instance : l'annuaire de
+l'entreprise (SAML, LDAP, Active Directory), ACME, les configurations dans
+git, l'export OpenTelemetry, les dispositions des pages et la marque retirée,
+le fournisseur OpenID, le tunnel développeur intégré. Sans mention
+d'évaluation. Licence perpétuelle ; le prix annuel inclut les mises à
+jour et le support standard.
 
-Les tailles et leur prix sont en cours de définition. Dites-nous combien de
-gateways vous faites tourner, nous vous répondrons par un chiffre.
+Faite pour la petite structure, sans contrainte de scalabilité.
 
-### Enterprise - parlons-en
+Nous écrire : [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%20Team)
 
-**EE.** La même image, sans plafond : autant de gateways et de clusters que
-vous en exploitez, dans tous vos environnements et sur tous vos sites.
+### Enterprise - 24 000 € par an
 
-Le prix porte sur l'installation : **ni par utilisateur, ni par requête, ni par
-route**.
+**EE.** Tout, sans plafond : autant d'organisations que vous en exploitez, et
+la gateway en cluster actif/actif sur PostgreSQL, qui monte en charge en
+ajoutant des instances. Support étendu compris.
+
+Une licence **perpétuelle** par entreprise, pour toutes ses installations : **ni par
+installation, ni par utilisateur, ni par requête, ni par route**. Le prix
+annuel inclut les mises à jour et le support ; le droit d'utilisation, lui,
+est acquis une fois pour toutes.
+
+Nous écrire : [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%20Enterprise)
 :::
 
 ## Ce que contient chaque édition
 
 | | Community | Évaluation | Team | Enterprise |
 | --- | --- | --- | --- | --- |
-| **Prix** | Gratuite | Gratuite | Sur demande | Sur demande |
-| **D'où elle vient** | Docker Hub | Docker Hub | Construite pour vous | Construite pour vous |
+| **Prix par an** (mises à jour et support) | Gratuite | Gratuite | 4 000 € HT | 24 000 € HT |
+| **Licence** | - | - | Perpétuelle | Perpétuelle |
+| **D'où elle vient** | Docker Hub | Docker Hub | L'image d'évaluation et une licence | L'image d'évaluation et une licence |
 | **Usage en production** | Oui | Non | Oui | Oui |
 | **Les capacités Enterprise** | - | Oui | Oui | Oui |
 | **Mention d'évaluation** | - | Partout | - | - |
-| **Gateways dans un cluster** | Une | Sans limite | Fixé par votre contrat | Sans limite |
-| **Support** | Le dépôt public | Le dépôt public | Compris dans l'accord | Compris dans l'accord |
+| **Organisations** | Une | Sans limite | Une | Sans limite |
+| **Installations** | Autant que vous voulez | Autant que vous voulez | Autant que vous voulez | Autant que vous voulez |
+| **Instances par installation** | Une | Plusieurs, synchronisées | Une | Plusieurs, synchronisées |
+| **Utilisateurs, routes, requêtes** | Sans limite | Sans limite | Sans limite | Sans limite |
+| **Support compris** | Le dépôt public | Le dépôt public | Standard | Étendu |
 
 La page [Éditions](/product/editions) détaille, ligne par ligne, ce que sont
 "les capacités Enterprise".
 
-## Une image construite pour vous
+## Le support
 
-Une image Team ou Enterprise est **construite pour votre société**, dans le
-cadre de votre contrat. Il n'y a toujours rien à activer : pas de clé à installer, pas de
-serveur d'activation à joindre, pas de droit à renouveler, rien qui expire au
-milieu de la nuit. La gateway ne nous appelle jamais, et elle ne contient
-aucun rapport d'usage.
+Le prix annuel inclut un an de mises à jour et un niveau de support. Sans
+renouvellement, la licence reste valable : toute version publiée pendant la
+période payée reste à vous, à installer et à faire tourner aussi longtemps que
+vous voulez. Seules les versions publiées ensuite ne sont plus couvertes. Un
+support au-delà de celui compris se commande à part.
 
-Les deux éditions gratuites sont le même binaire pour tout le monde, publié
-ouvertement.
+| | Ce que c'est | Pour qui |
+| --- | --- | --- |
+| **Support standard** | Par e-mail, les jours ouvrés : les bugs et l'usage du produit. | Compris dans Team |
+| **Support étendu** | Un délai de première réponse garanti, un interlocuteur nommé, l'aide aux montées de version. | Compris dans Enterprise |
+| **Options de support** | Des plages horaires élargies et un délai court garanti sur un incident bloquant. | Enterprise, sur demande |
+| **Prestations** | À la journée : l'intégration chez vous, la migration depuis un autre proxy ou fournisseur d'identité, la revue d'architecture, la formation. | Toutes les éditions, sur demande |
+
+Le support répond sur le produit ; une prestation travaille sur votre projet.
+
+## Une licence, saisie dans la console
+
+Team et Enterprise ne sont pas des images à part : c'est l'image d'évaluation,
+à laquelle vous donnez une licence. Vous la collez dans la console, elle est
+vérifiée sur place, et la mention d'évaluation disparaît aussitôt, sans
+redémarrage, sur toutes les instances de l'installation. Un déploiement peut
+aussi la monter depuis un secret, où chaque instance la lit.
+
+- **Vérifiée hors ligne.** La licence est signée par Softwarity et la gateway
+  en contrôle la signature elle-même. Pas de serveur d'activation à joindre :
+  la gateway ne nous appelle jamais, et elle ne contient aucun rapport d'usage.
+- **Perpétuelle.** Une licence n'expire pas. Sa date dit jusqu'où vont les
+  mises à jour couvertes : une version publiée après est hors de l'accord, et
+  la console le dit, mais rien ne s'éteint.
+- **Rien ne s'arrête au milieu de la nuit.** Une licence ne coupe jamais le
+  trafic. Ce qui dépasse ses plafonds est refusé à la création, par une phrase
+  qui le dit : une deuxième organisation sur une licence Team ne se crée pas,
+  mais tout ce qui est déjà en place continue d'être servi.
+- **Une licence par entreprise, autant d'installations que vous voulez.** La
+  même licence se colle dans chacune, sans surcoût : une installation Team
+  garde ses plafonds, une organisation et une instance, mais rien ne limite
+  leur nombre. Elle couvre les installations de l'entreprise qui l'a achetée,
+  et seulement celles-là : la transmettre à une autre structure, cliente ou
+  partenaire, n'est pas couvert.
+- **Le nom du titulaire est affiché** dans la console, avec l'identifiant de
+  la licence : une licence collée ailleurs dit à qui elle appartient.
 
 ## Évaluer d'abord
 
@@ -90,10 +137,10 @@ votre cluster aussi longtemps qu'il le faut pour vous décider : elle ne retient
 rien, et elle ne s'arrête pas.
 
 En revanche, elle ne sert pas à faire tourner une production : la mention
-figure sur chaque page que voient vos utilisateurs, et la retirer supposerait
-de construire un autre binaire, ce que la licence interdit. Passer d'une
-évaluation à une image sous licence conserve tout : même base de données, même
-configuration, seule l'image change.
+figure sur chaque page que voient vos utilisateurs, et aucun réglage ne la
+retire. Passer d'une évaluation à une édition sous licence conserve tout :
+même image, même base de données, même configuration. Seule la licence
+s'ajoute.
 
 ## Les questions qu'on nous pose d'abord
 
@@ -109,17 +156,23 @@ vous être retiré plus tard.
 
 **Voyez-vous notre trafic, nos utilisateurs ou notre configuration ?** Non. Le
 produit ne contient aucune télémétrie, et rien en lui ne nous envoie quoi que
-ce soit.
+ce soit. La licence se vérifie sur place.
 
-**Team ou Enterprise ?** Les capacités sont les mêmes. Team convient à une
-installation dont vous pouvez donner la taille dès aujourd'hui ; Enterprise est
-faite pour celle que vous ne voulez pas compter.
+**Team ou Enterprise ?** Les capacités sont les mêmes. Team tient sur une
+organisation et une instance ; dès que vous devez séparer plusieurs clients ou
+filiales dans une même installation, ou survivre à la perte d'une machine,
+c'est Enterprise.
 
-**Que devient une installation si un accord prend fin ?** C'est l'une des
-conditions en cours de rédaction ; posez-nous la question, nous y répondrons
-clairement, sans langage de contrat. Le produit, lui, ne coupe rien
-brutalement : une capacité qu'il ne contient plus est refusée par une phrase
-qui le dit, et tout ce qui est déjà en place continue d'être servi.
+**Peut-on faire tourner plusieurs installations Team au lieu d'une
+Enterprise ?** Oui, avec la même licence et sans surcoût. Elles ne partagent
+ni leurs comptes, ni leur configuration, ni leurs sessions : c'est ce que le
+cluster Enterprise apporte.
+
+**Que devient une installation si on ne renouvelle pas ?** Elle continue de
+tourner, sous licence : la licence est perpétuelle. Ce qui s'arrête, ce sont
+les mises à jour et le support. Vous gardez les versions publiées pendant la
+période payée ; les suivantes ne sont plus couvertes, et le renouvellement
+les rouvre.
 
 **Vendez-vous du support pour l'édition gratuite ?** Demandez-nous. Le support
 de l'image Community passe par le dépôt : un ticket ouvert sur
@@ -128,9 +181,7 @@ de l'image Community passe par le dépôt : un ticket ouvert sur
 ::: cta
 ### Parlons-en
 
-Le contact commercial est en cours de mise en place, et son adresse figurera
-ici. En attendant, ouvrez un ticket sur
-[softwarity/meerkat-ce](https://github.com/softwarity/meerkat-ce/issues) en
-précisant ce que vous construisez et à quelle échelle : nous prendrons la
-suite.
+Écrivez-nous à [sales@softwarity.io](mailto:sales@softwarity.io) en précisant ce que vous construisez et à
+quelle échelle : une licence Team ou Enterprise, un contrat de support, une
+intégration, ou simplement le projet dont vous voulez discuter.
 :::

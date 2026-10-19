@@ -57,12 +57,11 @@ var agentCovers = map[string][]string{
 	"locales": {"list_languages", "read_language", "write_language"},
 	"configurations": {"list_configurations", "save_configuration", "activate_configuration",
 		"pull_configuration", "push_configuration"},
-	// The git locations themselves (CFG-07): an agent LISTS them, because
-	// pulling needs to name one, and that is where its business ends. Creating
-	// one hands over a repository URL and a credential reference - a decision
-	// about which repository this installation answers to, taken once, on a
-	// screen, by the person who owns both.
-	"config-remotes": {"list_git_locations"},
+	// The git locations themselves (CFG-07): an agent lists them, because
+	// pulling needs to name one, and creates or changes one, root's like the
+	// screen. The credential stays a vault reference, typed by a person: an
+	// agent names ${token}, it never holds it.
+	"config-remotes": {"list_git_locations", "save_git_location"},
 	"schedules":      {"list_schedules", "list_schedule_runs", "pause_schedule", "run_schedule"},
 	// The catalogue was out of reach on the grounds that renaming a role
 	// silently changes who reaches what - every access rule names roles by
@@ -265,6 +264,7 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"PUT /api/logs/level":           true,
 		"PUT /api/settings/maintenance": true,
 		"PUT /api/settings/mail-relay":  true, "PUT /api/settings/tenancy": true,
+		"PUT /api/license":      true,
 		"PUT /api/settings/tls": true,
 		"POST /api/tenants":     true, "PUT /api/tenants/{id}": true, "DELETE /api/tenants/{id}": true,
 		"POST /api/tenants/{id}/group-rules": true, "PUT /api/tenants/{id}/group-rules/{ruleId}": true,
@@ -383,6 +383,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"run_schedule",
 		"save_branding",
 		"save_configuration",
+		"save_git_location",
 		"save_group",
 		"save_member",
 		"save_oidc_client",

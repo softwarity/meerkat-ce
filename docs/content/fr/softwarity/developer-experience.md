@@ -23,7 +23,7 @@ docker run -p 8080:8080 -p 9090:9090 \
 Pas de base de données à créer, pas de serveur de messages, pas de fichier de
 configuration, pas de chart à générer. La gateway démarre avec son propre
 stockage, sert ses propres pages de connexion et sa propre console. Le jour où
-il vous faut plusieurs gateways, elle demande un PostgreSQL - et pas avant.
+il vous faut plusieurs instances, elle demande un PostgreSQL - et pas avant.
 
 ## Une erreur dit ce qui est accepté
 

@@ -3831,11 +3831,11 @@ func (h *Handler) reachableLinks(ctx context.Context, sess store.Session) []publ
 	// this list is what one can open right now, in the organisation currently
 	// active - offering a link that would land on the tenant chooser would be
 	// offering a detour, not an application.
-	caller := store.Caller{Authenticated: true, TenantID: sess.TenantID}
+	caller := store.Caller{Authenticated: true, TenantID: h.st.SessionTenant(ctx, sess.UserID, sess.TenantID)}
 	if u, err := h.st.GetUserByID(ctx, sess.UserID); err == nil {
 		caller.Username = u.Username
 	}
-	if names, err := h.st.SessionRoleNames(ctx, sess.UserID, sess.TenantID, sess.GroupID); err == nil {
+	if names, err := h.st.SessionRoleNames(ctx, sess.UserID, caller.TenantID, sess.GroupID); err == nil {
 		caller.Roles = names
 	}
 	return h.catalogue(ctx, func(rt store.Route) bool { return rt.Access.Grants(caller) })

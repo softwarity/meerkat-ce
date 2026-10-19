@@ -183,8 +183,8 @@ travail d'une API gateway, et le dire ici vous fait gagner du temps.
 Community, la gratuite, est toute la gateway pour une organisation sur une
 instance. Enterprise est ce dont une installation a besoin dès qu'elle
 grandit : plusieurs organisations, votre annuaire d'entreprise, plusieurs
-gateways derrière un même point d'entrée. Team, c'est Enterprise pour un
-cluster de taille connue, et l'édition d'évaluation, c'est Enterprise avec une
+instances de la gateway derrière un même point d'entrée. Team, c'est
+Enterprise pour une organisation sur une instance, et l'édition d'évaluation, c'est Enterprise avec une
 mention affichée, gratuite, pour tout essayer d'abord.
 
 La règle qui dit ce qui va de chaque côté tient en une ligne, et c'est elle

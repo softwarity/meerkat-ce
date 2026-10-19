@@ -67,7 +67,7 @@ Everything, and refused at the first miss:
   made, kept in its own cookie;
 - **a replay**: an assertion is accepted once. The ones already used are kept
   in the database until they would have expired, so a second post of the same
-  one is refused on every gateway of a cluster.
+  one is refused on every instance of a cluster.
 
 The answer is posted back from the provider's site, and a browser leaves the
 gateway's own cookie off such a post. The gateway answers it with a page that

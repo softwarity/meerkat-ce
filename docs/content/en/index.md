@@ -126,9 +126,9 @@ that version becomes plain Apache 2.0.
 
 Enterprise is what you need once the installation grows: several
 organisations, SAML, LDAP and Active Directory, the OpenID provider of your
-other tools, several gateways behind one entry point. Never
+other tools, several instances of the gateway behind one entry point. Never
 a security primitive - TLS, two-factor, passkeys, the vault and the audit trail
-are free and stay free. Team is Enterprise for a cluster of a known size, and
+are free and stay free. Team is Enterprise for one organisation on one instance, and
 the evaluation edition is Enterprise with a notice on it, free, to try all of
 it first.
 

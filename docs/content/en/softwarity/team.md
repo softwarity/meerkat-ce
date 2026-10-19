@@ -20,8 +20,8 @@ a discussion there stays where the answer will be useful to somebody else.
 ::: grid
 ### Commercial
 
-For the Team and Enterprise editions, a support agreement or an integration:
-the contact channel is being set up and its address will be here.
+For the Team and Enterprise editions, a support agreement, an integration, or
+to talk about your project: [sales@softwarity.io](mailto:sales@softwarity.io).
 
 ### Security
 

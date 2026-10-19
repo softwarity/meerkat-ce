@@ -50,6 +50,27 @@ type Store struct {
 	// issuedPair is where a certificate cert-manager issued (SSL-13) is read
 	// on this node: the Secret as the watch last saw it. Nil until wired.
 	issuedPair atomic.Pointer[func(secret string) (certPEM, keyPEM string, ok bool)]
+	// ownAudit is where the events the store writes BY ITSELF go - nobody's
+	// request behind them (OnOwnAudit). Nil until wired: then straight to
+	// the table.
+	ownAudit atomic.Pointer[func(context.Context, AuditEvent)]
+}
+
+// OnOwnAudit names the funnel for the events the store raises on its own, a
+// schedule starting or stopping to fail (SCHED-06): the control plane's, so
+// such an event reaches the console's live channel and the other nodes like
+// any administrator's write, instead of sitting in the table until somebody
+// reloads the trail.
+func (s *Store) OnOwnAudit(f func(context.Context, AuditEvent)) { s.ownAudit.Store(&f) }
+
+func (s *Store) auditOwn(ctx context.Context, ev AuditEvent) {
+	if f := s.ownAudit.Load(); f != nil {
+		(*f)(ctx, ev)
+		return
+	}
+	if err := s.AddAuditEvent(ctx, ev); err != nil {
+		slog.Warn("store: an event was not written to the audit trail", "action", ev.Action, "err", err)
+	}
 }
 
 // OnSessionsMoved names what to call when the set of open sessions changes:
@@ -1165,7 +1186,12 @@ CREATE TABLE IF NOT EXISTS schedules (
   last_detail TEXT NOT NULL DEFAULT '',
   last_at     BIGINT NOT NULL DEFAULT 0,
   created_at  BIGINT NOT NULL DEFAULT 0,
-  updated_at  BIGINT NOT NULL DEFAULT 0
+  updated_at  BIGINT NOT NULL DEFAULT 0,
+  -- Since when the schedule's turns end badly (SCHED-06), 0 while they end
+  -- well. Moved only by a turn that is SETTLED - not one about to be tried
+  -- again - and each move is one line in the audit trail: failing, then
+  -- recovered, rather than a line per turn.
+  failing_since BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules (paused, next_at);
 
@@ -1244,7 +1270,9 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // oidc_refresh) are new, created by the DDL above.
 // 86 carries no step either: plug_sessions and plug_session_holds are new, and
 // oauth_refresh.used_at is filled in by the additive pass.
-const schemaVersion = 86
+// 87 carries no step: schedules.failing_since is filled in by the additive
+// pass, at 0 - every schedule starts out well until a turn says otherwise.
+const schemaVersion = 87
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -1917,6 +1945,11 @@ type IdentityForward struct {
 	// ISO-8601 duration; empty means the default (2 minutes). Not used by oidc:
 	// the client says how long its tokens live.
 	TTL string `json:"ttl,omitempty"`
+	// Audience is the "aud" of the jwt/signed-jwt tokens; empty means the
+	// route's name. Set it when the application checks for a value of its own,
+	// or so that renaming the route does not change what its tokens say. Not
+	// used by oidc: there the client holds the audience.
+	Audience string `json:"audience,omitempty"`
 	// Algorithm is the signature algorithm for signed-jwt (ES256|EdDSA|RS256);
 	// unused by the header and unsigned-jwt transports, and by oidc.
 	Algorithm string `json:"algorithm,omitempty"`

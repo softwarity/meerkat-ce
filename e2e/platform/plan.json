@@ -1827,6 +1827,20 @@
    "fr": "Le report demandé par le service est respecté."
   },
   {
+   "id": "SCHED-06",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A schedule that starts failing writes one audit line, and one more when it recovers; a failure retried successfully writes none.",
+   "fr": "Une planification qui se met à échouer écrit une ligne d'audit, et une autre quand elle revient ; un échec rattrapé par la reprise n'en écrit aucune."
+  },
+  {
    "id": "I18N-01",
    "priority": "P2",
    "feasibility": "easy",
@@ -3694,6 +3708,20 @@
    ],
    "en": "No card, table or row of the console paints an opaque background over the page; the sticky header and the frozen columns are the two stated exceptions, and every banded table hovers the same colour.",
    "fr": "Aucune carte, aucun tableau ni aucune ligne de la console ne peint un fond opaque par-dessus la page ; l'en-tête collant et les colonnes figées sont les deux exceptions déclarées, et tous les tableaux à bandes ont la même couleur au survol."
+  },
+  {
+   "id": "EVAL-06",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U"
+   ],
+   "editions": [
+    "EVAL",
+    "EE"
+   ],
+   "en": "A license pasted on the License screen is verified before it is kept, refused with its reason otherwise; a license mounted through MEERKAT_LICENSE_FILE is shown, read again after the secret changes, and the screen takes no other.",
+   "fr": "Une licence collée sur l'écran License est vérifiée avant d'être gardée, refusée avec sa raison sinon ; une licence montée par MEERKAT_LICENSE_FILE est affichée, relue après un changement du secret, et l'écran n'en prend pas d'autre."
   }
  ],
  "platform": [

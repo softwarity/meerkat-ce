@@ -106,7 +106,7 @@ La console est compilée dans le binaire. Il n'y a ni CGO, ni sidecar, ni
 courtier de messages, ni cache à faire tourner à côté.
 
 Une base PostgreSQL externe est une **option**, et elle apporte une chose :
-plusieurs gateways au service d'une même installation. PostgreSQL a été
+plusieurs instances de la gateway au service d'une même installation. PostgreSQL a été
 retenu pour ce qu'il offre au-delà du stockage : `LISTEN`/`NOTIFY`, par lequel
 une gateway prévient les autres qu'un changement a eu lieu, et les verrous
 consultatifs, qui fournissent la seule exclusion dont le produit a besoin.

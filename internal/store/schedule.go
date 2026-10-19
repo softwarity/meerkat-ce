@@ -165,6 +165,11 @@ type Schedule struct {
 	LastState  string `json:"lastState,omitempty"`
 	LastDetail string `json:"lastDetail,omitempty"`
 	LastAt     int64  `json:"lastAt,omitempty"`
+	// FailingSince is when the turns started ending badly (SCHED-06), 0
+	// while they end well. Only a SETTLED turn moves it: one the gateway is
+	// about to try again, or that the service asked to have later, says
+	// nothing yet about the schedule's health.
+	FailingSince int64 `json:"failingSince,omitempty"`
 
 	CreatedAt int64 `json:"createdAt,omitempty"`
 	UpdatedAt int64 `json:"updatedAt,omitempty"`
@@ -661,7 +666,8 @@ func (s Schedule) TooLate(t time.Time) bool {
 
 const scheduleColumns = `id, name, roles, created_by, tenant_id, route_id, method, path, body,
 	content_type, headers, metadata, every, cron, at, timezone, start_at, overlap, catch_up, timeout, paused, next_at, run_id, run_started,
-	claimed_by, claimed_at, progress, run_state, attempts, run_cause, run_of, turn_try, last_state, last_detail, last_at, created_at, updated_at`
+	claimed_by, claimed_at, progress, run_state, attempts, run_cause, run_of, turn_try, last_state, last_detail, last_at, created_at, updated_at,
+	failing_since`
 
 func scanSchedule(row interface{ Scan(...any) error }) (Schedule, error) {
 	var s Schedule
@@ -671,7 +677,8 @@ func scanSchedule(row interface{ Scan(...any) error }) (Schedule, error) {
 		&s.CatchUp, &s.Timeout,
 		&s.Paused, &s.NextAt, &s.RunID, &s.RunStarted, &s.ClaimedBy, &s.ClaimedAt, &s.Progress,
 		&s.RunState, &s.Attempts, &s.RunCause, &s.RunOf, &s.TurnTry,
-		&s.LastState, &s.LastDetail, &s.LastAt, &s.CreatedAt, &s.UpdatedAt)
+		&s.LastState, &s.LastDetail, &s.LastAt, &s.CreatedAt, &s.UpdatedAt,
+		&s.FailingSince)
 	if err != nil {
 		return s, err
 	}
@@ -742,13 +749,15 @@ func (s *Store) CreateSchedule(ctx context.Context, sc Schedule) error {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO schedules (`+scheduleColumns+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		?)`,
 		sc.ID, sc.Name, rolesJSON(sc.Roles), sc.CreatedBy, sc.TenantID, sc.RouteID, sc.Method, sc.Path, string(sc.Body),
 		sc.ContentType, headers, meta, sc.Every, sc.Cron, sc.At, sc.Timezone, sc.StartAt, sc.Overlap, sc.CatchUp, sc.Timeout,
 		sc.Paused, sc.NextAt,
 		sc.RunID, sc.RunStarted, sc.ClaimedBy, sc.ClaimedAt, sc.Progress, sc.RunState, sc.Attempts,
 		sc.RunCause, sc.RunOf, sc.TurnTry,
-		sc.LastState, sc.LastDetail, sc.LastAt, sc.CreatedAt, sc.UpdatedAt)
+		sc.LastState, sc.LastDetail, sc.LastAt, sc.CreatedAt, sc.UpdatedAt,
+		sc.FailingSince)
 	if err != nil {
 		return fmt.Errorf("store: create schedule %q: %w", sc.ID, err)
 	}
@@ -991,6 +1000,11 @@ func (s *Store) FinishSchedule(ctx context.Context, id, runID string, end RunEnd
 	}
 	if closed && readErr == nil {
 		row := s.recordRun(ctx, was, end, t)
+		// Another attempt at the same turn, or a later one the service asked
+		// for: the turn is still open, and so is the question of its health.
+		if next.Cause != CauseRetry && next.Cause != CauseAsked {
+			s.settleHealth(ctx, was, end, row, t)
+		}
 		// A turn that continues this one: it carries the attempts already
 		// made, and the history says which run it follows.
 		if next.Cause != "" {
@@ -1042,7 +1056,8 @@ func (s *Store) AbandonRun(ctx context.Context, id, runID, detail string, next, 
 		WHERE id = ? AND run_id = ? AND claimed_at <= ?`,
 		RunLost, clip(detail), t.Unix(), turnAt(next), t.Unix(), id, runID, t.Add(-lease).Unix())
 	if closed && err == nil && readErr == nil {
-		s.recordRun(ctx, was, RunEnd{State: RunLost, Detail: detail}, t)
+		end := RunEnd{State: RunLost, Detail: detail}
+		s.settleHealth(ctx, was, end, s.recordRun(ctx, was, end, t), t)
 	}
 	return closed, err
 }
@@ -1089,7 +1104,8 @@ func (s *Store) DropTurn(ctx context.Context, id string, due, next, t time.Time,
 		// A turn that never went out has no run identifier and no node: what
 		// it has is the moment it was owed, which is what a replay needs.
 		was.RunID, was.ClaimedBy, was.Attempts, was.RunStarted = "", "", 0, due.Unix()
-		s.recordRun(ctx, was, RunEnd{State: RunDropped, Detail: detail}, t)
+		end := RunEnd{State: RunDropped, Detail: detail}
+		s.settleHealth(ctx, was, end, s.recordRun(ctx, was, end, t), t)
 	}
 	return dropped, err
 }
@@ -1142,6 +1158,71 @@ func (s *Store) recordRun(ctx context.Context, was Schedule, end RunEnd, t time.
 		return ""
 	}
 	return row
+}
+
+// ScheduledActor is who the trail names for what the scheduler decides by
+// itself: the name its calls are made under (gateway.ScheduledUser). There is
+// no account behind it, so the trail shows the name as it is.
+const ScheduledActor = "meerkat"
+
+// settleHealth writes the turn that just SETTLED into the schedule's health
+// (SCHED-06), and audits a change of it - only a change. The history already
+// keeps every turn; the trail answers "when did it break, when did it come
+// back", and a schedule failing every ten minutes all night is two lines
+// there, not a hundred.
+//
+// Each move is a conditional UPDATE, so two nodes settling turns of the same
+// schedule at once write it, and audit it, once. Best effort like the history:
+// the run is closed already, and its health is not worth reopening it.
+func (s *Store) settleHealth(ctx context.Context, was Schedule, end RunEnd, row string, t time.Time) {
+	bad := end.State == RunFailed || end.State == RunLost || end.State == RunDropped
+	var moved bool
+	var err error
+	if bad {
+		moved, err = s.affected(ctx, "mark schedule "+was.ID+" failing",
+			`UPDATE schedules SET failing_since = ? WHERE id = ? AND failing_since = 0`, t.Unix(), was.ID)
+	} else if end.State == RunDone {
+		moved, err = s.affected(ctx, "mark schedule "+was.ID+" recovered",
+			`UPDATE schedules SET failing_since = 0 WHERE id = ? AND failing_since <> 0`, was.ID)
+	}
+	if err != nil {
+		slog.Warn("store: a schedule's health was not recorded", "schedule", was.ID, "err", err)
+		return
+	}
+	if !moved {
+		return
+	}
+	ev := AuditEvent{
+		At: t.Unix(), ActorID: ScheduledActor, Target: "schedule",
+		TargetID: was.ID, TargetName: was.Name, TenantID: was.TenantID,
+	}
+	if bad {
+		ev.Action = "schedule.failing"
+		ev.Detail = end.State
+		if end.Status != 0 {
+			ev.Detail += fmt.Sprintf(" (%d)", end.Status)
+		}
+		if d := end.Detail; d != "" {
+			// Shorter than the history's own clip, so the run named after it
+			// is never what gets cut.
+			if len(d) > 300 {
+				d = d[:300] + "..."
+			}
+			ev.Detail += ": " + d
+		}
+	} else {
+		ev.Action = "schedule.recovered"
+		ev.Detail = "done again"
+		if was.FailingSince > 0 {
+			ev.Detail += ", failing since " + time.Unix(was.FailingSince, 0).UTC().Format("2006-01-02 15:04 UTC")
+		}
+	}
+	// The run that made the change, so the trail leads to its line in the
+	// history - the one place where the turns between the two are.
+	if row != "" {
+		ev.Detail += " - run " + row
+	}
+	s.auditOwn(ctx, ev)
 }
 
 // newRunRowID names one history row, and it SORTS: the moment first, in a

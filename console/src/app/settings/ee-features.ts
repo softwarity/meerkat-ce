@@ -132,6 +132,10 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     where: '/system/audit',
     whereLabel: $localize`:@@Audit:Audit`,
   },
+  'EVAL-06': {
+    label: $localize`:@@EE_EVAL_06:License`,
+    what: $localize`:@@EE_EVAL_06_what:The license Softwarity sent, pasted here or mounted from a secret.`,
+  },
   'CFG-07': {
     label: $localize`:@@EE_CFG_07:Configurations in git`,
     what: $localize`:@@EE_CFG_07_what:Keep configurations in a git repository, exported under your own name.`,

@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -356,4 +357,36 @@ func repoPaths(repo *confrepotest.Fake) []string {
 		out = append(out, path)
 	}
 	return out
+}
+
+// An agent creates a location and changes it by name, with the console's rules:
+// a literal token is refused, and a change touches only what it names.
+func TestAnAgentSavesAGitLocation(t *testing.T) {
+	f := setupEE(t)
+	confrepotest.New().Register(t)
+	ctx := context.WithValue(context.Background(), mcpActorKey{}, store.User{ID: "root", Username: "root", Root: true})
+
+	if _, err := f.api.toolSaveGitLocation(ctx, json.RawMessage(
+		`{"name":"Acme","url":"https://example.invalid/a.git","branch":"main","tokenRef":"ghp_real"}`)); err == nil ||
+		!strings.Contains(err.Error(), "vault") {
+		t.Fatalf("a literal token: %v", err)
+	}
+	if _, err := f.api.toolSaveGitLocation(ctx, json.RawMessage(
+		`{"name":"Acme","url":"https://example.invalid/a.git","branch":"main","directory":"prod","tokenRef":"${git}"}`)); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	out, err := f.api.toolSaveGitLocation(ctx, json.RawMessage(`{"name":"Acme","branch":"release"}`))
+	if err != nil {
+		t.Fatalf("change: %v", err)
+	}
+	if m, _ := out.(map[string]any); m["changed"] != "Acme" {
+		t.Fatalf("the change did not find the location by name: %v", out)
+	}
+	list, err := f.api.st.ListConfigRemotes(ctx)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("locations: %v %v", list, err)
+	}
+	if r := list[0]; r.Branch != "release" || r.Dir != "prod" || r.TokenRef != "${git}" {
+		t.Fatalf("a change of branch touched the rest: %+v", r)
+	}
 }

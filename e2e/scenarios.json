@@ -722,8 +722,8 @@
         "fr": "Mettre fin à une session"
       },
       "description": {
-        "en": "Signs one session out on every gateway (SEC-07), and writes session.revoke to the trail. A console session is root's alone: under an application administrator's eyes it reads as absent.",
-        "fr": "Déconnecte une session sur toutes les gateways (SEC-07) et écrit session.revoke dans le journal d'audit. Une session de la console ne regarde que root : pour un administrateur d'application, elle apparaît comme inexistante."
+        "en": "Signs one session out on every instance (SEC-07), and writes session.revoke to the trail. A console session is root's alone: under an application administrator's eyes it reads as absent.",
+        "fr": "Déconnecte une session sur toutes les instances (SEC-07) et écrit session.revoke dans le journal d'audit. Une session de la console ne regarde que root : pour un administrateur d'application, elle apparaît comme inexistante."
       }
     },
     {

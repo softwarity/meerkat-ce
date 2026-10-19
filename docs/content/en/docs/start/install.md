@@ -154,7 +154,7 @@ address costs one door, not the installation.
 | Flag | Variable | Default | What |
 |---|---|---|---|
 | `-data` | `MEERKAT_DATA` | `data` | directory holding the embedded storage |
-| `-database-url` | `MEERKAT_DATABASE_URL` | empty | PostgreSQL URL for several gateways sharing one installation |
+| `-database-url` | `MEERKAT_DATABASE_URL` | empty | PostgreSQL URL for several gateway instances sharing one installation |
 
 > [!WARNING]
 > The default for `-data` is **relative**. Under Docker the image already sets
@@ -190,6 +190,7 @@ single-tenant, and says that too.
 | Flag | Variable | What |
 |---|---|---|
 | `-plug-addr` | `MEERKAT_PLUG_ADDR` | developer tunnel listen address, default `:22222`, Enterprise only |
+| `-license` | `MEERKAT_LICENSE_FILE` | the license file Softwarity sent, mounted from a secret (the Helm chart's `license.existingSecret`). Read at start and again on every look, so a secret updated in place needs no restart; the License screen then shows it and takes no other. Enterprise image only |
 | `-console-url` | `MEERKAT_CONSOLE_URL` | development override: proxy the console to a front dev server |
 | `-version` | - | print version and exit |
 

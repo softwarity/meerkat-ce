@@ -60,7 +60,7 @@ un jeton créé aujourd'hui, et un rôle retiré cesse aussitôt de s'appliquer.
 
 **La révocation** se fait sur la même page : vous désactivez un jeton pour le mettre en
 sommeil, vous le révoquez pour le détruire. Dans les deux cas, l'effet se propage à toutes
-les gateways en quelques secondes. Un jeton cesse aussi de fonctionner dès que son
+les instances en quelques secondes. Un jeton cesse aussi de fonctionner dès que son
 titulaire est désactivé, sort de sa période d'accès ou est supprimé.
 
 Les personnes qui administrent les applications (root, app-admin) voient en outre les

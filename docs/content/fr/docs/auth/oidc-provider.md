@@ -86,7 +86,7 @@ développeur.
 |---|---|
 | **Client id** | ce que l'application appelle son `client_id` : lettres minuscules, chiffres, `.`, `_` et `-`, 63 caractères au plus. Figé une fois le client créé |
 | **Client secret** | d'où vient le secret, un choix parmi trois (ci-dessous) |
-| **Audience** | le `aud` des access tokens : le nom que l'application s'attend à y trouver. Vide, l'identifiant du client. Le `aud` de l'ID token est toujours l'identifiant du client |
+| **Audience** | le `aud` des access tokens : le nom que l'application s'attend à y trouver. Vide, l'identifiant du client. Un texte de 255 caractères au plus, sans caractère de contrôle ; les espaces aux deux bouts sont retirés. Le `aud` de l'ID token est toujours l'identifiant du client |
 | **Token lifetime** | la durée de vie des ID tokens et des access tokens : 5 minutes par défaut, de 1 minute à 24 heures. Un refresh les renouvelle |
 
 Un client ne déclare aucune adresse de retour : les routes qui lui sont liées

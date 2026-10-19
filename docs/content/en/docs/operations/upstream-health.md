@@ -130,7 +130,7 @@ which right it lacks.
 ## In a cluster
 
 The breaker's state and the target check are **per node**, and that is the right choice.
-Two gateways may genuinely disagree about an upstream - a network path, a DNS answer, a
+Two instances may genuinely disagree about an upstream - a network path, a DNS answer, a
 sidecar - and a shared verdict would let one node's bad minute open a circuit for
 everybody.
 

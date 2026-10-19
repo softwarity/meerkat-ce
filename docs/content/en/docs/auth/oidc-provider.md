@@ -82,7 +82,7 @@ for a developer's gateway.
 |---|---|
 | **Client id** | what the application calls its `client_id`: lower-case letters, digits, `.`, `_` and `-`, up to 63 characters. Fixed once the client exists |
 | **Client secret** | where the secret comes from, one choice of three (below) |
-| **Audience** | the `aud` of the access tokens: the name the application expects to find there. Empty, the client id. The ID token's `aud` is always the client id |
+| **Audience** | the `aud` of the access tokens: the name the application expects to find there. Empty, the client id. Any text up to 255 characters, with no control character; spaces at either end are dropped. The ID token's `aud` is always the client id |
 | **Token lifetime** | of the ID and access tokens: 5 minutes by default, from 1 minute to 24 hours. A refresh renews them |
 
 A client declares no return address: the routes bound to it say where the

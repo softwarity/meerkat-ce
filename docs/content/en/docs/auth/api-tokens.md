@@ -58,7 +58,7 @@ the account, the organisation and the group, so a role granted tomorrow applies
 to a token minted today, and a role withdrawn stops applying at once.
 
 **Revoking** is on the same page: disable to park it, revoke to destroy it.
-Either takes effect across every gateway within seconds. A token also stops the
+Either takes effect across every instance within seconds. A token also stops the
 moment its owner is disabled, falls outside their access window, or is deleted.
 
 Those who administer the applications (root, app-admin) also see **everyone's**

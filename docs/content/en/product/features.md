@@ -178,8 +178,8 @@ here saves you time.
 
 Community, the free one, is the whole gateway for one organisation on one
 instance. Enterprise is what an installation needs once it grows: several
-organisations, your corporate directory, several gateways behind one entry
-point. Team is Enterprise for a cluster of a known size, and the evaluation
+organisations, your corporate directory, several instances of the gateway
+behind one entry point. Team is Enterprise for one organisation on one instance, and the evaluation
 edition is Enterprise with a notice on it, free, to try all of it first.
 
 The rule for what falls on each side is one line, and it is the one to check

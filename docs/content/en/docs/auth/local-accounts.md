@@ -239,7 +239,7 @@ would open a second door the authority knows nothing about.
 
 The link is valid for one hour and is spent on use (a code, ten minutes). The new password is checked
 against the policy, including the no-reuse rule, and the change **destroys
-every live session of that account** on every gateway - whoever held one,
+every live session of that account** on every instance - whoever held one,
 including an intruder, signs in again or is out. The owner is told by e-mail
 that their password changed.
 

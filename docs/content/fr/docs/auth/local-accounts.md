@@ -248,7 +248,7 @@ ouvrirait une seconde porte dont l'autorité ne saurait rien.
 
 Le lien est valable une heure et ne sert qu'une fois (un code, dix minutes). Le nouveau mot de passe est contrôlé
 selon la politique, règle de non-réutilisation comprise, et le changement **détruit toutes
-les sessions en cours de ce compte**, sur toutes les gateways : quiconque en détenait
+les sessions en cours de ce compte**, sur toutes les instances : quiconque en détenait
 une, intrus compris, doit se reconnecter ou reste dehors. Le titulaire est prévenu par
 e-mail que son mot de passe a changé.
 

@@ -6,6 +6,7 @@ package admin
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,6 +71,13 @@ type API struct {
 	// package embeds it), for the License screen (CONSOLE-14).
 	EnterpriseFeatures []EditionFeature
 	ReleaseNotes       string
+
+	// LicenseFile is main's -license (MEERKAT_LICENSE_FILE): a license the
+	// deployment mounts, which the console then shows and does not replace.
+	LicenseFile string
+	// LicenseKeys verify a license; nil means the ones the build carries.
+	// Set by tests, which sign their own.
+	LicenseKeys []ed25519.PublicKey
 
 	// TLS is the live HTTPS state (SSL-01/02). Wired by main; nil in the tests
 	// that have no listener to open, where saving material still has to work.

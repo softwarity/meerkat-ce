@@ -100,6 +100,8 @@ func main() {
 		"single (one implicit organisation) or multi (Enterprise); chosen once, at the first start")
 	vaultFile := flag.String("vault", envOr("MEERKAT_VAULT_FILE", ""),
 		"encrypted vault file to ingest once (passphrase in MEERKAT_VAULT_PASSPHRASE or _FILE)")
+	licenseFile := flag.String("license", envOr("MEERKAT_LICENSE_FILE", ""),
+		"license file Softwarity issued, mounted from a secret; the console then shows it and takes no other")
 	// Two ports per plane, and they have different jobs: one serves, the other
 	// tells the caller where to go (SSL-02). A port whose protocol cannot be
 	// named is a port nobody can write a firewall rule or a runbook against.
@@ -155,6 +157,7 @@ func main() {
 		tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
 		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr, databaseURL: *databaseURL,
+		licenseFile: *licenseFile,
 	}); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
@@ -174,6 +177,7 @@ type options struct {
 	tenancy               string
 	plugAddr              string
 	databaseURL           string
+	licenseFile           string
 }
 
 func run(o options) error {
@@ -366,6 +370,8 @@ func run(o options) error {
 	}
 	adminAPI.InternalTLSAddr = o.internalTLSAddr
 	adminAPI.ReleaseNotes = meerkat.ReleaseNotes
+	adminAPI.LicenseFile = o.licenseFile
+	adminAPI.LogLicense(ctx)
 	// The Enterprise rows of the contract, for the License screen (CONSOLE-14).
 	for _, f := range meerkat.EnterpriseFeatures() {
 		adminAPI.EnterpriseFeatures = append(adminAPI.EnterpriseFeatures,
@@ -678,6 +684,10 @@ func run(o options) error {
 	// Every administrative write passes through the audit funnel, which is what
 	// makes this complete without an emission at forty call sites.
 	adminAPI.Changes = changes
+	// And what the store raises by itself - a schedule starting or stopping
+	// to fail (SCHED-06) - goes through the same funnel, so the trail on
+	// screen shows it without a reload.
+	st.OnOwnAudit(adminAPI.Record)
 	// The log level turned on another node's console (OBS-03).
 	bus.OnSignal(store.TopicLogLevel, admin.ApplyLogLevelSignal)
 	// And a write taken by ANOTHER node reaches the consoles this one holds

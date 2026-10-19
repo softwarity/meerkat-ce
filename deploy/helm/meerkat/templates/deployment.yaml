@@ -134,6 +134,11 @@ spec:
                   name: {{ include "meerkat.adminSecretName" . }}
                   key: {{ .Values.admin.existingSecretKey }}
             {{- end }}
+            {{- if (.Values.license).existingSecret }}
+            # The license, read from the mounted Secret below.
+            - name: MEERKAT_LICENSE_FILE
+              value: /etc/meerkat/license/{{ .Values.license.existingSecretKey | default "license" }}
+            {{- end }}
             {{- if .Values.plug.enabled }}
             - name: MEERKAT_PLUG_ADDR
               value: ":{{ .Values.plug.port }}"
@@ -167,10 +172,22 @@ spec:
               mountPath: /etc/meerkat/tls/internal
               readOnly: true
             {{- end }}
+            {{- if (.Values.license).existingSecret }}
+            # The whole Secret, never a subPath: an update in place reaches the
+            # pod only through a mounted volume.
+            - name: license
+              mountPath: /etc/meerkat/license
+              readOnly: true
+            {{- end }}
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        {{- with (.Values.license).existingSecret }}
+        - name: license
+          secret:
+            secretName: {{ . }}
+        {{- end }}
         {{- with include "meerkat.internalTlsSecret" . }}
         - name: internal-tls
           secret:

@@ -65,7 +65,7 @@ Tout, avec un refus au premier écart :
   faite, gardée dans son propre cookie ;
 - **un rejeu** : une assertion n'est acceptée qu'une fois. Celles déjà utilisées sont
   gardées en base jusqu'à leur expiration : un second envoi de la même est refusé sur
-  toutes les gateways d'un cluster.
+  toutes les instances d'un cluster.
 
 La réponse est renvoyée depuis le site du fournisseur, et un navigateur ne joint pas le
 cookie de la gateway à ce genre d'envoi. La gateway y répond donc par une page qui

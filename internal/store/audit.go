@@ -244,8 +244,11 @@ var auditTargets = map[string]AuditTarget{
 	// the configurations themselves: a location names a repository and a
 	// credential reference, which is the installation's own business.
 	"config-remote": {},
-	AuditTargetAll:  {},
-	"backup":        {},
+	// The licence pasted in the console: a contract of this installation's
+	// owner, root's like the configuration.
+	"license":      {},
+	AuditTargetAll: {},
+	"backup":       {},
 	// The SECURITY of an account rather than its administration (AUD-01): a
 	// sign-in, a refusal, a new factor, a password changed by its owner. Written
 	// by the identity handlers, never by the control plane, so no screen is

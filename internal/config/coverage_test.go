@@ -24,6 +24,8 @@ import (
 // staysHome is every setting that deliberately does not travel, and why. The
 // reason is the point: it is what the next person reads before moving one.
 var staysHome = map[string]string{
+	"SettingLicense": "a contract with ONE company, for its own installations: a configuration that " +
+		"travels to someone else's gateway must not carry it",
 	"SettingInstallationID": "names THIS installation for its cookies: generated at install, and a document " +
 		"moved to another gateway must not make that gateway's cookies the same as this one's",
 	// Secrets and key material. A configuration document is not a vault, and

@@ -1,10 +1,14 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, Edition } from '../api.service';
+import { MeService } from '../me.service';
 import { EE_FEATURES } from './ee-features';
 
 // What this installation IS, in one place - and the only screen that talks
@@ -12,9 +16,9 @@ import { EE_FEATURES } from './ee-features';
 // its [Enterprise] cap and links here; repeating the pitch on ten screens
 // would turn the console into an advert.
 //
-// Read-only on purpose. The mode is not switched from here either: it is
-// switched where organisations are administered, because that is where someone
-// can see what it costs them.
+// Read-only but for one thing: the license, which root pastes here. The mode
+// is not switched from here: it is switched where organisations are
+// administered, because that is where someone can see what it costs them.
 interface FeatureRow {
   key: string;
   label: string;
@@ -27,7 +31,15 @@ interface FeatureRow {
 
 @Component({
   selector: 'app-license-page',
-  imports: [MatCardModule, MatIconModule, MatTooltipModule, LoadingIndicatorComponent, RouterLink],
+  imports: [
+    DatePipe,
+    MatButtonModule,
+    MatCardModule,
+    MatIconModule,
+    MatTooltipModule,
+    LoadingIndicatorComponent,
+    RouterLink,
+  ],
   template: `
     <div class="banner">
       <h1 i18n="@@License">License</h1>
@@ -62,7 +74,41 @@ interface FeatureRow {
                   A license is perpetual: its term only covers updates, nothing gets switched off.
                 </p>
               }
+              @if (e.license; as l) {
+                <dl class="license">
+                  <dt i18n="@@Licensee">Licensee</dt>
+                  <dd>{{ l.licensee }}</dd>
+                  @if (l.id) {
+                    <dt i18n="@@License_id">License</dt>
+                    <dd>{{ l.id }}</dd>
+                  }
+                  <dt i18n="@@Updates_until">Updates until</dt>
+                  <dd>
+                    {{ l.updatesUntil | date: 'longDate' }}
+                    @if (l.covered === false) {
+                      <span class="late" i18n="@@Build_not_covered">this build was released after it</span>
+                    }
+                  </dd>
+                </dl>
+              }
+              @if (e.licenseProblem) {
+                <p class="problem">{{ e.licenseProblem }}</p>
+              }
             </div>
+            <!-- Root's, and only on the image a license applies to. A license
+                 the deployment mounts is changed where it is mounted. -->
+            @if (e.enterprise && me.isRoot()) {
+              <button
+                matButton="tonal"
+                type="button"
+                [disabled]="e.licenseSource === 'file'"
+                [matTooltip]="e.licenseSource === 'file' ? fromFile : ''"
+                (click)="change()"
+                i18n="@@Change_license"
+              >
+                Change license
+              </button>
+            }
           </div>
         </mat-card>
 
@@ -167,6 +213,29 @@ interface FeatureRow {
       .warn {
         border-color: var(--mat-sys-error);
       }
+      .license {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 2px 12px;
+        margin: 12px 0 0;
+        font-size: 0.85rem;
+      }
+      .license dt {
+        color: var(--mat-sys-on-surface-variant);
+      }
+      .license dd {
+        margin: 0;
+      }
+      .late {
+        margin-left: 6px;
+        color: var(--mat-sys-on-surface-variant);
+        font-style: italic;
+      }
+      .problem {
+        margin: 8px 0 0;
+        font-size: 0.85rem;
+        color: var(--mat-sys-error);
+      }
       .warn .line > mat-icon {
         color: var(--mat-sys-error);
       }
@@ -249,6 +318,10 @@ interface FeatureRow {
 })
 export class LicensePageComponent {
   private readonly api = inject(ApiService);
+  private readonly dialog = inject(MatDialog);
+  protected readonly me = inject(MeService);
+
+  protected readonly fromFile = $localize`:@@License_from_file:Set by the deployment (MEERKAT_LICENSE_FILE): change it where it is mounted.`;
 
   protected readonly loading = signal(true);
   protected readonly edition = signal<Edition | null>(null);
@@ -287,6 +360,16 @@ export class LicensePageComponent {
         };
       });
   });
+
+  protected async change(): Promise<void> {
+    const { LicenseDialogComponent } = await import('./license-dialog.component');
+    this.dialog
+      .open(LicenseDialogComponent, { width: '640px' })
+      .afterClosed()
+      .subscribe((e: Edition | undefined) => {
+        if (e) this.edition.set(e);
+      });
+  }
 
   constructor() {
     this.api.edition().subscribe({

@@ -413,6 +413,36 @@ func (s *Store) MemberGroups(ctx context.Context, tenantID, userID string) ([]Gr
 	return out, rows.Err()
 }
 
+// SessionTenant is the organisation a session acts in: the one it chose, or,
+// when it chose none, the account's only enabled membership.
+//
+// A session opened BEFORE its account joined an organisation carries none,
+// and sign-in only adopts the only membership at sign-in. Roles are held IN
+// an organisation (RBAC-06), so without this such a session holds no role at
+// all - and every place that judged a route on it must agree: the gateway let
+// it into a route gated by a role while the portal, reading the bare session,
+// hid that same route from it. One rule, here, for all of them.
+func (s *Store) SessionTenant(ctx context.Context, userID, tenantID string) string {
+	if tenantID != "" || userID == "" {
+		return tenantID
+	}
+	ms, err := s.ListUserTenants(ctx, userID)
+	if err != nil {
+		return ""
+	}
+	only := ""
+	for _, m := range ms {
+		if !m.Enabled {
+			continue
+		}
+		if only != "" {
+			return "" // several: the choice is the person's, not ours
+		}
+		only = m.TenantID
+	}
+	return only
+}
+
 // SessionRoleNames resolves the role names a SESSION actually carries - the
 // single place the group mode applies (RBAC-03). Cumulative: every assigned
 // group counts. Exclusive (SINGLE): only the session's ACTIVE group counts,

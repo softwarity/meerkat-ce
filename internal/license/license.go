@@ -28,8 +28,16 @@ var (
 // several entries allows key rotation without invalidating older licenses.
 var productionKeys []ed25519.PublicKey
 
+// ProductionKeys are the signing keys this build verifies a license against.
+// Empty until the first commercial release: every license is refused until
+// then, and the console says why.
+func ProductionKeys() []ed25519.PublicKey { return productionKeys }
+
 // License is the signed payload of a license file.
 type License struct {
+	// ID names this licence: the console shows it beside the licensee, and it
+	// is what a support request quotes.
+	ID        string    `json:"id"`
 	Licensee  string    `json:"licensee"`
 	Plan      string    `json:"plan"`
 	Features  []string  `json:"features"`

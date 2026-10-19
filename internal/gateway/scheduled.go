@@ -1,6 +1,10 @@
 package gateway
 
-import "context"
+import (
+	"context"
+
+	"github.com/softwarity/meerkat/internal/store"
+)
 
 // ScheduledUser is the name a scheduled call answers to, and this is the
 // identity such a call carries (SCHED-01).
@@ -21,7 +25,9 @@ import "context"
 // It is posed in the CONTEXT of the in-process request the scheduler makes,
 // never in a header: nothing about it travels on a wire, so nothing about it
 // can be forged from outside.
-const ScheduledUser = "meerkat"
+//
+// The same name the audit trail gives what the scheduler decides by itself.
+const ScheduledUser = store.ScheduledActor
 
 type scheduledKey struct{}
 

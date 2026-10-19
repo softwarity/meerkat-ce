@@ -465,6 +465,11 @@
     "guard": "authed"
   },
   {
+    "method": "PUT",
+    "path": "/api/license",
+    "guard": "rootOnly"
+  },
+  {
     "method": "GET",
     "path": "/api/live",
     "guard": "authed"

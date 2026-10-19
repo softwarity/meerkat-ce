@@ -127,7 +127,11 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
   qu'elle n'en a pas (le cluster actif/actif, les fichiers de déploiement). La
   liste est lue dans le contrat de fonctionnalités du produit lui-même : elle ne
   peut donc pas s'en écarter. C'est le seul écran qui parle d'éditions : partout
-  ailleurs, un contrôle verrouillé porte son badge et renvoie ici.
+  ailleurs, un contrôle verrouillé porte son badge et renvoie ici. Sur l'image
+  Enterprise, root y change la licence : **Change license** prend le fichier
+  collé, déposé ou choisi, et le vérifie avant de le garder. Une licence montée
+  par le déploiement (`MEERKAT_LICENSE_FILE`) y est affichée à la place, et se
+  change là où elle est montée.
 
 ![L'écran License : l'édition, puis chaque fonctionnalité Enterprise avec son degré d'avancement et l'écran où elle se trouve](img/console/license.webp)
 

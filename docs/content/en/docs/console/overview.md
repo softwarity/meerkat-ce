@@ -122,7 +122,10 @@ Learn these five and the console stops surprising you.
   (the active/active cluster, the deployment files). The list is read from the
   product's own feature contract, so it cannot drift from it. It is the only
   screen that talks about editions: everywhere else a locked control carries its
-  badge and links here.
+  badge and links here. On the Enterprise image, root changes the license there:
+  **Change license** takes the file pasted, dropped or chosen, and it is checked
+  before it is kept. A license mounted by the deployment (`MEERKAT_LICENSE_FILE`)
+  is shown instead, and changed where it is mounted.
 
 ![The License screen: the edition, then every Enterprise feature with how far it is built and the screen it lives on](img/console/license.webp)
 

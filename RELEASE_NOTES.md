@@ -9,6 +9,31 @@
   browser's "Save page as" no longer opens over the console.
 - **A selection shows in the code editors.** Selected text on the line being edited was not
   highlighted: the active line's opaque background covered it.
+- **A schedule's health reaches the audit trail.** One line when a schedule starts failing
+  (`schedule.failing`: what broke, and the run that tipped it), one when it comes back
+  (`schedule.recovered`, with since when it was failing), signed `meerkat` - not one per turn,
+  which the run history already keeps. A failure the automatic retry absorbs, or a turn the
+  service asked to have later, writes nothing.
+- **The portal and the user button agree with the gateway on a session's organisation.** A
+  session opened before its account joined an organisation acts in the only one the account
+  has; the gateway already let it into a route gated by a role held there, while the portal
+  hid that route (and a container holding only such routes) and the user button showed no
+  role. All of them now read the session the same way.
+- **A route's signed JWT takes an audience.** The `aud` of the jwt and signed-jwt tokens was always
+  the route's name; the route editor now has an Audience field (and `identity.audience` in the
+  API), the name still being the default. A service that checks for a value of its own gets it,
+  and renaming a route no longer changes what its tokens say.
+- **One rule for an audience, a route's or an OIDC client's.** Any text up to 255 characters,
+  spaces inside included, no control character: an OIDC client's audience refused a space, which
+  no standard asks, and a route's default audience is its name, which may hold one.
+- **The license has its place.** On the Enterprise image, root changes it on the License screen
+  (**Change license**: paste the file, drop it or choose it), and it is verified before it is kept;
+  or the deployment mounts it from a secret (`MEERKAT_LICENSE_FILE`, `license.existingSecret` in the
+  chart), which the screen then shows and does not replace. The screen names the licensee and how
+  far its updates go. It switches nothing yet: the image still decides the edition.
+- **An agent creates a git location.** `save_git_location` creates one, or changes the one of
+  that name (only the fields given), with the console's rules: https, a branch, and the token as
+  a vault reference, never the token itself.
 ---
 
 ## 1.13.0

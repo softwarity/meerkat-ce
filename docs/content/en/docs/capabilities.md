@@ -100,7 +100,7 @@ The ways in, all served by the gateway in your colours, in 20 languages.
 | [Traffic and metrics](/docs/operations/traffic) | Traffic, latency and failures per route and per endpoint, nothing to install; metrics over OTLP with Enterprise. | Prometheus and Grafana. | Community |
 | [Logs](/docs/operations/logs) and [traces](/docs/operations/tracing) | Structured logs and an access log, refusals included; a trace identifier on every request, the gateway on the trace with Enterprise. | Each piece instrumented on its own. | Community, *partly* |
 | [Scheduled calls](/docs/operations/scheduler) | A route, a path and a cadence: called at least once, retried when too early, history in the console. | Cron jobs, or a scheduler in every service; Temporal, Inngest. | Community |
-| [Several gateways](/docs/deploy/kubernetes) | Active/active on PostgreSQL, no session affinity, no primary. | Sticky sessions and a shared store to design. | Enterprise |
+| [Several gateway instances](/docs/deploy/kubernetes) | Active/active on PostgreSQL, no session affinity, no primary. | Sticky sessions and a shared store to design. | Enterprise |
 | [Deployment](/docs/deploy/shapes) | One image, embedded storage by default, Docker, Swarm or Kubernetes with a Helm chart. | One component per need above, each deployed and upgraded. | Community |
 
 ## For your developers

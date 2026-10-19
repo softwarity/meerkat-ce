@@ -44,6 +44,15 @@ vault:
   previousKey: ""
   existingSecretPreviousKey: vault-key-previous
 
+# The license Softwarity sent, from a Secret you create:
+#   kubectl create secret generic meerkat-license --from-file=license=<the file>
+# Mounted, every pod reads it, the License screen shows it and takes no other;
+# left empty, root pastes it on that screen instead. A Secret updated in place
+# is read again without a restart.
+license:
+  existingSecret: ""
+  existingSecretKey: license
+
 # The FIRST admin account, created on the first start and never read again.
 # Either give a password here (the chart makes a Secret) or name a Secret you
 # manage yourself - never both.

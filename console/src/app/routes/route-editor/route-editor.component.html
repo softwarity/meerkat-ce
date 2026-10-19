@@ -646,6 +646,24 @@
               </mat-select>
             </mat-form-field>
           </div>
+
+          <h3 class="sub" i18n="@@Token_audience">Audience</h3>
+          <p class="section-hint id-hint" i18n="@@Token_audience_hint">
+            The token's <code>aud</code>: the route's name unless the application expects a value of its own.
+          </p>
+          <div class="ttl-row">
+            <mat-form-field class="position-field" subscriptSizing="dynamic">
+              <mat-label i18n="@@Audience">Audience</mat-label>
+              <input
+                matInput
+                spellcheck="false"
+                autocapitalize="off"
+                [placeholder]="draft().name"
+                [value]="draft().identityAudience"
+                (input)="patch('identityAudience', $any($event.target).value)"
+              />
+            </mat-form-field>
+          </div>
         }
 
         @if (draft().identityMechanism) {

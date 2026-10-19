@@ -1336,6 +1336,15 @@ func validateRouteType(r store.Route) error {
 			return fmt.Errorf("identity mechanism %q is not allowed: allowed mechanisms are %s",
 				id.Mechanism, strings.Join(store.IdentityMechanisms, ", "))
 		}
+		if id.Audience != "" {
+			if id.Mechanism != "jwt" && id.Mechanism != "signed-jwt" {
+				return fmt.Errorf("identity mechanism %q takes no audience: only the jwt and signed-jwt tokens carry one "+
+					"(an oidc client holds its own)", id.Mechanism)
+			}
+			if err := store.CheckAudience(id.Audience); err != nil {
+				return fmt.Errorf("identity %w", err)
+			}
+		}
 		if id.Mechanism != store.IdentityOIDC && (id.Client != "" || len(id.Claims) > 0) {
 			return fmt.Errorf("identity mechanism %q takes no client and no claims: they belong to the oidc mechanism", id.Mechanism)
 		}
@@ -1652,20 +1661,10 @@ func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityE
 			}
 		}
 	}
-	tenantID := sess.TenantID
-	if tenantID == "" {
-		// The session was opened BEFORE this account joined an organisation.
-		// Sign-in adopts the only membership when there is exactly one; this
-		// does the same afterwards, so being added to an organisation takes
-		// effect without asking the person to sign out and back in.
-		//
-		// Roles are held IN an organisation (RBAC-06), so without one the
-		// caller carries none - which is how a group full of roles could look
-		// like it did nothing at all.
-		if len(d.Memberships) == 1 {
-			tenantID = d.Memberships[0]
-		}
-	}
+	// A session opened before this account joined an organisation carries
+	// none: it acts in the only one there is, so being added to an
+	// organisation takes effect without signing out and back in.
+	tenantID := rt.st.SessionTenant(req.Context(), u.ID, sess.TenantID)
 	if tenantID != "" {
 		d.TenantID = tenantID
 		if t, err := rt.st.GetTenant(req.Context(), tenantID); err == nil {
@@ -2774,7 +2773,9 @@ func identityClaims(cfg store.IdentityForward, routeName, issuer string, d ident
 		"iat": now.Unix(),
 		"exp": now.Add(ttl).Unix(),
 	}
-	if routeName != "" {
+	if cfg.Audience != "" {
+		claims["aud"] = cfg.Audience
+	} else if routeName != "" {
 		claims["aud"] = routeName
 	}
 	if d.UserID != "" {

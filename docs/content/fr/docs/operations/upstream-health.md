@@ -137,7 +137,7 @@ le droit qui lui manque.
 ## En cluster
 
 L'état du disjoncteur et la vérification des cibles sont propres à **chaque nœud**, et
-c'est le bon choix. Deux gateways peuvent réellement être en désaccord sur un upstream -
+c'est le bon choix. Deux instances peuvent réellement être en désaccord sur un upstream -
 un chemin réseau, une réponse DNS, un sidecar - et un verdict partagé laisserait la
 mauvaise passe d'un seul nœud ouvrir un circuit pour tout le monde.
 

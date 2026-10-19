@@ -70,7 +70,7 @@ carries no account, no certificate and no secret value, so it is not a backup.
 | the live channel's own subscribers (messages are relayed) | sessions and API tokens |
 
 > [!NOTE] Enterprise edition
-> Running several gateways against one PostgreSQL database is the Enterprise
+> Running several gateway instances against one PostgreSQL database is the Enterprise
 > image: the driver that opens the connection and waits on notifications lives
 > there. The community image tells you what it can do instead of failing on a
 > driver.

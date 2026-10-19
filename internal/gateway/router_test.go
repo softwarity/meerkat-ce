@@ -801,6 +801,41 @@ func TestValidateIdentity(t *testing.T) {
 	if err := Validate(bad); err == nil {
 		t.Fatal("bad ttl accepted")
 	}
+	// The audience belongs to the tokens: a jwt or signed-jwt route may name
+	// one, headers have no token to carry it, and an oidc client holds its own.
+	aud := mk("signed-jwt", store.IdentityAttr{Field: "username"})
+	aud.Identity.Audience = "api://orders"
+	if err := Validate(aud); err != nil {
+		t.Fatalf("valid audience refused: %v", err)
+	}
+	// The default is the route's name, which may hold a space: so may the
+	// audience that stands in for it.
+	aud.Identity.Audience = "GeoServer OGC"
+	if err := Validate(aud); err != nil {
+		t.Fatalf("audience with a space inside refused: %v", err)
+	}
+	aud.Identity.Audience = "line\nbreak"
+	if err := Validate(aud); err == nil || !strings.Contains(err.Error(), "control character") {
+		t.Fatalf("audience with a control character: %v", err)
+	}
+	onHeaders := mk("headers", store.IdentityAttr{Field: "username"})
+	onHeaders.Identity.Audience = "orders"
+	if err := Validate(onHeaders); err == nil || !strings.Contains(err.Error(), "takes no audience") {
+		t.Fatalf("audience on headers: %v", err)
+	}
+}
+
+// The aud is the route's name unless the route names one: an application
+// that checks its own value, or a route renamed without its tokens changing.
+func TestIdentityClaimsAudience(t *testing.T) {
+	cfg := store.IdentityForward{Mechanism: "jwt"}
+	if got := identityClaims(cfg, "orders", "iss", identityData{})["aud"]; got != "orders" {
+		t.Fatalf("default aud = %v, want the route name", got)
+	}
+	cfg.Audience = "api://orders"
+	if got := identityClaims(cfg, "orders", "iss", identityData{})["aud"]; got != "api://orders" {
+		t.Fatalf("aud = %v, want the route's audience", got)
+	}
 }
 
 // Identity forwarding rides EVERY request of the route, HTML navigations and

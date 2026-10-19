@@ -45,7 +45,7 @@ visible après coup.
 - **Le portail de navigation** : une barre commune à toutes les applications que
   sert la gateway, injectée dans des pages qui n'embarquent aucune bibliothèque
   pour cela.
-- **Le cluster** : plusieurs gateways derrière un même PostgreSQL, qui se
+- **Le cluster** : plusieurs instances de la gateway derrière un même PostgreSQL, qui se
   coordonnent par la base plutôt qu'entre elles.
 - **Les configurations versionnées** : plusieurs coexistent, une seule est active,
   l'export et l'import bouclent la boucle, chaque changement crée un point de

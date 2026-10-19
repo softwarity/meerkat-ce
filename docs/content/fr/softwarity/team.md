@@ -21,8 +21,7 @@ une discussion y reste là où la réponse servira à quelqu'un d'autre.
 ### Commercial
 
 Pour les éditions Team et Enterprise, un contrat de support ou une
-intégration : le contact commercial est en cours de mise en place, et son
-adresse figurera ici.
+intégration, ou pour discuter de votre projet : [sales@softwarity.io](mailto:sales@softwarity.io).
 
 ### Sécurité
 

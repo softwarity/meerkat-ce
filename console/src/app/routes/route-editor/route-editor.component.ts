@@ -480,6 +480,7 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     telemetryUi: r?.telemetryUi ?? false,
     identityMechanism: (r?.identity?.mechanism ?? "") as IdentityMechanism,
     identityTtl: r?.identity?.ttl || "PT2M",
+    identityAudience: r?.identity?.audience ?? "",
     identityAlgorithm: r?.identity?.algorithm || "ES256",
     // OIDC: the client the application signs in as, and what its tokens say.
     identityClient: r?.identity?.client ?? "",
@@ -1883,6 +1884,7 @@ export class RouteEditorComponent {
       | "specPath"
       | "upstream"
       | "identityTtl"
+      | "identityAudience"
       | "identityAlgorithm"
       | "identityClient"
       | "btnPosition"
@@ -2220,6 +2222,7 @@ export class RouteEditorComponent {
     };
     if (d.identityMechanism === "jwt" || d.identityMechanism === "signed-jwt") {
       if (d.identityTtl.trim()) identity.ttl = d.identityTtl.trim();
+      if (d.identityAudience.trim()) identity.audience = d.identityAudience.trim();
     }
     if (d.identityMechanism === "signed-jwt" && d.identityAlgorithm) {
       identity.algorithm = d.identityAlgorithm;

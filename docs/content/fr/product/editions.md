@@ -9,19 +9,20 @@ summary: Ce que fait l'édition gratuite, ce qu'ajoute Enterprise, comment tout 
 
 Un produit, quatre éditions. **Community** n'est ni une démonstration ni une
 version d'essai : c'est toute la gateway pour le cas courant - une
-organisation, une gateway, vos propres comptes ou un fournisseur OpenID
+organisation, une instance, vos propres comptes ou un fournisseur OpenID
 Connect - gratuite, production comprise. **Enterprise** sert quand vous grandissez
-dans l'une de trois directions : plusieurs organisations, plusieurs gateways,
-ou l'annuaire de votre entreprise. **Team**, c'est Enterprise pour un cluster
-d'une taille fixée. Et **Évaluation**, c'est Enterprise avec une mention
+dans l'une de trois directions : plusieurs organisations, plusieurs instances
+en cluster, ou l'annuaire de votre entreprise. **Team**, c'est Enterprise pour une
+organisation sur une instance : l'annuaire, sans la montée en charge horizontale ni les
+organisations multiples. Et **Évaluation**, c'est Enterprise avec une mention
 affichée, gratuite, pour tout essayer d'abord.
 
 | Édition | Ce qu'elle est | Comment l'obtenir |
 | --- | --- | --- |
 | **Community** (CE) | Toute la gateway gratuite, production comprise | `softwarity/meerkat` sur Docker Hub |
 | **Évaluation** (Eval) | Tout Enterprise, avec une mention d'évaluation ; pas pour la production | `softwarity/meerkat:eval` sur Docker Hub |
-| **Team** (TE) | Tout ce qu'ajoute Enterprise, pour un cluster de la taille que fixe votre contrat | Construite pour vous - [parlons-en](/pricing/index) |
-| **Enterprise** (EE) | Tout ce qu'ajoute Enterprise, sans plafond | Construite pour vous - [parlons-en](/pricing/index) |
+| **Team** (TE) | Tout ce qu'ajoute Enterprise, pour une organisation sur une instance | L'image d'évaluation et une licence - [parlons-en](/pricing/index) |
+| **Enterprise** (EE) | Tout ce qu'ajoute Enterprise, sans plafond | L'image d'évaluation et une licence - [parlons-en](/pricing/index) |
 
 ::: lead
 La ligne que nous tenons, et celle qui compte au moment de comparer : **la
@@ -60,7 +61,7 @@ en entreprise, pour un usage commercial, gratuitement.
 | **Rôles issus de l'annuaire** | Accordés dans Meerkat | Règles de groupe : un groupe LDAP, une équipe GitHub ou un claim OIDC devient une appartenance et ses rôles, à chaque connexion. |
 | **Certificats** | Générés, importés ou signés sur demande, placés à la main sur la console et sur l'application | ACME en plus : Let's Encrypt, ZeroSSL, Google ou votre propre step-ca les émettent et les renouvellent sans intervention, avec plusieurs autorités côte à côte. |
 | **Heures ouvrées** | - | Fenêtres d'accès : plages horaires, jours de la semaine, fuseau horaire. Livré en partie - voir la [feuille de route](/project/roadmap). |
-| **Plusieurs gateways** | Une gateway sur son stockage embarqué | Actif/actif sur un PostgreSQL partagé : une modification atteint tous les nœuds en moins d'une seconde, les certificats sont partagés, n'importe quel nœud sert n'importe quelle session. Voir [la page sur le cluster](/docs/deploy/kubernetes). |
+| **Montée en charge horizontale** | Une instance sur son stockage embarqué | Plusieurs instances de la même gateway, en actif/actif sur un PostgreSQL partagé : une modification atteint tous les nœuds en moins d'une seconde, les certificats sont partagés, n'importe quel nœud sert n'importe quelle session. Voir [la page sur le cluster](/docs/deploy/kubernetes). |
 | **Supervision** | Écrans de trafic et de métriques intégrés, rien à installer. Journaux écrits en JSON OpenTelemetry pour un agent installé sur le nœud. | Les mêmes écrans, plus l'export vers votre collecteur OpenTelemetry : traces, métriques et journaux envoyés en OTLP. |
 | **Audit** | Le journal d'audit, dans la console | Le journal envoyé à votre collecteur, l'audit des endpoints (Endpoint audit) opération par opération, et l'export CSV. |
 | **Configurations enregistrées** | Trois à la fois, et la console vous dit où vous en êtes avant que vous n'atteigniez le plafond | Autant que vous voulez : une par client, une par environnement. |
@@ -68,6 +69,10 @@ en entreprise, pour un usage commercial, gratuitement.
 | **Pages intégrées** | Vos couleurs, votre logo, votre nom, la disposition centrée (*Centered*) | Les dispositions *Split*, *Drawer*, *Banner* et *Bare* en plus, et la marque Meerkat retirée des pages que vous servez. |
 | **Tunnel développeur** | plug, gratuit, tourne seul à côté de la gateway ; Meerkat n'en sait rien | plug intégré à la gateway : chaque développeur se connecte avec sa propre clé, et chaque substitution est nommée et annoncée aux utilisateurs. Voir [Mode développement](/product/dev-mode). |
 | **Support** | Le dépôt : un ticket est lu, et la réponse reste là où elle servira au suivant | Compris dans l'accord : vous joignez ceux qui ont écrit la gateway, pas un premier niveau de support. |
+
+**Team** porte toutes ces lignes sauf deux : une seule organisation, et une
+seule instance sur son stockage, comme Community. Le support y est standard ;
+celui d'Enterprise est étendu.
 
 Annoncés mais pas encore construits : Kerberos, et l'export du journal d'audit
 au format Parquet. La [feuille de route](/project/roadmap) dit où en
@@ -80,16 +85,16 @@ aucune limite de durée, aucun compteur, aucune capacité désactivée. Elle
 ajoute en revanche une mention - *Meerkat evaluation version. Not licensed for
 production use.* - sur les pages que sert la gateway, dans le bouton
 utilisateur, dans les e-mails qu'elle envoie, et en filigrane sur toute la
-console. Aucun réglage ne la retire : la mention est dans le binaire, et les
-images sous licence sont simplement construites sans elle.
+console. Aucun réglage ne la retire : seule une licence Team ou Enterprise,
+collée dans la console, la fait disparaître.
 
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
   -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat:eval
 ```
 
-Passer plus tard à une image sous licence conserve la base de données et la
-configuration telles quelles : c'est une autre image sur les mêmes données.
+Passer plus tard à une édition sous licence conserve tout : même image, même
+base de données, même configuration. Seule la licence s'ajoute.
 
 ## Laquelle il vous faut
 
@@ -101,16 +106,24 @@ Trois questions, et un seul oui suffit :
 3. La gateway doit-elle **survivre à la perte d'une machine** ?
 
 Si c'est non trois fois, Community est tout le produit et il n'y a rien à
-acheter. Si l'une est oui, essayez l'édition d'évaluation sur votre cas avant
-d'en parler à qui que ce soit.
+acheter. Si seule la deuxième est oui, Team suffit. Si la première ou la
+troisième l'est, c'est Enterprise. Dans tous les cas, essayez l'édition
+d'évaluation sur votre cas avant d'en parler à qui que ce soit.
 
-## Rien à activer
+## Une licence, rien d'autre à activer
 
-L'édition, c'est l'image. Pas de clé de licence à installer, pas de serveur
-d'activation à joindre, rien qui expire au milieu de la nuit : l'essentiel du
-code Enterprise est tout simplement absent de l'image Community, et une image
-Team ou Enterprise est construite pour votre société. La gateway ne nous
-appelle jamais et n'envoie aucun rapport d'usage.
+L'essentiel du code Enterprise est tout simplement absent de l'image
+Community. Team et Enterprise, elles, sont l'image d'évaluation à laquelle vous
+donnez une licence : collée dans la console, vérifiée sur place par sa
+signature, elle retire la mention d'évaluation sans redémarrage. Pas de serveur
+d'activation à joindre, rien qui expire au milieu de la nuit : la gateway ne
+nous appelle jamais et n'envoie aucun rapport d'usage.
+
+Une licence ne coupe jamais le trafic. Ce qui dépasse ses plafonds est refusé
+à la création, par une phrase qui le dit. La même licence vaut pour toutes
+les installations de votre entreprise, sans surcoût, et elle est perpétuelle : le prix annuel
+inclut les mises à jour et le support ; le droit d'utilisation, lui, est
+acquis une fois pour toutes.
 
 Quand l'image Community rencontre ce qu'elle ne contient pas, elle dit
 clairement ce qu'elle ne peut pas faire, et ne vous laisse jamais en panne :

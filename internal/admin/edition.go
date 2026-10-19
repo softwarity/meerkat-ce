@@ -20,6 +20,8 @@ func (a *API) registerEdition(mux Mux) {
 	// who belongs where - and the capability that holds users, roles and
 	// organisations is the one that decides it.
 	mux.Handle("PUT /api/settings/tenancy", a.appAdmin(a.putTenancy))
+	// Root: the license is the installation owner's contract.
+	mux.Handle("PUT /api/license", a.rootOnly(a.putLicense))
 }
 
 // editionInfo is what the console needs to know before drawing anything.
@@ -73,6 +75,12 @@ type editionInfo struct {
 	// licence wording - which would be a lie on a build that is licensed for
 	// evaluation only.
 	Notice string `json:"notice,omitempty"`
+	// License is the verified license in force, LicenseSource where it comes
+	// from ("file" when MEERKAT_LICENSE_FILE is set, "console" when pasted),
+	// and LicenseProblem why the one held is refused. See license.go.
+	License        *licenseInfo `json:"license,omitempty"`
+	LicenseSource  string       `json:"licenseSource,omitempty"`
+	LicenseProblem string       `json:"licenseProblem,omitempty"`
 }
 
 // EditionFeature is one Enterprise row of the contract.
@@ -92,6 +100,9 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 		InternalPort: portOf(a.InternalAddr),
 		Features:     a.EnterpriseFeatures,
 		Notice:       evalmark.MailNote,
+	}
+	if edition.Enterprise {
+		info.License, info.LicenseSource, info.LicenseProblem = a.currentLicense(ctx)
 	}
 	in := a.internalOf(ctx)
 	info.InternalOrigin, info.InternalNames, info.InternalSource = in.Origin, in.Names, in.Source

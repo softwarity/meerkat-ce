@@ -196,7 +196,8 @@ func routeSchema() map[string]any {
 		"identity": map[string]any{"type": "object",
 			"description": "What the route forwards about the caller to the service: mechanism " +
 				"('headers', 'jwt', 'signed-jwt', 'oidc'), the attributes, ttl, and algorithm for signed-jwt " +
-				"(ES256 by default, or EdDSA, RS256). With 'oidc' nothing is forwarded: the application " +
+				"(ES256 by default, or EdDSA, RS256). 'audience' is the aud of the jwt and signed-jwt " +
+				"tokens, the route's name when absent (any text up to 255 characters). With 'oidc' nothing is forwarded: the application " +
 				"signs its people in against this gateway as an OpenID provider, through 'client' (an id " +
 				"from list_oidc_clients), and 'claims' say what its tokens carry - each {name, field} " +
 				"naming one of the attributes, or {name, value} fixed. The provider's own claims (iss, " +

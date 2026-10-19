@@ -133,9 +133,9 @@ ans après sa publication, chaque version passe sous licence Apache 2.0.
 
 Enterprise est ce qu'il vous faut dès que l'installation grandit : plusieurs
 organisations, SAML, LDAP et Active Directory, le fournisseur OpenID de vos autres
-outils, plusieurs gateways derrière un même point d'entrée. Jamais une brique de sécurité : TLS, le second facteur, les passkeys,
+outils, plusieurs instances de la gateway derrière un même point d'entrée. Jamais une brique de sécurité : TLS, le second facteur, les passkeys,
 le coffre et le journal d'audit sont gratuits et le resteront. Team, c'est
-Enterprise pour un cluster de taille connue, et l'édition d'évaluation, c'est
+Enterprise pour une organisation sur une instance, et l'édition d'évaluation, c'est
 Enterprise avec une mention affichée, gratuite, pour tout essayer d'abord.
 
 [plug](https://softwarity.github.io/plug/), le tunnel développeur de

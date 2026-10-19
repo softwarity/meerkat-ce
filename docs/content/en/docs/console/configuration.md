@@ -211,7 +211,7 @@ exists, and writes nothing - so a wrong token is found on the screen that sets i
 
 ### From an agent
 
-`list_git_locations`, `pull_configuration` and `push_configuration`
+`list_git_locations`, `save_git_location` (create or change a location; the token stays a vault reference), `pull_configuration` and `push_configuration`
 ([agents](/docs/agent/overview)). An agent that asks the gateway to push holds no
 credential and needs no checkout: the token in the vault, scoped to one
 repository, is the one doing the work.

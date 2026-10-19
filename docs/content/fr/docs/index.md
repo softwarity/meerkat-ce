@@ -28,7 +28,7 @@ et de l'observation, pour que vos services n'aient plus à s'en occuper.
 
 - **[Exploitation](/docs/operations/overview)** - trafic, audit, sauvegardes, montées de version.
 - **[Déployer](/docs/deploy/one-gateway)** - Docker, Helm, et ce que règle chaque variable.
-- **[Cluster Kubernetes](/docs/deploy/kubernetes)** - plusieurs gateways derrière un seul point d'entrée.
+- **[Cluster Kubernetes](/docs/deploy/kubernetes)** - plusieurs instances de la gateway derrière un seul point d'entrée.
 
 > [!TIP]
 > La recherche de la barre supérieure parcourt toutes les pages, dans la langue

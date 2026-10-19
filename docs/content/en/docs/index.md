@@ -28,7 +28,7 @@ routing and observation, so your services do not have to.
 
 - **[Operations](/docs/operations/overview)** - traffic, audit, backups, upgrades.
 - **[Deploying](/docs/deploy/one-gateway)** - Docker, Helm, and what each variable decides.
-- **[Kubernetes cluster](/docs/deploy/kubernetes)** - several gateways behind one entry point.
+- **[Kubernetes cluster](/docs/deploy/kubernetes)** - several instances of the gateway behind one entry point.
 
 > [!TIP]
 > The search in the top bar looks through every page, in the language you are

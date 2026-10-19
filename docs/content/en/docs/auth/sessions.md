@@ -105,14 +105,14 @@ the installation-wide lifetime, because the organisation is not known yet.
 |---|---|---|
 | `POST /logout`, or `GET /logout` from a page of the site | that one session | yes, the row is deleted |
 | Idle expiry | that session | yes, refused on the wall clock |
-| A password reset from the e-mailed link | **every** session of that account, on every gateway | yes |
+| A password reset from the e-mailed link | **every** session of that account, on every instance | yes |
 | Deleting the account | every session of that account | yes |
 | **Disabling** the account | every session of that account, on both planes | yes |
 | **Sign out** on the profile's *Active sessions*, or *Sign out everywhere else* | that session, or every other one of that person | yes |
 | **Sign out** on the console's *Sessions* screen | that session | yes |
 
 Logout deletes the row rather than merely clearing the cookie, then clears both
-cookies and tells the other gateways to forget it.
+cookies and tells the other instances to forget it.
 
 Our own pages sign out by `POST`. On the data plane, `/logout` also answers a
 `GET`, because a sign-out button inside an application behind the gateway can only

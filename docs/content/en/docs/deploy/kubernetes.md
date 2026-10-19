@@ -2,12 +2,12 @@
 title: Kubernetes cluster
 section: Deploying
 order: 235
-summary: Several gateways serving one installation: the Deployment, the two Services, the Ingress, and how not to turn the entry point into a single point of failure.
+summary: Several instances of the gateway serving one installation: the Deployment, the two Services, the Ingress, and how not to turn the entry point into a single point of failure.
 ---
 
 # Kubernetes cluster
 
-Several gateways serving one installation, in front of the same applications. The whole shape follows from one property of the product: the nodes never talk to each other. All the coordination goes through the database they share, which is what lets a Kubernetes deployment be an ordinary one.
+Several instances of the gateway serving one installation, in front of the same applications. The whole shape follows from one property of the product: the nodes never talk to each other. All the coordination goes through the database they share, which is what lets a Kubernetes deployment be an ordinary one.
 
 What you deploy is four objects and one dependency: a Deployment of three replicas, two ClusterIP Services (one per plane), an Ingress in front of the public one, and one external PostgreSQL. No StatefulSet, no headless Service, no PersistentVolumeClaim, no sidecar, no Redis.
 

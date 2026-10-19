@@ -51,6 +51,8 @@ var agentClosedSections = map[string]string{
 		"stops meaning anything",
 	"backup": "a snapshot is a file to download, and a copy moves the database under the running " +
 		"gateway; export_configuration is the readable half",
+	"license": "a license is a contract between a company and Softwarity, pasted by a person of " +
+		"that company; describe_gateway says which edition this is",
 	"live": "the console's websocket: an agent does not hold a socket open, it asks again",
 	"mcp":  "the agent endpoint itself",
 }

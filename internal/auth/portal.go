@@ -176,11 +176,11 @@ func (h *Handler) portalJSON(w http.ResponseWriter, r *http.Request) {
 	caller := store.Caller{}
 	if sess, err := h.sm.Resolve(r.Context(), r); err == nil && sess.Pending == "" {
 		caller.Authenticated = true
-		caller.TenantID = sess.TenantID
+		caller.TenantID = h.st.SessionTenant(r.Context(), sess.UserID, sess.TenantID)
 		if u, err := h.st.GetUserByID(r.Context(), sess.UserID); err == nil {
 			caller.Username = u.Username
 		}
-		if names, err := h.st.SessionRoleNames(r.Context(), sess.UserID, sess.TenantID, sess.GroupID); err == nil {
+		if names, err := h.st.SessionRoleNames(r.Context(), sess.UserID, caller.TenantID, sess.GroupID); err == nil {
 			caller.Roles = names
 		}
 	}

@@ -101,7 +101,7 @@ Les façons d'entrer, toutes servies par la gateway à vos couleurs, en 20 langu
 | [Trafic et métriques](/docs/operations/traffic) | Trafic, latence et échecs par route et par endpoint, rien à installer ; métriques en OTLP avec Enterprise. | Prometheus et Grafana. | Community |
 | [Journaux](/docs/operations/logs) et [traces](/docs/operations/tracing) | Journaux structurés et journal d'accès, refus compris ; un identifiant de trace sur chaque requête, la gateway dans la trace avec Enterprise. | Chaque pièce instrumentée séparément. | Community, *en partie* |
 | [Les appels planifiés](/docs/operations/scheduler) | Une route, un chemin et une cadence : appel fait au moins une fois, relancé quand c'est trop tôt, historique dans la console. | Des cron jobs, ou un ordonnanceur dans chaque service ; Temporal, Inngest. | Community |
-| [Plusieurs gateways](/docs/deploy/kubernetes) | Actif/actif sur PostgreSQL, sans affinité de session, sans nœud principal. | Des sessions collantes et un stockage partagé à concevoir. | Enterprise |
+| [Plusieurs instances de la gateway](/docs/deploy/kubernetes) | Actif/actif sur PostgreSQL, sans affinité de session, sans nœud principal. | Des sessions collantes et un stockage partagé à concevoir. | Enterprise |
 | [Le déploiement](/docs/deploy/shapes) | Une image, un stockage embarqué par défaut, Docker, Swarm ou Kubernetes avec un chart Helm. | Un composant par besoin ci-dessus, chacun déployé et mis à jour. | Community |
 
 ## Pour vos développeurs

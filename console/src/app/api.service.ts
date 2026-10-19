@@ -488,6 +488,8 @@ export interface IdentityForward {
   mechanism?: IdentityMechanism;
   attributes?: IdentityAttr[];
   ttl?: string;
+  // The tokens' aud (jwt, signed-jwt); absent means the route's name.
+  audience?: string;
   algorithm?: string;
   client?: string;
   claims?: OIDCClaim[];
@@ -1433,6 +1435,24 @@ export interface Edition {
   // flag: the sentence itself, which the License screen shows in place of the
   // perpetual-licence wording.
   notice?: string;
+  // The verified license in force (Enterprise image only), where it comes
+  // from - mounted by the deployment (MEERKAT_LICENSE_FILE) or pasted here -
+  // and why the one held is refused.
+  license?: License;
+  licenseSource?: 'file' | 'console';
+  licenseProblem?: string;
+}
+
+// What the License screen shows of a license: never the file itself.
+export interface License {
+  id?: string;
+  licensee: string;
+  plan?: string;
+  issuedAt: string;
+  updatesUntil: string;
+  // Whether this build falls within the updates paid for; absent on a build
+  // with no date. False switches nothing off.
+  covered?: boolean;
 }
 
 // One field's before/after inside an audit event (from/to are the decoded JSON
@@ -3093,6 +3113,11 @@ export class ApiService {
 
   edition(): Observable<Edition> {
     return this.http.get<Edition>('/api/edition');
+  }
+
+  // Root: verified by the server before it is kept; answers the edition.
+  putLicense(license: string): Observable<Edition> {
+    return this.http.put<Edition>('/api/license', { license });
   }
 
   setTenancy(tenancy: 'single' | 'multi'): Observable<Edition> {

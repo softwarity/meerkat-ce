@@ -2,12 +2,12 @@
 title: Cluster Kubernetes
 section: Déployer
 order: 235
-summary: Plusieurs gateways pour une même installation : le Deployment, les deux Services, l'Ingress, et comment éviter que le point d'entrée ne devienne un point de défaillance unique.
+summary: Plusieurs instances de la gateway pour une même installation : le Deployment, les deux Services, l'Ingress, et comment éviter que le point d'entrée ne devienne un point de défaillance unique.
 ---
 
 # Cluster Kubernetes
 
-Plusieurs gateways au service d'une même installation, devant les mêmes applications.
+Plusieurs instances de la gateway au service d'une même installation, devant les mêmes applications.
 Toute l'architecture découle d'une propriété du produit : les nœuds ne se parlent jamais.
 Toute la coordination passe par la base de données qu'ils partagent, et c'est ce qui permet
 à un déploiement Kubernetes de rester un déploiement ordinaire.

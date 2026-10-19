@@ -117,6 +117,7 @@ func (h *Handler) relayPerson(r *http.Request) tracing.Who {
 	if err != nil || sess.Pending != "" {
 		return tracing.Who{}
 	}
+	sess.TenantID = h.st.SessionTenant(r.Context(), sess.UserID, sess.TenantID)
 	who := tracing.Who{UserID: sess.UserID, TenantID: sess.TenantID}
 	if u, err := h.st.GetUserByID(r.Context(), sess.UserID); err == nil {
 		who.Username = u.Username

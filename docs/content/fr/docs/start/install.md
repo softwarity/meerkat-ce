@@ -161,7 +161,7 @@ l'installation.
 | Option | Variable | Valeur par défaut | Rôle |
 |---|---|---|---|
 | `-data` | `MEERKAT_DATA` | `data` | répertoire du stockage embarqué |
-| `-database-url` | `MEERKAT_DATABASE_URL` | vide | URL PostgreSQL, pour plusieurs gateways qui partagent une même installation |
+| `-database-url` | `MEERKAT_DATABASE_URL` | vide | URL PostgreSQL, pour plusieurs instances de la gateway qui partagent une même installation |
 
 > [!WARNING]
 > La valeur par défaut de `-data` est un chemin **relatif**. Sous Docker,
@@ -199,6 +199,7 @@ et le journal le dit aussi.
 | Option | Variable | Rôle |
 |---|---|---|
 | `-plug-addr` | `MEERKAT_PLUG_ADDR` | adresse d'écoute du tunnel développeur, `:22222` par défaut, Enterprise uniquement |
+| `-license` | `MEERKAT_LICENSE_FILE` | le fichier de licence envoyé par Softwarity, monté depuis un secret (`license.existingSecret` dans le chart Helm). Lu au démarrage puis à chaque consultation : un secret mis à jour sur place ne demande aucun redémarrage ; l'écran License l'affiche alors et n'en accepte pas d'autre. Image Enterprise uniquement |
 | `-console-url` | `MEERKAT_CONSOLE_URL` | pour le développement : relaie la console vers un serveur de développement front |
 | `-version` | - | affiche la version et quitte |
 

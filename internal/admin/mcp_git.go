@@ -37,6 +37,26 @@ func (a *API) gitTools() []mcp.Tool {
 			Call:   a.toolListGitLocations,
 		},
 		{
+			Name: "save_git_location", Allow: isRoot, Title: "Create or change a git location",
+			Description: "Create a named git location - a repository reached over https, a branch and a " +
+				"directory - or change the one already called `name`. Changing it only touches the " +
+				"fields given. The access token is a vault reference (${name}), never the token " +
+				"itself: put it in the vault first. A location that moves to another repository, " +
+				"branch or directory forgets what its configurations last read there. Enterprise edition.",
+			Schema: object(map[string]any{
+				"name":        str("The location's name, how pull_configuration and push_configuration will name it."),
+				"url":         str("The repository, https://... (ssh is not supported). Required for a new location."),
+				"branch":      str("The branch. Required for a new location."),
+				"directory":   str("Optional: the directory inside the repository, the root when empty."),
+				"tokenRef":    str("Optional: the vault reference of the access token, ${name}."),
+				"tokenUser":   str("Optional: the username the forge wants with that token, when it wants one."),
+				"provider":    str("Optional: the forge (github, gitlab, ... or generic), for its advice on a refused token."),
+				"authorName":  str("Optional: the commit author's name; the account pushing by default."),
+				"authorEmail": str("Optional: the commit author's e-mail."),
+			}, "name"),
+			Call: a.toolSaveGitLocation,
+		},
+		{
 			Name: "pull_configuration", Allow: isRoot, Title: "Pull a configuration from git",
 			Description: "Read a configuration from a git location and KEEP IT BESIDE the running one. " +
 				"It applies NOTHING: the document lands as a saved configuration and the gateway goes " +
@@ -110,6 +130,82 @@ func (a *API) toolListGitLocations(ctx context.Context, _ json.RawMessage) (any,
 		out = append(out, l)
 	}
 	return map[string]any{"locations": out}, nil
+}
+
+// toolSaveGitLocation is the console's location form, for an agent: the same
+// validation (remoteBody.into), the same name rule and the same audit. By name,
+// as everything here: the one called `name` is changed, otherwise one is made.
+func (a *API) toolSaveGitLocation(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := gitAvailable(); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Name        string  `json:"name"`
+		URL         *string `json:"url"`
+		Branch      *string `json:"branch"`
+		Directory   *string `json:"directory"`
+		TokenRef    *string `json:"tokenRef"`
+		TokenUser   *string `json:"tokenUser"`
+		Provider    *string `json:"provider"`
+		AuthorName  *string `json:"authorName"`
+		AuthorEmail *string `json:"authorEmail"`
+	}
+	if err := decode(args, &in); err != nil {
+		return nil, err
+	}
+	list, err := a.st.ListConfigRemotes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	row, found := store.ConfigRemote{ID: newID()}, false
+	for _, r := range list {
+		if strings.EqualFold(r.Name, strings.TrimSpace(in.Name)) {
+			row, found = r, true
+			break
+		}
+	}
+	before := row
+	// What is not given keeps what the location holds: a change names only
+	// what it changes.
+	body := remoteBody{Provider: row.Provider, Name: in.Name, URL: row.URL, Branch: row.Branch, Dir: row.Dir,
+		TokenRef: row.TokenRef, TokenUser: row.TokenUser, AuthorName: row.AuthorName, AuthorEmail: row.AuthorEmail}
+	for _, f := range []struct {
+		in  *string
+		out *string
+	}{{in.URL, &body.URL}, {in.Branch, &body.Branch}, {in.Directory, &body.Dir}, {in.TokenRef, &body.TokenRef},
+		{in.TokenUser, &body.TokenUser}, {in.Provider, &body.Provider}, {in.AuthorName, &body.AuthorName},
+		{in.AuthorEmail, &body.AuthorEmail}} {
+		if f.in != nil {
+			*f.out = *f.in
+		}
+	}
+	if err := body.into(&row); err != nil {
+		return nil, err
+	}
+	if taken, err := a.st.ConfigRemoteNameTaken(ctx, row.Name, row.ID); err != nil {
+		return nil, err
+	} else if taken {
+		return nil, fmt.Errorf("a git location called %s already exists", row.Name)
+	}
+	if err := a.st.SaveConfigRemote(ctx, &row); err != nil {
+		return nil, err
+	}
+	actor := mcpActor(ctx)
+	if !found {
+		a.auditEvent(ctx, actor, "config-remote.create", "config-remote", row.ID, row.Name, "",
+			fmt.Sprintf("%s (%s) in %s", row.URL, row.Branch, dirOrRoot(row.Dir)))
+		return map[string]any{"created": row.Name, "url": row.URL, "branch": row.Branch, "directory": row.Dir}, nil
+	}
+	// The same rule as the console: a location pointing elsewhere makes the
+	// revisions it handed out meaningless.
+	if before.URL != row.URL || before.Branch != row.Branch || before.Dir != row.Dir {
+		if err := a.st.ForgetConfigRemoteRevisions(ctx, row.ID); err != nil {
+			return nil, err
+		}
+	}
+	a.auditUpdate(ctx, actor, "config-remote.update", "config-remote", row.ID, row.Name, "",
+		remoteMeta(before), remoteMeta(row))
+	return map[string]any{"changed": row.Name, "url": row.URL, "branch": row.Branch, "directory": row.Dir}, nil
 }
 
 func (a *API) toolPullConfiguration(ctx context.Context, args json.RawMessage) (any, error) {

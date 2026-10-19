@@ -82,7 +82,7 @@ peut savoir si vous l'avez reçue :
 |---|---|
 | Vous avez répondu, quel que soit le statut | L'exécution se clôt sur cette réponse. Ce même appel n'est **jamais** renvoyé. Quelques échecs donnent droit à une autre TENTATIVE, sous la forme d'une nouvelle exécution dotée d'un nouvel identifiant - voir "Quels échecs sont retentés" |
 | Vous avez répondu `202` | Le travail est à vous. Il n'est jamais renvoyé, quoi qu'il arrive à la gateway |
-| La gateway qui effectuait l'appel s'est arrêtée avant votre réponse | Une autre gateway le renvoie, avec le **même identifiant d'exécution** et un `Meerkat-Job-Attempt` augmenté de un |
+| L'instance qui effectuait l'appel s'est arrêtée avant votre réponse | Une autre instance le renvoie, avec le **même identifiant d'exécution** et un `Meerkat-Job-Attempt` augmenté de un |
 
 La dernière ligne connaît trois bornes. **Trois tentatives** au plus, pour qu'un
 appel qui fait tomber une gateway ne les fasse pas toutes tomber l'une après
@@ -526,10 +526,10 @@ et se réveille à la seconde près. Écrire une planification, la mettre en pau
 l'avancer ou clore une exécution la réveille aussitôt ; un filet de sécurité couvre
 le reste, une fois par minute.
 
-Plusieurs gateways partagent une même table et **rien ne pose de verrou** :
-prendre un tour est un `UPDATE` conditionnel, de sorte que deux gateways au même
+Plusieurs instances de la gateway partagent une même table et **rien ne pose de verrou** :
+prendre un tour est un `UPDATE` conditionnel, de sorte que deux instances au même
 instant ne produisent qu'un seul gagnant. Les appels **se répartissent entre les
-gateways**, plusieurs à la fois sur chacune - un service lent retient son propre
+instances**, plusieurs à la fois sur chacune - un service lent retient son propre
 appel, et celui de personne d'autre.
 
 Ce qu'un cluster apporte réellement, c'est le **bail** : une exécution dont

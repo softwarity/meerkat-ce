@@ -225,7 +225,7 @@ configure.
 
 ### Depuis un agent
 
-`list_git_locations`, `pull_configuration` et `push_configuration`
+`list_git_locations`, `save_git_location` (créer ou modifier un emplacement ; le jeton reste une référence du coffre), `pull_configuration` et `push_configuration`
 ([agents](/docs/agent/overview)). Un agent qui demande à la gateway de pousser ne
 détient aucun identifiant et n'a besoin d'aucun clone du dépôt : c'est le jeton rangé
 dans le coffre, limité à un seul dépôt, qui fait le travail.

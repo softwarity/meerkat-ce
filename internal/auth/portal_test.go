@@ -181,3 +181,52 @@ func mustRoutes(t *testing.T, st *store.Store) []store.Route {
 	}
 	return routes
 }
+
+// TestPortalJSONActsInTheOnlyOrganisation: a session opened before its account
+// joined an organisation carries none, and acts in the only one the account
+// has - as the gateway judges routes on it. The portal used to read the bare
+// session: no organisation, so no role, and it hid a route the gateway let the
+// same person into.
+func TestPortalJSONActsInTheOnlyOrganisation(t *testing.T) {
+	mux, _, st := mfaSetup(t)
+	ctx := context.Background()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(st.SaveRoute(ctx, uiRoute("ops", 1, true, "operations")))
+	must(st.SetSetting(ctx, store.SettingPortal, store.PortalConfig{
+		Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
+		Entries: []store.PortalEntry{{Label: "Admin", Children: []store.PortalSubEntry{{RouteID: "ops"}}}},
+	}))
+
+	// Signed in with no organisation at all.
+	sc := sessionCookieOf(do(t, mux, "POST", "/login", url.Values{"username": {"admin"}, "password": {"s3cret"}}, nil))
+
+	// Then given one, and a group granting the role, without signing in again.
+	must(st.SaveTenant(ctx, store.Tenant{ID: "t1", Name: "acme", Enabled: true}))
+	must(st.SaveMembership(ctx, store.Membership{
+		UserID: "u1", TenantID: "t1", Type: store.MemberUser, Enabled: true,
+		BusinessAccess: store.BusinessAccess{Inherited: true},
+	}))
+	must(st.SaveRole(ctx, store.Role{Name: "operations"}))
+	must(st.SaveGroup(ctx, store.Group{ID: "g-ops", TenantID: "t1", Name: "Operations", Roles: []string{"operations"}}))
+	must(st.SetMemberGroups(ctx, "t1", "u1", []string{"g-ops"}))
+
+	raw := bodyString(do(t, mux, "GET", "/meerkat/portal.json", nil, sc))
+	var payload struct {
+		Parents []struct {
+			Children []struct {
+				Href string `json:"href"`
+			} `json:"children"`
+		} `json:"parents"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("portal.json is not valid JSON: %v\n%s", err, raw)
+	}
+	if len(payload.Parents) != 1 || len(payload.Parents[0].Children) != 1 || payload.Parents[0].Children[0].Href != "/ops" {
+		t.Fatalf("the Admin container should hold /ops for a session in the only organisation:\n%s", raw)
+	}
+}

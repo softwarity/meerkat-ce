@@ -79,10 +79,10 @@ When is the same run sent twice? Only when nobody can know whether you got it:
 |---|---|
 | You answered, whatever the status | The run closes on that answer. That same call is **never** sent again. A few failures get another ATTEMPT, as a new run with a new identifier - see "Which failures are tried again" |
 | You answered `202` | The work is yours. Never sent again, whatever happens to the gateway |
-| The gateway making the call stopped before your answer | Another gateway sends it again, **same run identifier**, `Meerkat-Job-Attempt` one higher |
+| The instance making the call stopped before your answer | Another instance sends it again, **same run identifier**, `Meerkat-Job-Attempt` one higher |
 
 The last line has three bounds. **Three attempts** at most, so that a call
-that brings a gateway down does not bring every gateway down in turn. **Never
+that brings an instance down does not bring every instance down in turn. **Never
 later than `catchUp`**, the same rule as a turn missed while the gateway was
 down. And **how soon**: at once when the gateway stopped cleanly - a rolling
 deployment hands its calls in flight over as it leaves - and when the lease
@@ -504,9 +504,9 @@ deleted.
 the second. Writing a schedule, pausing it, bringing it forward or closing a
 run wakes it at once; a backstop covers the rest, once a minute.
 
-Several gateways share one table and **nothing takes a lock**: taking a turn is
-a conditional `UPDATE`, so two gateways at the same instant produce one winner.
-The calls **spread over the gateways**, several at a time on each - a slow
+Several gateway instances share one table and **nothing takes a lock**: taking a turn is
+a conditional `UPDATE`, so two instances at the same instant produce one winner.
+The calls **spread over the instances**, several at a time on each - a slow
 service holds its own call and nobody else's.
 
 What a cluster really adds is the **lease**: a run nobody says anything about

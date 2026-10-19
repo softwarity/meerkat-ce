@@ -87,6 +87,7 @@ function inline(text) {
   );
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, href) => {
     if (/^https?:/.test(href)) return `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
+    if (href.startsWith('mailto:')) return `<a href="${href}">${label}</a>`;
     if (href.startsWith('#')) return `<a href="${href}" data-at="${href.slice(1)}">${label}</a>`;
     // A FILE the site serves - a chart, a compose file - rather than a page.
     // It stays a plain relative href, like an image: the document carries a

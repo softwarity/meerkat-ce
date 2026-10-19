@@ -633,3 +633,101 @@ func TestEveryEndedTurnLandsInTheHistory(t *testing.T) {
 		t.Fatalf("a deleted schedule kept its history: %+v", runs)
 	}
 }
+
+// The trail hears about a schedule's health, not about each of its turns
+// (SCHED-06): one line when it starts failing, one when it comes back. A
+// failure the gateway is about to try again settles nothing yet, and neither
+// does a turn the service asked to have later.
+func TestTheTrailHearsAScheduleFailAndRecoverOnce(t *testing.T) {
+	st, ctx := scheduleStore(t)
+	sc := aSchedule("s1")
+	sc.NextAt = time.Now().Add(-time.Minute).Unix()
+	if err := st.CreateSchedule(ctx, sc); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	n := 0
+	turn := func(end RunEnd, next RunNext) {
+		t.Helper()
+		n++
+		run := fmt.Sprintf("run-%d", n)
+		if ok, err := st.ClaimSchedule(ctx, "s1", run, "node-a", now); err != nil || !ok {
+			t.Fatalf("claim %s: %v %v", run, ok, err)
+		}
+		if next.At.IsZero() {
+			next.At = now
+		}
+		if err := st.FinishSchedule(ctx, "s1", run, end, next, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	trail := func() []string {
+		t.Helper()
+		evs, err := st.ListAuditEvents(ctx, AuditFilter{Target: "schedule", TargetID: "s1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for i := len(evs) - 1; i >= 0; i-- {
+			if evs[i].ActorID != ScheduledActor {
+				t.Fatalf("the verdict is the gateway's: %+v", evs[i])
+			}
+			got = append(got, evs[i].Action)
+		}
+		return got
+	}
+	ok := RunEnd{State: RunDone, Status: 200}
+	broken := RunEnd{State: RunFailed, Status: 503, Detail: "503 Service Unavailable"}
+
+	turn(ok, RunNext{})
+	if got := trail(); len(got) != 0 {
+		t.Fatalf("a turn that went well is not news: %v", got)
+	}
+	// Tried again, then fine: the blip SCHED-04 is there for.
+	turn(broken, RunNext{Cause: CauseRetry, Tries: 1})
+	turn(ok, RunNext{})
+	if got := trail(); len(got) != 0 {
+		t.Fatalf("a failure that was tried again and passed is not news: %v", got)
+	}
+	// Asked to come back later: the turn is still open.
+	turn(RunEnd{State: RunFailed, Status: 424}, RunNext{Cause: CauseAsked, Tries: 1})
+	if got := trail(); len(got) != 0 {
+		t.Fatalf("a turn the service put off is not news: %v", got)
+	}
+	turn(ok, RunNext{})
+
+	// Failing all night is one line, not one per turn.
+	turn(broken, RunNext{})
+	turn(broken, RunNext{})
+	turn(RunEnd{State: RunFailed, Status: 500}, RunNext{})
+	if got := trail(); len(got) != 1 || got[0] != "schedule.failing" {
+		t.Fatalf("failing turns: %v", got)
+	}
+	failing, _ := st.GetSchedule(ctx, "s1")
+	if failing.FailingSince != now.Unix() {
+		t.Fatalf("since when it fails is lost: %d", failing.FailingSince)
+	}
+	evs, _ := st.ListAuditEvents(ctx, AuditFilter{Target: "schedule", TargetID: "s1"})
+	if d := evs[0].Detail; !strings.HasPrefix(d, "failed (503): 503 Service Unavailable - run run-") {
+		t.Fatalf("the line does not say what broke, nor lead to the run: %q", d)
+	}
+
+	turn(ok, RunNext{})
+	turn(ok, RunNext{})
+	if got := trail(); len(got) != 2 || got[1] != "schedule.recovered" {
+		t.Fatalf("recovery: %v", got)
+	}
+	back, _ := st.GetSchedule(ctx, "s1")
+	if back.FailingSince != 0 {
+		t.Fatalf("a schedule that came back still reads failing: %d", back.FailingSince)
+	}
+
+	// A turn that never went out counts as one that ended badly.
+	due := time.Unix(back.NextAt, 0)
+	if ok, err := st.DropTurn(ctx, "s1", due, due.Add(time.Hour), now, "too late"); err != nil || !ok {
+		t.Fatalf("drop: %v %v", ok, err)
+	}
+	if got := trail(); len(got) != 3 || got[2] != "schedule.failing" {
+		t.Fatalf("a dropped turn: %v", got)
+	}
+}

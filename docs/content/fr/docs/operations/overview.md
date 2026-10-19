@@ -71,7 +71,7 @@ secrète : ce n'est donc pas une sauvegarde.
 | les abonnés du canal temps réel (les messages, eux, sont relayés) | les sessions et les jetons d'API |
 
 > [!NOTE] Édition Enterprise
-> Faire tourner plusieurs gateways sur une même base PostgreSQL est réservé à l'image
+> Faire tourner plusieurs instances de la gateway sur une même base PostgreSQL est réservé à l'image
 > Enterprise : c'est elle qui contient le pilote qui ouvre la connexion et attend les
 > notifications. L'image Community vous dit ce qu'elle sait faire, au lieu d'échouer sur un
 > pilote.

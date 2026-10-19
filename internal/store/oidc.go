@@ -100,6 +100,19 @@ func (c OIDCClient) TTL() time.Duration {
 	return d
 }
 
+// CheckAudience is the one rule for an "aud" this gateway writes, whether an
+// OIDC client's or a route's JWT: any text, as RFC 7519 allows - a route's
+// audience defaults to its name, and "GeoServer OGC" is a name - up to 255
+// characters, with no control character and no space at either end, which no
+// application would compare equal to what it was configured with.
+func CheckAudience(aud string) error {
+	if len(aud) > 255 || strings.TrimSpace(aud) != aud || strings.ContainsFunc(aud, unicode.IsControl) {
+		return fmt.Errorf("audience %q is not allowed: up to 255 characters, "+
+			"no control character, no space at either end", aud)
+	}
+	return nil
+}
+
 // AudienceOrID is the "aud" its access tokens carry.
 func (c OIDCClient) AudienceOrID() string {
 	if c.Audience != "" {
@@ -180,10 +193,8 @@ func SanitizeOIDCClient(c *OIDCClient) error {
 			"and . _ - after the first character, which is a letter or a digit", c.ID))
 	}
 	c.Audience = strings.TrimSpace(c.Audience)
-	if len(c.Audience) > 255 || strings.ContainsFunc(c.Audience, func(r rune) bool {
-		return unicode.IsSpace(r) || unicode.IsControl(r)
-	}) {
-		return invalidf(fmt.Errorf("audience %q is not allowed: up to 255 characters, no spaces", c.Audience))
+	if err := CheckAudience(c.Audience); err != nil {
+		return invalidf(err)
 	}
 	c.TokenTTL = strings.TrimSpace(c.TokenTTL)
 	if c.TokenTTL != "" {
