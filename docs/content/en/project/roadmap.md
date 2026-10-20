@@ -57,6 +57,10 @@ transform it, an access rule decides, and what happened is visible afterwards.
   [scheduled calls](/docs/operations/scheduler).
 - **The gateway's own log**, live in the console, with its level turned up for
   half an hour from there. See [logs](/docs/operations/logs).
+- **Dev mode** (Enterprise): the tunnel, sign-in halting on a page naming what
+  is substituted and by whom, a strip saying it again while you work, who is
+  plugged in and ending a session, each run and name served in the audit trail.
+  See [Dev mode](/product/dev-mode).
 
 ## Being finished
 
@@ -73,11 +77,6 @@ line, what is missing from each.
   token, organisation, address - and going over answers 429 with the standard
   headers. What is missing is the screen that shows consumption, throttling
   rather than refusing, and counters that stay right across a cluster.
-- **Dev mode** - the tunnel works, sign-in halts on a page naming what is
-  substituted and by whom, and a strip says it again while you work. What is
-  missing is reading a workload's environment and mounting its volumes in the
-  audit trail; who is plugged in, ending a session, and each run and name
-  served are there.
 - **Notifications** - the SMTP relay is shipped, with one template in the
   theme's colours, and the daily summary of accesses about to close goes out on
   its own. What is missing is one template per event, each of them translated.

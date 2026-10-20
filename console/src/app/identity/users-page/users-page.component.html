@@ -19,6 +19,21 @@
         />
       </app-form-field>
       <span class="spacer"></span>
+      <!-- Closing the developer surface of a gateway (DEV-01): the capability
+           taken from every account at once. Root keeps its tools. Always
+           drawn, so it is found where it is looked for; disabled while no
+           account but root carries the capability, the tooltip on a wrapper
+           since a disabled button shows none. -->
+      <span [matTooltip]="devCount() ? '' : noDevTooltip">
+        <button matButton type="button" [disabled]="clearingDev() || devCount() === 0" (click)="clearDev()">
+          <mat-icon>code_off</mat-icon>
+          @if (devCount() > 0) {
+            <ng-container i18n="@@Remove_developer_mode_COUNT">Remove developer mode ({{ devCount() }})</ng-container>
+          } @else {
+            <ng-container i18n="@@Remove_developer_mode">Remove developer mode</ng-container>
+          }
+        </button>
+      </span>
     </div>
 
     <div class="content">
@@ -53,9 +68,9 @@
                     <button
                       type="button"
                       class="badge"
-                      [class.on]="u[c.key]"
-                      [disabled]="c.key === 'root' && u.id === meId()"
-                      [matTooltip]="c.tooltip"
+                      [class.on]="u[c.key] || (c.key === 'dev' && u.root)"
+                      [disabled]="(c.key === 'root' && u.id === meId()) || (c.key === 'dev' && u.root)"
+                      [matTooltip]="c.key === 'dev' && u.root ? rootDevTooltip : c.tooltip"
                       (click)="toggleCapability(u, c.key, $event)"
                     >
                       {{ c.label }}

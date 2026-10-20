@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, LOCALE_ID, output } from '@angular/core';
+import { booleanAttribute, Component, computed, inject, input, LOCALE_ID, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -41,6 +41,12 @@ export class BusinessAccessFormComponent {
   // topLevel = the global level: no level above, so no inherit toggle - the
   // fields are always editable.
   readonly topLevel = input(false);
+  // What the toggle says instead of "Inherited (tz)": an account's own window
+  // has nothing to inherit, only "none of its own".
+  readonly inheritText = input<string>();
+  // A member's window also bounds by dates (from, until), which hold whether
+  // its hours are its own or its organisation's.
+  readonly withDates = input(false, { transform: booleanAttribute });
   readonly valueChange = output<BusinessAccess>();
 
   private readonly locale = inject(LOCALE_ID);
@@ -78,6 +84,8 @@ export class BusinessAccessFormComponent {
   }
 
   protected inheritLabel(): string {
+    const text = this.inheritText();
+    if (text) return text;
     const tz = this.inherited().timezone || 'UTC';
     return $localize`:@@Inherited_TZ:Inherited (${tz}:TZ:)`;
   }
@@ -91,6 +99,12 @@ export class BusinessAccessFormComponent {
       const seed = this.inherited();
       this.valueChange.emit({ ...seed, timezone: seed.timezone || this.browserTz, inherited: false });
     }
+  }
+
+  // The dates ride on the value as it is, inherited or not: they bound the
+  // member's access in both cases.
+  protected patchDate(key: 'dateFrom' | 'dateTo', v: string): void {
+    this.valueChange.emit({ ...this.value(), [key]: v || undefined });
   }
 
   protected patchTimezone(tz: string): void {
@@ -119,7 +133,8 @@ export class BusinessAccessFormComponent {
   // Every edit pins the effective timezone so the first change persists the
   // browser default the hours were entered in.
   private emitDays(days: DayRange[], tz = this.displayTz()): void {
-    this.valueChange.emit({ ...this.shown(), timezone: tz, inherited: false, days });
+    const { dateFrom, dateTo } = this.value();
+    this.valueChange.emit({ ...this.shown(), timezone: tz, inherited: false, days, dateFrom, dateTo });
   }
 }
 

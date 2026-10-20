@@ -1,8 +1,11 @@
-import { Component, computed, inject, output, signal } from '@angular/core';
+import { Component, computed, inject, linkedSignal, output, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService, User } from '../api.service';
 import { PasswordDialogComponent } from './password-dialog.component';
@@ -20,6 +23,7 @@ import { UserFieldsFormComponent } from './user-fields-form.component';
   selector: 'app-user-create',
   imports: [
     MatButtonModule,
+    MatButtonToggleModule,
     MatDividerModule,
     MatIconModule,
     MatTooltipModule,
@@ -65,6 +69,32 @@ import { UserFieldsFormComponent } from './user-fields-form.component';
           [(validFrom)]="validFrom"
           [(validUntil)]="validUntil"
         />
+      </section>
+
+      <mat-divider />
+
+      <!-- How the person gets in the first time (AUTH-25): one or the other,
+           never both - a password shown once here, or a link mailed to them
+           to choose their own. -->
+      <section>
+        <h3 i18n="@@First_sign_in">First sign-in</h3>
+        <mat-button-toggle-group
+          [value]="access()"
+          (change)="access.set($event.value)"
+          hideSingleSelectionIndicator
+          i18n-aria-label="@@First_sign_in"
+          aria-label="First sign-in"
+        >
+          <mat-button-toggle value="password">
+            <mat-icon>password</mat-icon>
+            <ng-container i18n="@@Show_a_temporary_password">Show a temporary password</ng-container>
+          </mat-button-toggle>
+          <mat-button-toggle value="invite" [disabled]="!mailReady()">
+            <mat-icon>forward_to_inbox</mat-icon>
+            <ng-container i18n="@@Send_an_invitation">Send an invitation</ng-container>
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+        <p class="hint">{{ accessHint() }}</p>
       </section>
 
       @if (error()) {
@@ -129,6 +159,11 @@ import { UserFieldsFormComponent } from './user-fields-form.component';
       gap: 8px;
       margin-top: 16px;
     }
+    .hint {
+      margin: 8px 0 0;
+      font-size: 0.82rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
     .warn {
       display: flex;
       align-items: center;
@@ -144,6 +179,7 @@ export class UserCreateComponent {
 
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
+  private readonly snack = inject(MatSnackBar);
 
   protected readonly username = signal('');
   protected readonly fullname = signal('');
@@ -154,13 +190,33 @@ export class UserCreateComponent {
   protected readonly error = signal('');
   protected readonly saving = signal(false);
 
-  // A login and nothing else: everything the server refuses beyond that comes
-  // back as a sentence, and a rule copied here would be a second, worse copy.
-  protected readonly valid = computed(() => this.username().trim() !== '');
+  // Whether an invitation can be mailed at all, and why not.
+  private readonly edition = toSignal(this.api.edition());
+  protected readonly mailReady = computed(() => !!this.edition()?.mailReady);
+  // The invitation when it can be sent, the password otherwise.
+  protected readonly access = linkedSignal<'password' | 'invite'>(() => (this.mailReady() ? 'invite' : 'password'));
+  protected readonly accessHint = computed(() => {
+    if (this.access() === 'password') {
+      return this.mailReady() || !this.edition()
+        ? $localize`:@@Access_password_hint:A password is generated and shown once, to hand over; it must be changed at the first sign-in.`
+        : $localize`:@@Access_no_invite_WHY:An invitation cannot be sent: ${this.edition()?.mailWhy}:WHY:.`;
+    }
+    return this.email().trim()
+      ? $localize`:@@Access_invite_hint:A link to choose a password is mailed to the address above, valid 48 hours.`
+      : $localize`:@@Access_invite_needs_email:The invitation goes to the e-mail address above: give one.`;
+  });
+
+  // A login and nothing else - and an address when it is to be mailed:
+  // everything the server refuses beyond that comes back as a sentence, and a
+  // rule copied here would be a second, worse copy.
+  protected readonly valid = computed(
+    () => this.username().trim() !== '' && (this.access() === 'password' || this.email().trim() !== ''),
+  );
 
   protected save(): void {
     this.error.set('');
     this.saving.set(true);
+    const invite = this.access() === 'invite';
     this.api
       .createUser({
         username: this.username().trim(),
@@ -170,15 +226,21 @@ export class UserCreateComponent {
         fields: this.fields(),
         validFrom: this.validFrom(),
         validUntil: this.validUntil(),
-      })
+      }, invite)
       .subscribe({
-        next: ({ user, password, validHours }) => {
+        next: ({ user, password, email, validHours }) => {
           this.saving.set(false);
-          // Shown once and never again: the generated password exists in this
-          // response and nowhere else.
-          this.dialog.open(PasswordDialogComponent, {
-            data: { username: user.username, password, validHours },
-          });
+          if (invite) {
+            this.snack.open($localize`:@@Invitation_mailed_EMAIL:Invitation mailed to ${email}:EMAIL:`, undefined, {
+              duration: 4000,
+            });
+          } else {
+            // Shown once and never again: the generated password exists in
+            // this response and nowhere else.
+            this.dialog.open(PasswordDialogComponent, {
+              data: { username: user.username, password, validHours },
+            });
+          }
           this.created.emit(user);
         },
         error: (e: { error?: { error?: string } }) => {

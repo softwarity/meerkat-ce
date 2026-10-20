@@ -20,9 +20,8 @@ import { SnippetComponent } from '../shared/snippet.component';
 // service under its real name, reaching the others by theirs - through a
 // tunnel this gateway opens. The page is the infrastructure half: the switch,
 // the address developers type, and the commands they run, stamped with that
-// address so they are copied rather than translated. Developer mode
-// (Application, General) is the other condition, and the page says so rather
-// than offering it: it is the application administrator's.
+// address so they are copied rather than translated. Who may use it is the
+// dev capability, granted by the application administrator on Users.
 type Os = 'macos' | 'linux' | 'windows';
 
 @Component({

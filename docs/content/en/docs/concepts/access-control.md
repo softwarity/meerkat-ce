@@ -87,7 +87,7 @@ administering the gateway rather than about using an application.
 | `root` | global administration; implies both below, and is the only flag that can mint control-plane tokens |
 | `infraAdmin` | the routing side: routes, TLS, authorities, the mail relay |
 | `appAdmin` | the application side: accounts, roles, the global settings, the built-in pages |
-| `dev` | the developer tooling, where developer mode is on |
+| `dev` | the developer tooling on the served applications (root always has it) |
 | `tenantCreator` | may create organisations |
 
 Administering an organisation is deliberately **not** a flag: it is being its

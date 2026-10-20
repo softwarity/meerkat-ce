@@ -76,16 +76,33 @@ a start and end date, in a named timezone.
 > [!NOTE] **Enterprise edition.**
 > Business hours are part of the Enterprise edition.
 
-The window is resolved from the narrowest level that says something: the
-membership, then the organisation, then the installation. When the organisation's
-window is the one that applies, the membership's start and end dates are still
-layered on top of it. The default opens every day, around the clock.
+The hours that apply come from the most precise level that sets some, and they
+apply **whole**: the membership, then the group, then the account, then the
+organisation, then the installation. A group's hours count only in an
+organisation in **exclusive** group mode, where one group is chosen per session
+(a day shift, a night shift); in cumulative mode a person holds several groups
+at once, so a group has no hours of its own there. Hours set at a level are a different rule for whoever it
+covers, not a narrower one: a member given evenings gets in at 20:00 even when
+the organisation closes at 18:00. The membership's start and end dates hold
+whichever level the hours come from. The default opens every day, around the
+clock.
 
-> [!WARNING]
-> The window is checked **at sign-in and when switching organisation, and nowhere
-> else**. A session already open is not cut off when the window closes, and there
-> is no in-session re-check. FEATURES.md lists that, and per-member editing in the
-> console, as the missing half.
+The account's hours are set by the application administrator, on the account;
+the membership's by the organisation's administrator, in the member's drawer.
+Without an organisation, the account's apply, else the installation's. Root is
+never held to hours: the person who repairs the gateway is never locked out of
+it.
+
+With several organisations, the chooser shows the ones whose hours are closed
+for this person greyed out, marked *Outside working hours*; a sign-in when all
+of them are closed is refused. The group chooser does the same with closed
+groups, and the session is then bound by the hours of the group chosen.
+
+The hours are checked at sign-in and when entering or switching organisation, and
+the session **ends when they close**: one opened at 17:55 in a window that closes
+at 18:00 ends at 18:01, the minute 18:00 being part of the window, however long
+its lifetime. The page goes back to sign-in, which then says the hours are closed.
+Hours changed during the day apply from the next sign-in.
 
 Refusing on hours says so plainly - it never looks like a wrong password.
 
@@ -94,7 +111,7 @@ Refusing on hours says so plainly - it never looks like a wrong password.
 | Setting | Levels, narrowest first | Editable where |
 |---|---|---|
 | Session lifetime | membership, organisation, installation | installation in the console; the two others through the admin API |
-| Working hours | membership, organisation, installation | organisation in the console |
+| Working hours | membership, group (exclusive mode), account, organisation, installation | all of them in the console: the member's drawer, the group's drawer, the account's drawer (Security), the organisation, Application, General |
 | Group mode | organisation only | the organisation's screen |
 | Two-factor | **account, then installation** | both in the console |
 

@@ -336,6 +336,10 @@ CREATE TABLE IF NOT EXISTS users (
   -- all of the 31st.
   valid_from           BIGINT NOT NULL DEFAULT 0,
   valid_until          BIGINT NOT NULL DEFAULT 0,
+  -- The account's own working hours (TENANT-04, Enterprise): a window that
+  -- applies on top of its organisation's, wherever it signs in. Inherited
+  -- means none of its own.
+  business_access      TEXT NOT NULL DEFAULT '{"inherited":true}',
   -- Self-registration (AUTH-12). email_verified defaults to 1: admin-created
   -- accounts answer for their address; only the /register flow creates
   -- unverified ones (and confirms them by e-mail).
@@ -403,7 +407,11 @@ CREATE TABLE IF NOT EXISTS sessions (
   -- which address, with which browser. Recorded at issue, never updated.
   created_at BIGINT NOT NULL DEFAULT 0,
   ip         TEXT NOT NULL DEFAULT '',
-  agent      TEXT NOT NULL DEFAULT ''
+  agent      TEXT NOT NULL DEFAULT '',
+  -- When the working hours this session was let in under close (TENANT-04),
+  -- unix seconds, 0 = no window. The deadline above slides; it never slides
+  -- past this, so a session opened at 17:55 ends at the window's 18:00.
+  hours_until BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS sessions_expires ON sessions(expires_at);
 
@@ -527,6 +535,10 @@ CREATE TABLE IF NOT EXISTS groups (
   -- A human description (RBAC-02), editable from the matrix's group menu and
   -- shown as the label the roles hang under.
   description TEXT NOT NULL DEFAULT '',
+  -- The group's own working hours (TENANT-04, Enterprise), held only in an
+  -- organisation in exclusive mode, where one group is chosen per session: a
+  -- day shift, a night shift. Inherited means none of its own.
+  business_access TEXT NOT NULL DEFAULT '{"inherited":true}',
   created_at BIGINT NOT NULL DEFAULT 0,
   updated_at BIGINT NOT NULL DEFAULT 0,
   -- The revision this row is on, raised by every write. See ErrStale: a save
@@ -1272,7 +1284,11 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // oauth_refresh.used_at is filled in by the additive pass.
 // 87 carries no step: schedules.failing_since is filled in by the additive
 // pass, at 0 - every schedule starts out well until a turn says otherwise.
-const schemaVersion = 87
+// 88 carries no step: users.business_access (inherited: no window of its own)
+// and sessions.hours_until (0: no window) are filled in by the additive pass.
+// 89 carries no step: groups.business_access (inherited: no window of its
+// own) is filled in by the additive pass.
+const schemaVersion = 89
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -2464,6 +2480,11 @@ type User struct {
 	// The validity window, unix seconds, 0 = no bound on that side.
 	ValidFrom  int64 `json:"validFrom,omitempty"`
 	ValidUntil int64 `json:"validUntil,omitempty"`
+	// BusinessAccess is the account's own working hours (TENANT-04,
+	// Enterprise): set, they replace its organisations' and the gateway's, a
+	// membership's or a group's own replacing them in turn. Inherited means
+	// none of its own. Root is never held to one.
+	BusinessAccess BusinessAccess `json:"businessAccess"`
 	// Rev is the revision this row was READ at, carried back by a save so a
 	// write built on a version somebody has replaced is refused. Zero means "I
 	// read no version" and still wins - see rev.go.
@@ -2473,16 +2494,17 @@ type User struct {
 const userCols = `id, username, password_hash, fullname, email, enabled,
 	root, dev, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
 	created_at, updated_at, last_connection_at, must_change_password, mfa_required,
-	email_verified, self_registered, password_changed_at, password_temporary, fields, valid_from, valid_until, rev`
+	email_verified, self_registered, password_changed_at, password_temporary, fields, valid_from, valid_until, business_access, rev`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
-	var fields string
+	var fields, ba string
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Fullname, &u.Email, &u.Enabled,
 		&u.Root, &u.Dev, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastConnectionAt, &u.MustChangePassword, &u.MFARequired,
-		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &u.PasswordTemporary, &fields, &u.ValidFrom, &u.ValidUntil, &u.Rev)
+		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &u.PasswordTemporary, &fields, &u.ValidFrom, &u.ValidUntil, &ba, &u.Rev)
 	u.Fields = decodeFields(fields)
+	u.BusinessAccess = decodeBusinessAccess(ba)
 	// Derived here so every read carries it and no caller has to remember: the
 	// hash is json:"-", this boolean is what the console is allowed to know.
 	u.HasPassword = u.PasswordHash != ""
@@ -2503,15 +2525,16 @@ func (s *Store) CreateUser(ctx context.Context, u User) error {
 		   root, dev, tenant_creator, infra_admin, app_admin, locale, timezone,
 		   created_at, updated_at, must_change_password, mfa_required,
 		   email_verified, self_registered, fields, valid_from, valid_until,
-		   password_changed_at, password_temporary, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+		   password_changed_at, password_temporary, business_access, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
 		u.ID, u.Username, u.PasswordHash, u.Fullname, u.Email, u.Enabled,
 		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
 		now, now, u.MustChangePassword, u.MFARequired,
 		u.EmailVerified, u.SelfRegistered, encodeFields(u.Fields), u.ValidFrom, u.ValidUntil,
 		// A password set at creation has a known age from now on; and one an
 		// administrator issued (must change) is temporary (CONSOLE-07).
-		changedAt(u.PasswordHash, now), u.PasswordHash != "" && u.MustChangePassword)
+		changedAt(u.PasswordHash, now), u.PasswordHash != "" && u.MustChangePassword,
+		encodeBusinessAccess(u.BusinessAccess))
 	if err != nil {
 		return fmt.Errorf("store: create user %q: %w", u.Username, err)
 	}
@@ -2532,11 +2555,12 @@ func (s *Store) UpdateUser(ctx context.Context, u User) error {
 		`UPDATE users SET username = ?, fullname = ?, email = ?, enabled = ?,
 		   root = ?, dev = ?, tenant_creator = ?, infra_admin = ?, app_admin = ?,
 		   locale = ?, timezone = ?, mfa_required = ?, updated_at = ?,
-		   fields = ?, valid_from = ?, valid_until = ?, rev = rev + 1
+		   fields = ?, valid_from = ?, valid_until = ?, business_access = ?, rev = rev + 1
 		 WHERE id = ?`,
 		u.Username, u.Fullname, u.Email, u.Enabled,
 		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
-		u.MFARequired, time.Now().Unix(), encodeFields(u.Fields), u.ValidFrom, u.ValidUntil, u.ID)
+		u.MFARequired, time.Now().Unix(), encodeFields(u.Fields), u.ValidFrom, u.ValidUntil,
+		encodeBusinessAccess(u.BusinessAccess), u.ID)
 	if err != nil {
 		return fmt.Errorf("store: update user %q: %w", u.Username, err)
 	}
@@ -2940,15 +2964,19 @@ type Session struct {
 	TokenID    string
 	TokenName  string
 	TokenScope string
+	// HoursUntil is when the working hours this session was let in under
+	// close (TENANT-04), unix seconds, 0 = no window: the sliding deadline
+	// never goes past it.
+	HoursUntil int64
 }
 
 // CreateSession persists a session.
 func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO sessions (token_hash, user_id, tenant_id, group_id, pending, next, method, expires_at, ttl, plane, created_at, ip, agent)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sessions (token_hash, user_id, tenant_id, group_id, pending, next, method, expires_at, ttl, plane, created_at, ip, agent, hours_until)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		sess.TokenHash, sess.UserID, sess.TenantID, sess.GroupID, sess.Pending, sess.Next, sess.Method, sess.ExpiresAt, sess.TTL, sess.Plane,
-		sess.CreatedAt, sess.IP, sess.Agent)
+		sess.CreatedAt, sess.IP, sess.Agent, sess.HoursUntil)
 	if err != nil {
 		return fmt.Errorf("store: create session: %w", err)
 	}
@@ -2961,8 +2989,8 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 func (s *Store) GetSession(ctx context.Context, tokenHash string) (Session, error) {
 	var sess Session
 	err := s.db.QueryRowContext(ctx,
-		`SELECT token_hash, user_id, tenant_id, group_id, pending, next, method, expires_at, ttl, plane FROM sessions WHERE token_hash = ?`, tokenHash).
-		Scan(&sess.TokenHash, &sess.UserID, &sess.TenantID, &sess.GroupID, &sess.Pending, &sess.Next, &sess.Method, &sess.ExpiresAt, &sess.TTL, &sess.Plane)
+		`SELECT token_hash, user_id, tenant_id, group_id, pending, next, method, expires_at, ttl, plane, hours_until FROM sessions WHERE token_hash = ?`, tokenHash).
+		Scan(&sess.TokenHash, &sess.UserID, &sess.TenantID, &sess.GroupID, &sess.Pending, &sess.Next, &sess.Method, &sess.ExpiresAt, &sess.TTL, &sess.Plane, &sess.HoursUntil)
 	if err != nil {
 		return Session{}, fmt.Errorf("store: get session: %w", err)
 	}
@@ -3011,6 +3039,25 @@ func (s *Store) SetSessionTenant(ctx context.Context, tokenHash, tenantID string
 	}
 	s.sessionsChanged()
 	return nil
+}
+
+// SetSessionHours records when the working hours a session was let in under
+// close (TENANT-04), 0 for no window, and brings its deadline back to that
+// instant if it lies beyond. It answers the deadline the session now has.
+func (s *Store) SetSessionHours(ctx context.Context, tokenHash string, until int64) (int64, error) {
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE sessions SET hours_until = ?,
+		   expires_at = CASE WHEN ? > 0 AND expires_at > ? THEN ? ELSE expires_at END
+		 WHERE token_hash = ?`, until, until, until, until, tokenHash); err != nil {
+		return 0, fmt.Errorf("store: set session hours: %w", err)
+	}
+	var expires int64
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT expires_at FROM sessions WHERE token_hash = ?`, tokenHash).Scan(&expires); err != nil {
+		return 0, fmt.Errorf("store: set session hours: %w", err)
+	}
+	s.sessionsChanged()
+	return expires, nil
 }
 
 // SetSessionGroup records the ACTIVE group of a session (SINGLE mode,

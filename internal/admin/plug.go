@@ -14,12 +14,10 @@ import (
 // The developer tunnel's pages: Infra, Plug (DEV-11) and Application, Plug
 // (DEV-13).
 //
-// The TUNNEL is infrastructure, beside developer mode rather than under it.
-// Developer mode (Application, General) is a configuration - the installation
-// offers its developers the tooling, the API docs, the simulated sign-ins.
-// The tunnel opens a port into the cluster and exercises the deployment's
-// rights over it, which is whoever runs the routing plane's decision. It runs
-// only when both say so.
+// The TUNNEL is infrastructure: it opens a port into the cluster and
+// exercises the deployment's rights over it, which is whoever runs the
+// routing plane's decision. Its own switch decides alone whether it runs; who
+// may use it is the dev capability (DEV-01).
 //
 // The PEOPLE are the application's: who holds the developer capability and
 // which key they deposited, who is plugged in now, and ending a run. The
@@ -95,9 +93,6 @@ type plugAnswer struct {
 	store.PlugSetting
 	// Enterprise: the tunnel is in the Enterprise image only.
 	Enterprise bool `json:"enterprise"`
-	// DevMode is the other switch, read-only here: it belongs to the
-	// application administrator, and the page says so rather than offering it.
-	DevMode bool `json:"devMode"`
 	// Status is what the tunnel is doing on the node that answered.
 	Status devtunnel.Status `json:"status"`
 	// Version is the plug client this image hands out.
@@ -125,7 +120,6 @@ type plugAnswer struct {
 // in, and who still has a key to deposit.
 type plugPeople struct {
 	Enabled    bool            `json:"enabled"`
-	DevMode    bool            `json:"devMode"`
 	Developers []plugDeveloper `json:"developers"`
 }
 
@@ -146,8 +140,7 @@ func (a *API) plugState(r *http.Request) (plugAnswer, error) {
 	ctx := r.Context()
 	out := plugAnswer{
 		PlugSetting: a.st.Plug(ctx), Enterprise: edition.Enterprise,
-		DevMode: a.st.DevMode(ctx),
-		Status:  devtunnel.CurrentStatus(), Version: devtunnel.ClientVersion(),
+		Status: devtunnel.CurrentStatus(), Version: devtunnel.ClientVersion(),
 		DefaultPort: store.DefaultPlugPort, DataOrigin: a.dataOrigin(r), Profile: a.st.PlugProfile(ctx),
 	}
 	out.Address.Host, out.Address.Port, out.Exposure = devtunnel.Address(ctx, out.PlugSetting)
@@ -156,8 +149,7 @@ func (a *API) plugState(r *http.Request) (plugAnswer, error) {
 
 func (a *API) listPlugDevelopers(w http.ResponseWriter, r *http.Request, _ store.User) {
 	ctx := r.Context()
-	out := plugPeople{Enabled: edition.Enterprise && a.st.Plug(ctx).Enabled, DevMode: a.st.DevMode(ctx),
-		Developers: []plugDeveloper{}}
+	out := plugPeople{Enabled: edition.Enterprise && a.st.Plug(ctx).Enabled, Developers: []plugDeveloper{}}
 	devs, err := a.st.Developers(ctx)
 	if err != nil {
 		a.internal(w, err)
@@ -206,8 +198,8 @@ func (a *API) putPlug(w http.ResponseWriter, r *http.Request, actor store.User) 
 		return
 	}
 	// This node looks at once, and the answer waits for it, so the page shows
-	// what the tunnel does now; the others re-read both switches on their own
-	// tick, which is how developer mode has always reached them.
+	// what the tunnel does now; the others re-read the switch on their own
+	// tick.
 	devtunnel.WakeAndWait(2 * time.Second)
 	a.auditUpdate(r.Context(), actor, "plug.configure", "settings", "", "", "", before, body)
 	out, err := a.plugState(r)

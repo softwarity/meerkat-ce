@@ -3,7 +3,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -17,7 +16,7 @@ import {
   GroupDialogData,
   GroupDialogResult,
 } from '../group-dialog.component';
-import { DialogsService } from '../../shared/dialogs.service';
+import { IdentityDrawer } from '../identity-drawer';
 import { LiveChangesService } from '../../shared/live-changes.service';
 
 // The per-tenant groups matrix (RBAC-02): rows are the GLOBAL role catalogue,
@@ -37,7 +36,6 @@ type RoleRow = FilteredRoleRow;
     MatButtonModule,
     MatCheckboxModule,
     MatIconModule,
-    MatMenuModule,
     MatTableModule,
     MatTooltipModule,
     LoadingIndicatorComponent,
@@ -57,10 +55,11 @@ export class GroupsMatrixComponent {
   // Emitted when the set of groups changes, so the host can refresh anything
   // else that lists them (the members matrix).
   readonly changed = output<void>();
+  // The drawer of the page hosting this matrix: a group is edited there.
+  protected readonly drawer = inject(IdentityDrawer);
 
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
-  private readonly dialogs = inject(DialogsService);
   private readonly dialog = inject(MatDialog);
 
   protected readonly loading = signal(true);
@@ -236,46 +235,11 @@ export class GroupsMatrixComponent {
     });
   }
 
-  protected async editGroup(g: Group): Promise<void> {
-    const res = await firstValueFrom(
-      this.dialog
-        .open<GroupDialogComponent, GroupDialogData, GroupDialogResult | undefined>(GroupDialogComponent, {
-          width: '440px',
-          data: {
-            title: $localize`:@@Edit_group:Edit group`,
-            confirmLabel: $localize`:@@Save:Save`,
-            name: g.name,
-            description: g.description,
-          },
-        })
-        .afterClosed(),
-    );
-    if (!res || (res.name === g.name && res.description === (g.description ?? ''))) return;
-    this.api
-      .updateGroup({ ...g, name: res.name, description: res.description, roles: g.roles ?? [] })
-      .subscribe({
-        next: (saved) => {
-          this.groups.update((list) => list.map((x) => (x.id === saved.id ? saved : x)));
-          this.changed.emit();
-        },
-        error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
-      });
-  }
-
-  protected async removeGroup(g: Group): Promise<void> {
-    const ok = await this.dialogs.confirm({
-      title: $localize`:@@Delete_group_NAME:Delete group "${g.name}:NAME:"?`,
-      confirmLabel: $localize`:@@Delete:Delete`,
-      danger: true,
-    });
-    if (!ok) return;
-    this.api.deleteGroup(this.tenantId(), g.id).subscribe({
-      next: () => {
-        this.groups.update((list) => list.filter((x) => x.id !== g.id));
-        this.changed.emit();
-      },
-      error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
-    });
+  // A group is edited in the page's drawer, opened by its name: name,
+  // description, its working hours when the organisation picks one group per
+  // session, and its deletion in the danger zone.
+  protected editGroup(g: Group): void {
+    this.drawer.openGroup(g.id);
   }
 }
 

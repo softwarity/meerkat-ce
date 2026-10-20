@@ -21,7 +21,7 @@ groupes.
 
 ![L'écran Groups : le catalogue des rôles en lignes, trois colonnes de groupes, et une coche là où un rôle appartient à un groupe](img/console/groups.webp)
 
-Trois groupes - Finance, Front desk, Warehouse - en regard du catalogue. Chaque ligne
+Trois groupes - Finance, Support, Warehouse - en regard du catalogue. Chaque ligne
 affiche la description du rôle au-dessus de son nom technique, et la ligne *Whole
 column* se trouve juste sous les en-têtes.
 
@@ -30,8 +30,9 @@ organisation en colonnes, et une coche là où un rôle appartient à un groupe.
 
 - **Cocher un rôle parent coche tous ceux qui en dépendent.** C'est la hiérarchie du
   catalogue qui fait le travail.
-- **Le menu d'une colonne de groupe** renomme ou supprime ce groupe ; le bouton rond +
-  en ajoute un.
+- **Le nom d'un groupe**, en tête de sa colonne, ouvre son tiroir (plus bas) ; le
+  bouton rond + en ajoute un. Les groupes se créent et se modifient ici seulement :
+  dans Members, ils ne font que titrer leurs colonnes.
 - **La ligne Whole column**, sous les en-têtes, coche ou décoche un groupe entier pour
   les lignes actuellement affichées : vous cochez ce que vous voyez.
 - **La recherche et le sélecteur de tags** réduisent le nombre de lignes. Sur un grand
@@ -45,6 +46,13 @@ d'une personne :
 |---|---|
 | **Cumulative** | Les rôles de tous les groupes de la personne sont réunis |
 | **Exclusive** | Un seul groupe est choisi à la connexion |
+
+Sur l'écran Groups, le nom d'un groupe (son en-tête de colonne, un bouton tonal)
+ouvre **son tiroir** : nom,
+description et, en mode exclusif seulement, ses **heures ouvrées** (Enterprise),
+qui remplacent celles du compte et de l'organisation pour qui se connecte avec ce
+groupe. Save enregistre ; la suppression est dans la danger zone du tiroir, après
+confirmation.
 
 ## Members
 
@@ -65,7 +73,13 @@ colonnes.
 - Cocher un groupe pour une personne qui n'est pas encore membre en fait un membre ; la
   case de colonne entière agit sur les membres affichés.
 - La dernière colonne indique la dernière connexion et donne accès à la
-  réinitialisation du mot de passe, limitée à cette organisation.
+  réinitialisation du mot de passe, limitée à cette organisation : un mot de passe
+  temporaire affiché une fois, ou un lien envoyé par mail au membre pour en choisir
+  un nouveau.
+- Deux boutons sur la ligne d'un membre ouvrent **son tiroir**, chacun sur sa page :
+  l'horloge sur ses **heures ouvrées** dans cette organisation (Enterprise), propres
+  ou héritées, et les dates entre lesquelles son accès court, valables dans les deux
+  cas ; l'historique sur son **historique de connexion** dans cette organisation.
 
 Members et [Users](/docs/console/users) répondent à deux questions différentes et
 restent séparés : Users traite du compte, cet écran de son affectation.

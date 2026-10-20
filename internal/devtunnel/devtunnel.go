@@ -296,8 +296,8 @@ type Deps struct {
 	Store    *store.Store
 	Registry *Registry
 	// Addr is where the tunnel listens (MEERKAT_PLUG_ADDR), DefaultAddr when
-	// empty. It is not the switch: that is developer mode and the tunnel's own
-	// setting (store.PlugOpen). A gateway run from a working tree is stopped
+	// empty. It is not the switch: that is the tunnel's own setting
+	// (store.PlugOpen). A gateway run from a working tree is stopped
 	// by Available instead - it cannot identify its own container.
 	//
 	// Above 1024: binding a privileged port would want root or
@@ -439,13 +439,10 @@ var pollEvery = 10 * time.Second
 // own, and long enough that the reason is readable in a log.
 const retryCap = 5 * time.Minute
 
-// Supervise ties the tunnel to developer mode (DEV-01): mode off, no agent, no
-// port, nothing listening. The switch is the whole authorisation - an
-// installation that has not asked for the developer surface does not get a
-// second way in.
-//
-// It also means the deployment's extra rights (a Docker socket, a Kubernetes
-// role) are only ever exercised by an installation that turned the mode on.
+// Supervise ties the agent to the tunnel's own switch (DEV-11): off, no agent,
+// no port, nothing listening. An installation that has not opened the tunnel
+// does not get a second way in, and the deployment's extra rights (a Docker
+// socket, a Kubernetes role) are only ever exercised by one that did.
 func Supervise(ctx context.Context, d Deps) {
 	if !Linked() {
 		return // community image: nothing to supervise, and nothing to say about it
@@ -496,10 +493,6 @@ func Supervise(ctx context.Context, d Deps) {
 		}
 		_, port, _ := net.SplitHostPort(d.Addr)
 		switch {
-		case !d.Store.DevMode(ctx):
-			stop("developer mode is off")
-			retryAfter, nextTry, lastSaid = 0, time.Time{}, ""
-			setStatus(Status{State: StateOff, Why: "developer mode is off (Application, General)"})
 		case !d.Store.Plug(ctx).Enabled:
 			stop("the tunnel is switched off")
 			retryAfter, nextTry, lastSaid = 0, time.Time{}, ""

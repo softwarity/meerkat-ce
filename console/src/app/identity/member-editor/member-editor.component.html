@@ -1,0 +1,55 @@
+<header>
+  <h2>{{ heading() }}</h2>
+  <span class="who mono">{{ member()?.username }}</span>
+  <span class="grow"></span>
+  <button matIconButton (click)="drawer.close()" i18n-aria-label="@@Close" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<div class="body">
+  @switch (view()) {
+    @case ('history') {
+      <app-login-history [userId]="userId()" [tenantId]="tenantId()" />
+    }
+
+    @default {
+      @if (!member()) {
+        <loading-indicator withContainer />
+      } @else {
+      <!-- The member's own hours in this organisation (TENANT-04): set, they
+           replace every other window for this person here; inherited, the
+           account's own apply, else the organisation's, else the gateway's.
+           The dates hold in both cases. -->
+      <section>
+        <h3>
+          <ng-container i18n="@@Working_hours">Working hours</ng-container>
+          <app-ee-lock
+            feature="business-hours"
+            i18n-why="@@Working_hours_ee_why"
+            why="Refuse access outside declared hours, gateway-wide or per person: an audit requirement rather than a defence."
+          />
+        </h3>
+        <p class="hint" i18n="@@Member_hours_hint">
+          Set here, they replace the account's and the organisation's hours in this organisation.
+        </p>
+        <app-business-access-form
+          ee-feature="business-hours"
+          [value]="hours()"
+          [inherited]="above()"
+          withDates
+          (valueChange)="hours.set($event)"
+        />
+        @if (error()) {
+          <p class="error">{{ error() }}</p>
+        }
+        <div class="actions">
+          <button matButton="filled" [disabled]="!hoursDirty() || saving()" (click)="saveHours()" i18n="@@Save">
+            Save
+          </button>
+        </div>
+      </section>
+      }
+    }
+  }
+</div>

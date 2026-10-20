@@ -20,7 +20,7 @@ organisation, and a **membership** puts a person in groups.
 
 ![The Groups screen: the role catalogue down the side, three group columns, a tick where a role belongs to a group](img/console/groups.webp)
 
-Three groups - Finance, Front desk, Warehouse - against the catalogue. Each row
+Three groups - Finance, Support, Warehouse - against the catalogue. Each row
 shows the role's description over its technical name, and the *Whole column* row
 sits just under the headers.
 
@@ -29,7 +29,9 @@ across the top, a tick where a role belongs to a group.
 
 - **Ticking a parent role ticks what hangs under it.** The catalogue's hierarchy
   is doing the work.
-- **A group column's menu** renames or deletes it; the round + button adds one.
+- **A group's name**, at the head of its column, opens its drawer (below); the
+  round + button adds one. Groups are created and edited here only: on Members
+  they head their columns and nothing more.
 - **The Whole column row** under the headers ticks or clears a whole group over
   the rows currently on screen: what you see is what you tick.
 - **The search and the tag picker** narrow the rows. On a large catalogue, tags
@@ -42,6 +44,12 @@ Above the matrix, **Group mode** decides how a person's groups combine:
 |---|---|
 | **Cumulative** | The roles of every group the person is in are merged |
 | **Exclusive** | One group is picked at sign-in |
+
+On the Groups screen, a group's name (its column header, a tonal button) opens
+**its drawer**: name, description and,
+in exclusive mode only, its **working hours** (Enterprise), which replace the
+account's and the organisation's for whoever signs in with that group. Save
+applies; deleting it is in the drawer's danger zone, after a confirmation.
 
 ## Members
 
@@ -61,7 +69,12 @@ top.
 - Ticking a group for somebody who is not a member yet makes them one; the
   whole-column box acts on the members on screen.
 - The last column shows the last connection and carries the password reset, scoped
-  to this organisation.
+  to this organisation: a temporary password shown once, or a link mailed to the
+  member to choose a new one.
+- Two buttons on a member's row open **its drawer**, each on its own page: the
+  clock on its **working hours** in this organisation (Enterprise), its own or
+  inherited, and the dates its access runs between, which hold either way; the
+  history on its **sign-in history** into this organisation.
 
 Members and [Users](/docs/console/users) answer two different questions and stay
 apart: Users is the account, this is the assignment.

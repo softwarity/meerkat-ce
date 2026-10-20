@@ -264,7 +264,7 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"PUT /api/logs/level":           true,
 		"PUT /api/settings/maintenance": true,
 		"PUT /api/settings/mail-relay":  true, "PUT /api/settings/tenancy": true,
-		"PUT /api/license":      true,
+		"PUT /api/license": true, "POST /api/users/clear-dev": true,
 		"PUT /api/settings/tls": true,
 		"POST /api/tenants":     true, "PUT /api/tenants/{id}": true, "DELETE /api/tenants/{id}": true,
 		"POST /api/tenants/{id}/group-rules": true, "PUT /api/tenants/{id}/group-rules/{ruleId}": true,

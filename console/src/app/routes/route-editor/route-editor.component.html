@@ -170,10 +170,61 @@
              h2c is HTTP/2 over cleartext, which is what a gRPC service inside
              a cluster speaks (ROUTE-20). Last, because it is the one an
              operator picks knowing why. -->
-        <app-url-input i18n-label="@@Upstream" label="Upstream" required
-          [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
-          [protocols]="['http', 'https', 'h2c']" [suggestions]="upstreamChoices()"
-          [hint]="upstreamHint()" hintAlign="end" hostPlaceholder="service:8080/base" />
+        <!-- Where the offered services come from, when this gateway may read
+             more than its own namespace (SVC-02): a cluster lists many, and
+             one namespace at a time keeps the list readable. A namespace
+             chosen, the upstream is one of its services; External is where a
+             public site or a machine is typed freely. -->
+        @if (namespaces().length > 1) {
+          <mat-form-field class="namespace" subscriptSizing="dynamic">
+            <mat-label i18n="@@Namespace">Namespace</mat-label>
+            <mat-select [value]="namespace()" (selectionChange)="loadServices($event.value)">
+              @for (n of namespaceChoices(); track n) {
+                <mat-option [value]="n">{{ n }}</mat-option>
+              }
+              <mat-option [value]="EXTERNAL" i18n="@@Namespace_external">External</mat-option>
+            </mat-select>
+          </mat-form-field>
+        }
+        <!-- A namespace chosen, the upstream is PICKED: the list is every
+             service of it, so a typed host could only be a typo. The base
+             path stays typed, beside it. External, Docker, or no right
+             beyond the own namespace: the free field, as always. -->
+        @if (listOnly()) {
+          <div class="pair upstream-pick">
+            <mat-form-field class="service">
+              <mat-label i18n="@@Upstream">Upstream</mat-label>
+              <mat-select required [value]="pickedService()" (selectionChange)="pickService($event.value)"
+                panelClass="mk-url-suggestions">
+                <mat-select-trigger>{{ pickedService() }}</mat-select-trigger>
+                @for (c of upstreamChoices(); track c.value) {
+                  <mat-option [value]="c.value" [class.muted]="c.muted">
+                    {{ c.value }}
+                    @if (c.hint) {<span class="hint">{{ c.hint }}</span>}
+                  </mat-option>
+                }
+              </mat-select>
+              <mat-select matPrefix class="proto" [value]="upstreamScheme()"
+                (selectionChange)="setUpstreamScheme($event.value)" i18n-aria-label="@@Protocol" aria-label="Protocol">
+                @for (p of ['http', 'https', 'h2c']; track p) {
+                  <mat-option [value]="p">{{ p }}</mat-option>
+                }
+              </mat-select>
+              <span matTextPrefix class="sep">://</span>
+              <mat-hint align="end">{{ upstreamHint() }}</mat-hint>
+            </mat-form-field>
+            <mat-form-field class="base-path">
+              <mat-label i18n="@@Base_path">Base path</mat-label>
+              <input matInput placeholder="/" [value]="upstreamPath()" [disabled]="!pickedService()"
+                (change)="setUpstreamPath($any($event.target).value)" />
+            </mat-form-field>
+          </div>
+        } @else {
+          <app-url-input i18n-label="@@Upstream" label="Upstream" required
+            [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
+            [protocols]="['http', 'https', 'h2c']" [suggestions]="upstreamChoices()"
+            [hint]="upstreamHint()" hintAlign="end" hostPlaceholder="service:8080/base" />
+        }
 
         <!-- How long this one may take (ROUTE-07), and when to stop asking
              (ROUTE-09): one subject, because both answer what happens when the

@@ -256,6 +256,83 @@ func TestLoginOutsideWorkingHoursIsRefusedExplicitly(t *testing.T) {
 	}
 }
 
+// A session let in under working hours ends when they close (TENANT-04): its
+// deadline never goes past the window's end.
+func TestASessionEndsWithItsWorkingHours(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("working hours are Enterprise")
+	}
+	mux, sm, st := setupFlow(t)
+	today := int(time.Now().UTC().Weekday())
+	if today == 0 {
+		today = 7
+	}
+	addMembership(t, st, "t1", "acme",
+		store.BusinessAccess{Timezone: "UTC", Days: baDays("00:00", "23:59", today)}, "")
+	rec := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("inside hours: %d", rec.Code)
+	}
+	now := time.Now().UTC()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1).Unix()
+	sess := sessionOf(t, sm, rec)
+	if sess.HoursUntil != midnight || sess.ExpiresAt > midnight {
+		t.Fatalf("hours until %d, expires %d, want both bound by tonight's midnight %d", sess.HoursUntil, sess.ExpiresAt, midnight)
+	}
+
+	// The most precise hours set win whole: the account's own, closed today,
+	// keep it out once the membership defers to them...
+	ctx := context.Background()
+	u, err := st.GetUserByID(ctx, "u1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.BusinessAccess = store.BusinessAccess{Timezone: "UTC", Days: baDays("00:00", "23:59", today%7+1)}
+	if err := st.UpdateUser(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	if rec := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("the member's own hours lost to the account's: %d", rec.Code)
+	}
+	addMembership(t, st, "t1", "acme", store.BusinessAccess{Inherited: true}, "")
+	if rec := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}}); rec.Code != http.StatusForbidden {
+		t.Fatalf("the account's own hours were not held: %d", rec.Code)
+	}
+}
+
+// With several organisations, the chooser shows the ones whose hours are
+// closed for this person as such, and a sign-in into none open is refused.
+func TestTheChooserShowsAClosedOrganisation(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("working hours are Enterprise")
+	}
+	mux, _, st := setupFlow(t)
+	today := int(time.Now().UTC().Weekday())
+	if today == 0 {
+		today = 7
+	}
+	closed := store.BusinessAccess{Timezone: "UTC", Days: baDays("00:00", "23:59", today%7+1)}
+	addMembership(t, st, "t1", "acme", store.BusinessAccess{Inherited: true}, "")
+	addMembership(t, st, "t2", "globex", closed, "")
+	rec := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/select-tenant" {
+		t.Fatalf("one organisation open: %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	req := httptest.NewRequest("GET", "/select-tenant", nil)
+	req.AddCookie(rec.Result().Cookies()[0])
+	page := httptest.NewRecorder()
+	mux.ServeHTTP(page, req)
+	body, _ := io.ReadAll(page.Result().Body)
+	if !strings.Contains(string(body), `value="t2" disabled`) || strings.Contains(string(body), `value="t1" disabled`) {
+		t.Fatalf("globex closed, acme open: %s", body)
+	}
+
+	addMembership(t, st, "t1", "acme", closed, "")
+	if rec := postLogin(t, mux, url.Values{"username": {"alice"}, "password": {"s3cret"}}); rec.Code != http.StatusForbidden {
+		t.Fatalf("every organisation closed and the sign-in went on: %d", rec.Code)
+	}
+}
+
 func TestLoginMultiTenantGoesThroughSelection(t *testing.T) {
 	mux, sm, st := setupFlow(t)
 	open := store.BusinessAccess{Inherited: true}

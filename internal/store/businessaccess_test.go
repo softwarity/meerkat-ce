@@ -65,7 +65,7 @@ func TestOrganisationHoursReachAMemberJoinedByTheAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ba, err := st.ResolveBusinessAccess(ctx, "u-alice", "acme")
+	ba, err := st.ResolveBusinessAccess(ctx, "u-alice", "acme", "")
 	if err != nil {
 		t.Fatal(err)
 	}

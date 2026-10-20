@@ -172,7 +172,6 @@ var ExportedSettings = []string{
 	// lands in an environment where nothing defines it otherwise.
 	store.SettingUserFields,
 	store.SettingExpiryDigest,
-	store.SettingDevMode,
 	// What the gateway will hold in memory while it proxies (PERF-02). It
 	// travels because it describes the SHAPE of the installation, not its
 	// hardware: an environment that answers big documents needs the same

@@ -286,12 +286,15 @@ func (a *API) tools() []mcp.Tool {
 		{
 			Name: "list_services", Allow: administersRouting, Title: "List what the runtime can route to", ReadOnly: true,
 			Description: "The services this gateway's runtime knows about - Swarm services, Docker containers or " +
-				"Kubernetes services in its own namespace - with the ports they listen on inside and a suggested " +
-				"upstream url. Ask this BEFORE writing an upstream by hand: a name that does not resolve or a port " +
-				"belonging to the neighbouring service only shows up when traffic does. An installation with no " +
-				"runtime to ask answers why, and an upstream typed by hand still works.",
-			Schema: noArgs(),
-			Call:   a.toolListServices,
+				"Kubernetes services, of its own namespace unless another is named - with the ports they listen on " +
+				"inside and a suggested upstream url. On Kubernetes the answer also lists the namespaces that hold a " +
+				"service, when the deployment grants reading them. Ask this BEFORE writing an upstream by hand: a name that " +
+				"does not resolve or a port belonging to the neighbouring service only shows up when traffic does. An " +
+				"installation with no runtime to ask answers why, and an upstream typed by hand still works.",
+			Schema: object(map[string]any{
+				"namespace": str("Kubernetes only: the namespace to list, among those the answer names. Omit for the gateway's own."),
+			}),
+			Call: a.toolListServices,
 		},
 		{
 			Name: "read_traffic", Allow: administersRouting, Title: "Read what is passing through", ReadOnly: true,
@@ -609,8 +612,19 @@ func accessSummary(a store.Access) string {
 }
 
 // toolListServices answers what the runtime can route to (SVC-02).
-func (a *API) toolListServices(ctx context.Context, _ json.RawMessage) (any, error) {
-	return discovery.Discover(ctx), nil
+func (a *API) toolListServices(ctx context.Context, raw json.RawMessage) (any, error) {
+	var in struct {
+		Namespace string `json:"namespace"`
+	}
+	if err := decode(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Namespace != "" {
+		if err := discovery.ValidNamespace(in.Namespace); err != nil {
+			return nil, err
+		}
+	}
+	return discovery.DiscoverIn(ctx, in.Namespace), nil
 }
 
 func (a *API) toolReadTraffic(_ context.Context, raw json.RawMessage) (any, error) {

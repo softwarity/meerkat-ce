@@ -180,7 +180,7 @@ moment où quelqu'un utilise la fonction, c'est-à-dire au pire moment.
 
 Ces droits **suivent le tunnel**, et non un interrupteur qui leur serait
 propre. Le tunnel peut s'ouvrir - il le fait dès qu'il est activé dans
-**Infra, Plug**, avec le mode développeur actif - et le déploiement accorde
+**Infra, Plug** - et le déploiement accorde
 donc ce qu'on pourra lui demander d'utiliser. C'est pourquoi `plug.enabled` vaut **true** par défaut : la
 situation inverse - le tunnel ouvert, les droits absents - est la seule
 combinaison qui ne peut pas fonctionner, avec un agent qui répète chaque
@@ -272,14 +272,16 @@ proxy, la ligne garde les deux - `203.0.113.5 via 10.42.0.15`.
 ## La surface développeur en production
 
 L'outillage, la documentation des API, le mode de test des interfaces et le
-tunnel s'activent dans la console - **Application, General** pour le mode
-développeur, **Infra, Plug** pour le tunnel - sur une gateway de production
-comme ailleurs. Rien dans l'environnement ne passe par-dessus.
-`MEERKAT_PRODUCTION`, qui le faisait, n'est plus lue : posée, elle ne fait
-qu'écrire un avertissement dans le journal.
+tunnel suivent la capacité `dev` de chaque compte - root l'a toujours - et le
+tunnel son propre interrupteur dans **Infra, Plug**, sur une gateway de
+production comme ailleurs. Pour les fermer sur une gateway de production,
+**Remove developer mode** dans **Application, Users** retire la capacité à tous
+les comptes sauf root, en une fois. Rien dans l'environnement ne passe
+par-dessus. `MEERKAT_PRODUCTION`, qui le faisait, n'est plus lue : posée, elle
+ne fait qu'écrire un avertissement dans le journal.
 
-Ces interrupteurs sont stockés : un export de configuration, une sauvegarde
-restaurée ou une base copiée depuis la préproduction les emportent avec eux.
+Les comptes sont stockés : une sauvegarde restaurée ou une base copiée depuis la
+préproduction emporte leurs capacités avec eux.
 
 ## Ce que fait chaque variable
 

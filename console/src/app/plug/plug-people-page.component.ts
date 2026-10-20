@@ -29,12 +29,6 @@ import { PlugSessionsComponent } from './plug-sessions.component';
             The developer tunnel is closed. An infrastructure administrator opens it in Infra, Plug.
           </p>
         } @else {
-          @if (!p.devMode) {
-            <p class="hint" i18n="@@Plug_people_devmode_off">
-              <b>Developer mode is off</b>, and the tunnel needs it: nobody can plug in until it is
-              on, in Application, General.
-            </p>
-          }
           <mat-card appearance="outlined">
             <app-plug-sessions />
           </mat-card>
@@ -74,8 +68,8 @@ export class PlugPeoplePageComponent {
 
   constructor() {
     this.load();
-    // A capability granted or taken (user), the tunnel opened or closed or
-    // developer mode switched (settings).
+    // A capability granted or taken (user), the tunnel opened or closed
+    // (settings).
     const live = inject(LiveChangesService);
     live.on('user', () => this.load());
     live.on('settings', () => this.load());

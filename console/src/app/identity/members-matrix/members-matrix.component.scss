@@ -74,12 +74,6 @@ mat-cell.mat-column-user {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.new-fab {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-}
-
 /* membership badges - "member" joins/leaves, "admin" flips the type on
    click, OWNER read-only. Same activatable pill for all. */
 .type-badge {
@@ -154,4 +148,8 @@ mat-cell.mat-column-lastConn {
   font-size: 0.75rem;
   font-weight: 400;
   color: var(--mat-sys-on-surface-variant);
+}
+
+mat-cell.open .name {
+  color: var(--mat-sys-primary);
 }

@@ -192,6 +192,13 @@ type Result struct {
 	// Why nothing answered, in a sentence naming what would make it work.
 	// Empty when something did.
 	Unavailable string `json:"unavailable,omitempty"`
+	// Namespace is the Kubernetes namespace these services are from, and
+	// Namespaces every namespace of the cluster when this gateway may list
+	// them (SVC-02): the console then offers the choice. Absent when it may
+	// not - a deployment that narrowed the grant to its own namespace sees
+	// that one, and nothing asks for more.
+	Namespace  string   `json:"namespace,omitempty"`
+	Namespaces []string `json:"namespaces,omitempty"`
 }
 
 // lookupTimeout bounds the whole thing. It runs from a console screen, and a
@@ -776,24 +783,28 @@ type k8sList struct {
 	} `json:"items"`
 }
 
-// fromKubernetes reads the services of THIS gateway's own namespace.
-//
-// Its own, and not the cluster's: a gateway that could list every namespace
-// would be asking for a right nobody needs to answer "what can I route to",
-// and the answer would be a list of things it cannot reach anyway.
+// fromKubernetes reads the services of THIS gateway's own namespace - the
+// default list, the one the route editor opens on. Another namespace is read
+// on demand (DiscoverIn), when the deployment grants it.
 //
 // Only from INSIDE the cluster. A kubeconfig is a different job - contexts,
 // client certificates, exec plugins to fetch a token from a cloud provider -
 // and on a laptop the Docker socket already answers, which is what the
 // developer loop needs.
 func fromKubernetes(ctx context.Context) (Result, error) {
-	token, err := os.ReadFile(saDir + "/token")
-	if err != nil {
-		return Result{}, fmt.Errorf("no service account token: %w", err)
-	}
 	ns, err := os.ReadFile(saDir + "/namespace")
 	if err != nil {
 		return Result{}, fmt.Errorf("no namespace: %w", err)
+	}
+	return fromKubernetesIn(ctx, strings.TrimSpace(string(ns)), true)
+}
+
+// fromKubernetesIn reads the services of namespace ns; own says it is this
+// gateway's, where a service resolves under its bare name.
+func fromKubernetesIn(ctx context.Context, ns string, own bool) (Result, error) {
+	token, err := os.ReadFile(saDir + "/token")
+	if err != nil {
+		return Result{}, fmt.Errorf("no service account token: %w", err)
 	}
 	client, err := k8sClient()
 	if err != nil {
@@ -804,7 +815,7 @@ func fromKubernetes(ctx context.Context) (Result, error) {
 	if port == "" {
 		port = "443"
 	}
-	endpoint := fmt.Sprintf("https://%s/api/v1/namespaces/%s/services", net.JoinHostPort(host, port), string(ns))
+	endpoint := fmt.Sprintf("https://%s/api/v1/namespaces/%s/services", net.JoinHostPort(host, port), url.PathEscape(ns))
 
 	var list k8sList
 	if err := getJSON(ctx, client, endpoint, &list, "Authorization", "Bearer "+strings.TrimSpace(string(token))); err != nil {
@@ -816,12 +827,16 @@ func fromKubernetes(ctx context.Context) (Result, error) {
 		// themselves - still routable, so still offered.
 		// A Kubernetes service resolves under its bare name inside its own
 		// namespace, and under the fully qualified one from anywhere else.
-		// Both are offered, the short one first: this gateway runs in that
-		// namespace, which is where the short one works.
+		// In this gateway's namespace both are offered, the short one first;
+		// in another, only the qualified one resolves from here.
+		names := []string{it.Metadata.Name + "." + ns + ".svc"}
+		if own {
+			names = append([]string{it.Metadata.Name}, names...)
+		}
 		svc := Service{
 			Name:     it.Metadata.Name,
-			Names:    []string{it.Metadata.Name, it.Metadata.Name + "." + string(ns) + ".svc"},
-			Networks: []string{string(ns)},
+			Names:    names,
+			Networks: []string{ns},
 		}
 		for _, p := range it.Spec.Ports {
 			svc.Ports = append(svc.Ports, Port{Target: p.Port, Published: p.NodePort})
@@ -830,14 +845,16 @@ func fromKubernetes(ctx context.Context) (Result, error) {
 		// service. Not made: this list is for choosing an upstream, and the
 		// observed state (ROUTE-09) is what says whether it answers.
 		//
-		// Reachable without asking: this listing is the gateway's OWN
-		// namespace, and a pod resolves every service in it.
+		// Reachable without asking: a pod resolves every service of its own
+		// namespace by name, and of any other by the qualified name. A
+		// NetworkPolicy may still stand between them; the observed state
+		// (ROUTE-09) is what says so, not a guess here.
 		svc.Reachable = true
 		svc.Suggested = suggest(svc)
 		out = append(out, svc)
 	}
 	sortByName(out)
-	return Result{Source: "kubernetes", Services: out, Reach: []string{string(ns)}}, nil
+	return Result{Source: "kubernetes", Services: out, Reach: []string{ns}, Namespace: ns}, nil
 }
 
 func k8sClient() (*http.Client, error) {

@@ -13,12 +13,12 @@ the whole application, and writing to them takes the `app admin` capability (or
 
 ## General
 
-![The General screen: the organisations switch, developer mode, and the weekly working-hours grid](img/console/general.webp)
+![The General screen: the organisations switch and the weekly working-hours grid](img/console/general.webp)
 
-The two switches, then the working hours: a time zone and one line per day, each
+The switch, then the working hours: a time zone and one line per day, each
 with its own window and a + to add a second one.
 
-Two statements about what this installation **is**, and one access window.
+A statement about what this installation **is**, and one access window.
 
 **Several organisations.** Off, this gateway serves one organisation and never
 names it: its groups and members are administered right here, under Application.
@@ -29,16 +29,10 @@ and switching back brings the organisations and their access straight back.
 > [!NOTE]
 > Enterprise edition: several organisations.
 
-**Developer mode.** On, accounts holding the `dev` capability get their tooling on
-the applications this gateway serves: the Developer menu in the user button, the
-UI test mode, the routes' API docs. Off, none of it is there at all, however many
-accounts carry the capability. Free in both editions.
-
-This switch decides on a production gateway as anywhere else. It is stored, so
-a configuration export or a database restored from staging carries it along.
-
 **Working hours** are the application-wide access window every organisation
-inherits unless it defines its own.
+inherits unless it defines its own; an account, a member or a group (in exclusive
+mode) can replace them in turn, the most precise winning - see
+[working hours](/docs/access/tenants#working-hours).
 
 > [!NOTE]
 > Enterprise edition: working hours.
@@ -93,8 +87,8 @@ whole screen.
 
 ## Traps
 
-- **General saves on the button, its two switches do not.** The organisation mode
-  and developer mode take effect on the click; the working hours wait for Save.
+- **General saves on the button, its switch does not.** The organisation mode
+  takes effect on the click; the working hours wait for Save.
 - **Languages are the applications', not the console's.** The console is
   English only, and what the built-in pages offer comes from the routes.
 - **An empty password policy accepts anything**, however short. The screen says

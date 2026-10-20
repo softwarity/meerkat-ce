@@ -1,9 +1,12 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { ApiService, Tenant } from '../../api.service';
 import { MeService } from '../../me.service';
 import { MembersMatrixComponent } from '../members-matrix/members-matrix.component';
+import { IdentityDrawer } from '../identity-drawer';
+import { IdentityDrawerPanelComponent } from '../identity-drawer-panel.component';
 
 // Who is in which group, seen from Application.
 //
@@ -14,24 +17,38 @@ import { MembersMatrixComponent } from '../members-matrix/members-matrix.compone
 // administrators like any other.
 @Component({
   selector: 'app-app-members',
-  imports: [MatFormFieldModule, MatInputModule, MembersMatrixComponent],
+  // The identity drawer - a member, a group - is the page's, drawn over its
+  // whole height.
+  providers: [IdentityDrawer],
+  host: { '(document:keydown.escape)': 'drawer.escape()' },
+  imports: [MatFormFieldModule, MatInputModule, MatSidenavModule, MembersMatrixComponent, IdentityDrawerPanelComponent],
   template: `
-    <div class="banner">
-      <h1 i18n="@@Members">Members</h1>
-    </div>
+    <mat-drawer-container (backdropClick)="drawer.back()">
+      <mat-drawer-content>
+        <div class="banner">
+          <h1 i18n="@@Members">Members</h1>
+        </div>
 
-    <div class="toolbar">
-      <mat-form-field class="search" subscriptSizing="dynamic">
-        <mat-label i18n="@@Search">Search</mat-label>
-        <input matInput [value]="filter()" (input)="filter.set($any($event.target).value)" />
-      </mat-form-field>
-    </div>
+        <div class="toolbar">
+          <mat-form-field class="search" subscriptSizing="dynamic">
+            <mat-label i18n="@@Search">Search</mat-label>
+            <input matInput [value]="filter()" (input)="filter.set($any($event.target).value)" />
+          </mat-form-field>
+        </div>
 
-    @if (tenantId(); as id) {
-      <div class="panel">
-        <app-members-matrix [tenantId]="id" [ownerId]="ownerId()" [filter]="filter()" />
-      </div>
-    }
+        @if (tenantId(); as id) {
+          <div class="panel">
+            <app-members-matrix [tenantId]="id" [ownerId]="ownerId()" [filter]="filter()" />
+          </div>
+        }
+      </mat-drawer-content>
+
+      <mat-drawer position="end" mode="over" [opened]="drawer.opened()" disableClose>
+        @if (tenantId(); as id) {
+          <app-identity-drawer-panel [tenantId]="id" />
+        }
+      </mat-drawer>
+    </mat-drawer-container>
   `,
   styles: [
     `
@@ -40,6 +57,22 @@ import { MembersMatrixComponent } from '../members-matrix/members-matrix.compone
         flex-direction: column;
         height: 100%;
         min-height: 0;
+      }
+      mat-drawer-container {
+        flex: 1 1 auto;
+        min-height: 0;
+        background: transparent;
+      }
+      mat-drawer-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+      }
+      mat-drawer {
+        width: min(560px, 96vw);
+        border-left: 1px solid var(--mat-sys-outline-variant);
+        background: var(--mat-sys-surface-container-high);
       }
       .banner {
         display: flex;
@@ -83,6 +116,7 @@ import { MembersMatrixComponent } from '../members-matrix/members-matrix.compone
 export class AppMembersComponent {
   private readonly api = inject(ApiService);
   private readonly me = inject(MeService);
+  protected readonly drawer = inject(IdentityDrawer);
 
   protected readonly filter = signal('');
   private readonly tenant = signal<Tenant | null>(null);

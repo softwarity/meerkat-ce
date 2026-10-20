@@ -52,7 +52,7 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
   },
   'TENANT-04': {
     label: $localize`:@@EE_TENANT_04:Working hours`,
-    what: $localize`:@@EE_TENANT_04_what:Refuse access outside declared hours, gateway-wide, per organisation or per person.`,
+    what: $localize`:@@EE_TENANT_04_what:Refuse access outside declared hours - gateway-wide, per organisation, per account, per member, or per group in exclusive mode - the most precise winning, and end a session when they close.`,
     where: '/application/general',
     whereLabel: $localize`:@@General:General`,
   },
@@ -110,13 +110,13 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
   },
   'DEV-08': {
     label: $localize`:@@EE_DEV_08:Several substitutions at once`,
-    what: $localize`:@@EE_DEV_08_what:Several developers on several services, without stepping on each other.`,
+    what: $localize`:@@EE_DEV_08_what:Several developers on several services at once, one developer per service.`,
     where: '/infra/plug',
     whereLabel: $localize`:@@Plug:Plug`,
   },
   'DEV-11': {
     label: $localize`:@@EE_DEV_11:Tunnel security`,
-    what: $localize`:@@EE_DEV_11_what:Who may open a tunnel, to what, and the record of it.`,
+    what: $localize`:@@EE_DEV_11_what:Who may open a tunnel - the developers - where it is, and how to install and launch plug.`,
     where: '/infra/plug',
     whereLabel: $localize`:@@Plug:Plug`,
   },

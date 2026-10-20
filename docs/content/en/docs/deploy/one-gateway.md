@@ -77,7 +77,7 @@ default and needs nothing from Meerkat. What the whole thing is for is on the
 [Dev mode](/product/dev-mode) page.
 
 Deploying it opens nothing yet. The tunnel also has a switch of its own in the
-console, **Infra, Plug**, which ships off, beside developer mode; that page
+console, **Infra, Plug**, which ships off; that page
 records the address developers use and hands them the commands to install plug
 on macOS, Linux and Windows. See [Plug](/docs/operations/plug).
 
@@ -262,14 +262,16 @@ proxy, the line keeps both - `203.0.113.5 via 10.42.0.15`.
 
 ## The developer surface in production
 
-The tooling, the API docs, the UI test mode and the tunnel are switched in the
-console - **Application, General** for developer mode, **Infra, Plug** for the
-tunnel - on a production gateway as anywhere else. Nothing in the environment
-overrules them. `MEERKAT_PRODUCTION`, which used to, is no longer read: set, it
+The tooling, the API docs, the UI test mode and the tunnel follow the `dev`
+capability of each account - root always has it - and the tunnel its own switch
+in **Infra, Plug**, on a production gateway as anywhere else. To close it on a
+production gateway, **Remove developer mode** on **Application, Users** takes the
+capability from every account but root's in one act. Nothing in the environment
+overrules this. `MEERKAT_PRODUCTION`, which used to, is no longer read: set, it
 only logs a warning.
 
-Keep in mind that these switches are stored: a configuration export, a
-restored backup or a database copied from staging carries them along.
+Keep in mind that the accounts are stored: a restored backup or a database copied
+from staging carries their capabilities along.
 
 ## What each variable does
 

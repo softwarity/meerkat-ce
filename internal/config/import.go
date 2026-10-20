@@ -943,6 +943,12 @@ func importRelay(ctx context.Context, st *store.Store, doc *Document, plan *Plan
 	return nil
 }
 
+// retiredSettings are settings a configuration used to carry and no longer
+// does: a document saved before their removal still imports, and they are
+// passed over rather than refused. dev_mode was the installation-wide developer
+// switch, gone since the dev capability alone decides (DEV-01).
+var retiredSettings = map[string]bool{"dev_mode": true}
+
 func importSettings(ctx context.Context, st *store.Store, doc *Document, plan *Plan, commit bool) error {
 	keys := make([]string, 0, len(doc.Settings))
 	for key := range doc.Settings {
@@ -954,6 +960,9 @@ func importSettings(ctx context.Context, st *store.Store, doc *Document, plan *P
 		allowed[key] = true
 	}
 	for _, key := range keys {
+		if retiredSettings[key] {
+			continue
+		}
 		if !allowed[key] {
 			return fmt.Errorf("config: %q is not a setting a configuration carries (allowed: %s)",
 				key, strings.Join(ExportedSettings, ", "))

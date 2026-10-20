@@ -3,23 +3,16 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { RowActionsDirective } from '@softwarity/row-actions';
 import { DateTime } from 'luxon';
-import { catchError, concatMap, firstValueFrom, forkJoin, from, Observable, of, tap } from 'rxjs';
+import { catchError, concatMap, forkJoin, from, Observable, of, tap } from 'rxjs';
 import { ApiService, Group, Member, User } from '../../api.service';
-import { DialogsService } from '../../shared/dialogs.service';
-import {
-  GroupDialogComponent,
-  GroupDialogData,
-  GroupDialogResult,
-} from '../group-dialog.component';
-import { LoginHistoryDialogComponent } from '../login-history-dialog.component';
-import { PasswordDialogComponent } from '../password-dialog.component';
+import { IdentityDrawer, MemberEditorView } from '../identity-drawer';
+import { resetAccess } from '../reset-access';
 import { LiveChangesService } from '../../shared/live-changes.service';
 import { PresenceComponent, PresenceService } from '../../shared/presence';
 
@@ -48,7 +41,6 @@ interface UserRow {
     MatButtonModule,
     MatCheckboxModule,
     MatIconModule,
-    MatMenuModule,
     MatTableModule,
     MatTooltipModule,
     LoadingIndicatorComponent,
@@ -69,7 +61,6 @@ export class MembersMatrixComponent {
 
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
-  private readonly dialogs = inject(DialogsService);
   private readonly dialog = inject(MatDialog);
   private readonly locale = inject(LOCALE_ID);
 
@@ -115,6 +106,15 @@ export class MembersMatrixComponent {
       this.tenantId();
       this.load();
     });
+  }
+
+  // The drawer of the page hosting this matrix.
+  protected readonly drawer = inject(IdentityDrawer);
+
+  // Only a member has a drawer: hours and history are the membership's. Each
+  // of the row's two buttons opens it on the page it names.
+  protected openMember(u: UserRow, view: MemberEditorView): void {
+    if (this.isMember(u.id)) this.drawer.openMember(u.id, view);
   }
 
   private load(quiet = false): void {
@@ -320,87 +320,11 @@ export class MembersMatrixComponent {
     return DateTime.fromSeconds(ts).reconfigure({ locale: this.locale }).toLocaleString(DateTime.DATETIME_MED);
   }
 
-  protected showLogins(u: UserRow): void {
-    this.dialog.open(LoginHistoryDialogComponent, {
-      width: '520px',
-      data: { tenantId: this.tenantId(), userId: u.id, username: u.username },
-    });
-  }
-
-  protected async resetPassword(u: UserRow): Promise<void> {
-    const ok = await this.dialogs.confirm({
-      title: $localize`:@@Reset_password_USERNAME:Reset password for "${u.username}:USERNAME:"?`,
-      confirmLabel: $localize`:@@Reset_password:Reset password`,
-    });
-    if (!ok) return;
-    this.api.resetMemberPassword(this.tenantId(), u.id).subscribe({
-      next: ({ password, validHours }) =>
-        this.dialog.open(PasswordDialogComponent, { data: { username: u.username, password, validHours } }),
-      error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
-    });
-  }
-
-  // ── group columns (shared behaviour with the groups matrix) ───────────────
-
-  protected async addGroup(): Promise<void> {
-    const res = await firstValueFrom(
-      this.dialog
-        .open<GroupDialogComponent, GroupDialogData, GroupDialogResult | undefined>(GroupDialogComponent, {
-          width: '440px',
-          data: { title: $localize`:@@New_group:New group`, confirmLabel: $localize`:@@Create:Create` },
-        })
-        .afterClosed(),
+  protected resetPassword(u: UserRow): void {
+    const email = this.memberships().get(u.id)?.email ?? '';
+    void resetAccess(this.api, this.dialog, this.snack, { username: u.username, email }, (byMail) =>
+      this.api.resetMemberPassword(this.tenantId(), u.id, byMail),
     );
-    if (!res) return;
-    this.api.createGroup(this.tenantId(), { name: res.name, description: res.description, roles: [] }).subscribe({
-      next: (g) => {
-        this.groups.update((list) => [...list, g]);
-        this.changed.emit();
-      },
-      error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
-    });
-  }
-
-  protected async editGroup(g: Group): Promise<void> {
-    const res = await firstValueFrom(
-      this.dialog
-        .open<GroupDialogComponent, GroupDialogData, GroupDialogResult | undefined>(GroupDialogComponent, {
-          width: '440px',
-          data: {
-            title: $localize`:@@Edit_group:Edit group`,
-            confirmLabel: $localize`:@@Save:Save`,
-            name: g.name,
-            description: g.description,
-          },
-        })
-        .afterClosed(),
-    );
-    if (!res || (res.name === g.name && res.description === (g.description ?? ''))) return;
-    this.api
-      .updateGroup({ ...g, name: res.name, description: res.description, roles: g.roles ?? [] })
-      .subscribe({
-        next: (saved) => {
-          this.groups.update((list) => list.map((x) => (x.id === saved.id ? saved : x)));
-          this.changed.emit();
-        },
-        error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
-      });
-  }
-
-  protected async removeGroup(g: Group): Promise<void> {
-    const ok = await this.dialogs.confirm({
-      title: $localize`:@@Delete_group_NAME:Delete group "${g.name}:NAME:"?`,
-      confirmLabel: $localize`:@@Delete:Delete`,
-      danger: true,
-    });
-    if (!ok) return;
-    this.api.deleteGroup(this.tenantId(), g.id).subscribe({
-      next: () => {
-        this.groups.update((list) => list.filter((x) => x.id !== g.id));
-        this.changed.emit();
-      },
-      error: (err) => this.snack.open(errMsg(err), undefined, { duration: 4000 }),
-    });
   }
 }
 

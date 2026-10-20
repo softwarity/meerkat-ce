@@ -99,6 +99,14 @@ export class UsersPageComponent {
   private readonly dialogs = inject(DialogsService);
 
   protected readonly loading = signal(true);
+  // Accounts besides root that carry the dev capability: what the button
+  // above the table would change.
+  protected readonly devCount = computed(() => this.users().filter((u) => u.dev && !u.root).length);
+  protected readonly clearingDev = signal(false);
+  protected readonly noDevTooltip = $localize`:@@No_account_has_developer_mode:No account but root has developer mode`;
+  // Root's dev badge is drawn on and cannot be clicked: root always has the
+  // developer tooling, whatever its flag says (DEV-01).
+  protected readonly rootDevTooltip = $localize`:@@Root_always_develops:Root always has the developer tooling`;
   protected readonly users = signal<User[]>([]);
   private readonly settings = signal<Settings | null>(null);
   protected readonly columns = ["identity", "summary"];
@@ -146,6 +154,33 @@ export class UsersPageComponent {
     // see load - because a spinner replacing a list nobody asked to reload
     // takes the screen away from whoever is reading it.
     inject(LiveChangesService).on("user", () => this.load(true));
+  }
+
+  // The developer tools of a production gateway, closed in one act. Confirmed,
+  // naming how many accounts it reaches: there is no undoing it but account by
+  // account.
+  protected async clearDev(): Promise<void> {
+    const n = this.devCount();
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Remove_developer_mode_title:Remove developer mode from every account?`,
+      message: $localize`:@@Remove_developer_mode_message:${n}:COUNT: accounts lose the developer tools: Developer menu, UI test mode, API docs, the plug tunnel. Root keeps its own.`,
+      confirmLabel: $localize`:@@Remove_developer_mode:Remove developer mode`,
+      danger: true,
+    });
+    if (!ok) return;
+    this.clearingDev.set(true);
+    this.api.clearDevForAll().subscribe({
+      next: ({ users }) => {
+        this.clearingDev.set(false);
+        this.snack.open(
+          $localize`:@@COUNT_accounts_lost_dev:${users}:COUNT: accounts no longer have developer mode`,
+          undefined,
+          { duration: 4000 },
+        );
+        this.load(true);
+      },
+      error: () => this.clearingDev.set(false),
+    });
   }
 
   protected load(quiet = false): void {

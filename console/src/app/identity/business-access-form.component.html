@@ -1,3 +1,15 @@
+@if (withDates()) {
+  <div class="row dates">
+    <mat-form-field>
+      <mat-label i18n="@@Access_from">Access from</mat-label>
+      <input matInput type="date" [value]="value().dateFrom ?? ''" (input)="patchDate('dateFrom', $any($event.target).value)" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label i18n="@@Access_until">Access until</mat-label>
+      <input matInput type="date" [value]="value().dateTo ?? ''" (input)="patchDate('dateTo', $any($event.target).value)" />
+    </mat-form-field>
+  </div>
+}
 @if (!topLevel()) {
   <mat-slide-toggle [checked]="value().inherited" (change)="toggleInherited($event.checked)">
     {{ inheritLabel() }}

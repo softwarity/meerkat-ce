@@ -36,6 +36,8 @@ type MailSampleKind struct {
 var MailSampleKinds = []MailSampleKind{
 	{"confirm", "Account confirmation", false},
 	{"reset", "Password reset", false},
+	{"invite", "Invitation", false},
+	{"reset-admin", "Password reset by an administrator", false},
 	{"password-changed", "Password changed", false},
 	{"signin-attempts", "Failed sign-ins", false},
 	{"email-change", "New address confirmation", false},
@@ -109,6 +111,8 @@ func sampleSpec(kind string, t map[string]string, app, base string) (mail.Spec, 
 			Button:    &mail.Button{Label: t["mailConfirmCta"], URL: base + "/confirm?token=SAMPLE"},
 			Outro:     []string{t["mailConfirmOutro"]},
 		}, true
+	case "invite", "reset-admin":
+		return accessSpec(kind == "invite", t, app, base+"/reset-password?token=SAMPLE"), true
 	case "reset":
 		return mail.Spec{
 			Subject:   fmt.Sprintf(t["mailResetSubject"], app),

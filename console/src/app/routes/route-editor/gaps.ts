@@ -79,3 +79,55 @@ export function internalUpstream(raw: string): boolean {
   if (!host.includes('.')) return true;
   return ['.svc', '.cluster.local', '.local', '.internal', '.lan', '.localhost', '.test'].some((end) => host.endsWith(end));
 }
+
+// The Namespace choice's entry for an upstream that lives in no namespace of
+// this cluster (SVC-02): a public site, a machine of the network. Not a valid
+// namespace name, so it can never be mistaken for one.
+export const EXTERNAL = '-';
+
+// Where an upstream points, read the way a pod resolves it: a bare name is a
+// service of the gateway's own namespace, name.ns or name.ns.svc[.domain] one
+// of namespace ns. Null for anything else - a public host, an address, a
+// StatefulSet's pod (pod.service.ns.svc), which no Service lists.
+export function serviceRef(
+  raw: string,
+  own: string,
+  namespaces: string[],
+): { service: string; namespace: string; port: number } | null {
+  let u: URL;
+  try {
+    u = new URL((raw ?? '').trim());
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase();
+  if (!host) return null;
+  const port = Number(u.port) || (u.protocol === 'https:' ? 443 : 80);
+  const labels = host.split('.');
+  if (labels.length === 1) return { service: host, namespace: own, port };
+  const [service, ns, svc] = labels;
+  if (svc === 'svc' || (labels.length === 2 && namespaces.includes(ns))) {
+    return { service, namespace: ns, port };
+  }
+  return null;
+}
+
+// The Namespace choice an upstream reads as: its namespace, External for
+// anything that is not a service of the cluster, the gateway's own for a
+// route that has no upstream yet.
+export function namespaceOf(raw: string, own: string, namespaces: string[]): string {
+  if (!(raw ?? '').trim()) return own;
+  return serviceRef(raw, own, namespaces)?.namespace ?? EXTERNAL;
+}
+
+// Whether an upstream is spelled as a cluster service for certain
+// (name.ns.svc[.domain]). A bare or a two-label name may be one too - or a
+// machine, or a public host: softwarity.dev on a cluster that has a namespace
+// called dev.
+export function svcSpelled(raw: string): boolean {
+  try {
+    return /\.svc(\.|$)/.test(new URL((raw ?? '').trim()).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}

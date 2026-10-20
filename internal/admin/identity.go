@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -259,6 +260,9 @@ func (a *API) registerIdentity(mux Mux) {
 	// account, or every local one (root only - it reaches everybody at once).
 	mux.Handle("POST /api/users/{id}/must-change-password", a.appAdmin(a.putMustChangePassword))
 	mux.Handle("POST /api/users/must-change-password", a.appAdmin(a.postMustChangePasswordAll))
+	// Closing a gateway's developer surface in one act (DEV-01): the dev
+	// capability taken from every account but root's.
+	mux.Handle("POST /api/users/clear-dev", a.appAdmin(a.postClearDev))
 	mux.Handle("GET /api/users/{id}/logins", a.appAdmin(a.userLogins))
 	mux.Handle("GET /api/users/{id}/identities", a.appAdmin(a.userIdentities))
 	mux.Handle("DELETE /api/users/{id}", a.appAdmin(a.deleteUser))
@@ -351,6 +355,18 @@ func (a *API) requireBusinessHours(ctx context.Context, want store.BusinessAcces
 	return edition.Require("access hours")
 }
 
+// checkBusinessAccess refuses a window the gateway could not apply: a time zone
+// it does not know, which would otherwise fail open at every sign-in.
+func checkBusinessAccess(b store.BusinessAccess) error {
+	if b.Timezone == "" {
+		return nil
+	}
+	if _, err := time.LoadLocation(b.Timezone); err != nil {
+		return fmt.Errorf("time zone %q is not allowed: an IANA name such as Europe/Paris or UTC", b.Timezone)
+	}
+	return nil
+}
+
 // businessAccessEqual compares two windows by value; the day list is ordered,
 // so a plain element-wise walk is the comparison.
 func businessAccessEqual(a, b store.BusinessAccess) bool {
@@ -411,9 +427,25 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// ?invite=true: the person is mailed a link to choose their password and
+	// none is shown (AUTH-25). Checked BEFORE the account exists, so a refusal
+	// leaves nothing behind.
+	invite := r.URL.Query().Get("invite") == "true"
+	if invite {
+		if u.Email == "" {
+			writeErr(w, http.StatusUnprocessableEntity, "an invitation needs the account's e-mail address: give one, or show a temporary password")
+			return
+		}
+		if _, why := a.accessMailOrigin(r.Context()); why != "" {
+			writeErr(w, http.StatusUnprocessableEntity, "no invitation can be mailed: "+why+"; show a temporary password instead")
+			return
+		}
+	}
 	u.ID = newID()
 	// A generated one-time password, shown once in the response, and working
-	// for the policy's TemporaryHours until its owner sets their own.
+	// for the policy's TemporaryHours until its owner sets their own. An
+	// invited account gets one too, which nobody ever reads: it holds the
+	// account shut until the link is followed.
 	password, err := randomSecret()
 	if err != nil {
 		a.internal(w, err)
@@ -425,8 +457,8 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		return
 	}
 	u.PasswordHash = string(hash)
-	u.MustChangePassword = true // generated password -> forced update at first login
-	u.EmailVerified = true      // an admin answers for the address they type
+	u.MustChangePassword = !invite // generated password -> forced update at first login
+	u.EmailVerified = true         // an admin answers for the address they type
 	u.SelfRegistered = false
 	if err := a.st.CreateUser(r.Context(), u); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
@@ -435,6 +467,22 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 	created, err := a.st.GetUserByID(r.Context(), u.ID)
 	if err != nil {
 		a.internal(w, err)
+		return
+	}
+	if invite {
+		// Not sent, not created: an account nobody was told about, holding a
+		// password nobody knows, would be a door with no key.
+		if err := a.sendAccessMail(r, true, created); err != nil {
+			if _, derr := a.st.DeleteUser(r.Context(), created.ID); derr != nil {
+				a.internal(w, derr)
+				return
+			}
+			writeErr(w, http.StatusBadGateway, "the invitation could not be sent, so the account was not created: "+err.Error())
+			return
+		}
+		a.auditEvent(r.Context(), actor, "user.create", "user", created.ID, created.Username, "", "invitation mailed")
+		writeJSON(w, http.StatusCreated, map[string]any{"user": created, "invited": true,
+			"email": created.Email, "validHours": auth.AccessLinkHours})
 		return
 	}
 	a.auditEvent(r.Context(), actor, "user.create", "user", created.ID, created.Username, "", "")
@@ -488,6 +536,23 @@ func (a *API) updateUser(w http.ResponseWriter, r *http.Request, actor store.Use
 	if err := store.ValidFromUntil(u.ValidFrom, u.ValidUntil); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	// The account's own working hours (TENANT-04). A body that never mentioned
+	// them - an older client, a script - decodes to the zero window, which is
+	// not a decision: the account keeps its own. A window of its own is the
+	// Enterprise feature, the same rule as the organisation's and the member's.
+	if businessAccessEqual(u.BusinessAccess, store.BusinessAccess{}) {
+		u.BusinessAccess = current.BusinessAccess
+	}
+	if !u.BusinessAccess.Inherited && !businessAccessEqual(current.BusinessAccess, u.BusinessAccess) {
+		if err := edition.Require("access hours"); err != nil {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err := checkBusinessAccess(u.BusinessAccess); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 	}
 	if err := a.st.UpdateUser(r.Context(), u); err != nil {
 		if conflict(w, err) {
@@ -642,6 +707,22 @@ func (a *API) writeLogins(w http.ResponseWriter, r *http.Request, userID string)
 // must-change flag, returns it once, and records the reset (a security event -
 // never the password itself). tenantID scopes a tenant-admin's member reset.
 func (a *API) writeResetPassword(w http.ResponseWriter, r *http.Request, actor store.User, id, tenantID string) {
+	// ?send=mail: a link to choose a new password is mailed instead, and the
+	// current password keeps working until it is followed (AUTH-25).
+	if r.URL.Query().Get("send") == "mail" {
+		u, err := a.st.GetUserByID(r.Context(), id)
+		if err != nil {
+			writeErr(w, http.StatusNotFound, "user not found")
+			return
+		}
+		if err := a.sendAccessMail(r, false, u); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		a.auditEvent(r.Context(), actor, "user.reset-password", "user", id, u.Username, tenantID, "reset link mailed")
+		writeJSON(w, http.StatusOK, map[string]any{"sent": true, "email": u.Email, "validHours": auth.AccessLinkHours})
+		return
+	}
 	password, err := randomSecret()
 	if err != nil {
 		a.internal(w, err)
@@ -1130,16 +1211,10 @@ type settingsPayload struct {
 	// endpoint (PUT /api/settings/telemetry), because turning an export on is
 	// an Enterprise decision with its own refusal.
 	Telemetry store.TelemetryConfig `json:"telemetry"`
-	// DevMode is the installation-wide developer switch (DEV-01): off, the
-	// served applications carry no developer surface at all, whoever holds the
-	// capability. Free in both editions - developing against a gateway is how
-	// one adopts it.
-	//
-	// A POINTER because this PUT carries the whole payload: an older console,
-	// a script, or a screen that never heard of this field would send no
-	// `devMode` at all, and a plain bool would read that silence as "off" -
-	// saving a locale would close the developer tooling of an installation
-	// nobody asked about. Absent means UNCHANGED.
+	// DevMode was the installation-wide developer switch, retired: the dev
+	// capability of each account decides alone (DEV-01). Accepted and ignored,
+	// never sent, so a console tab opened before the upgrade can still save
+	// this screen rather than being refused for a field it remembers.
 	DevMode *bool `json:"devMode,omitempty"`
 }
 
@@ -1197,8 +1272,6 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	// names, endpoint templates, status codes, an operational map - at an
 	// address in the request. That is a destination somebody decides.
 	p.Telemetry = a.st.RawTelemetry(ctx)
-	devMode := a.st.DevMode(ctx)
-	p.DevMode = &devMode
 	smtp := a.st.GetSMTP(ctx)
 	p.SMTP = smtpPayload{
 		FromName: smtp.FromName, RelayHost: smtp.Host, RelayFrom: smtp.Address(),
@@ -1417,15 +1490,7 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		a.internal(w, err)
 		return
 	}
-	if p.DevMode == nil {
-		current := a.st.DevMode(r.Context())
-		p.DevMode = &current
-	} else if err := a.st.SetDevMode(r.Context(), *p.DevMode); err != nil {
-		// Not an internal error: the caller asked for something this gateway
-		// will not do, and the message says which gateway would.
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
+	p.DevMode = nil
 	// The default route lives in the data plane's snapshot - apply on save.
 	if err := a.reloadRouting(r.Context()); err != nil {
 		a.internal(w, fmt.Errorf("saved, but reload failed: %w", err))

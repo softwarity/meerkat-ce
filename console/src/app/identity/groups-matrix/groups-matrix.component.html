@@ -53,15 +53,15 @@
       @for (g of groups(); track g.id) {
         <ng-container [matColumnDef]="g.id">
           <mat-header-cell *matHeaderCellDef class="grp-head">
-            <span class="col-name" [title]="g.description">{{ g.name }}</span>
+            <!-- The name opens the group's drawer: edit, save, delete. A tonal
+                 button, filled while its drawer is open. -->
             <button
-              matIconButton
-              [matMenuTriggerFor]="groupMenu"
-              [matMenuTriggerData]="{ group: g }"
-              i18n-aria-label="@@Group_menu"
-              aria-label="Group menu"
+              [matButton]="drawer.groupId() === g.id ? 'filled' : 'tonal'"
+              class="col-name"
+              [title]="g.description"
+              (click)="editGroup(g)"
             >
-              <mat-icon>more_vert</mat-icon>
+              <span class="name">{{ g.name }}</span>
             </button>
           </mat-header-cell>
           <mat-cell *matCellDef="let row">
@@ -97,20 +97,3 @@
     <mat-icon>add</mat-icon>
   </button>
 }
-
-<!-- One menu at the template root (in scope of every trigger, correctly
-     positioned), receiving its group via context. It opens to the LEFT of its
-     trigger: opening right covered the next group's column, which is the one
-     someone compares against. -->
-<mat-menu #groupMenu xPosition="before">
-  <ng-template matMenuContent let-group="group">
-    <button mat-menu-item (click)="editGroup(group)">
-      <mat-icon>edit</mat-icon>
-      <span i18n="@@Edit">Edit</span>
-    </button>
-    <button mat-menu-item (click)="removeGroup(group)">
-      <mat-icon>delete</mat-icon>
-      <span i18n="@@Delete">Delete</span>
-    </button>
-  </ng-template>
-</mat-menu>

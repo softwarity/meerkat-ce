@@ -94,7 +94,7 @@ l'usage d'une application.
 | `root` | l'administration globale ; implique les deux suivants, et c'est le seul indicateur qui permet d'émettre des jetons du plan de contrôle |
 | `infraAdmin` | le côté routage : routes, TLS, autorités, relais de messagerie |
 | `appAdmin` | le côté application : comptes, rôles, réglages globaux, pages intégrées |
-| `dev` | l'outillage développeur, là où le mode développeur est activé |
+| `dev` | l'outillage développeur sur les applications servies (root l'a toujours) |
 | `tenantCreator` | peut créer des organisations |
 
 Administrer une organisation n'est volontairement **pas** un indicateur : il

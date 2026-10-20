@@ -108,5 +108,8 @@ func (h *Handler) doProfileLeave(w http.ResponseWriter, r *http.Request) {
 	if err := h.sm.SetTenant(r.Context(), r, ""); err != nil {
 		slog.Warn("clearing the organisation after leaving failed", "err", err)
 	}
+	// Out of the organisation, only the account's own hours still hold.
+	_, until := h.hours(r.Context(), sess.UserID, "")
+	h.boundSession(w, r, until)
 	http.Redirect(w, r, "/profile", http.StatusSeeOther)
 }

@@ -115,7 +115,7 @@ func main() {
 	// CAP_NET_BIND_SERVICE, against the grain of the rest of the image; which
 	// port is PUBLISHED outside the cluster is a deployment decision anyway.
 	plugAddr := flag.String("plug-addr", envOr("MEERKAT_PLUG_ADDR", devtunnel.DefaultAddr),
-		"developer tunnel (plug) listen address, Enterprise only; it opens only once switched on (console: Infra, Plug), with developer mode on and an orchestrator reachable")
+		"developer tunnel (plug) listen address, Enterprise only; it opens only once switched on (console: Infra, Plug) and with an orchestrator reachable")
 	// What this gateway's own output looks like (OBS-03). Until these existed
 	// Go's default stood - text, at Info, unchangeable. The level sits behind a
 	// slog.LevelVar so it can be turned at run time; nothing does yet.
@@ -183,16 +183,12 @@ type options struct {
 func run(o options) error {
 	addr, adminAddr, consoleURL := o.addr, o.adminAddr, o.consoleURL
 	dataDir, configFile, vaultFile, tenancy := o.dataDir, o.configFile, o.vaultFile, o.tenancy
-	// Before the store opens, so the very first read of the developer switch
-	// already has the environment's answer. Said out loud once: an operator
-	// looking for tooling that is not there deserves to find the reason in the
-	// startup lines rather than in the source.
 	// MEERKAT_PRODUCTION used to close the developer surface whatever the
-	// console said. The console's switch decides now, everywhere; the
-	// variable is read only to tell whoever still sets it, since ignored in
+	// console said. The dev capability decides now, everywhere; the variable
+	// is read only to tell whoever still sets it, since ignored in
 	// silence it would look like it still worked.
 	if v := os.Getenv("MEERKAT_PRODUCTION"); v != "" {
-		slog.Warn("MEERKAT_PRODUCTION is no longer read: developer mode (Application, General) and the tunnel (Infra, Plug) are switched in the console",
+		slog.Warn("MEERKAT_PRODUCTION is no longer read: developers are the accounts with the dev capability (Application, Users, where Remove developer mode takes it from all but root) and the tunnel is switched on Infra, Plug",
 			"ignored", v)
 	}
 	// Whose forwarded headers are believed is said on the Domains & TLS

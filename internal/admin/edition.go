@@ -81,6 +81,11 @@ type editionInfo struct {
 	License        *licenseInfo `json:"license,omitempty"`
 	LicenseSource  string       `json:"licenseSource,omitempty"`
 	LicenseProblem string       `json:"licenseProblem,omitempty"`
+	// MailReady says an administrator can mail a person their way in - an
+	// invitation, a reset link (AUTH-25) - and MailWhy, when not, why: the
+	// sentence beside the option the console greys out.
+	MailReady bool   `json:"mailReady"`
+	MailWhy   string `json:"mailWhy,omitempty"`
 }
 
 // EditionFeature is one Enterprise row of the contract.
@@ -104,6 +109,8 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 	if edition.Enterprise {
 		info.License, info.LicenseSource, info.LicenseProblem = a.currentLicense(ctx)
 	}
+	_, info.MailWhy = a.accessMailOrigin(ctx)
+	info.MailReady = info.MailWhy == ""
 	in := a.internalOf(ctx)
 	info.InternalOrigin, info.InternalNames, info.InternalSource = in.Origin, in.Names, in.Source
 	if info.Features == nil {

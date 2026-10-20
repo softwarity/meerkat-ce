@@ -181,6 +181,13 @@ func (m *Manager) Issue(ctx context.Context, w http.ResponseWriter, r *http.Requ
 // TENANT-05). The returned token is the raw cookie value (only its hash is
 // persisted).
 func (m *Manager) IssueWith(ctx context.Context, w http.ResponseWriter, r *http.Request, userID, tenantID, groupID string, ttl time.Duration, pending, next, method string) (string, error) {
+	return m.IssueWithin(ctx, w, r, userID, tenantID, groupID, ttl, pending, next, method, 0)
+}
+
+// IssueWithin is IssueWith for a session let in under working hours that close
+// at hoursUntil (unix seconds, 0 for none, TENANT-04): its deadline starts no
+// later, and never slides past it.
+func (m *Manager) IssueWithin(ctx context.Context, w http.ResponseWriter, r *http.Request, userID, tenantID, groupID string, ttl time.Duration, pending, next, method string, hoursUntil int64) (string, error) {
 	if ttl <= 0 {
 		ttl = m.ttl
 	}
@@ -201,14 +208,18 @@ func (m *Manager) IssueWith(ctx context.Context, w http.ResponseWriter, r *http.
 		TTL:       int64(ttl.Seconds()),
 		Plane:     m.plane,
 		// What a list of sessions shows (AUTH-14): when, from where, with what.
-		CreatedAt: m.now().Unix(),
-		IP:        filters.ClientIP(r),
-		Agent:     clipAgent(r.UserAgent()),
+		CreatedAt:  m.now().Unix(),
+		IP:         filters.ClientIP(r),
+		Agent:      clipAgent(r.UserAgent()),
+		HoursUntil: hoursUntil,
+	}
+	if hoursUntil > 0 && sess.ExpiresAt > hoursUntil {
+		sess.ExpiresAt = hoursUntil
 	}
 	if err := m.st.CreateSession(ctx, sess); err != nil {
 		return "", err
 	}
-	m.setCookies(w, r, token, ttl, sess.ExpiresAt)
+	m.setCookies(w, r, token, time.Duration(sess.ExpiresAt-m.now().Unix())*time.Second, sess.ExpiresAt)
 	return token, nil
 }
 
@@ -297,6 +308,14 @@ func (m *Manager) slide(w http.ResponseWriter, r *http.Request) {
 		return // still in the first half: nothing to write, nothing to say
 	}
 	until := now.Add(ttl).Unix()
+	// Working hours (TENANT-04): the deadline slides up to the window's close
+	// and no further, so an open tab does not carry a session past 18:00.
+	if sess.HoursUntil > 0 && until > sess.HoursUntil {
+		until = sess.HoursUntil
+	}
+	if until <= sess.ExpiresAt {
+		return
+	}
 	if err := m.st.ExtendSession(r.Context(), sess.TokenHash, sess.ExpiresAt, until); err != nil {
 		// Paused (store/pause.go): the session keeps its deadline, which is
 		// still hours away, and says nothing about it.
@@ -307,7 +326,7 @@ func (m *Manager) slide(w http.ResponseWriter, r *http.Request) {
 	}
 	sess.ExpiresAt = until
 	m.remember(sess.TokenHash, cacheEntry{sess: sess, readAt: now})
-	m.setCookies(w, r, c.Value, ttl, until)
+	m.setCookies(w, r, c.Value, time.Duration(until-now.Unix())*time.Second, until)
 }
 
 // ClearPending marks the request's session as done with its current
@@ -344,6 +363,27 @@ func (m *Manager) SetTenant(ctx context.Context, r *http.Request, tenantID strin
 		return err
 	}
 	m.dropped(th)
+	return nil
+}
+
+// SetHours bounds the request's session by the working hours it was let in
+// under (TENANT-04): until, unix seconds, is when they close, 0 for none. The
+// deadline comes back to it if it lies beyond, and the page's readable
+// deadline with it, so the tab goes to the sign-in page when the hours end.
+func (m *Manager) SetHours(ctx context.Context, w http.ResponseWriter, r *http.Request, until int64) error {
+	c, err := r.Cookie(ForScheme(m.cookieName, r))
+	if err != nil || c.Value == "" {
+		return ErrNoSession
+	}
+	th := hashToken(c.Value)
+	expires, err := m.st.SetSessionHours(ctx, th, until)
+	if err != nil {
+		return err
+	}
+	m.dropped(th)
+	if w != nil {
+		m.setCookies(w, r, c.Value, time.Duration(expires-m.now().Unix())*time.Second, expires)
+	}
 	return nil
 }
 

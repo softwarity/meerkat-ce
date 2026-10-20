@@ -526,11 +526,22 @@ la laisse lister les Bundles trust-manager et lire leur ConfigMap dans son names
 l'autre à false, et la console dit lequel manque - voir
 [Trouvées dans le cluster](/docs/operations/tls#trouves-dans-le-cluster).
 
-Une route dont l'upstream vit dans un AUTRE namespace (`grafana.monitoring.svc`) se lit de
-la même façon dès que ce namespace figure dans `rbac.watchNamespaces` : le chart crée un Role
-dans chaque namespace nommé, jamais un ClusterRole, donc la gateway lit les namespaces que
-quelqu'un a choisis, pas le cluster entier. Un namespace absent de la liste est vérifié par
-une connexion.
+**Les autres namespaces.** Une route pointe très souvent hors du namespace de la gateway -
+Grafana dans `monitoring`, une application dans le sien. Le chart laisse la gateway lister les
+Services de tout le cluster (`rbac.clusterServices`, actif par défaut : un ClusterRole qui lit
+les services, et rien d'autre - aucun pod, aucun secret, aucune écriture). L'éditeur de routes
+propose alors un choix **Namespace** au-dessus de l'upstream : les namespaces qui portent un
+Service, et **External**. Un namespace choisi, l'upstream se choisit parmi ses services, sous leur nom
+qualifié (`grafana.monitoring.svc`), et seul le chemin de base se tape à côté (`/geoserver`) :
+un hôte tapé à la main, c'est la faute de frappe que la liste existe pour éviter. External est l'entrée libre, pour un site public ou une
+machine du réseau, et pour le pod d'un StatefulSet (`pg-0.pg.data.svc`), qu'aucun Service ne
+liste. Une route existante s'ouvre sur le namespace où pointe son upstream, ou sur External. Avec `rbac.clusterServices: false`, la gateway s'en
+tient à son namespace : l'éditeur montre celui-là, sans choix à faire.
+
+Les répliques et l'image d'un service d'un autre namespace se lisent dès que ce namespace
+figure dans `rbac.watchNamespaces` : le chart crée un Role dans chaque namespace nommé, jamais
+un ClusterRole pour les pods, puisque lire les pods c'est lire leur environnement. Un
+namespace absent de la liste est vérifié par une connexion.
 
 Lire les pods, c'est lire les variables d'environnement que déclarent leurs manifestes. Là
 où un manifeste porte un secret en clair, mettez `rbac.watch: false`, ou mieux, rangez ce
@@ -539,7 +550,7 @@ secret dans un Secret.
 Le tunnel développeur en demande davantage, et les droits qu'il reçoit sont détaillés sur
 la page [Une gateway](/docs/deploy/one-gateway).
 
-::: details Le Role et son binding
+::: details Le Role, le ClusterRole et leurs bindings
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -569,6 +580,30 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: meerkat
+---
+# Facultatif : les autres namespaces, pour le choix Namespace de l'éditeur
+# de routes. Les Services du cluster, lus ; rien d'autre.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: meerkat-cluster-services
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: meerkat-cluster-services
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: meerkat-cluster-services
+subjects:
+  - kind: ServiceAccount
+    name: meerkat
+    namespace: meerkat   # le namespace où tourne la gateway
 # Et nommez-le dans la spécification du pod :
 #   serviceAccountName: meerkat
 ```

@@ -129,20 +129,23 @@ interface FeatureRow {
         }
 
         <mat-card appearance="outlined">
-          <h3>
-            @if (e.enterprise) {
-              <ng-container i18n="@@EE_features_bought">What the Enterprise edition carries</ng-container>
-            } @else {
-              <ng-container i18n="@@EE_features_offer">What the Enterprise edition adds</ng-container>
-            }
-          </h3>
-          <!-- How far each one is built, said once here and then by its icon:
-               a word on every row read as a list of excuses. -->
-          <p class="legend">
-            @for (s of states; track s.status) {
-              <span><mat-icon>{{ s.icon }}</mat-icon>{{ s.label }}</span>
-            }
-          </p>
+          <!-- The title, and on its line, to the right, how far each one is
+               built - said once here and then by its icon: a word on every row
+               read as a list of excuses. -->
+          <div class="features-head">
+            <h3>
+              @if (e.enterprise) {
+                <ng-container i18n="@@EE_features_bought">What the Enterprise edition carries</ng-container>
+              } @else {
+                <ng-container i18n="@@EE_features_offer">What the Enterprise edition adds</ng-container>
+              }
+            </h3>
+            <p class="legend">
+              @for (s of states; track s.status) {
+                <span><mat-icon>{{ s.icon }}</mat-icon>{{ s.label }}</span>
+              }
+            </p>
+          </div>
           <div class="features">
             @for (f of rows(); track f.key) {
               <div class="feature" [class.on]="f.on">
@@ -295,11 +298,22 @@ interface FeatureRow {
         margin-left: 6px;
         font-style: italic;
       }
+      .features-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 4px 16px;
+        margin: 0 0 12px;
+      }
+      .features-head h3 {
+        margin: 0;
+      }
       .legend {
         display: flex;
         flex-wrap: wrap;
         gap: 4px 16px;
-        margin: 0 0 12px;
+        margin: 0;
         font-size: 0.8rem;
         color: var(--mat-sys-on-surface-variant);
       }

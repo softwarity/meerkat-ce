@@ -2,6 +2,7 @@ package admin
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/softwarity/meerkat/internal/store"
@@ -59,6 +60,20 @@ func (a *API) putMustChangePassword(w http.ResponseWriter, r *http.Request, acto
 // The ACTOR is spared. Being signed out of the console by one's own click, in
 // the middle of an incident, is the wrong lesson at the wrong moment - and the
 // admin can flag themselves from the list like anyone else.
+// postClearDev takes the dev capability from every account but root's: what a
+// production gateway does once, instead of an installation-wide switch above
+// the accounts. Root keeps its tooling, whatever it carries.
+func (a *API) postClearDev(w http.ResponseWriter, r *http.Request, actor store.User) {
+	n, err := a.st.ClearDevCapability(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	a.auditEvent(r.Context(), actor, "users.clear-dev", "user", "", "", "",
+		fmt.Sprintf("the developer capability taken from %d accounts (root keeps its own)", n))
+	writeJSON(w, http.StatusOK, map[string]int{"users": int(n)})
+}
+
 func (a *API) postMustChangePasswordAll(w http.ResponseWriter, r *http.Request, actor store.User) {
 	n, err := a.st.SetMustChangePasswordForAll(r.Context(), actor.ID)
 	if err != nil {

@@ -12,12 +12,12 @@ entière, et il faut la capacité `app admin` (ou `root`) pour y écrire.
 
 ## General
 
-![L'écran General : l'interrupteur des organisations, le mode développeur et la grille hebdomadaire des heures ouvrées](img/console/general.webp)
+![L'écran General : l'interrupteur des organisations et la grille hebdomadaire des heures ouvrées](img/console/general.webp)
 
-Les deux interrupteurs, puis les heures ouvrées : un fuseau horaire et une ligne par
+L'interrupteur, puis les heures ouvrées : un fuseau horaire et une ligne par
 jour, chacune avec sa plage horaire et un + pour en ajouter une seconde.
 
-Deux déclarations sur ce que cette installation **est**, et une plage d'accès.
+Une déclaration sur ce que cette installation **est**, et une plage d'accès.
 
 **Several organisations.** Désactivé, cette gateway sert une seule organisation et
 ne la nomme jamais : ses groupes et ses membres s'administrent ici même, sous
@@ -29,18 +29,10 @@ organisations et leurs accès.
 > [!NOTE]
 > Édition Enterprise : plusieurs organisations.
 
-**Developer mode.** Activé, les comptes dotés de la capacité `dev` disposent de leurs
-outils sur les applications que sert cette gateway : le menu Developer du bouton
-utilisateur, le mode de test de l'interface, la documentation d'API des routes.
-Désactivé, rien de tout cela n'existe, quel que soit le nombre de comptes dotés de la
-capacité. Gratuit dans les deux éditions.
-
-Cet interrupteur décide sur une gateway de production comme ailleurs. Il est stocké :
-un export de configuration ou une base restaurée depuis la préproduction l'emporte avec
-elle.
-
 **Working hours** définit la plage d'accès de toute l'application : chaque organisation
-en hérite, sauf si elle définit la sienne.
+en hérite, sauf si elle définit la sienne ; un compte, un membre ou un groupe (en mode
+exclusif) peuvent à leur tour la remplacer, la plus précise l'emportant - voir
+[les heures ouvrées](/docs/access/tenants#heures-ouvres).
 
 > [!NOTE]
 > Édition Enterprise : les heures ouvrées.
@@ -105,9 +97,8 @@ pour tout l'écran.
 
 ## Pièges
 
-- **General enregistre avec le bouton, mais pas ses deux interrupteurs.** Le mode
-  d'organisation et le mode développeur prennent effet dès le clic ; les heures ouvrées
-  attendent Save.
+- **General enregistre avec le bouton, mais pas son interrupteur.** Le mode
+  d'organisation prend effet dès le clic ; les heures ouvrées attendent Save.
 - **Les langues sont celles des applications, pas celles de la console.** La console
   n'existe qu'en anglais, et ce que proposent les pages intégrées vient des routes.
 - **Une politique de mots de passe vide accepte n'importe quoi**, même un mot de passe

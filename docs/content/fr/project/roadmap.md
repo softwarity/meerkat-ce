@@ -63,6 +63,11 @@ visible après coup.
   [les appels planifiés](/docs/operations/scheduler).
 - **Le journal de la gateway**, en direct dans la console, d'où son niveau se
   relève pour une demi-heure. Voir [les journaux](/docs/operations/logs).
+- **Le mode développeur** (Enterprise) : le tunnel, la connexion qui s'arrête sur
+  une page disant ce qui est substitué et par qui, un bandeau qui le rappelle
+  pendant le travail, qui est branché et la fin d'une session, chaque run et
+  chaque nom servi dans le journal d'audit. Voir [le mode
+  développeur](/product/dev-mode).
 
 ## En cours d'achèvement
 
@@ -80,11 +85,6 @@ indique, ligne par ligne, ce qui manque à chacune.
   reçoit un 429 avec les en-têtes standard. Il manque l'écran qui montre la
   consommation, la possibilité de ralentir plutôt que de refuser, et des compteurs
   qui restent justes en cluster.
-- **Le mode développeur** - le tunnel fonctionne, la connexion s'arrête sur une
-  page qui dit ce qui est substitué et par qui, et un bandeau le rappelle pendant
-  que vous travaillez. Il manque la lecture de l'environnement d'un workload et le
-  montage de ses volumes dans le journal d'audit ; qui est branché, la fin d'une
-  session, chaque run et chaque nom servi y sont.
 - **Les notifications** - le relais SMTP est livré, avec un gabarit unique aux
   couleurs du thème, et le récapitulatif quotidien des accès qui arrivent à
   échéance part tout seul. Il manque un gabarit par événement, chacun traduit.

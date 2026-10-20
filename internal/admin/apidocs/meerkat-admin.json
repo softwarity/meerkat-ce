@@ -601,7 +601,6 @@
           "enabled": { "type": "boolean" },
           "root": { "type": "boolean" },
           "dev": { "type": "boolean" },
-          "tester": { "type": "boolean" },
           "tenantCreator": { "type": "boolean" },
           "infraAdmin": { "type": "boolean" },
           "appAdmin": { "type": "boolean" },

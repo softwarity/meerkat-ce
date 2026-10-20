@@ -38,7 +38,23 @@ the power without opening the drawer.
 Row actions enable and disable an account. You cannot revoke your own `root`, nor
 disable or delete yourself.
 
-The search matches the account. The **+** button creates one.
+`dev` alone decides who gets the developer tooling, and `root` always has it: on a
+root account the `dev` badge is drawn on and cannot be clicked. To close the developer
+surface of a production gateway, **Remove developer mode** (above the table, disabled
+while no account but root carries `dev`) takes the capability from every account but
+root's, after saying how many it reaches.
+
+The search matches the account. The **+** button creates one, and asks how its
+owner gets in the first time - one or the other, never both:
+
+- **Show a temporary password** - generated, shown once to hand over, to be
+  changed at the first sign-in.
+- **Send an invitation** - a link mailed to the account's address, valid 48
+  hours, opening the page where the person chooses their password; no password
+  is shown. Offered when a mail relay is configured, local passwords are allowed
+  and the application has a public name the gateway vouches for; otherwise the
+  form says which is missing. If the mail cannot be sent, the account is not
+  created.
 
 ## The account drawer
 
@@ -57,7 +73,12 @@ Three pages in one drawer, and the first is the only one you **fill**.
 
 - **Two-factor** - required, optional, or inherited from the application policy;
   the label says what inherited currently resolves to.
-- **Password** - *Reset password* produces one to hand over, and *Force a change
+- **Working hours** (Enterprise) - the account's own: set, they replace the
+  installation's and its organisations' for this person, unless a membership
+  sets its own. Not offered on a root account, which is never held to hours.
+- **Password** - *Reset password* asks how: a temporary password to hand over, or
+  a link mailed to the account to choose a new one (the current password keeps
+  working until it is followed). *Force a change
   at next sign-in* keeps the password the person already knows and refuses to go
   further with it, which saves a phone call per person. An account born at an
   authority holds no local password, so the button reads *Set a password*: doing

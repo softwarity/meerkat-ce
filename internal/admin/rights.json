@@ -1100,6 +1100,11 @@
     "guard": "appAdmin"
   },
   {
+    "method": "POST",
+    "path": "/api/users/clear-dev",
+    "guard": "appAdmin"
+  },
+  {
     "method": "GET",
     "path": "/api/users/lookup",
     "guard": "authed"

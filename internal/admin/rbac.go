@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -189,6 +190,15 @@ func (a *API) createGroup(w http.ResponseWriter, r *http.Request, actor store.Us
 	}
 	g.ID = newID()
 	g.TenantID = r.PathValue("id")
+	// A body that never mentioned the hours - the console's creation dialog,
+	// a script - decodes to the zero window, which means none of its own.
+	if businessAccessEqual(g.BusinessAccess, store.BusinessAccess{}) {
+		g.BusinessAccess = store.BusinessAccess{Inherited: true}
+	}
+	if status, err := a.checkGroupHours(r.Context(), g, store.BusinessAccess{Inherited: true}); err != nil {
+		writeErr(w, status, err.Error())
+		return
+	}
 	if err := a.st.SaveGroup(r.Context(), g); err != nil {
 		if conflict(w, err) {
 			return
@@ -213,6 +223,16 @@ func (a *API) updateGroup(w http.ResponseWriter, r *http.Request, actor store.Us
 		writeErr(w, http.StatusNotFound, "group not found")
 		return
 	}
+	// A body that never mentioned the hours - the matrix's rename, an older
+	// client - decodes to the zero window, which is not a decision: the group
+	// keeps its own.
+	if businessAccessEqual(g.BusinessAccess, store.BusinessAccess{}) {
+		g.BusinessAccess = existing.BusinessAccess
+	}
+	if status, err := a.checkGroupHours(r.Context(), g, existing.BusinessAccess); err != nil {
+		writeErr(w, status, err.Error())
+		return
+	}
 	if err := a.st.SaveGroup(r.Context(), g); err != nil {
 		if conflict(w, err) {
 			return
@@ -224,6 +244,29 @@ func (a *API) updateGroup(w http.ResponseWriter, r *http.Request, actor store.Us
 		a.auditUpdate(r.Context(), actor, "group.update", "group", saved.ID, saved.Name, saved.TenantID, existing, saved)
 	}
 	a.writeGroup(w, r, g.ID)
+}
+
+// checkGroupHours refuses a group's own working hours (TENANT-04) that could
+// not hold: they are Enterprise, and they count only in an organisation in
+// exclusive mode, where one group is chosen per session - in cumulative mode a
+// person holds several groups at once and none of them could say which hours.
+// A window left as it was passes, so a mode switched back to cumulative does
+// not block every later save of the group.
+func (a *API) checkGroupHours(ctx context.Context, g store.Group, current store.BusinessAccess) (int, error) {
+	if g.BusinessAccess.Inherited || businessAccessEqual(g.BusinessAccess, current) {
+		return 0, nil
+	}
+	if err := edition.Require("access hours"); err != nil {
+		return http.StatusForbidden, err
+	}
+	if a.st.EffectiveGroupMode(ctx, g.TenantID) != store.GroupModeSingle {
+		return http.StatusUnprocessableEntity, fmt.Errorf("group %q: working hours of its own need its organisation in exclusive group mode, "+
+			"where one group is chosen per session; in cumulative mode leave them inherited", g.Name)
+	}
+	if err := checkBusinessAccess(g.BusinessAccess); err != nil {
+		return http.StatusUnprocessableEntity, err
+	}
+	return 0, nil
 }
 
 func (a *API) deleteGroup(w http.ResponseWriter, r *http.Request, actor store.User) {

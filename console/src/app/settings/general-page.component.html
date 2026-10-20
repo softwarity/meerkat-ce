@@ -34,29 +34,6 @@
       </div>
     </mat-card>
 
-    <!-- The developer switch (DEV-01). It sits here, under the mode, because
-         it is the same kind of statement: what this installation IS. The
-         capability on an account says who may develop; this says whether one
-         develops here at all. Free in both editions - developing against a
-         gateway is how one adopts it. -->
-    <mat-card appearance="outlined">
-      <div class="tenancy">
-        <mat-icon>code</mat-icon>
-        <div class="grow">
-          <div class="title"><ng-container i18n="@@Developer_mode">Developer mode</ng-container></div>
-          <p class="hint text-muted" i18n="@@Developer_mode_hint_plug">
-            Gives accounts with the developer capability their tools: Developer menu, UI test mode,
-            API docs. The plug tunnel also needs its own switch in Infra.
-          </p>
-        </div>
-        <mat-slide-toggle
-          [checked]="devMode()"
-          [disabled]="switchingDev()"
-          (change)="setDevMode($event.checked)"
-        />
-      </div>
-    </mat-card>
-
     <mat-card appearance="outlined" ee-feature="business-hours">
       <h3 i18n="@@Working_hours">
         Working hours

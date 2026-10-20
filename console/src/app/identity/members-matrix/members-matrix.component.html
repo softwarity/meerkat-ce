@@ -8,7 +8,7 @@
     <mat-table [dataSource]="filteredRows()">
       <ng-container matColumnDef="user" sticky>
         <mat-header-cell *matHeaderCellDef i18n="@@User">User</mat-header-cell>
-        <mat-cell *matCellDef="let u">
+        <mat-cell *matCellDef="let u" [class.open]="drawer.userId() === u.id">
           <app-presence [userId]="u.id" [tenantId]="tenantId()" />
           <div class="user-cell">
             <span class="name mono">{{ u.username }}</span>
@@ -65,16 +65,9 @@
       @for (g of groups(); track g.id) {
         <ng-container [matColumnDef]="g.id">
           <mat-header-cell *matHeaderCellDef class="grp-head">
+            <!-- A group is edited on the Groups screen; here it only heads its
+                 column. -->
             <span class="col-name" [title]="g.description">{{ g.name }}</span>
-            <button
-              matIconButton
-              [matMenuTriggerFor]="groupMenu"
-              [matMenuTriggerData]="{ group: g }"
-              i18n-aria-label="@@Group_menu"
-              aria-label="Group menu"
-            >
-              <mat-icon>more_vert</mat-icon>
-            </button>
           </mat-header-cell>
           <mat-cell *matCellDef="let u">
             <!-- Never disabled: ticking a group is how someone becomes a
@@ -124,10 +117,23 @@
             {{ lastSeen(u.lastConnectionAt) }}
           </span>
           <span rowActions="tonal">
+            <!-- The member drawer, opened on the page each button names. -->
+            <button
+              matIconButton
+              ee-feature="business-hours"
+              [disabled]="!isMember(u.id)"
+              (click)="openMember(u, 'member')"
+              i18n-matTooltip="@@Working_hours"
+              matTooltip="Working hours"
+              i18n-aria-label="@@Working_hours"
+              aria-label="Working hours"
+            >
+              <mat-icon>schedule</mat-icon>
+            </button>
             <button
               matIconButton
               [disabled]="!isMember(u.id)"
-              (click)="showLogins(u)"
+              (click)="openMember(u, 'history')"
               i18n-matTooltip="@@Sign_in_history"
               matTooltip="Sign-in history"
               i18n-aria-label="@@Sign_in_history"
@@ -156,22 +162,4 @@
     </mat-table>
   </div>
 
-  <button mat-fab class="new-fab" (click)="addGroup()" i18n-matTooltip="@@New_group" matTooltip="New group" i18n-aria-label="@@New_group" aria-label="New group">
-    <mat-icon>add</mat-icon>
-  </button>
 }
-
-<!-- Opens to the LEFT: the same menu on the same kind of column header, and
-     opening right covered the next group. -->
-<mat-menu #groupMenu xPosition="before">
-  <ng-template matMenuContent let-group="group">
-    <button mat-menu-item (click)="editGroup(group)">
-      <mat-icon>edit</mat-icon>
-      <span i18n="@@Edit">Edit</span>
-    </button>
-    <button mat-menu-item (click)="removeGroup(group)">
-      <mat-icon>delete</mat-icon>
-      <span i18n="@@Delete">Delete</span>
-    </button>
-  </ng-template>
-</mat-menu>

@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -344,5 +345,36 @@ func TestAnAliasCompetesAcrossEverythingTheGatewayJoins(t *testing.T) {
 	}
 	if by["far_api"].Reachable {
 		t.Error("far_api: shares no network with the gateway")
+	}
+}
+
+// A namespace is checked before it reaches a URL path (SVC-02).
+func TestANamespaceIsALabel(t *testing.T) {
+	for _, ok := range []string{"canopy", "monitoring", "a", "kube-system", "ns1"} {
+		if err := ValidNamespace(ok); err != nil {
+			t.Errorf("%q refused: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "Canopy", "-x", "x-", "a/b", "../x", "a.b", strings.Repeat("a", 64)} {
+		if ValidNamespace(bad) == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+// A namespace holding no Service offers nothing to route to, so it is not
+// offered; the gateway's own always is.
+func TestOnlyANamespaceWithAServiceIsOffered(t *testing.T) {
+	var list k8sMetaList
+	if err := json.Unmarshal([]byte(`{"items":[
+		{"metadata":{"namespace":"monitoring"}},
+		{"metadata":{"namespace":"canopy"}},
+		{"metadata":{"namespace":"monitoring"}},
+		{"metadata":{"namespace":"kube-system"}}]}`), &list); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(servedNamespaces(list, "meerkat"), ",")
+	if want := "canopy,kube-system,meerkat,monitoring"; got != want {
+		t.Fatalf("offered %s, want %s", got, want)
 	}
 }

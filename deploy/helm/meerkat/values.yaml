@@ -222,10 +222,18 @@ securityContext:
 # the pods' manifests declare, so set it false where those carry secrets in
 # clear; the targets are then checked by a connection, as before.
 #
-# watchNamespaces names OTHER namespaces to read the same way, for routes whose
-# upstream lives there (grafana.monitoring.svc): one Role per namespace, never a
-# ClusterRole. A route to a namespace not listed is checked by a connection.
+# clusterServices lists the Services of the whole cluster (a ClusterRole, read
+# only, services and nothing else): the route editor then offers the
+# namespaces holding one, and the services of the namespace chosen. false keeps the
+# gateway to its own namespace, with no choice shown.
+#
+# watchNamespaces names OTHER namespaces whose PODS are read too, for routes
+# whose upstream lives there (grafana.monitoring.svc): their replicas and image
+# on the routes screen. One Role per namespace - pods are where environment
+# variables are, so never a ClusterRole for them. A route to a namespace not
+# listed is checked by a connection.
 rbac:
   read: true
   watch: true
+  clusterServices: true
   watchNamespaces: []

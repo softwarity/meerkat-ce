@@ -22,12 +22,12 @@ environments - is in [plug's documentation](https://softwarity.github.io/plug/).
 
 ## Two conditions, two owners
 
-The tunnel runs only when **both** of these are on:
+The tunnel runs when it is open, and serves the accounts allowed to develop:
 
-| switch | where | whose | what it decides |
+| what | where | whose | what it decides |
 |---|---|---|---|
-| Developer mode | Application, General | application admin | what this installation offers its developers: the Developer menu, the API docs, the simulated sign-ins |
 | Open the developer tunnel | **Infra, Plug** | infrastructure admin | a port into the cluster, and the deployment's rights over it (Docker socket, Kubernetes role) |
+| The `dev` capability | **Application, Users** | application admin | who may plug in, with the rest of the developer tooling; root always may |
 
 The tunnel's own switch **ships off**. These two switches decide, on a
 production gateway as anywhere else.

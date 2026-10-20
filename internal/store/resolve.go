@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -13,8 +14,27 @@ import (
 // without membership: root, console-only accounts).
 
 // ResolveBusinessAccess returns the working-hours window that applies to
-// userID within tenantID.
-func (s *Store) ResolveBusinessAccess(ctx context.Context, userID, tenantID string) (BusinessAccess, error) {
+// userID within tenantID, in groupID when one is active (TENANT-04). The most
+// precise level that sets one wins whole, the others no longer count: the
+// membership, else the group, else the account, else the organisation, else
+// the gateway. A window there says who may come in when - an override is a
+// different rule for this person, not a narrower one. The group counts only
+// in an organisation in exclusive mode, where one is chosen per session: in
+// cumulative mode a person holds several at once, and no one of them could
+// say which hours. Without an organisation (none, or not chosen yet) it is
+// the account's, else the gateway's. Root is held to none: the person who
+// must always be able to repair the gateway.
+func (s *Store) ResolveBusinessAccess(ctx context.Context, userID, tenantID, groupID string) (BusinessAccess, error) {
+	u, err := s.GetUserByID(ctx, userID)
+	if err != nil {
+		return BusinessAccess{}, err
+	}
+	if u.Root {
+		return BusinessAccess{}, nil
+	}
+	// A member's date bounds hold whichever level its hours come from: they
+	// say when this person's access to the organisation runs, not which hours.
+	var from, to string
 	if tenantID != "" {
 		m, err := s.GetMembership(ctx, userID, tenantID)
 		if err != nil {
@@ -23,14 +43,34 @@ func (s *Store) ResolveBusinessAccess(ctx context.Context, userID, tenantID stri
 		if !m.BusinessAccess.Inherited {
 			return m.BusinessAccess, nil
 		}
+		from, to = m.BusinessAccess.DateFrom, m.BusinessAccess.DateTo
+		if groupID != "" && s.EffectiveGroupMode(ctx, tenantID) == GroupModeSingle {
+			g, err := s.GetGroup(ctx, groupID)
+			if err != nil {
+				return BusinessAccess{}, err
+			}
+			if g.TenantID == tenantID && !g.BusinessAccess.Inherited {
+				ba := g.BusinessAccess
+				ba.DateFrom, ba.DateTo = from, to
+				return ba, nil
+			}
+		}
+	}
+	if !u.BusinessAccess.Inherited {
+		ba := u.BusinessAccess
+		if from != "" || to != "" {
+			ba.DateFrom, ba.DateTo = from, to
+		}
+		return ba, nil
+	}
+	if tenantID != "" {
 		t, err := s.GetTenant(ctx, tenantID)
 		if err != nil {
 			return BusinessAccess{}, err
 		}
 		if !t.BusinessAccess.Inherited {
-			// Member-level date bounds still apply on top of the tenant window.
 			ba := t.BusinessAccess
-			ba.DateFrom, ba.DateTo = m.BusinessAccess.DateFrom, m.BusinessAccess.DateTo
+			ba.DateFrom, ba.DateTo = from, to
 			return ba, nil
 		}
 	}
@@ -39,6 +79,7 @@ func (s *Store) ResolveBusinessAccess(ctx context.Context, userID, tenantID stri
 		return BusinessAccess{}, err
 	}
 	global.Inherited = false
+	global.DateFrom, global.DateTo = from, to
 	return global, nil
 }
 
@@ -157,4 +198,113 @@ func ParseISODuration(s string) (time.Duration, error) {
 		return 0, fmt.Errorf("duration %q is not ISO-8601: expected forms like PT30M, PT2H, P1D", orig)
 	}
 	return d, nil
+}
+
+func encodeBusinessAccess(b BusinessAccess) string {
+	SanitizeBusinessAccess(&b)
+	raw, err := json.Marshal(b)
+	if err != nil {
+		return `{"inherited":true}`
+	}
+	return string(raw)
+}
+
+func decodeBusinessAccess(s string) BusinessAccess {
+	b := BusinessAccess{Inherited: true}
+	if s != "" {
+		_ = json.Unmarshal([]byte(s), &b)
+	}
+	return b
+}
+
+// OpenBusinessAccess says whether the window is open at now and, when it is,
+// until when: the instant it closes, the zero time when it never does. A
+// session let in under it ends there (TENANT-04).
+func OpenBusinessAccess(ba BusinessAccess, now time.Time) (bool, time.Time, error) {
+	open, err := WithinBusinessAccess(ba, now)
+	if err != nil || !open {
+		return false, time.Time{}, err
+	}
+	closes, err := businessAccessCloses(ba, now)
+	if err != nil {
+		return false, time.Time{}, err
+	}
+	return true, closes, nil
+}
+
+// businessAccessCloses is the first instant after now, inside an open window,
+// at which it is no longer open; zero when it never closes. A range's end is
+// inclusive to the minute (18:00 covers 18:00:59), and a closing that runs
+// straight into the next open range - Monday 23:59 into Tuesday 00:00 - is
+// not one: it walks on, a fortnight at most, to the real end.
+func businessAccessCloses(ba BusinessAccess, now time.Time) (time.Time, error) {
+	if len(ba.Days) == 0 && ba.DateTo == "" {
+		return time.Time{}, nil
+	}
+	loc := time.UTC
+	if ba.Timezone != "" {
+		l, err := time.LoadLocation(ba.Timezone)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("business access: timezone %q is not a valid IANA name", ba.Timezone)
+		}
+		loc = l
+	}
+	at := now.In(loc)
+	for range 15 * 24 * 60 / 30 {
+		next := endOfOpenStretch(ba, at, loc)
+		if next.IsZero() {
+			return time.Time{}, nil
+		}
+		open, err := WithinBusinessAccess(ba, next)
+		if err != nil {
+			return time.Time{}, err
+		}
+		if !open {
+			return next, nil
+		}
+		at = next
+	}
+	return time.Time{}, nil
+}
+
+// endOfOpenStretch is where the range covering at ends (the minute after its
+// "to"), or the end of DateTo's day when no weekday range restricts.
+func endOfOpenStretch(ba BusinessAccess, at time.Time, loc *time.Location) time.Time {
+	day := time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, loc)
+	var end time.Time
+	if ba.DateTo != "" {
+		if d, err := time.ParseInLocation("2006-01-02", ba.DateTo, loc); err == nil {
+			end = d.AddDate(0, 0, 1)
+		}
+	}
+	if len(ba.Days) == 0 {
+		return end
+	}
+	iso := int(at.Weekday())
+	if iso == 0 {
+		iso = 7
+	}
+	hhmm := at.Format("15:04")
+	for _, r := range ba.Days {
+		from, to := r.From, r.To
+		if from == "" {
+			from = "00:00"
+		}
+		if to == "" {
+			to = "23:59"
+		}
+		if r.Day != iso || hhmm < from || hhmm > to {
+			continue
+		}
+		t, err := time.ParseInLocation("15:04", to, loc)
+		if err != nil {
+			continue
+		}
+		closes := day.Add(time.Duration(t.Hour())*time.Hour + time.Duration(t.Minute()+1)*time.Minute)
+		if end.IsZero() || closes.Before(end) {
+			end = closes
+		}
+		return end
+	}
+	return end
 }

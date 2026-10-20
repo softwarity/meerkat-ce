@@ -195,10 +195,10 @@ single-tenant, and says that too.
 | `-version` | - | print version and exit |
 
 The developer surface - the tooling, the API docs, the UI test mode, the
-tunnel - is switched in the console (**Application, General** and **Infra,
-Plug**), on a production gateway as anywhere else. `MEERKAT_PRODUCTION`, which
-used to close it from the environment, is no longer read: set, it only logs a
-warning.
+tunnel - follows the `dev` capability of each account (root always has it),
+and the tunnel its own switch in **Infra, Plug**, on a production gateway as
+anywhere else. `MEERKAT_PRODUCTION`, which used to close it from the
+environment, is no longer read: set, it only logs a warning.
 
 ### Logs and traces
 

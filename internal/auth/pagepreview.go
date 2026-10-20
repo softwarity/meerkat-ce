@@ -129,7 +129,7 @@ var previewErrors = map[string][]string{
 	"signin-code":     {"errBadEmail", "errTooManyAttempts"},
 	"signin-sent":     {"errSigninCode", "errTooManyAttempts"},
 	"select-tenant":   {"errTenantForbidden", "errTenantRefused"},
-	"select-group":    {"errGroupForbidden"},
+	"select-group":    {"errGroupForbidden", "errTenantRefused"},
 	"update-password": {"errPwPolicy", "errPwMismatch", "errPwReused"},
 	// The same three, given through a helper that takes the key - which is why
 	// the scan reads literals rather than h.tr call sites.
@@ -218,20 +218,22 @@ var PreviewPages = []PreviewPage{
 			// chosen from what refused the caller, and a preview of one leaves
 			// the other two on no screen.
 			Why: stack(c, "whyRoles", "whyOtherTenant", "whyNamed"),
-			Tenants: []store.UserTenant{
-				{TenantID: "acme", TenantName: "Acme Corporation", Type: "ADMIN", Enabled: true},
-				{TenantID: "globex", TenantName: "Globex", Type: "USER", Enabled: true},
-				{TenantID: "initech", TenantName: "Initech", Type: "USER", Enabled: true},
+			// One of them closed: the mark its hours leave on the chooser.
+			Tenants: []tenantChoice{
+				{UserTenant: store.UserTenant{TenantID: "acme", TenantName: "Acme Corporation", Type: "ADMIN", Enabled: true}},
+				{UserTenant: store.UserTenant{TenantID: "globex", TenantName: "Globex", Type: "USER", Enabled: true}},
+				{UserTenant: store.UserTenant{TenantID: "initech", TenantName: "Initech", Type: "USER", Enabled: true}, Closed: true},
 			},
 		}
 	}},
 	{"select-group", cSignIn, "Group chooser", "titleChooseGroup", func(c flowChrome) (*template.Template, any) {
 		return selectGroupPage, selectGroupData{
 			flowChrome: c, Next: "/", Active: "g-support", Error: c.PreviewErrors,
-			Groups: []store.Group{
-				{ID: "g-support", Name: "Support"},
-				{ID: "g-sales", Name: "Sales"},
-				{ID: "g-ops", Name: "Operations"},
+			// One of them closed: the mark its hours leave on the chooser.
+			Groups: []groupChoice{
+				{Group: store.Group{ID: "g-support", Name: "Support"}},
+				{Group: store.Group{ID: "g-sales", Name: "Sales"}},
+				{Group: store.Group{ID: "g-ops", Name: "Night shift"}, Closed: true},
 			},
 		}
 	}},

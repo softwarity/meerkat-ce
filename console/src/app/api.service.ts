@@ -29,8 +29,6 @@ export interface PlugState extends PlugSetting {
   // else what the runtime publishes, else the defaults.
   address: { host: string; port: number };
   enterprise: boolean;
-  // The other switch, the application administrator's: read-only here.
-  devMode: boolean;
   status: { state: 'off' | 'unavailable' | 'running' | 'absent'; why?: string; port?: string };
   version?: string;
   defaultPort: number;
@@ -45,7 +43,6 @@ export interface PlugState extends PlugSetting {
 // admin.plugPeople.
 export interface PlugPeople {
   enabled: boolean;
-  devMode: boolean;
   // One key per workstation: plug keeps a key pair per profile.
   developers: { username: string; fullname?: string; keys: { fingerprint: string; comment?: string }[] }[];
 }
@@ -1126,6 +1123,10 @@ export interface User {
   // Days, not instants: valid until the 31st works all of the 31st.
   validFrom?: number;
   validUntil?: number;
+  // The account's own working hours (TENANT-04, Enterprise): set, they replace
+  // the gateway's and the organisation's, a membership's own replacing them in
+  // turn; inherited means none of its own. Root is never held to one.
+  businessAccess?: BusinessAccess;
 }
 
 // One completed sign-in, as the gateway records it (method: password | totp |
@@ -1199,6 +1200,9 @@ export interface Member extends Membership {
   fullname: string;
   email: string;
   lastConnectionAt: number;
+  // The account's own working hours (TENANT-04): what the member's inherited
+  // hours fall back on before the organisation's.
+  accountHours?: BusinessAccess;
 }
 
 export interface UserTenant {
@@ -1246,6 +1250,9 @@ export interface Group {
   description: string;
   // The catalogue roles it grants, BY NAME.
   roles: string[];
+  // Its own working hours (TENANT-04, Enterprise), held only when its
+  // organisation is in exclusive mode; inherited means none of its own.
+  businessAccess?: BusinessAccess;
   createdAt: number;
   updatedAt: number;
 }
@@ -1409,6 +1416,24 @@ export interface UserFieldDef {
   choices?: string[];
 }
 
+// A new account, and how its owner gets in (AUTH-25): the one-time password,
+// or the invitation mailed to email.
+export interface CreatedUser {
+  user: User;
+  password?: string;
+  invited?: boolean;
+  email?: string;
+  validHours?: number;
+}
+
+// A password reset: the one-time password, or the link mailed to email.
+export interface PasswordReset {
+  password?: string;
+  sent?: boolean;
+  email?: string;
+  validHours?: number;
+}
+
 export interface Edition {
   enterprise: boolean;
   // Where the applications answer - never the console's own origin.
@@ -1441,6 +1466,10 @@ export interface Edition {
   license?: License;
   licenseSource?: 'file' | 'console';
   licenseProblem?: string;
+  // An administrator can mail a person their way in - an invitation, a reset
+  // link (AUTH-25) - and, when not, why.
+  mailReady?: boolean;
+  mailWhy?: string;
 }
 
 // What the License screen shows of a license: never the file itself.
@@ -2002,6 +2031,9 @@ export interface DiscoveredService {
   // deliberately stopped, which is not the same as a broken one.
   ready: number;
   wanted: number;
+  // Ready and wanted were really counted; false for a Kubernetes service whose
+  // pods this gateway may not read (another namespace): unknown, not 0/0.
+  counted?: boolean;
   // False only when this gateway's own networks are KNOWN and the service
   // shares none of them: then NO name resolves from here, short or full.
   reachable?: boolean;
@@ -2018,6 +2050,10 @@ export interface Discovery {
   reach?: string[];
   // Why nothing answered, naming what would make it work. Empty when it did.
   unavailable?: string;
+  // Kubernetes: the namespace listed, and every namespace this gateway may
+  // read - absent when the deployment grants only its own (SVC-02).
+  namespace?: string;
+  namespaces?: string[];
 }
 
 export interface ProxyLimits {
@@ -2173,12 +2209,6 @@ export interface Settings {
   // The navigation portal (PORTAL-01): the header-or-rail bar shown across the
   // proxied applications, and the modules it lists. Off until built.
   portal?: PortalConfig;
-  // The installation-wide developer switch (DEV-01). Optional on purpose: the
-  // server reads its ABSENCE as "leave it alone", so a screen that saves the
-  // settings without knowing about this field cannot close the developer
-  // tooling of a whole installation by accident.
-  devMode?: boolean;
-  /** The ENVIRONMENT closed the developer surface (MEERKAT_PRODUCTION), not an operator. Read-only. */
 }
 
 // One of the built-in arrangements. `side` is which edge the brand takes and
@@ -2675,8 +2705,10 @@ export class ApiService {
   // settings: deciding how much memory the proxy may spend is not an
   // application administrator's call.
   // What the runtime can route to (SVC-02).
-  services(): Observable<Discovery> {
-    return this.http.get<Discovery>('/api/services');
+  // namespace: another Kubernetes namespace than the gateway's own, among
+  // those the answer names (SVC-02).
+  services(namespace = ''): Observable<Discovery> {
+    return this.http.get<Discovery>('/api/services', { params: namespace ? { namespace } : {} });
   }
 
   // Which routes are answering (SVC-04). Keyed by route id.
@@ -3134,8 +3166,10 @@ export class ApiService {
     });
   }
 
-  createUser(user: Partial<User>): Observable<{ user: User; password: string; validHours?: number }> {
-    return this.http.post<{ user: User; password: string }>('/api/users', user);
+  // invite: the person is mailed a link to choose their password and none is
+  // shown (AUTH-25); otherwise the answer carries the one-time password.
+  createUser(user: Partial<User>, invite = false): Observable<CreatedUser> {
+    return this.http.post<CreatedUser>(invite ? '/api/users?invite=true' : '/api/users', user);
   }
 
   updateUser(user: User): Observable<User> {
@@ -3156,9 +3190,16 @@ export class ApiService {
     return this.http.post<{ users: number }>('/api/users/must-change-password', null);
   }
 
-  resetPassword(id: string): Observable<{ password: string; validHours?: number }> {
-    return this.http.post<{ password: string }>(
-      `/api/users/${encodeURIComponent(id)}/reset-password`,
+  // The dev capability taken from every account but root's (DEV-01): how a
+  // production gateway closes its developer surface. Answers how many changed.
+  clearDevForAll(): Observable<{ users: number }> {
+    return this.http.post<{ users: number }>('/api/users/clear-dev', null);
+  }
+
+  // byMail: a link to choose a new one is mailed instead (AUTH-25).
+  resetPassword(id: string, byMail = false): Observable<PasswordReset> {
+    return this.http.post<PasswordReset>(
+      `/api/users/${encodeURIComponent(id)}/reset-password${byMail ? '?send=mail' : ''}`,
       null,
     );
   }
@@ -3224,9 +3265,9 @@ export class ApiService {
 
   // Tenant-scoped reset (the target must be a member; resetting a root account
   // still requires root). Returns the one-time temporary password.
-  resetMemberPassword(tenantId: string, userId: string): Observable<{ password: string; validHours?: number }> {
-    return this.http.post<{ password: string }>(
-      `/api/tenants/${encodeURIComponent(tenantId)}/members/${encodeURIComponent(userId)}/reset-password`,
+  resetMemberPassword(tenantId: string, userId: string, byMail = false): Observable<PasswordReset> {
+    return this.http.post<PasswordReset>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/members/${encodeURIComponent(userId)}/reset-password${byMail ? '?send=mail' : ''}`,
       null,
     );
   }

@@ -39,7 +39,24 @@ accorde ou retire la capacité sans ouvrir le tiroir.
 Les actions de ligne activent et désactivent un compte. Vous ne pouvez pas retirer
 votre propre capacité `root`, ni désactiver ou supprimer votre propre compte.
 
-La recherche porte sur le compte. Le bouton **+** en crée un.
+Seule la capacité `dev` décide qui dispose de l'outillage développeur, et `root` l'a
+toujours : sur un compte root, le badge `dev` est allumé et ne se clique pas. Pour
+fermer la surface développeur d'une gateway de production, **Remove developer mode**
+(au-dessus du tableau, grisé tant qu'aucun compte autre que root ne porte `dev`)
+retire la capacité à tous les comptes sauf root, après avoir dit combien elle en
+touche.
+
+La recherche porte sur le compte. Le bouton **+** en crée un, et demande comment
+son titulaire entrera la première fois - l'un ou l'autre, jamais les deux :
+
+- **Show a temporary password** - un mot de passe généré, affiché une fois pour le
+  remettre, à changer à la première connexion.
+- **Send an invitation** - un lien envoyé à l'adresse du compte, valable 48 heures,
+  qui ouvre la page où la personne choisit son mot de passe ; aucun mot de passe
+  n'est affiché. Proposé quand un relais de mail est configuré, que les mots de
+  passe locaux sont autorisés et que l'application a un nom public dont la gateway
+  se porte garante ; sinon le formulaire dit ce qui manque. Si le mail ne part
+  pas, le compte n'est pas créé.
 
 ## Le tiroir d'un compte
 
@@ -59,7 +76,13 @@ Trois pages dans un même tiroir, dont la première est la seule que vous
 
 - **Two-factor** - le second facteur est exigé, facultatif, ou hérité de la politique
   de l'application ; le libellé précise ce que donne l'héritage en ce moment.
-- **Password** - *Reset password* génère un mot de passe à remettre à la personne.
+- **Working hours** (Enterprise) - les heures propres du compte : posées, elles
+  remplacent pour cette personne celles de l'installation et de ses organisations,
+  sauf si une appartenance définit les siennes. Absent d'un compte root, qui n'est
+  jamais soumis à des heures.
+- **Password** - *Reset password* demande comment : un mot de passe temporaire à
+  remettre à la personne, ou un lien envoyé par mail pour en choisir un nouveau
+  (le mot de passe actuel reste valable tant que le lien n'est pas suivi).
   *Force a change at next sign-in* conserve le mot de passe qu'elle connaît déjà, mais
   l'empêche d'aller plus loin sans en changer, ce qui épargne un appel téléphonique
   par personne. Un compte né auprès d'une autorité n'a pas de mot de passe local, et

@@ -50,9 +50,14 @@ type Group struct {
 	Description string `json:"description"`
 	// Roles are the catalogue roles this group grants, BY NAME - the only
 	// identity a role has.
-	Roles     []string `json:"roles"`
-	CreatedAt int64    `json:"createdAt"`
-	UpdatedAt int64    `json:"updatedAt"`
+	Roles []string `json:"roles"`
+	// BusinessAccess is the group's own working hours (TENANT-04, Enterprise),
+	// held only when its organisation is in exclusive mode: one group per
+	// session, so a day shift and a night shift can each have theirs.
+	// Inherited means none of its own.
+	BusinessAccess BusinessAccess `json:"businessAccess"`
+	CreatedAt      int64          `json:"createdAt"`
+	UpdatedAt      int64          `json:"updatedAt"`
 	// Rev is the revision this row was READ at, carried back by a save so a
 	// write built on a version somebody has replaced is refused. Zero means "I
 	// read no version" and still wins - see rev.go.
@@ -240,11 +245,11 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 	defer func() { _ = tx.Rollback() }()
 	now := time.Now().Unix()
 	if _, err = tx.ExecContext(ctx,
-		`INSERT INTO groups (id, tenant_id, name, description, created_at, updated_at, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, 1)
+		`INSERT INTO groups (id, tenant_id, name, description, business_access, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description,
-		   updated_at = excluded.updated_at, rev = groups.rev + 1`,
-		g.ID, g.TenantID, g.Name, g.Description, now, now); err != nil {
+		   business_access = excluded.business_access, updated_at = excluded.updated_at, rev = groups.rev + 1`,
+		g.ID, g.TenantID, g.Name, g.Description, encodeBusinessAccess(g.BusinessAccess), now, now); err != nil {
 		return fmt.Errorf("store: save group %q: %w", g.Name, err)
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM group_roles WHERE group_id = ?`, g.ID); err != nil {
@@ -262,12 +267,14 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 // GetGroup returns one group by id.
 func (s *Store) GetGroup(ctx context.Context, id string) (Group, error) {
 	var g Group
+	var ba string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, tenant_id, name, description, created_at, updated_at, rev FROM groups WHERE id = ?`, id).
-		Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt, &g.Rev)
+		`SELECT id, tenant_id, name, description, business_access, created_at, updated_at, rev FROM groups WHERE id = ?`, id).
+		Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &ba, &g.CreatedAt, &g.UpdatedAt, &g.Rev)
 	if err != nil {
 		return Group{}, fmt.Errorf("store: get group %q: %w", id, err)
 	}
+	g.BusinessAccess = decodeBusinessAccess(ba)
 	if g.Roles, err = s.groupRoles(ctx, []string{id}); err != nil {
 		return Group{}, err
 	}
@@ -280,7 +287,7 @@ func (s *Store) GetGroup(ctx context.Context, id string) (Group, error) {
 // ListGroups returns a tenant's groups (with their role sets), ordered by name.
 func (s *Store) ListGroups(ctx context.Context, tenantID string) ([]Group, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, tenant_id, name, description, created_at, updated_at, rev FROM groups WHERE tenant_id = ? ORDER BY name ASC`,
+		`SELECT id, tenant_id, name, description, business_access, created_at, updated_at, rev FROM groups WHERE tenant_id = ? ORDER BY name ASC`,
 		tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list groups: %w", err)
@@ -291,9 +298,11 @@ func (s *Store) ListGroups(ctx context.Context, tenantID string) ([]Group, error
 		// Roles starts as an empty slice, never nil: a role-less group must
 		// serialise as [] (the console indexes into it).
 		g := Group{Roles: []string{}}
-		if err := rows.Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt, &g.Rev); err != nil {
+		var ba string
+		if err := rows.Scan(&g.ID, &g.TenantID, &g.Name, &g.Description, &ba, &g.CreatedAt, &g.UpdatedAt, &g.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan group: %w", err)
 		}
+		g.BusinessAccess = decodeBusinessAccess(ba)
 		groups = append(groups, g)
 	}
 	if err := rows.Err(); err != nil {
@@ -394,7 +403,7 @@ func (s *Store) SetMemberGroups(ctx context.Context, tenantID, userID string, gr
 // the select-group step and the user button list them.
 func (s *Store) MemberGroups(ctx context.Context, tenantID, userID string) ([]Group, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT g.id, g.tenant_id, g.name, g.created_at, g.updated_at
+		`SELECT g.id, g.tenant_id, g.name, g.business_access, g.created_at, g.updated_at
 		 FROM member_groups mg JOIN groups g ON g.id = mg.group_id
 		 WHERE mg.tenant_id = ? AND mg.user_id = ? ORDER BY g.name ASC`,
 		tenantID, userID)
@@ -405,9 +414,11 @@ func (s *Store) MemberGroups(ctx context.Context, tenantID, userID string) ([]Gr
 	var out []Group
 	for rows.Next() {
 		var g Group
-		if err := rows.Scan(&g.ID, &g.TenantID, &g.Name, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		var ba string
+		if err := rows.Scan(&g.ID, &g.TenantID, &g.Name, &ba, &g.CreatedAt, &g.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("store: scan member group: %w", err)
 		}
+		g.BusinessAccess = decodeBusinessAccess(ba)
 		out = append(out, g)
 	}
 	return out, rows.Err()

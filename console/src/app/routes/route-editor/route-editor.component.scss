@@ -721,3 +721,28 @@ footer .gaps {
   border-radius: 4px;
   background: var(--mat-sys-surface-container);
 }
+
+/* The namespace the offered upstreams come from (SVC-02): its own line, the
+   width of a name, above the field it feeds. */
+mat-form-field.namespace {
+  width: 280px;
+  margin-bottom: 12px;
+}
+
+/* The upstream picked from a namespace's services, its base path beside it:
+   the service takes the room, the path the width of a segment. The scheme
+   prefix is url-input's, drawn the same way. */
+.upstream-pick mat-form-field.service {
+  flex: 3 1 260px;
+}
+.upstream-pick mat-form-field.base-path {
+  flex: 1 1 120px;
+}
+.upstream-pick .proto {
+  width: 62px;
+  margin-left: 12px;
+}
+.upstream-pick .sep {
+  margin-right: 6px;
+  color: var(--mat-sys-on-surface-variant);
+}

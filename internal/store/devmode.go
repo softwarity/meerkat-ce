@@ -2,37 +2,33 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"time"
 )
 
-// DevMode reports whether this installation offers a developer surface at all
-// (DEV-01, LIFE-03).
-//
-// It is read on the request path, so it stays a plain settings lookup rather
-// than a cached one: the read is a single indexed row, and a switch an operator
-// flips to close a demo has to be closed on the NEXT request, not in five
-// seconds.
-//
-// Missing means ON. The seed writes the row on every start, so a missing value
-// only happens on a database that predates the setting - and there, the dev
-// capability was the whole gate, which is exactly what ON reproduces.
-func (s *Store) DevMode(ctx context.Context) bool {
-	on := true
-	_ = s.GetSetting(ctx, SettingDevMode, &on)
-	return on
-}
-
-// SetDevMode records the switch. It is the only thing that decides: there
-// is no environment above it, on a production gateway as anywhere else - the
-// operator opens or closes the developer surface from the console.
-func (s *Store) SetDevMode(ctx context.Context, on bool) error {
-	return s.SetSetting(ctx, SettingDevMode, on)
-}
-
 // DevAllowed answers the question every developer gate asks: may THIS user use
-// the developer tooling here? Both halves have to be true - the installation
-// offers it, and the account holds the capability - and having one place to ask
-// is what stops the next dev entry point from checking only the account, the
-// way each of them did before the switch existed.
-func (s *Store) DevAllowed(ctx context.Context, u User) bool {
-	return u.Dev && u.Enabled && s.DevMode(ctx)
+// the developer tooling here (DEV-01)? Root always may; any other account when
+// it is enabled and carries the dev capability. Having one place to ask is what
+// stops the next dev entry point from checking something else.
+//
+// There used to be an installation-wide switch above the capability (the
+// dev_mode setting). It said the same thing a second time, in a second place
+// to look when a developer lost their tools: a production gateway closes its
+// developer surface by having no account carry the flag, which
+// ClearDevCapability does in one act.
+func (s *Store) DevAllowed(_ context.Context, u User) bool {
+	return u.Enabled && (u.Root || u.Dev)
+}
+
+// ClearDevCapability takes the dev capability from every account but root's,
+// and says how many it changed. Root keeps its tooling whatever it carries.
+func (s *Store) ClearDevCapability(ctx context.Context) (int64, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE users SET dev = ?, updated_at = ? WHERE dev = ? AND root = ?`,
+		false, time.Now().Unix(), true, false)
+	if err != nil {
+		return 0, fmt.Errorf("store: take the dev capability from every account: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }

@@ -183,6 +183,39 @@ subjects:
 {{- end }}
 {{- end }}
 {{- end }}
+{{- if ne ((.Values.rbac | default dict).clusterServices) false }}
+---
+# The other namespaces, for the route editor (SVC-02): the Services of the
+# whole cluster, so a route to Grafana in monitoring or to an application in
+# its own namespace is chosen rather than typed. The namespaces offered are
+# those holding a Service, read from the same list. Services only - names and
+# ports: no pod, no secret, nothing written.
+# rbac.clusterServices: false keeps the gateway to its own namespace, and the
+# console then shows that one with no choice to make.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-services
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-services
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-services
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
 {{- with include "meerkat.issuedSecret" . }}
 ---
 # The internal plane's certificate asked of cert-manager by the gateway itself

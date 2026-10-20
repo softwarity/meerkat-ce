@@ -23,12 +23,12 @@ plusieurs clusters à la fois, les volumes, les environnements - se trouve dans
 
 ## Deux conditions, deux responsables
 
-Le tunnel ne fonctionne que si ces **deux** interrupteurs sont activés :
+Le tunnel fonctionne quand il est ouvert, et sert les comptes autorisés à développer :
 
-| interrupteur | où | qui en décide | ce qu'il détermine |
+| quoi | où | qui en décide | ce qu'il détermine |
 |---|---|---|---|
-| Developer mode | Application, General | l'administrateur de l'application | ce que cette installation propose à ses développeurs : le menu Developer, la documentation des API, les connexions simulées |
 | Open the developer tunnel | **Infra, Plug** | l'administrateur de l'infrastructure | un port ouvert sur le cluster, et les droits du déploiement sur celui-ci (socket Docker, rôle Kubernetes) |
+| La capacité `dev` | **Application, Users** | l'administrateur de l'application | qui peut se brancher, avec le reste de l'outillage développeur ; root le peut toujours |
 
 L'interrupteur du tunnel est **désactivé à la livraison**. Ces deux interrupteurs décident,
 sur une gateway de production comme ailleurs.

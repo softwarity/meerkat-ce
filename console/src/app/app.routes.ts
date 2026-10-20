@@ -133,9 +133,7 @@ export const routes: Routes = [
       },
       {
         // The developer tunnel (DEV-11): a port into the cluster, so Infra.
-        // Developer mode stays in Application, General - a configuration of
-        // what the installation offers its developers - and is the other
-        // condition the tunnel needs.
+        // Who may use it is the dev capability, granted on Application, Users.
         path: 'plug',
         canActivate: [infraOnly],
         loadComponent: () => import('./plug/plug-page.component').then((m) => m.PlugPageComponent),

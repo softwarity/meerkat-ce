@@ -206,7 +206,7 @@ func TestResolveInheritance(t *testing.T) {
 	}
 
 	// Everything inherited -> the global values apply.
-	ba, err := s.ResolveBusinessAccess(ctx, "u1", "t1")
+	ba, err := s.ResolveBusinessAccess(ctx, "u1", "t1", "")
 	if err != nil || len(ba.Days) != 7 || ba.Days[0].From != "00:00" {
 		t.Fatalf("global fallback: %+v, %v", ba, err)
 	}
@@ -219,7 +219,7 @@ func TestResolveInheritance(t *testing.T) {
 		BusinessAccess: BusinessAccess{Timezone: "UTC", Days: ranges("08:00", "18:00", 1, 2, 3, 4, 5)}}); err != nil {
 		t.Fatal(err)
 	}
-	if ba, _ = s.ResolveBusinessAccess(ctx, "u1", "t1"); ba.Days[0].From != "08:00" {
+	if ba, _ = s.ResolveBusinessAccess(ctx, "u1", "t1", ""); ba.Days[0].From != "08:00" {
 		t.Fatalf("tenant override: %+v", ba)
 	}
 	if ttl, _ := s.ResolveSessionTTL(ctx, "u1", "t1"); ttl != "PT1H" {
@@ -232,7 +232,7 @@ func TestResolveInheritance(t *testing.T) {
 		BusinessAccess: BusinessAccess{Timezone: "UTC", Days: ranges("10:00", "16:00", 2)}}); err != nil {
 		t.Fatal(err)
 	}
-	if ba, _ = s.ResolveBusinessAccess(ctx, "u1", "t1"); len(ba.Days) != 1 || ba.Days[0].From != "10:00" {
+	if ba, _ = s.ResolveBusinessAccess(ctx, "u1", "t1", ""); len(ba.Days) != 1 || ba.Days[0].From != "10:00" {
 		t.Fatalf("membership override: %+v", ba)
 	}
 	if ttl, _ := s.ResolveSessionTTL(ctx, "u1", "t1"); ttl != "PT10M" {

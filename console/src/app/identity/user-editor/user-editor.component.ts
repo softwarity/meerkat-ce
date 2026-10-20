@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, model, output } from '@angular/core';
+import { Component, computed, inject, input, linkedSignal, model, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -6,12 +6,14 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ApiService, User } from '../../api.service';
+import { ApiService, BusinessAccess, User } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
+import { EeLockComponent } from '../../shared/ee-lock.component';
+import { BusinessAccessFormComponent } from '../business-access-form.component';
 import { ExternalIdentitiesComponent } from '../external-identities.component';
 import { LoginHistoryComponent } from '../login-history.component';
 import { MfaSelectComponent } from '../mfa-select.component';
-import { PasswordDialogComponent } from '../password-dialog.component';
+import { resetAccess } from '../reset-access';
 import { UserFieldsComponent } from '../user-fields.component';
 
 // Which page of the account drawer is on screen.
@@ -34,6 +36,8 @@ export type UserEditorView = 'account' | 'security' | 'history';
     MatIconModule,
     MatListModule,
     MatTooltipModule,
+    BusinessAccessFormComponent,
+    EeLockComponent,
     ExternalIdentitiesComponent,
     LoginHistoryComponent,
     MfaSelectComponent,
@@ -76,6 +80,19 @@ export class UserEditorComponent {
 
   protected readonly isMe = () => this.user().id === this.meId();
 
+  // The account's own hours, edited here and saved on the button: the grid
+  // emits on every keystroke, and each one is not a decision.
+  protected readonly hours = linkedSignal<BusinessAccess>(
+    () => this.user().businessAccess ?? { inherited: true },
+  );
+  protected readonly hoursDirty = computed(
+    () => JSON.stringify(this.hours()) !== JSON.stringify(this.user().businessAccess ?? { inherited: true }),
+  );
+
+  protected saveHours(): void {
+    this.apply({ ...this.user(), businessAccess: this.hours() });
+  }
+
   protected setMfa(mfaRequired: string): void {
     this.apply({ ...this.user(), mfaRequired });
   }
@@ -89,12 +106,8 @@ export class UserEditorComponent {
   }
 
   protected resetPassword(): void {
-    this.api.resetPassword(this.user().id).subscribe({
-      next: ({ password, validHours }) =>
-        this.dialog.open(PasswordDialogComponent, {
-          data: { username: this.user().username, password, validHours },
-        }),
-    });
+    const u = this.user();
+    void resetAccess(this.api, this.dialog, this.snack, u, (byMail) => this.api.resetPassword(u.id, byMail));
   }
 
   // Keeps the password the person already knows and refuses to go further with

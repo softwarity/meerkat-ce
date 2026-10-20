@@ -48,6 +48,9 @@ func TestFeaturesBelongToTheirCapability(t *testing.T) {
 		{"PUT", "/api/settings/tls/doors/app", `{"proxied":true,"names":[]}`, []string{"root", "infra-admin"}},
 		// Identity: the bulk password change and the shape of the organisations.
 		{"POST", "/api/users/must-change-password", "", []string{"root", "app-admin"}},
+		// Taking the dev capability from every account: the same scope as the
+		// flag itself.
+		{"POST", "/api/users/clear-dev", "", []string{"root", "app-admin"}},
 		{"PUT", "/api/settings/tenancy", `{"tenancy":"single"}`, []string{"root", "app-admin"}},
 	}
 	for _, c := range cases {

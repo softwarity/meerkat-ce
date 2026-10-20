@@ -156,11 +156,10 @@ func TestDeveloperHub(t *testing.T) {
 	}
 }
 
-// The same switch, seen from the pages: with developer mode off the profile
+// The same gate, seen from the pages: without the dev capability the profile
 // stops offering the hub, the hub refuses, and the user button never mentions
-// a Developer submenu. The account keeps its capability throughout - that is
-// the point: the installation answers, not the flag.
-func TestDeveloperModeHidesTheDeveloperSurface(t *testing.T) {
+// a Developer submenu; given back, everything returns on the same session.
+func TestTheDevCapabilityShowsTheDeveloperSurface(t *testing.T) {
 	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
@@ -175,24 +174,28 @@ func TestDeveloperModeHidesTheDeveloperSurface(t *testing.T) {
 	New(st, session.NewManager(st)).Register(mux)
 	devC := postLogin(t, mux, url.Values{"username": {"devon"}, "password": {"s3cret"}}).Result().Cookies()[0]
 
-	if err := st.SetDevMode(ctx, false); err != nil {
+	if _, err := st.ClearDevCapability(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if body := bodyString(do(t, mux, "GET", "/profile", nil, devC)); strings.Contains(body, `href="/profile/dev"`) {
-		t.Fatal("the profile offered the Developer entry with developer mode off")
+		t.Fatal("the profile offered the Developer entry without the capability")
 	}
 	for _, p := range []string{"/profile/dev", "/profile/dev/key"} {
 		if res := do(t, mux, "GET", p, nil, devC); res.Code != http.StatusForbidden {
-			t.Fatalf("%s with developer mode off: code=%d, want 403", p, res.Code)
+			t.Fatalf("%s without the capability: code=%d, want 403", p, res.Code)
 		}
 	}
 	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC)); strings.Contains(body, `"devDocs"`) {
-		t.Fatalf("the user button advertised the Developer submenu with developer mode off: %s", body)
+		t.Fatalf("the user button advertised the Developer submenu without the capability: %s", body)
 	}
 
-	// Back on, everything the developer had returns - no re-flagging, no
-	// re-login.
-	if err := st.SetDevMode(ctx, true); err != nil {
+	// Given back, everything the developer had returns - no re-login.
+	u, err := st.GetUserByID(ctx, "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Dev = true
+	if err := st.UpdateUser(ctx, u); err != nil {
 		t.Fatal(err)
 	}
 	if body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC)); !strings.Contains(body, `"devDocs":true`) {

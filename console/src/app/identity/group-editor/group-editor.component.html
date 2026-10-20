@@ -1,0 +1,72 @@
+<header>
+  <h2>{{ group()?.name }}</h2>
+  <span class="grow"></span>
+  <button matIconButton (click)="drawer.close()" i18n-aria-label="@@Close" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<div class="body">
+  @if (!group()) {
+    <loading-indicator withContainer />
+  } @else {
+    <section class="fields">
+      <mat-form-field>
+        <mat-label i18n="@@Group_name">Group name</mat-label>
+        <input matInput [value]="name()" (input)="name.set($any($event.target).value)" />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label i18n="@@Description">Description</mat-label>
+        <textarea matInput rows="2" [value]="description()" (input)="description.set($any($event.target).value)"></textarea>
+      </mat-form-field>
+    </section>
+
+    <!-- A group's own hours (TENANT-04) only where one group is chosen per
+         session: in cumulative mode a person holds several at once, and no
+         one of them could say which hours. -->
+    @if (exclusive()) {
+      <mat-divider />
+      <section>
+        <h3>
+          <ng-container i18n="@@Working_hours">Working hours</ng-container>
+          <app-ee-lock
+            feature="business-hours"
+            i18n-why="@@Working_hours_ee_why"
+            why="Refuse access outside declared hours, gateway-wide or per person: an audit requirement rather than a defence."
+          />
+        </h3>
+        <p class="hint" i18n="@@Group_hours_hint">
+          The organisation picks one group per session: set here, these hours replace the account's and
+          the organisation's for whoever signs in with this group, unless a member has its own.
+        </p>
+        <app-business-access-form
+          ee-feature="business-hours"
+          [value]="hours()"
+          [inherited]="inheritedHours()"
+          (valueChange)="hours.set($event)"
+        />
+      </section>
+    }
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    <div class="actions">
+      <button matButton="filled" [disabled]="!dirty() || saving() || !name().trim()" (click)="save()" i18n="@@Save">
+        Save
+      </button>
+    </div>
+
+    <!-- Its own zone, framed like every other destructive one. -->
+    <section class="danger-zone">
+      <h3 i18n="@@Danger_zone">Danger zone</h3>
+      <p class="hint" i18n="@@Delete_group_hint">
+        Removes the group and its assignments: its members stay, the roles it gave them do not.
+      </p>
+      <button matButton (click)="remove()">
+        <mat-icon>delete</mat-icon>
+        <ng-container i18n="@@Delete">Delete</ng-container>
+      </button>
+    </section>
+  }
+</div>

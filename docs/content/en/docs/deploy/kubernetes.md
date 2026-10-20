@@ -370,13 +370,15 @@ There is no switch for either: what opens them is what the deployment grants. Th
 
 The authorities the cluster publishes are found for the console's **Trusted authorities, From the cluster**: `trustDiscovery.certManager` (on by default) lets the gateway list the cert-manager issuers and learn one's certificate from a throwaway Certificate, never from the issuer's Secret; `trustDiscovery.trustManager` (on by default) lets it list the trust-manager Bundles and read their ConfigMap in its namespace. Set either false and the console says which is missing - see [Found in the cluster](/docs/operations/tls#found-in-the-cluster).
 
-A route whose upstream lives in ANOTHER namespace (`grafana.monitoring.svc`) is read the same way once that namespace is listed in `rbac.watchNamespaces`: the chart creates a Role in each one named, never a ClusterRole, so the gateway reads the namespaces somebody chose and not the whole cluster. A namespace not listed is checked by a connection.
+**The other namespaces.** A route very often points outside the gateway's namespace - Grafana in `monitoring`, an application in its own. The chart lets the gateway list the Services of the whole cluster (`rbac.clusterServices`, on by default: a ClusterRole that reads services and nothing else - no pod, no secret, nothing written). The route editor then offers a **Namespace** choice above the upstream: the namespaces that hold a Service, and **External**. A namespace chosen, the upstream is picked from its services, under their qualified name (`grafana.monitoring.svc`), and only the base path beside it is typed (`/geoserver`): a host typed by hand is the typo the list exists to remove. External is where a public site or a machine of the network is typed freely, and so is a StatefulSet's pod (`pg-0.pg.data.svc`), which no Service lists. An existing route opens on the namespace its upstream points into, or on External. Set `rbac.clusterServices: false` and the gateway keeps to its own namespace: the editor shows that one, with no choice to make.
+
+The replicas and image of a service in another namespace are read once that namespace is listed in `rbac.watchNamespaces`: the chart creates a Role in each one named, never a ClusterRole for the pods, since reading pods is reading their environment. A namespace not listed is checked by a connection.
 
 Reading the pods reads the environment variables their manifests declare. Where a manifest carries a secret in clear, set `rbac.watch: false`, or better, move the secret into a Secret.
 
 The developer tunnel asks for more than this, and what it grants is set out on [One gateway](/docs/deploy/one-gateway).
 
-::: details The Role and its binding
+::: details The Role, the ClusterRole and their bindings
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -406,6 +408,30 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: meerkat
+---
+# Optional: the other namespaces, for the route editor's Namespace choice.
+# The Services of the cluster, read; nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: meerkat-cluster-services
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: meerkat-cluster-services
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: meerkat-cluster-services
+subjects:
+  - kind: ServiceAccount
+    name: meerkat
+    namespace: meerkat   # the namespace the gateway runs in
 # And name it in the pod spec:
 #   serviceAccountName: meerkat
 ```

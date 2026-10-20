@@ -204,10 +204,11 @@ et le journal le dit aussi.
 | `-version` | - | affiche la version et quitte |
 
 La surface développeur - l'outillage, la documentation des API, le mode de
-test des interfaces, le tunnel - s'active dans la console (**Application,
-General** et **Infra, Plug**), sur une gateway de production comme ailleurs.
-`MEERKAT_PRODUCTION`, qui la fermait depuis l'environnement, n'est plus lue :
-posée, elle ne fait qu'écrire un avertissement dans le journal.
+test des interfaces, le tunnel - suit la capacité `dev` de chaque compte (root
+l'a toujours), et le tunnel son propre interrupteur dans **Infra, Plug**, sur une
+gateway de production comme ailleurs. `MEERKAT_PRODUCTION`, qui la fermait
+depuis l'environnement, n'est plus lue : posée, elle ne fait qu'écrire un
+avertissement dans le journal.
 
 ### Journaux et traces
 

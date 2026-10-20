@@ -30,5 +30,14 @@ func (a *API) listServices(w http.ResponseWriter, r *http.Request, _ store.User)
 	// without one, and the answer says so in a sentence naming what would make
 	// it work. A 500 here would put a red box in front of a field that works
 	// perfectly well typed by hand.
-	writeJSON(w, http.StatusOK, discovery.Discover(r.Context()))
+	// ?namespace= reads another Kubernetes namespace, when the deployment
+	// grants it; the answer lists the namespaces this gateway may choose from.
+	ns := r.URL.Query().Get("namespace")
+	if ns != "" {
+		if err := discovery.ValidNamespace(ns); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, discovery.DiscoverIn(r.Context(), ns))
 }

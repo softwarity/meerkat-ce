@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -45,9 +46,16 @@ func (h *Handler) applyGroupStep(r *http.Request, userID, tenantID string) bool 
 
 var selectGroupPage = flowPage("select-group", selectGroupBody)
 
+// groupChoice is one group on the chooser: Closed when its hours keep this
+// person out right now (TENANT-04) - shown, not offered.
+type groupChoice struct {
+	store.Group
+	Closed bool
+}
+
 type selectGroupData struct {
 	flowChrome
-	Groups []store.Group
+	Groups []groupChoice
 	Active string
 	Next   string
 	Error  string
@@ -57,8 +65,9 @@ const selectGroupBody = `    <form method="post" action="/select-group">
       <p class="lead">{{.T.chooseGroupLead}}</p>
       {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
       {{range .Groups}}
-      <button class="choice" type="submit" name="group" value="{{.ID}}" {{if eq .ID $.Active}}disabled{{end}}>
+      <button class="choice" type="submit" name="group" value="{{.ID}}" {{if or (eq .ID $.Active) .Closed}}disabled{{end}}>
         <span class="choice-name">{{.Name}}</span>
+        {{if .Closed}}<span class="choice-type">{{$.T.outsideHours}}</span>{{end}}
       </button>
       {{end}}
       <input type="hidden" name="next" value="{{.Next}}">
@@ -145,16 +154,32 @@ func (h *Handler) doSelectGroup(w http.ResponseWriter, r *http.Request) {
 		h.renderSelectGroup(w, r, groups, sess.GroupID, next, h.tr(r, "errGroupForbidden"), http.StatusForbidden)
 		return
 	}
+	// The chosen group's hours, when it has its own, are the ones that hold
+	// from here (TENANT-04): checked, and the session bound by them.
+	inHours, until := h.windowHours(r.Context(), sess.UserID, sess.TenantID, chosen.ID)
+	if !inHours {
+		h.securityOfIn(r, secSigninRefused, sess.UserID, sess.TenantID, refusedHours)
+		h.renderSelectGroup(w, r, groups, sess.GroupID, next,
+			fmt.Sprintf(h.tr(r, "errTenantRefused"), chosen.Name), http.StatusForbidden)
+		return
+	}
 	if err := h.sm.SetGroup(r.Context(), r, chosen.ID); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.boundSession(w, r, until)
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 func (h *Handler) renderSelectGroup(w http.ResponseWriter, r *http.Request, groups []store.Group, active, next, errMsg string, status int) {
+	sess, _ := h.sm.Resolve(r.Context(), r)
+	choices := make([]groupChoice, 0, len(groups))
+	for _, g := range groups {
+		open, _ := h.windowHours(r.Context(), sess.UserID, sess.TenantID, g.ID)
+		choices = append(choices, groupChoice{Group: g, Closed: !open})
+	}
 	writeFlow(w, selectGroupPage, selectGroupData{
 		flowChrome: h.flowData(r, "titleChooseGroup"),
-		Groups:     groups, Active: active, Next: next, Error: errMsg,
+		Groups:     choices, Active: active, Next: next, Error: errMsg,
 	}, status)
 }

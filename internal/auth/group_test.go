@@ -7,7 +7,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -169,5 +171,68 @@ func TestCumulativeModeUnchanged(t *testing.T) {
 	hub := do(t, mux, "GET", "/profile", nil, cookie)
 	if body := bodyString(hub); !strings.Contains(body, `href="/opsapp"`) || !strings.Contains(body, `href="/salesapp"`) {
 		t.Fatalf("cumulative roles must open both apps:\n%.400s", body)
+	}
+}
+
+// In exclusive mode a group's own hours hold (TENANT-04): the chooser shows a
+// closed group as such, choosing it is refused, and an open one bounds the
+// session.
+func TestAClosedGroupIsShownAndRefused(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("working hours are Enterprise")
+	}
+	mux, sm, st := groupSetup(t)
+	ctx := context.Background()
+	// Root is never held to hours: this person is not.
+	u, err := st.GetUserByID(ctx, "u1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Root = false
+	if err := st.UpdateUser(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	today := int(time.Now().UTC().Weekday())
+	if today == 0 {
+		today = 7
+	}
+	closed := store.BusinessAccess{Timezone: "UTC", Days: baDays("00:00", "23:59", today%7+1)}
+	open := store.BusinessAccess{Timezone: "UTC", Days: baDays("00:00", "23:59", today)}
+	g, err := st.GetGroup(ctx, "g-sales")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.BusinessAccess = closed
+	if err := st.SaveGroup(ctx, g); err != nil {
+		t.Fatal(err)
+	}
+	if g, err = st.GetGroup(ctx, "g-ops"); err != nil {
+		t.Fatal(err)
+	}
+	g.BusinessAccess = open
+	if err := st.SaveGroup(ctx, g); err != nil {
+		t.Fatal(err)
+	}
+
+	login := do(t, mux, "POST", "/login", url.Values{"username": {"admin"}, "password": {"s3cret"}}, nil)
+	cookie := sessionCookieOf(login)
+	if pick := do(t, mux, "POST", "/select-tenant", url.Values{"tenant": {"t1"}}, cookie); !strings.HasPrefix(pick.Header().Get("Location"), "/select-group") {
+		t.Fatalf("one group open: want /select-group, got %d %q", pick.Code, pick.Header().Get("Location"))
+	}
+	if body := bodyString(do(t, mux, "GET", "/select-group", nil, cookie)); !strings.Contains(body, `value="g-sales" disabled`) {
+		i := strings.Index(body, "g-sales")
+		t.Fatalf("the closed group is not shown as such: %q", body[max(i-80, 0):min(i+200, len(body))])
+	}
+	if rec := do(t, mux, "POST", "/select-group", url.Values{"group": {"g-sales"}}, cookie); rec.Code != http.StatusForbidden {
+		t.Fatalf("a closed group was let in: %d", rec.Code)
+	}
+	if rec := do(t, mux, "POST", "/select-group", url.Values{"group": {"g-ops"}}, cookie); rec.Code != http.StatusSeeOther {
+		t.Fatalf("the open group: %d", rec.Code)
+	}
+	req := httptest.NewRequest("GET", "/", nil)
+	req.AddCookie(cookie)
+	sess, err := sm.Resolve(ctx, req)
+	if err != nil || sess.GroupID != "g-ops" || sess.HoursUntil == 0 {
+		t.Fatalf("the session is not bound by the group's hours: %+v %v", sess, err)
 	}
 }

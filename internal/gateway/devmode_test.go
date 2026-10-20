@@ -13,16 +13,13 @@ import (
 	"github.com/softwarity/meerkat/internal/store/dbtest"
 )
 
-// The installation-wide developer switch (DEV-01). The capability says WHO may
-// develop here; this says whether HERE is a place one develops at all.
-//
-// What this pins is that the switch reaches EVERY door, not just the menu that
-// advertises them. A developer who bookmarked /meerkat/apidocs/ or whose
-// browser still holds the UI test bar has to meet the same closed gateway as
-// someone reading the user button - otherwise turning developer mode off means
-// hiding the entrance while leaving the door open, which is worse than not
-// having the switch: the operator believes it is closed.
-func TestDeveloperModeClosesEveryDoor(t *testing.T) {
+// The dev capability (DEV-01) is the one gate. What this pins is that taking it
+// away reaches EVERY door, not just the menu that advertises them. A developer
+// who bookmarked /meerkat/apidocs/ or whose browser still holds the UI test bar
+// has to meet the same closed gateway as someone reading the user button -
+// otherwise clearing the capability hides the entrance and leaves the door
+// open, and the operator believes it is closed.
+func TestTheDevCapabilityClosesEveryDoor(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		_, _ = io.WriteString(w, `<html><body>ok</body></html>`)
@@ -79,44 +76,43 @@ func TestDeveloperModeClosesEveryDoor(t *testing.T) {
 		return res.StatusCode
 	}
 
-	// A fresh installation develops: the capability was the only gate before
-	// this setting existed, and an upgrade must not take the tooling away.
-	if !st.DevMode(ctx) {
-		t.Fatal("a fresh installation came up with developer mode off")
-	}
 	if code := call("GET", "/meerkat/apidocs/catalog.json", ""); code != http.StatusOK {
-		t.Fatalf("docs catalog with the switch on: %d, want 200", code)
+		t.Fatalf("docs catalog with the capability: %d, want 200", code)
 	}
 	if code := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane"}`); code != http.StatusOK {
-		t.Fatalf("UI test mode with the switch on: %d, want 200", code)
+		t.Fatalf("UI test mode with the capability: %d, want 200", code)
 	}
 
-	if err := st.SetDevMode(ctx, false); err != nil {
+	if _, err := st.ClearDevCapability(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	// Switched off, the same developer, with the same session and the same
-	// capability, meets a gateway that develops nowhere.
+	// Without the capability, the same developer, with the same session, meets
+	// a gateway that develops nowhere.
 	if code := call("GET", "/meerkat/apidocs/catalog.json", ""); code == http.StatusOK {
-		t.Fatal("the route API docs answered a developer with developer mode off")
+		t.Fatal("the route API docs answered a developer without the capability")
 	}
 	if code := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane"}`); code != http.StatusUnauthorized {
-		t.Fatalf("UI test mode with the switch off: %d, want 401", code)
+		t.Fatalf("UI test mode without the capability: %d, want 401", code)
 	}
 	// And the identity simulation the docs and the bar drive: refused at the
 	// source, so a bar left open in a tab cannot keep posing as someone else.
 	req := httptest.NewRequest("GET", "/open/x", nil)
 	req.AddCookie(devC)
 	if _, _, ok := rt.simulationActor(req); ok {
-		t.Fatal("a data-plane session could still simulate with developer mode off")
+		t.Fatal("a data-plane session could still simulate without the capability")
 	}
 
-	// And back: nothing is one-way, or an operator who closed a demo would
-	// have to remember which accounts to re-flag.
-	if err := st.SetDevMode(ctx, true); err != nil {
+	// And back, on the same session: the capability is read on each request.
+	u, err := st.GetUserByID(ctx, "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Dev = true
+	if err := st.UpdateUser(ctx, u); err != nil {
 		t.Fatal(err)
 	}
 	if code := call("GET", "/meerkat/apidocs/catalog.json", ""); code != http.StatusOK {
-		t.Fatalf("docs catalog after switching back on: %d, want 200", code)
+		t.Fatalf("docs catalog with the capability back: %d, want 200", code)
 	}
 }

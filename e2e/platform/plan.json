@@ -395,6 +395,20 @@
    "fr": "L'autorité locale peut être désactivée pendant qu'une autorité externe assure la connexion."
   },
   {
+   "id": "AUTH-25",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "An account created by invitation shows no password and mails a link to the vouched name, a refused invitation leaves no account, a reset by mail keeps the current password.",
+   "fr": "Un compte créé par invitation n'affiche aucun mot de passe et envoie un lien vers le nom garanti, une invitation refusée ne laisse aucun compte, une réinitialisation par mail garde le mot de passe actuel."
+  },
+  {
    "id": "MFA-01",
    "priority": "P1",
    "feasibility": "easy",
@@ -707,8 +721,8 @@
    "editions": [
     "EE"
    ],
-   "en": "Working hours refuse outside the window (clock injected); ignored on CE.",
-   "fr": "Les heures ouvrées refusent l'accès hors de la plage (horloge injectée) ; elles sont ignorées en CE."
+   "en": "Working hours refuse outside the window (clock injected), a session ends when its window closes, the most precise window set wins whole (member, group in exclusive mode, account, organisation, gateway), a closed group is greyed out on the group chooser, the chooser greys out a closed organisation, a member's dates hold when it inherits the hours; ignored on CE.",
+   "fr": "Les heures ouvrées refusent l'accès hors de la plage (horloge injectée), une session se termine à la fermeture de sa plage, la plage la plus précise l'emporte entière (membre, groupe en mode exclusif, compte, organisation, gateway), un groupe fermé est grisé au choix du groupe, l'écran de choix grise une organisation fermée, les dates d'un membre valent quand il hérite des heures ; elles sont ignorées en CE."
   },
   {
    "id": "TENANT-05",
@@ -823,8 +837,8 @@
     "CE",
     "EE"
    ],
-   "en": "Discovery lists containers / swarm services / k8s services with the rights the chart and compose files grant; published ports read on each.",
-   "fr": "La découverte liste les conteneurs, les services swarm et les services k8s avec les droits qu'accordent le chart et les fichiers compose ; les ports publiés sont lus sur chacun."
+   "en": "Discovery lists containers / swarm services / k8s services with the rights the chart and compose files grant; published ports read on each; on Kubernetes another namespace is listed when rbac.clusterServices grants it, and only the gateway's own when it does not.",
+   "fr": "La découverte liste les conteneurs, les services swarm et les services k8s avec les droits qu'accordent le chart et les fichiers compose ; les ports publiés sont lus sur chacun ; sur Kubernetes un autre namespace est listé quand rbac.clusterServices l'accorde, et seul celui de la gateway sinon."
   },
   {
    "id": "ROUTE-03",
@@ -2291,8 +2305,8 @@
     "CE",
     "EE"
    ],
-   "en": "Developer mode switch gates dev features.",
-   "fr": "L'interrupteur du mode développeur conditionne les fonctionnalités de développement."
+   "en": "The dev capability alone gates the developer features: root always has them, another account only with dev, and Remove developer mode takes it from every account but root.",
+   "fr": "La capacité dev conditionne seule les fonctionnalités de développement : root les a toujours, un autre compte seulement avec dev, et Remove developer mode la retire à tous les comptes sauf root."
   },
   {
    "id": "LIFE-04",

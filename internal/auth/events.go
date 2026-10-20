@@ -76,7 +76,7 @@ func (h *Handler) eventsEcho(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := h.st.GetUserByID(r.Context(), sess.UserID)
 	if err != nil || !h.st.DevAllowed(r.Context(), u) {
-		http.Error(w, "the channel echo requires the dev capability, on an installation where developer mode is on", http.StatusUnauthorized)
+		http.Error(w, "the channel echo requires the dev capability: ask an application administrator to grant it on Users", http.StatusUnauthorized)
 		return
 	}
 	var msg events.Message

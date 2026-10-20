@@ -215,11 +215,10 @@ func (s *Store) DevKeyOwners(ctx context.Context) ([]DevKeyOwner, error) {
 }
 
 // SettingPlug is the developer tunnel's own switch and the address developers
-// use to reach it (DEV-11). INFRASTRUCTURE, beside developer mode rather than
-// under it: developer mode is a CONFIGURATION - the installation offers its
-// developers the tooling, the API docs, the simulated sign-ins - while this
-// opens a port on the cluster and exercises the deployment's rights over it
-// (a Docker socket, a Kubernetes role). The tunnel runs only when both say so.
+// use to reach it (DEV-11). INFRASTRUCTURE: it opens a port on the cluster and
+// exercises the deployment's rights over it (a Docker socket, a Kubernetes
+// role). It decides alone whether the tunnel runs; who may use it is the dev
+// capability (DEV-01).
 const SettingPlug = "plug"
 
 // PlugSetting is that setting.
@@ -256,10 +255,10 @@ func SanitizePlug(p *PlugSetting) error {
 	return nil
 }
 
-// PlugOpen says whether the tunnel may run: developer mode on (which the
-// production environment closes) AND the tunnel's own switch.
+// PlugOpen says whether the tunnel may run: its own switch, on Infra, Plug.
+// Who may use it is DevAllowed's answer, per account.
 func (s *Store) PlugOpen(ctx context.Context) bool {
-	return s.DevMode(ctx) && s.Plug(ctx).Enabled
+	return s.Plug(ctx).Enabled
 }
 
 // PlugAllowed is DevAllowed for the tunnel: the account may use the

@@ -4,12 +4,15 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { filter, map } from 'rxjs';
 import { ApiService } from '../../api.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { TenantScope } from '../tenant-scope';
+import { IdentityDrawer } from '../identity-drawer';
+import { IdentityDrawerPanelComponent } from '../identity-drawer-panel.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
 
 // One tenant's administration - a routed LAYOUT: every section is a child
@@ -21,8 +24,13 @@ import { LiveChangesService } from '../../shared/live-changes.service';
 // (the API scopes every call).
 @Component({
   selector: 'app-tenant-page',
-  providers: [TenantScope],
+  // The identity drawer - a member, a group - is the page's, drawn over its
+  // whole height; the matrices in the routed sections only open it.
+  providers: [TenantScope, IdentityDrawer],
+  host: { '(document:keydown.escape)': 'drawer.escape()' },
   imports: [
+    MatSidenavModule,
+    IdentityDrawerPanelComponent,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -42,6 +50,7 @@ export class TenantPageComponent {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   protected readonly scope = inject(TenantScope);
+  protected readonly drawer = inject(IdentityDrawer);
 
   protected readonly loading = signal(true);
 
@@ -77,6 +86,7 @@ export class TenantPageComponent {
     });
     effect(() => {
       this.section();
+      this.drawer.close();
       this.scope.filter.set('');
       this.scope.tagFilter.set('');
     });

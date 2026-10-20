@@ -91,8 +91,32 @@ section.danger-zone {
   margin-top: auto;
   gap: 6px;
 }
+section .hint {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+}
 section.danger-zone .hint {
   margin: 0 0 8px;
   font-size: 0.8rem;
   color: var(--mat-sys-on-surface-variant);
+}
+/* A save refused, said under the form it came from (the member drawer). */
+section .error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--mat-sys-error);
+}
+/* A save refused, outside any section (the group drawer). */
+.body > .error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--mat-sys-error);
+}
+/* Text fields fill the drawer's width (the group drawer). */
+section.fields {
+  align-items: stretch;
+}
+section.fields mat-form-field {
+  width: 100%;
 }

@@ -55,9 +55,11 @@ func SanitizeBusinessAccess(b *BusinessAccess) {
 		b.Inherited = true
 	}
 	if b.Inherited {
-		// An inherited window carries nothing of its own: leftovers here would
-		// come back to life the day somebody unticks the box.
-		b.Timezone, b.Days, b.DateFrom, b.DateTo = "", nil, "", ""
+		// An inherited window carries no hours of its own: leftovers here would
+		// come back to life the day somebody unticks the box. The dates stay:
+		// on a membership they say when the person's access runs, whichever
+		// level the hours come from (ResolveBusinessAccess).
+		b.Timezone, b.Days = "", nil
 	}
 }
 
@@ -157,6 +159,10 @@ type Member struct {
 	Fullname         string `json:"fullname"`
 	Email            string `json:"email"`
 	LastConnectionAt int64  `json:"lastConnectionAt"`
+	// AccountHours is the account's own working-hours window (TENANT-04):
+	// what a member's inherited hours fall back on before its organisation's,
+	// shown to the organisation's administrators, who cannot open the account.
+	AccountHours BusinessAccess `json:"accountHours"`
 }
 
 // UserTenant is a membership joined with the tenant - what /api/me reports
@@ -349,7 +355,8 @@ func (s *Store) GetMembership(ctx context.Context, userID, tenantID string) (Mem
 func (s *Store) ListMembers(ctx context.Context, tenantID string) ([]Member, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT m.user_id, m.tenant_id, m.type, m.enabled, m.business_access, m.session_ttl,
-		        m.created_at, m.updated_at, u.username, u.fullname, u.email, u.last_connection_at
+		        m.created_at, m.updated_at, u.username, u.fullname, u.email, u.last_connection_at,
+		        u.business_access
 		 FROM memberships m
 		 JOIN users u ON u.id = m.user_id
 		 WHERE m.tenant_id = ?
@@ -362,14 +369,15 @@ func (s *Store) ListMembers(ctx context.Context, tenantID string) ([]Member, err
 	var members []Member
 	for rows.Next() {
 		var m Member
-		var ba string
+		var ba, own string
 		if err := rows.Scan(&m.UserID, &m.TenantID, &m.Type, &m.Enabled, &ba, &m.SessionTTL,
-			&m.CreatedAt, &m.UpdatedAt, &m.Username, &m.Fullname, &m.Email, &m.LastConnectionAt); err != nil {
+			&m.CreatedAt, &m.UpdatedAt, &m.Username, &m.Fullname, &m.Email, &m.LastConnectionAt, &own); err != nil {
 			return nil, fmt.Errorf("store: scan member: %w", err)
 		}
 		if err := json.Unmarshal([]byte(ba), &m.BusinessAccess); err != nil {
 			return nil, fmt.Errorf("store: member %s@%s: bad business access: %w", m.UserID, tenantID, err)
 		}
+		m.AccountHours = decodeBusinessAccess(own)
 		members = append(members, m)
 	}
 	if err := rows.Err(); err != nil {
@@ -450,21 +458,6 @@ const (
 	// table - this holds only the switches, so turning HTTPS off never risks
 	// touching a private key.
 	SettingTLS = "tls"
-	// SettingDevMode is the installation-wide developer switch (DEV-01): the
-	// master the per-account `dev` capability hangs from. Off, the developer
-	// surface of the SERVED applications is not there at all - no Developer
-	// entry in the user button, no UI test mode, no route API docs, no
-	// developer profile page - however many accounts carry the capability.
-	//
-	// Two levels rather than one because they answer two questions. The
-	// capability says WHO may develop against this gateway; this setting says
-	// whether this INSTALLATION is one you develop against. A production
-	// gateway turns it off once and stops caring which accounts kept the flag,
-	// and a demo stops showing an amber bar to whoever is watching.
-	//
-	// Ships ON: the capability was the whole gate until now, and an upgrade
-	// must not take a developer's tools away without anyone asking for it.
-	SettingDevMode = "dev_mode"
 	// SettingIssuesEnabled turns on the embedded issue tracker (ISSUE-04):
 	// the user-button of proxied apps gains a "Report an issue" panel and the
 	// data plane accepts reports. Ships OFF; the switch lives on the Issues
@@ -593,10 +586,6 @@ func (s *Store) seedDefaultSettings() error {
 		SettingPortal: string(portal),
 		// Single until someone says otherwise at startup, with a license.
 		SettingTenancy: `"` + TenancySingle + `"`,
-		// On, because the dev CAPABILITY was the only gate until this setting
-		// existed: an installation that upgrades must not silently lose the
-		// developer tooling its people already had.
-		SettingDevMode: `true`,
 	}
 	for key, value := range defaults {
 		if _, err := s.db.Exec(

@@ -3,9 +3,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { ApiService, Tenant } from '../../api.service';
 import { MeService } from '../../me.service';
 import { GroupsMatrixComponent } from '../groups-matrix/groups-matrix.component';
+import { IdentityDrawer } from '../identity-drawer';
+import { IdentityDrawerPanelComponent } from '../identity-drawer-panel.component';
 
 // Groups, seen from Application rather than from an organisation.
 //
@@ -20,7 +23,12 @@ import { GroupsMatrixComponent } from '../groups-matrix/groups-matrix.component'
 // organisation's name or its hours.
 @Component({
   selector: 'app-app-groups',
+  // The identity drawer - a group - is the page's, drawn over its whole height.
+  providers: [IdentityDrawer],
+  host: { '(document:keydown.escape)': 'drawer.escape()' },
   imports: [
+    MatSidenavModule,
+    IdentityDrawerPanelComponent,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -28,61 +36,71 @@ import { GroupsMatrixComponent } from '../groups-matrix/groups-matrix.component'
     GroupsMatrixComponent,
   ],
   template: `
-    <div class="banner">
-      <h1 i18n="@@Groups">Groups</h1>
-    </div>
+    <mat-drawer-container (backdropClick)="drawer.back()">
+      <mat-drawer-content>
+        <div class="banner">
+          <h1 i18n="@@Groups">Groups</h1>
+        </div>
 
-    <div class="toolbar">
-      <!-- The two modes carry their own explanation, in the list where one
-           chooses between them - the same shape as the status-code picker. As
-           a hint it was three lines under a 56px field, and the toolbar read
-           as two rows for one filter bar. -->
-      <mat-form-field class="mode" subscriptSizing="dynamic">
-        <mat-label i18n="@@Group_mode">Group mode</mat-label>
-        <mat-select [value]="groupMode()" (selectionChange)="setGroupMode($event.value)">
-          <!-- Without it the closed field would read the option's WHOLE text,
-               explanation included: mat-select takes the option's text content
-               as its display value. -->
-          <mat-select-trigger>{{ modeLabel() }}</mat-select-trigger>
-          <mat-option value="MULTIPLE">
-            <span i18n="@@Cumulative">Cumulative</span>
-            <small class="what" i18n="@@Cumulative_what">merges the roles of every group</small>
-          </mat-option>
-          <mat-option value="SINGLE">
-            <span i18n="@@Exclusive">Exclusive</span>
-            <small class="what" i18n="@@Exclusive_what">one group is picked at sign-in</small>
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
+        <div class="toolbar">
+          <!-- The two modes carry their own explanation, in the list where one
+               chooses between them - the same shape as the status-code picker. As
+               a hint it was three lines under a 56px field, and the toolbar read
+               as two rows for one filter bar. -->
+          <mat-form-field class="mode" subscriptSizing="dynamic">
+            <mat-label i18n="@@Group_mode">Group mode</mat-label>
+            <mat-select [value]="groupMode()" (selectionChange)="setGroupMode($event.value)">
+              <!-- Without it the closed field would read the option's WHOLE text,
+                   explanation included: mat-select takes the option's text content
+                   as its display value. -->
+              <mat-select-trigger>{{ modeLabel() }}</mat-select-trigger>
+              <mat-option value="MULTIPLE">
+                <span i18n="@@Cumulative">Cumulative</span>
+                <small class="what" i18n="@@Cumulative_what">merges the roles of every group</small>
+              </mat-option>
+              <mat-option value="SINGLE">
+                <span i18n="@@Exclusive">Exclusive</span>
+                <small class="what" i18n="@@Exclusive_what">one group is picked at sign-in</small>
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
 
-      @if (tags().length) {
-        <mat-form-field class="tag-pick" subscriptSizing="dynamic">
-          <mat-label i18n="@@Tag">Tag</mat-label>
-          <mat-select [value]="tagFilter()" (selectionChange)="tagFilter.set($event.value)">
-            <mat-option value="" i18n="@@All">All</mat-option>
-            @for (t of tags(); track t) {
-              <mat-option [value]="t">{{ t }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-      }
+          @if (tags().length) {
+            <mat-form-field class="tag-pick" subscriptSizing="dynamic">
+              <mat-label i18n="@@Tag">Tag</mat-label>
+              <mat-select [value]="tagFilter()" (selectionChange)="tagFilter.set($event.value)">
+                <mat-option value="" i18n="@@All">All</mat-option>
+                @for (t of tags(); track t) {
+                  <mat-option [value]="t">{{ t }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
 
-      <mat-form-field class="search" subscriptSizing="dynamic">
-        <mat-label i18n="@@Search">Search</mat-label>
-        <input matInput [value]="filter()" (input)="filter.set($any($event.target).value)" />
-      </mat-form-field>
-    </div>
+          <mat-form-field class="search" subscriptSizing="dynamic">
+            <mat-label i18n="@@Search">Search</mat-label>
+            <input matInput [value]="filter()" (input)="filter.set($any($event.target).value)" />
+          </mat-form-field>
+        </div>
 
-    @if (tenantId(); as id) {
-      <div class="panel">
-        <app-groups-matrix
-          [tenantId]="id"
-          [filter]="filter()"
-          [tagFilter]="tagFilter()"
-          (availableTags)="tags.set($event)"
-        />
-      </div>
-    }
+        @if (tenantId(); as id) {
+          <div class="panel">
+            <app-groups-matrix
+              [tenantId]="id"
+              [filter]="filter()"
+              [tagFilter]="tagFilter()"
+              (availableTags)="tags.set($event)"
+            />
+          </div>
+        }
+      </mat-drawer-content>
+
+      <mat-drawer position="end" mode="over" [opened]="drawer.opened()" disableClose>
+        @if (tenantId(); as id) {
+          <app-identity-drawer-panel [tenantId]="id" />
+        }
+      </mat-drawer>
+    </mat-drawer-container>
   `,
   styles: [
     `
@@ -91,6 +109,22 @@ import { GroupsMatrixComponent } from '../groups-matrix/groups-matrix.component'
         flex-direction: column;
         height: 100%;
         min-height: 0;
+      }
+      mat-drawer-container {
+        flex: 1 1 auto;
+        min-height: 0;
+        background: transparent;
+      }
+      mat-drawer-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+      }
+      mat-drawer {
+        width: min(560px, 96vw);
+        border-left: 1px solid var(--mat-sys-outline-variant);
+        background: var(--mat-sys-surface-container-high);
       }
       .banner {
         display: flex;
@@ -149,6 +183,7 @@ import { GroupsMatrixComponent } from '../groups-matrix/groups-matrix.component'
   ],
 })
 export class AppGroupsComponent {
+  protected readonly drawer = inject(IdentityDrawer);
   private readonly api = inject(ApiService);
   private readonly me = inject(MeService);
 

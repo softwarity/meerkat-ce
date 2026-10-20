@@ -85,18 +85,37 @@ horaire nommé.
 > [!NOTE] **Édition Enterprise.**
 > Les heures ouvrées font partie de l'édition Enterprise.
 
-La fenêtre se résout à partir du niveau le plus précis qui en définit une :
-l'appartenance, puis l'organisation, puis l'installation. Quand c'est la
-fenêtre de l'organisation qui s'applique, les dates de début et de fin de
-l'appartenance s'y superposent malgré tout. La valeur par défaut ouvre tous les
-jours, 24 heures sur 24.
+Les heures qui s'appliquent viennent du niveau le plus précis qui en définit,
+et s'appliquent **entières** : l'appartenance, puis le groupe, puis le compte,
+puis l'organisation, puis l'installation. Les heures d'un groupe ne comptent que
+dans une organisation en mode de groupe **exclusif**, où un seul groupe est
+choisi par session (équipe de jour, équipe de nuit) ; en mode cumulatif une
+personne a plusieurs groupes à la fois, et un groupe n'y a donc pas d'heures
+propres. Des heures posées à un niveau sont une autre
+règle pour les personnes qu'il couvre, pas une règle plus étroite : un membre à
+qui l'on donne ses soirées entre à 20:00 même si l'organisation ferme à 18:00.
+Les dates de début et de fin de l'appartenance s'appliquent quel que soit le
+niveau d'où viennent les heures. La valeur par défaut ouvre tous les jours,
+24 heures sur 24.
 
-> [!WARNING]
-> La fenêtre est vérifiée **à la connexion et au changement d'organisation, et
-> nulle part ailleurs**. Une session déjà ouverte n'est pas coupée quand la
-> fenêtre se ferme, et rien n'est revérifié en cours de session. FEATURES.md
-> donne ce contrôle, ainsi que la modification par membre dans la console,
-> comme la moitié manquante.
+Les heures du compte sont posées par l'administrateur de l'application, sur le
+compte ; celles de l'appartenance par l'administrateur de l'organisation, dans
+le tiroir du membre. Sans organisation, ce sont celles du compte, sinon celles
+de l'installation. Root n'est jamais soumis à des heures : la personne qui répare
+la gateway n'en est jamais exclue.
+
+Avec plusieurs organisations, l'écran de choix montre grisées celles dont les
+heures sont fermées pour cette personne, avec la mention *Hors horaires
+d'accès* ; une connexion alors qu'elles sont toutes fermées est refusée. Le choix
+du groupe fait de même avec les groupes fermés, et la session est alors bornée
+par les heures du groupe choisi.
+
+Les heures sont vérifiées à la connexion et à l'entrée ou au changement
+d'organisation, et la session **se termine à leur fermeture** : ouverte à 17:55
+dans une plage qui ferme à 18:00, elle prend fin à 18:01, la minute 18:00
+faisant partie de la plage, quelle que soit sa durée de vie. La page revient à
+la connexion, qui dit alors que les heures sont fermées. Des heures modifiées en
+cours de journée s'appliquent à la connexion suivante.
 
 Un refus pour cause d'horaires le dit clairement : il ne ressemble jamais à un
 mot de passe erroné.
@@ -106,7 +125,7 @@ mot de passe erroné.
 | Réglage | Niveaux, du plus précis au plus général | Où il se modifie |
 |---|---|---|
 | Durée de vie de la session | appartenance, organisation, installation | l'installation dans la console ; les deux autres par l'API d'administration |
-| Heures ouvrées | appartenance, organisation, installation | l'organisation dans la console |
+| Heures ouvrées | appartenance, groupe (mode exclusif), compte, organisation, installation | toutes dans la console : le tiroir du membre, le tiroir du groupe, le tiroir du compte (Security), l'organisation, Application, General |
 | Mode de groupe | organisation uniquement | l'écran de l'organisation |
 | Second facteur | **compte, puis installation** | les deux dans la console |
 

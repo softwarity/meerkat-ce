@@ -114,9 +114,15 @@ mat-cell.mat-column-role {
 .grp-head {
   gap: 2px;
 }
+/* The name is the way into the group's drawer: an M3 tonal button, its
+   label cut short rather than the column widened. */
 .grp-head .col-name {
-  font-weight: 500;
-  max-width: 96px;
+  max-width: 112px;
+  min-width: 0;
+  padding: 0 12px;
+}
+.grp-head .col-name .name {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

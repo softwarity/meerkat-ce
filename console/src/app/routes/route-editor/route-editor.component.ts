@@ -10,6 +10,7 @@ import {
   linkedSignal,
   output,
   signal,
+  untracked,
   viewChild,
 } from "@angular/core";
 import { humanIso, withCurrent } from "../../shared/iso-duration";
@@ -99,7 +100,15 @@ import {
   cleanSpecs,
   humanize,
 } from "../predicates/args";
-import { internalUpstream, missingArgs, upstreamProblem } from "./gaps";
+import {
+  EXTERNAL,
+  internalUpstream,
+  missingArgs,
+  namespaceOf,
+  serviceRef,
+  svcSpelled,
+  upstreamProblem,
+} from "./gaps";
 import { PredicatesComponent } from "../predicates/predicates.component";
 import { InjectionsComponent } from "../custom-code/injections.component";
 import { COMMON_LOCALES } from "../../shared/common-locales";
@@ -873,6 +882,29 @@ export class RouteEditorComponent {
   private hostDeclined = false; // it was removed by hand: do not put it back
 
   constructor() {
+    // The Namespace choice says where the route goes: read from its upstream
+    // each time the editor opens on a route, once the own namespace is known.
+    // External for a public site - plug.softwarity.dev lives in no namespace,
+    // and showing the gateway's own above it would say it did.
+    effect(() => {
+      const upstream = this.route()?.upstream ?? "";
+      const own = this.ownNamespace();
+      if (!own) return;
+      untracked(() => {
+        if (this.namespaces().length < 2) return;
+        const ns = namespaceOf(upstream, own, this.namespaces());
+        // Only name.ns.svc is a service for certain. A bare or two-label name
+        // stays on a namespace if that namespace lists it, and reads as
+        // External otherwise: a route to softwarity.dev must not open on a
+        // namespace called dev and refuse to save.
+        const verify = ns !== EXTERNAL && !svcSpelled(upstream) ? upstream : "";
+        if (ns === this.namespace() && this.loadedNamespace() === ns) {
+          if (verify && !this.matchChoice(verify)) this.loadServices(EXTERNAL);
+          return;
+        }
+        this.loadServices(ns === own ? "" : ns, verify);
+      });
+    });
     effect(() => {
       if (this.route() !== null) return;
       const d = this.draft();
@@ -903,16 +935,7 @@ export class RouteEditorComponent {
       next: (s) => this.telemetryOn.set(s.enabled && s.traces),
       error: () => {},
     });
-    // What the runtime can route to. Silent on failure: an installation with
-    // no runtime to ask still types an upstream by hand, and a red box in
-    // front of a working field would be the wrong trade.
-    this.api.services().subscribe({
-      next: (d) => {
-        this.discovered.set(d.services ?? []);
-        this.reach.set(d.reach ?? []);
-      },
-      error: () => {},
-    });
+    this.loadServices();
     // What the installation waits, for the "inherited" entries. Read once and
     // failing silently: a label is not worth an error box in front of a route.
     this.api.proxyLimits().subscribe({
@@ -1287,7 +1310,7 @@ export class RouteEditorComponent {
     });
     validate(p.upstream, ({ value }) => {
       if (this.mode() !== "proxy") return [];
-      const problem = upstreamProblem(value());
+      const problem = upstreamProblem(value()) || this.outOfNamespace(value());
       return problem ? [gapError("target", problem)] : [];
     });
     validate(p.predicates, ({ value }) => {
@@ -1748,6 +1771,125 @@ export class RouteEditorComponent {
   // it once would mean guessing which - the guess being exactly the mistake
   // this list exists to remove.
   private readonly discovered = signal<DiscoveredService[]>([]);
+  // The Kubernetes namespace the offered services come from, and those this
+  // gateway may read (SVC-02). No choice is shown when there is only its own:
+  // the deployment narrowed the grant, and that is its decision to make.
+  protected readonly namespace = signal('');
+  protected readonly namespaces = signal<string[]>([]);
+  // This gateway's own namespace, "" outside Kubernetes; and the namespace
+  // whose services are in `discovered`, "" until a list has arrived.
+  private readonly ownNamespace = signal('');
+  private readonly loadedNamespace = signal('');
+  protected readonly EXTERNAL = EXTERNAL;
+  // The namespaces offered, with the one an existing route points into even
+  // when it holds no Service any more: the select shows where the route goes,
+  // and the field says that service is gone.
+  protected readonly namespaceChoices = computed(() => {
+    const list = this.namespaces();
+    const cur = this.namespace();
+    return cur && cur !== EXTERNAL && !list.includes(cur) ? [...list, cur].sort() : list;
+  });
+  // Whether the upstream must be one of the listed services: a namespace is
+  // chosen, so the route points at a service of it, and the list is the
+  // truth about what exists there. External is the free entry - a public
+  // site, a machine, a StatefulSet's pod. Without the choice (no right beyond
+  // the own namespace, or Docker) the field stays free, as it always was.
+  protected readonly listOnly = computed(
+    () => this.namespaces().length > 1 && this.namespace() !== EXTERNAL,
+  );
+
+  // What the runtime can route to. Silent on failure: an installation with
+  // no runtime to ask still types an upstream by hand, and a red box in
+  // front of a working field would be the wrong trade.
+  protected loadServices(namespace = '', verify = ''): void {
+    if (namespace === EXTERNAL) {
+      this.namespace.set(EXTERNAL);
+      this.discovered.set([]);
+      this.loadedNamespace.set("");
+      return;
+    }
+    this.api.services(namespace).subscribe({
+      next: (d) => {
+        this.discovered.set(d.services ?? []);
+        this.reach.set(d.reach ?? []);
+        this.namespaces.set(d.namespaces ?? []);
+        this.namespace.set(d.namespace ?? '');
+        this.loadedNamespace.set(d.namespace ?? '');
+        if (!namespace) this.ownNamespace.set(d.namespace ?? '');
+        if (verify && !this.matchChoice(verify)) this.loadServices(EXTERNAL);
+      },
+      error: () => {},
+    });
+  }
+
+  // Why the upstream is not a service of the chosen namespace, "" when it is
+  // or when nothing is checked. Only once that namespace's list has arrived:
+  // a list still on its way is not an absent service.
+  private outOfNamespace(raw: string): string {
+    const ns = this.namespace();
+    if (!this.listOnly() || this.loadedNamespace() !== ns) return "";
+    return this.matchChoice(raw)
+      ? ""
+      : $localize`:@@Gap_upstream_not_in_namespace:the upstream is no service of namespace ${ns}:NS:: pick one from the list, or choose External`;
+  }
+
+  // The offered choice (service:port) an upstream names, null when none.
+  // Compared as qualified names, the one form every spelling reduces to: a
+  // bare name in the own namespace, name.ns, name.ns.svc.cluster.local - and
+  // the own list also carries the watched namespaces' services, under their
+  // qualified name already.
+  private matchChoice(raw: string): string | null {
+    const ns = this.namespace();
+    const ref = serviceRef(raw, this.ownNamespace(), this.namespaces());
+    if (!ref) return null;
+    const want = `${ref.service}.${ref.namespace}.svc`;
+    const qualified = (n: string) => (n.includes(".") ? n : `${n}.${ns}.svc`);
+    const s = this.discovered().find(
+      (s) =>
+        [s.name, ...(s.names ?? [])].some((n) => qualified(n) === want) &&
+        (s.ports ?? []).some((p) => p.target === ref.port),
+    );
+    return s ? `${s.names?.[0] || s.name}:${ref.port}` : null;
+  }
+
+  // The upstream as the service picker edits it: a scheme, a service picked
+  // from the list, and a base path typed beside it (GeoServer answers under
+  // /geoserver). The host is never typed: a namespace chosen, the list is
+  // the truth about what exists there. An upstream spelled long
+  // (name.ns.svc.cluster.local) keeps its spelling until another service is
+  // picked: opening a route rewrites nothing.
+  private readonly upstreamSplit = computed(() => {
+    const m = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/([^/?#]*)(.*)$/.exec(
+      this.draft().upstream ?? "",
+    );
+    return m
+      ? { proto: m[1].toLowerCase(), host: m[2], path: m[3] }
+      : { proto: "", host: "", path: "" };
+  });
+  // The scheme chosen before any service is: kept until one is picked.
+  private readonly wantedScheme = signal("http");
+  protected readonly upstreamScheme = computed(
+    () => this.upstreamSplit().proto || this.wantedScheme(),
+  );
+  protected readonly upstreamPath = computed(() => this.upstreamSplit().path);
+  protected readonly pickedService = computed(
+    () => this.matchChoice(this.draft().upstream) ?? "",
+  );
+  protected pickService(host: string): void {
+    this.patch("upstream", `${this.upstreamScheme()}://${host}${this.upstreamPath()}`);
+  }
+  protected setUpstreamScheme(proto: string): void {
+    const { host, path } = this.upstreamSplit();
+    if (host) this.patch("upstream", `${proto}://${host}${path}`);
+    else this.wantedScheme.set(proto);
+  }
+  protected setUpstreamPath(raw: string): void {
+    const { host } = this.upstreamSplit();
+    if (!host) return;
+    let path = raw.trim();
+    if (path && !path.startsWith("/")) path = "/" + path;
+    this.patch("upstream", `${this.upstreamScheme()}://${host}${path}`);
+  }
   // Said under the field, because a list that only appears on focus needs to
   // announce itself once. Short and right-aligned, so it clears the floating
   // label of the row underneath. Empty when there is no runtime to ask: the
@@ -1784,7 +1926,9 @@ export class RouteEditorComponent {
         // service somebody stopped, and hiding it would make a deliberate
         // decision look like a missing answer. Pointing a route at one is a
         // choice; pointing at one by accident is not.
-        const state = `${s.ready}/${s.wanted}`;
+        // Only when it was COUNTED: a service of another namespace, whose
+        // pods this gateway may not read, is no "0/0" - it is unknown.
+        const state = s.counted ? `${s.ready}/${s.wanted}` : "";
         // Out of reach: the network is named, because that is the answer to
         // "why can I not use this one" - and the answer is never the stack.
         const out = s.reachable === false;

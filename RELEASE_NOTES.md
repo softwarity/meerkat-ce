@@ -34,6 +34,55 @@
 - **An agent creates a git location.** `save_git_location` creates one, or changes the one of
   that name (only the fields given), with the console's rules: https, a branch, and the token as
   a vault reference, never the token itself.
+- **The dev capability decides alone; developer mode is gone.** The installation-wide switch on
+  Application, General said a second time what the `dev` flag of each account already says. Root
+  now always has the developer tooling; any other account when it carries `dev`. To close the
+  developer surface of a production gateway, **Remove developer mode** on the Users screen takes
+  the flag from every account but root's. **If you had turned developer mode off**, the accounts
+  that still carry `dev` get their tools back with this version: use that button once. A saved
+  configuration that still holds `dev_mode` imports as before, the key is ignored.
+- **A session ends when its working hours close** (Enterprise). They were checked at sign-in and
+  never again: a session opened at 17:55 in a window closing at 18:00 lasted its whole lifetime.
+  It now ends with the window, the page going back to sign-in, which says the hours are closed.
+- **Working hours for an account, and for a member from the console** (Enterprise). The most
+  precise hours set win whole: the member's, then the group's, then the account's, then the
+  organisation's, then the gateway's. An account's own are set in its drawer (Security); a
+  member's own hours and access dates in **the member's drawer**, opened by the clock on its row
+  in the members table. A member's dates now hold when it inherits the hours as well.
+- **The gateway's working hours hold for an account with no organisation** (Enterprise). They
+  were never checked for it at sign-in.
+- **The organisation chooser greys out a closed organisation** (Enterprise), marked *Outside
+  working hours*, instead of refusing it after the click; a sign-in with every organisation closed
+  is refused.
+- **Working hours for a group, in exclusive group mode** (Enterprise). Where one group is chosen per
+  session, a group can have hours of its own - a day shift, a night shift - between the member's
+  and the account's. The group chooser greys out a closed group, and the session ends with the
+  chosen group's hours. In cumulative mode a group has no hours of its own.
+- **A group and a member are edited in a drawer.** On the Groups screen, a group's name, now a
+  tonal button, opens its drawer (name, description, working hours, and its deletion in a danger
+  zone, after a confirmation); groups are created and edited there only, the Members screen no
+  longer has a group menu nor a + button; the clock and history buttons on a member's row open the
+  member's drawer, each on its own page. Both cover the page's whole height.
+- **The route editor offers the services of the other Kubernetes namespaces.** A Namespace choice
+  above the upstream offers the namespaces that hold a Service, and External. A namespace chosen,
+  the upstream is picked from its services, with only the base path typed beside it; External is
+  the free entry, for a public site or a machine. An existing route opens on the namespace its upstream points into. The
+  chart grants it by default (`rbac.clusterServices`: a ClusterRole that reads services, nothing
+  else); set it false and the gateway keeps to its own namespace, with no choice shown. The `list_services` agent tool takes the namespace too.
+- **The License screen's legend sits on the title's line**, aligned right.
+- **The developer tunnel is marked built on the License screen**: laptop to cluster, cluster to
+  laptop, the substitution's lifecycle, several substitutions at once, its security and its audit.
+  What they were said to lack was either already there (a substitution ends with its plug session),
+  the rule itself (one developer per service name; the laptop's calls go straight to the services;
+  a name nobody serves yet is taken as it is, to start new services), or no business of a
+  development tool (rights per service, an event for what a plugged process reads of its
+  workload's environment).
+- **Invite a new account by mail, or reset a password by mail.** Creating an account asks how its
+  owner gets in: a temporary password shown once, or an invitation mailed to the account, a link
+  valid 48 hours to choose a password. A password reset, on the account or on a member, asks the
+  same. Offered when a mail relay is configured, local passwords are allowed and the application
+  has a public name the gateway vouches for. Two new mails, in the 20 languages, are in the mail
+  relay's sample list.
 ---
 
 ## 1.13.0

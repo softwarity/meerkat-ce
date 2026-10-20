@@ -40,6 +40,39 @@
 
       <mat-divider />
 
+      <!-- The account's own working hours (TENANT-04): set, they replace the
+           gateway's and its organisations' for this person; a member's own
+           hours in an organisation replace them there. Root is held to none:
+           the person who repairs the gateway is never locked out of it. -->
+      @if (!user().root) {
+        <section>
+          <h3>
+            <ng-container i18n="@@Working_hours">Working hours</ng-container>
+            <app-ee-lock
+              feature="business-hours"
+              i18n-why="@@Working_hours_ee_why"
+              why="Refuse access outside declared hours, gateway-wide or per person: an audit requirement rather than a defence."
+            />
+          </h3>
+          <p class="hint" i18n="@@User_hours_hint">
+            Set here, they replace the gateway's and the organisation's hours for this person, unless a
+            membership sets its own.
+          </p>
+          <app-business-access-form
+            ee-feature="business-hours"
+            [value]="hours()"
+            i18n-inheritText="@@No_hours_of_its_own"
+            inheritText="No hours of its own"
+            (valueChange)="hours.set($event)"
+          />
+          <div class="actions">
+            <button matButton="filled" [disabled]="!hoursDirty()" (click)="saveHours()" i18n="@@Save">Save</button>
+          </div>
+        </section>
+
+        <mat-divider />
+      }
+
       <section>
         <h3 i18n="@@Password">Password</h3>
         <div class="actions">

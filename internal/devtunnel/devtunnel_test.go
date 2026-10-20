@@ -104,9 +104,6 @@ func TestAnEmptyAddressTurnsTheTunnelOff(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	if !st.DevMode(context.Background()) {
-		t.Fatal("developer mode is expected on by default, which is what makes this case worth guarding")
-	}
 	// Returns at once rather than looping: the address is a startup decision,
 	// so there is nothing to wait for. A timeout here would mean it started
 	// supervising something that can never run.

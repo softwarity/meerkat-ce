@@ -649,6 +649,10 @@ const flowTop = `<!doctype html>
       background: color-mix(in srgb, var(--mk-on-secondary-container) 8%, var(--mk-secondary-container));
     }
     button.choice .choice-type, a.choice .choice-type { color: inherit; opacity: .75; }
+    /* An organisation whose hours are closed for this person: shown, not
+       offered (TENANT-04). */
+    button.choice:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    button.choice:disabled:hover { border-color: transparent; background: var(--mk-secondary-container); }
     a.choice { justify-content: center; text-decoration: none; border-radius: 10px; }
     /* Two authorities in a row are two buttons: on a filled ground, with no
        outline left to tell them apart, they need the gap the grid of a card
@@ -1193,8 +1197,9 @@ const selectTenantBody = `    <form method="post" action="select-tenant">
            administration lives on the admin port, which shows what you
            administer. */}}
       {{range .Tenants}}
-      <button class="choice" type="submit" name="tenant" value="{{.TenantID}}">
+      <button class="choice" type="submit" name="tenant" value="{{.TenantID}}"{{if .Closed}} disabled{{end}}>
         <span class="choice-name">{{.TenantName}}</span>
+        {{if .Closed}}<span class="choice-type">{{$.T.outsideHours}}</span>{{end}}
       </button>
       {{end}}
     </form>
@@ -2553,7 +2558,7 @@ func (h *Handler) continueAfterCredential(w http.ResponseWriter, r *http.Request
 // 0/1/N (TENANT-03). method names how the user authenticated (history).
 func (h *Handler) resolveTenantAndGo(w http.ResponseWriter, r *http.Request, user store.User, dest, next, method string) {
 	if h.adminPlane {
-		h.issueAndGo(w, r, user, "", dest, dest, method)
+		h.issueAndGo(w, r, user, "", dest, dest, method, 0)
 		return
 	}
 
@@ -2571,26 +2576,41 @@ func (h *Handler) resolveTenantAndGo(w http.ResponseWriter, r *http.Request, use
 		if waitingRoom(user, 0) && dest == "/" {
 			dest = "/account-pending"
 		}
-		h.issueAndGo(w, r, user, "", dest, dest, method)
+		inHours, until := h.hours(r.Context(), user.ID, "")
+		if !inHours {
+			h.securityIn(r, secSigninRefused, user, "", refusedHours)
+			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
+			return
+		}
+		h.issueAndGo(w, r, user, "", dest, dest, method, until)
 	case 1:
 		tid := memberships[0].TenantID
-		if !h.withinHours(r.Context(), user.ID, tid) {
+		inHours, until := h.hours(r.Context(), user.ID, tid)
+		if !inHours {
 			// A closed window is refused EXPLICITLY (TENANT-04) - unlike bad
 			// credentials, there is nothing to enumerate here.
 			h.securityIn(r, secSigninRefused, user, tid, refusedHours)
 			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
 			return
 		}
-		h.issueAndGo(w, r, user, tid, dest, dest, method)
+		h.issueAndGo(w, r, user, tid, dest, dest, method, until)
 	default:
-		h.issueAndGo(w, r, user, "", dest, "/select-tenant", method)
+		// Which hours hold depends on the organisation chosen - a member may
+		// have hours of its own - so the sign-in is refused only when every
+		// one of them is closed; the chooser shows the closed ones.
+		if _, anyOpen := h.tenantChoices(r.Context(), user.ID, memberships); !anyOpen {
+			h.securityIn(r, secSigninRefused, user, "", refusedHours)
+			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
+			return
+		}
+		h.issueAndGo(w, r, user, "", dest, "/select-tenant", method, 0)
 	}
 }
 
 // issueAndGo resolves the applicable TTL (membership -> tenant -> global,
 // TENANT-05), issues the session carrying the post-login destination `next`, and
 // redirects to `dest` (usually `next`, or the select-tenant step).
-func (h *Handler) issueAndGo(w http.ResponseWriter, r *http.Request, user store.User, tenantID, next, dest, method string) {
+func (h *Handler) issueAndGo(w http.ResponseWriter, r *http.Request, user store.User, tenantID, next, dest, method string, hoursUntil int64) {
 	ttl := 30 * time.Minute
 	if iso, err := h.st.ResolveSessionTTL(r.Context(), user.ID, tenantID); err == nil {
 		if d, err := store.ParseISODuration(iso); err == nil {
@@ -2606,7 +2626,7 @@ func (h *Handler) issueAndGo(w http.ResponseWriter, r *http.Request, user store.
 	if groupChoice {
 		dest = "/select-group"
 	}
-	if _, err := h.sm.IssueWith(r.Context(), w, r, user.ID, tenantID, groupID, ttl, "", next, method); err != nil {
+	if _, err := h.sm.IssueWithin(r.Context(), w, r, user.ID, tenantID, groupID, ttl, "", next, method, hoursUntil); err != nil {
 		slog.Error("session issue failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -2727,9 +2747,17 @@ func (h *Handler) continueAfterStep(w http.ResponseWriter, r *http.Request, user
 				next = "/account-pending"
 			}
 		}
+		inHours, until := h.hours(r.Context(), userID, "")
+		if !inHours {
+			h.securityOfIn(r, secSigninRefused, userID, "", refusedHours)
+			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
+			return
+		}
+		h.boundSession(w, r, until)
 		http.Redirect(w, r, next, http.StatusSeeOther)
 	case 1:
-		if !h.withinHours(r.Context(), userID, memberships[0].TenantID) {
+		inHours, until := h.hours(r.Context(), userID, memberships[0].TenantID)
+		if !inHours {
 			h.securityOfIn(r, secSigninRefused, userID, memberships[0].TenantID, refusedHours)
 			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
 			return
@@ -2738,11 +2766,17 @@ func (h *Handler) continueAfterStep(w http.ResponseWriter, r *http.Request, user
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		h.boundSession(w, r, until)
 		if h.applyGroupStep(r, userID, memberships[0].TenantID) {
 			next = "/select-group"
 		}
 		http.Redirect(w, r, next, http.StatusSeeOther)
 	default:
+		if _, anyOpen := h.tenantChoices(r.Context(), userID, memberships); !anyOpen {
+			h.securityOfIn(r, secSigninRefused, userID, "", refusedHours)
+			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
+			return
+		}
 		http.Redirect(w, r, "/select-tenant", http.StatusSeeOther)
 	}
 }
@@ -3552,31 +3586,88 @@ func (h *Handler) activeMemberships(ctx context.Context, userID string) ([]store
 	return active, nil
 }
 
-// withinHours evaluates the resolved working-hours window (TENANT-04). A
-// broken configuration (bad timezone) fails OPEN with a warning - a config
-// mistake must not lock every user out.
-func (h *Handler) withinHours(ctx context.Context, userID, tenantID string) bool {
+// hours answers for userID ENTERING tenantID (TENANT-04). In exclusive mode
+// the group decides: a lone group is stamped right after, so its hours are
+// the ones; with several, the person is let in when one of them is open, and
+// the hours of the group they then choose bound the session (doSelectGroup).
+func (h *Handler) hours(ctx context.Context, userID, tenantID string) (bool, int64) {
+	gid, choice := h.groupForTenant(ctx, userID, tenantID)
+	if !choice {
+		return h.windowHours(ctx, userID, tenantID, gid)
+	}
+	groups, err := h.st.MemberGroups(ctx, tenantID, userID)
+	if err != nil {
+		return h.windowHours(ctx, userID, tenantID, "")
+	}
+	for _, g := range groups {
+		if open, _ := h.windowHours(ctx, userID, tenantID, g.ID); open {
+			return true, 0
+		}
+	}
+	return false, 0
+}
+
+// windowHours evaluates the working-hours window that holds userID within
+// tenantID and groupID (TENANT-04): the most precise one set, membership,
+// group, account, organisation, gateway. It answers whether it is open and,
+// when it is, until when - unix seconds, 0 when it never closes - which is
+// where the session is made to end. A broken configuration (bad timezone)
+// fails OPEN with a warning: a config mistake must not lock every user out.
+func (h *Handler) windowHours(ctx context.Context, userID, tenantID, groupID string) (bool, int64) {
 	// Enterprise (TENANT-04): the community image keeps the windows a
 	// configuration brought over and enforces none of them.
 	if !edition.Enterprise {
-		return true
+		return true, 0
 	}
-	ba, err := h.st.ResolveBusinessAccess(ctx, userID, tenantID)
+	ba, err := h.st.ResolveBusinessAccess(ctx, userID, tenantID, groupID)
 	if err != nil {
 		slog.Warn("business access resolution failed, allowing", "err", err)
-		return true
+		return true, 0
 	}
-	ok, err := store.WithinBusinessAccess(ba, time.Now())
+	open, until, err := store.OpenBusinessAccess(ba, time.Now())
 	if err != nil {
 		slog.Warn("business access misconfigured, allowing", "err", err)
-		return true
+		return true, 0
 	}
-	return ok
+	if !open {
+		return false, 0
+	}
+	if until.IsZero() {
+		return true, 0
+	}
+	return true, until.Unix()
+}
+
+// tenantChoices are the organisations offered to choose from, each marked
+// closed when its hours keep this person out right now (TENANT-04): shown,
+// and not offered, rather than refused after the click.
+func (h *Handler) tenantChoices(ctx context.Context, userID string, memberships []store.UserTenant) (choices []tenantChoice, anyOpen bool) {
+	for _, m := range memberships {
+		open, _ := h.hours(ctx, userID, m.TenantID)
+		choices = append(choices, tenantChoice{UserTenant: m, Closed: !open})
+		anyOpen = anyOpen || open
+	}
+	return choices, anyOpen
+}
+
+// boundSession ends the request's session when the hours it entered under
+// close (TENANT-04). A failure is logged and lets the person in: the hours
+// were checked, only the eviction at their end is lost.
+func (h *Handler) boundSession(w http.ResponseWriter, r *http.Request, until int64) {
+	if err := h.sm.SetHours(r.Context(), w, r, until); err != nil {
+		slog.Warn("bounding the session by the working hours failed", "err", err)
+	}
+}
+
+// tenantChoice is one organisation on the chooser.
+type tenantChoice struct {
+	store.UserTenant
+	Closed bool
 }
 
 type selectTenantData struct {
 	flowChrome
-	Tenants []store.UserTenant
+	Tenants []tenantChoice
 	Error   string
 	// Why says what sent someone here, when it was a refusal rather than a
 	// sign-in: the page used to reappear with nothing on it, which is the one
@@ -3608,7 +3699,8 @@ func (h *Handler) showSelectTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	case 1:
 		// Nothing to choose - stamp the only tenant (hours-checked) and go.
-		if !h.withinHours(r.Context(), sess.UserID, memberships[0].TenantID) {
+		inHours, until := h.hours(r.Context(), sess.UserID, memberships[0].TenantID)
+		if !inHours {
 			h.securityOfIn(r, secSigninRefused, sess.UserID, memberships[0].TenantID, refusedHours)
 			h.render(w, r, next, h.tr(r, "errOutsideHours"), http.StatusForbidden)
 			return
@@ -3617,6 +3709,7 @@ func (h *Handler) showSelectTenant(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		h.boundSession(w, r, until)
 		h.securityOfIn(r, secSigninTenant, sess.UserID, memberships[0].TenantID, memberships[0].TenantName)
 		if h.applyGroupStep(r, sess.UserID, memberships[0].TenantID) {
 			next = "/select-group"
@@ -3624,7 +3717,7 @@ func (h *Handler) showSelectTenant(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, next, http.StatusSeeOther)
 		return
 	}
-	h.renderSelect(w, r, memberships, "", http.StatusOK, r.URL.Query().Get("why"))
+	h.renderSelect(w, r, sess.UserID, memberships, "", http.StatusOK, r.URL.Query().Get("why"))
 }
 
 // doSelectTenant records the choice on the session after checking the
@@ -3662,12 +3755,13 @@ func (h *Handler) doSelectTenant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if chosen == nil {
-		h.renderSelect(w, r, memberships, h.tr(r, "errTenantForbidden"), http.StatusForbidden, "")
+		h.renderSelect(w, r, sess.UserID, memberships, h.tr(r, "errTenantForbidden"), http.StatusForbidden, "")
 		return
 	}
-	if !h.withinHours(r.Context(), sess.UserID, chosen.TenantID) {
+	inHours, until := h.hours(r.Context(), sess.UserID, chosen.TenantID)
+	if !inHours {
 		h.securityOfIn(r, secSigninRefused, sess.UserID, chosen.TenantID, refusedHours)
-		h.renderSelect(w, r, memberships,
+		h.renderSelect(w, r, sess.UserID, memberships,
 			fmt.Sprintf(h.tr(r, "errTenantRefused"), chosen.TenantName), http.StatusForbidden, "")
 		return
 	}
@@ -3675,6 +3769,7 @@ func (h *Handler) doSelectTenant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.boundSession(w, r, until)
 	// Entering an organisation - at sign-in, or switching later - is a line
 	// of its own, stamped with it: its administrators see who came in.
 	h.securityOfIn(r, secSigninTenant, sess.UserID, chosen.TenantID, chosen.TenantName)
@@ -3690,9 +3785,10 @@ func (h *Handler) doSelectTenant(w http.ResponseWriter, r *http.Request) {
 // renderSelect draws the chooser. why is the refusal that sent someone here
 // ("" when they simply signed in): the page names it above the list, in their
 // language, from a code the gateway put in the URL.
-func (h *Handler) renderSelect(w http.ResponseWriter, r *http.Request, tenants []store.UserTenant, errMsg string, status int, why string) {
+func (h *Handler) renderSelect(w http.ResponseWriter, r *http.Request, userID string, tenants []store.UserTenant, errMsg string, status int, why string) {
+	choices, _ := h.tenantChoices(r.Context(), userID, tenants)
 	data := selectTenantData{
-		flowChrome: h.flowData(r, "titleChooseTenant"), Tenants: tenants, Error: errMsg}
+		flowChrome: h.flowData(r, "titleChooseTenant"), Tenants: choices, Error: errMsg}
 	switch why {
 	case "tenant":
 		data.Why = h.tr(r, "whyOtherTenant")

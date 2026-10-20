@@ -45,11 +45,11 @@ func (rt *Router) simulationActor(req *http.Request) (actor store.User, via stri
 			}
 		}
 	}
-	// The data-plane branch follows the installation's developer switch: this
-	// is the developer's OWN plane, the one the switch is about. The admin
-	// branch above does not - it is the console's test facility, gated by
-	// control-plane capabilities, and an operator turning developer mode off on
-	// the served applications is not asking to lose Try it out.
+	// The data-plane branch follows the dev capability: this is the
+	// developer's OWN plane. The admin branch above does not - it is the
+	// console's test facility, gated by control-plane capabilities, and
+	// taking developer tools from the served applications is not taking Try
+	// it out from the console.
 	if rt.sm != nil {
 		if sess, err := rt.sm.Resolve(req.Context(), req); err == nil && sess.Pending == "" {
 			if u, err := rt.st.GetUserByID(req.Context(), sess.UserID); err == nil && rt.st.DevAllowed(req.Context(), u) {
