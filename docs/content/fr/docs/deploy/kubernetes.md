@@ -61,12 +61,10 @@ pages que les autres nœuds tiennent ouvertes, si bien que personne ne voit une 
 moitié. Ce qui reste propre à chaque nœud, et qu'il vaut mieux savoir avant de fixer un
 nombre : les rate limits sont comptés en mémoire, par nœud, donc N nœuds laissent
 passer jusqu'à N fois la borne - la console le signale à l'endroit où le nombre se saisit.
-Deux outils de développement sont propres à chaque processus pour la même raison : le mode
-de test des interfaces et les jetons qu'utilise le Swagger embarqué n'existent que dans le
-nœud qui les a émis, de sorte qu'une identité simulée peut changer d'une requête à la
-suivante quand plusieurs nœuds répondent. C'est dit, et non corrigé : il s'agit d'un outil
-pour un seul exploitant devant un seul écran, et l'étendre au cluster reviendrait à
-construire une machinerie pour personne.
+Les outils de développement, eux, ne sont pas propres à un nœud : les jetons qu'utilise le
+Swagger embarqué et le test en cours du mode de test des interfaces sont signés par une clé
+que tous les nœuds lisent en base, si bien que le nœud qui répond, quel qu'il soit, sert la
+même identité simulée.
 
 ## Le prérequis : un PostgreSQL qu'elles partagent
 

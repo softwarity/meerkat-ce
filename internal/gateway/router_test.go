@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/certs"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
@@ -104,7 +105,7 @@ func TestProxiesWithStripPrefixAndInjection(t *testing.T) {
 	// Every UI page also carries the agent: it watches the session, so no
 	// route opts out of it.
 	want := "<html><head><script>\nmeerkat()\n</script>\n</head><body>" +
-		`<script defer src="/meerkat/page.js"></script>` + "ok</body></html>"
+		`<script defer src="/meerkat/page.js?v=` + auth.ChromeVersion + `"></script>` + "ok</body></html>"
 	if body != want {
 		t.Fatalf("got %q, want %q", body, want)
 	}
@@ -1491,7 +1492,7 @@ func TestPageAgentRunsWithoutTheButton(t *testing.T) {
 	}
 	got := pageAgentFragment(r, []string{"en", "fr"})
 	for _, want := range []string{
-		`src="/meerkat/page.js"`, `data-scheme="select"`, `data-scheme-mechanism="class"`,
+		`src="/meerkat/page.js?v=` + auth.ChromeVersion + `"`, `data-scheme="select"`, `data-scheme-mechanism="class"`,
 		`data-scheme-light="lt"`, `data-scheme-dark="dk"`, `data-languages="en,fr"`,
 	} {
 		if !strings.Contains(got, want) {

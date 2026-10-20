@@ -31,6 +31,32 @@ The user button also carries the entry points to what the gateway holds for that
 person: their applications, their profile, and **Report a problem** when the
 issue-reporting switch is on.
 
+## The Developer menu
+
+An account with the `dev` capability - root always has it - finds a
+**Developer** entry in the user button's menu, on any application's page. On a
+page under the navigation portal, the button is the one at the end of the bar,
+and it carries the same menu.
+
+| Entry | What it opens | When it is there |
+|---|---|---|
+| plug key | `/profile/dev/key`, where the workstation's public key is deposited - ticked once one is | the developer tunnel is on (**Infra, Plug**) |
+| OpenAPI docs | the control plane's API reference | always |
+| UI test mode | the developer bar, to browse this application as a simulated identity | on a UI route's page |
+
+**The developer bar** opens at the top of the page, with an amber frame around
+it that marks every page served under the simulated identity. It takes a user
+and the roles to tick from the catalogue, and applies them to your own session
+on this route only, for a limited time: the page is served as that person
+would see it, and every call reaches the backend flagged as a test and is
+logged under your real name. The **DEV** tab under the bar folds it away and
+slides it along the edge, out of the way of what it covers. The plug strip at
+the bottom of a page served from a developer machine works the same way, from
+its **plug** tab.
+
+To close all of it on a production gateway, see
+[the developer surface in production](/docs/deploy/one-gateway).
+
 ## The page agent
 
 `window.meerkatPage` is the small API the injected chrome runs on, and the page

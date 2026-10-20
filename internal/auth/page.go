@@ -556,8 +556,11 @@ const pageJS = `(() => {
     // and the cursor is what says the second one is there at all.
     ' cursor: grab; touch-action: none; user-select: none; }' +
     '.pb-tab:active { cursor: grabbing; }' +
-    '.pb-badge { background: #f59e0b; color: #1c1c22; font-weight: 700; border-radius: 4px;' +
-    ' padding: 1px 6px; font-size: 11px; }' +
+    // The word and its chevron in the strip's orange, on the tab's own
+    // background: no filled badge. Darker on a light page, where #f59e0b on
+    // white reads at barely 2:1.
+    '.pb-badge, .pb-chev { color: light-dark(#b45309, #f59e0b); }' +
+    '.pb-badge { font-weight: 700; font-size: 12px; }' +
     '.pb-title { font-weight: 700; }' +
     '.pb-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }' +
     // One entry per DEVELOPER, their names inside it: with four services

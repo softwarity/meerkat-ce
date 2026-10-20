@@ -4,7 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -74,25 +76,27 @@ func TestUISim(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	cookieFor := func(userID string) *http.Cookie {
+	// A browser per person: the running test rides a cookie, so each keeps
+	// its own jar, seeded with its session.
+	base, _ := url.Parse(srv.URL)
+	browserFor := func(userID string) *http.Client {
 		rec := httptest.NewRecorder()
 		if _, err := sm.Issue(ctx, rec, httptest.NewRequest("POST", "/login", nil), userID); err != nil {
 			t.Fatal(err)
 		}
-		return rec.Result().Cookies()[0]
+		jar, _ := cookiejar.New(nil)
+		jar.SetCookies(base, rec.Result().Cookies()[:1])
+		return &http.Client{Jar: jar}
 	}
-	devC, bobC := cookieFor("d"), cookieFor("b")
+	devC, bobC := browserFor("d"), browserFor("b")
 
-	call := func(method, path, body string, cookie *http.Cookie) (int, string) {
+	call := func(method, path, body string, client *http.Client) (int, string) {
 		t.Helper()
 		req, _ := http.NewRequest(method, srv.URL+path, strings.NewReader(body))
 		if body != "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
-		if cookie != nil {
-			req.AddCookie(cookie)
-		}
-		res, err := http.DefaultClient.Do(req)
+		res, err := client.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,6 +163,96 @@ func TestUISim(t *testing.T) {
 		}
 	})
 
+	t.Run("another node of the cluster serves the same test", func(t *testing.T) {
+		// Two gateways on one database: the Apply lands on one, the reloaded
+		// page on the other - which used to know nothing of it.
+		other := New(st, sm)
+		if err := other.Reload(ctx); err != nil {
+			t.Fatal(err)
+		}
+		mux2 := http.NewServeMux()
+		other.RegisterUISim(mux2)
+		mux2.Handle("/", other)
+		srv2 := httptest.NewServer(mux2)
+		t.Cleanup(srv2.Close)
+		if code, _ := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane","roles":["sales"]}`, devC); code != http.StatusOK {
+			t.Fatalf("set: %d", code)
+		}
+		req, _ := http.NewRequest("GET", srv2.URL+"/open/page", nil)
+		for _, ck := range devC.Jar.Cookies(base) {
+			req.AddCookie(ck)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if !strings.Contains(string(b), `<body class="sales">`) {
+			t.Fatalf("the other node must serve the simulated identity: %s", b)
+		}
+	})
+
+	t.Run("starting and ending a test are in the trail", func(t *testing.T) {
+		if code, _ := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane","roles":["sales"]}`, devC); code != http.StatusOK {
+			t.Fatalf("set: %d", code)
+		}
+		if code, _ := call("DELETE", "/meerkat/dev-sim?route=r-open", "", devC); code != http.StatusOK {
+			t.Fatalf("clear: %d", code)
+		}
+		// Cancel on a route with no test running writes nothing.
+		if code, _ := call("DELETE", "/meerkat/dev-sim?route=r-open", "", devC); code != http.StatusOK {
+			t.Fatalf("idle clear: %d", code)
+		}
+		events, err := st.ListAuditEvents(ctx, store.AuditFilter{ActorID: "d"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var starts, stops int
+		for _, ev := range events {
+			switch ev.Action {
+			case "uitest.start":
+				// Earlier steps started tests too; this one's line is the
+				// one naming exactly what was just applied.
+				if ev.ActorName == "devon" && ev.Detail == "route open: as jane, roles sales" {
+					starts++
+				}
+			case "uitest.stop":
+				stops++
+			}
+		}
+		if starts == 0 || stops != 1 {
+			t.Fatalf("trail: %d matching starts, %d stops (want a start, and exactly one stop)", starts, stops)
+		}
+	})
+
+	t.Run("taking the dev capability ends a running test at once", func(t *testing.T) {
+		if code, _ := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane","roles":["sales"]}`, devC); code != http.StatusOK {
+			t.Fatalf("set: %d", code)
+		}
+		u, err := st.GetUserByID(ctx, "d")
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.Dev = false
+		if err := st.UpdateUser(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			back, err := st.GetUserByID(ctx, "d")
+			if err != nil {
+				t.Fatal(err)
+			}
+			back.Dev = true
+			if err := st.UpdateUser(ctx, back); err != nil {
+				t.Fatal(err)
+			}
+		}()
+		if _, body := call("GET", "/open/page", "", devC); strings.Contains(body, "sales") {
+			t.Fatalf("a developer without the capability must not keep a running test: %s", body)
+		}
+	})
+
 	t.Run("exit and expiry both end the test", func(t *testing.T) {
 		if code, _ := call("DELETE", "/meerkat/dev-sim?route=r-open", "", devC); code != http.StatusOK {
 			t.Fatalf("clear: %d", code)
@@ -166,15 +260,24 @@ func TestUISim(t *testing.T) {
 		if _, body := call("GET", "/open/page", "", devC); strings.Contains(body, "sales") {
 			t.Fatalf("cleared sim still applies: %s", body)
 		}
-		// An expired leftover answers inactive without waiting for a sweep.
-		rt.uiSimMu.Lock()
-		for k, e := range rt.uiSims {
-			e.expires = time.Now().Add(-time.Minute)
-			rt.uiSims[k] = e
+		// An expired cookie answers inactive, whatever the browser still holds.
+		var hash string
+		for _, ck := range devC.Jar.Cookies(base) {
+			if s, err := sm.Resolve(ctx, sessionRequest(ck)); err == nil {
+				hash = s.TokenHash
+			}
 		}
-		rt.uiSimMu.Unlock()
+		stale := rt.uiSimSign(uiSimClaims{Session: hash, Route: "r-gated", User: "jane", Roles: []string{"sales"}, By: "devon", Exp: time.Now().Add(-time.Minute).Unix()})
+		devC.Jar.SetCookies(base, []*http.Cookie{{Name: uiSimCookie(httptest.NewRequest("GET", "/", nil), "r-gated"), Value: stale, Path: "/"}})
 		if _, body := call("GET", "/gated/page", "", devC); strings.Contains(body, "Exit UI test mode") {
 			t.Fatalf("expired sim still applies: %s", body)
 		}
 	})
+}
+
+// sessionRequest is a request carrying one cookie, for resolving a session.
+func sessionRequest(ck *http.Cookie) *http.Request {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.AddCookie(ck)
+	return r
 }

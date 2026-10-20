@@ -83,6 +83,19 @@
   same. Offered when a mail relay is configured, local passwords are allowed and the application
   has a public name the gateway vouches for. Two new mails, in the 20 languages, are in the mail
   relay's sample list.
+- **Starting and ending a UI test are in the audit trail**: `uitest.start` and `uitest.stop` on the
+  developer's account, naming the route, the simulated user and its roles. A test also ends the
+  moment its developer loses the dev capability.
+- **The UI test mode works with several replicas.** The running test lived in the memory of the
+  node that took the Apply, so the reloaded page, answered by another node, came back unchanged
+  and the bar closed. It now rides a cookie signed with the key every node reads from the
+  database, bound to the session and to the route.
+- **The UI test mode is reachable under the navigation portal.** The portal's account button did
+  not know which route the page came from, so its Developer menu lacked the entry. It does now.
+- **The plug and DEV tabs read as text**: the word and its chevron in the strip's orange, with no
+  filled badge.
+- **The route editor's user info fields line up behind the longest fact**: a custom one such as
+  employeeNumber ran into its field, and each field's label sat on the one above.
 ---
 
 ## 1.13.0

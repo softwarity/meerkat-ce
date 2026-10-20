@@ -822,7 +822,10 @@ const userButtonJS = `(() => {
         ' background: var(--mk-surface-container, Canvas); color: inherit;' +
         ' border: 1px solid #f59e0b; border-top: 0; border-radius: 0 0 8px 8px; }' +
         '.db-tab:active { cursor: grabbing; }' +
-        '.db-badge { background: #f59e0b; color: #1c1c22; font-weight: 700; border-radius: 4px; padding: 1px 6px; font-size: 11px; }' +
+        // The word and its chevron in the bar's orange, like the plug tab: no
+        // filled badge. Darker on a light page, where #f59e0b reads at 2:1.
+        '.db-badge, .db-chev { color: light-dark(#b45309, #f59e0b); }' +
+        '.db-badge { font-weight: 700; font-size: 12px; }' +
         '.db label { display: flex; align-items: center; gap: 5px; }' +
         // Scoped to the text input: a bare ".db input" would also stretch the
         // popup's checkboxes to this width.

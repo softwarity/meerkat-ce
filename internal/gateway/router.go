@@ -30,6 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/edition"
 	filtering "github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/metrics"
@@ -112,10 +113,6 @@ type Router struct {
 	// name, served at store.RouteAssetPath (injections.go).
 	assets map[string]map[string]store.RouteFile
 
-	// uiSims holds the running UI tests (uisim.go): a developer session
-	// browsing ONE route as a simulated identity. Per process, TTL-bounded.
-	uiSimMu sync.RWMutex
-	uiSims  map[uiSimKey]uiSimEntry
 	// signing holds the gateway's identity signing keys (signed-jwt). Loaded
 	// at Reload; nil until a route uses signed-jwt or the admin generates them.
 	signing *signing.Set
@@ -2921,7 +2918,7 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 			attrs += fmt.Sprintf(` data-locale-param="%s"`, htmlEscape(orDefault(r.Locales.Param, "lg")))
 		}
 	}
-	agent := `<script defer src="/meerkat/page.js"` + attrs + `></script>`
+	agent := `<script defer src="/meerkat/page.js?v=` + auth.ChromeVersion + `"` + attrs + `></script>`
 	// The route's own scheme script, before the agent so it is defined by the
 	// time the agent's catch-up calls it. The body's hash is in the URL: the
 	// answer is cacheable, and an edit reaches a browser holding the last one.
@@ -3022,7 +3019,7 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 	if len(localeCodes) > 0 {
 		attrs += fmt.Sprintf(` languages="%s"`, strings.Join(localeCodes, ","))
 	}
-	return `<script defer src="/meerkat/user-button.js"></script>` +
+	return `<script defer src="/meerkat/user-button.js?v=` + auth.ChromeVersion + `"></script>` +
 		`<meerkat-user-button` + attrs + `></meerkat-user-button>`
 }
 
@@ -3062,6 +3059,11 @@ func portalFragment(r store.Route, localeCodes []string) string {
 	// gateway's whole offer. A page that speaks no language of ours must get
 	// no language menu, not the sign-in page's.
 	attr := ` languages="` + htmlEscape(strings.Join(localeCodes, ",")) + `"`
+	// THIS route, for the button the bar mounts: the UI test mode (DEV-10)
+	// is scoped to a route, and in a portal the application's own button is
+	// off - the bar's is the only one, so without the id the developer menu
+	// lost the entry. Server-generated id, HTML-safe.
+	attr += ` route="` + htmlEscape(r.ID) + `"`
 	// Route-specific, like the languages above: the bar is global, the
 	// application behind THIS route is not. The bar mounts the user button, so
 	// what that button offers is decided per route here.
@@ -3084,8 +3086,8 @@ func portalFragment(r store.Route, localeCodes []string) string {
 		// and dark must not be offered a position nothing behind it can hold.
 		attr += ` no-auto`
 	}
-	return `<script defer src="/meerkat/user-button.js"></script>` +
-		`<script defer src="/meerkat/portal.js"></script>` +
+	return `<script defer src="/meerkat/user-button.js?v=` + auth.ChromeVersion + `"></script>` +
+		`<script defer src="/meerkat/portal.js?v=` + auth.ChromeVersion + `"></script>` +
 		`<meerkat-portal-nav` + attr + `></meerkat-portal-nav>`
 }
 

@@ -19,6 +19,17 @@ var portalAssetVersion = func() string {
 	return hex.EncodeToString(sum[:])[:12]
 }()
 
+// ChromeVersion is a short content hash of the three scripts the gateway
+// injects into proxied pages - the page agent, the user button and the portal
+// bar - for the ?v= of their <script src>. They are cached five minutes, and
+// without it a deployment that changed them left every open browser on the
+// previous copy for that long: a fixed menu entry still missing after the
+// rollout. Same content, same URL, so nothing is refetched for nothing.
+var ChromeVersion = func() string {
+	sum := sha256.Sum256([]byte(pageJS + userButtonScript() + portalNavJS))
+	return hex.EncodeToString(sum[:])[:12]
+}()
+
 // The <meerkat-portal-nav> web component (PORTAL-01): a header-or-rail bar the
 // gateway injects into the proxied UI pages when a portal is configured, in
 // place of the per-route user button - which then rides INSIDE the bar. It is

@@ -174,6 +174,17 @@ On a proxy route you also set:
 - **Upstream** - the scheme is chosen, never typed: `http` first because inside
   a cluster TLS ends at the gateway, `https` for a third party, `h2c` for a gRPC
   service. Services the gateway discovered are offered in the field.
+- **Namespace** - on Kubernetes, when the gateway may read more than its own
+  namespace, a choice above the upstream: the namespaces that hold a Service,
+  and **External**. A namespace chosen, the upstream is *picked* from its
+  services - the host is never typed, only the base path beside it
+  (`/geoserver`). External is the free field, for a public site, a machine of
+  the network or a StatefulSet's pod. A route opens on the namespace its
+  upstream points into: a `name.ns.svc` address is that namespace even when the
+  service is gone (the field then asks for another one), and a short name such
+  as `archi` or `softwarity.dev` stays on a namespace only if that namespace
+  lists it, External otherwise. See
+  [the other namespaces](/docs/deploy/kubernetes) for the right it takes.
 - **When the service is slow or down** - connect and first-answer timeouts,
   which inherit the Global values unless set here. Past the connect timeout the
   caller gets a 502 (the service cannot be reached), past the first-answer one a

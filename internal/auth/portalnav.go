@@ -551,6 +551,10 @@ const portalNavJS = `(function () {
         ? (this.getAttribute('languages') || '').split(',').filter(Boolean)
         : (d.languages || []);
       if (langs.length) b.setAttribute('languages', langs.join(','));
+      // The route this page is served by, passed on: the developer menu's UI
+      // test mode (DEV-10) is scoped to it, and in a portal this bar's button
+      // is the only one on the page.
+      if (this.getAttribute('route')) b.setAttribute('route', this.getAttribute('route'));
       // What the switch may be, in order of who decides. The installation
       // first: built-in pages settled on light or dark leave nothing to switch
       // between anywhere. THIS ROUTE next, on the injection like the languages

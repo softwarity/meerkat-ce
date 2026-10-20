@@ -89,6 +89,7 @@ contrôle. Elles ont leurs deux types de cible : `account` pour un compte applic
 | `token.create`, `token.revoke` | un jeton d'API personnel | son nom |
 | `register`, `register.confirm` | une auto-inscription et sa confirmation | |
 | `devkey.add`, `devkey.remove` | une clé plug déposée ou retirée, une par poste de travail | son empreinte, jamais la clé |
+| `uitest.start`, `uitest.stop` | un test UI lancé ou arrêté sur une route (Apply de la barre développeur, sa sortie) | la route, l'utilisateur simulé et, au lancement, ses rôles |
 
 Les motifs de refus d'une connexion : `bad-credentials`, `disabled`, `outside-validity`,
 `unconfirmed`, `outside-hours`, `bad-code`, `passkey`, `not-recognised` (l'autorité ne

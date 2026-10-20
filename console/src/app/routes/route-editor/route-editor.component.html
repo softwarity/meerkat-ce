@@ -1295,6 +1295,7 @@
               The Identity section declares no fact to put on the page.
             </p>
           }
+          <div class="field-rows">
           @for (field of pageUserFields(); track field) {
             <div class="field-row" [attr.ee-feature]="frozen(field) ? 'multi-tenant' : null">
               <mat-checkbox
@@ -1322,6 +1323,7 @@
               </mat-form-field>
             </div>
           }
+          </div>
         }
       }
       @case ('tracing') {

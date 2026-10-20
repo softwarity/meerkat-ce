@@ -33,6 +33,32 @@ Le bouton utilisateur donne aussi accès à ce que la gateway détient pour
 cette personne : ses applications, son profil, et **Signaler un problème**
 lorsque le signalement de problèmes est activé.
 
+## Le menu Developer
+
+Un compte qui a la capacité `dev` - root l'a toujours - trouve une entrée
+**Developer** dans le menu du bouton utilisateur, sur la page de n'importe
+quelle application. Sur une page sous le portail de navigation, le bouton est
+celui du bout de la barre, et il porte le même menu.
+
+| Entrée | Ce qu'elle ouvre | Quand elle est là |
+|---|---|---|
+| plug key | `/profile/dev/key`, où se dépose la clé publique du poste - cochée une fois déposée | le tunnel développeur est ouvert (**Infra, Plug**) |
+| OpenAPI docs | la référence de l'API du plan de contrôle | toujours |
+| UI test mode | la barre développeur, pour parcourir cette application sous une identité simulée | sur la page d'une route UI |
+
+**La barre développeur** s'ouvre en haut de la page, avec un liseré ambre
+autour qui marque chaque page servie sous l'identité simulée. Elle prend un
+utilisateur et les rôles à cocher dans le catalogue, et les applique à votre
+seule session sur cette route, pour une durée limitée : la page est servie
+comme cette personne la verrait, et chaque appel arrive au backend marqué comme
+un test et est journalisé sous votre vrai nom. L'onglet **DEV** sous la barre
+la replie et la fait glisser le long du bord, hors de ce qu'elle couvre. La
+bande plug, en bas d'une page servie depuis un poste de développeur, marche de
+la même façon, depuis son onglet **plug**.
+
+Pour fermer tout cela sur une gateway de production, voir
+[la surface développeur en production](/docs/deploy/one-gateway).
+
 ## L'agent de page
 
 `window.meerkatPage` est la petite API sur laquelle s'appuient les éléments

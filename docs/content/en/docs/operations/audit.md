@@ -88,6 +88,7 @@ for a sign-in to the console.
 | `token.create`, `token.revoke` | a personal API token | its name |
 | `register`, `register.confirm` | a self-registration and its confirmation | |
 | `devkey.add`, `devkey.remove` | a plug key deposited or removed, one per workstation | its fingerprint, never the key |
+| `uitest.start`, `uitest.stop` | a UI test started or ended on a route (the developer bar's Apply, its exit) | the route, the simulated user and, on a start, its roles |
 
 The reasons a sign-in is refused: `bad-credentials`, `disabled`,
 `outside-validity`, `unconfirmed`, `outside-hours`, `bad-code`, `passkey`,

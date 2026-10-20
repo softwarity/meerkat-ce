@@ -187,6 +187,17 @@ Sur une route en mode proxy, vous réglez aussi :
   premier, parce qu'à l'intérieur d'un cluster TLS se termine à la gateway,
   `https` pour un tiers, `h2c` pour un service gRPC. Le champ propose les services
   que la gateway a découverts.
+- **Namespace** - sur Kubernetes, quand la gateway peut lire plus que son propre
+  namespace, un choix au-dessus de l'upstream : les namespaces qui portent un
+  Service, et **External**. Un namespace choisi, l'upstream se *choisit* parmi
+  ses services - l'hôte ne se tape jamais, seul le chemin de base se tape à côté
+  (`/geoserver`). External est le champ libre, pour un site public, une machine
+  du réseau ou le pod d'un StatefulSet. Une route s'ouvre sur le namespace où
+  pointe son upstream : une adresse `nom.ns.svc` désigne ce namespace même si le
+  service a disparu (le champ demande alors d'en choisir un autre), et un nom
+  court comme `archi` ou `softwarity.dev` ne reste sur un namespace que si ce
+  namespace le liste, External sinon. Voir
+  [les autres namespaces](/docs/deploy/kubernetes) pour le droit que cela demande.
 - **When the service is slow or down** - les timeouts de connexion et de première
   réponse, qui reprennent les valeurs de Global tant qu'ils ne sont pas réglés
   ici. Passé le timeout de connexion, l'appelant reçoit un 502 (le service est

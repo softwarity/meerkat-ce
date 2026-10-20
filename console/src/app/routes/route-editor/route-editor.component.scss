@@ -227,21 +227,26 @@ app-form-field.height-field {
   font-size: 0.88rem;
   max-width: 560px;
 }
-/* user-info per-field rows: checkbox + its attribute/meta name */
-.field-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 3px 0;
-  position: relative;
+/* user-info per-field rows: checkbox + its attribute/meta name. A grid, so
+   the names line up behind the LONGEST fact (employeeNumber) instead of a
+   fixed width it overflows; the row gap clears the outlined label floating
+   above each field. */
+.field-rows {
+  display: grid;
+  grid-template-columns: max-content 220px;
+  column-gap: 14px;
+  row-gap: 12px;
 }
-.field-row mat-checkbox {
-  width: 130px;
+.field-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
 }
 .field-row mat-form-field,
 .field-row app-form-field {
+  grid-area: 1 / 2;
   width: 220px;
-  display: inline-block;
 }
 .id-hint {
   margin-top: 12px;
@@ -561,16 +566,12 @@ mat-selection-list .ui-toggle {
   align-items: center;
   gap: 6px;
 }
+/* On the field, in the same cell: the grid stacks them. */
 .field-row app-ee-lock {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  grid-area: 1 / 2;
+  justify-self: center;
   justify-content: center;
   z-index: 1;
-}
-.field-row app-ee-lock {
-  left: 144px;
-  width: 220px;
 }
 
 // The Locales section owns the panel's height so that ONE thing scrolls: the
