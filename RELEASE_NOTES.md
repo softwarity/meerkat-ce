@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.14.0
+
 - **plug 2.31.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **Ctrl+S / Cmd+S saves in the console's code editors.** The custom CSS and JavaScript of a
   route, its scheme and language scripts, the roles expression, the configuration YAML being
