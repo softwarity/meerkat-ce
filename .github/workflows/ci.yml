@@ -14,11 +14,7 @@ on:
     # runs twice on the same commit - and the push half publishes an image
     # tagged `dependabot-npm_and_yarn-e2e-e2e-3f52c051c4`, which nobody will
     # ever deploy. Ignored here, they are still fully tested as pull requests.
-    #
-    # Nor `bench`: the latest benchmark the doc site reads (tools/bench), which
-    # the Benchmark publication job below pushes to. Testing a branch that holds
-    # one JSON file would fail every job - and re-run the benchmark about itself.
-    branches-ignore: ["dependabot/**", "bench"]
+    branches-ignore: ["dependabot/**"]
   pull_request:
   workflow_dispatch:
 
@@ -216,17 +212,20 @@ jobs:
           path: tools/bench/out/results.json
           if-no-files-found: error
 
-  # Both machines' latest results as ONE file on the `bench` branch, which the
-  # doc site's Performance page fetches on every visit. Only the latest run is
-  # kept - a history nobody reads is a file that grows - so the branch is
-  # rewritten each time as a single commit.
+  # Both machines' latest results as ONE file, published WITH THE SITE: the
+  # Performance page reads /bench/latest.json from its own origin. The file is
+  # kept as an artifact and the site redeployed to take it (deploy-doc.yml
+  # fetches the newest). Not the artifact itself: a browser cannot read one -
+  # it takes a token and comes zipped. Not a branch either, which it used to
+  # be: a branch rewritten on every run read as one months behind main.
+  # Only the latest run is kept - a history nobody reads is a file that grows.
   bench-publish:
     name: Benchmark publication
     timeout-minutes: 5
     needs: bench
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      actions: write
     concurrency:
       group: bench-publish
       cancel-in-progress: false
@@ -235,19 +234,21 @@ jobs:
         with:
           pattern: bench-*
           path: runs
-      - name: Publish the latest run
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Gather the latest run
         run: |
           set -e
-          mkdir -p /tmp/latest
-          jq -s '{schema: 1, runs: .}' runs/*/results.json > /tmp/latest/latest.json
-          cd /tmp/latest
-          git init -q -b bench
-          git add latest.json
-          git -c user.name="softwarity-bot" -c user.email="bot@softwarity.io" \
-            commit -q -m "Benchmark of ${GITHUB_SHA:0:7}"
-          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:bench
+          mkdir -p latest
+          jq -s '{schema: 1, runs: .}' runs/*/results.json > latest/latest.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bench-latest
+          path: latest/latest.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Redeploy the site with it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-doc.yml --ref main -R "${{ github.repository }}"
 
   # The OIDC driver, against the real thing. test/ldap brings up Dex; without
   # it the test SKIPS, and a skip is silent - `ok internal/idp` was being

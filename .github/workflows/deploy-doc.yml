@@ -17,6 +17,8 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # The latest benchmark, an artifact of ci.yml (see the step that takes it).
+  actions: read
 
 # Allow only one concurrent deployment
 concurrency:
@@ -61,6 +63,25 @@ jobs:
       - name: Install doc-site deps
         working-directory: docs
         run: npm ci
+
+      # The Performance page reads /bench/latest.json from the site itself: the
+      # newest `bench-latest` artifact ci.yml leaves, which then dispatches this
+      # workflow. None yet (or expired, after 90 days without a run) builds a
+      # site whose page says it has no figures, rather than failing.
+      - name: Take the latest benchmark
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=bench-latest&per_page=1" \
+            --jq '.artifacts[0] | select(.expired == false) | .id')
+          if [ -z "$id" ]; then
+            echo "::warning::no benchmark artifact: the Performance page will show none"
+            exit 0
+          fi
+          gh api "repos/${{ github.repository }}/actions/artifacts/$id/zip" > "$RUNNER_TEMP/bench.zip"
+          mkdir -p docs/public/bench
+          unzip -o -q "$RUNNER_TEMP/bench.zip" -d docs/public/bench
 
       - name: Build doc-site for GitHub Pages
         working-directory: docs

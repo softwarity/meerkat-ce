@@ -2,15 +2,16 @@ import { Component, computed, input, signal } from '@angular/core';
 
 // The benchmark table, and the ONE page of the site that is not Markdown -
 // because it is not prose. It renders the LATEST run the CI made (tools/bench,
-// ci.yml "Benchmark"), fetched on every visit rather than built in: the CI
-// rewrites latest.json on the `bench` branch of the community mirror after
-// each commit to main, so the figures follow the code without a redeploy.
+// ci.yml "Benchmark"), fetched from the site itself: after each commit to main
+// the CI keeps latest.json as an artifact and redeploys the site with it
+// (deploy-doc.yml), so the figures follow the code. Locally there is none, and
+// the page says so.
 //
 // A Markdown page asks for it with `widget: benchmark` in its front matter,
 // and gives it the words around it - see content/<lang>/product/performance.md
 // and the page component that mounts this.
 
-const LATEST_URL = 'https://raw.githubusercontent.com/softwarity/meerkat-ce/bench/latest.json';
+const LATEST_URL = 'bench/latest.json';
 const SOURCES_URL = 'https://github.com/softwarity/meerkat-ce/tree/main/tools/bench';
 const CONFIGS_URL = 'https://github.com/softwarity/meerkat-ce/tree/main/tools/bench/gateways';
 const RUNNERS_URL = 'https://docs.github.com/en/actions/reference/runners/github-hosted-runners';

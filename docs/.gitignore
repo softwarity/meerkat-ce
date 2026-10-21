@@ -1,5 +1,7 @@
 # Angular doc-site build artifacts and dependencies
 /node_modules
+# the latest benchmark, put there by deploy-doc.yml at publication
+/public/bench
 /dist
 /out-tsc
 /.angular
