@@ -21,18 +21,22 @@ l'installation, que vous modifiez ici.
 | | Ce qui s'affiche |
 |---|---|
 | **None** | rien. Le bouton utilisateur et les pages intégrées affichent le nom de votre marque, sans rien de cliquable |
-| **Links** | la liste, dans le sous-menu *Applications* du bouton utilisateur et sur les pages du plan de données |
-| **Portal** | une barre de navigation sur chaque page de chaque application ; les pages intégrées proposent alors un seul lien de retour |
+| **Links** | la liste, dans le sous-menu *Applications* du bouton utilisateur et sur les pages du plan de données, un conteneur en intertitre au-dessus de ses modules |
+| **Portal** | une barre de navigation sur chaque page de chaque application ; les pages intégrées proposent alors un seul lien de retour. **Enterprise** |
 
 **Changer de mode ne fait pas perdre la liste.** Vous pouvez composer un menu, le
 transformer en barre, puis revenir en arrière : les entrées sont conservées.
+
+![L'écran Portal en mode Links : la liste, les modules d'un conteneur sous lui, et à côté le menu Applications du bouton de compte tel qu'un visiteur le voit](img/console/portal-links.webp)
 
 ## Ce que vous faites sur cet écran
 
 1. **Choisissez le mode.** En mode *None*, rien de ce qui suit n'apparaît.
 2. **Ajoutez une application** pour chaque interface que la liste doit proposer. En
    mode *Links*, elles s'empilent dans une liste numérotée, avec deux flèches pour
-   régler l'ordre. En mode *Portal*, vous les composez sur le canevas, qui est
+   régler l'ordre et les modules d'un conteneur en retrait sous lui ; à côté, le
+   vrai bouton de compte montre son menu *Applications* tel qu'un visiteur le
+   verra. Le bouton apparaît sur les applications dont la route l'active. En mode *Portal*, vous les composez sur le canevas, qui est
    **la vraie barre en mode édition** : un clic sur une entrée l'ouvre dans le
    tiroir.
 3. **Choisissez la disposition** (mode *Portal*) : *header mode* ou *rail mode*, le

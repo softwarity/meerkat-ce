@@ -2,6 +2,14 @@
 
 ## NEXT RELEASE
 
+- **The Links mode keeps the catalogue's containers.** A container was flattened into the list;
+  it is now a heading over its modules, in the account button's Applications menu and on the
+  built-in pages (profile, sign-in). The Portal screen shows, beside the list, the real account
+  button with that menu open, drawing the list being edited.
+- **Breaking: the navigation bar (Portal mode) is Enterprise.** The Team and Enterprise licences
+  carry it. The Community image refuses to save Portal mode and reads a catalogue already in it
+  as Links: the same list, in the user button's menu, nothing to retype.
+
 ---
 
 ## 1.14.0

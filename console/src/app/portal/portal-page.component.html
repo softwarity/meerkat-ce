@@ -13,47 +13,50 @@
       }
     </mat-drawer>
     <mat-drawer-content>
-  <div class="content">
+  <div class="content" [class.fill]="hasCatalogue() && !isBar()">
+    <!-- One line: what this is and what the chosen mode does, the choice at
+         the end of it. -->
     <mat-card appearance="outlined">
       <div class="row">
         <mat-icon>apps</mat-icon>
         <div class="grow">
           <h2 class="title" i18n="@@Portal">Applications</h2>
-          <p class="hint text-muted" i18n="@@Portal_enable_hint">
-            The applications offered to users. Each one sees only those its access allows.
+          <p class="hint text-muted">
+            @switch (mode()) {
+              @case ('none') {
+                <ng-container i18n="@@Portal_mode_none_hint">No list: the account button and built-in pages
+                  show only the brand name.</ng-container>
+              }
+              @case ('links') {
+                <ng-container i18n="@@Portal_mode_links_hint">A menu in the account button injected into
+                  the applications, and on the built-in pages.</ng-container>
+              }
+              @case ('portal') {
+                <ng-container i18n="@@Portal_mode_portal_hint">A navigation bar on every application page,
+                  carrying the account button.</ng-container>
+              }
+            }
+            <ng-container i18n="@@Portal_access_hint">Each visitor sees what their access opens.</ng-container>
           </p>
         </div>
+        <mat-button-toggle-group [value]="mode()" (change)="setMode($event.value)"
+          hideSingleSelectionIndicator aria-label="Mode" i18n-aria-label="@@Portal_mode">
+          <mat-button-toggle value="none">
+            <mat-icon>block</mat-icon><span i18n="@@Portal_mode_none">None</span>
+          </mat-button-toggle>
+          <mat-button-toggle value="links">
+            <mat-icon>list</mat-icon><span i18n="@@Portal_mode_links">Links</span>
+          </mat-button-toggle>
+          <mat-button-toggle value="portal" ee-feature="portal" class="ee-toggle">
+            <mat-icon>toolbar</mat-icon><span i18n="@@Portal_mode_portal">Portal</span>
+            <app-ee-lock
+              feature="portal"
+              i18n-why="@@Portal_ee_why"
+              why="A navigation bar on every application page. The community edition offers the same list as links."
+            />
+          </mat-button-toggle>
+        </mat-button-toggle-group>
       </div>
-      <div class="modes">
-      <mat-button-toggle-group [value]="mode()" (change)="setMode($event.value)"
-        hideSingleSelectionIndicator>
-        <mat-button-toggle value="none">
-          <mat-icon>block</mat-icon><span i18n="@@Portal_mode_none">None</span>
-        </mat-button-toggle>
-        <mat-button-toggle value="links">
-          <mat-icon>list</mat-icon><span i18n="@@Portal_mode_links">Links</span>
-        </mat-button-toggle>
-        <mat-button-toggle value="portal">
-          <mat-icon>toolbar</mat-icon><span i18n="@@Portal_mode_portal">Portal</span>
-        </mat-button-toggle>
-      </mat-button-toggle-group>
-      </div>
-      <p class="mode-hint text-muted">
-        @switch (mode()) {
-          @case ('none') {
-            <ng-container i18n="@@Portal_mode_none_hint">No list: the user button and built-in pages
-              show only the application name. Right for a single application.</ng-container>
-          }
-          @case ('links') {
-            <ng-container i18n="@@Portal_mode_links_hint">The list below, in the user button's
-              Applications menu and on the built-in pages.</ng-container>
-          }
-          @case ('portal') {
-            <ng-container i18n="@@Portal_mode_portal_hint">A navigation bar with the account button
-              on every application page.</ng-container>
-          }
-        }
-      </p>
     </mat-card>
 
     @if (isBar()) {
@@ -160,9 +163,10 @@
         title="Portal preview" i18n-title="@@Portal_preview"></iframe>
     }
 
-    <!-- Links mode has no bar to preview, so the catalogue shows as what it
-         is: an ordered list. The SAME list the bar reads, edited in the same
-         drawer - switching mode must not cost the work. -->
+    <!-- Links mode: the catalogue as an ordered list, its two levels shown -
+         a container over its modules - and beside it the REAL account button
+         with its Applications menu open, fed this list. The SAME list the bar
+         reads, edited in the same drawer: switching mode must not cost the work. -->
     @if (hasCatalogue() && !isBar()) {
       <div class="canvas-head">
         <span class="text-muted" i18n="@@Portal_links_hint">Offered in this order</span>
@@ -174,39 +178,74 @@
           <mat-icon>add</mat-icon><span i18n="@@Portal_add_app">Add an application</span>
         </button>
       </div>
-      @if (!entries().length) {
-        <p class="empty text-muted" i18n="@@Portal_empty_links">
-          No application yet. Add one for each UI the menu should offer.
-        </p>
-      } @else {
-        <mat-card appearance="outlined" class="links">
-          @for (e of entries(); track $index; let i = $index) {
-            <div class="link-row" [class.off]="e.disabled">
-              <span class="pos">{{ i + 1 }}</span>
-              <span class="grow">
-                @if (isContainer(e)) {
-                  <mat-icon class="kind">folder</mat-icon><b>{{ e.label }}</b>
-                  <span class="text-muted path">{{ (e.children ?? []).length }} <span i18n="@@Portal_modules_count">modules, listed in its place</span></span>
-                } @else {
-                  <b>{{ e.label || routeNameOf(e.routeId) }}</b>
-                  <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
-                  @if (routeOff(e.routeId)) {
-                    <span class="text-muted path" i18n="@@Portal_route_off">route turned off</span>
-                  } @else if (routeGone(e.routeId)) {
-                    <span class="text-muted path" i18n="@@Portal_route_gone">no such UI route</span>
+      <div class="links-split">
+        @if (!entries().length) {
+          <p class="empty text-muted" i18n="@@Portal_empty_links">
+            No application yet. Add one for each UI the menu should offer.
+          </p>
+        } @else {
+          <mat-card appearance="outlined" class="links">
+            @for (e of entries(); track $index; let i = $index) {
+              <div class="link-row" [class.off]="e.disabled">
+                <span class="pos">{{ i + 1 }}</span>
+                <span class="grow">
+                  @if (isContainer(e)) {
+                    <span><mat-icon class="kind">folder</mat-icon><b>{{ e.label }}</b></span>
+                    @if (!(e.children ?? []).length) {
+                      <span class="text-muted path" i18n="@@Portal_container_empty">empty, not offered</span>
+                    }
+                  } @else {
+                    <b>{{ e.label || routeNameOf(e.routeId) }}</b>
+                    <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
+                    @if (routeOff(e.routeId)) {
+                      <span class="text-muted path" i18n="@@Portal_route_off">route turned off</span>
+                    } @else if (routeGone(e.routeId)) {
+                      <span class="text-muted path" i18n="@@Portal_route_gone">no such UI route</span>
+                    }
                   }
+                </span>
+                <button matIconButton [disabled]="i === 0" (click)="moveEntry(i, -1)"
+                  matTooltip="Move up" i18n-matTooltip="@@Move_up"><mat-icon>arrow_upward</mat-icon></button>
+                <button matIconButton [disabled]="i === entries().length - 1" (click)="moveEntry(i, 1)"
+                  matTooltip="Move down" i18n-matTooltip="@@Move_down"><mat-icon>arrow_downward</mat-icon></button>
+                <button matIconButton (click)="editParent(i)"
+                  matTooltip="Edit" i18n-matTooltip="@@Edit"><mat-icon>edit</mat-icon></button>
+              </div>
+              @if (isContainer(e)) {
+                @for (c of e.children ?? []; track $index; let j = $index; let last = $last) {
+                  <div class="link-row sub" [class.off]="e.disabled || c.disabled">
+                    <span class="pos">{{ i + 1 }}.{{ j + 1 }}</span>
+                    <span class="grow">
+                      <b>{{ c.label || routeNameOf(c.routeId) }}</b>
+                      <span class="text-muted path">{{ routeNameOf(c.routeId) }}</span>
+                      @if (routeOff(c.routeId)) {
+                        <span class="text-muted path" i18n="@@Portal_route_off">route turned off</span>
+                      } @else if (routeGone(c.routeId)) {
+                        <span class="text-muted path" i18n="@@Portal_route_gone">no such UI route</span>
+                      }
+                    </span>
+                    <button matIconButton [disabled]="j === 0" (click)="moveChild(i, j, -1)"
+                      matTooltip="Move up" i18n-matTooltip="@@Move_up"><mat-icon>arrow_upward</mat-icon></button>
+                    <button matIconButton [disabled]="last" (click)="moveChild(i, j, 1)"
+                      matTooltip="Move down" i18n-matTooltip="@@Move_down"><mat-icon>arrow_downward</mat-icon></button>
+                    <button matIconButton (click)="editChild(i, j)"
+                      matTooltip="Edit" i18n-matTooltip="@@Edit"><mat-icon>edit</mat-icon></button>
+                  </div>
                 }
-              </span>
-              <button matIconButton [disabled]="i === 0" (click)="moveEntry(i, -1)"
-                matTooltip="Move up" i18n-matTooltip="@@Move_up"><mat-icon>arrow_upward</mat-icon></button>
-              <button matIconButton [disabled]="i === entries().length - 1" (click)="moveEntry(i, 1)"
-                matTooltip="Move down" i18n-matTooltip="@@Move_down"><mat-icon>arrow_downward</mat-icon></button>
-              <button matIconButton (click)="editParent(i)"
-                matTooltip="Edit" i18n-matTooltip="@@Edit"><mat-icon>edit</mat-icon></button>
-            </div>
+              }
+            }
+          </mat-card>
+        }
+        <div class="links-preview">
+          <iframe #linksFrame class="links-frame" [src]="linksUrl"
+            title="Applications menu preview" i18n-title="@@Portal_links_preview"></iframe>
+          @if (linksDraft().length < 2) {
+            <p class="hint text-muted" i18n="@@Portal_links_single">
+              Fewer than two applications offered: the account button draws no Applications menu.
+            </p>
           }
-        </mat-card>
-      }
+        </div>
+      </div>
     }
   </div>
     </mat-drawer-content>

@@ -55,7 +55,7 @@ assistant plutôt qu'en cliquant.
 | `read_traffic` | Ce qui passe en ce moment. |
 | `read_logs` | Les dernières lignes du journal de la gateway, sur le nœud qui a répondu. |
 | `read_audit` | Le journal d'audit, dans le périmètre de l'appelant. |
-| `get_settings`, `save_portal` | Les réglages globaux, et le portail de navigation. |
+| `get_settings`, `save_portal` | Les réglages globaux, et le catalogue des applications (son mode `portal`, la barre, sur l'image Enterprise seulement). |
 | `get_branding`, `save_branding` | L'identité que portent les pages intégrées. |
 | `list_themes` | Les palettes de couleurs, et celle qui est active. |
 | `export_configuration` | Toute la configuration, sous la forme d'un document lisible. |

@@ -608,7 +608,11 @@ func sampleQR(brand brandView, secret string) template.URL {
 }
 
 func samplePublicLinks() []publicLink {
-	return []publicLink{{Name: "Billing", Href: "/billing"}, {Name: "Docs portal", Href: "/docs"}}
+	return []publicLink{
+		{Name: "Docs portal", Href: "/docs"},
+		{Name: "Invoices", Href: "/billing/invoices", Group: "Billing", Head: true},
+		{Name: "Plans", Href: "/billing/plans", Group: "Billing"},
+	}
 }
 
 func samplePasskeys() []passkeyView {

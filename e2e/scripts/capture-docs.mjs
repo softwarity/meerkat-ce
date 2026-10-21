@@ -655,6 +655,15 @@ const SHOTS = [
   // The portal preview is a real iframe doing a handshake before it draws
   // anything: caught too early it publishes an empty bar.
   { file: 'portal', path: '/application/portal', settle: 3500 },
+  // The same catalogue in Links mode: its two levels in the list, and beside
+  // it the account button's Applications menu, another framed handshake.
+  {
+    file: 'portal-links', path: '/application/portal', settle: 2000,
+    act: async (page) => {
+      await page.locator('mat-button-toggle[value="links"] button').click();
+      await page.waitForTimeout(2500);
+    },
+  },
   { file: 'security', path: '/application/security' },
   // ── Tenants ──
   { file: 'tenants', path: '/tenants' },

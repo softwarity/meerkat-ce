@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -16,6 +17,37 @@ import (
 // routerWithPortal builds a router whose store carries a portal config, so the
 // Reload bakes the portal decision into every compiled UI route - the same path
 // a live gateway takes when an operator turns the portal on.
+// skipWithoutTheBar: the bar is Enterprise, and the community image reads a
+// portal-mode catalogue as links (TestTheCommunityImageDrawsNoBar).
+func skipWithoutTheBar(t *testing.T) {
+	t.Helper()
+	if !edition.Enterprise {
+		t.Skip("the navigation bar is part of the Enterprise image")
+	}
+}
+
+// TestTheCommunityImageDrawsNoBar: a portal-mode catalogue on the community
+// image - imported, or carried over from the other image - injects no bar:
+// the route keeps its own user button, whose menu offers the same list.
+func TestTheCommunityImageDrawsNoBar(t *testing.T) {
+	if edition.Enterprise {
+		t.Skip("the Enterprise image draws the bar (TestPortalBarReplacesTheUserButton)")
+	}
+	upstream := htmlUpstream(t, "/page")
+	r := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,
+		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
+	r.IsUI = true
+	r.UI = &store.RouteUI{UserButton: store.UserButton{Enabled: true}}
+	on := routerWithPortal(t,
+		store.PortalConfig{Mode: store.PortalModePortal, Layout: store.PortalHeader, Side: "left",
+			Entries: []store.PortalEntry{{RouteID: "r1"}}},
+		r)
+	if _, body := get(t, on, "/demo/page"); strings.Contains(body, "meerkat-portal-nav") ||
+		!strings.Contains(body, "<meerkat-user-button") {
+		t.Errorf("the community image must keep the user button and draw no bar:\n%s", body)
+	}
+}
+
 func routerWithPortal(t *testing.T, portal store.PortalConfig, routes ...store.Route) *Router {
 	t.Helper()
 	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
@@ -43,6 +75,7 @@ func routerWithPortal(t *testing.T, portal store.PortalConfig, routes ...store.R
 // turning the portal on swaps the standalone button for the portal bar (which
 // mounts the button itself). The page agent rides either way.
 func TestPortalBarReplacesTheUserButton(t *testing.T) {
+	skipWithoutTheBar(t)
 	upstream := htmlUpstream(t, "/page")
 	uiRoute := func() store.Route {
 		r := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,
@@ -84,6 +117,7 @@ func TestPortalBarReplacesTheUserButton(t *testing.T) {
 // visitor can navigate away instead of being stranded. With the portal off it
 // stays the plain-text 502.
 func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
+	skipWithoutTheBar(t)
 	// A server we close at once: connections to it are refused, so the proxy's
 	// ErrorHandler fires.
 	dead := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
@@ -126,6 +160,7 @@ func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
 // The portal's HTML page follows the gateway's code: an upstream that does not
 // answer in time is a 504 there too, still carrying the bar.
 func TestUnavailableUIPageSaysTimeoutWith504(t *testing.T) {
+	skipWithoutTheBar(t)
 	r := pathRoute("r1", "demo", 1, "/demo/**", hangingUpstream(t),
 		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
 	r.IsUI = true

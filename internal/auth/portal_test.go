@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -15,6 +16,9 @@ import (
 // out of reach - the same rule the apps submenu applied, now two levels deep.
 // The access rules themselves never leave the server.
 func TestPortalJSONFiltersByRouteAccess(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("the navigation bar is part of the Enterprise image")
+	}
 	mux, _, st := mfaSetup(t)
 	ctx := context.Background()
 	for _, rt := range []store.Route{
@@ -106,6 +110,9 @@ func TestPortalJSONDisabled(t *testing.T) {
 // modules are all off is greyed out too; an entry turned off in the portal
 // itself, or a container with nothing shown, is not there at all.
 func TestPortalJSONGreysATurnedOffRoute(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("the navigation bar is part of the Enterprise image")
+	}
 	mux, _, st := mfaSetup(t)
 	ctx := context.Background()
 	off := func(rt store.Route) store.Route { rt.Enabled = false; return rt }
@@ -188,6 +195,9 @@ func mustRoutes(t *testing.T, st *store.Store) []store.Route {
 // session: no organisation, so no role, and it hid a route the gateway let the
 // same person into.
 func TestPortalJSONActsInTheOnlyOrganisation(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("the navigation bar is part of the Enterprise image")
+	}
 	mux, _, st := mfaSetup(t)
 	ctx := context.Background()
 	must := func(err error) {

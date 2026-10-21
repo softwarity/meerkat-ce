@@ -23,11 +23,16 @@ Un sélecteur à trois états décide de ce qui est affiché. **La liste, elle, 
 change pas** : passer d'un menu à une barre est une décision d'affichage, pas
 une raison de ressaisir vos applications.
 
+La barre fait partie de l'image Enterprise (licences Team et Enterprise).
+L'image Community refuse d'enregistrer le mode Portal, et lit un catalogue
+déjà dans ce mode - importé, ou venu de l'autre image - comme Links : la même
+liste, dans le menu du bouton utilisateur.
+
 | Mode | Ce qu'obtient le visiteur |
 |---|---|
 | **None** | Aucune liste. Le bouton utilisateur et les pages que Meerkat sert lui-même portent le nom de votre marque, sans rien à cliquer. C'est le bon choix quand il n'y a qu'une application |
 | **Links** | La liste, dans l'ordre que vous avez choisi, dans le sous-menu **Applications** du bouton utilisateur et sur les pages du plan de données |
-| **Portal** | Une barre de navigation sur chaque page de chaque application. Les pages intégrées ne proposent alors qu'**un seul** lien, la première entrée que l'appelant a le droit d'ouvrir : la navigation, c'est la barre, et une page extérieure aux applications n'a besoin que d'une porte d'entrée |
+| **Portal** | Une barre de navigation sur chaque page de chaque application. Les pages intégrées ne proposent alors qu'**un seul** lien, la première entrée que l'appelant a le droit d'ouvrir : la navigation, c'est la barre, et une page extérieure aux applications n'a besoin que d'une porte d'entrée. **Enterprise** |
 
 ## Modules et conteneurs
 
@@ -54,7 +59,10 @@ En mode **Portal**, une entrée porte en plus une icône :
 |---|---|
 | Icon | un pictogramme choisi dans la bibliothèque de la console, stocké en SVG et dessiné comme un masque CSS - aucune police d'icônes n'est jamais chargée. Laissé vide, c'est l'initiale du libellé qui sert |
 
-En mode **Links**, les modules d'un conteneur sont listés à sa place, dans l'ordre.
+En mode **Links**, un conteneur est un intertitre au-dessus de ses modules, dans
+le menu du bouton de compte comme sur les pages intégrées ; un module qui revient
+au premier niveau après lui ouvre une section à part. Un conteneur dont le
+visiteur ne peut ouvrir aucun module n'affiche pas d'intertitre.
 
 ## Le catalogue dit ce qui existe, la route dit qui le voit
 
@@ -118,7 +126,9 @@ clair ou sombre du visiteur.
 ## Modifier le catalogue
 
 En mode **Links**, la console montre la liste pour ce qu'elle est : des entrées
-numérotées et deux flèches pour l'ordre. En mode **Portal**, elle montre une
+numérotées, les modules d'un conteneur en retrait sous lui, deux flèches pour
+l'ordre - et à côté, le vrai bouton de compte, menu ouvert, qui dessine la liste
+comme un visiteur la verra. En mode **Portal**, elle montre une
 maquette interactive de la barre pendant que vous la construisez : la
 disposition se juge ainsi là où elle sera lue, plutôt que dans une liste de
 champs.

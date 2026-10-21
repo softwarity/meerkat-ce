@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -121,7 +122,7 @@ func TestThePortalIsWrittenAgainstTheRoutesThatExist(t *testing.T) {
 	ctx := mcpCtx(rootUser(t, f))
 
 	if _, err := f.api.toolSavePortal(ctx, json.RawMessage(
-		`{"mode":"portal","layout":"header","entries":[{"routeId":"ghost","label":"Ghost"}]}`)); err == nil {
+		`{"mode":"links","layout":"header","entries":[{"routeId":"ghost","label":"Ghost"}]}`)); err == nil {
 		t.Error("an entry bound to no route should be refused")
 	} else if !strings.Contains(err.Error(), "ghost") {
 		t.Errorf("the refusal should name the route: %v", err)
@@ -136,7 +137,7 @@ func TestThePortalIsWrittenAgainstTheRoutesThatExist(t *testing.T) {
 		t.Fatalf("seeding a route: %v", err)
 	}
 	out, err := f.api.toolSavePortal(ctx, json.RawMessage(
-		`{"mode":"portal","layout":"rail","side":"right","display":"icon","entries":[{"routeId":"sales","label":"Sales","icon":"storefront"}]}`))
+		`{"mode":"links","layout":"rail","side":"right","display":"icon","entries":[{"routeId":"sales","label":"Sales","icon":"storefront"}]}`))
 	if err != nil {
 		t.Fatalf("save_portal: %v", err)
 	}
@@ -144,7 +145,7 @@ func TestThePortalIsWrittenAgainstTheRoutesThatExist(t *testing.T) {
 		t.Errorf("the answer should say what was saved, got %#v", out)
 	}
 	saved := f.api.st.Portal(ctx)
-	if saved.Mode != store.PortalModePortal || saved.Layout != store.PortalRail || saved.Side != "right" {
+	if saved.Mode != store.PortalModeLinks || saved.Layout != store.PortalRail || saved.Side != "right" {
 		t.Errorf("the arrangement was not kept: %+v", saved)
 	}
 	if len(saved.Entries) != 1 || saved.Entries[0].RouteID != "sales" {
@@ -189,5 +190,33 @@ func TestWhatAnImageFieldMeans(t *testing.T) {
 				t.Errorf("got %.40q, want %.40q", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestThePortalBarIsEnterprise: the community image refuses a write that asks
+// for the bar, naming the edition, and reads a portal-mode catalogue already
+// stored (imported, or carried over from the other image) as links - the same
+// list, offered in the account button's menu. The Enterprise image keeps it.
+func TestThePortalBarIsEnterprise(t *testing.T) {
+	f := setupBare(t)
+	ctx := mcpCtx(rootUser(t, f))
+	_, err := f.api.toolSavePortal(ctx, json.RawMessage(`{"mode":"portal","layout":"header"}`))
+	if edition.Enterprise {
+		if err != nil {
+			t.Fatalf("the Enterprise image should save portal mode: %v", err)
+		}
+	} else if err == nil || !strings.Contains(err.Error(), "Enterprise") {
+		t.Errorf("the community image should refuse portal mode naming the edition, got %v", err)
+	}
+
+	if err := f.api.st.SetSetting(ctx, store.SettingPortal, store.PortalConfig{Mode: store.PortalModePortal}); err != nil {
+		t.Fatalf("storing a portal: %v", err)
+	}
+	want := store.PortalModeLinks
+	if edition.Enterprise {
+		want = store.PortalModePortal
+	}
+	if got := f.api.st.Portal(ctx).Mode; got != want {
+		t.Errorf("a stored portal-mode catalogue reads as %q, want %q", got, want)
 	}
 }

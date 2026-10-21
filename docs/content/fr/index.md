@@ -71,8 +71,9 @@ règle au lieu de se réécrire.
 
 ### Elle habille vos pages
 
-Le bouton de compte, le portail de navigation, le mode clair ou sombre et le
-CSS par rôle sont ajoutés aux pages que sert la gateway. Votre
+Le bouton de compte et son menu des applications, le mode clair ou sombre et le
+CSS par rôle sont ajoutés aux pages que sert la gateway - et avec Enterprise,
+une barre de navigation entre vos applications. Votre
 application en bénéficie quel que soit le langage dans lequel elle est écrite,
 et n'embarque aucune bibliothèque pour cela.
 

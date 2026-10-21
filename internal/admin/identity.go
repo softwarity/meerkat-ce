@@ -1263,8 +1263,7 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	_ = a.st.GetSetting(ctx, store.SettingPagesScheme, &p.PagesScheme)
 	p.PageLayout = store.DefaultPageLayout()
 	_ = a.st.GetSetting(ctx, store.SettingPageLayout, &p.PageLayout)
-	p.Portal = store.DefaultPortalConfig()
-	_ = a.st.GetSetting(ctx, store.SettingPortal, &p.Portal)
+	p.Portal = a.st.Portal(ctx)
 	// Where traces go, RAW - references as references (OBS-04). Readable so
 	// that "why am I seeing no traces" has an answer without a shell; not
 	// writable by an agent, which is decided at the tool rather than here:
@@ -1476,6 +1475,10 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 	// naming what is allowed. A route deleted LATER leaves a dangling
 	// reference the served bar skips, and the stored portal lets it through.
 	portal := p.Portal
+	if err := store.RequirePortalMode(portal); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	routes, err := a.st.ListRoutes(r.Context())
 	if err != nil {
 		a.internal(w, err)

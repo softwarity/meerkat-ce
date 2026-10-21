@@ -68,6 +68,12 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     where: '/infra/routes',
     whereLabel: $localize`:@@Routes:Routes`,
   },
+  'PORTAL-01': {
+    label: $localize`:@@EE_PORTAL_01:Navigation bar`,
+    what: $localize`:@@EE_PORTAL_01_what:A bar on every application page, to go from one application to another.`,
+    where: '/application/portal',
+    whereLabel: $localize`:@@Portal_menu:Portal`,
+  },
   'THEME-02': {
     label: $localize`:@@EE_THEME_02:Your brand only`,
     what: $localize`:@@EE_THEME_02_what:Remove the Meerkat mark from the pages your users see.`,

@@ -14,6 +14,7 @@ import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, PortalEntry, PortalSubEntry, PortalConfig, Route, Settings } from '../api.service';
 import { EntryKind, ModuleEditorComponent, ModuleDraft, ModuleFormData } from './module-editor.component';
 import { LiveChangesService } from '../shared/live-changes.service';
+import { EeLockComponent } from '../shared/ee-lock.component';
 
 // The navigation portal (PORTAL-01): build the header-or-rail bar the proxied
 // applications wear, with a live mock-up beside the editor. On, the bar carries
@@ -37,6 +38,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
     MatTooltipModule,
     LoadingIndicatorComponent,
     ModuleEditorComponent,
+    EeLockComponent,
   ],
   styleUrl: './portal-page.component.scss',
   templateUrl: './portal-page.component.html',
@@ -101,6 +103,31 @@ export class PortalPageComponent {
   // fit. 0 is full width. View-only, never saved.
   protected readonly previewWidth = signal(0);
 
+  // Links mode's preview: the REAL account button, menu open, fed the list
+  // below as the menu draws it. Its own frame, its own readiness, like the bar's.
+  protected readonly linksUrl = this.sanitizer.bypassSecurityTrustResourceUrl('/meerkat/links-preview');
+  private readonly linksFrame = viewChild<ElementRef<HTMLIFrameElement>>('linksFrame');
+  private readonly linksReady = signal(false);
+  // What the menu offers, resolved the way the gateway resolves it: entries
+  // turned off, routes turned off or gone are left out, and a container is the
+  // heading over its modules (`head` on the first of each run). Access is not
+  // applied: the preview shows the whole catalogue, each visitor gets their part.
+  protected readonly linksDraft = computed(() => {
+    const out: { name: string; href: string; group?: string; head?: boolean }[] = [];
+    let last = 0;
+    const push = (m: PortalEntry | PortalSubEntry, group: string, run: number) => {
+      if (m.disabled || this.routeOff(m.routeId) || this.routeGone(m.routeId)) return;
+      out.push({ name: this.label(m), href: '#', ...(group ? { group } : {}), ...(run !== last ? { head: true } : {}) });
+      last = run;
+    };
+    this.entries().forEach((e, i) => {
+      if (e.disabled) return;
+      if (!this.isContainer(e)) push(e, '', 0);
+      else (e.children ?? []).forEach((c) => push(c, e.label ?? '', i + 1));
+    });
+    return out;
+  });
+
   constructor() {
     this.load();
     // Somebody else's write (CONSOLE-13). OFFERED and not applied: this screen
@@ -135,12 +162,28 @@ export class PortalPageComponent {
       );
     });
 
+    // The same for the links frame: a new one each time links mode comes back.
+    effect(() => {
+      this.linksFrame();
+      untracked(() => this.linksReady.set(false));
+    });
+    effect(() => {
+      const apps = this.linksDraft();
+      if (!this.linksReady()) return;
+      // One application is no menu: the gateway sends none, and neither does this.
+      this.linksFrame()?.nativeElement.contentWindow?.postMessage(
+        { type: 'mk-links-draft', apps: apps.length > 1 ? apps : [] },
+        location.origin,
+      );
+    });
+
     // The preview talks back: "ready" to receive, and "select" when an entry is
     // clicked.
     const onMsg = (e: MessageEvent) => {
       if (e.origin !== location.origin) return;
       const m = e.data as { type?: string; id?: string };
       if (m?.type === 'mk-portal-ready') this.frameReady.set(true);
+      else if (m?.type === 'mk-links-ready') this.linksReady.set(true);
       else if (m?.type === 'mk-portal-select' && typeof m.id === 'string') this.onSelect(m.id);
     };
     window.addEventListener('message', onMsg);
@@ -397,7 +440,13 @@ export class PortalPageComponent {
     });
   }
 
-  private editChild(pi: number, ci: number, keep = false): void {
+  // Reorder a container's modules from the list.
+  protected moveChild(pi: number, ci: number, dir: -1 | 1): void {
+    this.mutateChildren(pi, (cs) => move(cs, ci, dir));
+    this.persist();
+  }
+
+  protected editChild(pi: number, ci: number, keep = false): void {
     const c = (this.entries()[pi].children ?? [])[ci];
     this.open(this.data.title.editSub, 'sub', c, { pi, ci }, (m) =>
       this.mutateChildren(pi, (cs) => cs.map((x, j) => (j === ci ? { ...x, ...childFromDraft(m) } : x))),

@@ -92,7 +92,8 @@ Ce que la gateway ajoute aux pages qu'elle sert.
 Pour en savoir plus : [Ce que la gateway injecte](/docs/concepts/data-plane-chrome).
 
 - **Bouton utilisateur injecté** : profil, déconnexion, changement d'organisation, langue, mode clair ou sombre.
-- **Portail de navigation** entre vos applications, en barre ou en rail, qui ne montre que ce qu'autorisent les droits d'accès.
+- **Menu des applications** dans le bouton utilisateur, regroupé par conteneur, qui ne montre que ce qu'autorisent les droits d'accès.
+- **Portail de navigation** entre vos applications, en barre ou en rail. **Enterprise**
 - **Masquage de l'interface selon le rôle**, en CSS pur : les rôles sont inscrits dans la page côté serveur.
 - **Votre propre CSS et JavaScript, route par route**, écrits dans la console ou téléversés en fichiers, placés en début ou en fin de head ou en fin de body, dans l'ordre que vous choisissez.
 - **Signalement d'un problème** : capture d'écran, console du navigateur, contexte technique, avec un suivi dans la console d'administration.

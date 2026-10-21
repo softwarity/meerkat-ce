@@ -54,7 +54,7 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `read_traffic` | What is passing through right now. |
 | `read_logs` | The gateway's own last lines, on the node that answered. |
 | `read_audit` | The audit trail, within the caller's own scope. |
-| `get_settings`, `save_portal` | The global settings, and the navigation portal. |
+| `get_settings`, `save_portal` | The global settings, and the application catalogue (its `portal` mode, the bar, on the Enterprise image only). |
 | `get_branding`, `save_branding` | The identity the built-in pages wear. |
 | `list_themes` | The colour palettes, and which is active. |
 | `export_configuration` | The whole configuration, as a readable document. |

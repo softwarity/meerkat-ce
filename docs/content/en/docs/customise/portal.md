@@ -22,11 +22,16 @@ A three-state control decides what is drawn. **The list itself does not move**:
 going from a menu to a bar is a rendering decision, not a reason to retype your
 applications.
 
+The bar is part of the Enterprise image (Team and Enterprise licences alike).
+The Community image refuses to save the Portal mode, and reads a catalogue
+already in that mode - imported, or carried over - as Links: the same list, in
+the user button's menu.
+
 | Mode | What the visitor gets |
 |---|---|
 | **None** | No list. The user button and the pages Meerkat serves itself carry your brand's name and nothing to click. That is the right answer when there is one application |
 | **Links** | The list, in the order you chose, in the user button's **Applications** submenu and on the data-plane pages |
-| **Portal** | A navigation bar on every page of every application. The built-in pages then offer **one** link, the first entry the caller may open: the bar is the navigation, and a page outside the applications only needs a door |
+| **Portal** | A navigation bar on every page of every application. The built-in pages then offer **one** link, the first entry the caller may open: the bar is the navigation, and a page outside the applications only needs a door. **Enterprise** |
 
 ## Modules and containers
 
@@ -53,7 +58,10 @@ In **Portal** mode an entry also carries an icon:
 |---|---|
 | Icon | a glyph picked from the console's bank, stored as SVG and drawn as a CSS mask - no icon font is ever loaded. Empty falls back to the label's initial |
 
-In **Links** mode, a container's modules are listed in its place, in order.
+In **Links** mode, a container is a heading over its modules, in the account
+button's menu as on the built-in pages; a module back at the top level after it
+starts a section of its own. A container none of whose modules the visitor may
+open draws no heading.
 
 ## The catalogue says what exists, the route says who sees it
 
@@ -111,7 +119,9 @@ button, wearing the data plane's theme and the visitor's light or dark.
 ## Editing it
 
 In **Links** mode the console shows the list as what it is: numbered entries,
-two arrows for the order. In **Portal** mode it shows a live mock of the bar
+a container's modules indented under it, two arrows for the order - and beside
+it the real account button, menu open, drawing the list as a visitor will see
+it. In **Portal** mode it shows a live mock of the bar
 while you build it, so the layout is judged where it will be read rather than in
 a list of fields.
 

@@ -77,8 +77,9 @@ trust, and a password policy that is a setting rather than a rewrite.
 
 ### It completes your pages
 
-The account button, the navigation portal, light and dark mode and the per-role
-CSS are added to the pages the gateway serves. Your application
+The account button and its application menu, light and dark mode and the per-role
+CSS are added to the pages the gateway serves - and with Enterprise, a
+navigation bar across your applications. Your application
 gets them whatever it is written in, and it ships no library for it.
 
 ### Edited hot, never restarted

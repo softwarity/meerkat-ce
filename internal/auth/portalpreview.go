@@ -279,8 +279,9 @@ func portalSampleUser(t map[string]string) userButtonPayload {
 		// the strings somebody came to read are in the ones that fold out.
 		Apps: []userButtonLink{
 			{Name: "Orders", Href: "/orders"},
-			{Name: "Billing", Href: "/billing"},
-			{Name: "Docs", Href: "/docs"},
+			{Name: "Invoices", Href: "/billing/invoices", Group: "Billing", Head: true},
+			{Name: "Plans", Href: "/billing/plans", Group: "Billing"},
+			{Name: "Docs", Href: "/docs", Head: true},
 		},
 		Issues:  true,
 		DevDocs: true,

@@ -21,17 +21,22 @@ edited here.
 | | What is drawn |
 |---|---|
 | **None** | nothing. The user button and the built-in pages carry your brand's name, with nothing to click |
-| **Links** | the list, in the user button's *Applications* submenu and on the data-plane pages |
-| **Portal** | a navigation bar on every page of every application; the built-in pages then offer one way back in |
+| **Links** | the list, in the user button's *Applications* submenu and on the data-plane pages, a container as a heading over its modules |
+| **Portal** | a navigation bar on every page of every application; the built-in pages then offer one way back in. **Enterprise** |
 
 **Changing mode does not cost the list.** You can build a menu, promote it to a
 bar, come back: the entries stay.
+
+![The Portal screen in Links mode: the list with a container's modules under it, and beside it the account button's Applications menu as a visitor sees it](img/console/portal-links.webp)
 
 ## What you do here
 
 1. **Pick the mode.** Nothing below shows in *None*.
 2. **Add an application** for each UI the list should offer. In *Links* they
-   stack in a numbered list with two arrows for the order. In *Portal* they are
+   stack in a numbered list with two arrows for the order, a container's
+   modules indented under it, and the real account button beside the list shows
+   its *Applications* menu as a visitor will see it. The button appears on the
+   applications whose route turns it on. In *Portal* they are
    built on the canvas, which is **the real bar in edit mode**: clicking an
    entry opens it in the drawer.
 3. **Choose the arrangement** (*Portal* mode): *header mode* or *rail mode*,

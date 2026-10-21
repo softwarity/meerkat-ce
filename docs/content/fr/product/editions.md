@@ -45,8 +45,8 @@ et être protégé.
 Tout ce que décrit la [page des fonctionnalités](/product/features), sauf les
 lignes du tableau ci-dessous : le routage avec ses onze prédicats et ses
 trente-quatre filtres, les pages de connexion à vos couleurs, les comptes
-locaux, OpenID Connect et GitHub, les rôles et les groupes, le portail de
-navigation, le coffre, TLS (certificats générés, importés ou signés sur
+locaux, OpenID Connect et GitHub, les rôles et les groupes, le menu des
+applications dans le bouton utilisateur, le coffre, TLS (certificats générés, importés ou signés sur
 demande), les limites de débit, le journal d'audit, les écrans de trafic et de
 métriques, toute la console et le point d'entrée des agents IA. En production,
 en entreprise, pour un usage commercial, gratuitement.
@@ -66,6 +66,7 @@ en entreprise, pour un usage commercial, gratuitement.
 | **Audit** | Le journal d'audit, dans la console | Le journal envoyé à votre collecteur, l'audit des endpoints (Endpoint audit) opération par opération, et l'export CSV. |
 | **Configurations enregistrées** | Trois à la fois, et la console vous dit où vous en êtes avant que vous n'atteigniez le plafond | Autant que vous voulez : une par client, une par environnement. |
 | **Configurations dans git** | Export et import d'un fichier | Chaque plateforme dans son répertoire d'un dépôt git : pull, comparaison, activation, push - committé au nom de l'exploitant. Voir [Configuration](/docs/console/configuration). |
+| **Navigation entre applications** | Le menu des applications dans le bouton utilisateur, regroupé par conteneur | Une barre de navigation sur chaque page d'application, en en-tête ou en rail. Voir [le catalogue d'applications](/docs/customise/portal). |
 | **Pages intégrées** | Vos couleurs, votre logo, votre nom, la disposition centrée (*Centered*) | Les dispositions *Split*, *Drawer*, *Banner* et *Bare* en plus, et la marque Meerkat retirée des pages que vous servez. |
 | **Tunnel développeur** | plug, gratuit, tourne seul à côté de la gateway ; Meerkat n'en sait rien | plug intégré à la gateway : chaque développeur se connecte avec sa propre clé, et chaque substitution est nommée et annoncée aux utilisateurs. Voir [Mode développement](/product/dev-mode). |
 | **Support** | Le dépôt : un ticket est lu, et la réponse reste là où elle servira au suivant | Compris dans l'accord : vous joignez ceux qui ont écrit la gateway, pas un premier niveau de support. |

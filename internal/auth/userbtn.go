@@ -125,10 +125,14 @@ type userButtonTenant struct {
 	Name string `json:"name"`
 }
 
-// userButtonLink is one reachable UI route: the Applications submenu.
+// userButtonLink is one reachable UI route: the Applications submenu. Group
+// and Head are publicLink's: the container it sits in, and the first link of
+// a run, where the menu draws the container's heading or the rule back out.
 type userButtonLink struct {
-	Name string `json:"name"`
-	Href string `json:"href"`
+	Name  string `json:"name"`
+	Href  string `json:"href"`
+	Group string `json:"group,omitempty"`
+	Head  bool   `json:"head,omitempty"`
 }
 
 type userButtonPayload struct {
@@ -583,8 +587,8 @@ const userButtonJS = `(() => {
       // side and points the actual direction.
       const flyLeft = align !== 'left';
       const chev = '<span class="chev">' + (flyLeft ? '&#8249;' : '&#8250;') + '</span>';
-      const subMenu = (label, inner) =>
-        '<div class="has-sub"><button class="item parent">' +
+      const subMenu = (label, inner, key) =>
+        '<div class="has-sub"' + (key ? ' data-sub="' + key + '"' : '') + '><button class="item parent">' +
         (flyLeft ? chev : '') + '<span class="grow">' + esc(label) + '</span>' + (flyLeft ? '' : chev) +
         '</button><div class="sub">' + inner + '</div></div>';
 
@@ -626,13 +630,18 @@ const userButtonJS = `(() => {
         // The fronted applications this session may open; the current one is
         // ticked (matched on its entry path). Suppressed inside the portal bar,
         // whose own navigation IS this list (PORTAL-01).
+        // A container of the catalogue is a heading over its modules, which
+        // sit indented under it; a module back at the top level after one
+        // gets a rule instead. Two levels, and no third flyout: a heading
+        // reads the same under a finger as under a mouse.
         if (!inPortal && (data.apps || []).length) {
-          items.push(subMenu(L.applications, data.apps.map(a => {
+          items.push(subMenu(L.applications, data.apps.map((a, i) => {
             const cur = a.href === '/' ? location.pathname === '/'
               : (location.pathname === a.href || location.pathname.startsWith(a.href + '/'));
-            return '<a class="item" href="' + esc(a.href) + '"><span>' + esc(a.name) + '</span>' +
+            const head = !a.head ? '' : (i ? '<hr>' : '') + (a.group ? '<div class="group">' + esc(a.group) + '</div>' : '');
+            return head + '<a class="item' + (a.group ? ' in' : '') + '" href="' + esc(a.href) + '"><span>' + esc(a.name) + '</span>' +
               (cur ? mark() : '') + '</a>';
-          }).join('')));
+          }).join(''), 'apps'));
         }
         if ((data.tenants || []).length > 1) {
           items.push(subMenu(L.tenant, data.tenants.map(t =>
@@ -726,6 +735,9 @@ const userButtonJS = `(() => {
         '.item:disabled { cursor: default; opacity: .85; }' +
         '.item.out { color: var(--mk-error, color-mix(in srgb, red 70%, CanvasText)); }' +
         '.chev { opacity: .55; }' +
+        '.group { padding: 8px 10px 4px; font-size: .72em; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;' +
+        ' color: var(--mk-on-surface-variant, color-mix(in srgb, CanvasText 65%, transparent)); }' +
+        '.item.in { padding-inline-start: 22px; }' +
         '.grow { flex: 1; text-align: start; }' +
         // Flyout submenus: a sibling panel of the parent row, opening away
         // from the anchored side and growing away from the anchored edge.
@@ -912,6 +924,10 @@ const userButtonJS = `(() => {
       } else if (openWith !== null) {
         menu.classList.add('open');
         stampHere();
+        // open="apps" also unfolds the Applications submenu: the catalogue
+        // editor previews THAT list, and a folded row is not a preview of it.
+        const apps = openWith === 'apps' && this.shadowRoot.querySelector('.has-sub[data-sub="apps"]');
+        if (apps) apps.classList.add('open');
       } else {
         document.addEventListener('click', () => { closeSubs(); menu.classList.remove('open'); });
       }

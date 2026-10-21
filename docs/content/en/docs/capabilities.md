@@ -77,7 +77,7 @@ The ways in, all served by the gateway in your colours, in 20 languages.
 
 | Capability | What Meerkat does | Without Meerkat | Edition |
 |---|---|---|---|
-| [User button and portal](/docs/concepts/data-plane-chrome) | Profile, sign-out, organisation, language, light or dark, and the navigation across your applications, added to the pages the gateway serves. | To build in each application. No product does it. | Community |
+| [User button and portal](/docs/concepts/data-plane-chrome) | Profile, sign-out, organisation, language, light or dark, and the navigation across your applications, added to the pages the gateway serves. | To build in each application. No product does it. | Community, navigation bar Enterprise |
 | [Per-role CSS, your CSS and JavaScript](/docs/customise/injections) | Roles stamped on the page server-side, and your own code per route. | Front-end code in each application. | Community |
 | Issue reporting | A screenshot and its technical context, tracked in the console. | Sentry self-hosted, or Marker.io, Jam, Userback. | Community |
 | [Theme and branding](/docs/customise/theme) | Material 3 themes, light and dark, your logo and background; more page layouts and no Meerkat mark with Enterprise. | A theme per tool. | Community, layouts Enterprise |

@@ -129,6 +129,9 @@ func (a *API) toolSavePortal(ctx context.Context, args json.RawMessage) (any, er
 	if err := json.Unmarshal(args, &portal); err != nil {
 		return nil, fmt.Errorf("this is not a portal: %w", err)
 	}
+	if err := store.RequirePortalMode(portal); err != nil {
+		return nil, err
+	}
 	before := a.st.Portal(ctx)
 	routes, err := a.st.ListRoutes(ctx)
 	if err != nil {

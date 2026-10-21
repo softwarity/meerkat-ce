@@ -22,7 +22,7 @@ language picker without anyone opening its source.
 |---|---|---|
 | Page agent | `/meerkat/page.js`, which installs `window.meerkatPage` | the route being a UI route |
 | User button | a `meerkat-user-button` Web Component: who you are, organisation, language, sign out | a switch on the route |
-| Navigation portal | a `meerkat-portal-nav` bar listing the applications this person may open | the global catalogue in `portal` mode; it replaces the standalone button |
+| Navigation portal | a `meerkat-portal-nav` bar listing the applications this person may open | the global catalogue in `portal` mode (Enterprise); it replaces the standalone button |
 | Identity stamp | roles and user fields written into the page's own markup, server-side | a switch on the route, per field |
 | Custom CSS and JS | the blocks of the route's Custom section, written there or uploaded as files | at least one block |
 | Locale hook | a function the gateway calls when the visitor changes language | a route whose locales travel by script |

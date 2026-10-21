@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/icons"
 )
 
@@ -179,10 +180,27 @@ func DefaultPortalConfig() PortalConfig {
 // any read error - a broken setting must not take the injection decision with
 // it (a gateway that cannot read the portal simply serves the per-route
 // buttons, as if the portal were off).
+//
+// The bar is Enterprise. The community image reads a portal-mode catalogue as
+// links: the list is the same one, so nothing is lost and nothing converted -
+// an imported configuration, or a database carried over from the other image,
+// offers its applications in the account button's menu instead of a bar.
 func (s *Store) Portal(ctx context.Context) PortalConfig {
 	cfg := DefaultPortalConfig()
 	_ = s.GetSetting(ctx, SettingPortal, &cfg)
+	if cfg.Mode == PortalModePortal && !edition.Enterprise {
+		cfg.Mode = PortalModeLinks
+	}
 	return cfg
+}
+
+// RequirePortalMode refuses, on the community image, a write that asks for the
+// bar - said rather than saved as links behind the writer's back.
+func RequirePortalMode(cfg PortalConfig) error {
+	if cfg.Mode != PortalModePortal {
+		return nil
+	}
+	return edition.Require("the navigation bar (portal mode)")
 }
 
 // SanitizePortalConfig normalises and validates in place against the routes

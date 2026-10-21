@@ -104,7 +104,7 @@ Learn these five and the console stops surprising you.
 - **[Users](/docs/console/users)** - accounts, capabilities, and their fields.
 - **[Groups, Members and Group rules](/docs/console/organisation)** - who is in which group.
 - **[Built-in pages](/docs/console/built-in-pages)** - theme, layout and branding of the pages the gateway serves.
-- **[Portal](/docs/console/portal)** - the navigation bar the proxied applications wear.
+- **[Portal](/docs/console/portal)** - the application catalogue: a menu in the account button, or a navigation bar the proxied applications wear (Enterprise).
 - **[Sessions](/docs/auth/sessions#seeing-the-sessions)** - who is signed in, and signing a session out.
 - **[Access tokens](/docs/console/access-and-agents)** - console tokens, and everyone's application tokens.
 

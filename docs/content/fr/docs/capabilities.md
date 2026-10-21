@@ -78,7 +78,7 @@ Les façons d'entrer, toutes servies par la gateway à vos couleurs, en 20 langu
 
 | Capacité | Ce que fait Meerkat | Sans Meerkat | Édition |
 |---|---|---|---|
-| [Bouton utilisateur et portail](/docs/concepts/data-plane-chrome) | Profil, déconnexion, organisation, langue, clair ou sombre, et la navigation entre vos applications, ajoutés aux pages que sert la gateway. | À construire dans chaque application. Aucun produit ne le fait. | Community |
+| [Bouton utilisateur et portail](/docs/concepts/data-plane-chrome) | Profil, déconnexion, organisation, langue, clair ou sombre, et la navigation entre vos applications, ajoutés aux pages que sert la gateway. | À construire dans chaque application. Aucun produit ne le fait. | Community, barre de navigation Enterprise |
 | [CSS par rôle, votre CSS et votre JavaScript](/docs/customise/injections) | Les rôles posés sur la page côté serveur, et votre propre code par route. | Du code front dans chaque application. | Community |
 | Signalement d'anomalies | Une capture d'écran et son contexte technique, suivis dans la console. | Sentry auto-hébergé, ou Marker.io, Jam, Userback. | Community |
 | [Thème et marque](/docs/customise/theme) | Thèmes Material 3, clair et sombre, votre logo et votre fond ; plus de mises en page et sans la marque Meerkat avec Enterprise. | Un thème par outil. | Community, mises en page Enterprise |

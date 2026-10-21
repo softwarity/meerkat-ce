@@ -90,7 +90,8 @@ What the gateway adds to the pages it serves.
 Read more: [What the gateway injects](/docs/concepts/data-plane-chrome).
 
 - **Injected user button**: profile, sign-out, organisation switch, language, light or dark.
-- **Navigation portal** across your applications, as a bar or a rail, showing only what access rights allow.
+- **Application menu** in the user button, grouped by container, showing only what access rights allow.
+- **Navigation portal** across your applications, as a bar or a rail. **Enterprise**
 - **Hide UI by role** in pure CSS: roles are stamped on the page server-side.
 - **Your own CSS and JavaScript per route**, written in the console or uploaded as files, placed at the start or end of the head or at the end of the body, in the order you set.
 - **Issue reporting**: screenshot, console, technical context, tracked in the admin console.

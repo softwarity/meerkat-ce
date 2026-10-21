@@ -42,7 +42,7 @@ between paying less and being safe.
 Everything the [features page](/product/features) describes, minus the rows of
 the table below: routing with its eleven predicates and thirty-four filters,
 the sign-in pages in your colours, local accounts, OpenID Connect and GitHub,
-roles and groups, the navigation portal, the vault, TLS (generated, imported or
+roles and groups, the application menu in the user button, the vault, TLS (generated, imported or
 signed on request), rate limits, the audit trail, the traffic and metrics
 screens, the whole console, and the AI agent endpoint. In production, in a
 company, commercially, for free.
@@ -62,6 +62,7 @@ company, commercially, for free.
 | **Audit** | The audit trail, in the console | The trail sent to your collector, Endpoint audit per operation, and CSV export. |
 | **Saved configurations** | Three at a time, and the console says which one you are on before you hit the cap | As many as you like - one per customer, one per environment. |
 | **Configurations in git** | Export and import of a file | Each platform in its directory of a git repository: pull, compare, activate, push - committed under the name of the operator. See [Configuration](/docs/console/configuration). |
+| **Navigation between applications** | The application menu in the user button, grouped by container | A navigation bar on every application page, as a header or a rail. See [the application catalogue](/docs/customise/portal). |
 | **Built-in pages** | Your colours, your logo, your name, the centred arrangement | The split, drawer, banner and bare arrangements too, and the Meerkat mark off the pages you serve. |
 | **Developer tunnel** | plug, free, runs on its own beside the gateway; Meerkat knows nothing of it | plug integrated into the gateway: each developer signs in with their own key, and every substitution is named and announced to users. See [Dev mode](/product/dev-mode). |
 | **Support** | The repository: an issue is read, and the answer stays where it helps the next person | Part of the agreement - you reach the people who wrote the gateway, not a tier. |

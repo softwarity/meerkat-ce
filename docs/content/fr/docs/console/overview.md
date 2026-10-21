@@ -109,7 +109,7 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
 - **[Users](/docs/console/users)** - les comptes, leurs capacités et leurs champs.
 - **[Groups, Members et Group rules](/docs/console/organisation)** - qui appartient à quel groupe.
 - **[Built-in pages](/docs/console/built-in-pages)** - le thème, la disposition et la marque des pages que sert la gateway.
-- **[Portal](/docs/console/portal)** - la barre de navigation qui habille les applications exposées par la gateway.
+- **[Portal](/docs/console/portal)** - le catalogue des applications : un menu dans le bouton de compte, ou une barre de navigation qui habille les applications exposées par la gateway (Enterprise).
 - **[Sessions](/docs/auth/sessions#voir-les-sessions)** - qui est connecté, et comment fermer une session.
 - **[Access tokens](/docs/console/access-and-agents)** - les jetons de la console, et les jetons d'application de tous les comptes.
 

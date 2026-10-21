@@ -289,7 +289,7 @@ const pendingBody = `    <form onsubmit="return false">
     {{if .Public}}<div class="public">
       <p class="lead">{{.T.continueWithout}}</p>
       <nav class="public-links">
-        {{range .Public}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
+        {{range .Public}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
       </nav>
     </div>{{end}}
     <p class="back"><a href="/profile">{{.T.backToProfile}}</a></p>

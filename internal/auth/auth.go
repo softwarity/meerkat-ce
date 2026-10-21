@@ -715,6 +715,15 @@ const flowTop = `<!doctype html>
       background: var(--mk-surface-container);
     }
     .public-links a:hover { border-color: var(--mk-secondary); }
+    /* A container of the catalogue: its label on a line of its own, over its
+       modules. Empty, it is the line break back to the top level. */
+    .public-links .group {
+      flex-basis: 100%; margin-top: 6px;
+      font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--mk-on-surface-variant);
+    }
+    .public-links .group:first-child { margin-top: 0; }
+    .public-links .group:empty { margin-top: 0; }
     /* button.pk-btn: must out-rank button.choice, whose margin: 0 wins over
        a bare class selector */
     button.pk-btn { margin-top: 22px; width: 100%; justify-content: center; }
@@ -1126,7 +1135,7 @@ var loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
     {{if .Public}}<div class="public">
       <p class="lead">{{.T.continueWithout}}</p>
       <nav class="public-links">
-        {{range .Public}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
+        {{range .Public}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
       </nav>
     </div>{{end}}
 `
@@ -1520,7 +1529,7 @@ const profileBody = `    <style>
     <div class="apps panel">
       <h2>{{.T.applications}}</h2>
       <nav class="public-links">
-        {{range .Apps}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
+        {{range .Apps}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
       </nav>
     </div>
     {{end}}
@@ -2218,6 +2227,9 @@ func (h *Handler) Register(raw *http.ServeMux) {
 		// page that renders the REAL bar in edit mode, so the SAME component is
 		// the editor. Served here to stay same-origin with the console.
 		h.registerPortalPreview(mux)
+		// And the links mode's: the account button's Applications submenu,
+		// fed the catalogue being edited.
+		h.registerLinksPreview(mux)
 	}
 	// The PROFILE lives on both planes. Whoever administers the gateway is a
 	// user too: they need a passkey, a photo, a second factor and an address,
@@ -3835,9 +3847,19 @@ func (h *Handler) loginView(r *http.Request, next, errMsg string) loginView {
 
 // publicLink is one UI route reachable without signing in, offered on the
 // login page under the form.
+//
+// Group is the container the module sits in, empty for a module of its own:
+// the catalogue has two levels and a list of links shows both, the container
+// as a heading over its modules. Head marks the first link of a run - under
+// a container, or back at the top level after one - which is where a heading
+// (or, coming back out, a break) is drawn. Said on the link rather than worked
+// out by the templates, because two runs can carry the same label and the
+// templates only see one link at a time.
 type publicLink struct {
-	Name string
-	Href string
+	Name  string
+	Href  string
+	Group string
+	Head  bool
 }
 
 // catalogue resolves the portal catalogue into offerable links: the entries
@@ -3873,24 +3895,31 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 		byID[rt.ID] = rt
 	}
 	// The modules in catalogue order: a module for itself, a container for
-	// each of its own - a flat list has no heading to hang them under.
-	type module struct{ routeID, label string }
+	// each of its own, which carry the container's label as their group. run
+	// tells two containers apart, labels being free text.
+	type module struct {
+		routeID, label, group string
+		run                   int
+	}
 	var modules []module
-	for _, e := range cfg.Entries {
+	for i, e := range cfg.Entries {
 		if e.Disabled {
 			continue
 		}
 		if !e.IsContainer() {
-			modules = append(modules, module{e.RouteID, e.Label})
+			modules = append(modules, module{routeID: e.RouteID, label: e.Label})
 			continue
 		}
 		for _, c := range e.Children {
 			if !c.Disabled {
-				modules = append(modules, module{c.RouteID, c.Label})
+				modules = append(modules, module{routeID: c.RouteID, label: c.Label, group: e.Label, run: i + 1})
 			}
 		}
 	}
 	var links []publicLink
+	// The run of the last link KEPT: a heading goes over the first module of
+	// a container the caller may open, not over one they will never see.
+	last := 0
 	for _, m := range modules {
 		rt, ok := byID[m.routeID]
 		// A route deleted after it entered the catalogue leaves a dangling id.
@@ -3903,10 +3932,14 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 		if href == "" {
 			continue
 		}
-		links = append(links, publicLink{Name: portalLabel(m.label, rt), Href: href})
 		if cfg.Mode == store.PortalModePortal {
+			// One way back in has no heading to sit under.
+			links = append(links, publicLink{Name: portalLabel(m.label, rt), Href: href})
 			break
 		}
+		links = append(links, publicLink{Name: portalLabel(m.label, rt), Href: href,
+			Group: m.group, Head: m.run != last})
+		last = m.run
 	}
 	return links
 }

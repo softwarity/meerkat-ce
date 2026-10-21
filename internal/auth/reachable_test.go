@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -167,6 +168,13 @@ func TestTheModeDecidesWhatTheMenuOffers(t *testing.T) {
 
 	seedCatalogue(t, st, store.PortalModePortal, "shop", "intranet")
 	body := hub()
+	// The community image has no bar, so it reads the catalogue as links.
+	if !edition.Enterprise {
+		if !strings.Contains(body, `href="/shop"`) || !strings.Contains(body, `href="/intranet"`) {
+			t.Errorf("mode portal on the community image must offer the catalogue as links:\n%.600s", body)
+		}
+		return
+	}
 	if !strings.Contains(body, `href="/shop"`) {
 		t.Errorf("mode portal must still offer the way back in:\n%.600s", body)
 	}
@@ -195,5 +203,65 @@ func TestTheCatalogueOrderIsTheMenuOrder(t *testing.T) {
 	payload := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, sessionCookieOf(login)))
 	if strings.Index(payload, `"/intranet"`) > strings.Index(payload, `"/shop"`) {
 		t.Errorf("the catalogue order must win over the routing order: %s", payload)
+	}
+}
+
+// TestTheCatalogueKeepsItsContainers: links mode offers the two levels the
+// catalogue has. A container is the heading over its modules - on the user
+// button and on the built-in pages alike - a container the caller can open
+// nothing in draws no heading, and a module back at the top level after one
+// starts a run of its own.
+func TestTheCatalogueKeepsItsContainers(t *testing.T) {
+	mux, _, st := mfaSetup(t)
+	ctx := context.Background()
+	for _, rt := range []store.Route{
+		uiRoute("shop", 1, false, ""),
+		uiRoute("intranet", 2, false, ""),
+		uiRoute("wiki", 3, false, ""),
+		uiRoute("vault", 4, false, "auditor"),
+		uiRoute("docs", 5, false, ""),
+	} {
+		if err := st.SaveRoute(ctx, rt); err != nil {
+			t.Fatalf("SaveRoute %s: %v", rt.ID, err)
+		}
+	}
+	cfg := store.PortalConfig{Mode: store.PortalModeLinks, Entries: []store.PortalEntry{
+		{RouteID: "shop", Label: "shop"},
+		{Label: "Tools", Children: []store.PortalSubEntry{{RouteID: "intranet"}, {RouteID: "wiki"}}},
+		{Label: "Secrets", Children: []store.PortalSubEntry{{RouteID: "vault"}}},
+		{RouteID: "docs", Label: "docs"},
+	}}
+	routes, err := st.ListRoutes(ctx)
+	if err != nil {
+		t.Fatalf("ListRoutes: %v", err)
+	}
+	if err := store.SanitizePortalConfig(&cfg, routes, nil); err != nil {
+		t.Fatalf("SanitizePortalConfig: %v", err)
+	}
+	if err := st.SetSetting(ctx, store.SettingPortal, cfg); err != nil {
+		t.Fatalf("SetSetting portal: %v", err)
+	}
+	login := do(t, mux, "POST", "/login", url.Values{"username": {"admin"}, "password": {"s3cret"}}, nil)
+	sc := sessionCookieOf(login)
+
+	payload := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, sc))
+	for _, want := range []string{
+		`{"name":"shop","href":"/shop"}`,
+		`{"name":"intranet","href":"/intranet","group":"Tools","head":true}`,
+		`{"name":"wiki","href":"/wiki","group":"Tools"}`,
+		`{"name":"docs","href":"/docs","head":true}`,
+	} {
+		if !strings.Contains(payload, want) {
+			t.Errorf("the menu must carry %s: %s", want, payload)
+		}
+	}
+	if strings.Contains(payload, "Secrets") {
+		t.Errorf("a container with nothing the caller may open must draw no heading: %s", payload)
+	}
+
+	hub := bodyString(do(t, mux, "GET", "/profile", nil, sc))
+	if !strings.Contains(hub, `<span class="group">Tools</span><a href="/intranet">`) ||
+		!strings.Contains(hub, `<a href="/wiki">wiki</a><span class="group"></span><a href="/docs">`) {
+		t.Errorf("the profile hub must head the container's modules and break back out:\n%s", hub)
 	}
 }
