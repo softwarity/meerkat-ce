@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.15.0
+
 - **The Links mode keeps the catalogue's containers.** A container was flattened into the list;
   it is now a heading over its modules, in the account button's Applications menu and on the
   built-in pages (profile, sign-in). The Portal screen shows, beside the list, the real account
