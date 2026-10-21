@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -193,30 +193,31 @@ func TestWhatAnImageFieldMeans(t *testing.T) {
 	}
 }
 
-// TestThePortalBarIsEnterprise: the community image refuses a write that asks
-// for the bar, naming the edition, and reads a portal-mode catalogue already
-// stored (imported, or carried over from the other image) as links - the same
-// list, offered in the account button's menu. The Enterprise image keeps it.
+// TestThePortalBarIsEnterprise: an image without the bar (the community one)
+// refuses a write that asks for it, naming the edition, and reads a
+// portal-mode catalogue already stored (imported, or carried over from the
+// other image) as links - the same list, offered in the account button's
+// menu. With the bar registered, as ee/portal does, both go through.
 func TestThePortalBarIsEnterprise(t *testing.T) {
 	f := setupBare(t)
 	ctx := mcpCtx(rootUser(t, f))
-	_, err := f.api.toolSavePortal(ctx, json.RawMessage(`{"mode":"portal","layout":"header"}`))
-	if edition.Enterprise {
-		if err != nil {
-			t.Fatalf("the Enterprise image should save portal mode: %v", err)
-		}
-	} else if err == nil || !strings.Contains(err.Error(), "Enterprise") {
-		t.Errorf("the community image should refuse portal mode naming the edition, got %v", err)
+	if _, err := f.api.toolSavePortal(ctx, json.RawMessage(`{"mode":"portal","layout":"header"}`)); err == nil ||
+		!strings.Contains(err.Error(), "Enterprise") {
+		t.Errorf("without the bar, portal mode should be refused naming the edition, got %v", err)
 	}
-
 	if err := f.api.st.SetSetting(ctx, store.SettingPortal, store.PortalConfig{Mode: store.PortalModePortal}); err != nil {
 		t.Fatalf("storing a portal: %v", err)
 	}
-	want := store.PortalModeLinks
-	if edition.Enterprise {
-		want = store.PortalModePortal
+	if got := f.api.st.Portal(ctx).Mode; got != store.PortalModeLinks {
+		t.Errorf("without the bar, a stored portal-mode catalogue reads as %q, want links", got)
 	}
-	if got := f.api.st.Portal(ctx).Mode; got != want {
-		t.Errorf("a stored portal-mode catalogue reads as %q, want %q", got, want)
+
+	auth.RegisterPortalBar(&auth.PortalBar{})
+	t.Cleanup(func() { auth.RegisterPortalBar(nil) })
+	if _, err := f.api.toolSavePortal(ctx, json.RawMessage(`{"mode":"portal","layout":"header"}`)); err != nil {
+		t.Fatalf("with the bar, portal mode should be saved: %v", err)
+	}
+	if got := f.api.st.Portal(ctx).Mode; got != store.PortalModePortal {
+		t.Errorf("with the bar, the catalogue reads as %q, want portal", got)
 	}
 }

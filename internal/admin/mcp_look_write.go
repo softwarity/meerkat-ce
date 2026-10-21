@@ -32,9 +32,11 @@ import (
 func (a *API) lookWriteTools() []mcp.Tool {
 	return []mcp.Tool{
 		{
-			Name: "save_portal", Allow: administersIdentity, Title: "Write the navigation portal",
-			Description: "Set the portal - the bar the proxied applications wear (PORTAL-01): whether it is on, " +
-				"header or rail, which side, what an entry shows, and the modules it lists. " +
+			Name: "save_portal", Allow: administersIdentity, Title: "Write the application catalogue",
+			Description: "Set the application catalogue (PORTAL-03) and how it is offered: none, links (the account " +
+				"button's Applications menu, a container as a heading over its modules) or portal - the bar the " +
+				"proxied applications wear (PORTAL-01, Enterprise: refused on the community image) - and for the " +
+				"bar, header or rail, which side, what an entry shows. " +
 				"It takes the shape get_settings returns under \"portal\", so read it, change it, and send it " +
 				"back whole: what you leave out is removed. " +
 				"An entry is a MODULE, bound to an ENABLED UI route by its id - list_routes gives them - or a " +

@@ -103,10 +103,4 @@ func TestTheMenuOnAPageOffersThatPagesLanguages(t *testing.T) {
 	if frag := userButtonFragment(r, codes); !strings.Contains(frag, `languages="fr,ja-JP,lf"`) {
 		t.Errorf("the standalone button does not carry the page's own languages:\n%s", frag)
 	}
-	// And the portal bar, which mounts the same button: portal.json carries the
-	// gateway's whole offer for want of knowing which page asked, so the
-	// injection names them here.
-	if frag := portalFragment(r, codes); !strings.Contains(frag, `languages="fr,ja-JP,lf"`) {
-		t.Errorf("the portal bar does not carry the page's own languages:\n%s", frag)
-	}
 }

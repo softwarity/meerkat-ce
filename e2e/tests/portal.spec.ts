@@ -1,6 +1,6 @@
 import { expect, Locator, request, test } from '@playwright/test';
 import { ADMIN_URL, DATA_URL, HTTPBIN_URL } from '../playwright.config';
-import { authFile } from '../lib/fixtures';
+import { ENTERPRISE, authFile } from '../lib/fixtures';
 
 // The portal's rail, measured in a browser (2026-10-15). Collapsed, a module's
 // glyph sat 3px left of its pill and of the burger, and its label was cut to
@@ -9,6 +9,7 @@ import { authFile } from '../lib/fixtures';
 // label takes the rail's width, and the open rail is as wide as its widest
 // label with the same padding on both sides.
 test('portal-rail: the rail lines its icons up and fits its labels', async ({ browser }) => {
+  test.skip(!ENTERPRISE, 'the navigation bar is Enterprise: the community refusal is the last test');
   const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
   const before = await (await root.get('/api/settings')).json();
   const icon = '<svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z"/></svg>';
@@ -89,6 +90,7 @@ test('portal-rail: the rail lines its icons up and fits its labels', async ({ br
 // away, not gone: the save passes, and the bar shows the entry greyed out, in
 // its place, leading nowhere.
 test('portal: an entry whose route is turned off is kept and greyed out', async ({ browser }) => {
+  test.skip(!ENTERPRISE, 'the navigation bar is Enterprise: the community refusal is the last test');
   const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
   const id = 'e2e-portal-off';
   const route = await root.put(`/api/routes/${id}`, {
@@ -147,6 +149,7 @@ test('portal: an entry whose route is turned off is kept and greyed out', async 
 // its entry only when it is made. A new sub-module starts empty, and an empty
 // label is the route's name.
 test('portal: a sub-module added from its container starts with no label', async ({ browser }) => {
+  test.skip(!ENTERPRISE, 'the navigation bar is Enterprise: the community refusal is the last test');
   const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
   const before = await (await root.get('/api/settings')).json();
   const settings = structuredClone(before);
@@ -184,6 +187,7 @@ test('portal: a sub-module added from its container starts with no label', async
 // preview (2026-10-16): nothing said the bar would not offer it. It is crossed
 // out there, and never reaches the people's bar.
 test('portal: an entry turned off in the portal is crossed out in the preview', async ({ browser }) => {
+  test.skip(!ENTERPRISE, 'the navigation bar is Enterprise: the community refusal is the last test');
   const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
   const before = await (await root.get('/api/settings')).json();
   const settings = structuredClone(before);
@@ -218,4 +222,27 @@ test('portal: an entry turned off in the portal is crossed out in the preview', 
     expect(back.ok(), await back.text()).toBeTruthy();
     await root.dispose();
   }
+});
+
+// The community image does not carry the bar: a write asking for it is refused
+// by name, the bar's script is not served, and the Portal toggle is offered
+// locked beside the two modes the image has.
+test('portal: the community image refuses the bar by name and does not serve it', async ({ browser }) => {
+  test.skip(ENTERPRISE, 'the Enterprise image draws the bar: the tests above cover it');
+  const root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
+  const before = await (await root.get('/api/settings')).json();
+  const res = await root.put('/api/settings', { data: { ...before, portal: { ...(before.portal ?? {}), mode: 'portal' } } });
+  expect(res.status()).toBe(422);
+  expect(await res.text()).toContain('part of the Enterprise edition');
+  await root.dispose();
+
+  const data = await request.newContext({ baseURL: DATA_URL });
+  expect(await (await data.get('/meerkat/portal.js')).text()).not.toContain('meerkat-portal-nav');
+  await data.dispose();
+
+  const context = await browser.newContext({ storageState: authFile('root') });
+  const page = await context.newPage();
+  await page.goto(ADMIN_URL + '/application/portal');
+  await expect(page.locator('mat-button-toggle[value="portal"] app-ee-lock')).toBeVisible();
+  await context.close();
 });

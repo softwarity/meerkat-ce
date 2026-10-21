@@ -124,12 +124,12 @@ func buildKeyMap() {
 		inShell[k] = true
 	}
 
-	keysOf = make(map[string][]string, len(PreviewPages)+len(PortalPreviewKinds))
+	keysOf = make(map[string][]string, len(PreviewPages)+len(PortalPreviewKinds()))
 	// The bar draws its text from a JSON payload the page carries, not from a
 	// Go template, so the probe finds those strings the same way it finds a
 	// page's: they are IN the rendered document. Which is the whole reason the
 	// catalogue is handed to portalPreviewHTML instead of resolved inside it.
-	for _, k := range PortalPreviewKinds {
+	for _, k := range PortalPreviewKinds() {
 		kind := k
 		keysOf[kind.Key] = renderedKeys(probe, func(c flowChrome) []byte {
 			html, ok := portalPreviewHTML(kind.Key, store.DefaultTheme(), store.DefaultBranding(),

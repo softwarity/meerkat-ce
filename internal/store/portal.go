@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/icons"
 )
 
@@ -181,26 +180,35 @@ func DefaultPortalConfig() PortalConfig {
 // it (a gateway that cannot read the portal simply serves the per-route
 // buttons, as if the portal were off).
 //
-// The bar is Enterprise. The community image reads a portal-mode catalogue as
-// links: the list is the same one, so nothing is lost and nothing converted -
+// The bar is Enterprise (ee/portal). An image without it reads a portal-mode
+// catalogue as links: the list is the same one, so nothing is lost and nothing converted -
 // an imported configuration, or a database carried over from the other image,
 // offers its applications in the account button's menu instead of a bar.
 func (s *Store) Portal(ctx context.Context) PortalConfig {
 	cfg := DefaultPortalConfig()
 	_ = s.GetSetting(ctx, SettingPortal, &cfg)
-	if cfg.Mode == PortalModePortal && !edition.Enterprise {
+	if cfg.Mode == PortalModePortal && !portalBar {
 		cfg.Mode = PortalModeLinks
 	}
 	return cfg
 }
 
-// RequirePortalMode refuses, on the community image, a write that asks for the
-// bar - said rather than saved as links behind the writer's back.
+// portalBar says the image carries the navigation bar: ee/portal registers it
+// (auth.RegisterPortalBar), and the community image never does.
+var portalBar bool
+
+// SetPortalBar is how the registration reaches the store. Not a switch an
+// operator turns: the bar is code one image has and the other does not.
+func SetPortalBar(on bool) { portalBar = on }
+
+// RequirePortalMode refuses a write that asks for the bar on an image that
+// does not carry it - said rather than saved as links behind the writer's back.
 func RequirePortalMode(cfg PortalConfig) error {
-	if cfg.Mode != PortalModePortal {
+	if cfg.Mode != PortalModePortal || portalBar {
 		return nil
 	}
-	return edition.Require("the navigation bar (portal mode)")
+	return fmt.Errorf("portal mode %q: the navigation bar is part of the Enterprise edition, and this image does not carry it; allowed modes are %s, %s",
+		cfg.Mode, PortalModeNone, PortalModeLinks)
 }
 
 // SanitizePortalConfig normalises and validates in place against the routes

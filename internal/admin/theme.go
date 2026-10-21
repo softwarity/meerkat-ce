@@ -391,15 +391,17 @@ func (a *API) listTemplates(w http.ResponseWriter, _ *http.Request, _ store.User
 	// only thing the editor could show; with thirty real pages, it teaches
 	// nothing they do not, and it is not a page anybody is ever served.
 	out := make([]previewTemplate, 0,
-		len(auth.PreviewPages)+len(auth.PortalPreviewKinds)+len(auth.MailSampleKinds))
+		len(auth.PreviewPages)+len(auth.PortalPreviewKinds())+len(auth.MailSampleKinds))
 	for _, p := range auth.PreviewPages {
 		out = append(out, previewTemplate{Key: p.Key, Label: p.Label, Kind: "page", Category: p.Category})
 	}
-	// The bar, before the mails: it is the surface a visitor sees on every
-	// screen of every application, and it has a dark half a message does not.
-	for _, k := range auth.PortalPreviewKinds {
+	// The bar (Enterprise, when the image carries it), before the mails: it is
+	// the surface a visitor sees on every screen of every application, and it
+	// has a dark half a message does not. The report form goes with the
+	// account pages.
+	for _, k := range auth.PortalPreviewKinds() {
 		out = append(out, previewTemplate{
-			Key: k.Key, Label: k.Label, Kind: "page", Category: auth.CategoryPortal,
+			Key: k.Key, Label: k.Label, Kind: "page", Category: k.Category,
 		})
 	}
 	for _, k := range auth.MailSampleKinds {
@@ -426,6 +428,10 @@ func (a *API) listTemplates(w http.ResponseWriter, _ *http.Request, _ store.User
 func previewCategories() []previewCategory {
 	out := make([]previewCategory, 0, len(auth.PreviewCategories))
 	for _, c := range auth.PreviewCategories {
+		// No bar in this image, nothing to file under it.
+		if c.Key == auth.CategoryPortal && auth.Bar() == nil {
+			continue
+		}
 		out = append(out, previewCategory{Key: c.Key, Label: c.Label, Icon: c.Icon})
 	}
 	return out

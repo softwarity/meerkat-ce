@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -166,15 +165,16 @@ func TestTheModeDecidesWhatTheMenuOffers(t *testing.T) {
 		t.Errorf("mode links must offer the catalogue:\n%.600s", body)
 	}
 
+	// Without the bar (the community image), portal mode reads as links.
 	seedCatalogue(t, st, store.PortalModePortal, "shop", "intranet")
-	body := hub()
-	// The community image has no bar, so it reads the catalogue as links.
-	if !edition.Enterprise {
-		if !strings.Contains(body, `href="/shop"`) || !strings.Contains(body, `href="/intranet"`) {
-			t.Errorf("mode portal on the community image must offer the catalogue as links:\n%.600s", body)
-		}
-		return
+	if body := hub(); !strings.Contains(body, `href="/shop"`) || !strings.Contains(body, `href="/intranet"`) {
+		t.Errorf("mode portal without the bar must offer the catalogue as links:\n%.600s", body)
 	}
+
+	// With it, the bar is the navigation and the hub offers the way back in.
+	RegisterPortalBar(&PortalBar{})
+	t.Cleanup(func() { RegisterPortalBar(nil) })
+	body := hub()
 	if !strings.Contains(body, `href="/shop"`) {
 		t.Errorf("mode portal must still offer the way back in:\n%.600s", body)
 	}

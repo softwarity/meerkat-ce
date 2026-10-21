@@ -7,8 +7,9 @@
   built-in pages (profile, sign-in). The Portal screen shows, beside the list, the real account
   button with that menu open, drawing the list being edited.
 - **Breaking: the navigation bar (Portal mode) is Enterprise.** The Team and Enterprise licences
-  carry it. The Community image refuses to save Portal mode and reads a catalogue already in it
-  as Links: the same list, in the user button's menu, nothing to retype.
+  carry it, and the Community image no longer contains it. That image refuses to save Portal mode
+  and reads a catalogue already in it as Links: the same list, in the user button's menu, nothing
+  to retype.
 
 ---
 

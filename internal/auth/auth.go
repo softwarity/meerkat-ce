@@ -2211,8 +2211,11 @@ func (h *Handler) Register(raw *http.ServeMux) {
 		// serves itself, and the relay that keeps the collector private.
 		h.registerTelemetry(mux)
 		// The injected <meerkat-portal-nav> web component (PORTAL-01): the
-		// navigation bar that, when a portal is configured, carries the button.
-		h.registerPortal(mux)
+		// navigation bar that, in portal mode, carries the button. Enterprise:
+		// there only when ee/portal registered it.
+		if portalBar != nil && portalBar.Serve != nil {
+			portalBar.Serve(h, true, mux.HandleFunc)
+		}
 		// The live channel the served pages listen on (generic, not tied to
 		// any one feature).
 		h.registerEvents(mux)
@@ -2226,7 +2229,9 @@ func (h *Handler) Register(raw *http.ServeMux) {
 		// The portal editor's live preview (PORTAL-01): the console iframes a
 		// page that renders the REAL bar in edit mode, so the SAME component is
 		// the editor. Served here to stay same-origin with the console.
-		h.registerPortalPreview(mux)
+		if portalBar != nil && portalBar.Serve != nil {
+			portalBar.Serve(h, false, mux.HandleFunc)
+		}
 		// And the links mode's: the account button's Applications submenu,
 		// fed the catalogue being edited.
 		h.registerLinksPreview(mux)
@@ -3934,10 +3939,10 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 		}
 		if cfg.Mode == store.PortalModePortal {
 			// One way back in has no heading to sit under.
-			links = append(links, publicLink{Name: portalLabel(m.label, rt), Href: href})
+			links = append(links, publicLink{Name: EntryLabel(m.label, rt), Href: href})
 			break
 		}
-		links = append(links, publicLink{Name: portalLabel(m.label, rt), Href: href,
+		links = append(links, publicLink{Name: EntryLabel(m.label, rt), Href: href,
 			Group: m.group, Head: m.run != last})
 		last = m.run
 	}

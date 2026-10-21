@@ -2185,12 +2185,6 @@ func TestNoAutoTravelsToThePageAndTheButton(t *testing.T) {
 	if got := userButtonFragment(without, nil); strings.Contains(got, "no-auto") {
 		t.Errorf("the button lost a position it should keep:\n%s", got)
 	}
-	if got := portalFragment(with, nil); !strings.Contains(got, " no-auto") {
-		t.Errorf("the bar mounts a button that still offers three positions:\n%s", got)
-	}
-	if got := portalFragment(without, nil); strings.Contains(got, "no-auto") {
-		t.Errorf("the bar took a position away from a route that has it:\n%s", got)
-	}
 }
 
 // TestKeptPrefixIsTheCoordinateTheGuardCompares: an operation's address is what
@@ -2254,34 +2248,6 @@ func TestARefusalIsNotCoveredByAnErrorFurtherDown(t *testing.T) {
 	res, body := get(t, rt, "/open")
 	if res.StatusCode != http.StatusOK || !strings.Contains(body, "a real page") {
 		t.Fatalf("the fallthrough stopped working: %d %q", res.StatusCode, body)
-	}
-}
-
-// An application with NO colour scheme has nothing to switch between, and the
-// portal bar carries the switch on every UI route - so the bar is where that
-// has to be said. It was not: the bar offered the switch whatever the route
-// declared, and moving it repainted the bar over a page that stayed as it was.
-func TestThePortalOffersNoSwitchWhereThereIsNothingToSwitch(t *testing.T) {
-	mount := func(s *store.SchemeConfig) store.Route {
-		r := pathRoute("otel", "otel", 1, "/otel/**", "http://up")
-		r.IsUI = true
-		r.UI = &store.RouteUI{Scheme: s}
-		return r
-	}
-	none := mount(&store.SchemeConfig{Mechanism: store.SchemeNone})
-	if got := portalFragment(none, nil); !strings.Contains(got, `scheme="none"`) {
-		t.Errorf("a route with no mechanism must say so to the bar: %s", got)
-	}
-	// And it may still say what the BAR wears there, so a light bar does not
-	// float over a page that is always dark.
-	worn := mount(&store.SchemeConfig{Mechanism: store.SchemeNone, Button: "dark"})
-	if got := portalFragment(worn, nil); !strings.Contains(got, `scheme-wear="dark"`) {
-		t.Errorf("the bar must wear what the route says: %s", got)
-	}
-	// The ordinary case is untouched: a mechanism means a switch.
-	takes := mount(&store.SchemeConfig{Mechanism: "class", Select: true})
-	if got := portalFragment(takes, nil); strings.Contains(got, "scheme=") {
-		t.Errorf("a route that takes a choice needs no attribute: %s", got)
 	}
 }
 

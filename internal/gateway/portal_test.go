@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
 	"github.com/softwarity/meerkat/internal/store"
@@ -17,22 +17,29 @@ import (
 // routerWithPortal builds a router whose store carries a portal config, so the
 // Reload bakes the portal decision into every compiled UI route - the same path
 // a live gateway takes when an operator turns the portal on.
-// skipWithoutTheBar: the bar is Enterprise, and the community image reads a
-// portal-mode catalogue as links (TestTheCommunityImageDrawsNoBar).
-func skipWithoutTheBar(t *testing.T) {
+// standInBar registers a bar for one test. What is tested here is the
+// gateway's side of the seam - where the fragment goes, what it replaces, the
+// page that keeps it when the upstream is gone - not the bar, which is
+// ee/portal's and tested there.
+func standInBar(t *testing.T) {
 	t.Helper()
-	if !edition.Enterprise {
-		t.Skip("the navigation bar is part of the Enterprise image")
-	}
+	auth.RegisterPortalBar(&auth.PortalBar{
+		Fragment: func(r store.Route, _ []string) string {
+			if !r.IsUI {
+				return ""
+			}
+			return `<script defer src="/meerkat/portal.js"></script>` +
+				`<meerkat-portal-nav route="` + r.ID + `"></meerkat-portal-nav>`
+		},
+	})
+	t.Cleanup(func() { auth.RegisterPortalBar(nil) })
 }
 
-// TestTheCommunityImageDrawsNoBar: a portal-mode catalogue on the community
-// image - imported, or carried over from the other image - injects no bar:
-// the route keeps its own user button, whose menu offers the same list.
-func TestTheCommunityImageDrawsNoBar(t *testing.T) {
-	if edition.Enterprise {
-		t.Skip("the Enterprise image draws the bar (TestPortalBarReplacesTheUserButton)")
-	}
+// TestWithoutTheBarARouteKeepsItsButton: a portal-mode catalogue on an image
+// without the bar - the community one, imported or carried over from the
+// other image - injects no bar: the route keeps its own user button, whose
+// menu offers the same list.
+func TestWithoutTheBarARouteKeepsItsButton(t *testing.T) {
 	upstream := htmlUpstream(t, "/page")
 	r := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,
 		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
@@ -75,7 +82,7 @@ func routerWithPortal(t *testing.T, portal store.PortalConfig, routes ...store.R
 // turning the portal on swaps the standalone button for the portal bar (which
 // mounts the button itself). The page agent rides either way.
 func TestPortalBarReplacesTheUserButton(t *testing.T) {
-	skipWithoutTheBar(t)
+	standInBar(t)
 	upstream := htmlUpstream(t, "/page")
 	uiRoute := func() store.Route {
 		r := pathRoute("r1", "demo", 1, "/demo/**", upstream.URL,
@@ -117,7 +124,7 @@ func TestPortalBarReplacesTheUserButton(t *testing.T) {
 // visitor can navigate away instead of being stranded. With the portal off it
 // stays the plain-text 502.
 func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
-	skipWithoutTheBar(t)
+	standInBar(t)
 	// A server we close at once: connections to it are refused, so the proxy's
 	// ErrorHandler fires.
 	dead := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
@@ -160,7 +167,7 @@ func TestUnavailableUIPageKeepsThePortalBar(t *testing.T) {
 // The portal's HTML page follows the gateway's code: an upstream that does not
 // answer in time is a 504 there too, still carrying the bar.
 func TestUnavailableUIPageSaysTimeoutWith504(t *testing.T) {
-	skipWithoutTheBar(t)
+	standInBar(t)
 	r := pathRoute("r1", "demo", 1, "/demo/**", hangingUpstream(t),
 		routing.Spec{Type: "strip-prefix", Args: map[string]any{"parts": 1}})
 	r.IsUI = true
@@ -175,31 +182,5 @@ func TestUnavailableUIPageSaysTimeoutWith504(t *testing.T) {
 	}
 	if !strings.Contains(body, "<meerkat-portal-nav") {
 		t.Errorf("the 504 page must carry the portal bar:\n%s", body)
-	}
-}
-
-// TestPortalFragmentOnlyForUIRoutes: a service route wears no portal bar - the
-// bar is a UI-only injection, like the button it replaces.
-func TestPortalFragmentOnlyForUIRoutes(t *testing.T) {
-	if f := portalFragment(store.Route{IsUI: true}, nil); !strings.Contains(f, "<meerkat-portal-nav") ||
-		!strings.Contains(f, "/meerkat/portal.js") || !strings.Contains(f, "/meerkat/user-button.js") {
-		t.Errorf("a UI route should get the full portal fragment, got %q", f)
-	}
-	if f := portalFragment(store.Route{IsUI: false}, nil); f != "" {
-		t.Errorf("a non-UI route should get no portal fragment, got %q", f)
-	}
-}
-
-// TestARouteWithNoLanguageOffersNoLanguageMenu: a route that declares no
-// language still writes the attribute, empty. Absent, the bar would fall back
-// to portal.json's languages - the gateway's whole offer - and the account
-// menu would list the sign-in page's languages over an application that
-// speaks none of them.
-func TestARouteWithNoLanguageOffersNoLanguageMenu(t *testing.T) {
-	if f := portalFragment(store.Route{IsUI: true}, nil); !strings.Contains(f, `<meerkat-portal-nav languages=""`) {
-		t.Errorf("a route with no language should say so with an empty attribute, got %q", f)
-	}
-	if f := portalFragment(store.Route{IsUI: true}, []string{"fr", "de"}); !strings.Contains(f, `languages="fr,de"`) {
-		t.Errorf("a route's own languages should ride on the bar, got %q", f)
 	}
 }

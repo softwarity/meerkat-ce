@@ -235,7 +235,10 @@ func (rt *Router) Reload(ctx context.Context) error {
 	// the account button) instead of the standalone user button. Changing the
 	// setting reloads the router, exactly as changing the branding does - both
 	// are compiled into the routes below.
-	portalOn := rt.st.Portal(ctx).Mode == store.PortalModePortal
+	//
+	// The bar is Enterprise (ee/portal): without it, a portal-mode catalogue
+	// reads as links and every route keeps its own button.
+	portalOn := auth.Bar() != nil && rt.st.Portal(ctx).Mode == store.PortalModePortal
 	rt.issuer.Store(rt.st.JWTIssuer(ctx, rt.DataAddr))
 	// The tracing setting (OBS-04), read here for the same reason: it is baked
 	// into the injection of every route that asked for one, so changing the
@@ -918,7 +921,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	frag := rt.telemetryFragment(r)
 	frag += pageAgentFragment(r, localeCodes)
 	if portalOn && r.IsUI {
-		frag += portalFragment(r, localeCodes)
+		frag += auth.Bar().Fragment(r, localeCodes)
 	} else {
 		frag += userButtonFragment(r, localeCodes)
 	}
@@ -1022,7 +1025,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	} else {
 		unavailable := ""
 		if portalOn && r.IsUI {
-			unavailable = unavailablePage(pageAgentFragment(r, localeCodes) + portalFragment(r, localeCodes))
+			unavailable = unavailablePage(pageAgentFragment(r, localeCodes) + auth.Bar().Fragment(r, localeCodes))
 		}
 		handler, err = buildProxy(r, filters, rt.defaultTimeouts, unavailable)
 		if err != nil {
@@ -3021,74 +3024,6 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 	}
 	return `<script defer src="/meerkat/user-button.js?v=` + auth.ChromeVersion + `"></script>` +
 		`<meerkat-user-button` + attrs + `></meerkat-user-button>`
-}
-
-// portalFragment builds the HTML injected at the top of <body> for a UI route
-// when a portal is configured (PORTAL-01): the navigation bar, plus the user
-// button it mounts inside itself. The bar reads everything else - the modules,
-// the theme, the account - from /meerkat/portal.json and /meerkat/user-button.json,
-// so nothing route-specific rides in the markup, and it stays out of a framed
-// page on its own (self !== top).
-//
-// user-button.js loads BEFORE portal.js so the element the bar creates is
-// already defined when the bar mounts it; page.js (from pageAgentFragment)
-// comes first of all, so window.meerkatPage exists before either upgrades.
-// schemeOf is a route's colour-scheme configuration, or nil. Two nils to walk
-// and both are ordinary: a route may serve pages without configuring any
-// injection at all.
-func schemeOf(r store.Route) *store.SchemeConfig {
-	if r.UI == nil {
-		return nil
-	}
-	return r.UI.Scheme
-}
-
-func portalFragment(r store.Route, localeCodes []string) string {
-	if !r.IsUI {
-		return ""
-	}
-	// THIS ROUTE's languages, like the standalone button's. The bar mounts the
-	// account button, and the language a menu offers is the one the page behind
-	// it is written in - not the gateway's whole offer, which is what the
-	// payload carries for want of knowing which page asked. A route written in
-	// a language Meerkat does not embed still offers it here, which is the
-	// point: the sign-in page cannot, and this page can.
-	//
-	// ALWAYS WRITTEN, empty when the route declares nothing: an absent
-	// attribute is what sends the bar to the payload, and the payload is the
-	// gateway's whole offer. A page that speaks no language of ours must get
-	// no language menu, not the sign-in page's.
-	attr := ` languages="` + htmlEscape(strings.Join(localeCodes, ",")) + `"`
-	// THIS route, for the button the bar mounts: the UI test mode (DEV-10)
-	// is scoped to a route, and in a portal the application's own button is
-	// off - the bar's is the only one, so without the id the developer menu
-	// lost the entry. Server-generated id, HTML-safe.
-	attr += ` route="` + htmlEscape(r.ID) + `"`
-	// Route-specific, like the languages above: the bar is global, the
-	// application behind THIS route is not. The bar mounts the user button, so
-	// what that button offers is decided per route here.
-	//
-	// r.UI may be nil: a route can serve pages without configuring any of the
-	// injections, and this one asked its Scheme before checking.
-	if s := schemeOf(r); s != nil && s.Mechanism == store.SchemeNone {
-		// NOTHING TO SWITCH. An application declared to have no colour scheme
-		// takes no choice, so a switch on top of it moves the bar and leaves
-		// the page as it was - a control that appears to do something and does
-		// not. What the route may still say is what the BAR wears there, so a
-		// bar does not float light over a page that is always dark.
-		if s.Button == "light" || s.Button == "dark" {
-			attr += ` scheme-wear="` + htmlEscape(s.Button) + `"`
-		} else {
-			attr += ` scheme="none"`
-		}
-	} else if s != nil && s.NoAuto {
-		// Two positions instead of three: an application that knows only light
-		// and dark must not be offered a position nothing behind it can hold.
-		attr += ` no-auto`
-	}
-	return `<script defer src="/meerkat/user-button.js?v=` + auth.ChromeVersion + `"></script>` +
-		`<script defer src="/meerkat/portal.js?v=` + auth.ChromeVersion + `"></script>` +
-		`<meerkat-portal-nav` + attr + `></meerkat-portal-nav>`
 }
 
 // unavailablePage is the HTML served when a UI route's upstream does not answer

@@ -3,10 +3,10 @@
 package main
 
 // The Enterprise packages, linked in for their side effect: each registers
-// what it implements - a sign-in driver, the page arrangements. THIS FILE is
-// the seam between the two images. The community build does not compile it,
-// so that code is not in the binary at all, and the compiler proves the trunk
-// never depended on it.
+// what it implements - a sign-in driver, the page arrangements, the navigation
+// bar. THIS FILE is the seam between the two images. The community build does
+// not compile it, so that code is not in the binary at all, and the compiler
+// proves the trunk never depended on it.
 import (
 	_ "github.com/softwarity/meerkat/ee/changebus"
 	_ "github.com/softwarity/meerkat/ee/devplug"
@@ -14,6 +14,7 @@ import (
 	_ "github.com/softwarity/meerkat/ee/gitdriver"
 	_ "github.com/softwarity/meerkat/ee/layouts"
 	_ "github.com/softwarity/meerkat/ee/oidc"
+	_ "github.com/softwarity/meerkat/ee/portal"
 	_ "github.com/softwarity/meerkat/ee/saml"
 	_ "github.com/softwarity/meerkat/ee/telemetry"
 )
