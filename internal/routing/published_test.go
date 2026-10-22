@@ -78,6 +78,9 @@ func TestPublishBase(t *testing.T) {
 	for _, c := range []struct{ name, in, want string }{
 		{"the root", `<head><base href="/"><title>x</title>`, `<head><base href="/site/"><title>x</title>`},
 		{"single quotes, other attributes", `<BASE target="_top" href='/app/'>`, `<BASE target="_top" href='/site/app/'>`},
+		{"unquoted, as a minified page writes it", `<title>x</title><base href=/><meta charset=utf-8>`, `<title>x</title><base href=/site/><meta charset=utf-8>`},
+		{"unquoted, another attribute after", `<base href=/app/ target=_top>`, `<base href=/site/app/ target=_top>`},
+		{"unquoted, already published", `<base href=/site/>`, ""},
 		{"already published", `<base href="/site/">`, ""},
 		{"relative", `<base href="./">`, ""},
 		{"another host", `<base href="//cdn.example.org/">`, ""},

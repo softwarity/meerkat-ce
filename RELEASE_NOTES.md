@@ -2,6 +2,11 @@
 
 ## NEXT RELEASE
 
+- **A page whose `<base href>` has no quotes keeps working under a prefix.** With `strip-prefix`,
+  the gateway puts the route's prefix back in front of the page's `<base href>`, but only when the
+  value was quoted. A minified single-page application writes `<base href=/>` (Hubble UI does), so
+  its scripts and stylesheets were asked at the gateway's root and the page stayed blank.
+
 ---
 
 ## 1.15.1

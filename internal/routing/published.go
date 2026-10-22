@@ -95,8 +95,9 @@ func BringLocationHome(res *http.Response) {
 	}
 }
 
-// A <base> with a root-absolute href, the first of the document.
-var baseHref = regexp.MustCompile(`(?i)(<base\b[^>]*?\bhref\s*=\s*)("(/[^"]*)"|'(/[^']*)')`)
+// A <base> with a root-absolute href, the first of the document. Quoted or
+// not: a minified page writes <base href=/>, which is the same base.
+var baseHref = regexp.MustCompile(`(?i)(<base\b[^>]*?\bhref\s*=\s*)("(/[^"]*)"|'(/[^']*)'|(/[^\s"'=<>]*))`)
 
 // PublishBase puts the stripped prefix in front of a document's <base href>,
 // or returns nil when there is nothing to change. <base href="/"> is what a
@@ -111,10 +112,13 @@ func PublishBase(body []byte, prefix string) []byte {
 	if m == nil {
 		return nil
 	}
-	// The href's value, without its quotes: group 3 or 4.
+	// The href's value, without its quotes: group 3, 4 or 5.
 	from, to := m[6], m[7]
 	if from < 0 {
 		from, to = m[8], m[9]
+	}
+	if from < 0 {
+		from, to = m[10], m[11]
 	}
 	href := string(body[from:to])
 	if strings.HasPrefix(href, "//") || under(strings.TrimSuffix(href, "/"), prefix) || under(href, prefix) {
