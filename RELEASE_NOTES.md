@@ -2,6 +2,12 @@
 
 ## NEXT RELEASE
 
+- **An agent connected over OAuth no longer has to sign in again every morning.** Its access
+  token lasts twelve hours and its refresh token ninety days, but the periodic upkeep dropped the
+  connection as soon as the access token lapsed, and its refresh token with it: an agent left idle
+  overnight (Claude Code, for one) was sent back to the sign-in page instead of refreshing. The
+  connection now stays while it can be refreshed.
+
 ---
 
 ## 1.15.2

@@ -387,9 +387,17 @@ func (s *Store) DeleteAPIToken(ctx context.Context, id string) error {
 }
 
 // PurgeExpiredAPITokens drops lapsed tokens (periodic upkeep).
+//
+// NOT ONE AN AGENT CAN STILL REFRESH. An OAuth agent's row carries its access
+// token, which lapses in hours, and its refresh tokens hang off that row: the
+// lookup already refuses the lapsed access token, so dropping the row here only
+// took the refresh tokens with it, and an agent left idle overnight was asked to
+// sign in again rather than refresh. The row goes once its last refresh token
+// has lapsed too.
 func (s *Store) PurgeExpiredAPITokens(ctx context.Context, now int64) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`DELETE FROM api_tokens WHERE expires_at != 0 AND expires_at <= ?`, now)
+		`DELETE FROM api_tokens WHERE expires_at != 0 AND expires_at <= ?
+		   AND NOT EXISTS (SELECT 1 FROM oauth_refresh r WHERE r.token_id = api_tokens.id AND r.expires_at > ?)`, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("store: purge api tokens: %w", err)
 	}
