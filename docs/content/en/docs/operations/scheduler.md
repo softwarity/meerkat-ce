@@ -35,9 +35,10 @@ The roles asked for go through the **catalogue's hierarchy**, exactly as a
 session's do: asking for a parent role grants what it implies.
 
 No service account to create, so no rights to keep up to date for ever. What
-bounds a schedule is **the token that wrote it**: a token whose perimeter is
-`schedules`, minted by root, traced in the audit trail, revocable in a click.
-Two services that must not reach the same things get two tokens.
+bounds a schedule is **who may write one**, which the internal plane's
+[access](#who-may-call-it) decides: with a token whose perimeter is
+`schedules`, minted by root, traced in the audit trail, revocable in a click,
+two services that must not reach the same things get two tokens.
 
 If you do want to know whose a schedule is, file it in the **metadata**:
 `"metadata": { "owner": "stations-svc" }` is a key like any other, and one you
@@ -101,8 +102,9 @@ PATCH /api/schedules/{id}/run
 and at the end `{"state": "done", "detail": "12000 rows"}`. That is what makes
 a three-hour job expressible without a three-hour HTTP request.
 
-**With which token?** Yours, the one that created the schedule, on the internal
-plane like everything else. The scheduled call brought no token with it: its identity
+**With which token?** Whatever the internal plane's access asks of you - none,
+yours, or your pod's ServiceAccount token - on the internal plane like
+everything else. The scheduled call brought no token with it: its identity
 was posed inside the gateway, and never travelled on a wire.
 
 Every report renews the **lease**. Say nothing for five minutes and the run is
@@ -209,10 +211,10 @@ http://meerkat:7070/api/schedules
 In HTTPS on 7443 once a certificate is placed on the internal plane; the
 scheduler's page gives the address, as the runtime names it.
 
-That port is never put behind an ingress, and it answers **tokens only**: a
-browser session is refused there. Inside the cluster is a place, not a
-credential - any pod can reach a ClusterIP - so nothing on this port gives any
-power without a token.
+That port is never put behind an ingress, and a browser session is refused
+there. Inside the cluster is a place, not a credential - any pod can reach a
+ClusterIP - so what a caller must present is a decision, and it is yours: see
+[Who may call it](#who-may-call-it).
 
 | | |
 |---|---|
@@ -225,6 +227,50 @@ power without a token.
 | `POST /api/schedules/{id}/run` | bring the next turn forward |
 | `GET /api/schedules/{id}/runs` | what each turn did, newest first |
 | `PATCH /api/schedules/{id}/run` | report on the run in flight |
+
+### Who may call it
+
+What a service presents on this port is a setting, under Scheduler, **Access**.
+An infrastructure administrator changes it; the Scheduler's other readers see
+it.
+
+| Mode | The caller presents | It is known as |
+|---|---|---|
+| **None** | nothing | its token's name or its ServiceAccount when it sends one, otherwise the workload holding its address: `canopy/Deployment/reference-data` on Kubernetes, the service or container on Docker and Swarm |
+| **Meerkat token** | a token of perimeter `schedules` ([below](#the-token)) | the token's name |
+| **Cluster token** | its pod's ServiceAccount token, which Kubernetes checks (TokenReview). Kubernetes only | `namespace/serviceaccount` |
+
+```bash
+# Cluster token: the pod sends the token Kubernetes mounted for it.
+curl http://meerkat:7070/api/schedules \
+  -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+```
+
+Then **who**: everyone, or only the callers listed, compared with the name the
+mode gives. A caller nobody could identify is refused as soon as there is a
+list, and accepted under everyone. Every refusal says what is missing and who
+is allowed. A credential that is sent is checked in every mode: a revoked
+token is refused, it does not become an anonymous caller.
+
+> [!WARNING]
+> An address is not a proof: None names a caller for the trail and the list,
+> in a cluster that trusts itself. And neither the mode nor the list bounds
+> the **roles** a schedule asks for, or the **route** it calls, which may be
+> another service's. Under None with everyone let in, any pod can schedule a
+> call with any role, `ROLE_ADMIN` included, on any route.
+
+Each schedule records who created it and how that was known - a token, a
+ServiceAccount, a workload deduced from its address, or nobody, with the
+address it came from. Its drawer shows it, and so does the audit trail.
+
+A new installation starts in **None**. One upgraded while it held a
+`schedules` token keeps **Meerkat token**, so an upgrade opens nothing. The
+JWKS and the discovery document on the same port stay open in every mode.
+
+On Kubernetes the chart grants what this needs: `create` on TokenReviews and
+`list` on ServiceAccounts (`rbac.internalCallers`), and `get` on ReplicaSets
+where it already reads the pods (`rbac.watch`, `rbac.watchNamespaces`). A pod
+in a namespace the gateway does not read is unidentified.
 
 ### What the console does, and does not
 
@@ -244,7 +290,9 @@ service that needs it.
 ### The token
 
 A token whose **perimeter is `schedules`**, minted on the console (Infra,
-Access tokens) and used on the internal plane. It opens this API and nothing
+Access tokens, **Internal**, named after the service that holds it or `global`)
+and used on the internal plane. It is what the Meerkat token mode asks for, and
+what None reads when it is sent. It opens this API and nothing
 else - not the configuration, not the accounts, not the routes, and nothing at
 all on the console's port. Narrow on purpose: it lives in a deployment manifest, often in another
 team's repository, and it is the one nobody remembers to rotate.

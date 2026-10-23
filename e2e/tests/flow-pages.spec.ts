@@ -461,8 +461,12 @@ test.describe.serial('flow-scheduler', () => {
     };
     const made = await svc.post('/api/schedules', { data: body });
     expect(made.status(), await made.text()).toBe(201);
-    const schedule = (await made.json()) as { id: string; roles: string[] };
+    const schedule = (await made.json()) as { id: string; roles: string[]; caller?: string; callerVia?: string };
     expect(schedule.id.startsWith('sch_'), 'the gateway hands back its own id').toBeTruthy();
+    // Who wrote it, as the gateway knows it whatever the access mode: a token
+    // that is sent is the identity.
+    expect(schedule.caller).toBe('e2e stations');
+    expect(schedule.callerVia).toBe('token');
     expect((await svc.put(`/api/schedules/${schedule.id}`, { data: body })).status()).toBe(200);
 
     // One role is said in the singular, and lands in the same field.

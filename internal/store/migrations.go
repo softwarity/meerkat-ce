@@ -53,6 +53,7 @@ var migrations = []migration{
 	{Version: 77, Name: "a theme is its source colours", Up: themesFromColours},
 	{Version: 80, Name: "a route's custom code is an ordered list", Up: injectionsFromBlocks},
 	{Version: 83, Name: "the signing keys are sealed", Up: signingKeysSealed},
+	{Version: 90, Name: "the internal plane keeps asking for the tokens it handed out", Up: internalAccessKept},
 }
 
 // signingKeysSealed seals, under the master key, the two settings that were

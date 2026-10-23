@@ -41,6 +41,13 @@ const GUARDS = {
       fr: "un jeton limité au périmètre schedules seulement, le temps que son service passe au plan interne (port 7070), qui est la place de cet endpoint",
     },
   },
+  runReport: {
+    admits: [],
+    note: {
+      en: 'the service a run was handed to, on that run\'s identifier (Meerkat-Job-Run), whatever the internal access mode',
+      fr: "le service à qui un tour a été confié, sur l'identifiant de ce tour (Meerkat-Job-Run), quel que soit le mode d'accès du plan interne",
+    },
+  },
   tenantCreator: { admits: ['tenant-creator', 'root'] },
   devOrInfra: { admits: ['dev', 'infra-admin', 'root'] },
   authed: {

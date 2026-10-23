@@ -59,6 +59,12 @@ export interface ScheduleRow extends LiveRow {
   lastDetail: string;
   lastAt: number;
   createdBy: string;
+  // Who created it on the internal plane, and how that was known: a token's
+  // name, a ServiceAccount, the workload or container at its address, or
+  // nobody - then only the address it came from.
+  caller?: string;
+  callerVia?: "token" | "serviceaccount" | "workload" | "container" | "unidentified";
+  callerAddr?: string;
 }
 
 // One ENDED turn, as the history keeps it (SCHED-03). The row above keeps

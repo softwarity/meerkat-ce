@@ -90,8 +90,18 @@
         i18n-matTooltip="@@How_a_service_schedules"
         matTooltip="How a service schedules a call"
       >
-        <mat-icon>terminal</mat-icon>
         <ng-container i18n="@@API">API</ng-container>
+      </button>
+      <!-- Who may call that API, and how they are recognised: beside the
+           button that explains the API, since it is the same question asked
+           from the gateway's side. -->
+      <button
+        matButton="outlined"
+        (click)="openAccess()"
+        i18n-matTooltip="@@Who_may_schedule"
+        matTooltip="Who may schedule a call"
+      >
+        <ng-container i18n="@@Access">Access</ng-container>
       </button>
     </div>
 
@@ -133,18 +143,6 @@
                     >pause_circle</mat-icon
                   >
                 }
-              </mat-cell>
-            </ng-container>
-
-            <ng-container matColumnDef="calls">
-              <mat-header-cell *matHeaderCellDef i18n="@@Calls"
-                >Calls</mat-header-cell
-              >
-              <mat-cell *matCellDef="let s">
-                <span class="lines">
-                  <span class="mono">{{ s.method }} {{ s.path }}</span>
-                  <span class="muted">{{ named(s) }}</span>
-                </span>
               </mat-cell>
             </ng-container>
 
@@ -340,10 +338,25 @@
     position="end"
     mode="over"
     [class.wide]="howto()"
-    [opened]="selected() !== null || howto()"
+    [opened]="selected() !== null || howto() || access()"
     (closedStart)="closePanel()"
   >
-    @if (howto()) {
+    @if (access()) {
+      <div class="drawer">
+        <div class="drawer-head">
+          <h2 i18n="@@Access_to_the_scheduler">Access to the scheduler</h2>
+          <button
+            matIconButton
+            (click)="closePanel()"
+            i18n-aria-label="@@Close"
+            aria-label="Close"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <app-scheduler-access (closed)="closePanel()" />
+      </div>
+    } @else if (howto()) {
       <div class="drawer">
         <div class="drawer-head">
           <h2 i18n="@@Scheduled_calls">Scheduled calls</h2>
@@ -420,7 +433,20 @@
             <dt i18n="@@Organization">Organization</dt>
             <dd>{{ s.tenantId }}</dd>
           }
-          @if (s.createdBy) {
+          <!-- Who wrote it on the internal plane, and how that was known:
+               a token is a credential, an address only a guess. A schedule
+               older than that record keeps the account it was written as. -->
+          @if (s.callerVia) {
+            <dt i18n="@@Created_by">Created by</dt>
+            <dd>
+              @if (s.caller) {
+                {{ s.caller }}
+              } @else {
+                <ng-container i18n="@@Unidentified">Unidentified</ng-container>
+              }
+              <span class="muted"> - {{ callerHow(s) }}</span>
+            </dd>
+          } @else if (s.createdBy) {
             <dt i18n="@@Created_by">Created by</dt>
             <dd>{{ s.createdBy }}</dd>
           }

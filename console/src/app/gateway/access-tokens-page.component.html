@@ -3,31 +3,39 @@
     <div class="banner">
       <h1 i18n="@@Access_tokens">Access tokens</h1>
       <span class="spacer"></span>
+      <!-- Under the Internal filter, the token a service calls the scheduler
+           with: named after that service, its perimeter fixed. -->
       <button matButton="filled" (click)="create()">
         <mat-icon>add</mat-icon>
-        <ng-container i18n="@@New_console_token">New console token</ng-container>
+        @if (view() === 'internal') {
+          <ng-container i18n="@@New_internal_token">New internal token</ng-container>
+        } @else {
+          <ng-container i18n="@@New_console_token">New console token</ng-container>
+        }
       </button>
     </div>
 
     <p class="hint" i18n="@@Access_tokens_both_planes">
-      Console tokens call this console's API with your powers, narrowed by a perimeter. Application
-      tokens are created by each person on their profile; you can see and revoke them here.
+      Console tokens call this console's API with your powers, narrowed by a perimeter. Internal
+      tokens let a service call the scheduler on the internal plane. Application tokens are created by
+      each person on their profile; you can see and revoke them here.
     </p>
 
     <div class="toolbar">
-      @if (me.isAppAdmin()) {
-        <mat-button-toggle-group
-          [value]="view()"
-          (change)="view.set($event.value)"
-          hideSingleSelectionIndicator
-          i18n-aria-label="@@Which_tokens"
-          aria-label="Which tokens"
-        >
-          <mat-button-toggle value="" i18n="@@All">All</mat-button-toggle>
-          <mat-button-toggle value="admin" i18n="@@Console">Console</mat-button-toggle>
-          <mat-button-toggle value="data" i18n="@@Applications">Applications</mat-button-toggle>
-        </mat-button-toggle-group>
-      }
+      <mat-button-toggle-group
+        [value]="view()"
+        (change)="view.set($event.value)"
+        hideSingleSelectionIndicator
+        i18n-aria-label="@@Which_tokens"
+        aria-label="Which tokens"
+      >
+        <mat-button-toggle value="" i18n="@@All">All</mat-button-toggle>
+        <mat-button-toggle value="admin" i18n="@@Console">Console</mat-button-toggle>
+        @if (me.isAppAdmin()) {
+          <mat-button-toggle value="data" i18n="@@Application">Application</mat-button-toggle>
+        }
+        <mat-button-toggle value="internal" i18n="@@Internal">Internal</mat-button-toggle>
+      </mat-button-toggle-group>
       <mat-form-field class="filter" subscriptSizing="dynamic">
         <mat-icon matPrefix>search</mat-icon>
         <input
@@ -78,6 +86,8 @@
                 <span class="plane">
                   @if (t.plane === 'admin') {
                     <ng-container i18n="@@Console">Console</ng-container>
+                  } @else if (t.plane === 'internal') {
+                    <ng-container i18n="@@Internal">Internal</ng-container>
                   } @else {
                     <ng-container i18n="@@Applications">Applications</ng-container>
                   }
@@ -121,6 +131,8 @@
           <dd>
             @if (t.plane === 'admin') {
               <ng-container i18n="@@Console_api">This console's API</ng-container>
+            } @else if (t.plane === 'internal') {
+              <ng-container i18n="@@Internal_scheduler_api">The scheduler's API, on the internal plane</ng-container>
             } @else {
               <ng-container i18n="@@Applications_apis">The applications' APIs</ng-container>
             }
@@ -149,7 +161,7 @@
           <dd>{{ t.lastUsedAt ? relative(t.lastUsedAt) : neverLabel }}</dd>
         </dl>
 
-        @if (t.plane === 'admin') {
+        @if (t.plane !== 'data') {
           <mat-slide-toggle [checked]="t.enabled" (change)="toggle(t, $event.checked)">
             <ng-container i18n="@@Token_enabled">Enabled</ng-container>
           </mat-slide-toggle>

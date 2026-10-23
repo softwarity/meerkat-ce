@@ -365,6 +365,9 @@ func run(o options) error {
 		adminAPI.DataDir = abs
 	}
 	adminAPI.InternalTLSAddr = o.internalTLSAddr
+	// Who calls the internal plane: a ServiceAccount token checked with the
+	// API server, an address followed to its workload or container.
+	adminAPI.Callers = discovery.NewCallers()
 	adminAPI.ReleaseNotes = meerkat.ReleaseNotes
 	adminAPI.LicenseFile = o.licenseFile
 	adminAPI.LogLicense(ctx)

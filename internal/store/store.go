@@ -1203,7 +1203,14 @@ CREATE TABLE IF NOT EXISTS schedules (
   -- well. Moved only by a turn that is SETTLED - not one about to be tried
   -- again - and each move is one line in the audit trail: failing, then
   -- recovered, rather than a line per turn.
-  failing_since BIGINT NOT NULL DEFAULT 0
+  failing_since BIGINT NOT NULL DEFAULT 0,
+  -- WHO wrote it on the internal plane, and how that was known (v90): a
+  -- token's name, a ServiceAccount, the workload or container holding the
+  -- caller's address, or nobody - and the address itself, which is all an
+  -- unidentified caller leaves. Written at creation and kept.
+  caller      TEXT NOT NULL DEFAULT '',
+  caller_via  TEXT NOT NULL DEFAULT '',
+  caller_addr TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules (paused, next_at);
 
@@ -1288,7 +1295,11 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // and sessions.hours_until (0: no window) are filled in by the additive pass.
 // 89 carries no step: groups.business_access (inherited: no window of its
 // own) is filled in by the additive pass.
-const schemaVersion = 89
+// 90 decides who may call the internal plane on an upgrade: an installation
+// holding a schedules token keeps the token mode (internal_access), one
+// without gets None like a fresh one. schedules.caller, caller_via and
+// caller_addr are filled in by the additive pass.
+const schemaVersion = 90
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

@@ -1,0 +1,130 @@
+<p class="lead" i18n="@@Access_lead">
+  How the services calling this API on the internal plane are recognised, and
+  which of them get in.
+</p>
+
+<h3 i18n="@@Mode">Mode</h3>
+<!-- One line per mode on what it guarantees: the choice is between three
+     promises, and a bare word does not say which one is being made. -->
+<mat-radio-group class="choices" [formField]="f.mode">
+  @for (m of modes(); track m) {
+    <mat-radio-button [value]="m">
+      @switch (m) {
+        @case ("token") {
+          <span class="choice" i18n="@@Access_mode_token">Meerkat token</span>
+          <span class="muted" i18n="@@Access_mode_token_hint"
+            >A token minted under Access tokens, Internal: named, traced,
+            revocable.</span
+          >
+        }
+        @case ("cluster") {
+          <span class="choice" i18n="@@Access_mode_cluster">Cluster token</span>
+          <span class="muted" i18n="@@Access_mode_cluster_hint"
+            >The pod's own ServiceAccount token, checked by Kubernetes. Nothing
+            to mint or hand out.</span
+          >
+        }
+        @default {
+          <span class="choice" i18n="@@Access_mode_none">None</span>
+          <span class="muted" i18n="@@Access_mode_none_hint"
+            >Nothing asked. A caller is named by its token or ServiceAccount if
+            it sends one, otherwise by the workload at its address: a guess,
+            not a proof.</span
+          >
+        }
+      }
+    </mat-radio-button>
+  }
+</mat-radio-group>
+
+<!-- The token this mode asks for is minted here, one click away: the mode
+     that needs one is where somebody asks how to get it. Hidden for whoever
+     cannot mint - a token is root's - so the link never opens a door that
+     answers no. -->
+@if (draft().mode === "token") {
+  <p class="go">
+    <a matButton="tonal" routerLink="/infra/access-tokens" [queryParams]="{ view: 'internal' }" any-role="root">
+      <ng-container i18n="@@Mint_a_token">Mint a token</ng-container>
+    </a>
+  </p>
+}
+
+<h3 i18n="@@Access_who">Who</h3>
+<mat-radio-group class="choices inline" [formField]="f.who">
+  <mat-radio-button value="everyone" i18n="@@Everyone">Everyone</mat-radio-button>
+  <mat-radio-button value="only" i18n="@@Only_these_services"
+    >Only these services</mat-radio-button
+  >
+</mat-radio-group>
+
+@if (draft().who === "only") {
+  <!-- Offered from what the runtime knows, typed when it knows nothing: a
+       name the gateway could not list is still a name it can match. -->
+  <mat-form-field class="list">
+    <mat-label>{{ listLabel() }}</mat-label>
+    <mat-chip-grid #grid [disabled]="!editable()">
+      @for (c of callers(); track c) {
+        <mat-chip-row (removed)="remove(c)">
+          {{ c }}
+          <button matChipRemove [attr.aria-label]="c" type="button">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+      }
+      <input
+        #input
+        [matChipInputFor]="grid"
+        [matChipInputSeparatorKeyCodes]="separators"
+        [matAutocomplete]="auto"
+        (matChipInputTokenEnd)="add($event)"
+        (input)="query.set($any($event.target).value)"
+        i18n-placeholder="@@Access_add_caller"
+        placeholder="Add a caller"
+      />
+    </mat-chip-grid>
+    <mat-autocomplete #auto (optionSelected)="pick($event, input)">
+      @for (o of options(); track o) {
+        <mat-option [value]="o">{{ o }}</mat-option>
+      }
+    </mat-autocomplete>
+    <mat-hint>{{ listHint() }}</mat-hint>
+  </mat-form-field>
+  @if (unavailable(); as why) {
+    <p class="muted">{{ why }}</p>
+  }
+  <p class="muted" i18n="@@Access_unidentified_refused">
+    A caller nobody could identify is refused.
+  </p>
+}
+
+<p class="note" i18n="@@Access_out_of_scope">
+  A task calls with the roles it asks for, and may call any route: neither is
+  bounded by who created it.
+</p>
+
+@if (wideOpen()) {
+  <p class="warning">
+    <mat-icon>warning</mat-icon>
+    <span i18n="@@Access_wide_open"
+      >Any pod or container that reaches the internal plane can schedule a call
+      with any role, ROLE_ADMIN included, on any route.</span
+    >
+  </p>
+}
+
+@if (problem(); as p) {
+  <p class="problem">{{ p }}</p>
+}
+
+@if (stored() && !editable()) {
+  <p class="muted" i18n="@@Access_read_only">
+    Only an infrastructure administrator changes this.
+  </p>
+} @else if (stored()) {
+  <div class="actions">
+    <button matButton (click)="closed.emit()" i18n="@@Cancel">Cancel</button>
+    <button matButton="filled" [disabled]="!canSave()" (click)="save()">
+      <ng-container i18n="@@Save">Save</ng-container>
+    </button>
+  </div>
+}

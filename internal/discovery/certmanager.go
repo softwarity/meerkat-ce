@@ -60,6 +60,9 @@ type IssuedStatus struct {
 	RenewalTime int64  `json:"renewalTime,omitempty"`
 	IssuerKind  string `json:"issuerKind,omitempty"`
 	IssuerName  string `json:"issuerName,omitempty"`
+	// Refused is why the certificate it issued is refused although it is
+	// ready: its authority may sign none of the names asked for.
+	Refused string `json:"refused,omitempty"`
 }
 
 // CertManager talks to cert-manager for the one Certificate it may manage.
@@ -71,6 +74,15 @@ type CertManager struct {
 	mu      sync.Mutex
 	certPEM string
 	keyPEM  string
+	// limits are the name constraints of the chain the Secret holds, and
+	// limitsBy the issuer that wrote it ("Kind/name", empty when the Secret
+	// does not say).
+	limits   nameLimits
+	limitsBy string
+	// refused is what Status reports when no name asked for is permitted;
+	// said is the last thing logged about the names, said once.
+	refused string
+	said    string
 }
 
 // NewCertManager is nil, with the reason, when this gateway cannot ask:
@@ -266,9 +278,20 @@ func (m *CertManager) Issuers(ctx context.Context) ([]Issuer, error) {
 
 // Ensure creates the Certificate for names, signed by the issuer, or brings
 // the one already there to them.
+//
+// Asked again of the issuer whose Secret is there, the names are only the ones
+// its authority permits (fitNames): the bare Service name it refused does not
+// come back with each request.
 func (m *CertManager) Ensure(ctx context.Context, issuerKind, issuerName string, names []string) error {
 	ctx, cancel := context.WithTimeout(ctx, lookupTimeout)
 	defer cancel()
+	m.mu.Lock()
+	if !m.limits.none() && m.limitsBy == issuerKind+"/"+issuerName {
+		if kept, _ := m.limits.split(names); len(kept) > 0 {
+			names = kept
+		}
+	}
+	m.mu.Unlock()
 	spec := map[string]any{
 		"secretName": m.name,
 		"dnsNames":   names,
@@ -304,6 +327,7 @@ func (m *CertManager) Ensure(ctx context.Context, issuerKind, issuerName string,
 
 type k8sCertificate struct {
 	Spec struct {
+		DNSNames  []string `json:"dnsNames"`
 		IssuerRef struct {
 			Name string `json:"name"`
 			Kind string `json:"kind"`
@@ -338,6 +362,9 @@ func (m *CertManager) Status(ctx context.Context) (IssuedStatus, error) {
 	if t, err := time.Parse(time.RFC3339, c.Status.RenewalTime); err == nil {
 		s.RenewalTime = t.Unix()
 	}
+	m.mu.Lock()
+	s.Refused = m.refused
+	m.mu.Unlock()
 	return s, nil
 }
 
@@ -376,23 +403,97 @@ func (m *CertManager) Pair() (certPEM, keyPEM string, ok bool) {
 // renewal planned - for the screen to read it again. It returns with ctx.
 func (m *CertManager) Watch(ctx context.Context, issued, moved func()) {
 	go m.watchOne(ctx, m.api.base+"/secrets", func(typ string, raw json.RawMessage) {
-		var s struct {
-			Data map[string][]byte `json:"data"`
-		}
-		_ = json.Unmarshal(raw, &s)
-		cert, key := string(s.Data["tls.crt"]), string(s.Data["tls.key"])
-		if typ == "DELETED" {
-			cert, key = "", ""
-		}
-		m.mu.Lock()
-		changed := cert != m.certPEM || key != m.keyPEM
-		m.certPEM, m.keyPEM = cert, key
-		m.mu.Unlock()
-		if changed {
+		if m.holdSecret(typ, raw) {
+			m.fitNames(ctx)
 			issued()
 		}
 	})
 	m.watchOne(ctx, m.certificate(), func(string, json.RawMessage) { moved() })
+}
+
+// holdSecret keeps the pair one event of the Secret carries, and the name
+// constraints of its chain. It says whether the pair changed.
+func (m *CertManager) holdSecret(typ string, raw json.RawMessage) bool {
+	var s struct {
+		Metadata struct {
+			Annotations map[string]string `json:"annotations"`
+		} `json:"metadata"`
+		Data map[string][]byte `json:"data"`
+	}
+	if typ != "DELETED" {
+		_ = json.Unmarshal(raw, &s)
+	}
+	cert, key := string(s.Data["tls.crt"]), string(s.Data["tls.key"])
+	by := ""
+	if a := s.Metadata.Annotations; a["cert-manager.io/issuer-name"] != "" {
+		by = a["cert-manager.io/issuer-kind"] + "/" + a["cert-manager.io/issuer-name"]
+	}
+	limits := limitsOf(s.Data["tls.crt"], s.Data["ca.crt"])
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	changed := cert != m.certPEM || key != m.keyPEM
+	m.certPEM, m.keyPEM = cert, key
+	m.limits, m.limitsBy = limits, by
+	return changed
+}
+
+// fitNames brings the Certificate's names within what the authority that
+// signed its Secret permits, cert-manager reissuing. Under an authority with
+// no name constraints it does nothing, not even a read. When it permits none
+// of them, the Certificate is left as it is - an empty list is no request -
+// and the reason is logged once and reported by Status.
+func (m *CertManager) fitNames(ctx context.Context) {
+	m.mu.Lock()
+	limits, by := m.limits, m.limitsBy
+	if limits.none() {
+		m.refused = ""
+		m.mu.Unlock()
+		return
+	}
+	m.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, lookupTimeout)
+	defer cancel()
+	refused, said := "", ""
+	defer func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		m.refused = refused
+		if said != "" && said != m.said {
+			slog.Warn(said)
+		}
+		m.said = said
+	}()
+	res, err := m.do(ctx, http.MethodGet, m.certificate()+"/"+m.name, "", nil)
+	if err == nil {
+		var c k8sCertificate
+		if err = answer(res, "reading the Certificate "+m.name, &c); err == nil {
+			// Asked of another issuer since: its own Secret will tell.
+			if by != "" && by != c.Spec.IssuerRef.Kind+"/"+c.Spec.IssuerRef.Name {
+				return
+			}
+			kept, out := limits.split(c.Spec.DNSNames)
+			switch {
+			case len(out) == 0:
+				return
+			case len(kept) == 0:
+				refused = fmt.Sprintf("its authority may sign none of the names asked for (%s), so every client refuses the certificate; the Certificate %s is left as it is. Constraints: %s",
+					strings.Join(out, ", "), m.name, limits)
+				said = "cert-manager: " + refused
+				return
+			}
+			res, err = m.do(ctx, http.MethodPatch, m.certificate()+"/"+m.name, "application/merge-patch+json",
+				map[string]any{"spec": map[string]any{"dnsNames": kept}})
+			if err == nil {
+				err = answer(res, "updating the Certificate "+m.name, nil)
+			}
+			if err == nil {
+				slog.Info("cert-manager: names its authority may not sign are dropped from the Certificate, it is issued again",
+					"certificate", m.name, "dropped", out, "kept", kept, "constraints", limits.String())
+				return
+			}
+		}
+	}
+	said = fmt.Sprintf("cert-manager: the names of the Certificate %s are not brought within its authority's constraints (%s): %v", m.name, limits, err)
 }
 
 // watchOne follows the one object of collection named m.name: a LIST, then a

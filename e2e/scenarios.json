@@ -1181,6 +1181,56 @@
       }
     },
     {
+      "id": "api-infra-internal-access-read",
+      "domain": "infra",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/settings/internal-access"
+      },
+      "allowed": [
+        "root",
+        "infra-admin",
+        "app-admin"
+      ],
+      "title": {
+        "en": "Read who may call the scheduler on the internal plane",
+        "fr": "Lire qui peut appeler le scheduler sur le plan interne"
+      },
+      "description": {
+        "en": "The access mode of the scheduled calls API (none, a Meerkat token, a cluster token) and the callers let in. The Scheduler's readers see it, read-only: root, the infra-admin and the app-admin. A tenant admin or a plain user gets 403.",
+        "fr": "Le mode d'accès de l'API des appels planifiés (sans titre, jeton Meerkat, jeton de cluster) et les appelants admis. Les lecteurs du Scheduler le voient, en lecture seule : root, l'admin infra et l'admin applicatif. Un admin d'organisation ou un simple utilisateur reçoit 403."
+      }
+    },
+    {
+      "id": "api-infra-internal-access-write",
+      "domain": "infra",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/settings/internal-access",
+        "body": {
+          "mode": "no-such-mode",
+          "callers": []
+        },
+        "allowedStatus": [
+          422
+        ]
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Choose who may call the scheduler on the internal plane",
+        "fr": "Choisir qui peut appeler le scheduler sur le plan interne"
+      },
+      "description": {
+        "en": "Who may reach a port of the gateway is the infrastructure's decision: root and the infra-admin only, an app-admin reads it and gets 403 here. The probe sends a mode that does not exist, refused after the guard and naming the three allowed, so the run never opens or closes the plane it is testing.",
+        "fr": "Qui peut atteindre un port de la gateway est une décision d'infrastructure : root et l'admin infra seulement, un admin applicatif le lit et reçoit 403 ici. La sonde envoie un mode qui n'existe pas, refusé une fois la garde franchie en nommant les trois permis : le test n'ouvre ni ne ferme jamais le plan qu'il teste."
+      }
+    },
+    {
       "id": "api-gw-token-update",
       "domain": "gateway",
       "kind": "api",

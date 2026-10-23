@@ -169,6 +169,9 @@ func (s *Schedules) Read(ctx context.Context, q any) (livewire.Window, error) {
 				"progress": sc.Progress, "lastState": sc.LastState,
 				"lastDetail": sc.LastDetail, "lastAt": sc.LastAt,
 				"createdBy": sc.CreatedBy,
+				// Who created it on the internal plane, and how that was
+				// known. Written once, so nothing for the version to follow.
+				"caller": sc.Caller, "callerVia": sc.CallerVia, "callerAddr": sc.CallerAddr,
 			},
 		})
 	}

@@ -66,6 +66,9 @@ var agentClosedEndpoints = map[string]string{
 	"PUT /api/settings/tls/ports/{plane}": "a plane's ports: a change can close the console's, the " +
 		"agent's own door with it",
 	"PUT /api/settings/agent": "whether agents may connect at all is not a question an agent answers",
+	"PUT /api/settings/internal-access": "who may schedule a call, with any role, on the internal plane is " +
+		"a perimeter a person decides: an agent loosening it would hand every pod of the cluster what a " +
+		"token used to bound; reading it stays open",
 	"POST /api/apidocs/token": "a test token for the developers' API docs: a credential, minted for a " +
 		"browser page",
 }

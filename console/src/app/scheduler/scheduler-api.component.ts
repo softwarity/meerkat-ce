@@ -2,8 +2,6 @@ import { Component, computed } from "@angular/core";
 import { httpResource } from "@angular/common/http";
 import { MatButtonModule } from "@angular/material/button";
 import { MatExpansionModule } from "@angular/material/expansion";
-import { MatIconModule } from "@angular/material/icon";
-import { RouterLink } from "@angular/router";
 import { Edition } from "../api.service";
 import { SnippetComponent } from "../shared/snippet.component";
 
@@ -21,8 +19,6 @@ import { SnippetComponent } from "../shared/snippet.component";
   imports: [
     MatButtonModule,
     MatExpansionModule,
-    MatIconModule,
-    RouterLink,
     SnippetComponent,
   ],
   templateUrl: "./scheduler-api.component.html",
@@ -46,14 +42,6 @@ export class SchedulerApiComponent {
     return e?.internalOrigin || `http://meerkat:${e?.internalPort || "7070"}`;
   });
 
-  protected readonly mintCmd = `# Perimeter "schedules" - it opens this API and nothing else. Minted on
-# the console, used on the internal plane. The clear value is shown once.
-#
-# The same thing over the API, as root:
-curl -X POST http://meerkat:9090/api/admin-tokens \\
-  -H "Authorization: Bearer $ROOT_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{"name":"stations","scope":"schedules","days":365}'`;
 
   protected readonly writeCmd = computed(
     () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"

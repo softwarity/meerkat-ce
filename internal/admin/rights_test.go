@@ -43,7 +43,7 @@ var knownGuards = map[string]bool{
 	"rootOnly": true, "infraAdmin": true, "gw": true, "appAdmin": true,
 	"domainAdmin": true, "tenantScoped": true, "schedules": true, "serviceTokens": true,
 	"tenantCreator": true, "devOrInfra": true,
-	"authed": true, "agentDoor": true,
+	"authed": true, "agentDoor": true, "runReport": true,
 }
 
 func TestTheRightsMatrixIsReadFromTheCode(t *testing.T) {

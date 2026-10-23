@@ -740,6 +740,11 @@
     "guard": "serviceTokens"
   },
   {
+    "method": "PATCH",
+    "path": "/api/schedules/{id}/run",
+    "guard": "runReport"
+  },
+  {
     "method": "POST",
     "path": "/api/schedules/{id}/run",
     "guard": "schedules"
@@ -793,6 +798,21 @@
     "method": "PUT",
     "path": "/api/settings/audit",
     "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/internal-access",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/settings/internal-access",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings/internal-access/candidates",
+    "guard": "domainAdmin"
   },
   {
     "method": "GET",

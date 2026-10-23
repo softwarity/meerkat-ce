@@ -62,9 +62,16 @@ type Schedule struct {
 	// field in the store, and a reader is never handed two spellings of it.
 	Role      string `json:"role,omitempty"`
 	CreatedBy string `json:"createdBy,omitempty"`
-	TenantID  string `json:"tenantId,omitempty"`
-	RouteID   string `json:"routeId"`
-	Route     string `json:"route,omitempty"` // route name, filled for reading
+	// Caller is who wrote the schedule on the internal plane, in the form its
+	// identification gives (see the Caller* constants for CallerVia), and
+	// CallerAddr the address it called from. Set by the gateway at creation,
+	// never by what the caller sends, and kept as long as the schedule.
+	Caller     string `json:"caller,omitempty"`
+	CallerVia  string `json:"callerVia,omitempty"`
+	CallerAddr string `json:"callerAddr,omitempty"`
+	TenantID   string `json:"tenantId,omitempty"`
+	RouteID    string `json:"routeId"`
+	Route      string `json:"route,omitempty"` // route name, filled for reading
 
 	// Metadata is the service's OWN filing system: whatever it needs to find
 	// its schedules again - a station, a customer, a batch - without Meerkat
@@ -667,7 +674,7 @@ func (s Schedule) TooLate(t time.Time) bool {
 const scheduleColumns = `id, name, roles, created_by, tenant_id, route_id, method, path, body,
 	content_type, headers, metadata, every, cron, at, timezone, start_at, overlap, catch_up, timeout, paused, next_at, run_id, run_started,
 	claimed_by, claimed_at, progress, run_state, attempts, run_cause, run_of, turn_try, last_state, last_detail, last_at, created_at, updated_at,
-	failing_since`
+	failing_since, caller, caller_via, caller_addr`
 
 func scanSchedule(row interface{ Scan(...any) error }) (Schedule, error) {
 	var s Schedule
@@ -678,7 +685,7 @@ func scanSchedule(row interface{ Scan(...any) error }) (Schedule, error) {
 		&s.Paused, &s.NextAt, &s.RunID, &s.RunStarted, &s.ClaimedBy, &s.ClaimedAt, &s.Progress,
 		&s.RunState, &s.Attempts, &s.RunCause, &s.RunOf, &s.TurnTry,
 		&s.LastState, &s.LastDetail, &s.LastAt, &s.CreatedAt, &s.UpdatedAt,
-		&s.FailingSince)
+		&s.FailingSince, &s.Caller, &s.CallerVia, &s.CallerAddr)
 	if err != nil {
 		return s, err
 	}
@@ -750,14 +757,14 @@ func (s *Store) CreateSchedule(ctx context.Context, sc Schedule) error {
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO schedules (`+scheduleColumns+`)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?)`,
+		?, ?, ?, ?)`,
 		sc.ID, sc.Name, rolesJSON(sc.Roles), sc.CreatedBy, sc.TenantID, sc.RouteID, sc.Method, sc.Path, string(sc.Body),
 		sc.ContentType, headers, meta, sc.Every, sc.Cron, sc.At, sc.Timezone, sc.StartAt, sc.Overlap, sc.CatchUp, sc.Timeout,
 		sc.Paused, sc.NextAt,
 		sc.RunID, sc.RunStarted, sc.ClaimedBy, sc.ClaimedAt, sc.Progress, sc.RunState, sc.Attempts,
 		sc.RunCause, sc.RunOf, sc.TurnTry,
 		sc.LastState, sc.LastDetail, sc.LastAt, sc.CreatedAt, sc.UpdatedAt,
-		sc.FailingSince)
+		sc.FailingSince, sc.Caller, sc.CallerVia, sc.CallerAddr)
 	if err != nil {
 		return fmt.Errorf("store: create schedule %q: %w", sc.ID, err)
 	}

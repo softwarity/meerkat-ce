@@ -65,12 +65,13 @@ func TestTheInternalPlaneServesTheJWKSToAnybody(t *testing.T) {
 	}
 }
 
-// TestTheInternalPlaneAnswersTokensOnly: a place is not a credential. No
-// token is a 401, and so is the root's console session - a cookie has no
-// business on this port.
+// TestTheInternalPlaneAnswersTokensOnly: in token mode, a place is not a
+// credential. No token is a 401, and so is the root's console session - a
+// cookie has no business on this port.
 func TestTheInternalPlaneAnswersTokensOnly(t *testing.T) {
 	f := setupBare(t)
 	aRoute(t, f)
+	tokenMode(t, f)
 	srv := internalPlane(t, f)
 	if code, body := on(t, srv, "POST", "/api/schedules", stationSchedule, "", nil); code != http.StatusUnauthorized {
 		t.Fatalf("no token: %d %s", code, body)

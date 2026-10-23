@@ -232,8 +232,16 @@ securityContext:
 # on the routes screen. One Role per namespace - pods are where environment
 # variables are, so never a ClusterRole for them. A route to a namespace not
 # listed is checked by a connection.
+#
+# internalCallers lets the scheduler's API on the internal plane recognise a
+# pod by its ServiceAccount token (a TokenReview, the API server checking it)
+# and list the cluster's ServiceAccounts for the console (names only). A pod
+# that sends no token is named by its address, read from the pods of the
+# namespaces above - one elsewhere is unidentified. false refuses the cluster
+# token mode, and a ServiceAccount token is then not checked.
 rbac:
   read: true
   watch: true
   clusterServices: true
+  internalCallers: true
   watchNamespaces: []

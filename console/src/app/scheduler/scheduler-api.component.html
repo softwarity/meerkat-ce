@@ -46,27 +46,17 @@
         </tbody>
       </table>
       <p class="hint" i18n="@@Sched_api_where_2">
-        The token reaches only this API. What the calls may reach is set by
-        each schedule's <code>roles</code>, so one token serves all your
+        A token minted for it reaches only this API. What the calls may reach is
+        set by each schedule's <code>roles</code>, so one token serves all your
         endpoints.
       </p>
       <p class="hint" i18n="@@Sched_api_where_3">
         This is the <b>internal plane</b>: a port inside the cluster, never
-        behind an ingress, that answers tokens only. Services write their
-        schedules there. This console reads them and pauses, resumes, runs or
-        deletes them, but creates and changes none.
+        behind an ingress. What a service presents there - nothing, this token,
+        or its pod's ServiceAccount token - is set under <b>Access</b>.
+        Services write their schedules there. This console reads them and
+        pauses, resumes, runs or deletes them, but creates and changes none.
       </p>
-      <!-- The screen that mints one, one click away: an operator reading this
-           has the console in front of them. Hidden for whoever cannot mint -
-           a control-plane token is root's - so the link never opens a door
-           that answers no. -->
-      <p class="go">
-        <a matButton="tonal" routerLink="/infra/access-tokens" any-role="root">
-          <mat-icon>key</mat-icon>
-          <ng-container i18n="@@Mint_a_token">Mint a token</ng-container>
-        </a>
-      </p>
-      <app-snippet filename="mint-token.sh" [content]="mintCmd" />
     </ng-template>
   </mat-expansion-panel>
 

@@ -235,6 +235,11 @@ func (a *API) issuedView(r *http.Request, c store.Certificate) certView {
 		if !st.Ready {
 			v.Error = st.Message
 		}
+		// Ready for cert-manager, refused by every client: its authority's
+		// name constraints permit none of the names.
+		if st.Refused != "" {
+			v.Error = st.Refused
+		}
 	}
 	return v
 }

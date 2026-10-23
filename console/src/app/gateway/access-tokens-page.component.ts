@@ -1,4 +1,6 @@
 import { Component, computed, inject, LOCALE_ID, signal } from '@angular/core';
+import { httpResource } from '@angular/common/http';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -16,6 +18,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { ActivatedRoute } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { DateTime } from 'luxon';
 import { firstValueFrom } from 'rxjs';
@@ -24,21 +27,25 @@ import { MeService } from '../me.service';
 import { DialogsService } from '../shared/dialogs.service';
 import { LiveChangesService } from '../shared/live-changes.service';
 
-// One row of the common table: a control-plane token of the caller's, or an
-// application token of anyone's.
+// One row of the common table: a control-plane token of the caller's, an
+// internal one (perimeter schedules, which a service presents on the internal
+// plane), or an application token of anyone's.
 type TokenRow = (AdminToken | DataToken) & {
-  plane: 'admin' | 'data';
+  plane: 'admin' | 'internal' | 'data';
   ownerName?: string;
   tenantName?: string;
   groupName?: string;
 };
 
-// Access tokens, both planes in one table (AUTH-09). The CONTROL plane's are
+// Access tokens, every plane in one table (AUTH-09). The CONTROL plane's are
 // the caller's own - minted here, shown once, acting with their owner's powers
-// narrowed by a perimeter. The APPLICATIONS' are everyone's, shown to whoever
-// administers the applications: seen and revoked here, and minted only by
-// their owner, on the profile - a credential is never created in somebody
-// else's name. Details and actions live in the drawer, like every other list.
+// narrowed by a perimeter. The INTERNAL plane's are the same kind of token
+// with the schedules perimeter: what a service presents to the scheduler, so
+// they are filed apart, named after the service that holds them. The
+// APPLICATIONS' are everyone's, shown to whoever administers the applications:
+// seen and revoked here, and minted only by their owner, on the profile - a
+// credential is never created in somebody else's name. Details and actions
+// live in the drawer, like every other list.
 @Component({
   selector: 'app-access-tokens-page',
   imports: [
@@ -68,16 +75,30 @@ export class AccessTokensPageComponent {
   // Every account's application tokens (AUTH-09), for those who administer
   // the applications: seen and revoked here, minted by their owner only.
   protected readonly dataTokens = signal<DataToken[]>([]);
-  protected readonly view = signal<'' | 'admin' | 'data'>('');
+  // Opened on one plane when a screen sends here for it (?view=internal from
+  // the Scheduler's Access drawer), on all of them otherwise.
+  protected readonly view = signal<'' | 'admin' | 'internal' | 'data'>(
+    (['admin', 'internal', 'data'] as const).find(
+      (v) => v === inject(ActivatedRoute).snapshot.queryParamMap.get('view'),
+    ) ?? '',
+  );
   protected readonly query = signal('');
   protected readonly columns = ['name', 'owner', 'plane', 'scope', 'used'];
   protected readonly rows = computed<TokenRow[]>(() => {
     const q = this.query().trim().toLowerCase();
     const view = this.view();
-    const mine: TokenRow[] = view === 'data' ? [] : this.tokens().map((t) => ({ ...t, plane: 'admin' as const }));
-    const theirs: TokenRow[] = view === 'admin' ? [] : this.dataTokens().map((t) => ({ ...t, plane: 'data' as const }));
+    // A schedules token is a control-plane token in the store - which is why
+    // every one minted before keeps working - and an internal one here: it is
+    // what a service presents on the internal plane, never on the console's.
+    const mine: TokenRow[] = this.tokens().map((t) => ({
+      ...t,
+      plane: t.scope === 'schedules' ? ('internal' as const) : ('admin' as const),
+    }));
+    const theirs: TokenRow[] = this.dataTokens().map((t) => ({ ...t, plane: 'data' as const }));
     return [...mine, ...theirs].filter(
-      (t) => !q || t.name.toLowerCase().includes(q) || (t.ownerName ?? '').toLowerCase().includes(q),
+      (t) =>
+        (!view || t.plane === view) &&
+        (!q || t.name.toLowerCase().includes(q) || (t.ownerName ?? '').toLowerCase().includes(q)),
     );
   });
   protected readonly selected = signal<TokenRow | null>(null);
@@ -108,14 +129,20 @@ export class AccessTokensPageComponent {
   protected readonly enableTip = $localize`:@@Enable_token:Enable this token`;
   protected readonly disableTip = $localize`:@@Disable_token:Disable this token (it can be turned back on)`;
 
+  // Under the Internal filter, a token for a service to call the scheduler:
+  // the perimeter is not a choice there, it is what makes it internal.
   protected async create(): Promise<void> {
     const res = await firstValueFrom(
       this.dialog
         .open<
           TokenCreateDialogComponent,
-          void,
+          TokenDialogData,
           { name: string; days: number; scope: TokenScope; from: string } | undefined
-        >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true })
+        >(TokenCreateDialogComponent, {
+          width: '520px',
+          restoreFocus: true,
+          data: { internal: this.view() === 'internal' },
+        })
         .afterClosed(),
     );
     if (!res) return;
@@ -138,9 +165,9 @@ export class AccessTokensPageComponent {
       this.dialog
         .open<
           TokenCreateDialogComponent,
-          AdminToken,
+          TokenDialogData,
           { name: string; days: number; scope: TokenScope; from: string } | undefined
-        >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true, data: t })
+        >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true, data: { token: t } })
         .afterClosed(),
     );
     if (!res) return;
@@ -263,10 +290,24 @@ export class AccessTokensPageComponent {
   }
 }
 
+// What the dialog is opened on: a token to edit, or a new one - internal or
+// for the console.
+interface TokenDialogData {
+  token?: AdminToken;
+  internal?: boolean;
+}
+
 // Create dialog: a name and an expiry choice. Returns {name, days} or undefined.
 @Component({
   selector: 'app-token-create-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [
+    MatAutocompleteModule,
+    MatButtonModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+  ],
   styles: [
     `
       /* One rule. The dialog's WIDTH is set where a dialog's width is set -
@@ -290,6 +331,8 @@ export class AccessTokensPageComponent {
     <h2 mat-dialog-title>
       @if (editing) {
         <ng-container i18n="@@Edit_token">Edit token</ng-container>
+      } @else if (internal) {
+        <ng-container i18n="@@New_internal_token">New internal token</ng-container>
       } @else {
         <ng-container i18n="@@New_token">New token</ng-container>
       }
@@ -302,12 +345,33 @@ export class AccessTokensPageComponent {
           [value]="name()"
           (input)="name.set($any($event.target).value)"
           (keydown.enter)="confirm()"
+          [matAutocomplete]="services"
+          [matAutocompleteDisabled]="!internal"
           cdkFocusInitial
         />
+        <mat-autocomplete #services (optionSelected)="name.set($event.option.value)">
+          @for (s of suggestions(); track s) {
+            <mat-option [value]="s">{{ s }}</mat-option>
+          }
+        </mat-autocomplete>
+        <mat-hint>
+          @if (internal) {
+            <ng-container i18n="@@Internal_token_name_hint">
+              The service that holds it, or global for one every service shares.
+            </ng-container>
+          }
+        </mat-hint>
       </mat-form-field></p>
-      <p class="plane" i18n="@@Token_for_the_control_plane">
-        For the control plane, on this port.
-      </p>
+      @if (internal) {
+        <p class="plane" i18n="@@Token_for_the_internal_plane">
+          For the internal plane: a service presents it to call the scheduler, and it opens nothing else.
+        </p>
+      } @else {
+        <p class="plane" i18n="@@Token_for_the_control_plane">
+          For the control plane, on this port.
+        </p>
+      }
+      @if (!internal) {
       <p><mat-form-field>
         <mat-label i18n="@@Perimeter">Perimeter</mat-label>
         <mat-select [value]="scope()" (selectionChange)="scope.set($event.value)">
@@ -335,6 +399,7 @@ export class AccessTokensPageComponent {
           }
         </mat-hint>
       </mat-form-field></p>
+      }
       <p><mat-form-field>
         <mat-label i18n="@@Used_from">Used from</mat-label>
         <input
@@ -371,17 +436,33 @@ export class AccessTokensPageComponent {
 })
 export class TokenCreateDialogComponent {
   private readonly ref = inject(MatDialogRef<TokenCreateDialogComponent>);
+  private readonly data = inject<TokenDialogData | null>(MAT_DIALOG_DATA, { optional: true });
   // The token being changed, or null when one is being minted. ONE dialog for
   // the two: the fields are the same fields, and a second component would be
   // the same form with a different title and a copy of every hint.
-  protected readonly editing = inject<AdminToken | null>(MAT_DIALOG_DATA, { optional: true }) ?? null;
+  protected readonly editing = this.data?.token ?? null;
+  // A new internal token: its perimeter is the scheduler, not a choice.
+  protected readonly internal = !this.editing && !!this.data?.internal;
 
   protected readonly name = signal(this.editing?.name ?? '');
   protected readonly days = signal(0);
   // Read-only by default when minting: a token handed to an agent is the
   // common case, and the safe answer should be the one nobody has to think
   // about. When editing, what the token already is.
-  protected readonly scope = signal<TokenScope>(this.editing?.scope ?? 'readonly');
+  protected readonly scope = signal<TokenScope>(
+    this.editing?.scope ?? (this.internal ? 'schedules' : 'readonly'),
+  );
+
+  // The names offered for an internal token: global, and the services the
+  // runtime knows, by their own name - the workload's last segment.
+  private readonly candidates = httpResource<{ candidates: string[] }>(() =>
+    this.internal ? '/api/settings/internal-access/candidates?mode=none' : undefined,
+  );
+  protected readonly suggestions = computed(() => {
+    const typed = this.name().trim().toLowerCase();
+    const names = (this.candidates.value()?.candidates ?? []).map((c) => c.slice(c.lastIndexOf('/') + 1));
+    return ['global', ...new Set(names)].filter((n) => !typed || n.toLowerCase().includes(typed)).slice(0, 50);
+  });
   protected readonly from = signal(this.editing?.fromCidrs ?? '');
 
   protected confirm(): void {

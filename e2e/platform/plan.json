@@ -3652,8 +3652,8 @@
     "CE",
     "EE"
    ],
-   "en": "The internal plane answers the JWKS without a token and the scheduler API with a schedules token only, refuses a browser session, and the chart publishes it on a ClusterIP Service nothing else points at; the application port serves no JWKS.",
-   "fr": "Le plan interne sert le JWKS sans jeton et l'API du scheduler avec un jeton schedules seulement, refuse une session de navigateur, et le chart le publie sur un Service ClusterIP vers lequel rien d'autre ne pointe ; le port applicatif ne sert aucun JWKS."
+   "en": "The internal plane answers the JWKS without a token in every access mode, and the scheduler API as its mode says: none (a caller named by its token, its ServiceAccount or the workload at its address), a schedules token, or a ServiceAccount token checked by TokenReview; with callers listed an unidentified caller is refused, without it is accepted; an upgrade holding a schedules token keeps the token mode. It refuses a browser session, and the chart publishes it on a ClusterIP Service nothing else points at; the application port serves no JWKS.",
+   "fr": "Le plan interne sert le JWKS sans jeton dans tous les modes d'accès, et l'API du scheduler comme son mode le dit : sans titre (un appelant nommé par son jeton, son ServiceAccount ou le workload de son adresse), un jeton schedules, ou un jeton de ServiceAccount vérifié par TokenReview ; avec une liste d'appelants, un appelant non identifié est refusé, sans liste il est accepté ; une mise à jour qui détient un jeton schedules garde le mode jeton. Il refuse une session de navigateur, et le chart le publie sur un Service ClusterIP vers lequel rien d'autre ne pointe ; le port applicatif ne sert aucun JWKS."
   },
   {
    "id": "EVAL-01",

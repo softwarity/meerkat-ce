@@ -36,10 +36,10 @@ Les rôles demandés passent par la **hiérarchie du catalogue**, exactement com
 d'une session : demander un rôle parent accorde ce qu'il implique.
 
 Pas de compte de service à créer, donc pas de droits à tenir à jour indéfiniment. Ce
-qui borne une planification, c'est **le jeton qui l'a écrite** : un jeton dont le
-périmètre est `schedules`, émis par root, tracé dans le journal d'audit, révocable
-en un clic. Deux services qui ne doivent pas atteindre les mêmes choses reçoivent
-deux jetons.
+qui borne une planification, c'est **qui peut en écrire une**, ce que décide
+l'[accès](#qui-peut-lappeler) au plan interne : avec un jeton dont le périmètre est
+`schedules`, émis par root, tracé dans le journal d'audit, révocable en un clic,
+deux services qui ne doivent pas atteindre les mêmes choses reçoivent deux jetons.
 
 Si vous tenez à savoir à qui appartient une planification, notez-le dans les
 **métadonnées** : `"metadata": { "owner": "stations-svc" }` est une clé comme une
@@ -105,8 +105,9 @@ PATCH /api/schedules/{id}/run
 puis, à la fin, `{"state": "done", "detail": "12000 rows"}`. C'est ce qui permet
 d'exprimer un traitement de trois heures sans requête HTTP de trois heures.
 
-**Avec quel jeton ?** Le vôtre, celui qui a créé la planification, sur le plan
-interne comme tout le reste. L'appel planifié n'a apporté aucun jeton : son identité a été
+**Avec quel jeton ?** Ce que l'accès au plan interne vous demande - aucun, le
+vôtre, ou le jeton de ServiceAccount de votre pod -, sur le plan interne comme
+tout le reste. L'appel planifié n'a apporté aucun jeton : son identité a été
 établie à l'intérieur de la gateway, et n'a jamais circulé sur le réseau.
 
 Chaque compte rendu renouvelle le **bail**. Restez silencieux cinq minutes, et
@@ -219,10 +220,10 @@ http://meerkat:7070/api/schedules
 En HTTPS sur 7443 dès qu'un certificat est placé sur le plan interne ; la page du
 scheduler donne l'adresse, telle que le runtime la nomme.
 
-Ce port n'est jamais placé derrière un ingress, et il ne répond **qu'aux
-jetons** : une session de navigateur y est refusée. L'intérieur du cluster est un
-lieu, pas un titre d'accès - n'importe quel pod atteint un ClusterIP -, donc rien
-sur ce port ne donne de pouvoir sans jeton.
+Ce port n'est jamais placé derrière un ingress, et une session de navigateur y
+est refusée. L'intérieur du cluster est un lieu, pas un titre d'accès - n'importe
+quel pod atteint un ClusterIP -, donc ce qu'un appelant doit présenter est une
+décision, et c'est la vôtre : voir [Qui peut l'appeler](#qui-peut-lappeler).
 
 | | |
 |---|---|
@@ -235,6 +236,52 @@ sur ce port ne donne de pouvoir sans jeton.
 | `POST /api/schedules/{id}/run` | avancer le prochain tour |
 | `GET /api/schedules/{id}/runs` | ce qu'a fait chaque tour, du plus récent au plus ancien |
 | `PATCH /api/schedules/{id}/run` | rendre compte de l'exécution en cours |
+
+### Qui peut l'appeler
+
+Ce qu'un service présente sur ce port est un réglage, sous Scheduler, **Access**.
+Un administrateur de l'infrastructure le change ; les autres lecteurs du
+Scheduler le voient.
+
+| Mode | L'appelant présente | Il est connu comme |
+|---|---|---|
+| **None** (sans) | rien | le nom de son jeton ou son ServiceAccount quand il en envoie un, sinon le workload qui tient son adresse : `canopy/Deployment/reference-data` sur Kubernetes, le service ou le conteneur sur Docker et Swarm |
+| **Meerkat token** | un jeton de périmètre `schedules` ([plus bas](#le-jeton)) | le nom du jeton |
+| **Cluster token** | le jeton de ServiceAccount de son pod, que Kubernetes vérifie (TokenReview). Kubernetes seulement | `namespace/serviceaccount` |
+
+```bash
+# Cluster token : le pod envoie le jeton que Kubernetes a monté pour lui.
+curl http://meerkat:7070/api/schedules \
+  -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+```
+
+Puis **qui** : tout le monde, ou seulement les appelants listés, comparés au nom
+que donne le mode. Un appelant que personne n'a pu identifier est refusé dès
+qu'il y a une liste, et accepté quand tout le monde est admis. Chaque refus dit ce qui
+manque et qui est admis. Un titre envoyé est vérifié dans tous les modes : un
+jeton révoqué est refusé, il ne devient pas un appelant anonyme.
+
+> [!WARNING]
+> Une adresse n'est pas une preuve : None nomme un appelant pour le journal et
+> pour la liste, dans un cluster qui se fait confiance. Et ni le mode ni la liste
+> ne bornent les **rôles** qu'une planification demande, ni la **route** qu'elle
+> appelle, qui peut être celle d'un autre service. Sous None avec tout le monde
+> admis, n'importe quel pod peut planifier un appel avec n'importe quel rôle,
+> `ROLE_ADMIN` compris, sur n'importe quelle route.
+
+Chaque planification garde qui l'a créée et comment on l'a su - un jeton, un
+ServiceAccount, un workload déduit de son adresse, ou personne, avec l'adresse
+d'où il venait. Son tiroir l'affiche, et le journal d'audit aussi.
+
+Une nouvelle installation démarre en **None**. Une installation mise à jour qui
+détenait un jeton `schedules` garde **Meerkat token** : une mise à jour n'ouvre
+rien. Le JWKS et le document de découverte, sur le même port, restent ouverts
+dans tous les modes.
+
+Sur Kubernetes, le chart accorde ce qu'il faut : `create` sur les TokenReviews et
+`list` sur les ServiceAccounts (`rbac.internalCallers`), et `get` sur les
+ReplicaSets là où il lit déjà les pods (`rbac.watch`, `rbac.watchNamespaces`). Un
+pod d'un namespace que la gateway ne lit pas reste non identifié.
 
 ### Ce que fait la console, et ce qu'elle ne fait pas
 
@@ -256,7 +303,9 @@ service qui en a besoin.
 ### Le jeton
 
 Un jeton dont le **périmètre est `schedules`**, créé dans la console (Infra,
-Access tokens) et utilisé sur le plan interne. Il ouvre cette API et rien
+Access tokens, **Internal**, nommé d'après le service qui le détient ou `global`)
+et utilisé sur le plan interne. C'est ce que demande le mode Meerkat token, et ce
+que None lit quand il est envoyé. Il ouvre cette API et rien
 d'autre - ni la configuration, ni les comptes, ni les routes, et rien du tout
 sur le port de la console. Il est étroit à dessein : il vit dans un manifeste de déploiement, souvent
 dans le dépôt d'une autre équipe, et c'est celui que personne ne pense à

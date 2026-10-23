@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+- **A service reports on its run whatever the access mode.** The report on a run a service
+  answered 202 to is proven by the run identifier the call carried (`Meerkat-Job-Run`), not by
+  the access mode's credential: switching the mode no longer leaves a service unable to say its
+  run is done, and its runs no longer end lost one after the other.
 - **A roles expression can decide, and the console reads it.** The expression a route uses to
   shape the roles it sends is Go's text/template: `if`, `else if` and `else` turn the roles into
   the one value an application wants (Grafana's Admin, Editor or Viewer from three roles), and a
@@ -20,6 +24,29 @@
   once, with its Port beside it, always shown and filled: a list when the service has several,
   read-only on a single one, and a port the list does not carry (a route set up by hand) stays
   shown.
+- **A certificate asked of cert-manager follows what the cluster CA may sign.** On Kubernetes
+  the gateway asks cert-manager for its doors' certificates with every name of its Service,
+  the bare one included (`meerkat-meerkat`). Under a cluster CA with name constraints that
+  permit only cluster names (`svc`, `cluster.local`, the namespace), cert-manager's CA issuer
+  signs that bare name anyway, and every verifier (Go, OpenSSL) then refuses the whole
+  certificate, whatever name was called. The gateway now reads the constraints of the chain the
+  Secret carries and brings the Certificate down to the names they permit, and cert-manager
+  issues it again; asked again from the console, the refused name does not come back. A name
+  the CA permits stays, even bare (`meerkat-meerkat-internal`). When it permits none of them,
+  the Certificate is left as it is and its row on Domains & TLS says which names are refused
+  and by which constraints. Under a CA without name constraints nothing changes.
+- **Who may call the scheduler's API is a setting.** On the internal plane, the scheduled calls
+  API asked every service for a token of perimeter `schedules`. It now has three modes, chosen
+  under Scheduler, **Access**: **None** asks nothing, and names the caller by its token or its
+  ServiceAccount when it sends one, otherwise by the workload (Kubernetes) or the container
+  (Docker, Swarm) at its address; **Meerkat token** is the previous behaviour; **Cluster token**
+  takes the pod's own ServiceAccount token, checked by Kubernetes. A list of callers can narrow
+  any mode, and a caller nobody could identify is then refused. Each new schedule records who
+  created it and how that was known. An installation that holds a `schedules` token keeps the
+  Meerkat token mode on upgrade, so nothing opens; a new installation starts in None. Under
+  Infra, Access tokens, `schedules` tokens are listed apart, as **Internal**, and existing ones
+  keep working. The Helm chart grants `create` on TokenReviews, `list` on ServiceAccounts
+  (`rbac.internalCallers`) and `get` on ReplicaSets where it already reads the pods.
 
 ---
 

@@ -220,7 +220,10 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		// How long a finished delayed action is kept before the sweep: a
 		// number stored, like the trail's own retention beside it.
 		"PUT /api/settings/schedules": true,
-		"POST /api/configurations":    true, "POST /api/configurations/import": true,
+		// Who may call the scheduler on the internal plane: the mode and the
+		// list, stored.
+		"PUT /api/settings/internal-access": true,
+		"POST /api/configurations":          true, "POST /api/configurations/import": true,
 		// A pull SHELVES a document and applies nothing - but it writes the
 		// row it shelved it in, which is what this list is about.
 		"POST /api/configurations/pull": true, "POST /api/configurations/{id}/pull": true,

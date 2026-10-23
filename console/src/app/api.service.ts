@@ -1472,6 +1472,32 @@ export interface Edition {
   mailWhy?: string;
 }
 
+// How a caller of the internal plane is recognised: by nothing (its token,
+// ServiceAccount or address name it when they can), by a Meerkat token, or by
+// its pod's ServiceAccount token, which the cluster checks.
+export type InternalAccessMode = 'none' | 'token' | 'cluster';
+
+// Who may call the scheduler's API on the internal plane.
+export interface InternalAccess {
+  mode: InternalAccessMode;
+  // The identities let in, in the mode's form; empty is everyone.
+  callers: string[];
+  // The modes this platform offers: cluster only on Kubernetes.
+  modes: InternalAccessMode[];
+  // What the gateway runs on, as discovery names it.
+  platform: string;
+  // Whether this reader may change it.
+  editable: boolean;
+}
+
+// What a mode's list can offer: the workloads, the tokens, the ServiceAccounts.
+export interface InternalAccessCandidates {
+  mode: InternalAccessMode;
+  candidates: string[];
+  // Why nothing could be listed: the list stays free to type.
+  unavailable?: string;
+}
+
 // What the License screen shows of a license: never the file itself.
 export interface License {
   id?: string;
@@ -3484,6 +3510,17 @@ export class ApiService {
       retentionDays: days,
       choices: [],
     });
+  }
+
+  // Who may call the scheduler's API on the internal plane, and how they are
+  // recognised (SCHED-01). Read by the Scheduler's readers, changed by an
+  // infrastructure administrator.
+  internalAccess(): Observable<InternalAccess> {
+    return this.http.get<InternalAccess>('/api/settings/internal-access');
+  }
+
+  setInternalAccess(mode: InternalAccessMode, callers: string[]): Observable<InternalAccess> {
+    return this.http.put<InternalAccess>('/api/settings/internal-access', { mode, callers });
   }
 
   // The trail as a CSV file (STORE-06): the same filters, the same perimeter.

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -28,10 +29,12 @@ import (
 // it calls - the schedule names the roles its call needs, and the route's rule
 // reads them like anybody else's.
 //
-// Asking for a role is not being granted one: what bounds it is holding this
-// token at all. It is an administrator's credential, minted by root, traced in
-// the audit, revocable in a click - and two services that must not reach the
-// same things get two tokens.
+// Asking for a role is not being granted one: what bounds it is being let in
+// at all. With a token that is an administrator's credential, minted by root,
+// traced in the audit, revocable in a click - and two services that must not
+// reach the same things get two tokens. Without one (the internal plane's None
+// mode, internalaccess.go), it is the cluster's own trust and the list of
+// callers, and the console says so where the mode is chosen.
 //
 // THE IDS ARE OURS. A service that named its own would collide with the next
 // service that likes the same word, and the second write would take the first
@@ -69,6 +72,8 @@ func (a *API) registerSchedules(mux Mux) {
 	// decides how long the gateway remembers what it did.
 	mux.Handle("GET /api/settings/schedules", a.rootOnly(a.getScheduleSettings))
 	mux.Handle("PUT /api/settings/schedules", a.rootOnly(a.putScheduleSettings))
+	// Who may call the API on the internal plane, and how they are known.
+	a.registerInternalAccess(mux)
 }
 
 // scheduleSettings is the housekeeping the scheduler has, and what may be
@@ -172,11 +177,15 @@ func (a *API) createSchedule(w http.ResponseWriter, r *http.Request, actor store
 	in.ID = newScheduleID()
 	in.CreatedAt = 0
 	in.NextAt = in.FirstTurn(time.Now())
+	// Who wrote it, as the gateway knows it - never what the body claims.
+	c := callerOf(r)
+	in.Caller, in.CallerVia, in.CallerAddr = c.Identity, c.Via, c.Addr
 	if err := a.st.CreateSchedule(r.Context(), in); err != nil {
 		a.internal(w, err)
 		return
 	}
-	a.auditEvent(r.Context(), actor, "schedule.create", "schedule", in.ID, in.Name, "", rolesWords(in.Roles))
+	a.auditEvent(r.Context(), actor, "schedule.create", "schedule", in.ID, in.Name, "",
+		rolesWords(in.Roles)+"; written by "+c.words())
 	a.schedulesMoved(r.Context())
 	writeJSON(w, http.StatusCreated, in)
 }
@@ -224,6 +233,8 @@ func (a *API) readSchedule(w http.ResponseWriter, r *http.Request, actor store.U
 	in.RunID, in.ClaimedBy, in.ClaimedAt, in.Progress = stored.RunID, stored.ClaimedBy, stored.ClaimedAt, stored.Progress
 	in.RunStarted, in.RunState, in.Attempts = stored.RunStarted, stored.RunState, stored.Attempts
 	in.LastState, in.LastDetail, in.LastAt = stored.LastState, stored.LastDetail, stored.LastAt
+	// Who created it stays who created it: a later writer is in the audit.
+	in.Caller, in.CallerVia, in.CallerAddr = stored.Caller, stored.CallerVia, stored.CallerAddr
 	if err := store.SanitizeSchedule(&in, a.routeExists(r)); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return in, false
@@ -275,7 +286,7 @@ func (a *API) reportRun(w http.ResponseWriter, r *http.Request, _ store.User) {
 	if in.Run == "" {
 		in.Run = r.Header.Get("Meerkat-Job-Run")
 	}
-	if sc.RunID == "" || in.Run != sc.RunID {
+	if sc.RunID == "" || subtle.ConstantTimeCompare([]byte(in.Run), []byte(sc.RunID)) != 1 {
 		writeErr(w, http.StatusConflict,
 			"this run is not the one in flight: a report names the run it was given")
 		return

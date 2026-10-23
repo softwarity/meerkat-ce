@@ -1,0 +1,96 @@
+// The access half of the drawer: two choices and a list, then what they do
+// not decide.
+:host {
+  display: block;
+}
+
+.lead,
+.muted,
+.note {
+  color: var(--mat-sys-on-surface-variant);
+  line-height: 1.5;
+}
+
+.lead {
+  margin: 12px 0 0;
+}
+
+.muted {
+  font-size: 0.85em;
+}
+
+h3 {
+  margin: 24px 0 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// A mode is a word and the promise it makes, one under the other.
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &.inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .choice {
+    display: block;
+  }
+}
+
+.list {
+  width: 100%;
+  margin-top: 12px;
+
+  // What is said under the list: why nothing could be offered, and who is
+  // refused.
+  & ~ .muted {
+    margin: 8px 0 0;
+  }
+}
+
+.note {
+  margin: 20px 0 0;
+  font-size: 0.85em;
+}
+
+// The one consequence nobody guesses, in the error colours: it is not an
+// error, but it is the thing to read before saving.
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+  line-height: 1.4;
+
+  mat-icon {
+    flex: none;
+  }
+}
+
+.problem {
+  margin: 16px 0 0;
+  color: var(--mat-sys-error);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+// The way to a token: a button rather than a link buried in a paragraph -
+// somebody choosing this mode is going to go and mint one.
+.go {
+  margin: 8px 0 14px;
+}

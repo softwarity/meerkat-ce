@@ -23,6 +23,7 @@ import { FormFieldComponent } from "../shared/form-field.component";
 import { SnippetComponent } from "../shared/snippet.component";
 import { MeService } from "../me.service";
 import { ZonedDatePipe } from "../shared/zoned-date.pipe";
+import { SchedulerAccessComponent } from "./scheduler-access.component";
 import { SchedulerApiComponent } from "./scheduler-api.component";
 import {
   ScheduleRow,
@@ -59,6 +60,7 @@ import {
     MatTableModule,
     MatTooltipModule,
     RowActionsDirective,
+    SchedulerAccessComponent,
     SchedulerApiComponent,
     SnippetComponent,
     ZonedDatePipe,
@@ -165,7 +167,6 @@ export class SchedulerPageComponent {
 
   protected readonly columns = [
     "name",
-    "calls",
     "every",
     "next",
     "state",
@@ -185,15 +186,33 @@ export class SchedulerPageComponent {
   // error at two in the morning.
   protected readonly selected = signal<ScheduleRow | null>(null);
 
-  // The drawer holds one of two things: a schedule, or the explanation of how
-  // a service gets one. Two panels, one surface - and opening either closes
-  // the other, because a drawer showing two things is a drawer showing one of
-  // them badly.
+  // The drawer holds one of three things: a schedule, the explanation of how
+  // a service gets one, or who may call that API. Three panels, one surface -
+  // and opening one closes the others, because a drawer showing two things is
+  // a drawer showing one of them badly.
   protected readonly howto = signal(false);
+  protected readonly access = signal(false);
 
   protected open(row: ScheduleRow): void {
     this.howto.set(false);
+    this.access.set(false);
     this.selected.set(row);
+  }
+
+  // How the creator of a schedule was recognised, in a few words beside its
+  // name: a token is a credential, an address only a guess.
+  protected callerHow(s: ScheduleRow): string {
+    switch (s.callerVia) {
+      case "token":
+        return $localize`:@@Caller_by_token:Meerkat token`;
+      case "serviceaccount":
+        return $localize`:@@Caller_by_service_account:ServiceAccount, checked by the cluster`;
+      case "workload":
+      case "container":
+        return $localize`:@@Caller_by_address:deduced from its address ${s.callerAddr}:addr:`;
+      default:
+        return $localize`:@@Caller_unidentified_from:from ${s.callerAddr}:addr:`;
+    }
   }
 
   // What this schedule was WRITTEN as: the payload that recreates it, fetched
@@ -295,12 +314,20 @@ export class SchedulerPageComponent {
 
   protected openHowto(): void {
     this.selected.set(null);
+    this.access.set(false);
     this.howto.set(true);
+  }
+
+  protected openAccess(): void {
+    this.selected.set(null);
+    this.howto.set(false);
+    this.access.set(true);
   }
 
   protected closePanel(): void {
     this.selected.set(null);
     this.howto.set(false);
+    this.access.set(false);
   }
 
   // Whether this reader is root, for the one control that is root's alone.

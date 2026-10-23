@@ -112,6 +112,11 @@ subjects:
 # read of every pod of the namespace, so of the environment variables their
 # manifests declare: a value written in clear in a manifest is readable here.
 # rbac.watch: false keeps the services only, and the targets are then dialled.
+#
+# The same read names a caller of the internal plane that sends no token
+# (SCHED-01, mode None): the pod at its address, then the workload owning it.
+# A ReplicaSet is read for that, when its pod does not carry the template hash
+# that names its Deployment. Without rbac.watch, such a caller is unidentified.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -125,6 +130,9 @@ rules:
     resources: ["pods"]
 {{- if ne ((.Values.rbac | default dict).watch) false }}
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
 {{- else }}
     verbs: ["get"]
 {{- end }}
@@ -158,6 +166,10 @@ rules:
   - apiGroups: [""]
     resources: ["services", "pods"]
     verbs: ["get", "list", "watch"]
+  # The owner of a pod calling the internal plane from there (SCHED-01).
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
   {{- if ne (($.Values.trustDiscovery | default dict).certManager) false }}
   # Which authority signs the services there (trustDiscovery.certManager): a
   # Certificate names its issuer and its dnsNames, and holds no key.
@@ -182,6 +194,44 @@ subjects:
     namespace: {{ $.Release.Namespace }}
 {{- end }}
 {{- end }}
+{{- end }}
+{{- if ne ((.Values.rbac | default dict).internalCallers) false }}
+---
+# Who calls the internal plane (SCHED-01): the scheduler's API recognises a
+# pod by its own ServiceAccount token, which the API server checks for it - a
+# TokenReview, cluster-wide by nature, and the only thing created here: it
+# writes nothing, it asks. The ServiceAccounts are listed, names only, for the
+# console to offer them in the Scheduler's Access drawer. A caller is never
+# found by reading the pods of the whole cluster: the pods are read where the
+# Roles above already read them (rbac.watch, rbac.watchNamespaces).
+# rbac.internalCallers: false leaves the cluster token mode refused and a
+# ServiceAccount token unchecked.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-internal-callers
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-internal-callers
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-internal-callers
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" . }}
+    namespace: {{ .Release.Namespace }}
 {{- end }}
 {{- if ne ((.Values.rbac | default dict).clusterServices) false }}
 ---

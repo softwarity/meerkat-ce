@@ -32,17 +32,19 @@ import (
 // keeping the backends away from what they need.
 //
 // "Internal" is a place, not a credential. Every pod of every namespace
-// reaches a ClusterIP unless something says otherwise, so the rule here is
-// the same as everywhere else: nothing on this plane gives any power without
-// a token. The JWKS needs none because it gives none - public keys, which a
-// service must be able to read before it holds anything at all.
+// reaches a ClusterIP unless something says otherwise, so what the scheduler
+// API asks of a caller is a decision, and it is the operator's: a token, the
+// pod's own ServiceAccount token, or nothing in a cluster that trusts itself
+// (internalaccess.go). The JWKS needs nothing in any of them because it gives
+// nothing - public keys, which a service must be able to read before it holds
+// anything at all.
 //
-// It answers TOKENS only. A browser has no business here, and refusing the
-// cookie outright means no session minted for the console ever reaches the
-// scheduler through a side door.
+// A browser has no business here: its cookie is dropped in every mode, so no
+// session minted for the console ever reaches the scheduler through a side
+// door.
 
 // RegisterInternal mounts the internal plane on mux: the JWKS, and the whole
-// scheduler API behind tokensOnly.
+// scheduler API behind the access the operator chose.
 func (a *API) RegisterInternal(mux Mux) {
 	mux.HandleFunc("GET "+gateway.JWKSPath, a.router.ServeJWKS)
 	// The discovery document (SAUTH-04): the issuer, and where its keys are.
@@ -69,23 +71,24 @@ func (a *API) RegisterInternal(mux Mux) {
 		{"POST /api/schedules/{id}/resume", a.resumeSchedule},
 		{"POST /api/schedules/{id}/run", a.runSchedule},
 		{"GET /api/schedules/{id}/runs", a.listScheduleRuns},
-		{"PATCH /api/schedules/{id}/run", a.reportRun},
 	} {
-		mux.Handle(e.pattern, tokensOnly(a.schedules(e.h)))
+		mux.Handle(e.pattern, a.internalSchedules(e.h))
 	}
+	mux.Handle("PATCH /api/schedules/{id}/run", a.runReport(a.reportRun))
 }
 
-// tokensOnly refuses a request that carries no bearer token, and drops the
-// cookies of one that does: on this plane the token is the whole identity.
-func tokensOnly(next http.Handler) http.Handler {
+// runReport lets a service report on the run it was handed, whatever the
+// access mode. A report is not a request of the service's own: it answers a
+// call the gateway made, and the run identifier that call carried
+// (Meerkat-Job-Run, 96 random bits, given to that service alone) is the proof
+// reportRun checks. Asking the access mode's credential as well broke every
+// run in flight the moment the mode changed: a service holding a Meerkat token
+// accepted the call, could no longer say it was done, and its runs were lost
+// one after the other.
+func (a *API) runReport(next userHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-			writeErr(w, http.StatusUnauthorized,
-				"the internal plane answers a token (Authorization: Bearer ...), never a browser session")
-			return
-		}
 		r.Header.Del("Cookie")
-		next.ServeHTTP(w, r)
+		next(w, r, store.User{})
 	})
 }
 

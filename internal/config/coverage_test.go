@@ -40,6 +40,7 @@ var staysHome = map[string]string{
 	"SettingTenancy":               "single or multi is decided when an installation is born, and changing it under existing data is not an import",
 	"SettingTenancyChosen":         "records that the question above was answered here",
 	"SettingScheduleRetention":     "how long a finished delayed action is kept before the sweep: housekeeping for THIS installation's own rows, like the trail's retention, and a number an imported configuration has no business shortening",
+	"SettingInternalAccess":        "who may call THIS installation's internal plane, named in THIS platform's terms (a namespace, a stack, a token minted here): a reproduced installation decides its own, and an import must not open or close a port under the services already calling it",
 	"SettingAuditRetention":        "how long THIS installation keeps its trail: a compliance decision of this place, root's alone, and not something a configuration imported by someone else should be able to shorten",
 	"SettingEndpointCallRetention": "how long THIS installation keeps the audited calls of its data plane: the same compliance decision as the trail's own retention, for the part of it whose volume follows the traffic",
 	"SettingPlug":                  "the tunnel's switch and the address developers type: a port into THIS cluster, published by THIS platform - a reproduced installation decides its own",

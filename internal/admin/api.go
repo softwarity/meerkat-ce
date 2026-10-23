@@ -158,6 +158,11 @@ type API struct {
 	// procedures of the Database tab; nil is discovery.Runtime. A test
 	// replaces it rather than reach a cluster.
 	LookupPlatform func(ctx context.Context) discovery.Platform
+	// Callers says who calls the internal plane (internalaccess.go): a
+	// ServiceAccount token checked with the API server, an address followed
+	// to its workload or container. Wired by main; nil leaves a caller with
+	// no Meerkat token unidentified, and the cluster mode unavailable.
+	Callers CallerFinder
 	// CertManager asks cert-manager for the internal plane's certificate
 	// (SSL-13); nil when it cannot, and CertManagerWhy says why - another
 	// runtime, or a chart that did not grant it.
