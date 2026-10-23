@@ -11,9 +11,10 @@ Trois écrans pour un même sujet : intervenir sur cette gateway sans passer par
 console.
 
 - **Access tokens** figure sur les deux plans. Sous **Infra**, l'écran émet des jetons
-  de console destinés à un script ou à un pipeline. Sous **Application**, il liste en
-  plus les jetons d'application : un administrateur d'application voit ceux de tous
-  les comptes et peut les révoquer.
+  de console destinés à un script ou à un pipeline, et des jetons internes pour un
+  service qui appelle le scheduler. Sous **Application**, il liste en plus les jetons
+  d'application : un administrateur d'application voit ceux de tous les comptes et
+  peut les révoquer.
 - **Infra > MCP** (administrateurs infra) connecte un assistant, sans produire la
   moindre clé.
 - **Meerkat, API reference** est la référence des appels que font l'un et l'autre.
@@ -24,19 +25,30 @@ Un jeton d'administration donne accès à l'API de la console sans navigateur. I
 **avec vos propres pouvoirs**, réduits par son périmètre, et s'authentifie sur le port
 d'administration avec `Authorization: Bearer mk_...`.
 
-![L'écran Access tokens : trois jetons de console, avec leur propriétaire, leur plan, leur périmètre et leur dernière utilisation](img/console/access-tokens.webp)
+![L'écran Access tokens : deux jetons de console et deux jetons internes, avec leur propriétaire, leur plan, leur périmètre et leur dernière utilisation](img/console/access-tokens.webp)
 
-Cinq jetons : trois pour la console - un accès complet depuis `10.20.0.0/16`
-uniquement, un en lecture seule et un réservé aux appels planifiés - et deux jetons
-d'application que leurs propriétaires ont créés depuis leur profil. Un clic sur une
-ligne ouvre son tiroir.
+Quatre jetons : deux pour la console - un en lecture seule et un à accès complet -
+et deux jetons internes, `billing` et `orders-api`, que des services présentent au
+scheduler ; `orders-api` vient d'écrire les planifications que montre l'écran
+Scheduler. Les filtres au-dessus de la liste la restreignent à **Console**,
+**Application** (les jetons que chacun a créés depuis son profil, pour un
+administrateur d'application) ou **Internal**. Un clic sur une ligne ouvre son
+tiroir.
+
+**Internal** liste les jetons de périmètre `schedules` : ils ouvrent
+l'[API du scheduler](/docs/operations/scheduler#le-jeton) sur le plan interne, et
+rien sur le port de la console. Sous ce filtre, le bouton devient **New internal
+token** : un nom - le service qui le détient, proposé parmi les services que voit
+la gateway, ou `global` pour un jeton qu'ils partagent -, les adresses et
+l'expiration, le périmètre étant ce qui le rend interne. Qu'un service en ait besoin
+ou non dépend du réglage **Access** du scheduler.
 
 La création d'un jeton demande quatre informations :
 
 | Champ | Ce qu'il détermine |
 |---|---|
 | **Token name** | Le nom sous lequel vous le retrouverez dans la liste et dans le journal d'audit |
-| **Perimeter** | *Scheduled calls only* donne accès à `/api/schedules` et à rien d'autre, sur le plan interne ; *Read only* lit et lance les testeurs ; *Full access* couvre tout ce que vous pouvez faire |
+| **Perimeter** | *Scheduled calls only* donne accès à `/api/schedules` et à rien d'autre, sur le plan interne, et range le jeton sous Internal ; *Read only* lit et lance les testeurs ; *Full access* couvre tout ce que vous pouvez faire |
 | **Used from** | Des adresses ou des plages CIDR séparées par des virgules. La vérification porte sur l'adresse qui se connecte, jamais sur un en-tête transmis |
 | **Expiry** | Jamais, 30 jours, 90 jours ou 1 an |
 

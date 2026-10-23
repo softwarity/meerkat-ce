@@ -62,7 +62,8 @@ alone.
 Point the upstream at the service's **full name** inside the platform:
 `https://reference-data.canopy.svc:443` on Kubernetes, `stack_service` on Swarm.
 The upstream picker offers the short name to read and stores the full one, and the
-editor flags a route stored with a bare short name.
+editor flags an `https` route stored with a bare short name, with a button that
+writes the full one.
 
 The full name matters as soon as the cluster's authority is **name-constrained**:
 an authority allowed to certify `svc` and `cluster.local` names cannot certify

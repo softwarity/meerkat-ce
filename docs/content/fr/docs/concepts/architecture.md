@@ -51,7 +51,7 @@ Parce qu'une erreur commise sur l'un ne doit pas en devenir une sur l'autre.
 - La console n'est **jamais** accessible sur le plan de données. Aucune route ne peut l'exposer, puisqu'elle n'y est tout simplement pas montée.
 - Chaque plan a son propre cookie de session - `MEERKAT_SESSION` et `MEERKAT_ADMIN_SESSION` - et chaque session stockée porte la marque du plan auquel elle appartient. Un jeton copié d'un cookie dans l'autre est refusé : les deux ports ne partagent jamais une session de navigateur.
 - Les jetons d'API portent eux aussi un plan. Un jeton du plan de données n'ouvre jamais le port d'administration, et inversement.
-- Le plan interne ne répond **qu'aux jetons**. Une session de navigateur y est refusée, et « l'intérieur du cluster » n'est jamais pris pour un titre d'accès : n'importe quel pod atteint un ClusterIP, donc rien sur ce port ne donne de pouvoir sans jeton. Le JWKS est la seule exception, parce que des clés publiques n'en donnent aucun.
+- Le plan interne refuse une session de navigateur, et ce qu'un service y présente est un réglage, l'[accès](/docs/operations/scheduler#qui-peut-lappeler) du scheduler : rien, un jeton Meerkat ou le jeton de ServiceAccount de son pod, puis tout le monde ou seulement les services listés. L'intérieur du cluster est un lieu, pas un titre d'accès - n'importe quel pod atteint un ClusterIP -, donc un cluster qui ne se fait pas confiance demande un jeton. Le JWKS et le document de découverte restent ouverts dans tous les modes, parce que des clés publiques ne donnent aucun pouvoir.
 - Publier la console ne publie pas le plan interne. Un exploitant qui ouvre la console sur le réseau de l'entreprise n'ouvre pas avec elle l'API par laquelle les services écrivent leurs planifications.
 - Une conséquence mérite d'être connue avant d'en avoir besoin : le port HTTP en clair du plan de contrôle reste en clair, définitivement. C'est par lui que l'on répare un certificat cassé. Seul le port en clair du plan de données redirige vers HTTPS.
 
@@ -90,7 +90,7 @@ modifier une revient au service, sur le plan interne.
 
 - `/.well-known/jwks.json` - les clés publiques avec lesquelles se vérifie le [JWT d'identité](/docs/auth/service-jwt). Aucun jeton n'est demandé.
 - `/.well-known/openid-configuration` - le document de découverte : l'émetteur, et l'endroit où se trouvent ces clés. Aucun jeton n'est demandé.
-- `/api/schedules/...` - les [appels planifiés](/docs/operations/scheduler), écrits par le service qui en a besoin, avec un jeton dont le périmètre est `schedules`.
+- `/api/schedules/...` - les [appels planifiés](/docs/operations/scheduler), écrits par le service qui en a besoin, qui présente ce que demande l'accès du scheduler : rien, un jeton dont le périmètre est `schedules`, ou le jeton de ServiceAccount de son pod.
 - `/healthz`.
 
 En HTTP simple par défaut, puisqu'un service l'atteint par un nom interne au

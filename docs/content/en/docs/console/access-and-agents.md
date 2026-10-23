@@ -10,8 +10,9 @@ summary: Driving Meerkat without a browser - a token for a script, an MCP connec
 Three screens, one subject: working on this gateway from outside the console.
 
 - **Access tokens** is on both planes. Under **Infra**, it mints console tokens
-  for a script or a pipeline. Under **Application**, it also lists the
-  application tokens: an app admin sees everyone's and can revoke them.
+  for a script or a pipeline, and internal tokens for a service calling the
+  scheduler. Under **Application**, it also lists the application tokens: an
+  app admin sees everyone's and can revoke them.
 - **Infra > MCP** (infra admins) connects an assistant, and produces no key at
   all.
 - **Meerkat, API reference** is the reference for the calls both of them make.
@@ -22,18 +23,29 @@ An admin token opens the console's own API without a browser. It acts **with you
 own powers**, narrowed by its perimeter, and it authenticates on the admin port as
 `Authorization: Bearer mk_...`.
 
-![The Access tokens screen: three console tokens, with their owner, plane, perimeter and last use](img/console/access-tokens.webp)
+![The Access tokens screen: two console tokens and two internal ones, with their owner, plane, perimeter and last use](img/console/access-tokens.webp)
 
-Five tokens: three for the console - full access from `10.20.0.0/16` only, read
-only, and scheduled calls only - and two application tokens their owners created
-on their profile. A row opens its drawer.
+Four tokens: two for the console - read only, and full access - and two
+internal ones, `billing` and `orders-api`, which services present to the
+scheduler; `orders-api` has just written the schedules the Scheduler screen
+shows. The filters above the list narrow it to **Console**, **Application** (the
+tokens people created on their profile, for an app admin) or **Internal**. A row
+opens its drawer.
+
+**Internal** lists the tokens of perimeter `schedules`: they open the
+[scheduler's API](/docs/operations/scheduler#the-token) on the internal plane
+and nothing on the console's port. Under that filter the button reads **New
+internal token**: a name - the service that holds it, offered from the
+services the gateway sees, or `global` for one they share - the addresses and
+the expiry, the perimeter being what makes it internal. Whether a service needs
+one at all is the scheduler's **Access** setting.
 
 Creating one asks four things:
 
 | Field | What it decides |
 |---|---|
 | **Token name** | What you will recognise in the list and in the audit trail |
-| **Perimeter** | *Scheduled calls only* opens `/api/schedules` and nothing else, on the internal plane; *Read only* reads and runs the testers; *Full access* is everything you can do |
+| **Perimeter** | *Scheduled calls only* opens `/api/schedules` and nothing else, on the internal plane, and lists the token under Internal; *Read only* reads and runs the testers; *Full access* is everything you can do |
 | **Used from** | Comma-separated addresses or CIDR ranges. Judged on the connecting address, never on a forwarded header |
 | **Expiry** | Never, 30 days, 90 days, or 1 year |
 

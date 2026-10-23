@@ -99,11 +99,12 @@ Clicking a row opens the route in the right drawer. The drawer is in the URL -
 `/infra/routes/:id/:section` - so a section can be bookmarked and a refresh
 comes back to it.
 
-![The route editor open on Target, with the section list on the left](img/console/route-editor-target.webp)
+![The route editor open on Target, with the section list on the left, and the upstream picked from a namespace with its port beside it](img/console/route-editor-target.webp)
 
 The editor on *Orders API*: the section list on the left with its stars and its
-counts, and the Target panel on the right - mode, upstream, the two waits, the
-circuit breaker and the API contract.
+counts, and the Target panel on the right - mode, the namespace `acme` and its
+service `orders` picked as the upstream, on port 9000 of the two it listens on,
+then the two waits, the circuit breaker and the API contract.
 
 The name sits in the header. The left column lists the sections, grouped:
 
@@ -173,7 +174,21 @@ On a proxy route you also set:
 
 - **Upstream** - the scheme is chosen, never typed: `http` first because inside
   a cluster TLS ends at the gateway, `https` for a third party, `h2c` for a gRPC
-  service. Services the gateway discovered are offered in the field.
+  service. Services the gateway discovered are offered in the field, once
+  each: the short name to read, and under it, smaller, the full name the route
+  stores - `name.ns.svc` on Kubernetes, `stack_service` on Swarm, nothing more
+  on Compose, where the short name is all there is.
+- **Port** - beside a picked service, always shown and filled: a list when the
+  service listens on several ports, read-only on a single one, typed when the
+  runtime knows none. A port the list does not carry (a route set up by hand)
+  stays shown. In the free field it appears once the typed host names a known
+  service.
+- **The short-name warning** - an `https` upstream still spelled with a bare
+  short name that a discovered service qualifies is flagged under the field: a
+  cluster authority constrained to cluster names (`svc`, `cluster.local`)
+  certifies `orders.acme.svc` and never `orders`, so verification fails.
+  **Use** followed by the full name rewrites the host in the form; nothing
+  changes until it is saved.
 - **Namespace** - on Kubernetes, when the gateway may read more than its own
   namespace, a choice above the upstream: the namespaces that hold a Service,
   and **External**. A namespace chosen, the upstream is *picked* from its

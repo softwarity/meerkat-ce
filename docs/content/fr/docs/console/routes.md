@@ -108,11 +108,12 @@ Un clic sur une ligne ouvre la route dans le tiroir de droite. Le tiroir figure
 dans l'URL - `/infra/routes/:id/:section` - si bien qu'une section peut être mise
 en favori et qu'un rechargement y ramène.
 
-![L'éditeur de route ouvert sur Target, avec la liste des sections à gauche](img/console/route-editor-target.webp)
+![L'éditeur de route ouvert sur Target, avec la liste des sections à gauche, et l'upstream choisi dans un namespace avec son port à côté](img/console/route-editor-target.webp)
 
 L'éditeur sur *Orders API* : à gauche, la liste des sections avec ses étoiles et
-ses compteurs ; à droite, le panneau Target, avec le mode, l'upstream, les deux
-timeouts, le disjoncteur et le contrat d'API.
+ses compteurs ; à droite, le panneau Target, avec le mode, le namespace `acme` et
+son service `orders` choisi comme upstream, sur le port 9000 des deux qu'il écoute,
+puis les deux timeouts, le disjoncteur et le contrat d'API.
 
 Le nom se trouve dans l'en-tête. La colonne de gauche liste les sections,
 regroupées ainsi :
@@ -186,7 +187,21 @@ Sur une route en mode proxy, vous réglez aussi :
 - **Upstream** - le schéma se choisit, il ne se saisit jamais : `http` en
   premier, parce qu'à l'intérieur d'un cluster TLS se termine à la gateway,
   `https` pour un tiers, `h2c` pour un service gRPC. Le champ propose les services
-  que la gateway a découverts.
+  que la gateway a découverts, chacun une seule fois : le nom court, à lire, et
+  dessous, en plus petit, le nom complet que la route enregistre - `nom.ns.svc`
+  sur Kubernetes, `stack_service` sur Swarm, rien de plus sur Compose, où le nom
+  court est le seul qui existe.
+- **Port** - à côté d'un service choisi, toujours affiché et rempli : une liste
+  quand le service écoute sur plusieurs ports, en lecture seule sur un seul, à
+  saisir quand le runtime n'en connaît aucun. Un port que la liste ne porte pas
+  (une route réglée à la main) reste affiché. Dans le champ libre, il apparaît dès
+  que l'hôte saisi désigne un service connu.
+- **L'avertissement sur le nom court** - un upstream en `https` encore écrit avec
+  le nom court d'un service découvert qui en a un complet est signalé sous le
+  champ : une autorité de cluster restreinte aux noms du cluster (`svc`,
+  `cluster.local`) certifie `orders.acme.svc` et jamais `orders`, si bien que la
+  vérification échoue. **Use** suivi du nom complet réécrit l'hôte dans le
+  formulaire ; rien ne change avant l'enregistrement.
 - **Namespace** - sur Kubernetes, quand la gateway peut lire plus que son propre
   namespace, un choix au-dessus de l'upstream : les namespaces qui portent un
   Service, et **External**. Un namespace choisi, l'upstream se *choisit* parmi

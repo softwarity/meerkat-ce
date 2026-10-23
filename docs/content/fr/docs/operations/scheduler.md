@@ -37,9 +37,10 @@ d'une session : demander un rôle parent accorde ce qu'il implique.
 
 Pas de compte de service à créer, donc pas de droits à tenir à jour indéfiniment. Ce
 qui borne une planification, c'est **qui peut en écrire une**, ce que décide
-l'[accès](#qui-peut-lappeler) au plan interne : avec un jeton dont le périmètre est
-`schedules`, émis par root, tracé dans le journal d'audit, révocable en un clic,
-deux services qui ne doivent pas atteindre les mêmes choses reçoivent deux jetons.
+l'[accès](#qui-peut-lappeler) au plan interne : aucun titre, un jeton Meerkat ou le
+jeton de ServiceAccount du pod, puis tout le monde ou seulement les services listés.
+Qui peut écrire une planification peut demander n'importe quel rôle : c'est donc
+cette liste qui fait la limite.
 
 Si vous tenez à savoir à qui appartient une planification, notez-le dans les
 **métadonnées** : `"metadata": { "owner": "stations-svc" }` est une clé comme une
@@ -239,9 +240,15 @@ décision, et c'est la vôtre : voir [Qui peut l'appeler](#qui-peut-lappeler).
 
 ### Qui peut l'appeler
 
-Ce qu'un service présente sur ce port est un réglage, sous Scheduler, **Access**.
-Un administrateur de l'infrastructure le change ; les autres lecteurs du
-Scheduler le voient.
+Ce qu'un service présente sur ce port est un réglage : le bouton **Access** de
+l'écran Scheduler, à côté d'**API**, l'ouvre dans un tiroir. Un administrateur de
+l'infrastructure le change ; les autres lecteurs du Scheduler le voient.
+
+![Le tiroir Access du Scheduler : les trois modes avec Meerkat token choisi, son bouton Mint a token, et Only these services avec le jeton orders-api dans la liste](img/console/scheduler-access.webp)
+
+Ici le mode Meerkat token, avec un seul jeton interne admis. **Mint a token**
+n'apparaît que sous ce mode, puisque les deux autres n'en demandent aucun, et ouvre
+Access tokens sur son filtre **Internal** ([plus bas](#le-jeton)).
 
 | Mode | L'appelant présente | Il est connu comme |
 |---|---|---|
@@ -303,8 +310,9 @@ service qui en a besoin.
 ### Le jeton
 
 Un jeton dont le **périmètre est `schedules`**, créé dans la console (Infra,
-Access tokens, **Internal**, nommé d'après le service qui le détient ou `global`)
-et utilisé sur le plan interne. C'est ce que demande le mode Meerkat token, et ce
+Access tokens, filtre **Internal**, **New internal token**, nommé d'après le
+service qui le détient ou `global` ; **Mint a token**, dans le tiroir Access, y
+mène) et utilisé sur le plan interne. C'est ce que demande le mode Meerkat token, et ce
 que None lit quand il est envoyé. Il ouvre cette API et rien
 d'autre - ni la configuration, ni les comptes, ni les routes, et rien du tout
 sur le port de la console. Il est étroit à dessein : il vit dans un manifeste de déploiement, souvent
@@ -383,13 +391,13 @@ Vous les retrouvez de la même manière :
 
 ```bash
 # une station
-curl "http://meerkat:9090/api/schedules?meta.station=42" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules?meta.station=42" -H "$AUTH"
 
 # deux conditions, toutes deux requises
-curl "http://meerkat:9090/api/schedules?meta.kind=poll&meta.region=west" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules?meta.kind=poll&meta.region=west" -H "$AUTH"
 
 # une expression, pour toute une flotte
-curl "http://meerkat:9090/api/schedules?meta.station=~^[0-9]{1,2}$" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules?meta.station=~^[0-9]{1,2}$" -H "$AUTH"
 ```
 
 `meta.<key>=<value>` correspond à une égalité stricte, `meta.<key>=~<expression>` à
@@ -514,7 +522,7 @@ répond à "depuis quand est-ce en échec ?", "la clôture de cette nuit a-t-ell
 tourné ?" et "qu'a-t-il répondu ?" :
 
 ```bash
-curl "http://meerkat:9090/api/schedules/sch_9f2c/runs" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules/sch_9f2c/runs" -H "$AUTH"
 ```
 
 ```json
@@ -553,7 +561,7 @@ Un tour abandonné, ou en échec pour une raison corrigée depuis, se redemande 
 son nom :
 
 ```bash
-curl -X POST "http://meerkat:9090/api/schedules/sch_9f2c/run" -H "$AUTH" \
+curl -X POST "http://meerkat:7070/api/schedules/sch_9f2c/run" -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{"replayOf":"run-17906f3c9d2a4e10-9f2c11"}'
 ```
@@ -614,6 +622,14 @@ qui en a besoin, et c'est lui qui l'écrit par l'API, sur le plan interne, depui
 ses propres écrans.
 
 ![L'écran Scheduler : une cadence, une ligne cron et une date unique, chacune avec sa prochaine exécution et sa dernière](img/console/scheduler.webp)
+
+Une ligne par planification, **triée par nom**, si bien qu'une ligne reste à sa
+place pendant qu'elle s'exécute : son nom et les rôles avec lesquels elle appelle,
+**When**, **Next run**, **State** et **Last run**. Ce qu'elle appelle - méthode,
+chemin et route - est dans son tiroir, avec **Created by**, l'appelant qui l'a
+écrite. **API** explique les appels que fait un service, **Access** décide qui peut
+les faire. Supprimer une planification demande d'en taper le nom : le service qui
+l'a écrite n'en est jamais averti, il n'est simplement plus appelé.
 
 Une exécution en cours indique où elle en est - **calling**, en attente de la
 réponse, ou **accepted**, le service a pris le travail - et de quelle tentative il

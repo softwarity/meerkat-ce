@@ -473,6 +473,17 @@ raison donnée par cert-manager quand il refuse. Demandé depuis le plan Interna
 placé quand ce plan est vide ; demandé depuis la Console ou l'Application, il est placé sur
 ce plan. Le supprimer supprime le Certificate et son Secret.
 
+**Sous une autorité à contraintes de noms.** Une autorité de cluster peut ne permettre que
+les noms du cluster (`svc`, `cluster.local`, le namespace). L'émetteur CA de cert-manager
+signe tous les noms qu'on lui demande, le nom nu du Service (`meerkat-meerkat`) compris, et
+un seul nom hors contraintes fait refuser le certificat entier par tout vérificateur (Go,
+OpenSSL), quel que soit le nom appelé. Alors, quand le Secret change, la gateway lit les
+contraintes de la chaîne qu'il porte, ramène le Certificate aux noms qu'elles permettent, et
+cert-manager l'émet de nouveau ; redemandé depuis la console, les noms refusés ne reviennent
+pas. Un nom que l'autorité permet reste, même nu (`meerkat-meerkat-internal`). Quand elle
+n'en permet aucun, le Certificate reste tel quel et sa ligne dit quels noms sont refusés, et
+par quelles contraintes. Sans contraintes, rien ne change.
+
 ```yaml
 internalTls:
   # autorise la gateway à créer ses Certificates, lire leurs Secrets, lister les émetteurs

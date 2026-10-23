@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/mcp"
@@ -142,6 +144,9 @@ func (a *API) toolListSchedules(ctx context.Context, _ json.RawMessage) (any, er
 	if err != nil {
 		return nil, err
 	}
+	// Soonest first for an agent, whose questions are "what runs next": the
+	// store lists by name, which is what a screen needs to keep still.
+	slices.SortStableFunc(list, func(x, y store.Schedule) int { return cmp.Compare(x.NextAt, y.NextAt) })
 	type line struct {
 		ID       string   `json:"id"`
 		Name     string   `json:"name"`

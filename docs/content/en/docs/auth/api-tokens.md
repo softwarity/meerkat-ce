@@ -96,7 +96,7 @@ already have.
 
 | Scope | What it opens |
 |---|---|
-| `schedules` | `/api/schedules` and nothing else, used on the internal plane (port 7070): the credential of a service managing its [scheduled calls](/docs/operations/scheduler) |
+| `schedules` | `/api/schedules` and nothing else, used on the internal plane (port 7070): the credential of a service managing its [scheduled calls](/docs/operations/scheduler), when the scheduler's access asks for one. Listed under **Internal** |
 | `readonly` | reads, and the testers. What counts as a read is decided per endpoint, not by the HTTP verb |
 | `full` | everything its owner may do |
 

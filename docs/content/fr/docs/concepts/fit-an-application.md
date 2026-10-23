@@ -65,7 +65,8 @@ propre nom, et le chemin laissé tel quel.
 Faites pointer l'upstream vers le **nom complet** du service dans la plateforme :
 `https://reference-data.canopy.svc:443` sur Kubernetes, `stack_service` sur Swarm.
 Le sélecteur d'upstream affiche le nom court pour la lecture et enregistre le nom
-complet, et l'éditeur signale une route enregistrée avec un nom court.
+complet, et l'éditeur signale une route en `https` enregistrée avec un nom court,
+avec un bouton qui écrit le nom complet.
 
 Le nom complet compte dès que l'autorité du cluster est **restreinte en noms** :
 une autorité autorisée à certifier les noms en `svc` et `cluster.local` ne peut pas

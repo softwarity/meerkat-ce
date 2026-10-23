@@ -369,7 +369,9 @@ async function seedEverythingElse(api) {
   for (const t of [
     { name: 'claude-desktop', days: 90, scope: 'readonly', from: '' },
     { name: 'ci-deploy', days: 30, scope: 'full', from: '10.0.0.0/8' },
-    { name: 'orders-scheduler', days: 0, scope: 'schedules', from: '' },
+    // An internal token: the scheduler's, listed under Internal beside the
+    // one the orders service mints below.
+    { name: 'billing', days: 0, scope: 'schedules', from: '' },
   ]) {
     await soft(`token ${t.name}`, () => api.post('/api/admin-tokens', { data: t }));
   }
@@ -536,10 +538,34 @@ const openOidcDrawer = async (page) => {
   await page.waitForTimeout(500);
 };
 
+// The upstream picker (SVC-02) shows only where the runtime lists several
+// namespaces, which a capture on a workstation has none of: the answer of a
+// Kubernetes gateway allowed two namespaces is laid in front of /api/services,
+// and the orders route points at its service by the full name a pick stores.
+const ACME_SERVICES = {
+  source: 'kubernetes',
+  namespace: 'acme',
+  namespaces: ['acme', 'billing'],
+  services: [
+    { name: 'orders', full: 'orders.acme.svc', ports: [{ target: 9000 }, { target: 9090 }], ready: 2, wanted: 2, counted: true },
+    { name: 'docs', full: 'docs.acme.svc', ports: [{ target: 80 }], ready: 1, wanted: 1, counted: true },
+    { name: 'inventory', full: 'inventory.acme.svc', ports: [{ target: 8080 }], ready: 1, wanted: 1, counted: true },
+    { name: 'www', full: 'www.acme.svc', ports: [{ target: 80 }], ready: 1, wanted: 1, counted: true },
+  ],
+};
+async function seedPicker(page) {
+  await page.route('**/api/services**', (r) =>
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ACME_SERVICES) }));
+  // Read back rather than taken from ROUTES: the seed has since given it a
+  // spec, which a route written from the fixture alone would drop.
+  const orders = await (await page.request.get(`${ADMIN}/api/routes/orders-api`)).json();
+  await page.request.put(`${ADMIN}/api/routes/orders-api`, { data: { ...orders, upstream: 'http://orders.acme.svc:9000' } });
+}
+
 const SHOTS = [
   // ── Infra ──
   { file: 'routes-list', path: '/infra/routes' },
-  { file: 'route-editor-target', path: '/infra/routes/orders-api/target' },
+  { file: 'route-editor-target', path: '/infra/routes/orders-api/target', prepare: seedPicker, settle: 1600 },
   { file: 'route-editor-security', path: '/infra/routes/orders-api/security' },
   { file: 'route-editor-predicates', path: '/infra/routes/orders-api/predicates' },
   { file: 'route-editor-filters', path: '/infra/routes/billing/modin' },
@@ -684,6 +710,27 @@ const SHOTS = [
   },
   { file: 'sessions', path: '/data-plane/sessions' },
   { file: 'scheduler', path: '/data-plane/scheduler' },
+  {
+    // The Access drawer: the Meerkat token mode, its Mint a token, and the
+    // one service let in. A fresh installation starts in None; this is the
+    // state an upgraded one keeps. Cluster token is offered on Kubernetes
+    // only, which a workstation is not: the answer says Kubernetes, so the
+    // drawer shows the three modes the page describes.
+    file: 'scheduler-access', path: '/data-plane/scheduler',
+    prepare: async (page) => {
+      await page.request.put(`${ADMIN}/api/settings/internal-access`, { data: { mode: 'token', callers: ['orders-api'] } });
+      await page.route('**/api/settings/internal-access', async (r) => {
+        if (r.request().method() !== 'GET') return r.continue();
+        const res = await r.fetch();
+        const view = await res.json();
+        r.fulfill({ response: res, json: { ...view, modes: ['none', 'token', 'cluster'], platform: 'kubernetes' } });
+      });
+    },
+    act: async (page) => {
+      await page.getByRole('button', { name: 'Access', exact: true }).first().click();
+      await page.waitForTimeout(1200);
+    },
+  },
   { file: 'issues', path: '/data-plane/issues' },
   // ── Meerkat ──
   { file: 'audit', path: '/system/audit' },

@@ -99,7 +99,7 @@ pas déjà.
 
 | Portée | Ce qu'elle ouvre |
 |---|---|
-| `schedules` | `/api/schedules` et rien d'autre, utilisé sur le plan interne (port 7070) : c'est le jeton d'un service qui gère ses [appels planifiés](/docs/operations/scheduler) |
+| `schedules` | `/api/schedules` et rien d'autre, utilisé sur le plan interne (port 7070) : c'est le jeton d'un service qui gère ses [appels planifiés](/docs/operations/scheduler), quand l'accès du scheduler en demande un. Listé sous **Internal** |
 | `readonly` | les lectures, et les outils de test. Ce qui compte comme une lecture se décide endpoint par endpoint, pas d'après le verbe HTTP |
 | `full` | tout ce que son titulaire a le droit de faire |
 

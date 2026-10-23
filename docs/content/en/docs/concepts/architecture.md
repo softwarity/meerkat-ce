@@ -49,7 +49,7 @@ Because a mistake on one must not be a mistake on the other.
 - The console is **never** reachable on the data plane. No route can expose it, because it is not mounted there at all.
 - Each plane has its own session cookie - `MEERKAT_SESSION` and `MEERKAT_ADMIN_SESSION` - and every stored session is stamped with the plane it belongs to. A token copied from one cookie into the other is refused: the two ports never share a browser session.
 - API tokens carry a plane too. A data-plane token never opens the admin port, and the other way round.
-- The internal plane answers **tokens only**. A browser session is refused there, and "inside the cluster" is never taken as a credential: any pod reaches a ClusterIP, so nothing on that port gives any power without a token. The JWKS is the one exception, because public keys give none.
+- The internal plane refuses a browser session, and what a service presents there is a setting, the scheduler's [access](/docs/operations/scheduler#who-may-call-it): nothing, a Meerkat token or its pod's ServiceAccount token, then everyone or only the services listed. "Inside the cluster" is a place, not a credential - any pod reaches a ClusterIP - so a cluster that does not trust itself asks for a token. The JWKS and the discovery document stay open in every mode, because public keys give no power.
 - Publishing the console does not publish the internal plane. An operator who opens the console on the company network has not opened, along with it, the API services write their schedules with.
 - One consequence is worth knowing before you need it: the control plane's plain HTTP port stays plain, for good. It is what a broken certificate gets repaired from. Only the data plane's plain port redirects to HTTPS.
 
@@ -87,7 +87,7 @@ on the internal plane.
 
 - `/.well-known/jwks.json` - the public keys the [identity JWT](/docs/auth/service-jwt) verifies against. No token needed.
 - `/.well-known/openid-configuration` - the discovery document: the issuer, and where those keys are. No token needed.
-- `/api/schedules/...` - the [scheduled calls](/docs/operations/scheduler), written by the service that needs them, with a token whose perimeter is `schedules`.
+- `/api/schedules/...` - the [scheduled calls](/docs/operations/scheduler), written by the service that needs them, presenting what the scheduler's access asks: nothing, a token whose perimeter is `schedules`, or its pod's ServiceAccount token.
 - `/healthz`.
 
 Plain HTTP by default, since a service reaches it by a name inside the cluster

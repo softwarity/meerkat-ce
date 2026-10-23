@@ -49,13 +49,19 @@ choices.
 > and the log says `certificate signed by unknown authority`. On **Infra >
 > Domains & TLS > Trusted authorities**, **From the cluster** lists the
 > authorities the cluster publishes - pick the one that signs your services.
-> See [Found in the cluster](/docs/operations/tls#found-in-the-cluster).
+> See [Found in the cluster](/docs/operations/tls#found-in-the-cluster). Call
+> the service by its full name (`billing.acme.svc`): an authority constrained
+> to cluster names never certifies the bare `billing`, and the editor flags an
+> `https` upstream left on it, with a button that writes the full name.
 
 > [!TIP]
 > Where the gateway can read its runtime - a Docker or Swarm socket, or a
 > Kubernetes namespace from the inside - the services it found are offered in
-> that field as you focus it. Free text stays free: an upstream outside the
-> cluster is typed.
+> that field as you focus it, once each: the short name, with the full name a
+> pick stores on a smaller line under it (`billing.acme.svc` on Kubernetes,
+> `stack_billing` on Swarm). Its **Port** sits beside it, a list when the
+> service has several. Free text stays free: an upstream outside the cluster
+> is typed.
 
 The same section holds how long this upstream may take (connect, then first
 answer) and whether to stop calling it when it stops answering. Both inherit

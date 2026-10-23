@@ -2,28 +2,52 @@
 
 ## NEXT RELEASE
 
-- **A service reports on its run whatever the access mode.** The report on a run a service
-  answered 202 to is proven by the run identifier the call carried (`Meerkat-Job-Run`), not by
-  the access mode's credential: switching the mode no longer leaves a service unable to say its
-  run is done, and its runs no longer end lost one after the other.
+- **Who may call the scheduler's API is a setting.** On the internal plane, the scheduled calls
+  API asked every service for a token of perimeter `schedules`. It now has three modes, chosen
+  from the Scheduler's new **Access** button, beside API: **None** asks nothing, and names the
+  caller by its token or its ServiceAccount when it sends one, otherwise by the workload
+  (Kubernetes) or the container (Docker, Swarm) at its address; **Meerkat token** is the
+  previous behaviour; **Cluster token** takes the pod's own ServiceAccount token, checked by
+  Kubernetes. A list of callers can narrow any mode, and a caller nobody could identify is then
+  refused. Each new schedule records who created it and how that was known, shown as **Created
+  by** in its drawer. An installation that holds a `schedules` token keeps the Meerkat token
+  mode on upgrade, so nothing opens; a new installation starts in None. The report on a run a
+  service answered 202 to is proven by the run identifier the call carried (`Meerkat-Job-Run`)
+  in every mode: the mode decides who writes schedules, not who answers the gateway's calls.
+  Under Infra, Access tokens, `schedules` tokens are listed apart under an **Internal** filter,
+  where **New internal token** creates one, and existing ones keep working. **Mint a token**
+  moves from the API panel to the Access drawer, shown only under Meerkat token since the other
+  modes need none, and the example curl is gone: the console mints the token. The Helm chart
+  grants `create` on TokenReviews, `list` on ServiceAccounts (`rbac.internalCallers`) and `get`
+  on ReplicaSets where it already reads the pods.
+- **The Scheduler's table keeps its order, and gives the name its room.** It was sorted by next
+  run, so Run now moved the schedule to the top while it ran and the progress showed on the line
+  above, as if another schedule had started. It is sorted by name now; the agent tool still
+  lists the soonest first. The Calls column is gone - method, path and route side by side read
+  as a smear, and the drawer shows them - and When, Next run, State and Last run have fixed
+  widths, so a name no longer wraps over two lines while the dates sit half empty. The API and
+  Access buttons lose their icons.
+- **Deleting a schedule asks for its name.** A schedule belongs to the service that wrote it,
+  and that service is never told it is gone: it is simply not called again. Deleting one, from
+  its row or its drawer, now asks for the name to be typed, as deleting an organisation does.
+- **The upstream picker lists each service once, and stores its full name.** The route editor's
+  list showed one entry per port, so a service on three ports read as three services, each with
+  a replica count. It now shows each service once, by its short name, with the full one smaller
+  on a second line (`reference-data.canopy.svc` on Kubernetes, `stack_service` on Swarm, nothing
+  more on Compose), and that full name is what the route keeps. Its **Port** sits beside it,
+  always shown and filled: a list when the service has several, read-only on a single one, typed
+  when the runtime knows none, and a port the list does not carry (a route set up by hand) stays
+  shown. A cluster CA constrained to cluster names (`svc`, `cluster.local`) can certify the full
+  name, and never the bare `reference-data`, so an https upstream verified against such a CA
+  failed. An existing https route still on the short name is flagged in the editor, with a
+  button that rewrites it; nothing changes until it is saved.
 - **A roles expression can decide, and the console reads it.** The expression a route uses to
   shape the roles it sends is Go's text/template: `if`, `else if` and `else` turn the roles into
   the one value an application wants (Grafana's Admin, Editor or Viewer from three roles), and a
   plain value (`["admin"]`) is sent as it is. The gateway always ran them; the console's preview
-  did not, showed them as errors and would not apply them. It reads them now, and its "Start
-  from" menu offers them under One value.
-- **A service picked as an upstream is stored under its full name.** The route editor's list
-  still reads by the short name, with the full one on a second line (`reference-data.canopy.svc`
-  on Kubernetes, `stack_service` on Swarm), and that full name is what the route keeps. A cluster
-  CA constrained to cluster names (`svc`, `cluster.local`) can certify it, and never the bare
-  `reference-data`, so an https upstream verified against such a CA failed. An existing https
-  route still on the short name is flagged in the editor, with a button that rewrites it; nothing
-  changes until it is saved.
-- **A service on several ports is listed once.** The route editor's upstream list showed one
-  entry per port, so a service on three ports read as three services. It now shows each service
-  once, with its Port beside it, always shown and filled: a list when the service has several,
-  read-only on a single one, and a port the list does not carry (a route set up by hand) stays
-  shown.
+  did not, showed them as errors and would not apply them. It reads them now, its "Start from"
+  menu offers them under One value, and its legend explains if / else and links the
+  documentation of the syntax.
 - **A certificate asked of cert-manager follows what the cluster CA may sign.** On Kubernetes
   the gateway asks cert-manager for its doors' certificates with every name of its Service,
   the bare one included (`meerkat-meerkat`). Under a cluster CA with name constraints that
@@ -35,18 +59,6 @@
   the CA permits stays, even bare (`meerkat-meerkat-internal`). When it permits none of them,
   the Certificate is left as it is and its row on Domains & TLS says which names are refused
   and by which constraints. Under a CA without name constraints nothing changes.
-- **Who may call the scheduler's API is a setting.** On the internal plane, the scheduled calls
-  API asked every service for a token of perimeter `schedules`. It now has three modes, chosen
-  under Scheduler, **Access**: **None** asks nothing, and names the caller by its token or its
-  ServiceAccount when it sends one, otherwise by the workload (Kubernetes) or the container
-  (Docker, Swarm) at its address; **Meerkat token** is the previous behaviour; **Cluster token**
-  takes the pod's own ServiceAccount token, checked by Kubernetes. A list of callers can narrow
-  any mode, and a caller nobody could identify is then refused. Each new schedule records who
-  created it and how that was known. An installation that holds a `schedules` token keeps the
-  Meerkat token mode on upgrade, so nothing opens; a new installation starts in None. Under
-  Infra, Access tokens, `schedules` tokens are listed apart, as **Internal**, and existing ones
-  keep working. The Helm chart grants `create` on TokenReviews, `list` on ServiceAccounts
-  (`rbac.internalCallers`) and `get` on ReplicaSets where it already reads the pods.
 
 ---
 

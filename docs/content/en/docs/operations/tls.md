@@ -445,6 +445,17 @@ refuses. Asked from the Internal plane, it is placed there when that plane is em
 from the Console or the Application, it is placed on that plane. Deleting it deletes the
 Certificate and its Secret.
 
+**Under an authority with name constraints.** A cluster authority may permit only cluster
+names (`svc`, `cluster.local`, the namespace). cert-manager's CA issuer signs whatever names
+it is asked for, the bare Service name (`meerkat-meerkat`) included, and one name outside the
+constraints makes every verifier (Go, OpenSSL) refuse the whole certificate, whatever name
+was called. So when the Secret changes, the gateway reads the constraints of the chain it
+carries, brings the Certificate down to the names they permit, and cert-manager issues it
+again; asked again from the console, the refused names do not come back. A name the
+authority permits stays, even bare (`meerkat-meerkat-internal`). When it permits none of
+them, the Certificate is left as it is and its line says which names are refused and by
+which constraints. Without constraints, nothing changes.
+
 ```yaml
 internalTls:
   # lets the gateway create its Certificates, read their Secrets, list the issuers

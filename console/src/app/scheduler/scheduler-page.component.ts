@@ -12,6 +12,7 @@ import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { MatSidenavModule } from "@angular/material/sidenav";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
+import { DialogsService } from "../shared/dialogs.service";
 import { MatSelectModule } from "@angular/material/select";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
@@ -70,6 +71,7 @@ import {
 })
 export class SchedulerPageComponent {
   private readonly schedules = inject(SchedulesService);
+  private readonly dialogs = inject(DialogsService);
   private readonly api = inject(ApiService);
 
   // WHICH HOURS these are. A scheduler is read by people who are not where the
@@ -467,7 +469,23 @@ export class SchedulerPageComponent {
     });
   }
 
-  protected remove(row: ScheduleRow): void {
+  // Type-to-confirm: a schedule belongs to the service that wrote it, and the
+  // service does not learn it is gone - it is simply never called again.
+  // Says whether it was confirmed, so the drawer closes only then.
+  protected async remove(row: ScheduleRow): Promise<boolean> {
+    const typed = await this.dialogs.prompt({
+      title: $localize`:@@Delete_schedule_NAME:Delete schedule "${row.name}:NAME:"?`,
+      label: $localize`:@@Type_the_schedule_name_to_confirm:Type the schedule name to confirm`,
+      confirmLabel: $localize`:@@Delete:Delete`,
+      requireMatch: row.name,
+      danger: true,
+    });
+    if (typed !== row.name) return false;
     this.schedules.remove(row.id).subscribe(() => this.subscribe());
+    return true;
+  }
+
+  protected async removeAndClose(row: ScheduleRow): Promise<void> {
+    if (await this.remove(row)) this.closePanel();
   }
 }

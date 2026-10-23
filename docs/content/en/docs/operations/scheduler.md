@@ -36,9 +36,9 @@ session's do: asking for a parent role grants what it implies.
 
 No service account to create, so no rights to keep up to date for ever. What
 bounds a schedule is **who may write one**, which the internal plane's
-[access](#who-may-call-it) decides: with a token whose perimeter is
-`schedules`, minted by root, traced in the audit trail, revocable in a click,
-two services that must not reach the same things get two tokens.
+[access](#who-may-call-it) decides: no credential, a Meerkat token or the pod's
+own ServiceAccount token, then everyone or only the services listed. Whoever
+may write a schedule may ask for any role, so that list is the boundary.
 
 If you do want to know whose a schedule is, file it in the **metadata**:
 `"metadata": { "owner": "stations-svc" }` is a key like any other, and one you
@@ -230,9 +230,15 @@ ClusterIP - so what a caller must present is a decision, and it is yours: see
 
 ### Who may call it
 
-What a service presents on this port is a setting, under Scheduler, **Access**.
-An infrastructure administrator changes it; the Scheduler's other readers see
-it.
+What a service presents on this port is a setting: the **Access** button of
+the Scheduler screen, beside **API**, opens it in a drawer. An infrastructure
+administrator changes it; the Scheduler's other readers see it.
+
+![The Access drawer of the Scheduler: the three modes with Meerkat token chosen, its Mint a token button, and Only these services with the orders-api token listed](img/console/scheduler-access.webp)
+
+Here the Meerkat token mode, with one internal token let in. **Mint a token**
+shows under that mode only, since the other two need none, and opens Access
+tokens on its **Internal** filter ([below](#the-token)).
 
 | Mode | The caller presents | It is known as |
 |---|---|---|
@@ -290,8 +296,9 @@ service that needs it.
 ### The token
 
 A token whose **perimeter is `schedules`**, minted on the console (Infra,
-Access tokens, **Internal**, named after the service that holds it or `global`)
-and used on the internal plane. It is what the Meerkat token mode asks for, and
+Access tokens, **Internal** filter, **New internal token**, named after the
+service that holds it or `global`; **Mint a token** in the Access drawer leads
+there) and used on the internal plane. It is what the Meerkat token mode asks for, and
 what None reads when it is sent. It opens this API and nothing
 else - not the configuration, not the accounts, not the routes, and nothing at
 all on the console's port. Narrow on purpose: it lives in a deployment manifest, often in another
@@ -366,13 +373,13 @@ You ask for them back the same way:
 
 ```bash
 # one station
-curl "http://meerkat:9090/api/schedules?meta.station=42" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules?meta.station=42" -H "$AUTH"
 
 # two conditions, both required
-curl "http://meerkat:9090/api/schedules?meta.kind=poll&meta.region=west" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules?meta.kind=poll&meta.region=west" -H "$AUTH"
 
 # an expression, for a fleet
-curl "http://meerkat:9090/api/schedules?meta.station=~^[0-9]{1,2}$" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules?meta.station=~^[0-9]{1,2}$" -H "$AUTH"
 ```
 
 `meta.<key>=<value>` matches exactly, `meta.<key>=~<expression>` matches by
@@ -493,7 +500,7 @@ Every turn that ended is also kept on its own, and that is what answers "since
 when is this failing", "did last night's close run" and "what did it answer":
 
 ```bash
-curl "http://meerkat:9090/api/schedules/sch_9f2c/runs" -H "$AUTH"
+curl "http://meerkat:7070/api/schedules/sch_9f2c/runs" -H "$AUTH"
 ```
 
 ```json
@@ -532,7 +539,7 @@ A turn that was dropped, or that failed for a reason since fixed, is asked for
 again by name:
 
 ```bash
-curl -X POST "http://meerkat:9090/api/schedules/sch_9f2c/run" -H "$AUTH" \
+curl -X POST "http://meerkat:7070/api/schedules/sch_9f2c/run" -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{"replayOf":"run-17906f3c9d2a4e10-9f2c11"}'
 ```
@@ -588,6 +595,14 @@ schedule belongs to the service that needs it, which writes it through the API,
 on the internal plane, from its own screens.
 
 ![The Scheduler screen: a cadence, a cron line and one date, each with its next run and its last](img/console/scheduler.webp)
+
+One row per schedule, **sorted by name**, so a row stays where it is while it
+runs: its name and the roles it calls with, **When**, **Next run**, **State**
+and **Last run**. What it calls - method, path and route - is in its drawer,
+with **Created by**, the caller that wrote it. **API** explains the calls a
+service makes, **Access** decides who may make them. Deleting a schedule asks
+for its name, typed: the service that wrote it is never told, it is simply not
+called again.
 
 A run in flight says where it stands - **calling**, waiting for the answer, or
 **accepted**, the service took the work - and which attempt it is when a

@@ -51,12 +51,20 @@ clair. Les deux autres choix sont `https` et `h2c`.
 > Domains & TLS > Trusted authorities**, **From the cluster** liste les
 > autorités que le cluster publie - choisissez celle qui signe vos services.
 > Voir [Trouvées dans le cluster](/docs/operations/tls#trouves-dans-le-cluster).
+> Appelez le service par son nom complet (`billing.acme.svc`) : une autorité
+> restreinte aux noms du cluster ne certifie jamais le simple `billing`, et
+> l'éditeur signale un upstream en `https` resté sur ce nom, avec un bouton qui
+> écrit le nom complet.
 
 > [!TIP]
 > Quand la gateway peut lire son environnement d'exécution - un socket
 > Docker ou Swarm, ou un namespace Kubernetes vu de l'intérieur - ce champ
-> propose les services qu'elle a trouvés dès que vous y placez le curseur. La
-> saisie reste libre : un upstream extérieur au cluster se tape à la main.
+> propose les services qu'elle a trouvés dès que vous y placez le curseur, chacun
+> une seule fois : le nom court, avec dessous, en plus petit, le nom complet
+> qu'enregistre le choix (`billing.acme.svc` sur Kubernetes, `stack_billing` sur
+> Swarm). Son **Port** se trouve à côté, une liste quand le service en a
+> plusieurs. La saisie reste libre : un upstream extérieur au cluster se tape à
+> la main.
 
 La même section règle le temps accordé à cet upstream (pour la connexion, puis
 pour la première réponse) et dit s'il faut cesser de l'appeler quand il ne

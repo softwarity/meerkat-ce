@@ -832,7 +832,10 @@ func ParseMetaMatch(key, value string) (MetaMatch, error) {
 	return MetaMatch{Key: key, Value: value}, nil
 }
 
-// ListSchedules returns the schedules matching the filter, soonest first.
+// ListSchedules returns the schedules matching the filter, by name. Not
+// soonest first: a turn that starts moves its next run to now, and a list
+// sorted on it moved the row under the pointer of whoever clicked Run now -
+// the run showed on the line above, as if another schedule had started.
 func (s *Store) ListSchedules(ctx context.Context, f ScheduleFilter) ([]Schedule, error) {
 	q := `SELECT ` + scheduleColumns + ` FROM schedules WHERE 1 = 1`
 	var args []any
@@ -844,7 +847,7 @@ func (s *Store) ListSchedules(ctx context.Context, f ScheduleFilter) ([]Schedule
 		q += ` AND route_id = ?`
 		args = append(args, f.RouteID)
 	}
-	q += ` ORDER BY next_at, name`
+	q += ` ORDER BY name, id`
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: list schedules: %w", err)
