@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.16.0
+
 - **Who may call the scheduler's API is a setting.** On the internal plane, the scheduled calls
   API asked every service for a token of perimeter `schedules`. It now has three modes, chosen
   from the Scheduler's new **Access** button, beside API: **None** asks nothing, and names the
