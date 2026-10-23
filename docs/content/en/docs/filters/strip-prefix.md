@@ -49,7 +49,8 @@ links wherever they asked.
 
 **On the way back, the prefix is restored** on the two things a browser follows
 without asking: a page's `<base href>` (`<base href="/">` becomes
-`<base href="/demo/">`, or its scripts are looked for at the gateway's root) and the
+`<base href="/demo/">`, or its scripts are looked for at the gateway's root; the
+unquoted `<base href=/>` a minified page writes too) and the
 `Location` of a redirect the service writes from its own root or to its own address.
 A base or a redirect already under the prefix, relative, or to another site is left
 alone.

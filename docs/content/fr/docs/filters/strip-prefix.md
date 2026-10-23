@@ -50,7 +50,8 @@ préfixe ferait écrire au service ses liens là où il l'a décidé.
 **Au retour, le préfixe est rétabli** sur les deux éléments qu'un navigateur suit
 sans rien demander : le `<base href>` d'une page (`<base href="/">` devient
 `<base href="/demo/">`, faute de quoi ses scripts sont cherchés à la racine de la
-gateway) et le `Location` d'une redirection que le service écrit depuis sa
+gateway ; le `<base href=/>` sans guillemets d'une page minifiée aussi) et le
+`Location` d'une redirection que le service écrit depuis sa
 propre racine ou vers sa propre adresse. Une base ou une redirection déjà sous le
 préfixe, relative, ou vers un autre site n'est pas modifiée.
 

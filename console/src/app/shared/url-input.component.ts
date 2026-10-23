@@ -10,6 +10,10 @@ const SCHEME = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/(.*)$/;
 export interface UrlSuggestion {
   /** The host part exactly as it goes into the field: "service:8080". */
   value: string;
+  /** What the list shows for it, when that is shorter than the value. */
+  label?: string;
+  /** A second, quieter line under it: the full name the value stores. */
+  detail?: string;
   /** A word beside it - a state, a source. Never part of the value. */
   hint?: string;
   /** Offered, but doubtful: rendered quieter. Order is the caller's. */
@@ -75,7 +79,9 @@ export class UrlInputComponent {
   protected readonly offered = computed(() => {
     const typed = this.rest().trim().toLowerCase();
     const all = this.suggestions();
-    return typed ? all.filter((s) => s.value.toLowerCase().includes(typed)) : all;
+    return typed
+      ? all.filter((s) => [s.value, s.label ?? ''].some((v) => v.toLowerCase().includes(typed)))
+      : all;
   });
 
   protected setProtocol(p: string): void {

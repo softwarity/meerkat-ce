@@ -45,6 +45,13 @@ type Service struct {
 	// the short one is what people write. Offering only the long one is
 	// technically correct and reads as wrong, which is worse than either.
 	Names []string `json:"names,omitempty"`
+	// Full is the name a route STORES, when the platform has a longer one
+	// than the short name people read: name.ns.svc on Kubernetes (its own
+	// namespace included), the stack_service name on Swarm. A certificate
+	// authority constrained to permitted names (svc, cluster.local) can
+	// certify the qualified name and never the bare one. Empty when the short
+	// name is all there is - a plain container, a compose service.
+	Full string `json:"full,omitempty"`
 	// Ports are what it listens on INSIDE the cluster - the number a route
 	// should point at. A published port is where the outside world reaches it,
 	// which is precisely what a gateway is replacing.
@@ -563,6 +570,9 @@ func nameTheServices(out []Service, raw []swarmService, netName map[string]strin
 			}
 		}
 		out[i].Names = append(out[i].Names, out[i].Name)
+		if out[i].Names[0] != out[i].Name {
+			out[i].Full = out[i].Name
+		}
 	}
 }
 
@@ -836,6 +846,7 @@ func fromKubernetesIn(ctx context.Context, ns string, own bool) (Result, error) 
 		svc := Service{
 			Name:     it.Metadata.Name,
 			Names:    names,
+			Full:     it.Metadata.Name + "." + ns + ".svc",
 			Networks: []string{ns},
 		}
 		for _, p := range it.Spec.Ports {
@@ -886,10 +897,10 @@ func getJSON(ctx context.Context, client *http.Client, endpoint string, into any
 	return json.NewDecoder(res.Body).Decode(into)
 }
 
-// suggest builds the url a route would use: the service's own name and the
-// port it listens on inside. Only when there is ONE obvious port - a service
-// exposing three is a choice somebody has to make, and guessing it would be
-// worse than leaving the field to them.
+// suggest builds the url a route would use: the name it stores (the full one
+// when there is one) and the port it listens on inside. Only when there is ONE
+// obvious port - a service exposing three is a choice somebody has to make, and
+// guessing it would be worse than leaving the field to them.
 func suggest(s Service) string {
 	if len(s.Ports) != 1 {
 		return ""
@@ -897,7 +908,16 @@ func suggest(s Service) string {
 	if s.Ports[0].Target == 0 {
 		return ""
 	}
-	return fmt.Sprintf("http://%s:%d", s.best(), s.Ports[0].Target)
+	return fmt.Sprintf("http://%s:%d", s.stored(), s.Ports[0].Target)
+}
+
+// stored is the name a route keeps: the full one when the platform has it,
+// the name that resolves otherwise.
+func (s Service) stored() string {
+	if s.Full != "" {
+		return s.Full
+	}
+	return s.best()
 }
 
 // best is the name to put in front of somebody: the first that resolves, and

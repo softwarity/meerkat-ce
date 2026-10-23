@@ -63,12 +63,18 @@ GF_AUTH_SIGNOUT_REDIRECT_URL=https://apps.example.com/logout
 2. **Identity**: `username` as `X-WEBAUTH-USER`, `email` as `X-WEBAUTH-EMAIL`,
    `fullname` as `X-WEBAUTH-NAME`.
 3. **Auth forward**: mechanism **Headers**.
-4. The role. Grafana wants one of `Viewer`, `Editor`, `Admin`. The plainest way is
-   two routes on the same path, the first with an access rule on your Grafana
-   administrators' role and an Incoming filter
-   [set-request-header](/docs/filters/set-request-header)
-   `X-WEBAUTH-ROLE: Admin`, the second for everyone else with `Viewer`. The first
-   route that lets a person in serves them.
+4. The role. Grafana wants one of `Viewer`, `Editor`, `Admin`. Declare three
+   catalogue roles tagged `grafana` (`grafana-admin`, `grafana-editor`,
+   `grafana-viewer`), put them in the route's access rule beside `ROLE_ADMIN`, and
+   add to **Identity** the attribute `roles` as `X-WEBAUTH-ROLE`, with the
+   expression:
+
+   ```text
+   {{if .Roles | .Keep "ROLE_ADMIN" "grafana-admin"}}Admin{{else if .Roles | .Keep "grafana-editor"}}Editor{{else}}Viewer{{end}}
+   ```
+
+   One route serves everybody, each with their level. See
+   [The shape of the roles](/docs/auth/service-jwt#the-shape-of-the-roles).
 
 **Traps**:
 
@@ -77,8 +83,9 @@ GF_AUTH_SIGNOUT_REDIRECT_URL=https://apps.example.com/logout
   other path.
 - `GF_SERVER_ROOT_URL` must be the public address with the route's path, or
   Grafana writes links and redirects that leave the route.
-- The role is applied when Grafana syncs the user (every `sync_ttl` minutes, 15 by
-  default): a role change at the gateway reaches Grafana within that delay.
+- Grafana applies the role it receives on every request (checked with Grafana
+  13): a role changed in Meerkat is the role in Grafana at the next page. Without
+  the header, an account the proxy creates is a Viewer.
 
 ## GeoServer, by headers
 

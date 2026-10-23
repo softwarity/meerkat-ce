@@ -691,6 +691,7 @@ func (st *k8sState) result(ns string, counted, own bool) Result {
 		svc := Service{
 			Name:      s.Metadata.Name,
 			Names:     []string{s.Metadata.Name, s.Metadata.Name + "." + ns + ".svc"},
+			Full:      s.Metadata.Name + "." + ns + ".svc",
 			Networks:  []string{ns},
 			Reachable: true,
 		}

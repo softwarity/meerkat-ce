@@ -9,20 +9,31 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, '..', '..');
-// The same file the benchmark page renders (widgets/benchmark.component.ts).
-const BENCH_URL = 'https://raw.githubusercontent.com/softwarity/meerkat-ce/bench/latest.json';
+// The same file the benchmark page renders (widgets/benchmark.component.ts):
+// deploy-doc.yml puts the CI's latest run in public/bench/ before the build, and
+// a build without it (on a laptop) reads the one the published site serves.
+const BENCH_FILE = join(here, '..', 'public', 'bench', 'latest.json');
+const BENCH_URL = 'https://meerkat.softwarity.dev/bench/latest.json';
+
+async function latestBench() {
+  try {
+    return JSON.parse(await readFile(BENCH_FILE, 'utf8'));
+  } catch {
+    const res = await fetch(BENCH_URL, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+}
 
 async function memory() {
   try {
-    const res = await fetch(BENCH_URL, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const run = (await res.json()).runs.find((r) => r.machine.arch === 'amd64');
+    const run = (await latestBench()).runs.find((r) => r.machine.arch === 'amd64');
     const mk = run.gateways.find((g) => g.name === 'meerkat');
     const day = new Date(run.date);
     const on = (locale) => day.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
     return { idle: Math.round(mk.memoryIdleMiB), peak: Math.round(mk.memoryPeakMiB), 'date.en': on('en-GB'), 'date.fr': on('fr-FR') };
   } catch (err) {
-    // Offline, or the branch is not there yet: the last figures somebody
+    // Offline, or no run published yet: the last figures somebody
     // checked, and a line saying so. A site build must not need the network.
     const fallback = JSON.parse(await readFile(join(here, 'facts-fallback.json'), 'utf8'));
     console.warn(`[facts] the latest benchmark could not be read (${err.message}): using facts-fallback.json`);

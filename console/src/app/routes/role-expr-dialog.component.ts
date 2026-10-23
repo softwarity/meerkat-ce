@@ -60,6 +60,18 @@ function shapes(tail: string): { label: string; expr: string }[] {
 const CSV_SHAPES = shapes('join ","');
 const JSON_SHAPES = shapes('json');
 
+// One value instead of a list: an application with levels of its own (Grafana's
+// Admin, Editor, Viewer) or a claim that is the same for everyone the route lets
+// in. The template decides, and a selection that keeps nothing is false.
+const VALUE_SHAPES: { label: string; expr: string }[] = [
+  { label: 'Admin or Viewer, by one role', expr: '{{if .Roles | .Keep "ROLE_ADMIN"}}Admin{{else}}Viewer{{end}}' },
+  {
+    label: 'Three levels, by role then tag',
+    expr: '{{if .Roles | .Keep "ROLE_ADMIN"}}Admin{{else if .Roles | .Keep "tag:TAGNAME"}}Editor{{else}}Viewer{{end}}',
+  },
+  { label: 'The same value for everyone', expr: '["admin"]' },
+];
+
 const HOLE = 'TAGNAME';
 
 const highlight = templateHighlight(ROLE_SYNTAX);
@@ -218,6 +230,7 @@ const highlight = templateHighlight(ROLE_SYNTAX);
             <mat-menu #starters="matMenu">
               <button mat-menu-item [matMenuTriggerFor]="csv">Comma-separated</button>
               <button mat-menu-item [matMenuTriggerFor]="jsonArray">JSON array</button>
+              <button mat-menu-item [matMenuTriggerFor]="oneValue">One value</button>
               @if (reuse().length) {
                 <div class="menu-head">Already sent by</div>
                 @for (r of reuse(); track r.expr) {
@@ -238,6 +251,14 @@ const highlight = templateHighlight(ROLE_SYNTAX);
             </mat-menu>
             <mat-menu #jsonArray="matMenu">
               @for (p of JSON_SHAPES; track p.expr) {
+                <button mat-menu-item (click)="use(p.expr)">
+                  <span class="opt-label">{{ p.label }}</span>
+                  <span class="opt-expr">{{ p.expr }}</span>
+                </button>
+              }
+            </mat-menu>
+            <mat-menu #oneValue="matMenu">
+              @for (p of VALUE_SHAPES; track p.expr) {
                 <button mat-menu-item (click)="use(p.expr)">
                   <span class="opt-label">{{ p.label }}</span>
                   <span class="opt-expr">{{ p.expr }}</span>
@@ -328,6 +349,15 @@ const highlight = templateHighlight(ROLE_SYNTAX);
           <dd>
             how the list is written: separated, or a JSON array. End the pipeline with one of them.
           </dd>
+
+          <dt><code [tpl]="IF_ELSE" [syntax]="SYNTAX"></code></dt>
+          <dd>
+            decides instead of listing: a selection that keeps nothing is false, so the roles become the
+            <strong>one value</strong> an application wants - Grafana's Admin, Editor or Viewer.
+            <a href="https://meerkat.softwarity.dev/docs/auth/service-jwt#the-shape-of-the-roles" target="_blank" rel="noopener"
+              >The full syntax, and shapes written for real applications</a
+            >.
+          </dd>
         </dl>
       </div>
     </mat-dialog-content>
@@ -348,6 +378,8 @@ export class RoleExprDialogComponent {
   protected readonly bytes = signal(0);
   // Written here rather than inline: Angular reads { and } as control flow.
   protected readonly KEEP = '.Keep "tag:BILLING" "ROLE_USER"';
+  protected readonly IF_ELSE = '{{if .Roles | .Keep "ROLE_ADMIN"}}Admin{{else}}Viewer{{end}}';
+  protected readonly VALUE_SHAPES = VALUE_SHAPES;
   protected readonly DROP = '.Drop "tag:OTHER"';
   // The declared shape only where it can give something: on a route that maps
   // nothing it keeps nothing, and a starter that empties the list is a trap.
@@ -483,9 +515,10 @@ function groupByExpr(others: { name: string; expr: string }[], current: string):
     }));
 }
 
-// A reader for the same pipeline the gateway runs. Deliberately narrow: it
-// understands the verbs and nothing else, so anything it cannot read is left
-// for the server to judge on save.
+// A reader for the same template the gateway runs. Deliberately narrow: it
+// understands the verbs, the text around the actions and if / else if / else,
+// and nothing else, so anything it cannot read is left for the server to judge
+// on save.
 // roleMap (declared name to catalogue name) is what .Declared reads; without
 // it, .Declared keeps nothing.
 export function runRoleExpr(
@@ -494,9 +527,109 @@ export function runRoleExpr(
   tagsOf: Map<string, string[]>,
   roleMap?: Record<string, string>,
 ): { text: string; count: number } {
-  const body = expr.trim().replace(/^\{\{/, '').replace(/\}\}$/, '').trim();
-  if (!body) return { text: roles.join(','), count: roles.length };
+  const src = expr.trim();
+  if (!src) return { text: roles.join(','), count: roles.length };
+  const nodes = parseTemplate(src);
+  // The usual shape, one pipeline and nothing around it, counts the roles it
+  // sends. A template that DECIDES - a fixed value, an if - sends one value,
+  // or nothing.
+  if (nodes.length === 1 && nodes[0].kind === 'pipe') {
+    const out = runPipeline(nodes[0].body, roles, tagsOf, roleMap);
+    return { text: out.text ?? out.list.join(','), count: out.list.length };
+  }
+  const text = render(nodes, roles, tagsOf, roleMap);
+  return { text, count: text ? 1 : 0 };
+}
 
+type TplNode =
+  | { kind: 'text'; text: string }
+  | { kind: 'pipe'; body: string }
+  | { kind: 'if'; branches: { cond: string; then: TplNode[] }[]; otherwise: TplNode[] };
+
+// Text and {{actions}}, nested on if / else if / else / end.
+function parseTemplate(src: string): TplNode[] {
+  const tokens: ({ text: string } | { action: string })[] = [];
+  let at = 0;
+  for (const m of src.matchAll(/\{\{-?\s*([\s\S]*?)\s*-?\}\}/g)) {
+    const from = m.index ?? 0;
+    if (from > at) tokens.push({ text: src.slice(at, from) });
+    tokens.push({ action: m[1].trim() });
+    at = from + m[0].length;
+  }
+  if (at < src.length) tokens.push({ text: src.slice(at) });
+
+  let i = 0;
+  const block = (closers: string[]): { nodes: TplNode[]; closer: string } => {
+    const nodes: TplNode[] = [];
+    while (i < tokens.length) {
+      const t = tokens[i++];
+      if ('text' in t) {
+        nodes.push({ kind: 'text', text: t.text });
+        continue;
+      }
+      const a = t.action;
+      const word = a.split(/\s+/)[0];
+      if (closers.includes(word)) return { nodes, closer: a };
+      if (word === 'if') {
+        const branches = [{ cond: a.slice(2).trim(), then: [] as TplNode[] }];
+        let otherwise: TplNode[] = [];
+        let current = branches[0];
+        for (;;) {
+          const inner = block(['else', 'end']);
+          current.then = inner.nodes;
+          if (inner.closer === 'end') break;
+          const rest = inner.closer.slice(4).trim();
+          if (rest.startsWith('if ')) {
+            current = { cond: rest.slice(3).trim(), then: [] };
+            branches.push(current);
+            continue;
+          }
+          otherwise = block(['end']).nodes;
+          break;
+        }
+        nodes.push({ kind: 'if', branches, otherwise });
+        continue;
+      }
+      if (word === 'end' || word === 'else') throw new Error(`${word} without if`);
+      nodes.push({ kind: 'pipe', body: a });
+    }
+    if (closers.length) throw new Error('if without end');
+    return { nodes, closer: '' };
+  };
+  return block([]).nodes;
+}
+
+function render(
+  nodes: TplNode[],
+  roles: string[],
+  tagsOf: Map<string, string[]>,
+  roleMap?: Record<string, string>,
+): string {
+  let out = '';
+  for (const n of nodes) {
+    if (n.kind === 'text') out += n.text;
+    else if (n.kind === 'pipe') {
+      const r = runPipeline(n.body, roles, tagsOf, roleMap);
+      out += r.text ?? r.list.join(',');
+    } else {
+      // A selection is true when it keeps something, as in Go's templates.
+      const hit = n.branches.find((b) => {
+        const r = runPipeline(b.cond, roles, tagsOf, roleMap);
+        return r.text !== null ? r.text !== '' : r.list.length > 0;
+      });
+      out += render(hit ? hit.then : n.otherwise, roles, tagsOf, roleMap);
+    }
+  }
+  return out;
+}
+
+// One pipeline: the list it leaves, and the text when it ends with join or json.
+function runPipeline(
+  body: string,
+  roles: string[],
+  tagsOf: Map<string, string[]>,
+  roleMap?: Record<string, string>,
+): { list: string[]; text: string | null } {
   let list = [...roles];
   let text: string | null = null;
 
@@ -551,7 +684,7 @@ export function runRoleExpr(
         throw new Error(`unknown verb ${verb}`);
     }
   }
-  return { text: text ?? list.join(','), count: list.length };
+  return { list, text };
 }
 
 // The pipeline's stages, splitting on | outside quotes.

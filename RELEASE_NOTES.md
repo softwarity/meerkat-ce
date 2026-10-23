@@ -2,6 +2,25 @@
 
 ## NEXT RELEASE
 
+- **A roles expression can decide, and the console reads it.** The expression a route uses to
+  shape the roles it sends is Go's text/template: `if`, `else if` and `else` turn the roles into
+  the one value an application wants (Grafana's Admin, Editor or Viewer from three roles), and a
+  plain value (`["admin"]`) is sent as it is. The gateway always ran them; the console's preview
+  did not, showed them as errors and would not apply them. It reads them now, and its "Start
+  from" menu offers them under One value.
+- **A service picked as an upstream is stored under its full name.** The route editor's list
+  still reads by the short name, with the full one on a second line (`reference-data.canopy.svc`
+  on Kubernetes, `stack_service` on Swarm), and that full name is what the route keeps. A cluster
+  CA constrained to cluster names (`svc`, `cluster.local`) can certify it, and never the bare
+  `reference-data`, so an https upstream verified against such a CA failed. An existing https
+  route still on the short name is flagged in the editor, with a button that rewrites it; nothing
+  changes until it is saved.
+- **A service on several ports is listed once.** The route editor's upstream list showed one
+  entry per port, so a service on three ports read as three services. It now shows each service
+  once, with its Port beside it, always shown and filled: a list when the service has several,
+  read-only on a single one, and a port the list does not carry (a route set up by hand) stays
+  shown.
+
 ---
 
 ## 1.15.3

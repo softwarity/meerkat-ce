@@ -33,8 +33,9 @@
   <mat-autocomplete #known class="mk-url-suggestions" (optionSelected)="pick($event.option.value)">
     @for (s of offered(); track s.value) {
       <mat-option [value]="s.value" [class.muted]="s.muted">
-        {{ s.value }}
+        {{ s.label ?? s.value }}
         @if (s.hint) {<span class="hint">{{ s.hint }}</span>}
+        @if (s.detail) {<span class="detail">{{ s.detail }}</span>}
       </mat-option>
     }
   </mat-autocomplete>

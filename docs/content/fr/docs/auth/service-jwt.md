@@ -56,6 +56,19 @@ déclare, `{{.Roles | .Declared | join ","}}` (voir
 `.Keep`, `.Drop` et `.Declared` lisent les noms du catalogue : ils passent avant
 tout verbe qui les retouche.
 
+L'expression est le [text/template](https://pkg.go.dev/text/template) de Go, donc
+elle peut aussi décider : une sélection qui ne garde rien est fausse, et `if`,
+`else if`, `else` transforment un ensemble de rôles en la seule valeur qu'une
+application attend. Le rôle d'organisation de Grafana, à partir de trois rôles
+étiquetés `grafana` :
+
+```text
+{{if .Roles | .Keep "ROLE_ADMIN" "grafana-admin"}}Admin{{else if .Roles | .Keep "grafana-editor"}}Editor{{else}}Viewer{{end}}
+```
+
+D'autres formes, avec l'application pour laquelle elles ont été écrites, sont dans
+[Adapter une application](/docs/concepts/fit-an-application#4-les-rles-sous-les-noms-de-lapplication).
+
 ## Comment un service le vérifie
 
 Tout ce dont un service a besoin est servi sur le **plan interne**, port

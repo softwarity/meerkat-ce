@@ -55,6 +55,18 @@ Without an expression a route sends every role, comma-separated
 `.Keep`, `.Drop` and `.Declared` read catalogue names, so they go before any
 verb that reshapes them.
 
+The expression is Go's [text/template](https://pkg.go.dev/text/template), so it
+can also decide: a selection that keeps nothing is false, and `if`, `else if`,
+`else` turn a set of roles into the single value an application wants. Grafana's
+organisation role, from three roles tagged `grafana`:
+
+```text
+{{if .Roles | .Keep "ROLE_ADMIN" "grafana-admin"}}Admin{{else if .Roles | .Keep "grafana-editor"}}Editor{{else}}Viewer{{end}}
+```
+
+More shapes, with the application they were written for, are in
+[Fitting an application](/docs/concepts/fit-an-application#4-the-roles-under-the-applications-names).
+
 ## How a service verifies it
 
 Everything a service needs is served on the **internal plane**, port

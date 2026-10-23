@@ -739,6 +739,14 @@ mat-form-field.namespace {
 .upstream-pick mat-form-field.base-path {
   flex: 1 1 120px;
 }
+/* The port only takes a number's room, beside the service it belongs to. */
+.upstream-pick mat-form-field.port,
+.upstream-free mat-form-field.port {
+  flex: 0 1 110px;
+}
+.upstream-free app-url-input {
+  flex: 1 1 260px;
+}
 .upstream-pick .proto {
   width: 62px;
   margin-left: 12px;

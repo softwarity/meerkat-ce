@@ -117,6 +117,13 @@ input:autofill:focus {
   font-size: 0.78rem;
   color: var(--mat-sys-on-surface-variant);
 }
+// The full name a pick stores, under the short one that is read.
+.mk-url-suggestions .detail {
+  display: block;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: var(--mat-sys-outline);
+}
 
 // What is missing, one row per gap: the section on the first line, what it
 // wants under it. Overlay, so global - opted in via the menu's own class.

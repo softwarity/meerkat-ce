@@ -196,11 +196,12 @@
               <mat-label i18n="@@Upstream">Upstream</mat-label>
               <mat-select required [value]="pickedService()" (selectionChange)="pickService($event.value)"
                 panelClass="mk-url-suggestions">
-                <mat-select-trigger>{{ pickedService() }}</mat-select-trigger>
+                <mat-select-trigger>{{ pickedLabel() }}</mat-select-trigger>
                 @for (c of upstreamChoices(); track c.value) {
                   <mat-option [value]="c.value" [class.muted]="c.muted">
-                    {{ c.value }}
+                    {{ c.label ?? c.value }}
                     @if (c.hint) {<span class="hint">{{ c.hint }}</span>}
+                    @if (c.detail) {<span class="detail">{{ c.detail }}</span>}
                   </mat-option>
                 }
               </mat-select>
@@ -213,6 +214,26 @@
               <span matTextPrefix class="sep">://</span>
               <mat-hint align="end">{{ upstreamHint() }}</mat-hint>
             </mat-form-field>
+            <!-- The port beside the service, always shown and filled: a list
+                 when the service offers a choice, read-only on a single port,
+                 typed when the runtime knows none. -->
+            @if (portUnknown()) {
+              <mat-form-field class="port">
+                <mat-label i18n="@@Port">Port</mat-label>
+                <input matInput type="number" min="1" max="65535" [value]="upstreamPort()"
+                  (change)="setUpstreamPort($any($event.target).value)" />
+              </mat-form-field>
+            } @else {
+              <mat-form-field class="port">
+                <mat-label i18n="@@Port">Port</mat-label>
+                <mat-select [value]="upstreamPort()" [disabled]="portChoices().length < 2"
+                  (selectionChange)="setUpstreamPort($event.value)" panelWidth="">
+                  @for (p of portChoices(); track p) {
+                    <mat-option [value]="p">{{ p }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
             <mat-form-field class="base-path">
               <mat-label i18n="@@Base_path">Base path</mat-label>
               <input matInput placeholder="/" [value]="upstreamPath()" [disabled]="!pickedService()"
@@ -220,10 +241,39 @@
             </mat-form-field>
           </div>
         } @else {
-          <app-url-input i18n-label="@@Upstream" label="Upstream" required
-            [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
-            [protocols]="['http', 'https', 'h2c']" [suggestions]="upstreamChoices()"
-            [hint]="upstreamHint()" hintAlign="end" hostPlaceholder="service:8080/base" />
+          <!-- Typed, a host that names a known service gets the same port
+               field: a list when it has several, read-only on one. Changing
+               it rewrites the port in the url, nothing else. -->
+          <div class="pair upstream-free">
+            <app-url-input i18n-label="@@Upstream" label="Upstream" required
+              [value]="draft().upstream" (valueChange)="patch('upstream', $event)"
+              [protocols]="['http', 'https', 'h2c']" [suggestions]="upstreamSuggestions()"
+              [hint]="upstreamHint()" hintAlign="end" hostPlaceholder="service:8080/base" />
+            @if (portChoices().length) {
+              <mat-form-field class="port">
+                <mat-label i18n="@@Port">Port</mat-label>
+                <mat-select [value]="upstreamPort()" [disabled]="portChoices().length < 2"
+                  (selectionChange)="setUpstreamPort($event.value)" panelWidth="">
+                  @for (p of portChoices(); track p) {
+                    <mat-option [value]="p">{{ p }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+          </div>
+        }
+        <!-- A route saved before picks stored the full name: said, with the
+             fix one click away, and saved only when the admin saves. -->
+        @if (shortUpstream(); as short) {
+          <p class="section-hint off-note">
+            <mat-icon inline>warning</mat-icon>
+            <span i18n="@@Upstream_short_name"
+              >The upstream uses the short name {{ short.host }}, which a name-constrained CA cannot certify.</span
+            >
+            <button matButton type="button" (click)="useFullName()">
+              <ng-container i18n="@@Use_full_name">Use {{ short.full }}</ng-container>
+            </button>
+          </p>
         }
 
         <!-- How long this one may take (ROUTE-07), and when to stop asking
@@ -727,13 +777,15 @@
             <p class="section-hint id-hint" i18n="@@Roles_shape_hint_oidc">
               A claim built from the roles carries every role of the person, comma-separated, unless shaped
               here: keep or drop roles by name or by tag, cut or add a prefix, change the case, then write
-              the list separated or as a JSON array - what the application reads, and nothing more.
+              the list separated or as a JSON array, or turn them into the one value it expects - what the
+              application reads, and nothing more.
             </p>
           } @else {
             <p class="section-hint id-hint" i18n="@@Roles_shape_hint">
               The roles travel on every request, all of them comma-separated unless shaped here: keep or drop
               roles by name or by tag, cut or add a prefix, change the case, then write the list separated or
-              as a JSON array - what the service reads, and nothing more.
+              as a JSON array, or turn them into the one value it expects - what the service reads, and
+              nothing more.
             </p>
           }
           <div class="btn-row">

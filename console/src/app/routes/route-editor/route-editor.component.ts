@@ -1767,9 +1767,8 @@ export class RouteEditorComponent {
   // glance and cannot be spelled wrong. The empty entry is the installation's
   // default, which is what every route ran with when the bounds were global.
   // What the runtime says exists beside this gateway (SVC-02). One entry per
-  // service AND PORT: a service exposing three is three choices, and offering
-  // it once would mean guessing which - the guess being exactly the mistake
-  // this list exists to remove.
+  // service, and its port a second choice beside it when it exposes several:
+  // guessing which would be exactly the mistake this list exists to remove.
   private readonly discovered = signal<DiscoveredService[]>([]);
   // The Kubernetes namespace the offered services come from, and those this
   // gateway may read (SVC-02). No choice is shown when there is only its own:
@@ -1833,50 +1832,132 @@ export class RouteEditorComponent {
       : $localize`:@@Gap_upstream_not_in_namespace:the upstream is no service of namespace ${ns}:NS:: pick one from the list, or choose External`;
   }
 
-  // The offered choice (service:port) an upstream names, null when none.
-  // Compared as qualified names, the one form every spelling reduces to: a
-  // bare name in the own namespace, name.ns, name.ns.svc.cluster.local - and
-  // the own list also carries the watched namespaces' services, under their
-  // qualified name already.
-  private matchChoice(raw: string): string | null {
+  // The offered service an upstream names, null when none. The host alone:
+  // the port is a second choice, and a route on a port the list does not
+  // carry still points at that service (the port field shows it).
+  //
+  // On Kubernetes, compared as qualified names, the one form every spelling
+  // reduces to: a bare name in the own namespace, name.ns,
+  // name.ns.svc.cluster.local - and the own list also carries the watched
+  // namespaces' services, under their qualified name already. Elsewhere
+  // (Swarm, Docker), a name is a name: the alias, the stack_service name or
+  // the container, as typed.
+  private serviceOf(raw: string): DiscoveredService | null {
+    const own = this.ownNamespace();
+    if (!own) {
+      const host = hostAndPort(splitUrl(raw).host).name.toLowerCase();
+      if (!host) return null;
+      return (
+        this.discovered().find((s) =>
+          [s.name, ...(s.names ?? []), s.full ?? ""].some((n) => n.toLowerCase() === host),
+        ) ?? null
+      );
+    }
     const ns = this.namespace();
-    const ref = serviceRef(raw, this.ownNamespace(), this.namespaces());
+    const ref = serviceRef(raw, own, this.namespaces());
     if (!ref) return null;
     const want = `${ref.service}.${ref.namespace}.svc`;
     const qualified = (n: string) => (n.includes(".") ? n : `${n}.${ns}.svc`);
-    const s = this.discovered().find(
-      (s) =>
-        [s.name, ...(s.names ?? [])].some((n) => qualified(n) === want) &&
-        (s.ports ?? []).some((p) => p.target === ref.port),
+    return (
+      this.discovered().find((s) =>
+        [s.name, ...(s.names ?? [])].some((n) => qualified(n) === want),
+      ) ?? null
     );
-    return s ? `${s.names?.[0] || s.name}:${ref.port}` : null;
+  }
+  // The offered choice (the stored host) an upstream names, null when none.
+  private matchChoice(raw: string): string | null {
+    const s = this.serviceOf(raw);
+    return s ? storedName(s) : null;
   }
 
   // The upstream as the service picker edits it: a scheme, a service picked
-  // from the list, and a base path typed beside it (GeoServer answers under
-  // /geoserver). The host is never typed: a namespace chosen, the list is
-  // the truth about what exists there. An upstream spelled long
-  // (name.ns.svc.cluster.local) keeps its spelling until another service is
-  // picked: opening a route rewrites nothing.
-  private readonly upstreamSplit = computed(() => {
-    const m = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/([^/?#]*)(.*)$/.exec(
-      this.draft().upstream ?? "",
-    );
-    return m
-      ? { proto: m[1].toLowerCase(), host: m[2], path: m[3] }
-      : { proto: "", host: "", path: "" };
-  });
+  // from the list, its port when it has a choice of them, and a base path
+  // typed beside it (GeoServer answers under /geoserver). The host is never
+  // typed: a namespace chosen, the list is the truth about what exists there.
+  // An upstream spelled long (name.ns.svc.cluster.local) keeps its spelling
+  // until another service is picked: opening a route rewrites nothing.
+  private readonly upstreamSplit = computed(() => splitUrl(this.draft().upstream));
   // The scheme chosen before any service is: kept until one is picked.
   private readonly wantedScheme = signal("http");
   protected readonly upstreamScheme = computed(
     () => this.upstreamSplit().proto || this.wantedScheme(),
   );
   protected readonly upstreamPath = computed(() => this.upstreamSplit().path);
-  protected readonly pickedService = computed(
-    () => this.matchChoice(this.draft().upstream) ?? "",
-  );
+  // The port the upstream dials: as written, or the scheme's own. 0 with no
+  // host yet.
+  protected readonly upstreamPort = computed(() => {
+    const { name, port } = hostAndPort(this.upstreamSplit().host);
+    if (!name) return 0;
+    return Number(port) || (this.upstreamScheme() === "https" ? 443 : 80);
+  });
+  private readonly pickedEntry = computed(() => this.serviceOf(this.draft().upstream));
+  protected readonly pickedService = computed(() => {
+    const s = this.pickedEntry();
+    return s ? storedName(s) : "";
+  });
+  // The pick as the list reads it: the short name, whatever the route stores.
+  protected readonly pickedLabel = computed(() => {
+    const s = this.pickedEntry();
+    return s ? s.names?.[0] || s.name : "";
+  });
+  // The picked service's ports, with the route's own when the list does not
+  // carry it: a port nobody listed is shown, not lost. The field is always
+  // there and filled; it only opens when this leaves a choice.
+  protected readonly portChoices = computed(() => {
+    const s = this.pickedEntry();
+    if (!s) return [];
+    const list = targets(s);
+    const cur = this.upstreamPort();
+    return cur && !list.includes(cur) ? [...list, cur].sort((a, b) => a - b) : list;
+  });
+  // A service the runtime knows no port of (no Service port, an image that
+  // declares none): the port is typed.
+  protected readonly portUnknown = computed(() => {
+    const s = this.pickedEntry();
+    return !!s && !targets(s).length;
+  });
+  // An https upstream spelled with a service's bare name when the platform has
+  // a qualified one: a CA constrained to cluster names (svc, cluster.local)
+  // certifies reference-data.canopy.svc, never reference-data. Said, with the
+  // way out, and never rewritten behind anyone's back on save.
+  protected readonly shortUpstream = computed(() => {
+    if (this.mode() !== "proxy" || this.upstreamScheme() !== "https") return null;
+    const host = hostAndPort(this.upstreamSplit().host).name.toLowerCase();
+    if (!host || host.includes(".")) return null;
+    const s = this.discovered().find((s) =>
+      [s.name, ...(s.names ?? [])].some((n) => n.toLowerCase() === host),
+    );
+    const full = s?.full;
+    return full && full.includes(".") && full !== host ? { host, full } : null;
+  });
+  protected useFullName(): void {
+    const short = this.shortUpstream();
+    if (!short) return;
+    const { proto, host, path } = this.upstreamSplit();
+    const { port } = hostAndPort(host);
+    this.patch("upstream", `${proto}://${short.full}${port ? ":" + port : ""}${path}`);
+  }
+  // Another service keeps the port already chosen when it listens there too,
+  // and takes its first one otherwise. One with no known port keeps whatever
+  // was written: it is the field beside it that says.
   protected pickService(host: string): void {
-    this.patch("upstream", `${this.upstreamScheme()}://${host}${this.upstreamPath()}`);
+    const s = this.discovered().find((s) => storedName(s) === host);
+    const list = s ? targets(s) : [];
+    const now = this.upstreamPort();
+    const port = list.includes(now)
+      ? now
+      : (list[0] ?? Number(hostAndPort(this.upstreamSplit().host).port));
+    this.patch("upstream", `${this.upstreamScheme()}://${host}${port ? ":" + port : ""}${this.upstreamPath()}`);
+  }
+  // Only the port moves: the host, the scheme and the base path stand. A port
+  // that is none (empty, 0, beyond 65535) leaves the scheme's own.
+  protected setUpstreamPort(raw: number | string): void {
+    const { host, path } = this.upstreamSplit();
+    const { name } = hostAndPort(host);
+    if (!name) return;
+    const n = Number(raw);
+    const port = Number.isInteger(n) && n > 0 && n < 65536 ? `:${n}` : "";
+    this.patch("upstream", `${this.upstreamScheme()}://${name}${port}${path}`);
   }
   protected setUpstreamScheme(proto: string): void {
     const { host, path } = this.upstreamSplit();
@@ -1909,6 +1990,9 @@ export class RouteEditorComponent {
       ? $localize`:@@Upstream_some_out:${n}:COUNT: offered, ${out}:OUT: off your network`
       : $localize`:@@Upstream_known:${n}:COUNT: services offered`;
   });
+  // One entry per service, its ports chosen beside it: a service on three
+  // ports listed three times read as three services.
+  //
   // Reachable first: an upstream this gateway shares no network with is still
   // shown - it may be one network away from working - but it does not sit
   // above the ones that answer today.
@@ -1917,37 +2001,41 @@ export class RouteEditorComponent {
       .sort(
         (a, b) => Number(b.reachable !== false) - Number(a.reachable !== false),
       )
-      .flatMap((s) => {
+      .map((s) => {
         // The name that RESOLVES, not the identity: a stack service answers to
-        // its short alias, and that is what an operator writes. The full name
-        // rides along in the hint, so the identity is never hidden.
+        // its short alias, and that is what an operator reads. The full name
+        // is what a pick STORES, said on a second line when it differs.
         const host = s.names?.[0] || s.name;
-        // The declared state, beside the name, ALWAYS - zero of zero is a
-        // service somebody stopped, and hiding it would make a deliberate
-        // decision look like a missing answer. Pointing a route at one is a
-        // choice; pointing at one by accident is not.
-        // Only when it was COUNTED: a service of another namespace, whose
-        // pods this gateway may not read, is no "0/0" - it is unknown.
-        const state = s.counted ? `${s.ready}/${s.wanted}` : "";
+        const stored = storedName(s);
+        // No replica count: choosing where a route goes is a question of
+        // name and port, and a "1/1" beside every entry is noise there.
         // Out of reach: the network is named, because that is the answer to
         // "why can I not use this one" - and the answer is never the stack.
         const out = s.reachable === false;
         const parts = [
-          host === s.name ? "" : s.name,
+          host === s.name || stored === s.name ? "" : s.name,
           out ? (s.networks ?? []).join(" ") : "",
-          state,
         ];
-        return (s.ports ?? [])
-          .filter((p) => p.target > 0)
-          .map((p) => ({
-            // The HOST only: the scheme is the field's own select, so picking a
-            // service keeps the scheme already chosen instead of imposing one.
-            value: `${host}:${p.target}`,
-            hint: parts.filter(Boolean).join("  "),
-            muted: out,
-          }));
+        return {
+          // The HOST only: the scheme is the field's own select, so picking a
+          // service keeps the scheme already chosen instead of imposing one.
+          value: stored,
+          label: stored === host ? undefined : host,
+          detail: stored === host ? undefined : stored,
+          hint: parts.filter(Boolean).join("  "),
+          muted: out,
+        };
       }),
   );
+  // The same entries for the free field, where a pick is written whole: the
+  // host and the service's first port. The port select beside it changes it.
+  protected readonly upstreamSuggestions = computed<UrlSuggestion[]>(() => {
+    const first = new Map(this.discovered().map((s) => [storedName(s), targets(s)[0]]));
+    return this.upstreamChoices().map((c) => {
+      const port = first.get(c.value);
+      return port ? { ...c, value: `${c.value}:${port}`, label: c.label ?? c.value } : c;
+    });
+  });
 
   private readonly reach = signal<string[]>([]);
 
@@ -2511,6 +2599,33 @@ export class RouteEditorComponent {
         }),
     );
   }
+}
+
+// The name a route stores for a service: the full one when the platform has
+// it (name.ns.svc, stack_service), the name that resolves otherwise.
+function storedName(s: DiscoveredService): string {
+  return s.full || s.names?.[0] || s.name;
+}
+
+// The ports a service listens on inside, each once, in the runtime's order.
+function targets(s: DiscoveredService): number[] {
+  return [...new Set((s.ports ?? []).map((p) => p.target).filter((t) => t > 0))];
+}
+
+// An upstream cut where the picker edits it: scheme, host part (name and
+// port), and everything after.
+function splitUrl(raw: string): { proto: string; host: string; path: string } {
+  const m = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/([^/?#]*)(.*)$/.exec(raw ?? "");
+  return m
+    ? { proto: m[1].toLowerCase(), host: m[2], path: m[3] }
+    : { proto: "", host: "", path: "" };
+}
+
+// A host part read as a name and a port ("" when none written). An address
+// in brackets or with credentials is no service name, and reads as one name.
+function hostAndPort(host: string): { name: string; port: string } {
+  const m = /^([^:@[\]]*)(?::(\d*))?$/.exec(host);
+  return m ? { name: m[1], port: m[2] ?? "" } : { name: host, port: "" };
 }
 
 // The inherited entry's wording. It names what the INSTALLATION is running, so

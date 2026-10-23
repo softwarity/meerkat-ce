@@ -2025,6 +2025,10 @@ export interface DiscoveredService {
   // stack service answers to its short alias ("mongodb") as well as its full
   // name ("neo_mongodb"), and the short one is what people write.
   names?: string[];
+  // What a route STORES, when the platform has longer than the short name:
+  // name.ns.svc on Kubernetes, stack_service on Swarm. A CA constrained to
+  // cluster names certifies the qualified name, never the bare one.
+  full?: string;
   ports?: { target: number; published?: number }[];
   networks?: string[];
   // The DECLARED state: running against asked for. Zero of zero is a service

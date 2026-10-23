@@ -197,8 +197,13 @@ func TestServicesOfferTheNameThatResolves(t *testing.T) {
 	if got := by["neo_mongodb"].Names; len(got) != 2 || got[0] != "mongodb" || got[1] != "neo_mongodb" {
 		t.Errorf("neo_mongodb: names = %v, want the alias then the full name", got)
 	}
-	if got := by["neo_mongodb"].Suggested; got != "http://mongodb:27017" {
-		t.Errorf("neo_mongodb: suggested = %q, want the alias", got)
+	// The alias is what is read, the full name what is stored: a route made
+	// from the suggestion keeps the name a certificate can carry.
+	if got := by["neo_mongodb"].Full; got != "neo_mongodb" {
+		t.Errorf("neo_mongodb: full = %q, want the full service name", got)
+	}
+	if got := by["neo_mongodb"].Suggested; got != "http://neo_mongodb:27017" {
+		t.Errorf("neo_mongodb: suggested = %q, want the full name", got)
 	}
 	// Two services claiming "cache" on the SAME network: nobody gets it, the
 	// full name is all that can be promised.
@@ -211,9 +216,16 @@ func TestServicesOfferTheNameThatResolves(t *testing.T) {
 	if got := by["far_cache"].Names; len(got) != 2 || got[0] != "cache" {
 		t.Errorf("far_cache: names = %v, want its own uncontested alias", got)
 	}
-	// No alias at all: the full name, once, not twice.
+	// No alias at all: the full name, once, not twice - and nothing longer
+	// to store.
 	if got := by["plain"].Names; len(got) != 1 || got[0] != "plain" {
 		t.Errorf("plain: names = %v", got)
+	}
+	if got := by["plain"]; got.Full != "" || got.Suggested != "http://plain:80" {
+		t.Errorf("plain: full = %q, suggested = %q", got.Full, got.Suggested)
+	}
+	if got := by["neo_cache"].Full; got != "" {
+		t.Errorf("neo_cache: full = %q, want none - its only name is already the full one", got)
 	}
 }
 
