@@ -2,6 +2,7 @@
 
 ## NEXT RELEASE
 
+- **plug 2.31.2 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **A schedule says what it is for.** The scheduler API takes a `description`, a sentence or two
   under the schedule's name in the console. An operator writes it in the schedule's drawer when
   the service gave none, and a service `PUT` without one keeps it. While a schedule runs, the
