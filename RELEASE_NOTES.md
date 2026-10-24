@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.18.0
+
 - **Tenants carry their own fields (Enterprise, several tenants).** Infra > Model now has a
   second list, Tenant fields, with the same kinds as the account fields. Root and app-admins fill
   them on the tenant's General screen; the tenant's own administrators see them read-only. A
