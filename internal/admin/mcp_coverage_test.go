@@ -62,7 +62,8 @@ var agentCovers = map[string][]string{
 	// screen. The credential stays a vault reference, typed by a person: an
 	// agent names ${token}, it never holds it.
 	"config-remotes": {"list_git_locations", "save_git_location"},
-	"schedules":      {"list_schedules", "list_schedule_runs", "pause_schedule", "run_schedule"},
+	"schedules": {"list_schedules", "list_schedule_runs", "pause_schedule", "run_schedule", "describe_schedule",
+		"cancel_schedule_run"},
 	// The catalogue was out of reach on the grounds that renaming a role
 	// silently changes who reaches what - every access rule names roles by
 	// name. The observation was right and the answer was wrong: the console
@@ -213,6 +214,10 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		// computes an answer.
 		"POST /api/schedules/{id}/pause": true, "POST /api/schedules/{id}/resume": true,
 		"POST /api/schedules/{id}/run": true, "DELETE /api/schedules/{id}": true,
+		// What a schedule is for, in a sentence: stored.
+		"PUT /api/schedules/{id}/description": true,
+		// Stopping the run in flight: closed, and the history says so.
+		"DELETE /api/schedules/{id}/run": true,
 		// Written by the service that owns them: the schedule itself, and the
 		// progress of the run it is working on.
 		"POST /api/schedules": true, "PUT /api/schedules/{id}": true,
@@ -343,11 +348,13 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"activate_configuration",
 		"call_admin_api",
 		"call_route",
+		"cancel_schedule_run",
 		"delete_group",
 		"delete_oidc_client",
 		"delete_role",
 		"delete_route",
 		"describe_gateway",
+		"describe_schedule",
 		"export_configuration",
 		"get_branding",
 		"get_route",

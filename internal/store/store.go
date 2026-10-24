@@ -1210,7 +1210,19 @@ CREATE TABLE IF NOT EXISTS schedules (
   -- unidentified caller leaves. Written at creation and kept.
   caller      TEXT NOT NULL DEFAULT '',
   caller_via  TEXT NOT NULL DEFAULT '',
-  caller_addr TEXT NOT NULL DEFAULT ''
+  caller_addr TEXT NOT NULL DEFAULT '',
+  -- What the schedule is for, in a sentence (v91): written by the service
+  -- that asked for it, or by an operator when it said nothing. The name
+  -- identifies, this explains.
+  description TEXT NOT NULL DEFAULT '',
+  -- What the service last said about the run in flight (v92): "7 233 / 9 882
+  -- records". Its last progress report's own words, cleared when the run
+  -- closes.
+  run_detail  TEXT NOT NULL DEFAULT '',
+  -- How long after a LOST run it is sent again (v92), as an ISO duration;
+  -- empty sends nothing - the service took the work and went quiet, and
+  -- only it knows whether picking it up again is safe.
+  retry_lost  TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules (paused, next_at);
 
@@ -1299,7 +1311,11 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // holding a schedules token keeps the token mode (internal_access), one
 // without gets None like a fresh one. schedules.caller, caller_via and
 // caller_addr are filled in by the additive pass.
-const schemaVersion = 90
+// 91 carries no step: schedules.description is filled in by the additive
+// pass, empty - a schedule says what it is for when somebody writes it.
+// 92 carries no step: schedules.run_detail and retry_lost are filled in by
+// the additive pass, empty - nothing said, nothing sent again.
+const schemaVersion = 92
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

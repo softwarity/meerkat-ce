@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"strconv"
 	"strings"
 	"sync"
@@ -156,7 +157,7 @@ func (s *Schedules) Read(ctx context.Context, q any) (livewire.Window, error) {
 			// swallow a whole run.
 			UpdatedAt: rowVersion(sc),
 			Data: map[string]any{
-				"id": sc.ID, "name": sc.Name, "roles": sc.Roles, "tenantId": sc.TenantID,
+				"id": sc.ID, "name": sc.Name, "description": sc.Description, "roles": sc.Roles, "tenantId": sc.TenantID,
 				"routeId": sc.RouteID, "method": sc.Method, "path": sc.Path,
 				// WHEN, all three shapes: a cadence, a calendar with the zone
 				// it is read in, or a single date. The screen shows one
@@ -166,7 +167,7 @@ func (s *Schedules) Read(ctx context.Context, q any) (livewire.Window, error) {
 				"paused":   sc.Paused, "nextAt": sc.NextAt,
 				"runId": sc.RunID, "runStarted": sc.RunStarted, "claimedBy": sc.ClaimedBy,
 				"runState": sc.RunState, "attempts": sc.Attempts,
-				"progress": sc.Progress, "lastState": sc.LastState,
+				"progress": sc.Progress, "runDetail": sc.RunDetail, "lastState": sc.LastState,
 				"lastDetail": sc.LastDetail, "lastAt": sc.LastAt,
 				"createdBy": sc.CreatedBy,
 				// Who created it on the internal plane, and how that was
@@ -183,5 +184,11 @@ func rowVersion(sc store.Schedule) string {
 	return strconv.FormatInt(sc.UpdatedAt, 10) + "|" + sc.RunID +
 		"|" + sc.RunState + "|" + strconv.Itoa(sc.Attempts) +
 		"|" + strconv.Itoa(sc.Progress) +
-		"|" + strconv.FormatInt(sc.LastAt, 10)
+		"|" + strconv.FormatInt(sc.LastAt, 10) +
+		// The description, by its checksum: written twice in the same second,
+		// it would otherwise keep the version of the first.
+		"|" + strconv.FormatUint(uint64(crc32.ChecksumIEEE([]byte(sc.Description))), 36) +
+		// What the service last said about its run: "7 233 / 9 882 records"
+		// moves while the percentage does not.
+		"|" + strconv.FormatUint(uint64(crc32.ChecksumIEEE([]byte(sc.RunDetail))), 36)
 }

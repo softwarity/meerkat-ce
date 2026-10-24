@@ -1855,6 +1855,62 @@
    "fr": "Une planification qui se met à échouer écrit une ligne d'audit, et une autre quand elle revient ; un échec rattrapé par la reprise n'en écrit aucune."
   },
   {
+   "id": "SCHED-07",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A paused, cancelled or deleted schedule answers its running job's next report with 410 and the reason; a cancelled run shows in the history.",
+   "fr": "Une planification suspendue, annulée ou supprimée répond 410 et la raison au compte rendu suivant de son traitement ; une exécution annulée figure dans l'historique."
+  },
+  {
+   "id": "SCHED-08",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A lost run of a schedule with retryLost is sent again after the delay, same run identifier, next attempt, three attempts at most.",
+   "fr": "Une exécution perdue d'une planification avec retryLost est renvoyée après le délai, même identifiant, tentative suivante, trois au plus."
+  },
+  {
+   "id": "SCHED-09",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A running report's detail shows live under the schedule's name and in its drawer.",
+   "fr": "Le détail d'un compte rendu en cours s'affiche en direct sous le nom de la planification et dans son tiroir."
+  },
+  {
+   "id": "SCHED-10",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "A service written against the documented 202 contract (headers, report, answers, lease) runs a long job end to end.",
+   "fr": "Un service écrit d'après le contrat 202 documenté (en-têtes, compte rendu, réponses, bail) mène un traitement long de bout en bout."
+  },
+  {
    "id": "I18N-01",
    "priority": "P2",
    "feasibility": "easy",

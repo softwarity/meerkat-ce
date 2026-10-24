@@ -1001,3 +1001,100 @@ func TestAServiceCannotPutATurnOffForEver(t *testing.T) {
 		t.Fatalf("the cadence did not take over: %d", got.NextAt)
 	}
 }
+
+// A service restarted in the middle of a long job loses its run: it took the
+// work (202), then went quiet for a lease. A schedule that says so (retryLost)
+// has the SAME run sent again after the delay - same Meerkat-Job-Run, so the
+// service picks up where its own state says, next Meerkat-Job-Attempt - and
+// within MaxAttempts like every attempt of a turn.
+func TestALostRunIsSentAgainWhenTheScheduleAsks(t *testing.T) {
+	p := &plane{status: http.StatusAccepted}
+	s, st, ctx := setup(t, p)
+	c := &clock{}
+	c.set(time.Now())
+	s.d.Now = c.now
+	sc := due("s1")
+	sc.RetryLost = "PT2M"
+	if err := st.CreateSchedule(ctx, sc); err != nil {
+		t.Fatal(err)
+	}
+	pass(ctx, t, s)
+	first, _ := st.GetSchedule(ctx, "s1")
+
+	// Quiet for a lease: lost, and waiting rather than closed.
+	c.add(61 * time.Second)
+	pass(ctx, t, s)
+	got, _ := st.GetSchedule(ctx, "s1")
+	if got.RunID != first.RunID || got.RunState != store.RunWaiting {
+		t.Fatalf("the lost run is not waiting to be sent again: %+v", got)
+	}
+	if p.calls.Load() != 1 {
+		t.Fatalf("sent again before its delay: %d calls", p.calls.Load())
+	}
+	c.add(time.Minute)
+	pass(ctx, t, s)
+	if p.calls.Load() != 1 {
+		t.Fatalf("sent again before its delay: %d calls", p.calls.Load())
+	}
+
+	// The delay is over: the same run, the next attempt.
+	c.add(70 * time.Second)
+	pass(ctx, t, s)
+	if p.calls.Load() != 2 {
+		t.Fatalf("the lost run was not sent again: %d calls", p.calls.Load())
+	}
+	r, _ := p.lastCtx.Load().(*http.Request)
+	if r.Header.Get(RunHeader) != first.RunID || r.Header.Get(AttemptHeader) != "2" {
+		t.Fatalf("sent again as run %q attempt %q, want %q attempt 2",
+			r.Header.Get(RunHeader), r.Header.Get(AttemptHeader), first.RunID)
+	}
+	if runs, _ := st.ListScheduleRuns(ctx, "s1", 0); len(runs) != 0 {
+		t.Fatalf("an attempt that is sent again is not a turn that ended: %+v", runs)
+	}
+
+	// Lost twice more: the third attempt is the last, and the run closes as
+	// lost, saying why it was not sent again.
+	c.add(61 * time.Second)
+	pass(ctx, t, s)
+	c.add(130 * time.Second)
+	pass(ctx, t, s)
+	if p.calls.Load() != 3 {
+		t.Fatalf("the third attempt was not made: %d calls", p.calls.Load())
+	}
+	c.add(61 * time.Second)
+	pass(ctx, t, s)
+	got, _ = st.GetSchedule(ctx, "s1")
+	if got.RunID != "" || got.LastState != store.RunLost || !strings.Contains(got.LastDetail, "3 attempts") {
+		t.Fatalf("the last attempt did not close the run as lost: %+v", got)
+	}
+}
+
+// A report while the lost run waits is the service saying it was slow, not
+// gone: the run is accepted again, and nothing is sent.
+func TestAReportTakesAWaitingRunBack(t *testing.T) {
+	p := &plane{status: http.StatusAccepted}
+	s, st, ctx := setup(t, p)
+	c := &clock{}
+	c.set(time.Now())
+	s.d.Now = c.now
+	sc := due("s1")
+	sc.RetryLost = "PT1M"
+	if err := st.CreateSchedule(ctx, sc); err != nil {
+		t.Fatal(err)
+	}
+	pass(ctx, t, s)
+	c.add(61 * time.Second)
+	pass(ctx, t, s) // waiting, to be sent again a minute from now
+	got, _ := st.GetSchedule(ctx, "s1")
+	c.add(40 * time.Second)
+	if err := st.TouchSchedule(ctx, "s1", got.RunID, 40, "4 000 / 9 882 records", c.now()); err != nil {
+		t.Fatal(err)
+	}
+	// Past the moment it would have been sent again, within the new lease.
+	c.add(40 * time.Second)
+	pass(ctx, t, s)
+	got, _ = st.GetSchedule(ctx, "s1")
+	if p.calls.Load() != 1 || got.RunState != store.RunAccepted || got.RunDetail != "4 000 / 9 882 records" {
+		t.Fatalf("a report did not take the run back: %d calls, %+v", p.calls.Load(), got)
+	}
+}

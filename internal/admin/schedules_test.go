@@ -186,6 +186,58 @@ func TestAnOperatorSeesEverySchedule(t *testing.T) {
 	}
 }
 
+// A schedule says what it is for. The service writes it; an operator writes
+// it when the service did not; and a service that rewrites its schedule
+// without one keeps the operator's.
+func TestAScheduleSaysWhatItIsFor(t *testing.T) {
+	f := setupBare(t)
+	aRoute(t, f)
+	token := serviceToken(t, f, "backend")
+	const payload = `{"name":"station 42","routeId":"r1","path":"/jobs/poll","every":"PT1H"%s}`
+	code, body := f.bearerJSON(t, "POST", "/api/schedules",
+		strings.Replace(payload, "%s", `,"description":"  Polls station 42's readings  "`, 1), token)
+	if code != http.StatusCreated {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	var made store.Schedule
+	if err := json.Unmarshal([]byte(body), &made); err != nil {
+		t.Fatal(err)
+	}
+	if made.Description != "Polls station 42's readings" {
+		t.Fatalf("the service's description came back as %q", made.Description)
+	}
+
+	// The operator's half: one field, and nothing else.
+	code, body = f.call(t, "PUT", "/api/schedules/"+made.ID+"/description",
+		`{"description":"Fetches the hourly readings of station 42"}`, f.rootC)
+	if code != http.StatusOK || !strings.Contains(body, "hourly readings") {
+		t.Fatalf("describe: %d %s", code, body)
+	}
+	// A PUT that says nothing about it keeps it.
+	if code, body := f.bearerJSON(t, "PUT", "/api/schedules/"+made.ID,
+		strings.Replace(payload, "%s", "", 1), token); code != http.StatusOK {
+		t.Fatalf("update: %d %s", code, body)
+	}
+	got, err := f.api.st.GetSchedule(context.Background(), made.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Description != "Fetches the hourly readings of station 42" {
+		t.Fatalf("a PUT without a description wiped the operator's: %q", got.Description)
+	}
+	// Too long is refused by name, and empty removes it.
+	long := `{"description":"` + strings.Repeat("x", store.MaxScheduleDescription+1) + `"}`
+	if code, body := f.call(t, "PUT", "/api/schedules/"+made.ID+"/description", long, f.rootC); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a description too long answered %d %s, want 422", code, body)
+	}
+	if code, body := f.call(t, "PUT", "/api/schedules/"+made.ID+"/description", `{"description":""}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("removing the description: %d %s", code, body)
+	}
+	if got, _ := f.api.st.GetSchedule(context.Background(), made.ID); got.Description != "" {
+		t.Fatalf("an empty description did not remove it: %q", got.Description)
+	}
+}
+
 func countSchedules(t *testing.T, f fixture, token, query string) int {
 	t.Helper()
 	code, body := f.bearer(t, "GET", "/api/schedules"+query, token)

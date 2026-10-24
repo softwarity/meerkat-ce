@@ -82,7 +82,7 @@ peut savoir si vous l'avez reçue :
 | Ce qui s'est passé | Ce que fait la gateway |
 |---|---|
 | Vous avez répondu, quel que soit le statut | L'exécution se clôt sur cette réponse. Ce même appel n'est **jamais** renvoyé. Quelques échecs donnent droit à une autre TENTATIVE, sous la forme d'une nouvelle exécution dotée d'un nouvel identifiant - voir "Quels échecs sont retentés" |
-| Vous avez répondu `202` | Le travail est à vous. Il n'est jamais renvoyé, quoi qu'il arrive à la gateway |
+| Vous avez répondu `202` | Le travail est à vous. Il n'est pas renvoyé, quoi qu'il arrive à la gateway - sauf si vous vous taisez au-delà du bail et que la planification le demande (`retryLost`, voir "Quand le service se tait") |
 | L'instance qui effectuait l'appel s'est arrêtée avant votre réponse | Une autre instance le renvoie, avec le **même identifiant d'exécution** et un `Meerkat-Job-Attempt` augmenté de un |
 
 La dernière ligne connaît trois bornes. **Trois tentatives** au plus, pour qu'un
@@ -96,28 +96,121 @@ morte brutalement.
 ## Un travail long répond 202
 
 L'appel **démarre** le travail ; il n'en attend pas la fin. Un service qui répond
-`202 Accepted` garde l'exécution ouverte et rend compte lui-même :
+`202 Accepted` garde l'exécution ouverte et en rend compte jusqu'à la clore. C'est
+ce qui permet d'exprimer un traitement de trois heures sans requête HTTP de trois
+heures. Toute autre réponse clôt l'exécution sur-le-champ : 2xx, c'est un succès ;
+le reste, un échec, avec le statut et ce que disait la réponse - une page d'erreur
+est réduite à la phrase qu'un humain y lit, jamais à son doctype.
+
+### Le compte rendu
 
 ```http
 PATCH /api/schedules/{id}/run
-{"run": "GvbDqbNG__YTOY00", "state": "running", "progress": 60}
+Content-Type: application/json
+
+{"run": "GvbDqbNG__YTOY00", "progress": 73, "detail": "7 233 / 9 882 records"}
 ```
 
-puis, à la fin, `{"state": "done", "detail": "12000 rows"}`. C'est ce qui permet
-d'exprimer un traitement de trois heures sans requête HTTP de trois heures.
+puis, à la fin, `{"run": "...", "state": "done", "detail": "9 882 records"}`.
 
-**Avec quel jeton ?** Ce que l'accès au plan interne vous demande - aucun, le
-vôtre, ou le jeton de ServiceAccount de votre pod -, sur le plan interne comme
-tout le reste. L'appel planifié n'a apporté aucun jeton : son identité a été
-établie à l'intérieur de la gateway, et n'a jamais circulé sur le réseau.
+| Champ | |
+|---|---|
+| `run` | Obligatoire : le `Meerkat-Job-Run` que portait l'appel (ou cet en-tête sur le compte rendu) |
+| `state` | `running`, ou rien, pendant le travail ; `done` ou `failed` pour clore l'exécution |
+| `progress` | De 0 à 100 : la barre de l'écran Scheduler |
+| `detail` | Vos propres mots. Pendant l'exécution, affichés en direct sous le nom de la planification et dans son tiroir (200 caractères gardés) ; sur le compte rendu de clôture, gardés dans l'historique |
+| `retryIn` | Avec `failed` seulement : rappelez-moi dans ce délai, une durée ISO - voir "Quand le service ne peut pas encore l'exécuter" |
+
+**Avec quel jeton ?** Aucun. L'identifiant d'exécution est la preuve - 96 bits
+aléatoires, donnés à votre service seul par l'appel -, donc un compte rendu est
+accepté quel que soit le mode d'accès au plan interne. Exiger en plus le titre du
+mode cassait toutes les exécutions en cours le jour où le mode changeait.
+
+### La réponse à un compte rendu
+
+La réponse est aussi la parole de la gateway à votre traitement, et un traitement
+long l'entend à son compte rendu suivant :
+
+| Statut | Sens | Ce que fait votre service |
+|---|---|---|
+| `204` | Enregistré | Il continue - ou, après `done`/`failed`, n'a plus rien à faire |
+| `410 Gone` | **Arrêtez.** L'exécution est déjà close côté gateway | Il arrête le travail et ne rend plus compte de rien. Le corps dit pourquoi : `{"stop": "paused", "error": "..."}` |
+| `409` | Un identifiant d'exécution que cette planification n'a jamais donné | Un bug : vérifier de quel `Meerkat-Job-Run` il rend compte |
+| `422` | Le compte rendu contient une impossibilité (progression au-delà de 100, `retryIn` sur `done`) | Corriger le compte rendu |
+
+Le `stop` d'un `410` :
+
+| `stop` | Pourquoi |
+|---|---|
+| `paused` | La planification a été suspendue pendant l'exécution. L'exécution est close comme `cancelled` ; le tour suivant vient après une reprise |
+| `cancelled` | Quelqu'un a annulé l'exécution - la console, un agent, ou un `DELETE /api/schedules/{id}/run` |
+| `deleted` | La planification n'existe plus |
+| `lost` | L'exécution a été close comme perdue : vous vous êtes tu au-delà du bail, et elle n'a pas été renvoyée |
+| `closed` | L'exécution était déjà terminée - un compte rendu de clôture envoyé deux fois |
+
+### Arrêter une exécution
+
+Trois façons, toutes entendues par le service à son compte rendu suivant, qu'un
+traitement long envoie de toute façon pour garder son bail :
+
+- **Suspendre** la planification. L'exécution continue jusqu'au compte rendu
+  suivant du service : il reçoit `410` avec `"stop": "paused"`, et l'exécution est
+  close comme `cancelled`. Un compte rendu de **clôture** (`done`, `failed`) sur
+  une planification suspendue est quand même accepté : le travail est fait, et
+  jeter son résultat n'aiderait personne. Rien d'autre ne part avant la reprise ;
+  un tour dû entre-temps part à la reprise, dans la limite de `catchUp`.
+- **Annuler** l'exécution : le bouton **Cancel run** dans la section *Run in
+  flight* du tiroir, l'outil agent `cancel_schedule_run`, ou
+  `DELETE /api/schedules/{id}/run` (sur le plan de la console et sur le plan
+  interne, pour qu'un service puisse arrêter sa propre exécution depuis ses
+  propres écrans). L'exécution est close **tout de suite** comme `cancelled`,
+  l'historique dit par qui, et le tour suivant est armé à l'heure de la
+  planification. Tout compte rendu sur cette exécution, y compris de clôture,
+  reçoit ensuite `410` avec `"stop": "cancelled"`.
+- **Supprimer** la planification : son compte rendu suivant reçoit `410` avec
+  `"stop": "deleted"`.
+
+Un appel encore en attente de sa réponse quand il est annulé est lâché de la
+même façon : ce qui revient pour lui ne correspond plus à l'exécution.
+
+Pour en arrêter **plusieurs** d'un coup, suspendez-les par ce sous quoi vous les
+avez classées - le filtre de la liste, qui répond par les planifications
+trouvées, telles qu'elles sont maintenant :
+
+```bash
+curl -X POST "http://meerkat:7070/api/schedules/pause?meta.svc=stations&meta.job=import" -H "$AUTH"
+curl -X POST "http://meerkat:7070/api/schedules/resume?meta.svc=stations&meta.job=import" -H "$AUTH"
+```
+
+Un appel qui ne nomme rien - ni `meta.*`, ni `tenant`, ni `route` - est refusé :
+toutes les planifications de la gateway d'un coup, ce n'est pas à un seul appel de
+le décider.
+
+### Quand le service se tait
 
 Chaque compte rendu renouvelle le **bail**. Restez silencieux cinq minutes, et
-l'exécution est close comme perdue au lieu de rester en cours indéfiniment - et elle
-n'est **pas** renvoyée : le 202 disait que le travail était à vous.
+l'exécution est **perdue** (`lost`) : close au lieu de rester en cours
+indéfiniment, et par défaut **pas** renvoyée - le 202 disait que le travail était
+à vous, et seul votre service sait si le reprendre est sans danger.
 
-Toute autre réponse clôt l'exécution sur-le-champ : 2xx, c'est un succès ; le reste,
-un échec, avec le statut et ce que disait la réponse - une page d'erreur est réduite
-à la phrase qu'un humain y lit, jamais à son doctype.
+Quand c'est sans danger - le service garde sa propre progression et repart de là
+-, la planification le dit avec **`retryLost`**, une durée ISO d'une minute à un
+jour :
+
+```json
+{ "name": "oscar import fr", "every": "P1D", "retryLost": "PT1M", ... }
+```
+
+Un service redémarré au milieu de son travail (un pod tué, un déploiement) perd
+alors son bail, et la gateway attend `retryLost` avant de renvoyer **la même
+exécution** : même `Meerkat-Job-Run`, `Meerkat-Job-Attempt` augmenté de un, pour
+que le service reconnaisse l'exécution sur laquelle il travaillait et la reprenne.
+Entre-temps la console affiche l'exécution *lost, to be sent again*, et un compte
+rendu qui arrive pendant l'attente la reprend - le service était lent, pas parti.
+Borné comme toute tentative d'un tour : **trois tentatives** au plus (celles
+d'avant le 202 comptent), jamais sur une planification suspendue, jamais plus tard
+que `catchUp`. Quand il n'en reste plus, l'exécution est close comme `lost` et
+l'historique dit pourquoi elle n'a pas été renvoyée.
 
 ## Quand le service est arrêté
 
@@ -158,7 +251,7 @@ gateway qui vient de redémarrer, une version encore en cours de déploiement :
 | `401`, `403`, `404` | nouvelle tentative : le compte n'est pas encore connu, les rôles ne sont pas chargés, la route d'une version en cours de démarrage n'existe pas encore |
 | `502`, `503`, `504`, ou aucune réponse dans le `timeout` | nouvelle tentative : personne n'a répondu |
 | tout le reste, `500` en tête | **pas** de nouvelle tentative. Là, le service DIT quelque chose, et un bogue à l'autre bout se traite à l'autre bout |
-| `lost` - il a pris le travail avec un `202` puis s'est tu | pas de nouvelle tentative : le travail est chez lui |
+| `lost` - il a pris le travail avec un `202` puis s'est tu | pas de nouvelle tentative : le travail est chez lui - sauf si la planification dit `retryLost`, et c'est alors la **même** exécution qui est renvoyée |
 
 Une nouvelle tentative est une **nouvelle exécution**, avec son propre
 identifiant : un service qui déduplique aurait sinon écarté un appel qu'il n'a
@@ -233,10 +326,14 @@ décision, et c'est la vôtre : voir [Qui peut l'appeler](#qui-peut-lappeler).
 | `GET /api/schedules/{id}` | une planification |
 | `PUT /api/schedules/{id}` | la modifier |
 | `DELETE /api/schedules/{id}` | la supprimer |
-| `POST /api/schedules/{id}/pause` et `/resume` | l'empêcher de se déclencher, l'y autoriser de nouveau |
+| `POST /api/schedules/{id}/pause` | l'empêcher de se déclencher - son exécution en cours est priée de s'arrêter |
+| `POST /api/schedules/{id}/resume` | l'autoriser de nouveau à se déclencher |
 | `POST /api/schedules/{id}/run` | avancer le prochain tour |
 | `GET /api/schedules/{id}/runs` | ce qu'a fait chaque tour, du plus récent au plus ancien |
-| `PATCH /api/schedules/{id}/run` | rendre compte de l'exécution en cours |
+| `PATCH /api/schedules/{id}/run` | rendre compte de l'exécution en cours - la réponse peut dire d'arrêter |
+| `DELETE /api/schedules/{id}/run` | annuler l'exécution en cours |
+| `POST /api/schedules/pause?meta.<clé>=...` | suspendre toutes les planifications que le filtre trouve |
+| `POST /api/schedules/resume?meta.<clé>=...` | reprendre toutes les planifications que le filtre trouve |
 
 ### Qui peut l'appeler
 
@@ -278,7 +375,8 @@ jeton révoqué est refusé, il ne devient pas un appelant anonyme.
 
 Chaque planification garde qui l'a créée et comment on l'a su - un jeton, un
 ServiceAccount, un workload déduit de son adresse, ou personne, avec l'adresse
-d'où il venait. Son tiroir l'affiche, et le journal d'audit aussi.
+d'où il venait. Son tiroir nomme le créateur ; le journal d'audit dit aussi
+comment on l'a su.
 
 Une nouvelle installation démarre en **None**. Une installation mise à jour qui
 détenait un jeton `schedules` garde **Meerkat token** : une mise à jour n'ouvre
@@ -293,9 +391,7 @@ pod d'un namespace que la gateway ne lit pas reste non identifié.
 ### Ce que fait la console, et ce qu'elle ne fait pas
 
 La console lit les mêmes planifications, sur son propre plan, et agit sur celles
-qui existent : **suspendre, reprendre, lancer maintenant, rejouer un tour,
-supprimer**. Elle n'en **crée et n'en modifie aucune**. Aucun bouton ne le
-permet, et le plan de contrôle refuse `POST`, `PUT` et le compte rendu
+qui existent : **suspendre, reprendre, lancer maintenant, annuler une exécution, supprimer**. Elle n'en **crée aucune, et n'en modifie qu'un champ** : la description, pour une planification dont le service n'a pas dit à quoi elle sert. Aucun bouton ne permet le reste, et le plan de contrôle refuse `POST`, `PUT` et le compte rendu
 d'exécution venant d'une session de console ou du jeton d'un exploitant, en
 nommant le plan interne dans sa réponse. Une planification s'écrit par le
 service qui en a besoin.
@@ -338,6 +434,7 @@ garde ses planifications.
 ```json
 {
   "name": "station 42, hourly poll",
+  "description": "Fetches the hourly readings of station 42",
   "roles": ["station_fetch"],
   "method": "POST",
   "routeId": "stations-api",
@@ -379,6 +476,15 @@ contenu, en `text/plain; charset=utf-8` par défaut : c'est ainsi que l'on envoi
 formulaire, un document XML ou une ligne de texte depuis un champ qui, par
 ailleurs, est du JSON. Un `contentType` explicite l'emporte toujours, puisque c'est
 celui que le service a demandé.
+
+### À quoi elle sert : la description
+
+Le nom identifie une planification ; `description` dit ce qu'elle fait, en une
+phrase ou deux (500 caractères au plus). Facultative, elle s'affiche sous le nom
+dans la console. Quand le service ne la donne pas, un exploitant peut l'écrire
+dans le tiroir de la planification ; c'est pourquoi un `PUT` **sans** description
+garde celle qui est en place : un service qui réécrit ses planifications à chaque
+démarrage ne l'efface pas.
 
 ### Les métadonnées : le système de classement du service
 
@@ -510,7 +616,7 @@ ne déclenche qu'un seul appel. Une cadence ignore ce champ.
 
 | Réglage | Ce qu'il évite |
 |---|---|
-| `overlap` (`skip` par défaut) | Un traitement lent qui n'est pas terminé : le tour suivant ne part pas. Rien d'autre n'est dû tant qu'une exécution est en cours, et c'est sa clôture qui **arme le tour suivant**, compté à partir de là - un traitement lent ne trouve donc jamais, à l'instant où il se termine, un tour qui l'attend dans le passé |
+| `overlap`, `skip` et rien d'autre | Un traitement lent qui n'est pas terminé : le tour suivant ne part pas. Rien d'autre n'est dû tant qu'une exécution est en cours, et c'est sa clôture qui **arme le tour suivant**, compté à partir de là - un traitement lent ne trouve donc jamais, à l'instant où il se termine, un tour qui l'attend dans le passé. `run` - un second appel à côté du premier - est refusé : une planification n'a qu'une exécution en cours |
 | `catchUp`, en secondes | Une gateway arrêtée toute la nuit qui déclenche douze tours à son réveil. Zéro signifie "exécutez-le dès que possible". Ce réglage borne aussi le retard avec lequel est renvoyé un appel interrompu par l'arrêt d'une gateway, et décide si une action différée dont l'heure est passée pendant un arrêt part encore |
 | `timeout` | Un appel qui ne répond jamais. Il borne la **réponse**, pas le travail : c'est à cela que sert le 202. Deux minutes au plus (`PT2M`) |
 
@@ -541,13 +647,14 @@ curl "http://meerkat:7070/api/schedules/sch_9f2c/runs" -H "$AUTH"
 ]
 ```
 
-Un tour se termine de quatre façons, et la différence compte :
+Un tour se termine de cinq façons, et la différence compte :
 
 | | |
 |---|---|
 | `done` | le service a répondu 2xx |
 | `failed` | il a répondu autre chose, ou personne n'a répondu avant le timeout |
 | `lost` | il a pris le travail avec un `202`, puis s'est tu au-delà de la durée du bail |
+| `cancelled` | quelqu'un l'a arrêté : annulé, ou suspendu pendant l'exécution |
 | `dropped` | le tour **n'est jamais parti** : son heure est arrivée plus tard que `catchUp` ne l'autorise |
 
 `attempt` indique quelle tentative a terminé le tour : `2` signifie qu'une
@@ -591,7 +698,7 @@ appel, et celui de personne d'autre.
 
 Ce qu'un cluster apporte réellement, c'est le **bail** : une exécution dont
 personne ne dit rien pendant cinq minutes est réglée par la première gateway qui
-la voit, renvoyée ou close comme perdue.
+la voit : renvoyée, mise en attente de `retryLost`, ou close comme perdue.
 
 Tant qu'une exécution est en cours, rien d'autre n'est dû : "run now" répond `409`,
 et c'est la clôture de l'exécution qui arme le tour suivant.
@@ -604,8 +711,8 @@ moins une fois. Si vous avez besoin du reste, il vous faut un broker.
 
 > [!TIP]
 > Vous utilisez déjà des CronJobs Kubernetes et vous voulez qu'ils restent
-> l'horloge ? Faites appeler `POST /api/schedules/{id}/run` par l'un d'eux, avec un
-> jeton d'API - l'appel répond `409` tant que l'exécution précédente est en cours.
+> l'horloge ? Faites appeler `POST /api/schedules/{id}/run` par l'un d'eux, sur le
+> plan interne - l'appel répond `409` tant que l'exécution précédente est en cours.
 > La gateway garde l'identité, le cloisonnement et l'historique ; votre cluster
 > garde le calendrier. Meerkat n'a besoin d'aucun droit sur votre cluster pour
 > cela.
@@ -614,42 +721,53 @@ moins une fois. Si vous avez besoin du reste, il vous faut un broker.
 
 **Data plane, Scheduler** liste tout ce qui est planifié, avec un filtre par
 organisation et par service, et se met à jour en direct : une exécution qui
-démarre, progresse et se termine apparaît sans rien rafraîchir. Trois actions s'y
-trouvent, celles dont on a besoin à deux heures du matin : mettre en pause (et
-reprendre), avancer le prochain tour, supprimer. Il n'y a volontairement aucun
-bouton pour en créer ou en modifier une : une planification appartient au service
+démarre, progresse et se termine apparaît sans rien rafraîchir. Les actions qui
+s'y trouvent sont celles dont on a besoin à deux heures du matin : mettre en pause
+(et reprendre), avancer le prochain tour, annuler l'exécution en cours, supprimer
+- et écrire à quoi sert une planification quand son service ne l'a pas dit. Il
+n'y a volontairement aucun
+bouton pour en créer une ou changer ce qu'elle appelle : une planification appartient au service
 qui en a besoin, et c'est lui qui l'écrit par l'API, sur le plan interne, depuis
 ses propres écrans.
 
-![L'écran Scheduler : une cadence, une ligne cron et une date unique, chacune avec sa prochaine exécution et sa dernière](img/console/scheduler.webp)
+![L'écran Scheduler : une cadence, une ligne cron et une date unique, chacune avec ce à quoi elle sert sous son nom, sa prochaine exécution et sa dernière](img/console/scheduler.webp)
 
 Une ligne par planification, **triée par nom**, si bien qu'une ligne reste à sa
-place pendant qu'elle s'exécute : son nom et les rôles avec lesquels elle appelle,
-**When**, **Next run**, **State** et **Last run**. Ce qu'elle appelle - méthode,
-chemin et route - est dans son tiroir, avec **Created by**, l'appelant qui l'a
-écrite. **API** explique les appels que fait un service, **Access** décide qui peut
+place pendant qu'elle s'exécute : son nom et ce à quoi elle sert, **When**,
+**Next run** et **Last run**. Une barre le long du bas de chaque ligne en donne
+l'état : une piste discrète quand rien ne tourne, en mouvement pendant qu'un
+appel attend sa réponse, qui se remplit avec la progression que le service
+rapporte, et qui défile à l'envers en rouge pour une exécution perdue en attente
+d'être renvoyée. Pendant une exécution, la ligne sous le nom dit en mots où elle
+en est, et **Last run** affiche *running* et depuis quand : le résultat précédent
+contredirait la barre. Il reste en tête des exécutions du tiroir, et la colonne
+montre le nouveau quand l'exécution se termine. Ce qu'elle appelle - méthode, chemin et
+route - est dans son tiroir, avec les rôles avec lesquels elle appelle et
+**Created by**, l'appelant qui l'a écrite. Le tiroir s'ouvre sur sa
+**description**, qu'un exploitant y écrit quand le service n'en a pas donné. **API** explique les appels que fait un service, **Access** décide qui peut
 les faire. Supprimer une planification demande d'en taper le nom : le service qui
 l'a écrite n'en est jamais averti, il n'est simplement plus appelé.
 
 Une exécution en cours indique où elle en est - **calling**, en attente de la
-réponse, ou **accepted**, le service a pris le travail - et de quelle tentative il
-s'agit quand une gateway s'est arrêtée avant la réponse. Son prochain tour
-affiche "after this run" : c'est la clôture qui l'arme, et "Run now" attend ce
-moment.
+réponse, **accepted**, le service a pris le travail, ou **lost, to be sent
+again** -, de quelle tentative il s'agit, et ce que le service en a dit en dernier
+("7 233 / 9 882 records"), en direct, sous le nom et dans son tiroir. Son prochain
+tour affiche "after this run" : c'est la clôture qui l'arme, et "Run now" attend
+ce moment. **Cancel run**, dans la section *Run in flight* du tiroir, l'arrête :
+close tout de suite, le service prévenu à son compte rendu suivant.
 
 Le tiroir d'une planification conserve **tous les tours qu'elle a exécutés** :
 quand chacun s'est terminé, comment, ce qui a répondu, quel nœud a effectué
-l'appel, de quelle tentative il s'agissait - et un bouton pour rejouer un tour
-abandonné ou en échec.
+l'appel, de quelle tentative il s'agissait. En relancer un, c'est **Run now** :
+le même appel, avec le payload d'aujourd'hui.
 
 Une **action différée** déjà partie affiche "finished" et garde son résultat à
 l'écran jusqu'à la purge. Un interrupteur les masque quand un service en envoie
 assez pour noyer le reste, et root choisit juste à côté leur durée de conservation.
 
 Les heures sont affichées dans le **fuseau de l'exploitant** - celui de son profil,
-défini une fois et lu par les deux plans - ou en **UTC**, grâce à un bouton qui
-indique lequel est affiché : "2:24 AM" ne veut rien dire tant que l'on ne sait pas
-de quel 2:24 il s'agit.
+défini une fois et lu par les deux plans, UTC s'il n'en a choisi aucun : "2:24 AM"
+ne veut rien dire tant que l'on ne sait pas de quel 2:24 il s'agit.
 
 Un bouton **API** ouvre, dans le même tiroir, le mécanisme et l'API : les commandes
 et le contenu de la requête sont déjà remplis avec l'adresse de **cette**
@@ -664,8 +782,8 @@ Le filtre **Metadata** de cet écran accepte ce qu'accepte l'API - `station=42`,
 `station=~^st-` - parce qu'un exploitant qui cherche une planification dans une
 flotte la cherche d'après ce que le service a écrit dessus.
 
-La création d'une planification n'en fait pas partie, à dessein : une planification
-s'exécute sous l'identité d'un compte, et les administrateurs qui lisent cet écran
-ne sont pas les comptes sous lesquels elle doit s'exécuter. Le plan de la console
-la refuse également, en toutes lettres : écrire une planification revient au
-service, avec son propre jeton, sur le plan interne.
+La création d'une planification n'en fait pas partie, à dessein : qui écrit une
+planification choisit les rôles que portent ses appels, et cela regarde le service,
+borné par qui peut appeler le plan interne - pas un formulaire que n'importe quel
+administrateur remplit. Le plan de la console la refuse également, en toutes
+lettres : écrire une planification revient au service, sur le plan interne.

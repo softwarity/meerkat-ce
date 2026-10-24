@@ -2,6 +2,52 @@
 
 ## NEXT RELEASE
 
+- **A schedule says what it is for.** The scheduler API takes a `description`, a sentence or two
+  under the schedule's name in the console. An operator writes it in the schedule's drawer when
+  the service gave none, and a service `PUT` without one keeps it. While a schedule runs, the
+  line under its name shows the run instead.
+- **A long job can be told to stop, and its report says so.** A report on a run (`PATCH
+  /api/schedules/{id}/run`) is answered `204` to carry on, or `410 Gone` to stop, with
+  `{"stop": "paused" | "cancelled" | "deleted" | "lost" | "closed"}`. The run is already closed
+  on the gateway's side when the service hears it. Pausing a schedule stops its job at the next
+  report (a closing report is still taken). **Cancel run** in the drawer, the agent's
+  `cancel_schedule_run` or `DELETE /api/schedules/{id}/run` closes the run at once as the new
+  `cancelled` state. Before, a pause let the job run on and a deleted schedule showed as a 404.
+  `POST /api/schedules/pause` and `/resume` on the internal plane act on every schedule a filter
+  matches (`meta.svc=...&meta.job=...`).
+- **A lost run can be sent again.** With `retryLost` (an ISO duration, none by default), a run
+  the service accepted and then went quiet on is sent again after that delay, as the same run
+  (same `Meerkat-Job-Run`, next `Meerkat-Job-Attempt`), three attempts per turn at most. A
+  service restarted mid-job no longer loses its turn until the next day.
+- **A running job's own words show live.** The `detail` of a progress report ("7 233 / 9 882
+  records") shows under the schedule's name and in its drawer, which now follows the live row
+  instead of the row that was clicked.
+- **The 202 contract is written out end to end** - headers, report, answers, lease - in the
+  Scheduler's documentation and in the console's API drawer.
+- **For a service that runs long jobs, two answers change.** A progress report on a paused
+  schedule is now answered `410 Gone` (it was `204`): stop the work, the run is closed. And
+  `overlap: "run"` is refused when a schedule is written.
+- **`overlap: "run"` is refused.** It was accepted and never acted on: a schedule holds one run
+  in flight, so a turn due during a run waits for it. Recreate a schedule that asked for it
+  without the field.
+- **A schedule's state is a bar along its row.** The State column is gone: a thin bar across
+  the bottom of each row is a quiet track while nothing runs, moves while a call waits for its
+  answer, fills with the progress the service reports, and runs backwards in red for a lost run
+  waiting to be sent again. What the run is doing (accepted, the attempt, the gateway that
+  claimed it, the service's own words) reads under the schedule's name, and Last run reads
+  "running" and since when rather than a previous result the bar contradicts. A running row keeps
+  its height - in 1.16.0 the claiming pod's name wrapped at every dash and stretched it. The
+  roles a schedule calls with leave the row for its drawer, where they already were.
+- **A schedule's drawer: the runs, the payload, and the actions at the bottom.** The runs fill
+  the drawer and scroll on their own, each as tall as its words; the payload folds against
+  them, one open at a time, and Pause, Run now and Delete stay at the bottom. "Last run" is
+  gone: it was the first run a second time. So is the button that ran a past turn again: it
+  sent the same call as Run now, with today's payload. A service can still name the run it
+  replays, through the API.
+- **The Scheduler's dates follow the profile's timezone, and nothing else.** The UTC switch in
+  its banner is gone: the timezone chosen on the profile already says which hours a person reads,
+  and an account without one reads UTC. A disabled switch only asked what it was for.
+
 ---
 
 ## 1.16.0

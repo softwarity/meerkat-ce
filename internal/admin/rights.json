@@ -725,6 +725,11 @@
     "guard": "serviceTokens"
   },
   {
+    "method": "PUT",
+    "path": "/api/schedules/{id}/description",
+    "guard": "schedules"
+  },
+  {
     "method": "POST",
     "path": "/api/schedules/{id}/pause",
     "guard": "schedules"
@@ -732,6 +737,11 @@
   {
     "method": "POST",
     "path": "/api/schedules/{id}/resume",
+    "guard": "schedules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/schedules/{id}/run",
     "guard": "schedules"
   },
   {

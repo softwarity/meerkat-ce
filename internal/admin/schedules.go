@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -46,7 +47,9 @@ import (
 // hand out: it opens this API and nothing else on this port.
 //
 // The CONSOLE reads the same rows and creates nothing: pause it, run it now,
-// remove it - the three things wanted at two in the morning.
+// remove it - the three things wanted at two in the morning. It writes one
+// field, the description, for the schedules whose service never said what
+// they are for.
 const schedulesPath = "/api/schedules"
 
 func (a *API) registerSchedules(mux Mux) {
@@ -61,6 +64,12 @@ func (a *API) registerSchedules(mux Mux) {
 	// keeps them all - including the turns that never went out.
 	mux.Handle("GET /api/schedules/{id}/runs", a.schedules(a.consoleSide(a.listScheduleRuns)))
 	mux.Handle("DELETE /api/schedules/{id}", a.schedules(a.consoleSide(a.deleteSchedule)))
+	// The one thing the console writes: what a schedule is for, when the
+	// service that asked for it did not say.
+	mux.Handle("PUT /api/schedules/{id}/description", a.schedules(a.consoleSide(a.describeSchedule)))
+	// Stopping the run in flight: closed at once, and the service hears it
+	// at its next report.
+	mux.Handle("DELETE /api/schedules/{id}/run", a.schedules(a.consoleSide(a.cancelRun)))
 	// What only a service writes: the schedule, and the report on a run it
 	// answered 202 to. Kept here for the service tokens of a backend that
 	// has not moved to the internal plane yet, and for nobody else.
@@ -121,6 +130,24 @@ func (a *API) schedules(next userHandler) http.Handler {
 }
 
 func (a *API) listSchedules(w http.ResponseWriter, r *http.Request, _ store.User) {
+	f, ok := scheduleFilter(w, r)
+	if !ok {
+		return
+	}
+	list, err := a.st.ListSchedules(r.Context(), f)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	if list == nil {
+		list = []store.Schedule{}
+	}
+	writeJSON(w, http.StatusOK, a.nameSchedules(r, list))
+}
+
+// scheduleFilter reads what a caller narrows the schedules by: the
+// organisation, the route, and conditions on the service's own metadata.
+func scheduleFilter(w http.ResponseWriter, r *http.Request) (store.ScheduleFilter, bool) {
 	q := r.URL.Query()
 	f := store.ScheduleFilter{
 		TenantID: strings.TrimSpace(q.Get("tenant")),
@@ -138,20 +165,12 @@ func (a *API) listSchedules(w http.ResponseWriter, r *http.Request, _ store.User
 			m, err := store.ParseMetaMatch(name, v)
 			if err != nil {
 				writeErr(w, http.StatusUnprocessableEntity, err.Error())
-				return
+				return f, false
 			}
 			f.Meta = append(f.Meta, m)
 		}
 	}
-	list, err := a.st.ListSchedules(r.Context(), f)
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	if list == nil {
-		list = []store.Schedule{}
-	}
-	writeJSON(w, http.StatusOK, a.nameSchedules(r, list))
+	return f, true
 }
 
 func (a *API) getSchedule(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -203,6 +222,12 @@ func (a *API) putSchedule(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	in.ID, in.CreatedAt = stored.ID, stored.CreatedAt
+	// A service that says nothing about it keeps the description there: an
+	// operator may have written it, and a service that rewrites its schedule
+	// at every start would wipe it each time.
+	if in.Description == "" {
+		in.Description = stored.Description
+	}
 	// WHEN changed, so the turn owed under the old answer is not owed under
 	// the new one. A single date moved this way is how a delayed action is
 	// pushed back - and how a finished one is given another date.
@@ -265,9 +290,22 @@ func (a *API) routeExists(r *http.Request) func(string) bool {
 // reportRun is the other half of a 202: the service says how far it has got,
 // and eventually that it is done. The run identifier is checked, so a late
 // report from a previous turn cannot close the current one.
+//
+// THE ANSWER IS ALSO THE GATEWAY'S WORD TO THE SERVICE. 204: carry on (or,
+// for a final report, it is recorded). 410 Gone: STOP - the run is over on
+// this side, and the body says why in one word (stopWhy). The run is already
+// closed when the service hears it: it stops its work and reports nothing
+// more. That is how a pause, a cancel or a deletion reaches a job that is
+// three hours into its work: at its next report, which a long job sends
+// anyway to keep its lease.
 func (a *API) reportRun(w http.ResponseWriter, r *http.Request, _ store.User) {
-	sc, ok := a.schedule(w, r)
-	if !ok {
+	sc, err := a.st.GetSchedule(r.Context(), r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		stopRun(w, stopDeleted, "this schedule no longer exists: stop the work, nothing is waiting for its report")
+		return
+	}
+	if err != nil {
+		a.internal(w, err)
 		return
 	}
 	var in struct {
@@ -286,7 +324,19 @@ func (a *API) reportRun(w http.ResponseWriter, r *http.Request, _ store.User) {
 	if in.Run == "" {
 		in.Run = r.Header.Get("Meerkat-Job-Run")
 	}
+	if in.Run == "" {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"name the run: the run field, or the Meerkat-Job-Run header the call carried")
+		return
+	}
 	if sc.RunID == "" || subtle.ConstantTimeCompare([]byte(in.Run), []byte(sc.RunID)) != 1 {
+		// A run this schedule HAD: closed meanwhile - cancelled, paused,
+		// lost - so the service is told to stop rather than that it is wrong.
+		if ended, err := a.st.EndedRun(r.Context(), sc.ID, in.Run); err == nil {
+			why := stopWhy(ended)
+			stopRun(w, why, "this run is over: "+ended.State+" ("+ended.Detail+"); stop the work")
+			return
+		}
 		writeErr(w, http.StatusConflict,
 			"this run is not the one in flight: a report names the run it was given")
 		return
@@ -298,10 +348,30 @@ func (a *API) reportRun(w http.ResponseWriter, r *http.Request, _ store.User) {
 	now := time.Now()
 	switch in.State {
 	case "", store.RunRunning:
+		// Paused while it ran: the run stops here, closed as cancelled, and
+		// the turn comes round again after a resume. A FINAL report on a
+		// paused schedule is still taken below - the work is done, and
+		// throwing its result away would help nobody.
+		if sc.Paused {
+			next := now.Add(time.Hour)
+			if at, e := sc.NextRun(now); e == nil {
+				next = at
+			}
+			end := store.RunEnd{State: store.RunCancelled, Detail: pausedWhileRunning}
+			if err := a.st.FinishSchedule(r.Context(), sc.ID, in.Run, end, store.RunNext{At: next}, now); err != nil {
+				a.internal(w, err)
+				return
+			}
+			a.schedulesMoved(r.Context())
+			stopRun(w, stopPaused, "the schedule is paused: stop the work, the run is closed and the next turn "+
+				"comes after it is resumed")
+			return
+		}
 		// Progress renews the lease and nothing else: the other nodes need
 		// not hear of it - a lease pushed later only means one of them wakes
-		// up for nothing, finds nothing lapsed, and sleeps again.
-		if err := a.st.TouchSchedule(r.Context(), sc.ID, in.Run, in.Progress, now); err != nil {
+		// up for nothing, finds nothing lapsed, and sleeps again. The screens
+		// read the table on their own beat, detail included.
+		if err := a.st.TouchSchedule(r.Context(), sc.ID, in.Run, in.Progress, in.Detail, now); err != nil {
 			a.internal(w, err)
 			return
 		}
@@ -349,6 +419,138 @@ func (a *API) reportRun(w http.ResponseWriter, r *http.Request, _ store.User) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Why a service is told to stop (the "stop" of a 410 on its report).
+const (
+	stopPaused    = "paused"
+	stopCancelled = "cancelled"
+	stopDeleted   = "deleted"
+	stopLost      = "lost"
+	stopClosed    = "closed"
+)
+
+// pausedWhileRunning is what the history says about a run closed because its
+// schedule was paused: how a later report on it is told "paused" rather than
+// "cancelled".
+const pausedWhileRunning = "paused while it ran: stopped at the service's report"
+
+// stopWhy is the word a service hears about a run that is over.
+func stopWhy(ended store.ScheduleRun) string {
+	switch ended.State {
+	case store.RunCancelled:
+		if ended.Detail == pausedWhileRunning {
+			return stopPaused
+		}
+		return stopCancelled
+	case store.RunLost:
+		return stopLost
+	}
+	return stopClosed
+}
+
+// stopRun is the 410: the run is over on this side, and the service stops.
+func stopRun(w http.ResponseWriter, why, msg string) {
+	writeJSON(w, http.StatusGone, map[string]string{"error": msg, "stop": why})
+}
+
+// cancelRun stops the run in flight (DELETE /api/schedules/{id}/run). It is
+// closed at once, as cancelled, and the next turn is armed at the schedule's
+// own cadence; the service hears it at its next report, which is answered
+// 410 with "stop": "cancelled". A call still waiting for its answer is let
+// go the same way: whatever comes back for it no longer matches the run.
+func (a *API) cancelRun(w http.ResponseWriter, r *http.Request, actor store.User) {
+	sc, ok := a.schedule(w, r)
+	if !ok {
+		return
+	}
+	if sc.RunID == "" {
+		writeErr(w, http.StatusConflict, "no run in flight: there is nothing to cancel")
+		return
+	}
+	who := actor.Username
+	if who == "" {
+		who = callerOf(r).Identity
+	}
+	if who == "" {
+		who = "the API"
+	}
+	if err := a.cancel(r.Context(), sc, "cancelled by "+who); err != nil {
+		a.internal(w, err)
+		return
+	}
+	a.auditEvent(r.Context(), actor, "schedule.cancel", "schedule", sc.ID, sc.Name, "", "run "+sc.RunID)
+	a.schedulesMoved(r.Context())
+	now, err := a.st.GetSchedule(r.Context(), sc.ID)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, a.nameSchedules(r, []store.Schedule{now})[0])
+}
+
+// cancel closes the run in flight as cancelled and arms the next turn.
+func (a *API) cancel(ctx context.Context, sc store.Schedule, detail string) error {
+	now := time.Now()
+	next := now.Add(time.Hour)
+	if at, e := sc.NextRun(now); e == nil {
+		next = at
+	}
+	return a.st.FinishSchedule(ctx, sc.ID, sc.RunID,
+		store.RunEnd{State: store.RunCancelled, Detail: detail}, store.RunNext{At: next}, now)
+}
+
+// pauseMatching and resumeMatching act on every schedule a filter matches -
+// the list's own (tenant, route, meta.<key>=...) - which is how a service
+// pauses "every import" in one call. A run in flight on a schedule paused
+// this way stops at its next report, like any pause.
+func (a *API) pauseMatching(w http.ResponseWriter, r *http.Request, actor store.User) {
+	a.setPausedMatching(w, r, actor, true)
+}
+
+func (a *API) resumeMatching(w http.ResponseWriter, r *http.Request, actor store.User) {
+	a.setPausedMatching(w, r, actor, false)
+}
+
+func (a *API) setPausedMatching(w http.ResponseWriter, r *http.Request, actor store.User, paused bool) {
+	f, ok := scheduleFilter(w, r)
+	if !ok {
+		return
+	}
+	if f.TenantID == "" && f.RouteID == "" && len(f.Meta) == 0 {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"say which schedules: meta.<key>=<value> (or =~<expression>), tenant or route - "+
+				"every schedule of the gateway at once is not one call's to decide")
+		return
+	}
+	list, err := a.st.ListSchedules(r.Context(), f)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	verb := "schedule.resume"
+	if paused {
+		verb = "schedule.pause"
+	}
+	moved := false
+	for i, sc := range list {
+		if sc.Paused == paused {
+			continue
+		}
+		if err := a.st.PauseSchedule(r.Context(), sc.ID, paused); err != nil {
+			a.internal(w, err)
+			return
+		}
+		a.auditEvent(r.Context(), actor, verb, "schedule", sc.ID, sc.Name, "", "by filter")
+		list[i].Paused, moved = paused, true
+	}
+	if moved {
+		a.schedulesMoved(r.Context())
+	}
+	if list == nil {
+		list = []store.Schedule{}
+	}
+	writeJSON(w, http.StatusOK, a.nameSchedules(r, list))
 }
 
 func (a *API) pauseSchedule(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -468,6 +670,35 @@ func (a *API) deleteSchedule(w http.ResponseWriter, r *http.Request, actor store
 	a.auditEvent(r.Context(), actor, "schedule.delete", "schedule", sc.ID, sc.Name, "", "")
 	a.schedulesMoved(r.Context())
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// describeSchedule writes what a schedule is for, and nothing else. Empty
+// removes it.
+func (a *API) describeSchedule(w http.ResponseWriter, r *http.Request, actor store.User) {
+	sc, ok := a.schedule(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Description string `json:"description"`
+	}
+	if err := decodeStrict(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())
+		return
+	}
+	if err := store.SanitizeScheduleDescription(&in.Description); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if err := a.st.DescribeSchedule(r.Context(), sc.ID, in.Description); err != nil {
+		a.internal(w, err)
+		return
+	}
+	a.auditUpdate(r.Context(), actor, "schedule.describe", "schedule", sc.ID, sc.Name, "",
+		map[string]string{"description": sc.Description}, map[string]string{"description": in.Description})
+	a.schedulesMoved(r.Context())
+	sc.Description = in.Description
+	writeJSON(w, http.StatusOK, a.nameSchedules(r, []store.Schedule{sc})[0])
 }
 
 func (a *API) schedule(w http.ResponseWriter, r *http.Request) (store.Schedule, bool) {

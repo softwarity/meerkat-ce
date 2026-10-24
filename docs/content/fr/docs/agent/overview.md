@@ -52,6 +52,8 @@ assistant plutôt qu'en cliquant.
 | `list_services` | Ce que la gateway voit tourner autour d'elle. |
 | `list_schedules` | Les appels planifiés : ce qui s'exécute la nuit, à quelle fréquence, au nom de qui, et comment s'est terminée la dernière exécution. |
 | `pause_schedule`, `run_schedule` | Suspendre un appel planifié, le laisser repartir, ou avancer sa prochaine exécution à maintenant. |
+| `describe_schedule` | Écrire à quoi sert un appel planifié, quand le service ne l'a pas dit. |
+| `cancel_schedule_run` | Arrêter l'exécution en cours d'un appel planifié : close tout de suite, le service prévenu à son compte rendu suivant. |
 | `read_traffic` | Ce qui passe en ce moment. |
 | `read_logs` | Les dernières lignes du journal de la gateway, sur le nœud qui a répondu. |
 | `read_audit` | Le journal d'audit, dans le périmètre de l'appelant. |

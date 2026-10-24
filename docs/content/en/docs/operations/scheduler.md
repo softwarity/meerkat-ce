@@ -79,7 +79,7 @@ When is the same run sent twice? Only when nobody can know whether you got it:
 | What happened | What the gateway does |
 |---|---|
 | You answered, whatever the status | The run closes on that answer. That same call is **never** sent again. A few failures get another ATTEMPT, as a new run with a new identifier - see "Which failures are tried again" |
-| You answered `202` | The work is yours. Never sent again, whatever happens to the gateway |
+| You answered `202` | The work is yours. Not sent again, whatever happens to the gateway - unless you go quiet for a lease and the schedule asks for it (`retryLost`, see "When the service goes quiet") |
 | The instance making the call stopped before your answer | Another instance sends it again, **same run identifier**, `Meerkat-Job-Attempt` one higher |
 
 The last line has three bounds. **Three attempts** at most, so that a call
@@ -92,28 +92,116 @@ runs out, five minutes, when it died.
 ## Long work answers 202
 
 The call **starts** the work; it does not wait for it. A service answering
-`202 Accepted` keeps the run open and reports for itself:
-
-```http
-PATCH /api/schedules/{id}/run
-{"run": "GvbDqbNG__YTOY00", "state": "running", "progress": 60}
-```
-
-and at the end `{"state": "done", "detail": "12000 rows"}`. That is what makes
-a three-hour job expressible without a three-hour HTTP request.
-
-**With which token?** Whatever the internal plane's access asks of you - none,
-yours, or your pod's ServiceAccount token - on the internal plane like
-everything else. The scheduled call brought no token with it: its identity
-was posed inside the gateway, and never travelled on a wire.
-
-Every report renews the **lease**. Say nothing for five minutes and the run is
-closed as lost rather than left running for ever - and it is **not** sent
-again: the 202 said the work was yours.
-
+`202 Accepted` keeps the run open and reports on it until it closes it. That
+is what makes a three-hour job expressible without a three-hour HTTP request.
 Any other answer closes the run there and then: 2xx succeeded, the rest
 failed, with the status and what the answer said - an error page is cut down
 to the sentence a human reads on it, never to its doctype.
+
+### The report
+
+```http
+PATCH /api/schedules/{id}/run
+Content-Type: application/json
+
+{"run": "GvbDqbNG__YTOY00", "progress": 73, "detail": "7 233 / 9 882 records"}
+```
+
+and at the end `{"run": "...", "state": "done", "detail": "9 882 records"}`.
+
+| Field | |
+|---|---|
+| `run` | Required: the `Meerkat-Job-Run` the call carried (or that header on the report) |
+| `state` | `running`, or nothing, while it works; `done` or `failed` to close the run |
+| `progress` | 0 to 100: the bar on the Scheduler screen |
+| `detail` | Your own words. While it runs, shown live under the schedule's name and in its drawer (200 characters kept); on the closing report, kept in the history |
+| `retryIn` | With `failed` only: call me back then, an ISO duration - see "When the service cannot run it yet" |
+
+**With which token?** None. The run identifier is the proof - 96 random bits,
+given to your service alone by the call - so a report is taken whatever the
+internal plane's access mode. Asking for the mode's credential as well broke
+every run in flight the day the mode changed.
+
+### The answer to a report
+
+The answer is also the gateway's word to your job, and a long job hears it at
+its next report:
+
+| Status | Meaning | What your service does |
+|---|---|---|
+| `204` | Recorded | Carry on - or, after `done`/`failed`, nothing more to do |
+| `410 Gone` | **Stop.** The run is already closed on the gateway's side | Stop the work and report nothing more. The body says why: `{"stop": "paused", "error": "..."}` |
+| `409` | A run identifier this schedule never gave out | A bug: check which `Meerkat-Job-Run` you are reporting on |
+| `422` | Something in the report cannot be (progress past 100, `retryIn` on `done`) | Fix the report |
+
+The `stop` of a `410`:
+
+| `stop` | Why |
+|---|---|
+| `paused` | The schedule was paused while the run went on. The run is closed as `cancelled`; the next turn comes after a resume |
+| `cancelled` | Somebody cancelled the run - the console, an agent, or a `DELETE /api/schedules/{id}/run` |
+| `deleted` | The schedule no longer exists |
+| `lost` | The run was closed as lost: you were silent past the lease, and it was not sent again |
+| `closed` | The run had already ended - a closing report sent twice |
+
+### Stopping a run
+
+Three ways, all heard by the service at its next report, which a long job
+sends anyway to keep its lease:
+
+- **Pause** the schedule. The run goes on until the service reports: that
+  report is answered `410` with `"stop": "paused"`, and the run closes as
+  `cancelled`. A **closing** report (`done`, `failed`) on a paused schedule is
+  still taken: the work is done, and throwing its result away would help
+  nobody. Nothing more goes out until the schedule is resumed; a turn owed in
+  the meantime goes out on the resume, within `catchUp`.
+- **Cancel** the run: the **Cancel run** button in the drawer's *Run in
+  flight*, the agent's `cancel_schedule_run`, or
+  `DELETE /api/schedules/{id}/run` (on the console's plane and on the internal
+  one, so a service can stop its own run from its own screens). The run is
+  closed **at once** as `cancelled`, the history says by whom, and the next
+  turn is armed at the schedule's own time. Any report on that run, closing
+  ones included, then gets `410` with `"stop": "cancelled"`.
+- **Delete** the schedule: its next report gets `410` with `"stop": "deleted"`.
+
+A call still waiting for its answer when it is cancelled is let go the same
+way: whatever comes back for it no longer matches the run.
+
+To stop **many** at once, pause them by what you filed them under - the
+list's own filter, answering the schedules it matched as they now stand:
+
+```bash
+curl -X POST "http://meerkat:7070/api/schedules/pause?meta.svc=stations&meta.job=import" -H "$AUTH"
+curl -X POST "http://meerkat:7070/api/schedules/resume?meta.svc=stations&meta.job=import" -H "$AUTH"
+```
+
+A call naming nothing - no `meta.*`, no `tenant`, no `route` - is refused:
+every schedule of the gateway at once is not one call's to decide.
+
+### When the service goes quiet
+
+Every report renews the **lease**. Say nothing for five minutes and the run is
+**lost**: closed rather than left running for ever, and by default **not**
+sent again - the 202 said the work was yours, and only your service knows
+whether picking it up again is safe.
+
+When it is safe - the service keeps its own progress and resumes from it - the
+schedule says so with **`retryLost`**, an ISO duration from one minute to one
+day:
+
+```json
+{ "name": "oscar import fr", "every": "P1D", "retryLost": "PT1M", ... }
+```
+
+A service restarted in the middle of its job (a pod killed, a deployment) then
+loses the lease, and the gateway waits `retryLost` before sending **the same
+run again**: same `Meerkat-Job-Run`, `Meerkat-Job-Attempt` one higher, so the
+service recognises the run it was working on and resumes it. Meanwhile the
+console shows the run *lost, to be sent again*, and a report arriving in the
+meantime takes it back - the service was slow, not gone. Bounded like every
+attempt of a turn: **three attempts** at most (those before the 202 count),
+never on a paused schedule, never later than `catchUp`. When none is left, the
+run closes as `lost` and the history says why it was not sent again.
 
 ## When the service is down
 
@@ -151,7 +239,7 @@ restarted, a version still rolling out:
 | `401`, `403`, `404` | tried again: the account is not known yet, the roles are not loaded, the route of a version still coming up is not there |
 | `502`, `503`, `504`, or no answer within the `timeout` | tried again: nobody answered |
 | anything else, `500` first of all | **not** tried again. That is the service SAYING something, and a bug at the far end is handled at the far end |
-| `lost` - it took the work with a `202` and went quiet | not tried again: it has the work |
+| `lost` - it took the work with a `202` and went quiet | not tried again: it has the work - unless the schedule says `retryLost`, and then it is the **same** run that is sent again |
 
 An attempt that is tried again is a **new run**, with its own identifier: a
 service that deduplicates would have thrown away a call it never acted on.
@@ -223,10 +311,14 @@ ClusterIP - so what a caller must present is a decision, and it is yours: see
 | `GET /api/schedules/{id}` | one of them |
 | `PUT /api/schedules/{id}` | change it |
 | `DELETE /api/schedules/{id}` | remove |
-| `POST /api/schedules/{id}/pause` and `/resume` | stop it firing, let it fire again |
+| `POST /api/schedules/{id}/pause` | stop it firing - its run in flight is told to stop |
+| `POST /api/schedules/{id}/resume` | let it fire again |
 | `POST /api/schedules/{id}/run` | bring the next turn forward |
 | `GET /api/schedules/{id}/runs` | what each turn did, newest first |
-| `PATCH /api/schedules/{id}/run` | report on the run in flight |
+| `PATCH /api/schedules/{id}/run` | report on the run in flight - the answer may say stop |
+| `DELETE /api/schedules/{id}/run` | cancel the run in flight |
+| `POST /api/schedules/pause?meta.<key>=...` | pause every schedule the filter matches |
+| `POST /api/schedules/resume?meta.<key>=...` | resume every schedule the filter matches |
 
 ### Who may call it
 
@@ -267,7 +359,8 @@ token is refused, it does not become an anonymous caller.
 
 Each schedule records who created it and how that was known - a token, a
 ServiceAccount, a workload deduced from its address, or nobody, with the
-address it came from. Its drawer shows it, and so does the audit trail.
+address it came from. Its drawer names the creator; the audit trail also
+says how it was known.
 
 A new installation starts in **None**. One upgraded while it held a
 `schedules` token keeps **Meerkat token**, so an upgrade opens nothing. The
@@ -281,8 +374,9 @@ in a namespace the gateway does not read is unidentified.
 ### What the console does, and does not
 
 The console reads the same schedules, on its own plane, and acts on those that
-exist: **pause, resume, run now, replay a turn, delete**. It **creates and
-changes none**. There is no button for it, and the control plane refuses
+exist: **pause, resume, run now, cancel a run, delete**. It **creates none, and
+changes one field**: the description, for a schedule whose service never said
+what it is for. There is no button for the rest, and the control plane refuses
 `POST`, `PUT` and the run report from a console session or an operator's
 token, naming the internal plane in its answer. A schedule is written by the
 service that needs it.
@@ -321,6 +415,7 @@ schedules.
 ```json
 {
   "name": "station 42, hourly poll",
+  "description": "Fetches the hourly readings of station 42",
   "roles": ["station_fetch"],
   "method": "POST",
   "routeId": "stations-api",
@@ -361,6 +456,14 @@ seen.
 `text/plain; charset=utf-8` by default: that is how a form, an XML document or
 a line of text is sent from a field that is otherwise JSON. An explicit
 `contentType` always wins, since it is the one the service asked for.
+
+### What it is for: the description
+
+The name identifies a schedule; `description` says what it does, in a sentence
+or two (500 characters at most). Optional, and shown under the name in the
+console. A service that leaves it out can have it written by an operator, in the
+schedule's drawer, so a `PUT` **without** a description keeps the one already
+there: a service that rewrites its schedules at every start does not wipe it.
 
 ### Metadata: the service's own filing system
 
@@ -489,7 +592,7 @@ cadence ignores the field.
 
 | Setting | What it prevents |
 |---|---|
-| `overlap` (`skip` by default) | A slow job that has not come back: the next turn does not go out. Nothing more is owed while a run is in flight, and its close **arms the next turn**, counted from then - so a slow job never finds one waiting in the past the instant it returns |
+| `overlap`, `skip` and nothing else | A slow job that has not come back: the next turn does not go out. Nothing more is owed while a run is in flight, and its close **arms the next turn**, counted from then - so a slow job never finds one waiting in the past the instant it returns. `run` - a second call alongside the first - is refused: a schedule holds one run in flight |
 | `catchUp`, in seconds | A gateway down all night firing twelve turns on waking. Zero means "run it whenever you can". It also bounds how late a call cut short by a stopping gateway is sent again, and whether a delayed action nobody was up for still goes out |
 | `timeout` | A call that never answers. It bounds the **answer**, not the work: that is what the 202 is for. Two minutes at most (`PT2M`) |
 
@@ -519,13 +622,14 @@ curl "http://meerkat:7070/api/schedules/sch_9f2c/runs" -H "$AUTH"
 ]
 ```
 
-Four ways a turn ends, and the difference matters:
+Five ways a turn ends, and the difference matters:
 
 | | |
 |---|---|
 | `done` | the service answered 2xx |
 | `failed` | it answered something else, or nobody answered within the timeout |
 | `lost` | it took the work with a `202` and then went quiet past the lease |
+| `cancelled` | somebody stopped it: cancelled, or paused while it ran |
 | `dropped` | the turn **never went out**: it came round later than `catchUp` allows |
 
 `attempt` says which attempt ended the turn: `2` means a gateway stopped
@@ -565,8 +669,8 @@ The calls **spread over the instances**, several at a time on each - a slow
 service holds its own call and nobody else's.
 
 What a cluster really adds is the **lease**: a run nobody says anything about
-for five minutes is settled by whichever gateway sees it first, sent again or
-closed as lost.
+for five minutes is settled by whichever gateway sees it first: sent again,
+set to wait for `retryLost`, or closed as lost.
 
 While a run is in flight nothing more is owed: "run now" answers `409`, and the
 run's close arms the next turn.
@@ -579,7 +683,7 @@ thing, you need a broker.
 
 > [!TIP]
 > Already running Kubernetes CronJobs and want them to stay the clock? Have one
-> call `POST /api/schedules/{id}/run` with an API token - it answers `409`
+> call `POST /api/schedules/{id}/run` on the internal plane - it answers `409`
 > while the previous run is still in flight. The gateway keeps the identity,
 > the containment and the record; your cluster keeps the calendar. Meerkat
 > needs no rights on your cluster for that.
@@ -588,38 +692,50 @@ thing, you need a broker.
 
 **Data plane, Scheduler** lists everything scheduled, filtered by
 organisation and service, updated live: a run starting, advancing and finishing
-appears without refreshing anything. Three actions live there, and they are the
-ones wanted at two in the morning: pause (and resume), bring the next turn
-forward, remove. There is no button to create or change one, by decision: a
+appears without refreshing anything. The actions there are the ones wanted at
+two in the morning: pause (and resume), bring the next turn forward, cancel the
+run in flight, remove - and write what a schedule is for when its service did
+not say. There is no button to create one or change what it calls, by decision: a
 schedule belongs to the service that needs it, which writes it through the API,
 on the internal plane, from its own screens.
 
-![The Scheduler screen: a cadence, a cron line and one date, each with its next run and its last](img/console/scheduler.webp)
+![The Scheduler screen: a cadence, a cron line and one date, each with what it is for under its name, its next run and its last](img/console/scheduler.webp)
 
 One row per schedule, **sorted by name**, so a row stays where it is while it
-runs: its name and the roles it calls with, **When**, **Next run**, **State**
-and **Last run**. What it calls - method, path and route - is in its drawer,
-with **Created by**, the caller that wrote it. **API** explains the calls a
+runs: its name and what it is for, **When**, **Next run** and **Last run**.
+A bar along the bottom of each row is its state: a quiet track while nothing
+runs, moving while a call waits for its answer, filling with the progress the
+service reports, and running backwards in red for a lost run waiting to be
+sent again. While it runs, the line under the name says in words where the run
+stands, and **Last run** reads *running* and since when: the previous result
+would contradict the bar. It is the first of the drawer's runs meanwhile, and
+the column shows the new one when the run ends. What it calls - method, path and route - is in its drawer, with the
+roles it calls with and **Created by**, the caller that wrote it. The drawer
+opens on its **description**, which an operator writes there when the service
+gave none. **API** explains the calls a
 service makes, **Access** decides who may make them. Deleting a schedule asks
 for its name, typed: the service that wrote it is never told, it is simply not
 called again.
 
-A run in flight says where it stands - **calling**, waiting for the answer, or
-**accepted**, the service took the work - and which attempt it is when a
-gateway stopped before the answer. Its next turn reads "after this run": the
-close arms it, and "run now" waits for that.
+A run in flight says where it stands - **calling**, waiting for the answer,
+**accepted**, the service took the work, or **lost, to be sent again** - which
+attempt it is, and what the service last said about it ("7 233 / 9 882
+records"), live, under the name and in its drawer. Its next turn reads "after
+this run": the close arms it, and "run now" waits for that. **Cancel run**, in
+the drawer's *Run in flight*, stops it: closed at once, the service told at its
+next report.
 
 A schedule's drawer keeps **every turn it ran**: when it ended, how, what
-answered, which node made the call, which attempt it was - and a button to
-run a dropped or failed one again.
+answered, which node made the call, which attempt it was. Running one again is
+**Run now**: the same call, with today's payload.
 
 A **delayed action** that has gone reads "finished" and keeps its result on
 screen until the sweep. A switch hides them when a service posts enough of
 them to bury the rest, and root chooses beside it how long they are kept.
 
 The hours are written in the **operator's own zone** - the one on their profile,
-set once and read by both planes - or in **UTC**, on a button that says which is
-showing: "2:24 AM" means nothing until it says whose 2:24 it is.
+set once and read by both planes, UTC when they chose none: "2:24 AM" means
+nothing until it says whose 2:24 it is.
 
 An **API** button opens, in the same drawer, the mechanism and the API: the
 commands and the payload already filled in with **this** installation's address,
@@ -634,7 +750,8 @@ The **Metadata** filter there takes what the API takes - `station=42`, or
 `station=~^st-` - because an operator looking for one schedule in a fleet looks
 for it by what the service wrote on it.
 
-Creating a schedule is not among them, deliberately: a schedule runs as an
-account, and the administrators reading that screen are not the accounts it
-should run as. The console's plane refuses it too, in as many words: writing a
-schedule belongs to the service, with its own token, on the internal plane.
+Creating a schedule is not among them, deliberately: whoever writes a schedule
+chooses the roles its calls carry, and that is the service's business, decided
+by who may call the internal plane - not a form any administrator can fill in.
+The console's plane refuses it too, in as many words: writing a schedule
+belongs to the service, on the internal plane.

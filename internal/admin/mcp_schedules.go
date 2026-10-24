@@ -14,8 +14,8 @@ import (
 
 // The agent's view of the scheduled calls (SCHED-01).
 //
-// Three tools, and the line between what is here and what is not is the same
-// one the console draws. READING the schedules answers the question an
+// The line between what is here and what is not is the same one the console
+// draws. READING the schedules answers the question an
 // operator actually brings to an agent - "what is hammering that service
 // every minute, and did last night's close run?" - and PAUSING one is the
 // answer to it, reversible in a word. RUNNING one is the other half of the
@@ -28,6 +28,10 @@ import (
 // token - a deliberate act by root - and a tool would hand the same reach to
 // whatever an agent was asked to do. The service that wants a schedule asks
 // for it on the control plane, with its own token.
+//
+// DESCRIBING one is here, like on the screen: a sentence saying what it is
+// for reaches nothing, and an agent that has just worked out what a schedule
+// does is well placed to write it down.
 func (a *API) scheduleTools() []mcp.Tool {
 	return []mcp.Tool{
 		{
@@ -69,6 +73,31 @@ func (a *API) scheduleTools() []mcp.Tool {
 					"goes out again as a NEW run, and the history says which one it replays."),
 			}, "id"),
 			Call: a.toolRunSchedule,
+		},
+		{
+			Name: "cancel_schedule_run", Allow: administersIdentity, Title: "Cancel the run in flight",
+			Description: "Stop the run a schedule has in flight: it is closed at once as cancelled, the " +
+				"history says so, and the next turn is armed at the schedule's own cadence. The service " +
+				"hears it at its next progress report, which is answered 410 with stop: cancelled, and " +
+				"stops its work. Pausing is the other way to stop a long job, for a schedule that should " +
+				"not run again until resumed. Take the id from list_schedules.",
+			Schema: object(map[string]any{
+				"id": str("The schedule's id, as given by list_schedules."),
+			}, "id"),
+			Call: a.toolCancelRun,
+		},
+		{
+			Name: "describe_schedule", Allow: administersIdentity, Title: "Describe a scheduled call",
+			Description: "Write what a schedule is for, in a sentence or two (" +
+				fmt.Sprint(store.MaxScheduleDescription) + " characters at most), for one whose " +
+				"service did not say: the console shows it under the name. An empty description " +
+				"removes it. It changes nothing about what the schedule calls or when. Take the id " +
+				"from list_schedules.",
+			Schema: object(map[string]any{
+				"id":          str("The schedule's id, as given by list_schedules."),
+				"description": str("What the schedule is for. Empty removes it."),
+			}, "id", "description"),
+			Call: a.toolDescribeSchedule,
 		},
 		{
 			Name: "list_schedule_runs", Allow: administersIdentity, Title: "The history of a scheduled call",
@@ -148,23 +177,24 @@ func (a *API) toolListSchedules(ctx context.Context, _ json.RawMessage) (any, er
 	// store lists by name, which is what a screen needs to keep still.
 	slices.SortStableFunc(list, func(x, y store.Schedule) int { return cmp.Compare(x.NextAt, y.NextAt) })
 	type line struct {
-		ID       string   `json:"id"`
-		Name     string   `json:"name"`
-		Roles    []string `json:"roles,omitempty"`
-		Tenant   string   `json:"tenant,omitempty"`
-		Calls    string   `json:"calls"`
-		Every    string   `json:"every"`
-		Timezone string   `json:"timezone,omitempty"`
-		Paused   bool     `json:"paused"`
-		NextAt   string   `json:"nextAt,omitempty"`
-		Running  string   `json:"running,omitempty"`
-		Progress int      `json:"progress,omitempty"`
-		Last     string   `json:"last,omitempty"`
+		ID          string   `json:"id"`
+		Name        string   `json:"name"`
+		Description string   `json:"description,omitempty"`
+		Roles       []string `json:"roles,omitempty"`
+		Tenant      string   `json:"tenant,omitempty"`
+		Calls       string   `json:"calls"`
+		Every       string   `json:"every"`
+		Timezone    string   `json:"timezone,omitempty"`
+		Paused      bool     `json:"paused"`
+		NextAt      string   `json:"nextAt,omitempty"`
+		Running     string   `json:"running,omitempty"`
+		Progress    int      `json:"progress,omitempty"`
+		Last        string   `json:"last,omitempty"`
 	}
 	out := make([]line, 0, len(list))
 	for _, sc := range list {
 		l := line{
-			ID: sc.ID, Name: sc.Name, Tenant: sc.TenantID, Roles: sc.Roles,
+			ID: sc.ID, Name: sc.Name, Description: sc.Description, Tenant: sc.TenantID, Roles: sc.Roles,
 			Calls:  sc.Method + " " + sc.Path + " on route " + sc.RouteID,
 			Every:  sc.Every,
 			Paused: sc.Paused,
@@ -246,6 +276,64 @@ func (a *API) toolPauseSchedule(ctx context.Context, raw json.RawMessage) (any, 
 		"said": sc.Name + " is " + said}, nil
 }
 
+func (a *API) toolCancelRun(ctx context.Context, raw json.RawMessage) (any, error) {
+	var in struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.ID == "" {
+		return nil, fmt.Errorf("which schedule: pass the id list_schedules gives")
+	}
+	sc, err := a.st.GetSchedule(ctx, in.ID)
+	if err != nil {
+		return nil, fmt.Errorf("no schedule %q on this gateway", in.ID)
+	}
+	if sc.RunID == "" {
+		return nil, fmt.Errorf("%q has no run in flight: there is nothing to cancel", sc.Name)
+	}
+	actor := mcpActor(ctx)
+	if err := a.cancel(ctx, sc, "cancelled by "+actor.Username); err != nil {
+		return nil, err
+	}
+	a.auditEvent(ctx, actor, "schedule.cancel", "schedule", sc.ID, sc.Name, "", "run "+sc.RunID)
+	a.schedulesMoved(ctx)
+	return map[string]any{"id": sc.ID, "name": sc.Name, "cancelled": sc.RunID,
+		"said": "the run of " + sc.Name + " is cancelled; the service stops at its next report"}, nil
+}
+
+func (a *API) toolDescribeSchedule(ctx context.Context, raw json.RawMessage) (any, error) {
+	var in struct {
+		ID          string  `json:"id"`
+		Description *string `json:"description"`
+	}
+	if err := json.Unmarshal(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.ID == "" {
+		return nil, fmt.Errorf("which schedule: pass the id list_schedules gives")
+	}
+	if in.Description == nil {
+		return nil, fmt.Errorf("say what the schedule is for: description, empty to remove it")
+	}
+	sc, err := a.st.GetSchedule(ctx, in.ID)
+	if err != nil {
+		return nil, fmt.Errorf("no schedule %q on this gateway", in.ID)
+	}
+	d := *in.Description
+	if err := store.SanitizeScheduleDescription(&d); err != nil {
+		return nil, err
+	}
+	if err := a.st.DescribeSchedule(ctx, sc.ID, d); err != nil {
+		return nil, err
+	}
+	a.auditUpdate(ctx, mcpActor(ctx), "schedule.describe", "schedule", sc.ID, sc.Name, "",
+		map[string]string{"description": sc.Description}, map[string]string{"description": d})
+	a.schedulesMoved(ctx)
+	return map[string]any{"id": sc.ID, "name": sc.Name, "description": d}, nil
+}
+
 func (a *API) toolRunSchedule(ctx context.Context, raw json.RawMessage) (any, error) {
 	var in struct {
 		ID       string `json:"id"`
@@ -296,6 +384,9 @@ func runWords(sc store.Schedule) string {
 	}
 	if sc.Attempts > 1 {
 		out += fmt.Sprintf(", attempt %d", sc.Attempts)
+	}
+	if sc.RunDetail != "" {
+		out += ": " + sc.RunDetail
 	}
 	return out
 }

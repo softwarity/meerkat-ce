@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/softwarity/meerkat/internal/cron"
 )
@@ -46,6 +47,11 @@ import (
 type Schedule struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// Description says what the schedule is for, in a sentence: the name
+	// identifies it, this explains it. Written by the service, and by an
+	// operator when the service said nothing - which is why a PUT that leaves
+	// it out keeps the one already there.
+	Description string `json:"description,omitempty"`
 	// Roles the CALL carries. A scheduled call has no account behind it: it is
 	// made as "meerkat" with these roles, and the route's rule, the endpoint
 	// rules and the identity forwarded to the service all read them exactly as
@@ -127,13 +133,19 @@ type Schedule struct {
 	// everywhere, and an RFC 3339 date carries its own offset.
 	Timezone string `json:"timezone,omitempty"`
 
-	// Overlap says what to do when the previous run has not reported back:
-	// skip this turn, or call anyway.
+	// Overlap says what to do when the previous run has not reported back,
+	// and there is one answer: skip - the turn waits for the run to close.
 	Overlap string `json:"overlap"`
 	// CatchUp is how late a missed run may still go out, in seconds. A
 	// gateway that was down all night should not fire twelve hourly runs the
 	// moment it wakes up; it should fire the last one, or none.
 	CatchUp int64 `json:"catchUp"`
+	// RetryLost is how long after a LOST run - accepted (202), then silent
+	// for a lease - the same run is sent again: same Meerkat-Job-Run, the
+	// next Meerkat-Job-Attempt, within MaxAttempts and the catch-up. Empty
+	// sends nothing, which is the default: only the service knows whether
+	// picking its work up again is safe, so it is the service that says so.
+	RetryLost string `json:"retryLost,omitempty"`
 	// Timeout bounds one call (ISO duration), MaxScheduleTimeout at most. The
 	// call STARTS the work: a service with a long job answers at once and
 	// reports its progress on the run, so the timeout covers the answer, not
@@ -152,6 +164,9 @@ type Schedule struct {
 	ClaimedBy  string `json:"claimedBy,omitempty"`
 	ClaimedAt  int64  `json:"claimedAt,omitempty"`
 	Progress   int    `json:"progress"`
+	// RunDetail is what the service last said about the run in flight, in
+	// its own words: "7 233 / 9 882 records".
+	RunDetail string `json:"runDetail,omitempty"`
 	// RunState is where the run in flight stands - RunCalling or RunAccepted
 	// - and it is what a lapsed lease is read against. See LapsedRuns.
 	RunState string `json:"runState,omitempty"`
@@ -212,6 +227,12 @@ const (
 	// reported on the run since. A lease lapsing here means the SERVICE went
 	// quiet, and sending again would only be ignored - the run is lost.
 	RunAccepted = "accepted"
+	// RunWaiting is a LOST run the schedule asked to have sent again
+	// (RetryLost): nobody holds it, and its lease is set to lapse when the
+	// delay is over, which is when the next node to look sends it - the same
+	// run, the next attempt. A report from the service in the meantime takes
+	// it back to accepted: it was slow, not gone.
+	RunWaiting = "waiting"
 )
 
 // How a run ended (last_state), and RunRunning, which is the word a service
@@ -228,6 +249,10 @@ const (
 	// schedule's catch-up allows, so making the call would have been worse
 	// than not making it. Nobody failed here either.
 	RunDropped = "dropped"
+	// RunCancelled is a run somebody stopped: cancelled from the console or
+	// the API, or paused while it ran and closed at the service's next
+	// report. Nobody failed here either, so it moves no health.
+	RunCancelled = "cancelled"
 )
 
 // ScheduleRetentionChoices are how long a finished single date is kept, in
@@ -333,11 +358,12 @@ const (
 // than this is what the 202 is for.
 const MaxScheduleTimeout = 2 * time.Minute
 
-// What to do when a turn arrives and the previous one has not reported.
-const (
-	OverlapSkip = "skip"
-	OverlapRun  = "run"
-)
+// OverlapSkip is what happens when a turn arrives and the previous run has
+// not reported: the turn waits for it. "run" - a second call while the first
+// is open - was once accepted and never acted on, since a schedule holds ONE
+// run in flight; it is refused now rather than stored as a promise nobody
+// keeps.
+const OverlapSkip = "skip"
 
 // ScheduleMethods are the verbs a schedule may use. GET and HEAD are absent
 // deliberately: a scheduled call is an ACTION, and a schedule that only reads
@@ -351,6 +377,9 @@ func SanitizeSchedule(s *Schedule, routeExists func(string) bool) error {
 	s.Name = strings.TrimSpace(s.Name)
 	if s.Name == "" {
 		return fmt.Errorf("a schedule needs a name: it is what the console lists and what a log line says")
+	}
+	if err := SanitizeScheduleDescription(&s.Description); err != nil {
+		return err
 	}
 	if err := sanitizeRoles(s); err != nil {
 		return err
@@ -448,8 +477,17 @@ func SanitizeSchedule(s *Schedule, routeExists func(string) bool) error {
 	if s.Overlap == "" {
 		s.Overlap = OverlapSkip
 	}
-	if s.Overlap != OverlapSkip && s.Overlap != OverlapRun {
-		return fmt.Errorf("overlap must be %q or %q, got %q", OverlapSkip, OverlapRun, s.Overlap)
+	if s.Overlap != OverlapSkip {
+		return fmt.Errorf("overlap %q: a schedule has one run in flight at a time, so a turn that comes round "+
+			"while the last one is open waits for it to close - %q is the only behaviour", s.Overlap, OverlapSkip)
+	}
+	s.RetryLost = strings.TrimSpace(s.RetryLost)
+	if s.RetryLost != "" {
+		d, err := ParseISODuration(s.RetryLost)
+		if err != nil || d < MinAsk || d > MaxAsk {
+			return fmt.Errorf("retryLost is how long after a lost run it is sent again, an ISO 8601 duration "+
+				"from %s to %s (PT1M, PT10M), got %q - leave it out to send nothing", MinAsk, MaxAsk, s.RetryLost)
+		}
 	}
 	if s.CatchUp < 0 {
 		return fmt.Errorf("catchUp is a number of seconds and cannot be negative")
@@ -674,7 +712,7 @@ func (s Schedule) TooLate(t time.Time) bool {
 const scheduleColumns = `id, name, roles, created_by, tenant_id, route_id, method, path, body,
 	content_type, headers, metadata, every, cron, at, timezone, start_at, overlap, catch_up, timeout, paused, next_at, run_id, run_started,
 	claimed_by, claimed_at, progress, run_state, attempts, run_cause, run_of, turn_try, last_state, last_detail, last_at, created_at, updated_at,
-	failing_since, caller, caller_via, caller_addr`
+	failing_since, caller, caller_via, caller_addr, description, run_detail, retry_lost`
 
 func scanSchedule(row interface{ Scan(...any) error }) (Schedule, error) {
 	var s Schedule
@@ -685,7 +723,7 @@ func scanSchedule(row interface{ Scan(...any) error }) (Schedule, error) {
 		&s.Paused, &s.NextAt, &s.RunID, &s.RunStarted, &s.ClaimedBy, &s.ClaimedAt, &s.Progress,
 		&s.RunState, &s.Attempts, &s.RunCause, &s.RunOf, &s.TurnTry,
 		&s.LastState, &s.LastDetail, &s.LastAt, &s.CreatedAt, &s.UpdatedAt,
-		&s.FailingSince, &s.Caller, &s.CallerVia, &s.CallerAddr)
+		&s.FailingSince, &s.Caller, &s.CallerVia, &s.CallerAddr, &s.Description, &s.RunDetail, &s.RetryLost)
 	if err != nil {
 		return s, err
 	}
@@ -757,14 +795,14 @@ func (s *Store) CreateSchedule(ctx context.Context, sc Schedule) error {
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO schedules (`+scheduleColumns+`)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?)`,
+		?, ?, ?, ?, ?, ?, ?)`,
 		sc.ID, sc.Name, rolesJSON(sc.Roles), sc.CreatedBy, sc.TenantID, sc.RouteID, sc.Method, sc.Path, string(sc.Body),
 		sc.ContentType, headers, meta, sc.Every, sc.Cron, sc.At, sc.Timezone, sc.StartAt, sc.Overlap, sc.CatchUp, sc.Timeout,
 		sc.Paused, sc.NextAt,
 		sc.RunID, sc.RunStarted, sc.ClaimedBy, sc.ClaimedAt, sc.Progress, sc.RunState, sc.Attempts,
 		sc.RunCause, sc.RunOf, sc.TurnTry,
 		sc.LastState, sc.LastDetail, sc.LastAt, sc.CreatedAt, sc.UpdatedAt,
-		sc.FailingSince, sc.Caller, sc.CallerVia, sc.CallerAddr)
+		sc.FailingSince, sc.Caller, sc.CallerVia, sc.CallerAddr, sc.Description, sc.RunDetail, sc.RetryLost)
 	if err != nil {
 		return fmt.Errorf("store: create schedule %q: %w", sc.ID, err)
 	}
@@ -887,15 +925,41 @@ func (s *Store) UpdateSchedule(ctx context.Context, sc Schedule) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE schedules SET name = ?, roles = ?, tenant_id = ?, route_id = ?,
+	_, err = s.db.ExecContext(ctx, `UPDATE schedules SET name = ?, description = ?, roles = ?, tenant_id = ?, route_id = ?,
 		method = ?, path = ?, body = ?, content_type = ?, headers = ?, metadata = ?, every = ?, cron = ?, at = ?,
 		timezone = ?, start_at = ?, overlap = ?, catch_up = ?, timeout = ?, paused = ?, next_at = ?,
-		updated_at = ? WHERE id = ?`,
-		sc.Name, rolesJSON(sc.Roles), sc.TenantID, sc.RouteID, sc.Method, sc.Path, string(sc.Body), sc.ContentType, headers, meta, sc.Every,
+		retry_lost = ?, updated_at = ? WHERE id = ?`,
+		sc.Name, sc.Description, rolesJSON(sc.Roles), sc.TenantID, sc.RouteID, sc.Method, sc.Path, string(sc.Body), sc.ContentType, headers, meta, sc.Every,
 		sc.Cron, sc.At, sc.Timezone, sc.StartAt, sc.Overlap, sc.CatchUp, sc.Timeout, sc.Paused, sc.NextAt,
-		time.Now().Unix(), sc.ID)
+		sc.RetryLost, time.Now().Unix(), sc.ID)
 	if err != nil {
 		return fmt.Errorf("store: update schedule %q: %w", sc.ID, err)
+	}
+	return nil
+}
+
+// MaxScheduleDescription is how long a description may be, in characters: a
+// sentence or two under a name in a list, not a document.
+const MaxScheduleDescription = 500
+
+// SanitizeScheduleDescription trims a description and refuses one too long to
+// sit under a name.
+func SanitizeScheduleDescription(d *string) error {
+	*d = strings.TrimSpace(*d)
+	if n := utf8.RuneCountInString(*d); n > MaxScheduleDescription {
+		return fmt.Errorf("a schedule's description is %d characters at most, got %d: say what it is for in a sentence or two",
+			MaxScheduleDescription, n)
+	}
+	return nil
+}
+
+// DescribeSchedule rewrites a schedule's description alone: the operator's
+// half of a field the service may have left empty.
+func (s *Store) DescribeSchedule(ctx context.Context, id, description string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE schedules SET description = ?, updated_at = ? WHERE id = ?`,
+		description, time.Now().Unix(), id)
+	if err != nil {
+		return fmt.Errorf("store: describe schedule %q: %w", id, err)
 	}
 	return nil
 }
@@ -954,7 +1018,7 @@ func (s *Store) DueSchedules(ctx context.Context, t time.Time) ([]Schedule, erro
 // false is the normal answer in a cluster - another node took it first.
 func (s *Store) ClaimSchedule(ctx context.Context, id, runID, node string, t time.Time) (bool, error) {
 	return s.affected(ctx, "claim schedule "+id, `UPDATE schedules
-		SET run_id = ?, run_started = ?, claimed_by = ?, claimed_at = ?, progress = 0,
+		SET run_id = ?, run_started = ?, claimed_by = ?, claimed_at = ?, progress = 0, run_detail = '',
 		    run_state = ?, attempts = turn_try + 1, updated_at = ?
 		WHERE id = ? AND paused = ? AND next_at > 0 AND next_at <= ? AND run_id = ''`,
 		runID, t.Unix(), node, t.Unix(), RunCalling, t.Unix(),
@@ -972,14 +1036,28 @@ func (s *Store) AcceptRun(ctx context.Context, id, runID string, t time.Time) er
 	return err
 }
 
-// TouchSchedule renews a lease and records progress. runID is checked so a
-// late report from a previous run cannot move the current one. A service
-// reporting on a run has it, by definition: the run is accepted from then on.
-func (s *Store) TouchSchedule(ctx context.Context, id, runID string, progress int, t time.Time) error {
+// TouchSchedule renews a lease and records progress, and what the service
+// said with it. runID is checked so a late report from a previous run cannot
+// move the current one. A service reporting on a run has it, by definition:
+// the run is accepted from then on - a run waiting to be sent again after a
+// lapse included, since a service that reports was slow, not gone.
+func (s *Store) TouchSchedule(ctx context.Context, id, runID string, progress int, detail string, t time.Time) error {
 	_, err := s.affected(ctx, "touch schedule "+id, `UPDATE schedules
-		SET claimed_at = ?, progress = ?, run_state = ?, updated_at = ?
-		WHERE id = ? AND run_id = ?`, t.Unix(), progress, RunAccepted, t.Unix(), id, runID)
+		SET claimed_at = ?, progress = ?, run_detail = ?, run_state = ?, updated_at = ?
+		WHERE id = ? AND run_id = ?`, t.Unix(), progress, clipDetail(detail), RunAccepted, t.Unix(), id, runID)
 	return err
+}
+
+// MaxRunDetail is how much of a progress report is kept: a line under a
+// name, "7 233 / 9 882 records", not a log.
+const MaxRunDetail = 200
+
+func clipDetail(detail string) string {
+	detail = strings.TrimSpace(detail)
+	if r := []rune(detail); len(r) > MaxRunDetail {
+		return string(r[:MaxRunDetail])
+	}
+	return detail
 }
 
 // turnAt is what goes in next_at: the moment, or ZERO when nothing more is
@@ -1001,7 +1079,7 @@ func (s *Store) FinishSchedule(ctx context.Context, id, runID string, end RunEnd
 	// attempt this was, which node held it, and what it continued.
 	was, readErr := s.GetSchedule(ctx, id)
 	closed, err := s.affected(ctx, "finish schedule "+id, `UPDATE schedules
-		SET run_id = '', run_state = '', claimed_by = '', claimed_at = 0, run_cause = '', run_of = '',
+		SET run_id = '', run_state = '', run_detail = '', claimed_by = '', claimed_at = 0, run_cause = '', run_of = '',
 		    turn_try = 0, last_state = ?, last_detail = ?, last_at = ?, next_at = ?, updated_at = ?
 		WHERE id = ? AND run_id = ?`,
 		end.State, clip(end.Detail), t.Unix(), turnAt(next.At), t.Unix(), id, runID)
@@ -1046,13 +1124,42 @@ func (s *Store) LapsedRuns(ctx context.Context, t time.Time, lease time.Duration
 // RetakeRun is the at-least-once half: a call whose node stopped before the
 // answer is taken by this one, to be sent AGAIN under the same run id - the
 // identifier a service dedupes on. Only a call still waiting for its answer
-// qualifies, and only while its lease is still lapsed, so two nodes seeing the
-// same row produce one attempt.
+// qualifies - or a lost run whose delay to be sent again is over (RunWaiting)
+// - and only while its lease is still lapsed, so two nodes seeing the same
+// row produce one attempt.
 func (s *Store) RetakeRun(ctx context.Context, id, runID, node string, t time.Time, lease time.Duration) (bool, error) {
 	return s.affected(ctx, "retake run of "+id, `UPDATE schedules
-		SET claimed_by = ?, claimed_at = ?, attempts = attempts + 1, updated_at = ?
+		SET claimed_by = ?, claimed_at = ?, attempts = attempts + 1, run_state = ?, updated_at = ?
+		WHERE id = ? AND run_id = ? AND run_state IN (?, ?) AND claimed_at <= ?`,
+		node, t.Unix(), RunCalling, t.Unix(), id, runID, RunCalling, RunWaiting, t.Add(-lease).Unix())
+}
+
+// WaitRun keeps a LOST run open to be sent again at `at` (RetryLost): nobody
+// holds it, and its lease is set to lapse then, so whichever node looks next
+// retakes it - the same run, the next attempt. The lapse is part of the
+// condition, like AbandonRun's: a run the service has just reported on is not
+// one to give up on.
+func (s *Store) WaitRun(ctx context.Context, id, runID string, at, t time.Time, lease time.Duration) (bool, error) {
+	return s.affected(ctx, "wait to send again the run of "+id, `UPDATE schedules
+		SET run_state = ?, claimed_by = '', claimed_at = ?, updated_at = ?
 		WHERE id = ? AND run_id = ? AND run_state = ? AND claimed_at <= ?`,
-		node, t.Unix(), t.Unix(), id, runID, RunCalling, t.Add(-lease).Unix())
+		RunWaiting, at.Add(-lease).Unix(), t.Unix(), id, runID, RunAccepted, t.Add(-lease).Unix())
+}
+
+// EndedRun is the history's last word on one run of a schedule: how the run
+// a service is still reporting on was closed, so the answer can tell it why
+// to stop. sql.ErrNoRows when the history has no such run.
+func (s *Store) EndedRun(ctx context.Context, scheduleID, runID string) (ScheduleRun, error) {
+	var r ScheduleRun
+	err := s.db.QueryRowContext(ctx, `SELECT id, schedule_id, run_id, attempt, node, cause, of_run,
+		started_at, ended_at, state, status, detail FROM schedule_runs
+		WHERE schedule_id = ? AND run_id = ? ORDER BY ended_at DESC, id DESC LIMIT 1`, scheduleID, runID).
+		Scan(&r.ID, &r.ScheduleID, &r.RunID, &r.Attempt, &r.Node, &r.Cause, &r.OfRun,
+			&r.StartedAt, &r.EndedAt, &r.State, &r.Status, &r.Detail)
+	if err != nil {
+		return ScheduleRun{}, err
+	}
+	return r, nil
 }
 
 // AbandonRun closes a lapsed run as lost and arms the next turn. The lapse is
@@ -1061,7 +1168,7 @@ func (s *Store) RetakeRun(ctx context.Context, id, runID, node string, t time.Ti
 func (s *Store) AbandonRun(ctx context.Context, id, runID, detail string, next, t time.Time, lease time.Duration) (bool, error) {
 	was, readErr := s.GetSchedule(ctx, id)
 	closed, err := s.affected(ctx, "abandon run of "+id, `UPDATE schedules
-		SET run_id = '', run_state = '', claimed_by = '', claimed_at = 0, run_cause = '', run_of = '',
+		SET run_id = '', run_state = '', run_detail = '', claimed_by = '', claimed_at = 0, run_cause = '', run_of = '',
 		    turn_try = 0, last_state = ?, last_detail = ?, last_at = ?, next_at = ?, updated_at = ?
 		WHERE id = ? AND run_id = ? AND claimed_at <= ?`,
 		RunLost, clip(detail), t.Unix(), turnAt(next), t.Unix(), id, runID, t.Add(-lease).Unix())

@@ -47,8 +47,11 @@
 // LONG WORK ANSWERS 202. A call starts the work; it does not wait for it. A
 // service that answers 202 keeps the run open and reports its own progress,
 // which is what makes a three-hour job expressible without a three-hour HTTP
-// request. Anything else closes the run there and then. A failure is not
-// retried: the next turn is the retry, at the schedule's own cadence.
+// request. Anything else closes the run there and then. A run the service
+// took and then went quiet on is LOST, and sent again - same run, next
+// attempt - only when the schedule says how long to wait first (RetryLost).
+// Stopping one is the service's to do: the answer to its next report says
+// so (see the admin API's reportRun).
 package scheduler
 
 import (
@@ -370,8 +373,26 @@ func (s *Scheduler) reap(ctx context.Context, now time.Time) {
 	for _, sc := range lapsed {
 		switch {
 		case sc.RunState == store.RunAccepted:
-			s.abandon(ctx, sc, now, fmt.Sprintf(
-				"the service took the call (202) and has not reported for %s", s.d.Lease))
+			silent := fmt.Sprintf("the service took the call (202) and has not reported for %s", s.d.Lease)
+			if at, ok := s.retryLostAt(sc, now); ok {
+				waiting, err := s.d.Store.WaitRun(ctx, sc.ID, sc.RunID, at, now, s.d.Lease)
+				if err != nil {
+					slog.Warn("scheduler: arming a lost run to be sent again", "schedule", sc.ID, "err", err)
+				} else if waiting {
+					slog.Warn("scheduled run lost, to be sent again: "+silent,
+						"schedule", sc.Name, "run", sc.RunID, "attempt", sc.Attempts+1,
+						"again_at", at.UTC().Format(time.RFC3339))
+				}
+				continue
+			}
+			s.abandon(ctx, sc, now, silent+s.notAgain(sc))
+		// A lost run whose delay is over, and nothing to send it again to any
+		// more: paused meanwhile, or later than its catch-up allows.
+		case sc.RunState == store.RunWaiting && sc.Paused:
+			s.abandon(ctx, sc, now, "lost, and the schedule was paused before it could be sent again")
+		case sc.RunState == store.RunWaiting && sc.TooLate(now):
+			s.abandon(ctx, sc, now,
+				"lost, and sending it again would be later than this schedule's catch-up allows")
 		case sc.Paused:
 			s.abandon(ctx, sc, now,
 				"the node making the call stopped before the answer, and the schedule is paused")
@@ -394,10 +415,51 @@ func (s *Scheduler) reap(ctx context.Context, now time.Time) {
 				continue
 			}
 			sc.Attempts++
-			slog.Warn("scheduled call sent again: the node making it stopped before the answer",
-				"schedule", sc.Name, "run", sc.RunID, "attempt", sc.Attempts, "was_claimed_by", sc.ClaimedBy)
+			if sc.RunState == store.RunWaiting {
+				slog.Warn("scheduled run sent again: it was lost, and the schedule asks for it (retryLost)",
+					"schedule", sc.Name, "run", sc.RunID, "attempt", sc.Attempts)
+			} else {
+				slog.Warn("scheduled call sent again: the node making it stopped before the answer",
+					"schedule", sc.Name, "run", sc.RunID, "attempt", sc.Attempts, "was_claimed_by", sc.ClaimedBy)
+			}
+			sc.RunState = store.RunCalling
 			s.launch(sc)
 		}
+	}
+}
+
+// retryLostAt says whether a LOST run is sent again, and when: only when the
+// schedule asks for it (RetryLost), never on a paused one, within MaxAttempts
+// - the attempts before the 202 count, like every attempt of the turn - and
+// within the catch-up, like any call sent again.
+func (s *Scheduler) retryLostAt(sc store.Schedule, now time.Time) (time.Time, bool) {
+	if sc.RetryLost == "" || sc.Paused || sc.Attempts >= MaxAttempts {
+		return time.Time{}, false
+	}
+	d, err := store.ParseISODuration(sc.RetryLost)
+	if err != nil || d <= 0 {
+		return time.Time{}, false
+	}
+	at := now.Add(d)
+	if sc.CatchUp > 0 && at.Unix()-sc.NextAt > sc.CatchUp {
+		return time.Time{}, false
+	}
+	return at, true
+}
+
+// notAgain is why a lost run is not sent again, when the schedule asked for
+// it: the sentence the history keeps, so nobody wonders why the retry did not
+// come.
+func (s *Scheduler) notAgain(sc store.Schedule) string {
+	switch {
+	case sc.RetryLost == "":
+		return ""
+	case sc.Paused:
+		return "; not sent again: the schedule is paused"
+	case sc.Attempts >= MaxAttempts:
+		return fmt.Sprintf("; not sent again: %d attempts already", sc.Attempts)
+	default:
+		return "; not sent again: it would be later than this schedule's catch-up allows"
 	}
 }
 

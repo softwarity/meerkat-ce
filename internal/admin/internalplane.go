@@ -71,6 +71,10 @@ func (a *API) RegisterInternal(mux Mux) {
 		{"POST /api/schedules/{id}/resume", a.resumeSchedule},
 		{"POST /api/schedules/{id}/run", a.runSchedule},
 		{"GET /api/schedules/{id}/runs", a.listScheduleRuns},
+		{"DELETE /api/schedules/{id}/run", a.cancelRun},
+		// Every schedule a filter matches, in one call: "pause every import".
+		{"POST /api/schedules/pause", a.pauseMatching},
+		{"POST /api/schedules/resume", a.resumeMatching},
 	} {
 		mux.Handle(e.pattern, a.internalSchedules(e.h))
 	}
@@ -94,7 +98,7 @@ func (a *API) runReport(next userHandler) http.Handler {
 
 // consoleSide marks the scheduler endpoints the control plane keeps: the
 // console READS the schedules and acts on them - pause, resume, run now,
-// replay a turn, delete - and writes none. A service token still arriving
+// cancel a run, delete - and writes nothing of them but their description. A service token still arriving
 // here is a backend configured before the internal plane: it is served, and
 // told once where its door is now.
 func (a *API) consoleSide(next userHandler) userHandler {

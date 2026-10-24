@@ -64,6 +64,9 @@ curl "${this.origin()}/api/schedules?meta.station=42" -H "$AUTH"`,
   // the field, not three paragraphs below.
   protected readonly payload = `{
   "name": "station 42, hourly poll",
+  "description": "Fetches the hourly readings of station 42",
+                                  // optional, shown under the name in the console;
+                                  // a PUT without it keeps the one there
   "roles": ["station_fetch"],     // what the CALL carries; "role" for a single one.
                                   // No account behind it: it goes out as "meerkat"
                                   // holding these, and the route's rule reads them
@@ -140,10 +143,16 @@ curl "${this.origin()}/api/schedules?meta.kind=poll&meta.region=west" -H "$AUTH"
 # An expression, for a fleet: every station numbered under a hundred.
 curl "${this.origin()}/api/schedules?meta.station=~^[0-9]{1,2}$" -H "$AUTH"
 
-# Pause one, let it fire again, owe a turn now.
-curl -X POST ${this.origin()}/api/schedules/sch_9f2c/pause  -H "$AUTH"
-curl -X POST ${this.origin()}/api/schedules/sch_9f2c/resume -H "$AUTH"
-curl -X POST ${this.origin()}/api/schedules/sch_9f2c/run    -H "$AUTH"`,
+# Pause one, let it fire again, owe a turn now, stop the run in flight.
+curl -X POST   ${this.origin()}/api/schedules/sch_9f2c/pause  -H "$AUTH"
+curl -X POST   ${this.origin()}/api/schedules/sch_9f2c/resume -H "$AUTH"
+curl -X POST   ${this.origin()}/api/schedules/sch_9f2c/run    -H "$AUTH"
+curl -X DELETE ${this.origin()}/api/schedules/sch_9f2c/run    -H "$AUTH"
+
+# Every schedule a filter matches, in one call: the same filter as the list.
+# The answer is those schedules, as they now stand.
+curl -X POST "${this.origin()}/api/schedules/pause?meta.svc=stations&meta.job=import" -H "$AUTH"
+curl -X POST "${this.origin()}/api/schedules/resume?meta.svc=stations&meta.job=import" -H "$AUTH"`,
   );
 
   protected readonly runsCmd = computed(
@@ -169,8 +178,9 @@ X-Roles: station_fetch                # identity over: headers, REMOTE_USER, a J
 Meerkat-Job: sch_9f2c                 # which schedule
 Meerkat-Job-Run: GvbDqbNG__YTOY00     # which TURN - the same on every attempt:
                                       # ignore one you have already acted on
-Meerkat-Job-Attempt: 1                # 2 or more: a gateway stopped before your
-                                      # answer came, and another sent it again
+Meerkat-Job-Attempt: 1                # 2 or more: sent again - a gateway stopped
+                                      # before your answer, an attempt failed, or
+                                      # a lost run came back (retryLost)
 User-Agent: meerkat-scheduler`,
   );
 
@@ -181,24 +191,22 @@ the daily extract is not published yet   # kept on this run, and read
                                          # from the history afterwards`;
 
   protected readonly reportCmd = computed(
-    () => `# You answered 202, so the run is yours until you close it - reported with
-# your OWN token, on the same API as everything else.
+    () => `# You answered 202, so the run is yours until you close it. The run id is
+# the proof: whatever the Access mode, a report needs no token.
 curl -X PATCH ${this.origin()}/api/schedules/sch_9f2c/run \\
-  -H "Authorization: Bearer $MEERKAT_TOKEN" \\
   -H "Content-Type: application/json" \\
-  -d '{"run":"GvbDqbNG__YTOY00","state":"running","progress":60}'
+  -d '{"run":"GvbDqbNG__YTOY00","progress":73,"detail":"7 233 / 9 882 records"}'
+# 204: carry on. Report at least every five minutes: it renews the lease.
+
+# 410 Gone: STOP. The run is closed on our side; report nothing more.
+# {"stop":"paused","error":"the schedule is paused: stop the work, ..."}
+# stop is paused, cancelled, deleted, lost or closed.
 
 # ... and when the work is over.
 curl -X PATCH ${this.origin()}/api/schedules/sch_9f2c/run \\
-  -H "Authorization: Bearer $MEERKAT_TOKEN" \\
   -H "Content-Type: application/json" \\
-  -d '{"run":"GvbDqbNG__YTOY00","state":"done","detail":"12000 rows"}'
+  -d '{"run":"GvbDqbNG__YTOY00","state":"done","detail":"9 882 records"}'
 
-# 204 both times. A report naming a run that is not the one in flight is
-# refused with 409: a late word from last night cannot close tonight.
-#
-# The 202 already told us the work is YOURS: from then on the call is never
-# sent again, whatever happens to the gateway. Report at least every five
-# minutes, or the lease lapses and the run is closed as lost.`,
+# A run id you were never given is a 409.`,
   );
 }

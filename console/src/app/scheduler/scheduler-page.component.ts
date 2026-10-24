@@ -1,4 +1,6 @@
-import { Component, computed, inject, signal } from "@angular/core";
+import { Component, computed, inject, linkedSignal, signal } from "@angular/core";
+import { FormField, form, maxLength } from "@angular/forms/signals";
+import { TextFieldModule } from "@angular/cdk/text-field";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { catchError, of } from "rxjs";
 import { httpResource } from "@angular/common/http";
@@ -11,10 +13,9 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { MatSidenavModule } from "@angular/material/sidenav";
-import { MatProgressBarModule } from "@angular/material/progress-bar";
+import { MatProgressBarModule, ProgressBarMode } from "@angular/material/progress-bar";
 import { DialogsService } from "../shared/dialogs.service";
 import { MatSelectModule } from "@angular/material/select";
-import { MatSnackBar } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { LiveWindowDataSource } from "@softwarity/livewire";
@@ -46,6 +47,7 @@ import {
 @Component({
   selector: "app-scheduler-page",
   imports: [
+    FormField,
     FormFieldComponent,
     KeyValuePipe,
     MatButtonModule,
@@ -64,6 +66,7 @@ import {
     SchedulerAccessComponent,
     SchedulerApiComponent,
     SnippetComponent,
+    TextFieldModule,
     ZonedDatePipe,
   ],
   templateUrl: "./scheduler-page.component.html",
@@ -74,39 +77,10 @@ export class SchedulerPageComponent {
   private readonly dialogs = inject(DialogsService);
   private readonly api = inject(ApiService);
 
-  // WHICH HOURS these are. A scheduler is read by people who are not where the
-  // gateway is: "2:24 AM" means nothing until it says whose 2:24. The times are
-  // written in the zone this operator chose on their own profile, and the
-  // switch offers the one alternative worth naming - UTC, which then says so
-  // with a Z. The other state needs no label: it is the hours of whoever is
-  // reading.
-  private readonly mine = inject(MeService).timezone;
-  protected readonly utc = signal(false);
-  protected readonly zone = computed(() => (this.utc() ? "UTC" : this.mine()));
-  // An account that never chose a zone reads UTC anyway, so the switch would
-  // flip between two identical answers: it says so instead, and points at the
-  // one place that fixes it.
-  protected readonly zoneIsUtc = computed(() => this.mine() === "UTC");
-  private readonly snack = inject(MatSnackBar);
-
-  // The toggle says UTC; the snackbar says where you landed. Which matters in
-  // the direction the toggle cannot label: coming BACK is coming back to a
-  // zone that has a name, and naming it once beats printing it on the header
-  // for ever.
-  protected switchZone(utc: boolean): void {
-    this.utc.set(utc);
-    this.snack.open(
-      $localize`:@@Times_shown_in:Times shown in ${this.zone()}:zone:`,
-      undefined,
-      { duration: 2500 },
-    );
-  }
-
-  protected readonly zoneHint = computed(() =>
-    this.zoneIsUtc()
-      ? $localize`:@@Zone_none:Your profile has no timezone: times are already in UTC`
-      : $localize`:@@Zone_to_utc:Show the times in UTC rather than ${this.mine()}:zone:`,
-  );
+  // WHICH HOURS these are: the zone this operator chose on their own profile,
+  // UTC when they chose none. The profile is the answer; a second switch here
+  // would only ask the same question again.
+  protected readonly zone = inject(MeService).timezone;
 
   // The three filters, and they travel WITH the subscription: a reader
   // watching one service does not receive the others to hide them.
@@ -171,7 +145,6 @@ export class SchedulerPageComponent {
     "name",
     "every",
     "next",
-    "state",
     "last",
   ];
 
@@ -201,21 +174,17 @@ export class SchedulerPageComponent {
     this.selected.set(row);
   }
 
-  // How the creator of a schedule was recognised, in a few words beside its
-  // name: a token is a credential, an address only a guess.
-  protected callerHow(s: ScheduleRow): string {
-    switch (s.callerVia) {
-      case "token":
-        return $localize`:@@Caller_by_token:Meerkat token`;
-      case "serviceaccount":
-        return $localize`:@@Caller_by_service_account:ServiceAccount, checked by the cluster`;
-      case "workload":
-      case "container":
-        return $localize`:@@Caller_by_address:deduced from its address ${s.callerAddr}:addr:`;
-      default:
-        return $localize`:@@Caller_unidentified_from:from ${s.callerAddr}:addr:`;
-    }
-  }
+  // The schedule the drawer shows, as the live channel has it NOW: a run
+  // advancing, its detail, its end - the row clicked is only where it
+  // started. Kept as clicked when the list no longer holds it (filtered out).
+  protected readonly shown = computed(() => {
+    const one = this.selected();
+    if (!one) return null;
+    return this.all().find((r) => r.id === one.id) ?? one;
+  });
+  // When the last run of the schedule shown ended: the history is read again
+  // when it moves, and not at every progress report.
+  private readonly lastEnd = computed(() => this.shown()?.lastAt ?? 0);
 
   // What this schedule was WRITTEN as: the payload that recreates it, fetched
   // when the drawer opens. Two things at once - the fields a row cannot show
@@ -231,6 +200,7 @@ export class SchedulerPageComponent {
     // Only what a caller SENDS: the run, the times and the identifiers are the
     // gateway's own answer, and copying them back would be noise.
     const out: Record<string, unknown> = { name: s.name };
+    if (s.description) out["description"] = s.description;
     if (s.roles?.length) out["roles"] = s.roles;
     if (s.tenantId) out["tenantId"] = s.tenantId;
     out["routeId"] = s.routeId;
@@ -252,10 +222,37 @@ export class SchedulerPageComponent {
     if (s.overlap && s.overlap !== "skip") out["overlap"] = s.overlap;
     if (s.catchUp) out["catchUp"] = s.catchUp;
     if (s.timeout) out["timeout"] = s.timeout;
+    if (s.retryLost) out["retryLost"] = s.retryLost;
     if (s.metadata && Object.keys(s.metadata).length)
       out["metadata"] = s.metadata;
     return JSON.stringify(out, null, 2);
   });
+
+  // What the schedule is for: the one field the console writes, for the
+  // schedules whose service never said. Reset whenever another one opens.
+  protected readonly described = linkedSignal(() => ({
+    description: this.selected()?.description ?? "",
+  }));
+  protected readonly describeForm = form(this.described, (p) => {
+    maxLength(p.description, 500);
+  });
+  protected readonly describeDirty = computed(
+    () =>
+      this.described().description.trim() !==
+      (this.selected()?.description ?? ""),
+  );
+
+  protected saveDescription(row: ScheduleRow): void {
+    if (this.describeForm().invalid()) return;
+    this.schedules
+      .describe(row.id, this.described().description.trim())
+      .subscribe((saved) => {
+        const now = this.selected();
+        if (now?.id === row.id) {
+          this.selected.set({ ...now, description: saved.description });
+        }
+      });
+  }
 
   // What each turn did (SCHED-03), read when the drawer opens. The row beside
   // it says how the LAST one ended; this is where "since when" lives - and
@@ -264,22 +261,22 @@ export class SchedulerPageComponent {
   private readonly runsRes = httpResource<ScheduleRun[]>(() => {
     const one = this.selected();
     this.reload();
+    this.lastEnd();
+    // A new object each time, so a run that ended reads the history again.
     return one
-      ? `/api/schedules/${encodeURIComponent(one.id)}/runs?limit=50`
+      ? { url: `/api/schedules/${encodeURIComponent(one.id)}/runs`, params: { limit: 50 } }
       : undefined;
   });
   protected readonly runs = computed(() => this.runsRes.value() ?? []);
 
-  // The chain, as a sentence: what this run continues, when it continues
-  // something. An ordinary turn says nothing, which is the common case.
+  // What this run continues, in a word, when it continues something. A retry
+  // says nothing more: its attempt number already does.
   protected chainOf(run: ScheduleRun): string {
     switch (run.cause) {
       case "replay":
-        return $localize`:@@Replay_of:replay of an earlier run`;
-      case "retry":
-        return $localize`:@@Retry_of:another attempt at the same turn`;
+        return $localize`:@@Replay_short:replay`;
       case "asked":
-        return $localize`:@@Asked_by_service:the service asked to be called back`;
+        return $localize`:@@Asked_short:called back`;
       default:
         return "";
     }
@@ -301,17 +298,14 @@ export class SchedulerPageComponent {
     return run.state === "done" ? "" : (run.detail ?? "");
   }
 
-  // A turn that did not go out, or went out badly, is worth asking for again.
-  // A done one is not: replaying a success is how a job runs twice.
-  protected replayable(run: ScheduleRun): boolean {
-    return run.state !== "done";
-  }
-
-  protected replay(row: ScheduleRow, run: ScheduleRun): void {
-    this.schedules.replay(row.id, run.id).subscribe(() => {
-      this.subscribe();
-      this.reload.update((n) => n + 1);
-    });
+  // What qualifies a run's answer, on one line: how long, which attempt, what
+  // it continues. Empty for an ordinary turn that answered at once.
+  protected runFacts(run: ScheduleRun): string {
+    const facts = [this.took(run), this.chainOf(run)];
+    if (run.attempt && run.attempt > 1) {
+      facts.splice(1, 0, $localize`:@@Attempt_number:attempt ${run.attempt}:n:`);
+    }
+    return facts.filter(Boolean).join(" - ");
   }
 
   protected openHowto(): void {
@@ -454,6 +448,29 @@ export class SchedulerPageComponent {
     return !!row.runId;
   }
 
+  // What the bar along a row says. Idle and paused are a quiet track; a call
+  // waiting for its answer, or work accepted with no progress said yet, moves
+  // without a value; accepted work with a progress fills; a lost run waiting
+  // to be sent again runs backwards, in the error colour.
+  protected barState(row: ScheduleRow): string {
+    if (!this.running(row)) return row.paused ? "paused" : "idle";
+    return row.runState || "calling";
+  }
+
+  protected barMode(row: ScheduleRow): ProgressBarMode {
+    switch (this.barState(row)) {
+      case "idle":
+      case "paused":
+        return "determinate";
+      case "waiting":
+        return "query";
+      case "accepted":
+        return row.progress > 0 ? "determinate" : "indeterminate";
+      default:
+        return "indeterminate";
+    }
+  }
+
   protected pause(row: ScheduleRow): void {
     this.schedules.pause(row.id).subscribe(() => this.subscribe());
   }
@@ -467,6 +484,19 @@ export class SchedulerPageComponent {
       this.subscribe();
       this.reload.update((n) => n + 1);
     });
+  }
+
+  // Confirmed: the service's work stops at its next report, and what it did
+  // so far is its own business to keep or undo.
+  protected async cancelRun(row: ScheduleRow): Promise<void> {
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Cancel_the_run_of_NAME:Cancel the run of "${row.name}:NAME:"?`,
+      message: $localize`:@@Cancel_run_message:The run is closed now. The service is told to stop at its next report; the next turn comes at the schedule's own time.`,
+      confirmLabel: $localize`:@@Cancel_run:Cancel run`,
+      danger: true,
+    });
+    if (!ok) return;
+    this.schedules.cancelRun(row.id).subscribe(() => this.subscribe());
   }
 
   // Type-to-confirm: a schedule belongs to the service that wrote it, and the

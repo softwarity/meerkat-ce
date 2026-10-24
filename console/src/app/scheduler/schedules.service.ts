@@ -11,6 +11,9 @@ import type { LiveRow } from "@softwarity/livewire";
 export interface ScheduleRow extends LiveRow {
   id: string;
   name: string;
+  // What it is for, in a sentence: the service's, or an operator's when the
+  // service said nothing.
+  description?: string;
   // The roles the CALL carries: a scheduled call is made as "meerkat", and
   // these are what the route's rule and the forwarded identity read.
   roles?: string[];
@@ -48,8 +51,15 @@ export interface ScheduleRow extends LiveRow {
   runStarted: number;
   claimedBy: string;
   progress: number;
+  // What the service last said about its run, in its own words: "7 233 /
+  // 9 882 records". Empty until it says something.
+  runDetail?: string;
+  // How long after a LOST run it is sent again (ISO duration); empty sends
+  // nothing. Read from the drawer's own call.
+  retryLost?: string;
   // Where that run stands: "calling" until the service answers, "accepted"
-  // once it took the work (a 202). And how many times it has been sent: 2 or
+  // once it took the work (a 202), "waiting" when it was lost and is to be
+  // sent again (retryLost). And how many times it has been sent: 2 or
   // more means a gateway stopped before the answer and another sent it again.
   runState: string;
   attempts: number;
@@ -139,13 +149,18 @@ export class SchedulesService {
       `/api/schedules/${encodeURIComponent(id)}/runs`,
     );
 
-  // Ask for a past turn again. It goes out as a NEW run carrying today's
-  // payload, and the history says which one it replays.
-  replay = (id: string, runId: string) =>
-    this.http.post(`/api/schedules/${id}/run`, { replayOf: runId });
 
   pause = (id: string) => this.http.post(`/api/schedules/${id}/pause`, {});
   resume = (id: string) => this.http.post(`/api/schedules/${id}/resume`, {});
   runNow = (id: string) => this.http.post(`/api/schedules/${id}/run`, {});
+  // Stops the run in flight: closed at once, the service told at its next
+  // report.
+  cancelRun = (id: string) => this.http.delete(`/api/schedules/${id}/run`);
   remove = (id: string) => this.http.delete(`/api/schedules/${id}`);
+  // The one field the console writes: what the schedule is for. Empty
+  // removes it.
+  describe = (id: string, description: string) =>
+    this.http.put<ScheduleRow>(`/api/schedules/${id}/description`, {
+      description,
+    });
 }

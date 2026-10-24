@@ -429,9 +429,12 @@ async function seedEverythingElse(api) {
   const minted = await api.post('/api/admin-tokens', { data: { name: 'orders-api', scope: 'schedules' } });
   const svc = await request.newContext({ baseURL: INTERNAL, extraHTTPHeaders: { Authorization: `Bearer ${(await minted.json()).token}` } });
   for (const sc of [
-    { name: 'Nightly reindex', path: '/api/orders/admin/reindex', method: 'POST', roles: ['OPS'], cron: '0 2 * * *', timezone: 'Europe/Paris' },
-    { name: 'Sync shipments', path: '/api/shipments', method: 'POST', roles: ['OPS'], every: 'PT15M' },
-    { name: 'Close the quarter', path: '/api/orders', method: 'POST', roles: ['BILLING'], at: '2026-12-31T23:00:00Z' },
+    { name: 'Nightly reindex', description: "Rebuilds the order search index from the day's writes",
+      path: '/api/orders/admin/reindex', method: 'POST', roles: ['OPS'], cron: '0 2 * * *', timezone: 'Europe/Paris' },
+    { name: 'Sync shipments', description: "Pulls the carriers' shipment updates into the orders",
+      path: '/api/shipments', method: 'POST', roles: ['OPS'], every: 'PT15M' },
+    { name: 'Close the quarter', description: "Locks the quarter's invoices and starts the accounting export",
+      path: '/api/orders', method: 'POST', roles: ['BILLING'], at: '2026-12-31T23:00:00Z' },
   ]) {
     await soft(`schedule ${sc.name}`, () => svc.post('/api/schedules', {
       data: { routeId: 'orders-api', overlap: 'skip', catchUp: 3600, ...sc } }));

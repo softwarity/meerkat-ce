@@ -10,6 +10,14 @@
       <table class="fields">
         <tbody>
           <tr>
+            <th><code>GET /</code></th>
+            <td i18n="@@Sched_ep_list">The list, narrowed by <code>meta.&lt;key&gt;</code>, <code>tenant</code>, <code>route</code>.</td>
+          </tr>
+          <tr>
+            <th><code>GET /&#123;id&#125;</code></th>
+            <td i18n="@@Sched_ep_get">One schedule.</td>
+          </tr>
+          <tr>
             <th><code>POST /</code></th>
             <td i18n="@@Sched_ep_post">Create one; the id comes back.</td>
           </tr>
@@ -18,30 +26,40 @@
             <td i18n="@@Sched_ep_put">Change it.</td>
           </tr>
           <tr>
-            <th><code>GET /</code></th>
-            <td i18n="@@Sched_ep_list">
-              The list, narrowed by your own metadata.
-            </td>
-          </tr>
-          <tr>
             <th><code>DELETE /&#123;id&#125;</code></th>
-            <td i18n="@@Sched_ep_delete">Remove one.</td>
+            <td i18n="@@Sched_ep_delete">Remove one. Its run in flight is told to stop.</td>
           </tr>
           <tr>
             <th><code>POST /&#123;id&#125;/pause</code></th>
-            <td i18n="@@Sched_ep_pause">
-              And <code>/resume</code>, <code>/run</code>.
-            </td>
+            <td i18n="@@Sched_ep_pause">Stop it firing. Its run in flight is told to stop.</td>
+          </tr>
+          <tr>
+            <th><code>POST /&#123;id&#125;/resume</code></th>
+            <td i18n="@@Sched_ep_resume">Let it fire again.</td>
+          </tr>
+          <tr>
+            <th><code>POST /&#123;id&#125;/run</code></th>
+            <td i18n="@@Sched_ep_run">Owe a turn now.</td>
+          </tr>
+          <tr>
+            <th><code>PATCH /&#123;id&#125;/run</code></th>
+            <td i18n="@@Sched_ep_report">Report on a run you answered 202 to. The answer may tell you to stop.</td>
+          </tr>
+          <tr>
+            <th><code>DELETE /&#123;id&#125;/run</code></th>
+            <td i18n="@@Sched_ep_cancel">Cancel the run in flight.</td>
           </tr>
           <tr>
             <th><code>GET /&#123;id&#125;/runs</code></th>
             <td i18n="@@Sched_ep_runs">What each turn did, newest first.</td>
           </tr>
           <tr>
-            <th><code>PATCH /&#123;id&#125;/run</code></th>
-            <td i18n="@@Sched_ep_report">
-              Report on a run you answered 202 to.
-            </td>
+            <th><code>POST /pause?meta.&lt;key&gt;=...</code></th>
+            <td i18n="@@Sched_ep_pause_many">Pause every schedule the filter matches.</td>
+          </tr>
+          <tr>
+            <th><code>POST /resume?meta.&lt;key&gt;=...</code></th>
+            <td i18n="@@Sched_ep_resume_many">Resume every schedule the filter matches.</td>
           </tr>
         </tbody>
       </table>
@@ -54,8 +72,9 @@
         This is the <b>internal plane</b>: a port inside the cluster, never
         behind an ingress. What a service presents there - nothing, this token,
         or its pod's ServiceAccount token - is set under <b>Access</b>.
-        Services write their schedules there. This console reads them and
-        pauses, resumes, runs or deletes them, but creates and changes none.
+        Services write their schedules there. This console reads them,
+        pauses, resumes, runs, cancels or deletes them, and writes only their
+        description.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -92,6 +111,14 @@
             <th><code>name</code></th>
             <td i18n="@@Sched_field_name">
               Required. Shown on this screen and in logs.
+            </td>
+          </tr>
+          <tr>
+            <th><code>description</code></th>
+            <td i18n="@@Sched_field_description">
+              What it is for, 500 characters at most, shown under the name. An
+              operator can write it here; a <code>PUT</code> without it keeps
+              it.
             </td>
           </tr>
           <tr>
@@ -181,8 +208,8 @@
           <tr>
             <th><code>overlap</code></th>
             <td i18n="@@Sched_field_overlap">
-              <code>skip</code> (default) or <code>run</code>: what to do with
-              a turn due while the previous run is still in flight.
+              <code>skip</code> only: a turn due while a run is in flight waits
+              for it to close. <code>run</code> is refused.
             </td>
           </tr>
           <tr>
@@ -198,6 +225,14 @@
             <td i18n="@@Sched_field_timeout">
               ISO duration, 30 seconds by default, two minutes at most. It
               bounds the answer, not the work (see 202 below).
+            </td>
+          </tr>
+          <tr>
+            <th><code>retryLost</code></th>
+            <td i18n="@@Sched_field_retrylost">
+              ISO duration, one minute to one day, none by default: how long
+              after a <b>lost</b> run (202, then silent) the same run is sent
+              again. Only if your service can pick its work up again.
             </td>
           </tr>
         </tbody>
@@ -274,9 +309,66 @@
         failed.
       </p>
       <app-snippet filename="report-run.sh" [content]="reportCmd()" />
+      <table class="fields">
+        <tbody>
+          <tr>
+            <th><code>run</code></th>
+            <td i18n="@@Sched_report_run">
+              Required: the <code>Meerkat-Job-Run</code> of the call. It is
+              the proof, no token is needed.
+            </td>
+          </tr>
+          <tr>
+            <th><code>state</code></th>
+            <td i18n="@@Sched_report_state">
+              <code>running</code> (or nothing) while it works,
+              <code>done</code> or <code>failed</code> to close it.
+            </td>
+          </tr>
+          <tr>
+            <th><code>progress</code></th>
+            <td i18n="@@Sched_report_progress">
+              0 to 100: the bar on this screen.
+            </td>
+          </tr>
+          <tr>
+            <th><code>detail</code></th>
+            <td i18n="@@Sched_report_detail">
+              Your words. While it runs, shown live under the name
+              (<code>7 233 / 9 882 records</code>, 200 characters); at the
+              end, kept in the history.
+            </td>
+          </tr>
+          <tr>
+            <th><code>retryIn</code></th>
+            <td i18n="@@Sched_report_retryin">
+              With <code>failed</code>: call me back then (see below).
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="hint" i18n="@@Sched_api_long_answers">
+        <b>The answer</b>: <code>204</code> carry on (or, at the end,
+        recorded). <code>410 Gone</code> <b>stop</b>: the run is already
+        closed on our side, report nothing more. Its
+        <code>stop</code> says why: <code>paused</code>,
+        <code>cancelled</code>, <code>deleted</code>, <code>lost</code> or
+        <code>closed</code>. <code>409</code>: a run id you were never given.
+      </p>
+      <p class="hint" i18n="@@Sched_api_long_stop">
+        <b>Paused</b> while it runs: your next progress report gets the 410
+        and the run closes as <code>cancelled</code>; the next turn comes after
+        a resume. A final report on a paused schedule is still taken.
+        <b>Cancelled</b> (here, or <code>DELETE /&#123;id&#125;/run</code>):
+        closed at once, any later report gets the 410.
+      </p>
       <p class="hint" i18n="@@Sched_api_long_2">
-        After a 202 the call is never resent. Without a report for five
-        minutes, the run closes as lost. Every report renews the lease.
+        Every report renews the lease. Without one for five minutes the run is
+        <b>lost</b>. It is not sent again unless the schedule says
+        <code>retryLost</code>: then, after that delay, the same run is sent
+        again (same <code>Meerkat-Job-Run</code>, next
+        <code>Meerkat-Job-Attempt</code>), three attempts per turn at most.
+        A report arriving meanwhile takes the run back.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -313,13 +405,14 @@
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_history_1">
         Every finished run is kept: when, how (<code>done</code>,
-        <code>failed</code>, <code>lost</code>, <code>dropped</code> when too
-        late), the answer, the node and the attempt.
+        <code>failed</code>, <code>lost</code>, <code>cancelled</code>,
+        <code>dropped</code> when too late), the answer, the node and the
+        attempt.
       </p>
       <app-snippet filename="schedule-runs.sh" [content]="runsCmd()" />
       <p class="hint" i18n="@@Sched_api_history_2">
-        Replay a run by its id: it goes out as a new run with today's payload.
-        Same button on each run in the schedule's drawer.
+        Replay a run by its id: it goes out as a new run with today's payload,
+        and the history says which one it replays.
       </p>
     </ng-template>
   </mat-expansion-panel>

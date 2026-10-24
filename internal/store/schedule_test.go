@@ -49,7 +49,11 @@ func TestSanitizeScheduleNamesWhatIsAllowed(t *testing.T) {
 		{"a relative path", func(s *Schedule) { s.Path = "jobs" }, "must start with /"},
 		{"no cadence", func(s *Schedule) { s.Every = "" }, "ISO 8601 duration"},
 		{"too fast", func(s *Schedule) { s.Every = "PT10S" }, "shortest cadence"},
-		{"an unknown overlap", func(s *Schedule) { s.Overlap = "queue" }, "overlap must be"},
+		{"an unknown overlap", func(s *Schedule) { s.Overlap = "queue" }, "the only behaviour"},
+		// Accepted once and never acted on: a schedule has one run in flight.
+		{"a second run alongside the first", func(s *Schedule) { s.Overlap = "run" }, "the only behaviour"},
+		{"a lost run sent again at once", func(s *Schedule) { s.RetryLost = "PT10S" }, "leave it out"},
+		{"a lost run sent again in a week", func(s *Schedule) { s.RetryLost = "P7D" }, "leave it out"},
 		{"a cadence and a date", func(s *Schedule) { s.At = "2026-10-03T04:00:00Z" }, "says WHEN once"},
 		{"a date that is not one", func(s *Schedule) { s.Every, s.At = "", "3 octobre" }, "RFC 3339"},
 		{"a date without its offset", func(s *Schedule) { s.Every, s.At = "", "2026-10-03T04:00:00" }, "RFC 3339"},

@@ -48,18 +48,6 @@
           placeholder="station=42"
         />
       </app-form-field>
-      <!-- Two columns carry dates, so the switch belongs to the screen rather than
-       to one header. It offers ONE thing - UTC: the other state is the hours
-       of whoever is reading, which needs no label. The snackbar names the zone
-       you land in, which is the half a toggle cannot say. -->
-      <mat-slide-toggle
-        class="utc"
-        [checked]="utc()"
-        [disabled]="zoneIsUtc()"
-        [matTooltip]="zoneHint()"
-        (change)="switchZone($event.checked)"
-        >UTC</mat-slide-toggle
-      >
       @if (me.isRoot() && retentionChoices().length) {
         <!-- Housekeeping, root's alone (SCHED-02): how long a delayed action
              that has gone stays before the sweep takes it. -->
@@ -77,7 +65,7 @@
       }
       @if (finishedCount()) {
         <mat-slide-toggle
-          class="utc"
+          class="toggle"
           [checked]="hideFinished()"
           (change)="hideFinished.set($event.checked)"
           i18n="@@Hide_finished"
@@ -124,16 +112,50 @@
               <mat-cell *matCellDef="let s" [class.off]="s.paused">
                 <span class="lines">
                   <span class="name">{{ s.name }}</span>
-                  <span class="muted">
-                    @if (rolesOf(s); as roles) {
-                      <ng-container i18n="@@Calls_with"
-                        >calls with</ng-container
-                      >
-                      {{ roles }}
-                    } @else {
-                      <ng-container i18n="@@No_role">no role</ng-container>
-                    }
-                  </span>
+                  <!-- The second line says what the schedule is for, and while
+                   it runs, what the run is doing instead.
+                   The roles it calls with are the drawer's, they do not move.
+                   Calling is a call nobody answered yet, accepted is work the
+                   service took (a 202). A second attempt means a gateway
+                   stopped before the answer: worth seeing. A call handed back
+                   by a stopping node has no claimant until another takes it.
+                   What the service last said ("7 233 / 9 882 records") ends
+                   the line: it is what moves while a long job runs. -->
+                  @if (running(s)) {
+                    <span class="muted description">
+                      @if (s.runState === "accepted") {
+                        <ng-container i18n="@@Run_accepted"
+                          >accepted</ng-container
+                        >
+                      } @else if (s.runState === "waiting") {
+                        <ng-container i18n="@@Run_waiting"
+                          >lost, to be sent again</ng-container
+                        >
+                      } @else {
+                        <ng-container i18n="@@Run_calling"
+                          >calling</ng-container
+                        >
+                      }
+                      @if (s.attempts > 1) {
+                        -
+                        <ng-container i18n="@@Attempt_n"
+                          >attempt {{ s.attempts }}</ng-container
+                        >
+                      }
+                      @if (s.claimedBy) {
+                        -
+                        <ng-container i18n="@@Claimed_by"
+                          >claimed by</ng-container
+                        >
+                        {{ s.claimedBy }}
+                      }
+                      @if (s.runDetail) {
+                        - {{ s.runDetail }}
+                      }
+                    </span>
+                  } @else if (s.description) {
+                    <span class="muted description">{{ s.description }}</span>
+                  }
                 </span>
                 @if (s.paused) {
                   <mat-icon
@@ -143,6 +165,17 @@
                     >pause_circle</mat-icon
                   >
                 }
+                <!-- The row's state, along its whole bottom edge: placed
+                 against the ROW, not this cell. Always there, so a run that
+                 starts does not move anything; quiet when nothing runs. What
+                 the run is doing reads in words under the name. -->
+                <mat-progress-bar
+                  class="row-state"
+                  [class]="'row-state ' + barState(s)"
+                  [mode]="barMode(s)"
+                  [value]="running(s) ? s.progress : 0"
+                  aria-hidden="true"
+                />
               </mat-cell>
             </ng-container>
 
@@ -192,53 +225,6 @@
               </mat-cell>
             </ng-container>
 
-            <ng-container matColumnDef="state">
-              <mat-header-cell *matHeaderCellDef i18n="@@State"
-                >State</mat-header-cell
-              >
-              <mat-cell *matCellDef="let s">
-                @if (running(s)) {
-                  <span class="lines running">
-                    <mat-progress-bar
-                      [mode]="s.progress > 0 ? 'determinate' : 'indeterminate'"
-                      [value]="s.progress"
-                    />
-                    <!-- Calling is a call nobody answered yet, accepted is
-                     work the service took (a 202). A second attempt means a
-                     gateway stopped before the answer: worth seeing. A call
-                     handed back by a stopping node has no claimant until
-                     another takes it. -->
-                    <span class="muted">
-                      @if (s.runState === "accepted") {
-                        <ng-container i18n="@@Run_accepted"
-                          >accepted</ng-container
-                        >
-                      } @else {
-                        <ng-container i18n="@@Run_calling"
-                          >calling</ng-container
-                        >
-                      }
-                      @if (s.attempts > 1) {
-                        -
-                        <ng-container i18n="@@Attempt_n"
-                          >attempt {{ s.attempts }}</ng-container
-                        >
-                      }
-                      @if (s.claimedBy) {
-                        -
-                        <ng-container i18n="@@Claimed_by"
-                          >claimed by</ng-container
-                        >
-                        {{ s.claimedBy }}
-                      }
-                    </span>
-                  </span>
-                } @else {
-                  <span class="muted" i18n="@@Idle">idle</span>
-                }
-              </mat-cell>
-            </ng-container>
-
             <!-- The last result and the row's actions share the last column: a
              column of buttons is a column of nothing most of the time. -->
             <ng-container matColumnDef="last">
@@ -246,14 +232,26 @@
                 >Last run</mat-header-cell
               >
               <mat-cell *matCellDef="let s">
-                <!-- lastAt, not lastState: a claim writes "running" the moment it
-                 takes a turn, and a run that has not ENDED has no moment to
-                 show - printing one gave the epoch. -->
-                @if (s.lastAt > 0) {
+                <!-- While a run is in flight, the column says so and since
+                 when: "done" beside a bar that is moving read as a
+                 contradiction. The previous result is still the first of the
+                 drawer's runs, and comes back here replaced when this one ends.
+                 lastAt, not lastState, otherwise: a run that has not ENDED has
+                 no moment to show - printing one gave the epoch. -->
+                @if (running(s)) {
+                  <span class="lines">
+                    <span class="result running">
+                      <span class="dot"></span
+                      ><ng-container i18n="@@Running">running</ng-container>
+                    </span>
+                    <span class="muted">{{ s.runStarted | zoned: zone() }}</span>
+                  </span>
+                } @else if (s.lastAt > 0) {
                   <span class="lines">
                     <span
                       class="result"
-                      [class.failed]="s.lastState !== 'done'"
+                      [class.failed]="s.lastState !== 'done' && s.lastState !== 'cancelled'"
+                      [class.stopped]="s.lastState === 'cancelled'"
                       [matTooltip]="s.lastDetail"
                     >
                       <span class="dot"></span>{{ s.lastState }}
@@ -371,8 +369,8 @@
         </div>
         <app-scheduler-api />
       </div>
-    } @else if (selected(); as s) {
-      <div class="drawer">
+    } @else if (shown(); as s) {
+      <div class="drawer schedule">
         <div class="drawer-head">
           <h2>{{ s.name }}</h2>
           <button
@@ -383,6 +381,31 @@
           >
             <mat-icon>close</mat-icon>
           </button>
+        </div>
+
+        <!-- What it is for: the service's words, or the operator's when the
+             service said nothing. The one field this screen writes. -->
+        <div class="description-edit">
+          <mat-form-field subscriptSizing="dynamic">
+            <mat-label i18n="@@Description">Description</mat-label>
+            <textarea
+              matInput
+              cdkTextareaAutosize
+              cdkAutosizeMinRows="1"
+              cdkAutosizeMaxRows="4"
+              [formField]="describeForm.description"
+            ></textarea>
+          </mat-form-field>
+          @if (describeDirty()) {
+            <button
+              matButton
+              [disabled]="describeForm().invalid()"
+              (click)="saveDescription(s)"
+              i18n="@@Save"
+            >
+              Save
+            </button>
+          }
         </div>
 
         <dl>
@@ -433,19 +456,11 @@
             <dt i18n="@@Organization">Organization</dt>
             <dd>{{ s.tenantId }}</dd>
           }
-          <!-- Who wrote it on the internal plane, and how that was known:
-               a token is a credential, an address only a guess. A schedule
-               older than that record keeps the account it was written as. -->
+          <!-- Who wrote it on the internal plane. A schedule older than that
+               record keeps the account it was written as. -->
           @if (s.callerVia) {
             <dt i18n="@@Created_by">Created by</dt>
-            <dd>
-              @if (s.caller) {
-                {{ s.caller }}
-              } @else {
-                <ng-container i18n="@@Unidentified">Unidentified</ng-container>
-              }
-              <span class="muted"> - {{ callerHow(s) }}</span>
-            </dd>
+            <dd>{{ s.caller || s.callerAddr }}</dd>
           } @else if (s.createdBy) {
             <dt i18n="@@Created_by">Created by</dt>
             <dd>{{ s.createdBy }}</dd>
@@ -475,19 +490,25 @@
                 <ng-container i18n="@@Run_accepted_long"
                   >Accepted: the service reports on it</ng-container
                 >
+              } @else if (s.runState === "waiting") {
+                <ng-container i18n="@@Run_waiting_long"
+                  >Lost, to be sent again</ng-container
+                >
               } @else {
                 <ng-container i18n="@@Run_calling_long"
                   >Calling - waiting for the answer</ng-container
                 >
               }
             </dd>
+            @if (s.runDetail) {
+              <dt i18n="@@Progress">Progress</dt>
+              <dd>{{ s.runDetail }}</dd>
+            }
             <dt i18n="@@Started">Started</dt>
             <dd>{{ s.runStarted | zoned: zone() : "long" }}</dd>
             @if (s.attempts > 1) {
               <dt i18n="@@Attempt">Attempt</dt>
-              <dd i18n="@@Attempt_of">
-                {{ s.attempts }}, resent by another gateway
-              </dd>
+              <dd>{{ s.attempts }}</dd>
             }
             <dt i18n="@@Claimed_by">claimed by</dt>
             <dd>
@@ -502,88 +523,64 @@
             <dt i18n="@@Run">Run</dt>
             <dd class="mono">{{ s.runId }}</dd>
           </dl>
+          <div class="run-actions">
+            <button matButton class="danger" (click)="cancelRun(s)">
+              <mat-icon>stop_circle</mat-icon>
+              <ng-container i18n="@@Cancel_run">Cancel run</ng-container>
+            </button>
+          </div>
         }
 
-        @if (s.lastAt > 0) {
-          <h3 i18n="@@Last_run">Last run</h3>
-          <dl>
-            <dt i18n="@@Result">Result</dt>
-            <dd>
-              <span class="result" [class.failed]="s.lastState !== 'done'">
-                <span class="dot"></span>{{ s.lastState }}
-              </span>
-            </dd>
-            <dt i18n="@@When">When</dt>
-            <dd>{{ s.lastAt | zoned: zone() : "long" }}</dd>
-            @if (s.lastDetail) {
-              <dt i18n="@@Detail">Detail</dt>
-              <dd class="detail">{{ s.lastDetail }}</dd>
-            }
-          </dl>
-        }
-
-        <!-- What each turn did (SCHED-03). The row above says how the LAST
-             one ended; this is where "since when is it failing" lives, and
-             where a turn that never went out is asked for again. -->
-        @if (runs().length) {
-          <h3 i18n="@@Runs">Runs</h3>
-          <ul class="runs">
-            @for (run of runs(); track run.id) {
-              <li>
-                <span class="result" [class.failed]="run.state !== 'done'">
-                  <span class="dot"></span>{{ run.state }}
-                </span>
-                <span class="when">{{ run.endedAt | zoned: zone() }}</span>
-                <span class="muted">
-                  @if (run.status) {
-                    {{ run.status }}
-                  }
-                  @if (took(run); as d) {
-                    - {{ d }}
-                  }
-                  @if (run.attempt && run.attempt > 1) {
-                    -
-                    <ng-container i18n="@@Attempt_n"
-                      >attempt {{ run.attempt }}</ng-container
-                    >
-                  }
-                  @if (chainOf(run); as chain) {
-                    - {{ chain }}
-                  }
-                </span>
-                @if (detailOf(run); as detail) {
-                  <span class="detail">{{ detail }}</span>
-                }
-                @if (replayable(run)) {
-                  <button
-                    matIconButton
-                    (click)="replay(s, run)"
-                    [disabled]="running(s) || s.paused"
-                    i18n-matTooltip="@@Replay"
-                    matTooltip="Run this turn again"
-                    i18n-aria-label="@@Replay"
-                    aria-label="Run this turn again"
+        <!-- Two sections, one open at a time, the open one filling what the
+             drawer has left and scrolling inside it. The runs (SCHED-03), the
+             last one first: where "since when is it failing" lives, and where
+             a turn that never went out is asked for again. The payload: what
+             it was written as, and a worked example for the next one. -->
+        <mat-accordion class="sections" displayMode="flat">
+          @if (runs().length) {
+            <mat-expansion-panel [expanded]="true">
+              <mat-expansion-panel-header>
+                <mat-panel-title i18n="@@Runs">Runs</mat-panel-title>
+              </mat-expansion-panel-header>
+            <!-- One entry per run, as tall as it needs: the result, the date
+             and how it went on the first line, a failure's own words under
+             it, whole. Nothing to press: running again is Run now. -->
+            <ul class="runs">
+              @for (run of runs(); track run.id) {
+                <li>
+                  <span
+                    class="result"
+                    [class.failed]="run.state !== 'done' && run.state !== 'cancelled'"
+                    [class.stopped]="run.state === 'cancelled'"
                   >
-                    <mat-icon>replay</mat-icon>
-                  </button>
-                }
-              </li>
-            }
-          </ul>
-        }
-
-        <!-- What it was written as, folded away: the fields a row cannot
-             show, and a worked example for whoever writes the next one. -->
-        @if (payload(); as body) {
-          <mat-expansion-panel class="payload">
-            <mat-expansion-panel-header>
-              <mat-panel-title i18n="@@Payload">Payload</mat-panel-title>
-            </mat-expansion-panel-header>
-            <ng-template matExpansionPanelContent>
-              <app-snippet filename="schedule.json" [content]="body" />
-            </ng-template>
-          </mat-expansion-panel>
-        }
+                    <span class="dot"></span>{{ run.state }}
+                  </span>
+                  <span class="when">{{ run.endedAt | zoned: zone() }}</span>
+                  <span class="muted">
+                    {{ run.status }}
+                    @if (runFacts(run); as facts) {
+                      - {{ facts }}
+                    }
+                  </span>
+                  @if (detailOf(run); as detail) {
+                    <span class="detail">{{ detail }}</span>
+                  }
+                </li>
+              }
+            </ul>
+            </mat-expansion-panel>
+          }
+          @if (payload(); as body) {
+            <mat-expansion-panel [expanded]="!runs().length">
+              <mat-expansion-panel-header>
+                <mat-panel-title i18n="@@Payload">Payload</mat-panel-title>
+              </mat-expansion-panel-header>
+              <ng-template matExpansionPanelContent>
+                <app-snippet filename="schedule.json" [content]="body" />
+              </ng-template>
+            </mat-expansion-panel>
+          }
+        </mat-accordion>
 
         <div class="drawer-actions">
           @if (s.paused) {

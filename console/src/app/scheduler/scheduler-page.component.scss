@@ -61,9 +61,6 @@
   .mat-column-next {
     flex: 0 0 170px;
   }
-  .mat-column-state {
-    flex: 0 0 110px;
-  }
   .mat-column-last {
     flex: 0 0 180px;
   }
@@ -82,6 +79,14 @@
 
 .name {
   font-weight: 500;
+}
+
+// Under the name, on one line: the row keeps the height of the others, and
+// the drawer has the whole sentence.
+.description {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .muted {
@@ -119,10 +124,44 @@
   &.failed .dot {
     background: var(--mat-sys-error);
   }
+
+  // Stopped by somebody: nobody failed.
+  &.stopped .dot {
+    background: var(--mat-sys-outline);
+  }
+
+  // In flight: not a result yet.
+  &.running .dot {
+    background: var(--mat-sys-tertiary);
+  }
 }
 
-.running mat-progress-bar {
-  width: 120px;
+// The row's state, along its bottom edge. The bar sits in the name cell but
+// is placed against the ROW, which is why the row is positioned and the cell
+// is not. Thin, and quiet while nothing runs: forty idle rows must not read as
+// forty stripes.
+mat-row {
+  position: relative;
+}
+
+mat-progress-bar.row-state {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  --mat-progress-bar-active-indicator-height: 3px;
+  --mat-progress-bar-track-height: 3px;
+
+  &.idle,
+  &.paused {
+    --mat-progress-bar-track-color: color-mix(in srgb, var(--mat-sys-outline-variant) 45%, transparent);
+  }
+
+  // Lost, and to be sent again: worth seeing from across the room.
+  &.waiting {
+    --mat-progress-bar-active-indicator-color: var(--mat-sys-error);
+    --mat-progress-bar-track-color: var(--mat-sys-error-container);
+  }
 }
 
 mat-cell {
@@ -190,18 +229,9 @@ lw-live-indicator {
   margin-right: auto;
 }
 
-// The zone switch, with the filters: two columns carry dates, so it belongs to
-// the screen. Small, because it is a statement about what is drawn rather than
-// a question somebody has to answer.
-.banner .utc {
+// A switch among the filters keeps its size: it is one word and a thumb.
+.banner .toggle {
   flex: none;
-
-  .mat-button-toggle-label-content {
-    line-height: 22px;
-    padding: 0 8px;
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
-  }
 }
 
 mat-row.clickable {
@@ -249,6 +279,18 @@ mat-row.clickable {
   }
 }
 
+// The description under the title, its Save beside it once it changed.
+.description-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+
+  mat-form-field {
+    flex: 1 1 auto;
+  }
+}
+
 .drawer-head {
   display: flex;
   align-items: center;
@@ -256,11 +298,16 @@ mat-row.clickable {
   gap: 12px;
 }
 
-// Folded, and flat against the drawer: it is a detail somebody opens, not a
-// second card competing with the facts above it.
-.payload {
-  margin-top: 24px;
-  background: transparent;
+// The run's own action, under its facts: it stops this run, not the
+// schedule.
+.run-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+
+  .danger {
+    color: var(--mat-sys-error);
+  }
 }
 
 .drawer-actions {
@@ -274,8 +321,63 @@ mat-row.clickable {
   }
 }
 
-// The history in the drawer: one line per ended turn, the result first so a
-// column of dots reads down the side, the detail wrapping under it.
+// A schedule's drawer is a column the height of the screen: the open section
+// fills what the facts leave and scrolls inside it, the actions stay at the
+// bottom.
+.drawer.schedule {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  > * {
+    flex: none;
+  }
+
+  // The open section takes the height, its body scrolls; the closed one is
+  // its header alone.
+  > .sections {
+    flex: 1 1 0;
+    min-height: 200px;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+
+    mat-expansion-panel {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: transparent;
+
+      &.mat-expanded {
+        flex: 1 1 0;
+      }
+    }
+
+    ::ng-deep .mat-expanded > .mat-expansion-panel-content-wrapper {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    ::ng-deep .mat-expanded .mat-expansion-panel-body {
+      height: 100%;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+  }
+
+  // The footer: pushed to the bottom however short the runs are, and set
+  // apart from them by a rule.
+  > .drawer-actions {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--mat-sys-outline-variant);
+  }
+}
+
+// The history in the drawer: one entry per run, as tall as its words. The
+// result, the date and how it went on the first line, the failure under it.
 .runs {
   list-style: none;
   margin: 0;
@@ -283,14 +385,16 @@ mat-row.clickable {
 
   li {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
+    grid-template-columns: auto auto 1fr;
+    align-items: baseline;
     column-gap: 0.75rem;
-    padding: 0.35rem 0;
+    row-gap: 2px;
+    padding: 6px 0;
     border-bottom: 1px solid var(--mat-sys-outline-variant);
 
     .when {
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
 
     .detail {

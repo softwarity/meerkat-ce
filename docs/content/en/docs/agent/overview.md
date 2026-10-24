@@ -51,6 +51,8 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `list_services` | What the gateway sees running around it. |
 | `list_schedules` | The scheduled calls: what runs at night, how often, as whom, and how the last run ended. |
 | `pause_schedule`, `run_schedule` | Stop a scheduled call, let it fire again, or bring its next turn forward to now. |
+| `describe_schedule` | Write what a scheduled call is for, when its service did not say. |
+| `cancel_schedule_run` | Stop the run a scheduled call has in flight: closed at once, the service told at its next report. |
 | `read_traffic` | What is passing through right now. |
 | `read_logs` | The gateway's own last lines, on the node that answered. |
 | `read_audit` | The audit trail, within the caller's own scope. |
