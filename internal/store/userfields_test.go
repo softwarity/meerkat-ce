@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -193,5 +194,102 @@ func TestAWindowThatEndsBeforeItStartsIsRefused(t *testing.T) {
 		if err := ValidFromUntil(ok[0], ok[1]); err != nil {
 			t.Errorf("window %v was refused: %v", ok, err)
 		}
+	}
+}
+
+// An account field and an organisation field travel in one namespace: a route
+// names `region`, and nothing tells an upstream which of two it received.
+func TestOneNameBelongsToOneList(t *testing.T) {
+	users := []UserField{{Name: "region", Kind: FieldText}}
+	err := DisjointFields(users, []UserField{{Name: "Region", Kind: FieldText}})
+	if err == nil || !strings.Contains(err.Error(), "Region") {
+		t.Fatalf("a name on both lists was accepted, or the refusal does not name it: %v", err)
+	}
+	if err := DisjointFields(users, []UserField{{Name: "plan", Kind: FieldText}}); err != nil {
+		t.Fatalf("two distinct names were refused: %v", err)
+	}
+}
+
+// An organisation's values are a column like an account's: written, read back
+// one at a time and in a listing, and an organisation without any carries none.
+func TestAnOrganisationKeepsItsFields(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	tn := Tenant{ID: "t1", Name: "acme", Enabled: true, BusinessAccess: BusinessAccess{Inherited: true},
+		Fields: map[string]string{"plan": "premium"}}
+	if err := s.SaveTenant(ctx, tn); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetTenant(ctx, "t1")
+	if err != nil || got.Fields["plan"] != "premium" {
+		t.Fatalf("GetTenant: %+v, %v", got.Fields, err)
+	}
+	list, err := s.ListTenants(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range list {
+		switch l.ID {
+		case "t1":
+			if l.Fields["plan"] != "premium" {
+				t.Errorf("ListTenants lost the value: %+v", l.Fields)
+			}
+		default:
+			if len(l.Fields) != 0 {
+				t.Errorf("organisation %q carries fields nobody wrote: %+v", l.ID, l.Fields)
+			}
+		}
+	}
+	got.Fields = nil
+	if err := s.SaveTenant(ctx, got); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := s.GetTenant(ctx, "t1"); len(again.Fields) != 0 {
+		t.Fatalf("an emptied value came back: %+v", again.Fields)
+	}
+}
+
+// A multiple choice is one line per set: the list's order, no repeats, so the
+// same regions are the same header on every account. A value off the list is
+// refused with the list, and a choice holding the separator is refused at
+// definition.
+func TestAMultipleChoiceHasOneSpelling(t *testing.T) {
+	defs, err := SanitizeUserFields([]UserField{{Name: "regions", Kind: FieldMultiChoice, Choices: []string{"FR", "ES", "IT"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ValidateUserValues(defs, map[string]string{"regions": " IT, FR,IT ,"})
+	if err != nil || got["regions"] != "FR,IT" {
+		t.Fatalf("got %q, %v; want FR,IT", got["regions"], err)
+	}
+	if got, _ := ValidateUserValues(defs, map[string]string{"regions": " , "}); len(got) != 0 {
+		t.Fatalf("an empty set was kept: %+v", got)
+	}
+	if _, err := ValidateUserValues(defs, map[string]string{"regions": "FR,DE"}); err == nil || !strings.Contains(err.Error(), "ES") {
+		t.Fatalf("a value off the list was accepted, or the refusal does not list them: %v", err)
+	}
+	if _, err := SanitizeUserFields([]UserField{{Name: "r", Kind: FieldMultiChoice, Choices: []string{"A,B"}}}); err == nil {
+		t.Fatal("a choice holding a comma was accepted")
+	}
+	if _, err := SanitizeUserFields([]UserField{{Name: "r", Kind: FieldMultiChoice}}); err == nil {
+		t.Fatal("a multiple choice with nothing to choose from was accepted")
+	}
+	if m := ArrayFields(defs, []UserField{{Name: "plan", Kind: FieldChoice}, {Name: "refs", Kind: FieldList}}); !m["regions"] || !m["refs"] || m["plan"] {
+		t.Fatalf("ArrayFields = %v", m)
+	}
+}
+
+// A list takes any text, in the order typed, without blanks or repeats.
+func TestAListKeepsTheOrderTyped(t *testing.T) {
+	defs, err := SanitizeUserFields([]UserField{{Name: "refs", Kind: FieldList, Choices: []string{"ignored"}}})
+	if err != nil || defs[0].Choices != nil {
+		t.Fatalf("a list kept choices, or was refused: %+v, %v", defs, err)
+	}
+	got, err := ValidateUserValues(defs, map[string]string{"refs": " B12, A7,,B12 "})
+	if err != nil || got["refs"] != "B12,A7" {
+		t.Fatalf("got %q, %v; want B12,A7", got["refs"], err)
+	}
+	if got, _ := ValidateUserValues(defs, map[string]string{"refs": ", ,"}); len(got) != 0 {
+		t.Fatalf("an empty list was kept: %+v", got)
 	}
 }

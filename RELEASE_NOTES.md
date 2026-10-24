@@ -2,6 +2,24 @@
 
 ## NEXT RELEASE
 
+- **Tenants carry their own fields (Enterprise, several tenants).** Infra > Model now has a
+  second list, Tenant fields, with the same kinds as the account fields. Root and app-admins fill
+  them on the tenant's General screen; the tenant's own administrators see them read-only. A
+  route forwards them with the other identity attributes, marked `tenant` in the editor, taken
+  from the session's tenant. A name belongs to one list only: the model refuses a name already
+  used on the other list.
+- **Fields with several values.** Account and tenant fields get two new kinds: Multiple choice
+  (several values from a list, kept in the list's order) and List (values typed freely, kept in
+  the order typed, without repeats). A header or a page attribute carries them on one line
+  (`FR,ES`), a JWT or an OIDC claim as an array. None of their values may contain a comma.
+- **A field added to the model reaches the routes at once.** Saving Infra > Model ticks a new
+  account or tenant field on every route that already forwards identity attributes, and removes a
+  deleted one from every route, page attributes included. The screen names the routes it
+  rewrote, and each change is in the audit trail. Putting a field on a page stays a choice made
+  on the route.
+- **Creating a tenant asks for its name and group mode only.** The description is filled
+  afterwards on the General screen.
+
 ---
 
 ## 1.17.0

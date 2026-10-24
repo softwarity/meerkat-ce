@@ -287,7 +287,7 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		"PUT /api/locales/{code}":                                true, "DELETE /api/locales/{code}": true,
 		"POST /api/themes": true, "PUT /api/themes/{id}": true,
 		"POST /api/themes/{id}/activate": true, "DELETE /api/themes/{id}": true,
-		"PUT /api/branding": true, "PUT /api/model/user-fields": true,
+		"PUT /api/branding": true, "PUT /api/model/user-fields": true, "PUT /api/model/tenant-fields": true,
 		"POST /api/users": true, "PUT /api/users/{id}": true, "DELETE /api/users/{id}": true,
 		"POST /api/users/must-change-password":      true,
 		"POST /api/users/{id}/must-change-password": true,

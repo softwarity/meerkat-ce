@@ -1,9 +1,13 @@
-import { Component, inject, input, model, signal } from '@angular/core';
+import { httpResource } from '@angular/common/http';
+import { Component, computed, input, model } from '@angular/core';
+import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { ApiService, UserFieldDef } from '../api.service';
+import { UserFieldDef } from '../api.service';
 import { FormFieldComponent } from '../shared/form-field.component';
 
 // The inputs, and only the inputs: the window an account is valid in, then
@@ -15,13 +19,17 @@ import { FormFieldComponent } from '../shared/form-field.component';
 // Presentational on purpose - it saves nothing and knows no account. The
 // editor wraps it with Save and Cancel; the creation dialog embeds it in its
 // own form. Two containers, one set of widgets, so a field added tomorrow is
-// drawn the same way in both places instead of the same way twice.
+// drawn the same way in both places instead of the same way twice. The
+// tenant's General screen is a third (MODEL-03): the organisation's own fields,
+// with the same widgets, read-only for whoever may not write them.
 @Component({
   selector: 'app-user-fields-form',
   imports: [
     FormFieldComponent,
     MatCheckboxModule,
+    MatChipsModule,
     MatFormFieldModule,
+    MatIconModule,
     MatInputModule,
     MatSelectModule,
   ],
@@ -52,7 +60,7 @@ import { FormFieldComponent } from '../shared/form-field.component';
             @case ('choice') {
               <mat-form-field>
                 <mat-label>{{ label(f) }}</mat-label>
-                <mat-select [value]="value(f.name)" (selectionChange)="set(f.name, $event.value)">
+                <mat-select [value]="value(f.name)" [disabled]="readonly()" (selectionChange)="set(f.name, $event.value)">
                   <!-- Always a way back to "not set": a choice with no way out
                        is a value nobody can remove once it is wrong, and no
                        custom field is ever mandatory. -->
@@ -63,9 +71,51 @@ import { FormFieldComponent } from '../shared/form-field.component';
                 </mat-select>
               </mat-form-field>
             }
+            <!-- Several of the list. No "Not set" line: an empty selection
+                 is the way back. Kept as one line, in the list's order, which
+                 is what the server stores and a header carries. -->
+            @case ('multichoice') {
+              <mat-form-field>
+                <mat-label>{{ label(f) }}</mat-label>
+                <mat-select
+                  multiple
+                  [value]="values(f.name)"
+                  [disabled]="readonly()"
+                  (selectionChange)="setMany(f, $event.value)"
+                >
+                  @for (c of f.choices ?? []; track c) {
+                    <mat-option [value]="c">{{ c }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+            <!-- Values typed freely, one chip each: Enter or a comma closes
+                 one, since the comma is what separates them on the wire. -->
+            @case ('list') {
+              <mat-form-field class="list">
+                <mat-label>{{ label(f) }}</mat-label>
+                <mat-chip-grid #grid [disabled]="readonly()">
+                  @for (v of values(f.name); track v) {
+                    <mat-chip-row (removed)="drop(f.name, v)">
+                      {{ v }}
+                      <button matChipRemove [attr.aria-label]="v" type="button">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                    </mat-chip-row>
+                  }
+                  <input
+                    [matChipInputFor]="grid"
+                    [matChipInputSeparatorKeyCodes]="separators"
+                    [matChipInputAddOnBlur]="true"
+                    (matChipInputTokenEnd)="push(f.name, $event)"
+                  />
+                </mat-chip-grid>
+              </mat-form-field>
+            }
             @case ('bool') {
               <mat-checkbox
                 [checked]="value(f.name) === 'true'"
+                [disabled]="readonly()"
                 (change)="set(f.name, $event.checked ? 'true' : 'false')"
               >
                 {{ label(f) }}
@@ -78,6 +128,7 @@ import { FormFieldComponent } from '../shared/form-field.component';
                   [type]="f.kind === 'date' ? 'date' : f.kind === 'number' ? 'number' : 'text'"
                   spellcheck="false"
                   [value]="value(f.name)"
+                  [readonly]="readonly()"
                   (input)="set(f.name, $any($event.target).value)"
                 />
               </app-form-field>
@@ -106,6 +157,12 @@ import { FormFieldComponent } from '../shared/form-field.component';
     .grid > * {
       width: 220px;
     }
+    /* A line of its own: chips flow along it instead of piling up in a
+       220px box and pushing the fields beside them down. */
+    .grid > .list {
+      flex-basis: 100%;
+      max-width: 640px;
+    }
     .hint {
       color: var(--mat-sys-on-surface-variant);
       font-size: 0.82rem;
@@ -122,16 +179,19 @@ export class UserFieldsFormComponent {
   // The creation drawer shows the window too; a caller that has its own place
   // for it can turn this off rather than draw it twice.
   readonly withWindow = input(true);
+  // Whose fields these are: an account's, or an organisation's (MODEL-03).
+  // One list each in Infra > Model, so the form reads the one it fills.
+  readonly of = input<'account' | 'tenant'>('account');
+  // Shown and not editable: an organisation's administrators read its fields,
+  // root and the app-admins write them.
+  readonly readonly = input(false);
 
-  private readonly api = inject(ApiService);
-  protected readonly defs = signal<UserFieldDef[]>([]);
-
-  constructor() {
-    this.api.userFields().subscribe({
-      next: (r) => this.defs.set(r.fields ?? []),
-      error: () => undefined,
-    });
-  }
+  private readonly defsRes = httpResource<{ fields: UserFieldDef[] }>(() =>
+    this.of() === 'tenant' ? '/api/model/tenant-fields' : '/api/model/user-fields',
+  );
+  protected readonly defs = computed(() =>
+    this.defsRes.hasValue() ? (this.defsRes.value().fields ?? []) : [],
+  );
 
   protected label(f: UserFieldDef): string {
     return f.label || f.name;
@@ -139,6 +199,27 @@ export class UserFieldsFormComponent {
 
   protected value(name: string): string {
     return this.fields()[name] ?? '';
+  }
+
+  protected values(name: string): string[] {
+    return this.value(name).split(',').filter(Boolean);
+  }
+
+  protected readonly separators = [ENTER, COMMA];
+
+  protected push(name: string, event: MatChipInputEvent): void {
+    const v = event.value.trim();
+    event.chipInput.clear();
+    if (!v || this.values(name).includes(v)) return;
+    this.set(name, [...this.values(name), v].join(','));
+  }
+
+  protected drop(name: string, v: string): void {
+    this.set(name, this.values(name).filter((x) => x !== v).join(','));
+  }
+
+  protected setMany(f: UserFieldDef, picked: string[]): void {
+    this.set(f.name, (f.choices ?? []).filter((c) => picked.includes(c)).join(','));
   }
 
   protected set(name: string, v: string): void {

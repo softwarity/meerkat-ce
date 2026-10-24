@@ -76,6 +76,10 @@ type Tenant struct {
 	// GroupMode (RBAC-03), a per-tenant call: "" defaults to cumulative,
 	// MULTIPLE cumulates every group's roles, SINGLE makes the member pick one.
 	GroupMode string `json:"groupMode"`
+	// Fields are the organisation's custom fields' values, by name (MODEL-03):
+	// defined in the tenant_fields setting, written by root or an app-admin
+	// only, and forwarded on a route like any other fact about the caller.
+	Fields map[string]string `json:"fields,omitempty"`
 	// CreatedBy is the id of the user who created the tenant (audit), set once
 	// and never changed. OwnerID is the current owner (TENANT-02): always set,
 	// the creator by default, transferable in the Danger zone, and INDEPENDENT
@@ -193,14 +197,14 @@ func (s *Store) SaveTenant(ctx context.Context, t Tenant) error {
 	// the tenant (it is stamped once at creation). owner_id IS updatable (the
 	// caller carries it forward on a plain update, or changes it on transfer).
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO tenants (id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+		`INSERT INTO tenants (id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, fields, created_at, updated_at, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, description = excluded.description, enabled = excluded.enabled,
 		   business_access = excluded.business_access, session_ttl = excluded.session_ttl,
-		   group_mode = excluded.group_mode, owner_id = excluded.owner_id,
+		   group_mode = excluded.group_mode, owner_id = excluded.owner_id, fields = excluded.fields,
 		   updated_at = excluded.updated_at, rev = tenants.rev + 1`,
-		t.ID, t.Name, t.Description, t.Enabled, string(ba), t.SessionTTL, t.GroupMode, t.CreatedBy, t.OwnerID, now, now)
+		t.ID, t.Name, t.Description, t.Enabled, string(ba), t.SessionTTL, t.GroupMode, t.CreatedBy, t.OwnerID, encodeFields(t.Fields), now, now)
 	if err != nil {
 		return fmt.Errorf("store: save tenant %q: %w", t.Name, err)
 	}
@@ -210,24 +214,25 @@ func (s *Store) SaveTenant(ctx context.Context, t Tenant) error {
 // GetTenant returns one tenant by ID, or an error wrapping sql.ErrNoRows.
 func (s *Store) GetTenant(ctx context.Context, id string) (Tenant, error) {
 	var t Tenant
-	var ba string
+	var ba, fields string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev
+		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, fields, created_at, updated_at, rev
 		 FROM tenants WHERE id = ?`, id).
-		Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &t.CreatedAt, &t.UpdatedAt, &t.Rev)
+		Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &fields, &t.CreatedAt, &t.UpdatedAt, &t.Rev)
 	if err != nil {
 		return Tenant{}, fmt.Errorf("store: get tenant %q: %w", id, err)
 	}
 	if err := json.Unmarshal([]byte(ba), &t.BusinessAccess); err != nil {
 		return Tenant{}, fmt.Errorf("store: tenant %q: bad business access: %w", id, err)
 	}
+	t.Fields = decodeFields(fields)
 	return t, nil
 }
 
 // ListTenants returns every tenant ordered by name.
 func (s *Store) ListTenants(ctx context.Context) ([]Tenant, error) {
 	return s.listTenants(ctx,
-		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev
+		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, fields, created_at, updated_at, rev
 		 FROM tenants ORDER BY name ASC`)
 }
 
@@ -236,7 +241,7 @@ func (s *Store) ListTenants(ctx context.Context) ([]Tenant, error) {
 // sees exactly these; root uses ListTenants instead.
 func (s *Store) ListTenantsAdministeredBy(ctx context.Context, userID string) ([]Tenant, error) {
 	return s.listTenants(ctx,
-		`SELECT t.id, t.name, t.description, t.enabled, t.business_access, t.session_ttl, t.group_mode, t.created_by, t.owner_id, t.created_at, t.updated_at, t.rev
+		`SELECT t.id, t.name, t.description, t.enabled, t.business_access, t.session_ttl, t.group_mode, t.created_by, t.owner_id, t.fields, t.created_at, t.updated_at, t.rev
 		 FROM tenants t
 		 LEFT JOIN memberships m ON m.tenant_id = t.id AND m.user_id = ?
 		 WHERE t.owner_id = ? OR (m.type = 'ADMIN' AND m.enabled = ?)
@@ -252,13 +257,14 @@ func (s *Store) listTenants(ctx context.Context, query string, args ...any) ([]T
 	var tenants []Tenant
 	for rows.Next() {
 		var t Tenant
-		var ba string
-		if err := rows.Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
+		var ba, fields string
+		if err := rows.Scan(&t.ID, &t.Name, &t.Description, &t.Enabled, &ba, &t.SessionTTL, &t.GroupMode, &t.CreatedBy, &t.OwnerID, &fields, &t.CreatedAt, &t.UpdatedAt, &t.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan tenant: %w", err)
 		}
 		if err := json.Unmarshal([]byte(ba), &t.BusinessAccess); err != nil {
 			return nil, fmt.Errorf("store: tenant %q: bad business access: %w", t.ID, err)
 		}
+		t.Fields = decodeFields(fields)
 		tenants = append(tenants, t)
 	}
 	if err := rows.Err(); err != nil {
@@ -649,7 +655,7 @@ func (s *Store) SetTenancy(ctx context.Context, mode string) error {
 // would mean more.
 func (s *Store) PrimaryTenant(ctx context.Context) (Tenant, error) {
 	list, err := s.listTenants(ctx,
-		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, created_at, updated_at, rev
+		`SELECT id, name, description, enabled, business_access, session_ttl, group_mode, created_by, owner_id, fields, created_at, updated_at, rev
 		 FROM tenants
 		 ORDER BY created_at ASC, CASE WHEN id = ? THEN 0 ELSE 1 END, id ASC LIMIT 1`, DefaultTenantID)
 	if err != nil {

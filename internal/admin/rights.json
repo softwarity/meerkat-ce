@@ -521,6 +521,16 @@
   },
   {
     "method": "GET",
+    "path": "/api/model/tenant-fields",
+    "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/model/tenant-fields",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/model/user-fields",
     "guard": "authed"
   },

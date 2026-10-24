@@ -670,6 +670,20 @@
    "fr": "Un compte hors de sa fenêtre de validité est refusé à la connexion, avec la date."
   },
   {
+   "id": "MODEL-03",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "EE"
+   ],
+   "en": "A tenant field set by root reaches the upstream of a route that names it; a tenant admin cannot change it.",
+   "fr": "Un champ d'organisation posé par root arrive à l'amont d'une route qui le nomme ; un administrateur de l'organisation ne peut pas le changer."
+  },
+  {
    "id": "TENANT-01",
    "priority": "P1",
    "feasibility": "easy",

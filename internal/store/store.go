@@ -430,6 +430,10 @@ CREATE TABLE IF NOT EXISTS tenants (
   -- transferable, and INDEPENDENT of membership - an owner need not be a
   -- member. This is why there is no OWNER membership type.
   owner_id        TEXT NOT NULL DEFAULT '',
+  -- What this installation knows about an organisation that the product could
+  -- not have guessed (MODEL-03, see userfields.go): the same JSON object as
+  -- users.fields, keyed by the names the tenant_fields setting defines.
+  fields          TEXT NOT NULL DEFAULT '{}',
   created_at      BIGINT NOT NULL DEFAULT 0,
   updated_at      BIGINT NOT NULL DEFAULT 0,
   -- The revision this row is on, raised by every write. See ErrStale: a save
@@ -1315,7 +1319,9 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // pass, empty - a schedule says what it is for when somebody writes it.
 // 92 carries no step: schedules.run_detail and retry_lost are filled in by
 // the additive pass, empty - nothing said, nothing sent again.
-const schemaVersion = 92
+// 93 carries no step: tenants.fields is filled in by the additive pass, empty
+// - an organisation carries nothing until somebody defines what it may.
+const schemaVersion = 93
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()

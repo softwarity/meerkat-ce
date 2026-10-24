@@ -914,6 +914,107 @@ func TestIdentityForwardHeadersReachUpstream(t *testing.T) {
 	}
 }
 
+// A multiple choice is a line in a header and an array in a token: the same
+// value, in the form each transport can carry.
+func TestAMultipleChoiceIsAnArrayInAToken(t *testing.T) {
+	d := identityData{Fields: map[string]string{"regions": "FR,ES", "cc": "B200"},
+		Arrays: map[string]bool{"regions": true}}
+	cfg := store.IdentityForward{Mechanism: "jwt", Attributes: []store.IdentityAttr{{Field: "regions"}, {Field: "cc"}}}
+	claims := identityClaims(cfg, "r", "iss", d)
+	if got, ok := claims["regions"].([]string); !ok || len(got) != 2 || got[0] != "FR" || got[1] != "ES" {
+		t.Fatalf("regions claim = %#v, want [FR ES]", claims["regions"])
+	}
+	if claims["cc"] != "B200" {
+		t.Fatalf("a plain field became %#v", claims["cc"])
+	}
+	cfg.Mechanism = "headers"
+	seen := false
+	for _, h := range identityHeaderPairs(cfg, d) {
+		if h.Name == "regions" {
+			seen = true
+		}
+		if h.Name == "regions" && h.Value != "FR,ES" {
+			t.Fatalf("regions header = %q, want FR,ES", h.Value)
+		}
+	}
+	if !seen {
+		t.Fatal("no regions header")
+	}
+}
+
+// An organisation's own field travels like an account's (MODEL-03): named on
+// the route, read from the session's organisation, and an inbound header of
+// the same name is purged rather than believed.
+func TestATenantFieldReachesUpstream(t *testing.T) {
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	if err := st.CreateUser(ctx, store.User{ID: "u1", Username: "neo", Enabled: true, PasswordHash: "x",
+		Fields: map[string]string{"costCenter": "B200"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveMembership(ctx, store.Membership{UserID: "u1", TenantID: store.DefaultTenantID,
+		Type: store.MemberUser, Enabled: true, BusinessAccess: store.BusinessAccess{Inherited: true}}); err != nil {
+		t.Fatal(err)
+	}
+	tn, err := st.GetTenant(ctx, store.DefaultTenantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tn.Fields = map[string]string{"plan": "premium"}
+	if err := st.SaveTenant(ctx, tn); err != nil {
+		t.Fatal(err)
+	}
+	sm := session.NewManager(st)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "plan="+r.Header.Get("X-Plan")+";cc="+r.Header.Get("costCenter"))
+	}))
+	t.Cleanup(upstream.Close)
+	route := store.Route{ID: "r", Name: "r", Enabled: true, Upstream: upstream.URL,
+		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/**"}}}},
+		Identity: &store.IdentityForward{Mechanism: "headers", Attributes: []store.IdentityAttr{
+			{Field: "plan", As: "X-Plan"}, {Field: "costCenter"},
+		}}}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+	rt := New(st, sm)
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+
+	rec := httptest.NewRecorder()
+	if _, err := sm.Issue(ctx, rec, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	call := func(withSession bool) string {
+		req, _ := http.NewRequest("GET", srv.URL+"/get", nil)
+		req.Header.Set("X-Plan", "enterprise")
+		if withSession {
+			req.AddCookie(rec.Result().Cookies()[0])
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		return string(body)
+	}
+	if got := call(true); got != "plan=premium;cc=B200" {
+		t.Fatalf("signed-in forwarding wrong: %q", got)
+	}
+	if got := call(false); got != "plan=;cc=" {
+		t.Fatalf("an anonymous request carried a tenant field, or the spoof survived: %q", got)
+	}
+}
+
 // TestIdentityForwardJWT: the jwt mechanism carries the selected attributes as
 // claims in an Authorization: Bearer token, purges an inbound Authorization
 // spoof, and writes nothing for an anonymous caller.

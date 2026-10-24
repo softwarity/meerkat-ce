@@ -28,6 +28,10 @@
   display: block;
   width: min(640px, 100%);
 }
+.fields {
+  display: block;
+  margin-top: 8px;
+}
 .hint {
   margin: 0 0 10px;
   color: var(--mat-sys-on-surface-variant);

@@ -1170,6 +1170,9 @@ export interface Tenant {
   // Group mode (RBAC-03), a per-tenant call: '' defaults to cumulative,
   // MULTIPLE cumulates every group's roles, SINGLE makes the member pick one.
   groupMode: string;
+  // The organisation's own fields' values (MODEL-03), by name. Written by root
+  // or an app-admin only: the services behind the gateway trust them.
+  fields?: Record<string, string>;
   // Audit: who created the tenant (id + display names, the latter GET-only).
   createdBy: string;
   // The current owner (TENANT-02): always set, transferable in the Danger zone,
@@ -1407,7 +1410,10 @@ export interface CurrentConfiguration {
 // it waited for (`ee-multi-tenant`) had no one left to write it.
 // A custom identity field's definition (Infra > Model). The values live on an
 // account; this is the shape a form asks for and a route may forward.
-export type UserFieldKind = 'text' | 'number' | 'date' | 'choice' | 'bool';
+// 'multichoice' holds several of its choices as one line, "FR,ES", in the
+// list's order; 'list' holds values typed freely, the same way, in the order
+// typed.
+export type UserFieldKind = 'text' | 'number' | 'date' | 'choice' | 'multichoice' | 'list' | 'bool';
 
 export interface UserFieldDef {
   name: string;
@@ -3167,8 +3173,22 @@ export class ApiService {
     return this.http.get<{ fields: UserFieldDef[] }>('/api/model/user-fields');
   }
 
-  saveUserFields(fields: UserFieldDef[]): Observable<{ fields: UserFieldDef[] }> {
-    return this.http.put<{ fields: UserFieldDef[] }>('/api/model/user-fields', {
+  // `routes` names the routes the change was carried to: a field added is
+  // ticked on every route that declares facts, a field removed leaves them.
+  saveUserFields(fields: UserFieldDef[]): Observable<{ fields: UserFieldDef[]; routes?: string[] }> {
+    return this.http.put<{ fields: UserFieldDef[]; routes?: string[] }>('/api/model/user-fields', {
+      fields,
+    });
+  }
+
+  // The same model for an organisation (MODEL-03): defined beside the
+  // account's, filled on the tenant's General screen.
+  tenantFields(): Observable<{ fields: UserFieldDef[] }> {
+    return this.http.get<{ fields: UserFieldDef[] }>('/api/model/tenant-fields');
+  }
+
+  saveTenantFields(fields: UserFieldDef[]): Observable<{ fields: UserFieldDef[]; routes?: string[] }> {
+    return this.http.put<{ fields: UserFieldDef[]; routes?: string[] }>('/api/model/tenant-fields', {
       fields,
     });
   }

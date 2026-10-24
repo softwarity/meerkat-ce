@@ -32,6 +32,13 @@ import (
 // SettingUserFields holds the definitions, gateway-wide.
 const SettingUserFields = "user_fields"
 
+// SettingTenantFields holds the ORGANISATION's definitions (MODEL-03): the
+// same kinds, the same rules, filled on a tenant instead of an account. What
+// an application wants to know about the caller's organisation - its plan, its
+// region, its contract number - is as much a fact about the caller as their
+// cost centre, and travels the same way.
+const SettingTenantFields = "tenant_fields"
+
 // The kinds a custom field may take. Small on purpose: each one is a widget in
 // the console, a validation here, and a promise about what an upstream
 // receives. A kind nobody asked for is three of those forever.
@@ -48,10 +55,21 @@ const (
 	FieldChoice = "choice"
 	// FieldBool is true or false, and travels as "true"/"false".
 	FieldBool = "bool"
+	// FieldMultiChoice is several of a list: the regions an organisation
+	// covers, the product lines a person sells. Stored and sent in a header
+	// or on a page as one line, "FR,ES", in the list's order; a JWT or an
+	// OIDC claim carries a real array. Which is why a choice of this kind
+	// may not hold a comma: it would be two values in a header.
+	FieldMultiChoice = "multichoice"
+	// FieldList is several values typed freely: contract references, aliases.
+	// The open sibling of FieldMultiChoice, travelling the same way - one
+	// line in a header or on a page, an array in a token - and with the same
+	// separator, so no value of it holds a comma.
+	FieldList = "list"
 )
 
 // UserFieldKinds is the closed list, named in every refusal.
-var UserFieldKinds = []string{FieldText, FieldNumber, FieldDate, FieldChoice, FieldBool}
+var UserFieldKinds = []string{FieldText, FieldNumber, FieldDate, FieldChoice, FieldMultiChoice, FieldList, FieldBool}
 
 // UserField is one custom field's definition, held in the settings.
 //
@@ -69,7 +87,8 @@ type UserField struct {
 	// Label is what the form shows. Empty falls back to the name.
 	Label string `json:"label,omitempty"`
 	Kind  string `json:"kind"`
-	// Choices is the list for FieldChoice, ignored otherwise.
+	// Choices is the list for FieldChoice and FieldMultiChoice, ignored
+	// otherwise.
 	Choices []string `json:"choices,omitempty"`
 }
 
@@ -107,10 +126,17 @@ func SanitizeUserFields(fields []UserField) ([]UserField, error) {
 			return nil, fmt.Errorf("field %q: kind %q is not allowed: %s",
 				f.Name, f.Kind, strings.Join(UserFieldKinds, ", "))
 		}
-		if f.Kind == FieldChoice {
+		if f.Kind == FieldChoice || f.Kind == FieldMultiChoice {
 			f.Choices = trimmedChoices(f.Choices)
 			if len(f.Choices) == 0 {
 				return nil, fmt.Errorf("field %q is a choice with nothing to choose from", f.Name)
+			}
+			if f.Kind == FieldMultiChoice {
+				for _, c := range f.Choices {
+					if strings.Contains(c, ",") {
+						return nil, fmt.Errorf("field %q: choice %q holds a comma, which separates the values of a multiple choice", f.Name, c)
+					}
+				}
 			}
 		} else {
 			f.Choices = nil
@@ -118,6 +144,25 @@ func SanitizeUserFields(fields []UserField) ([]UserField, error) {
 		out = append(out, f)
 	}
 	return out, nil
+}
+
+// DisjointFields refuses a name defined in both lists, the account's and the
+// organisation's. They travel in ONE namespace - a route names a field, and a
+// header or a claim carries it under that name - so `region` on both sides
+// would be two facts under one name, and which one an upstream received would
+// depend on nothing it can see. Lower-cased for the reason SanitizeUserFields
+// gives: these become header names.
+func DisjointFields(users, tenants []UserField) error {
+	taken := map[string]bool{}
+	for _, f := range users {
+		taken[strings.ToLower(f.Name)] = true
+	}
+	for _, f := range tenants {
+		if taken[strings.ToLower(f.Name)] {
+			return fmt.Errorf("field name %q is defined both on accounts and on tenants: a route forwards them under one name, so each name belongs to one list", f.Name)
+		}
+	}
+	return nil
 }
 
 func trimmedChoices(in []string) []string {
@@ -169,6 +214,21 @@ func ValidateUserValues(defs []UserField, values map[string]string) (map[string]
 			if !slices.Contains(f.Choices, v) {
 				return nil, fmt.Errorf("%s must be one of: %s", label(f), strings.Join(f.Choices, ", "))
 			}
+		case FieldMultiChoice:
+			picked, err := multiValue(f, v)
+			if err != nil {
+				return nil, err
+			}
+			if len(picked) == 0 {
+				continue
+			}
+			v = strings.Join(picked, ",")
+		case FieldList:
+			items := listValue(v)
+			if len(items) == 0 {
+				continue
+			}
+			v = strings.Join(items, ",")
 		case FieldBool:
 			if v != "true" && v != "false" {
 				return nil, fmt.Errorf("%s is true or false, not %q", label(f), v)
@@ -177,6 +237,57 @@ func ValidateUserValues(defs []UserField, values map[string]string) (map[string]
 		out[f.Name] = v
 	}
 	return out, nil
+}
+
+// multiValue reads a multiple choice, "ES, FR" or "FR,ES,FR", and answers it
+// in the LIST's order without repeats - one spelling per set, so the same
+// choices are the same header on every account and a diff says nothing moved.
+func multiValue(f UserField, v string) ([]string, error) {
+	held := map[string]bool{}
+	for p := range strings.SplitSeq(v, ",") {
+		if p = strings.TrimSpace(p); p == "" {
+			continue
+		}
+		if !slices.Contains(f.Choices, p) {
+			return nil, fmt.Errorf("%s takes values among: %s - not %q", label(f), strings.Join(f.Choices, ", "), p)
+		}
+		held[p] = true
+	}
+	var out []string
+	for _, c := range f.Choices {
+		if held[c] {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+// listValue reads a list as typed, "B12, A7,,B12", and answers it in the
+// order typed without blanks or repeats. Nothing to refuse: any text is a
+// value, and the comma is what separates them.
+func listValue(v string) []string {
+	var out []string
+	for p := range strings.SplitSeq(v, ",") {
+		if p = strings.TrimSpace(p); p != "" && !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// ArrayFields names the fields that hold several values - a multiple choice
+// or a list - in both lists: what a JWT or an OIDC claim carries as an array
+// rather than as a string.
+func ArrayFields(lists ...[]UserField) map[string]bool {
+	out := map[string]bool{}
+	for _, l := range lists {
+		for _, f := range l {
+			if f.Kind == FieldMultiChoice || f.Kind == FieldList {
+				out[f.Name] = true
+			}
+		}
+	}
+	return out
 }
 
 func label(f UserField) string {

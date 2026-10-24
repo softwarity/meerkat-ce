@@ -816,9 +816,19 @@ export class RouteEditorComponent {
   private readonly customRes = httpResource<{ fields: { name: string }[] }>(
     () => "/api/model/user-fields",
   );
-  protected readonly customFields = computed(() =>
-    (this.customRes.value()?.fields ?? []).map((f) => f.name),
+  // And the organisation's (MODEL-03), only where there are organisations to
+  // tell apart. One namespace with the account's - the model refuses a name
+  // on both lists - so they sit in the same pickers, marked.
+  private readonly tenantRes = httpResource<{ fields: { name: string }[] }>(
+    () => (this.me.multiTenant() ? "/api/model/tenant-fields" : undefined),
   );
+  protected readonly tenantFields = computed(
+    () => new Set((this.tenantRes.value()?.fields ?? []).map((f) => f.name)),
+  );
+  protected readonly customFields = computed(() => [
+    ...(this.customRes.value()?.fields ?? []).map((f) => f.name),
+    ...this.tenantFields(),
+  ]);
   protected readonly identityFields = computed(() => [
     ...IDENTITY_FIELDS,
     ...this.customFields(),
@@ -1294,7 +1304,8 @@ export class RouteEditorComponent {
     // A CUSTOM field (Infra > Model): its value is whatever the account
     // carries, so the reader's own is the honest sample. Without this the two
     // rows that are not built in showed an empty example, which reads as "this
-    // one sends nothing".
+    // one sends nothing". An organisation's field has no reader's own: the
+    // reader may be in none, or in several.
     return u?.fields?.[field] || "value";
   }
   // Everything that has to be true before the gateway will take this route.

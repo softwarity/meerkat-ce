@@ -1584,6 +1584,16 @@ type identityData struct {
 	// downstream they are the same kind of thing: one more fact about the
 	// caller, selected and renamed the same way.
 	Fields map[string]string
+	// TenantFields are the same for the session's organisation (MODEL-03).
+	// Kept apart rather than merged into Fields because they are read from
+	// another row; the model keeps the two lists' names disjoint, so a field
+	// name finds at most one of them.
+	TenantFields map[string]string
+	// Arrays names the custom fields holding several values (a multiple
+	// choice or a list): their value is one line, "FR,ES", in a header or on
+	// a page, and an array in a JWT or an OIDC claim. Read with the values,
+	// from the definitions.
+	Arrays map[string]bool
 	Roles  []string
 	// Memberships are the organisations this account is an ENABLED member of,
 	// whichever one the session is in: an access rule naming an organisation
@@ -1653,7 +1663,8 @@ func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityE
 		return identityEntry{}, false
 	}
 	d := identityData{UserID: u.ID, Username: u.Username, Fullname: u.Fullname,
-		Email: u.Email, Timezone: u.Timezone, Locale: u.Locale, Fields: u.Fields}
+		Email: u.Email, Timezone: u.Timezone, Locale: u.Locale, Fields: u.Fields,
+		Arrays: rt.arrayFields(req.Context())}
 	if ms, err := rt.st.ListUserTenants(req.Context(), u.ID); err == nil {
 		for _, m := range ms {
 			if m.Enabled {
@@ -1669,6 +1680,7 @@ func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityE
 		d.TenantID = tenantID
 		if t, err := rt.st.GetTenant(req.Context(), tenantID); err == nil {
 			d.Tenant = t.Name
+			d.TenantFields = t.Fields
 		}
 		if sess.GroupID != "" {
 			if g, err := rt.st.GetGroup(req.Context(), sess.GroupID); err == nil {
@@ -1810,8 +1822,36 @@ func userFieldValue(d identityData, field string) string {
 	}
 	// A custom field, last: a built-in name always wins, and the definition
 	// refuses a custom field that would shadow one - so this is reached only
-	// by a name the installation added.
-	return d.Fields[field]
+	// by a name the installation added, on the account or on its organisation.
+	if v, ok := d.Fields[field]; ok {
+		return v
+	}
+	return d.TenantFields[field]
+}
+
+// fieldClaim is a field's value as a token claim: what userFieldValue
+// answers, except that a multiple choice or a list becomes the array it is. A header
+// has no arrays; a claim does, and an application reading `regions` expects
+// to iterate it rather than to split a string.
+func fieldClaim(d identityData, field string) (any, bool) {
+	v := userFieldValue(d, field)
+	if v == "" {
+		return nil, false
+	}
+	if d.Arrays[field] {
+		return strings.Split(v, ","), true
+	}
+	return v, true
+}
+
+// arrayFields reads which custom fields hold several values, in both lists.
+// Asked when an identity is read, which the identity cache keeps for a few
+// seconds and forgets on any administrative write - a definition included.
+func (rt *Router) arrayFields(ctx context.Context) map[string]bool {
+	var users, tenants []store.UserField
+	_ = rt.st.GetSetting(ctx, store.SettingUserFields, &users)
+	_ = rt.st.GetSetting(ctx, store.SettingTenantFields, &tenants)
+	return store.ArrayFields(users, tenants)
 }
 
 // openTagRe matches the FIRST opening <tag ...> in the document (case-insensitive,
@@ -2801,7 +2841,7 @@ func identityClaims(cfg store.IdentityForward, routeName, issuer string, d ident
 			}
 			continue
 		}
-		if v := userFieldValue(d, a.Field); v != "" {
+		if v, ok := fieldClaim(d, a.Field); ok {
 			claims[name] = v
 		}
 	}

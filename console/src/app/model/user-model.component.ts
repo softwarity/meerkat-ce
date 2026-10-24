@@ -1,17 +1,15 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, WritableSignal } from '@angular/core';
+import { concat, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { ApiService, UserFieldDef, UserFieldKind } from '../api.service';
-import { FormFieldComponent } from '../shared/form-field.component';
+import { ApiService, UserFieldDef } from '../api.service';
+import { MeService } from '../me.service';
 import { LiveChangesService } from '../shared/live-changes.service';
+import { FieldDefsComponent } from './field-defs.component';
 
-// Infra > Model: the SHAPE of the objects this installation keeps, starting
-// with the account.
+// Infra > Model: the SHAPE of the objects this installation keeps - the
+// account, and with several organisations, the organisation (MODEL-03).
 //
 // Defining a field and filling it are two different acts by two different
 // people: one says "this installation records a cost centre", the other says
@@ -21,23 +19,11 @@ import { LiveChangesService } from '../shared/live-changes.service';
 // trusts.
 @Component({
   selector: 'app-user-model',
-  imports: [
-    FormFieldComponent,
-    MatButtonModule,
-    MatFormFieldModule,
-    MatIconModule,
-    MatInputModule,
-    MatSelectModule,
-    MatTooltipModule,
-  ],
+  imports: [FieldDefsComponent, MatButtonModule, MatIconModule],
   template: `
     <div class="banner">
       <h1 i18n="@@Model">Model</h1>
       <span class="grow"></span>
-      <button matButton (click)="add()">
-        <mat-icon>add</mat-icon>
-        <ng-container i18n="@@Add_a_field">Add a field</ng-container>
-      </button>
       <button matButton="filled" (click)="save()" [disabled]="saving() || !dirty()" i18n="@@Save">Save</button>
     </div>
 
@@ -47,67 +33,19 @@ import { LiveChangesService } from '../shared/live-changes.service';
         Your own facts about a person, such as an employee number or a cost centre. Fill them per
         account under Application, Users; a route can then forward them. None is mandatory.
       </p>
+      <app-field-defs [(fields)]="userFields" />
 
-      @for (f of fields(); track $index) {
-        <div class="field">
-          <div class="row">
-            <app-form-field class="name" i18n-label="@@Name" label="Name">
-              <input
-                matInput
-                spellcheck="false"
-                placeholder="employeeNumber"
-                [value]="f.name"
-                (input)="patch($index, { name: $any($event.target).value })"
-              />
-            </app-form-field>
-            <app-form-field class="label" i18n-label="@@Label" label="Label">
-              <input
-                matInput
-                [value]="f.label ?? ''"
-                (input)="patch($index, { label: $any($event.target).value })"
-              />
-            </app-form-field>
-            <mat-form-field class="kind">
-              <mat-label i18n="@@Type">Type</mat-label>
-              <mat-select [value]="f.kind" (selectionChange)="patch($index, { kind: $event.value })">
-                <mat-option value="text" i18n="@@Kind_text">Text</mat-option>
-                <mat-option value="number" i18n="@@Kind_number">Number</mat-option>
-                <mat-option value="date" i18n="@@Kind_date">Date</mat-option>
-                <mat-option value="choice" i18n="@@Kind_choice">Choice</mat-option>
-                <mat-option value="bool" i18n="@@Kind_bool">Yes / no</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <span class="grow"></span>
-            <button
-              matIconButton
-              (click)="remove($index)"
-              i18n-matTooltip="@@Remove"
-              matTooltip="Remove"
-              i18n-aria-label="@@Remove"
-              aria-label="Remove"
-            >
-              <mat-icon>close</mat-icon>
-            </button>
-          </div>
-
-          <!-- The list is what earns the type: it turns a cost centre into
-               data instead of three spellings of the same thing. -->
-          @if (f.kind === 'choice') {
-            <app-form-field class="choices" i18n-label="@@Choices" label="Choices">
-              <input
-                matInput
-                spellcheck="false"
-                placeholder="A100, B200, C300"
-                [value]="(f.choices ?? []).join(', ')"
-                (input)="setChoices($index, $any($event.target).value)"
-              />
-            </app-form-field>
-          }
-        </div>
-      } @empty {
-        <p class="empty" i18n="@@No_field_yet">
-          No field yet.
+      <!-- Only where there are organisations to tell apart: a single one
+           would carry facts about the installation, which is what the
+           gateway's own settings are for. -->
+      @if (multiTenant()) {
+        <h2 class="second" i18n="@@Tenant_fields">Tenant fields</h2>
+        <p class="hint" i18n="@@Tenant_model_hint">
+          Your own facts about a tenant, such as its plan or its region. Root and app-admins fill them
+          on the tenant's General screen; a route forwards them beside the account fields. A name
+          belongs to one list only.
         </p>
+        <app-field-defs [(fields)]="tenantFields" />
       }
 
       @if (error()) {
@@ -150,37 +88,14 @@ import { LiveChangesService } from '../shared/live-changes.service';
       letter-spacing: 0.05em;
       color: var(--mat-sys-on-surface-variant);
     }
-    .hint,
-    .empty {
+    .second {
+      margin-top: 32px;
+    }
+    .hint {
       color: var(--mat-sys-on-surface-variant);
       font-size: 0.85rem;
       line-height: 1.45;
       max-width: 78ch;
-    }
-    .empty {
-      margin: 24px 0;
-    }
-    .field {
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 12px;
-      padding: 12px 14px 0;
-      margin-bottom: 12px;
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .name,
-    .label {
-      width: 220px;
-    }
-    .kind {
-      width: 160px;
-    }
-    .choices {
-      width: 100%;
     }
     .warn {
       display: flex;
@@ -194,12 +109,17 @@ import { LiveChangesService } from '../shared/live-changes.service';
 export class UserModelComponent {
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
+  protected readonly multiTenant = inject(MeService).multiTenant;
 
-  protected readonly fields = signal<UserFieldDef[]>([]);
-  private readonly saved = signal<string>('[]');
+  protected readonly userFields = signal<UserFieldDef[]>([]);
+  protected readonly tenantFields = signal<UserFieldDef[]>([]);
+  private readonly savedUser = signal<string>('[]');
+  private readonly savedTenant = signal<string>('[]');
   protected readonly saving = signal(false);
   protected readonly error = signal('');
-  protected readonly dirty = computed(() => JSON.stringify(this.fields()) !== this.saved());
+  private readonly userDirty = computed(() => JSON.stringify(this.userFields()) !== this.savedUser());
+  private readonly tenantDirty = computed(() => JSON.stringify(this.tenantFields()) !== this.savedTenant());
+  protected readonly dirty = computed(() => this.userDirty() || this.tenantDirty());
 
   constructor() {
     this.load();
@@ -213,42 +133,62 @@ export class UserModelComponent {
 
   private load(): void {
     this.api.userFields().subscribe({
-      next: (r) => {
-        this.fields.set(r.fields ?? []);
-        this.saved.set(JSON.stringify(r.fields ?? []));
-      },
+      next: (r) => this.seed(this.userFields, this.savedUser, r.fields),
       error: () => undefined,
     });
+    if (this.multiTenant()) {
+      this.api.tenantFields().subscribe({
+        next: (r) => this.seed(this.tenantFields, this.savedTenant, r.fields),
+        error: () => undefined,
+      });
+    }
   }
 
-  protected add(): void {
-    this.fields.update((f) => [...f, { name: '', kind: 'text' as UserFieldKind }]);
+  private seed(list: WritableSignal<UserFieldDef[]>, saved: WritableSignal<string>, fields?: UserFieldDef[]): void {
+    list.set(fields ?? []);
+    saved.set(JSON.stringify(fields ?? []));
   }
 
-  protected remove(i: number): void {
-    this.fields.update((f) => f.filter((_, n) => n !== i));
-  }
-
-  protected patch(i: number, change: Partial<UserFieldDef>): void {
-    this.fields.update((f) => f.map((x, n) => (n === i ? { ...x, ...change } : x)));
-  }
-
-  // Typed as a line rather than as a repeater: a choice list is three or four
-  // short values, and a row of inputs to add one at a time is more machinery
-  // than the thing it holds.
-  protected setChoices(i: number, raw: string): void {
-    this.patch(i, { choices: raw.split(',').map((c) => c.trim()).filter(Boolean) });
-  }
-
+  // One Save for both lists, each sent only when it changed. The account's
+  // first: moving a name from it to the organisation's frees the name before
+  // the other list claims it.
   protected save(): void {
     this.error.set('');
     this.saving.set(true);
-    this.api.saveUserFields(this.fields()).subscribe({
-      next: (r) => {
-        this.fields.set(r.fields ?? []);
-        this.saved.set(JSON.stringify(r.fields ?? []));
+    // The routes the change was carried to, said rather than discovered: a
+    // field ticked on routes nobody opened is a change to what services get.
+    const moved = new Set<string>();
+    const calls = [
+      ...(this.userDirty()
+        ? [
+            this.api.saveUserFields(this.userFields()).pipe(
+              tap((r) => {
+                this.seed(this.userFields, this.savedUser, r.fields);
+                (r.routes ?? []).forEach((n) => moved.add(n));
+              }),
+            ),
+          ]
+        : []),
+      ...(this.tenantDirty()
+        ? [
+            this.api.saveTenantFields(this.tenantFields()).pipe(
+              tap((r) => {
+                this.seed(this.tenantFields, this.savedTenant, r.fields);
+                (r.routes ?? []).forEach((n) => moved.add(n));
+              }),
+            ),
+          ]
+        : []),
+    ];
+    concat(...calls).subscribe({
+      complete: () => {
         this.saving.set(false);
-        this.snack.open($localize`:@@Saved:Saved`, undefined, { duration: 2000 });
+        const names = [...moved].join(', ');
+        this.snack.open(
+          names ? $localize`:@@Saved_routes_updated:Saved. Routes updated: ${names}:NAMES:` : $localize`:@@Saved:Saved`,
+          undefined,
+          { duration: names ? 5000 : 2000 },
+        );
       },
       error: (e: { error?: { error?: string } }) => {
         this.saving.set(false);

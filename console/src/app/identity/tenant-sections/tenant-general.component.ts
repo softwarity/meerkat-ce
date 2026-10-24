@@ -10,11 +10,14 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService, BusinessAccess, Settings } from '../../api.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { BusinessAccessFormComponent } from '../business-access-form.component';
+import { UserFieldsFormComponent } from '../user-fields-form.component';
+import { MeService } from '../../me.service';
 import { TenantScope } from '../tenant-scope';
 import { TenantsService } from '../../shared/tenants.service';
 
-// The tenant's General section (a child route of the tenant layout): identity
-// and working hours, committed together with Save. The layout owns the tenant
+// The tenant's General section (a child route of the tenant layout): identity,
+// the organisation's own fields (MODEL-03) and working hours, committed
+// together with Save. The layout owns the tenant
 // signal - a save pushes the fresh copy back so the left nav's name follows.
 @Component({
   selector: 'app-tenant-general',
@@ -28,6 +31,7 @@ import { TenantsService } from '../../shared/tenants.service';
     MatSlideToggleModule,
     FormFieldComponent,
     BusinessAccessFormComponent,
+    UserFieldsFormComponent,
   ],
   styleUrl: './tenant-general.component.scss',
   templateUrl: './tenant-general.component.html',
@@ -37,6 +41,10 @@ export class TenantGeneralComponent {
   private readonly tenants = inject(TenantsService);
   private readonly snack = inject(MatSnackBar);
   protected readonly scope = inject(TenantScope);
+  // Root and the app-admins write an organisation's fields; its own
+  // administrators read them - the services behind the gateway trust them.
+  private readonly me = inject(MeService);
+  protected readonly fieldsReadonly = computed(() => !this.me.isAppAdmin());
 
   protected readonly saving = signal(false);
   private readonly settings = signal<Settings | null>(null);
@@ -46,6 +54,7 @@ export class TenantGeneralComponent {
   protected readonly enabled = signal(true);
   protected readonly description = signal('');
   protected readonly businessAccess = signal<BusinessAccess>({ inherited: true });
+  protected readonly fields = signal<Record<string, string>>({});
   // '' in the store means "default cumulative"; the select surfaces it as MULTIPLE.
   // Not edited here any more - the group mode moved to the Groups screen,
   // which is what it describes. It is still carried so a save round-trips the
@@ -64,7 +73,8 @@ export class TenantGeneralComponent {
       this.enabled() !== t.enabled ||
       this.description().trim() !== t.description ||
       this.groupMode() !== (t.groupMode || 'MULTIPLE') ||
-      JSON.stringify(this.businessAccess()) !== JSON.stringify(t.businessAccess)
+      JSON.stringify(this.businessAccess()) !== JSON.stringify(t.businessAccess) ||
+      JSON.stringify(sorted(this.fields())) !== JSON.stringify(sorted(t.fields ?? {}))
     );
   });
 
@@ -77,6 +87,7 @@ export class TenantGeneralComponent {
       this.description.set(t.description);
       this.groupMode.set(t.groupMode || 'MULTIPLE');
       this.businessAccess.set(t.businessAccess);
+      this.fields.set(t.fields ?? {});
     });
     this.api.settings().subscribe({ next: (s) => this.settings.set(s) });
   }
@@ -93,6 +104,7 @@ export class TenantGeneralComponent {
         description: this.description().trim(),
         groupMode: this.groupMode(),
         businessAccess: this.businessAccess(),
+        fields: this.fields(),
       })
       .subscribe({
         next: (saved) => {
@@ -114,4 +126,9 @@ export class TenantGeneralComponent {
         },
       });
   }
+}
+
+// Key order is not a change: the form rebuilds the object it edits.
+function sorted(m: Record<string, string>): [string, string][] {
+  return Object.entries(m).sort(([a], [b]) => a.localeCompare(b));
 }

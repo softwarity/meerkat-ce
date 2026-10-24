@@ -566,6 +566,15 @@ mat-selection-list .ui-toggle {
   align-items: center;
   gap: 6px;
 }
+/* Which list a custom field comes from (Infra > Model): an organisation's
+   travels beside the account's, and reads the same otherwise. */
+.field-origin {
+  font-size: 0.72rem;
+  color: var(--mat-sys-on-surface-variant);
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 6px;
+  padding: 0 6px;
+}
 /* On the field, in the same cell: the grid stacks them. */
 .field-row app-ee-lock {
   grid-area: 1 / 2;

@@ -84,7 +84,6 @@ export class AppComponent {
     this.api
       .createTenant({
         name: res.name,
-        description: res.description,
         groupMode: res.groupMode,
       })
       .subscribe({

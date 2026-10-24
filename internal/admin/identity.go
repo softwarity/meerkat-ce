@@ -880,6 +880,18 @@ func (a *API) createTenant(w http.ResponseWriter, r *http.Request, actor store.U
 			"group mode must be MULTIPLE, SINGLE, or empty (default cumulative)")
 		return
 	}
+	// Born with values only from somebody who may set them, like any later
+	// change: creating an organisation is not a way round who fills it.
+	fields, err := a.checkedTenantFields(r.Context(), t.Fields)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	t.Fields = fields
+	if err := tenantFieldsWrite(actor, nil, t.Fields); err != nil {
+		writeErr(w, http.StatusForbidden, err.Error())
+		return
+	}
 	t.ID = newID()
 	t.CreatedBy = actor.ID // audit: stamped once, never changed
 	// Every tenant has an owner from birth (the creator, root included) -
@@ -970,6 +982,17 @@ func (a *API) updateTenant(w http.ResponseWriter, r *http.Request, actor store.U
 	if t.GroupMode != "" && t.GroupMode != store.GroupModeMultiple && t.GroupMode != store.GroupModeSingle {
 		writeErr(w, http.StatusUnprocessableEntity,
 			"group mode must be MULTIPLE, SINGLE, or empty (default cumulative)")
+		return
+	}
+	if t.Fields, err = a.checkedTenantFields(r.Context(), t.Fields); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	// Compared with what the stored values would be once pruned the same way:
+	// a field removed from the model is not a change this person made.
+	prior, _ := a.checkedTenantFields(r.Context(), existing.Fields)
+	if err := tenantFieldsWrite(actor, prior, t.Fields); err != nil {
+		writeErr(w, http.StatusForbidden, err.Error())
 		return
 	}
 	if err := a.st.SaveTenant(r.Context(), t); err != nil {

@@ -28,6 +28,17 @@
   ></textarea>
 </app-form-field>
 
+<!-- The organisation's own fields (Infra > Model): nothing when none is
+     defined, read-only for its administrators. -->
+<app-user-fields-form
+  class="fields"
+  of="tenant"
+  [withWindow]="false"
+  [readonly]="fieldsReadonly()"
+  [fields]="fields()"
+  (fieldsChange)="fields.set($event)"
+/>
+
 <h3 class="sub">
   <ng-container i18n="@@Working_hours">Working hours</ng-container>
   <app-ee-lock

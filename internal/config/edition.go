@@ -57,6 +57,24 @@ func notOnCommunity(doc *Document) []string {
 	if hours {
 		out = append(out, "organisations' working hours (Enterprise)")
 	}
+	// The organisations' own fields (MODEL-03): the definitions and every
+	// value, together - a value without its definition would be dropped on
+	// the next save anyway, and a definition the image cannot fill is a form
+	// nobody sees.
+	tenantFields := false
+	if _, ok := doc.Settings[store.SettingTenantFields]; ok {
+		delete(doc.Settings, store.SettingTenantFields)
+		tenantFields = true
+	}
+	for i := range doc.Tenants {
+		if len(doc.Tenants[i].Fields) > 0 {
+			doc.Tenants[i].Fields = nil
+			tenantFields = true
+		}
+	}
+	if tenantFields {
+		out = append(out, "tenants' fields (Enterprise)")
+	}
 	kept := doc.AuthProviders[:0]
 	for _, p := range doc.AuthProviders {
 		if p.Kind == store.ProviderLDAP || p.Kind == store.ProviderSAML {

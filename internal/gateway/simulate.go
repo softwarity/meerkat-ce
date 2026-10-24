@@ -116,10 +116,11 @@ func isSpecRead(ctx context.Context) bool {
 // real traffic. The roles are expanded through the catalogue, as a session's.
 func (rt *Router) WithAgentCaller(ctx context.Context, user string, roles []string, tenantID, by, token string) context.Context {
 	d := identityData{UserID: "simulated", Username: user, Fullname: "Agent call", TenantID: tenantID,
-		Roles: rt.expandSimRoles(ctx, roles)}
+		Roles: rt.expandSimRoles(ctx, roles), Arrays: rt.arrayFields(ctx)}
 	if tenantID != "" {
 		if t, err := rt.st.GetTenant(ctx, tenantID); err == nil {
 			d.Tenant = t.Name
+			d.TenantFields = t.Fields
 		}
 	}
 	via := "mcp"

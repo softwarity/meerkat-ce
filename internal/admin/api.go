@@ -598,7 +598,8 @@ func (a *API) validateRoute(ctx context.Context, route store.Route) error {
 }
 
 // knownFields refuses a route naming a custom identity field this installation
-// has not defined.
+// has not defined - on an account or on an organisation (MODEL-03), which
+// share one namespace.
 //
 // gateway.Validate cannot ask: it is a pure function on a route, used by the
 // tests and by the agent, and handing it the settings would make every caller
@@ -609,8 +610,7 @@ func (a *API) validateRoute(ctx context.Context, route store.Route) error {
 // Here there is a store and a person, which is exactly where a typo should be
 // caught rather than discovered by a service that never received its header.
 func (a *API) knownFields(ctx context.Context, r store.Route) error {
-	var defs []store.UserField
-	_ = a.st.GetSetting(ctx, store.SettingUserFields, &defs)
+	defs := append(a.fieldDefs(ctx, store.SettingUserFields), a.fieldDefs(ctx, store.SettingTenantFields)...)
 	known := func(name string, builtin []string) error {
 		if slices.Contains(builtin, name) {
 			return nil

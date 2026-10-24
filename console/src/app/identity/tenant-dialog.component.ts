@@ -8,15 +8,15 @@ import { FormFieldComponent } from '../shared/form-field.component';
 
 export interface TenantDialogResult {
   name: string;
-  description: string;
   groupMode: string;
 }
 
-// New tenant: its name, the human description shown in the rail drawer, and the
-// group mode (RBAC-03). The mode is offered here on purpose - it is a founding
-// choice for how the tenant's groups combine, and burying it in the edit page
-// would leave the feature undiscovered. Resolves to the values on confirm,
-// undefined on cancel.
+// New tenant: its name and the group mode (RBAC-03), nothing else. The mode is
+// offered here on purpose - it is a founding choice for how the tenant's
+// groups combine, and burying it in the edit page would leave the feature
+// undiscovered. The description is not: it can wait for the General screen,
+// where the rest of the organisation is filled. Resolves to the values on
+// confirm, undefined on cancel.
 @Component({
   selector: 'app-tenant-dialog',
   imports: [
@@ -53,14 +53,6 @@ export interface TenantDialogResult {
           cdkFocusInitial
         />
       </app-form-field>
-      <app-form-field i18n-label="@@Description" label="Description">
-        <textarea
-          matInput
-          rows="2"
-          [value]="description()"
-          (input)="description.set($any($event.target).value)"
-        ></textarea>
-      </app-form-field>
       <mat-form-field class="mode">
         <mat-label i18n="@@Group_mode">Group mode</mat-label>
         <mat-select [value]="groupMode()" (selectionChange)="groupMode.set($event.value)">
@@ -83,7 +75,6 @@ export interface TenantDialogResult {
 export class TenantDialogComponent {
   private readonly ref = inject(MatDialogRef<TenantDialogComponent, TenantDialogResult>);
   protected readonly name = signal('');
-  protected readonly description = signal('');
   protected readonly groupMode = signal('MULTIPLE');
 
   protected readonly canConfirm = computed(() => this.name().trim().length > 0);
@@ -92,7 +83,6 @@ export class TenantDialogComponent {
     if (!this.canConfirm()) return;
     this.ref.close({
       name: this.name().trim(),
-      description: this.description().trim(),
       groupMode: this.groupMode(),
     });
   }

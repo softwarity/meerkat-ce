@@ -170,7 +170,7 @@ func (rt *Router) OIDCClaims(cfg store.IdentityForward, p Person) map[string]any
 			}
 			continue
 		}
-		if v := userFieldValue(p.d, c.Field); v != "" {
+		if v, ok := fieldClaim(p.d, c.Field); ok {
 			out[c.Name] = v
 		}
 	}

@@ -501,6 +501,9 @@
                     [matTooltip]="frozen(field) ? frozenTip() : ''"
                     (change)="toggleAttr(field, $event.checked)"
                   >{{ field }}</mat-checkbox>
+                  @if (tenantFields().has(field)) {
+                    <span class="field-origin" i18n="@@Tenant_field_tag">tenant</span>
+                  }
                   @if (frozen(field)) {
                     <app-ee-lock
                       feature="multi-tenant"
@@ -1355,7 +1358,7 @@
                 [disabled]="frozen(field)"
                 [matTooltip]="frozen(field) ? frozenTip() : ''"
                 (change)="setUserField(field, $event.checked)"
-              >{{ field }}</mat-checkbox>
+              >{{ field }}@if (tenantFields().has(field)) { <span class="field-origin" i18n="@@Tenant_field_tag">tenant</span>}</mat-checkbox>
               @if (frozen(field)) {
                 <app-ee-lock
                   feature="multi-tenant"

@@ -50,6 +50,12 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     where: '/tenants',
     whereLabel: $localize`:@@Tenants:Tenants`,
   },
+  'MODEL-03': {
+    label: $localize`:@@EE_MODEL_03:Tenant fields`,
+    what: $localize`:@@EE_MODEL_03_what:Your own facts about each tenant, such as its plan or its region, filled by root or an app-admin and forwarded by a route like an account field.`,
+    where: '/infra/model',
+    whereLabel: $localize`:@@Model:Model`,
+  },
   'TENANT-04': {
     label: $localize`:@@EE_TENANT_04:Working hours`,
     what: $localize`:@@EE_TENANT_04_what:Refuse access outside declared hours - gateway-wide, per organisation, per account, per member, or per group in exclusive mode - the most precise winning, and end a session when they close.`,
