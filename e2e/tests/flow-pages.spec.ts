@@ -113,9 +113,15 @@ test('flow-profile-apps: the hub links back to the reachable applications', asyn
   const page = await context.newPage();
   await page.goto(DATA_URL + '/profile');
   // The seeded demo routes: /demo (public UI) and /secure (authenticated UI)
-  // are both reachable for a signed-in user.
-  await expect(page.locator('.apps a[href="/demo"]')).toBeVisible();
-  await expect(page.locator('.apps a[href="/secure"]')).toBeVisible();
+  // are both reachable for a signed-in user: offered in the Applications list.
+  const apps = page.locator('select.apps-select');
+  await expect(apps).toBeVisible();
+  await expect(apps.locator('option[value="/demo"]')).toHaveCount(1);
+  await expect(apps.locator('option[value="/secure"]')).toHaveCount(1);
+  // Chosen without the pointer, the Open button beside it goes there.
+  await apps.selectOption('/demo');
+  await page.locator('#apps-open').click();
+  await expect(page).toHaveURL(/\/demo/);
   await context.close();
 });
 

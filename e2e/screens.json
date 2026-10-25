@@ -384,6 +384,16 @@
       ]
     },
     {
+      "path": "/tenants/{tenantId}/notifications",
+      "module": "./identity/tenant-sections/tenant-notifications.component",
+      "title": "Notifications",
+      "allowed": [
+        "root",
+        "tenant-admin"
+      ],
+      "edition": "ee"
+    },
+    {
       "path": "/tenants/{tenantId}/rules",
       "module": "./identity/tenant-sections/tenant-rules.component",
       "title": "Group rules",
@@ -455,6 +465,16 @@
           "why": "the route filter names routes, which only an infra admin may list; the rows show route ids instead (TEST-PLAN: to decide)"
         }
       ]
+    },
+    {
+      "path": "/data-plane/notifications",
+      "module": "./notifications/notifications-page.component",
+      "title": "Notifications",
+      "allowed": [
+        "root",
+        "app-admin"
+      ],
+      "edition": "ee"
     },
     {
       "path": "/data-plane/metrics",

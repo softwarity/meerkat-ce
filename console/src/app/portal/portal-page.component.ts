@@ -15,6 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, NotifyPage, PortalEntry, PortalSubEntry, PortalConfig, Route, Settings } from '../api.service';
+import { MeService } from '../me.service';
 import { EntryKind, ModuleEditorComponent, ModuleDraft, ModuleFormData } from './module-editor.component';
 import { LiveChangesService } from '../shared/live-changes.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
@@ -51,6 +52,7 @@ import { EeLockComponent } from '../shared/ee-lock.component';
 })
 export class PortalPageComponent {
   private readonly api = inject(ApiService);
+  private readonly me = inject(MeService);
   private readonly snack = inject(MatSnackBar);
 
   // The module editor lives in a drawer on this page (not a modal): open it with
@@ -280,12 +282,14 @@ export class PortalPageComponent {
 
   private load(): void {
     this.loadRoutes();
-    // Root's switch for the whole feature; refused (an image without it, a
-    // reader who may not see it) is off.
-    this.api.notifySettings().subscribe({
-      next: (n) => this.notifyOn.set(n.enabled),
-      error: () => this.notifyOn.set(false),
-    });
+    // Root's switch for the whole feature; refused (a reader who may not see
+    // it) is off. The community image has no notifications: nothing to ask.
+    if (this.me.enterprise()) {
+      this.api.notifySettings().subscribe({
+        next: (n) => this.notifyOn.set(n.enabled),
+        error: () => this.notifyOn.set(false),
+      });
+    }
     this.api.searchIcons('notifications').subscribe((r) => (this.bell = r.find((i) => i.name === 'notifications')?.svg ?? ''));
     this.api.branding().subscribe({
       next: (b) => this.brandLogo.set(b.logo || ''),
